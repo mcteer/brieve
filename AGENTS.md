@@ -1,0 +1,176 @@
+# AGENTS.md
+
+Instructions for AI coding agents working in this repository. Read this fully before
+making any change. Human contributors should read [CONTRIBUTING.md](CONTRIBUTING.md);
+this file is the condensed, imperative version for agents.
+
+## What this project is
+
+A governed runtime for AI agents that operate infrastructure products (Terraform,
+Vault, VCS) on behalf of people. Its guarantees are structural: per-task authority
+that cannot exceed the requesting human, fail-closed policy enforcement on every tool
+call, and an append-only audit trail joined by a single correlation ID. Code that
+compiles and passes unit tests can still break these guarantees — most of this file
+exists to prevent that.
+
+## Non-negotiable rules
+
+1. **No implementation without an approved spec.** Feature work follows the
+   spec-driven workflow below. If asked to "just add" a feature, start the spec.
+2. **Never weaken enforcement.** Enforcement code that errors must deny. Never convert
+   a deny to an allow, never add an `except` that falls through to permitted, never
+   make a hook optional or skippable.
+3. **Never write secrets anywhere.** Not in code, config, tests, fixtures, commit
+   messages, logs, or PR bodies — including plausible-looking fake ones. Use the test
+   harness's credential factories.
+4. **Never edit sealed core without an approved spec and a security review request.**
+   Sealed core: identity flows, hook engine, registries, audit schema, durability,
+   adapters.
+5. **Never hand-edit generated spec artifacts.** Files under `specs/` are produced by
+   the Spec Kit commands; to change one, re-run its stage.
+6. **Never add a core dependency casually.** The dependency tree is audited by
+   regulated operators. Adding one requires justification in the PR and is a
+   legitimate reason for rejection.
+7. **Stop and ask** when a task requires any of the above, or when the constitution and
+   the request conflict. Do not work around the conflict.
+
+## Read before planning
+
+1. `.specify/memory/constitution.md` — ten principles; every plan is checked against
+   them.
+2. `docs/glossary.md` — terms here are precise (*adapter*, *provider*, *capability
+   pack*, *native tool*, *ceiling*, *entitlement mirroring*). Use them exactly.
+3. `docs/adr/` — the authoritative decision record. If a request contradicts an
+   Accepted ADR, say so; the fix is a superseding ADR, not code that disagrees.
+4. `docs/development/testing.md` — before writing any test.
+
+## Workflow
+
+Feature or behavior change — run in order, never skip:
+
+```
+/speckit.specify   → what and why (never how); declare R-requirements and ADRs touched
+/speckit.clarify   → resolve open questions before planning
+/speckit.plan      → how; begins with the Constitution Check — a failing check stops here
+/speckit.tasks     → ordered task list
+/speckit.analyze   → cross-artifact consistency; principle findings block implementation
+/speckit.implement → only now write code, against the analyzed task list
+```
+
+Bug fixes and trivial changes (typos, comments, doc clarity) skip the spec: fix, add a
+regression test, open a PR linking the issue.
+
+The spec PR merges before the implementation PR opens. Branch names bind them:
+`spec/NNN-short-name`, then `feat/NNN-short-name` with the same NNN.
+
+## Commands
+
+```bash
+uv sync              # install/refresh dependencies
+make check           # lint + typecheck + unit tests — run before every commit
+make conformance     # conformance suite — required for adapter/provider changes
+make test-full       # PR-tier tests: integration, scenario, fault injection, adversarial
+make dev-up          # local stack (dev identity fabric, Postgres, collector, harness)
+pre-commit run -a    # formatting and hygiene
+```
+
+Run `make check` before declaring any task complete. Run `make conformance` if you
+touched an adapter, a provider, or anything in sealed core. Do not report success on
+work you have not verified.
+
+## Repository layout
+
+| Path | What it is | Rules |
+| --- | --- | --- |
+| `src/core/` | Framework-agnostic governed core | Sealed. Never imports an agent framework |
+| `src/adapters/` | Bindings to agent frameworks | Sealed. Glue only — four mappings, nothing else |
+| `src/surfaces/` | MCP, API, CLI | Sealed. All four transports share one authorization core |
+| `portal/` | Web UI (TypeScript) | Thin client — no business logic, orchestration, or model calls |
+| `packs/` | Capability packs (product knowledge) | Extension point. Tools, skills, workflows, evals |
+| `hooks/` | Hook implementations | Extension point. Enforcement code — highest review bar |
+| `providers/` | Registry/Gateway/Eval/Durability/Observability | Extension point. Ship with conformance tests |
+| `specs/` | Spec Kit artifacts | Generated. Never hand-edit |
+| `.specify/` | Constitution, templates, presets | Governed. Constitution changes need security review |
+| `docs/adr/` | Decision records | Append-only. Supersede, never edit |
+| `tests/harness/` | Fakes and assertion helpers | Public API under the semver promise |
+| `.github/` | PR template, issue forms, workflows | Use the templates verbatim — do not improvise a PR description |
+
+## Code conventions
+
+- **Python**: fully typed; Pydantic models at every boundary; validation fails loudly,
+  never coerces. **TypeScript** (portal): strict, no `any`.
+- **Layering**: core never imports a framework; adapters import core. Writing logic in
+  an adapter means it belongs in core — move it.
+- **Errors**: raise typed domain exceptions; include the correlation ID; never swallow.
+  User-facing messages say what was denied without disclosing what the user may not
+  see.
+- **Conventional Commits** with class scopes: `feat(pack):`, `fix(core):`,
+  `docs(adr):`. Every commit signed off (`git commit -s`).
+
+## Governance patterns — apply to every change
+
+- **Propagate the correlation ID** through every new code path. It joins prompt → hook
+  decision → tool call → product run → audit entry. Dropping it breaks attestation.
+- **Emit spans for hook decisions**; standard OTel only, no vendor SDKs in core.
+- **Log references, never secret values.** Hashes and metadata are fine; values are not
+  — including in error messages and traces.
+- **Fail closed**: every `except` around policy, identity, hook, or audit code denies.
+  Write the test that proves it.
+- **Side effects are idempotent and fenced**: stable side-effect key, safe to retry;
+  resumption re-observes outcomes rather than re-executing them.
+- **No standing credentials**: authority is manufactured per task and expires. A design
+  needing a long-lived credential needs an ADR.
+- **Scopes only narrow.** Never widen a scope in a delegation chain or handoff.
+- **Tools go through the registry.** Never call a product API directly from agent code;
+  transport (MCP vs native) follows the exists/mature/supported test.
+- **Keep schemas terse.** Tool schemas and prompts consume context budget; deferred
+  disclosure is the default.
+
+## Testing
+
+Read `docs/development/testing.md` first. The rule that matters most:
+
+> **Tests are deterministic. Evals are statistical. Never mix them.**
+
+Never call a live model in a test — use `stub_model` or `scripted_agent`. Never
+`sleep()` — advance `frozen_clock`. Never assert on model wording — assert on
+structure and behavior.
+
+Every enforcement test asserts four things: the decision, the audit record, the absence
+of side effects, and the absence of leaked secret values. Use the helpers
+(`assert_denied_closed`, `assert_audit_chain`, `assert_correlated`,
+`assert_scope_narrowed`, `assert_no_secret_values`).
+
+Hook changes require four cases: allows in scope, denies out of scope, **denies on
+internal error**, and runs in governance order. Pack changes require their eval suites
+(golden tasks, must-deny, must-decline, citation accuracy).
+
+## Pull requests and issues
+
+**Read `.github/PULL_REQUEST_TEMPLATE.md` and fill every required section** — governing
+spec or issue, contribution class, constitution impact, testing, the governance
+checklist, and docs/compatibility. "None" and "N/A" are acceptable answers; blank is
+not. Do not write a PR description from scratch: the template is the required format,
+and reviewers check it section by section.
+
+When opening an issue, use the matching form in `.github/ISSUE_TEMPLATE/` —
+`bug_report.yml` or `feature_request.yml`. Blank issues are disabled; supply every
+required field rather than filing a free-form report.
+
+Keep the change scoped to one spec or one fix. Update docs in the same PR as the
+behavior change; add a changelog entry for user-visible changes; add new terms to
+`docs/glossary.md`.
+
+## When to stop and ask
+
+Stop and surface the question rather than proceeding if:
+
+- The request conflicts with the constitution, an Accepted ADR, or a rule above.
+- The change would touch sealed core, identity, hooks, or the audit schema without a
+  spec.
+- You cannot satisfy a requirement without a standing credential, a widened scope, or
+  an allow-on-error path.
+- The correct behavior is genuinely ambiguous and the wrong guess would be a security
+  property rather than a style choice.
+- Tests fail in a way you do not understand. Do not disable, skip, or loosen a test to
+  make a build pass — a failing governance test is information, not an obstacle.
