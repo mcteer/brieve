@@ -1,0 +1,144 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: ["type/bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Is this a security vulnerability?** Stop — do not file it here. Follow
+        [SECURITY.md](../blob/main/SECURITY.md) and report privately.
+
+        **Before filing**, search existing issues. Redact everything you paste:
+        never include real credentials, real infrastructure identifiers, customer
+        data, or raw audit records.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: This is not a security vulnerability
+          required: true
+        - label: I searched existing issues and discussions
+          required: true
+        - label: I have redacted credentials, identifiers, and customer data from everything below
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Harness version
+      description: Output of `harness version`
+      placeholder: "1.4.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Core (identity, hooks, policy, durability, audit)
+        - Adapter
+        - Surface — MCP
+        - Surface — API
+        - Surface — CLI
+        - Portal / web UI
+        - Capability pack
+        - Provider (registry/gateway/eval/durability/observability)
+        - Installer / upgrade
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Deployment profile
+      options:
+        - Lean
+        - Federated
+        - Local development (`make dev-up`)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: substrate
+    attributes:
+      label: Substrate
+      options:
+        - Nomad enclave
+        - Kubernetes
+        - Local development
+    validations:
+      required: true
+
+  - type: dropdown
+    id: connectivity
+    attributes:
+      label: Connectivity tier
+      options:
+        - Connected
+        - Restricted (allowlisted proxy egress)
+        - Air-gapped
+    validations:
+      required: true
+
+  - type: input
+    id: components
+    attributes:
+      label: Adapter and pack versions
+      description: Relevant pinned versions — adapter, capability packs, provider implementations
+      placeholder: "pydantic-adapter 1.4.2; terraform-pack 2.1.0; vault-pack 1.8.3"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps. A failing test case is the ideal reproduction.
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+
+  - type: input
+    id: correlation
+    attributes:
+      label: Correlation ID
+      description: >
+        Required for anything involving governance behavior — denials, approvals,
+        scoping, audit. Without it, hook decisions usually cannot be reconstructed.
+      placeholder: "01J8F3K…"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: >
+        Redacted logs, hook decisions, or stack traces. Paste text, not screenshots.
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Workarounds found, when it started, whether it is intermittent.

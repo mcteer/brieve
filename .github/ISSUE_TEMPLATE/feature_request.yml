@@ -1,0 +1,89 @@
+name: Feature request
+description: Propose new functionality or a behavior change
+labels: ["type/feature", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature work here begins as a **specification**, not code — see
+        [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md). This issue is where the
+        problem gets agreed on; the spec is where the solution does.
+
+        If your idea would change an architectural decision, say so — it is an
+        **ADR** conversation, and the discussion will move there.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        Who is blocked, and what are they trying to accomplish? Describe the problem
+        before any solution — proposals that start from a solution are hard to
+        evaluate and often solve something narrower than the real need.
+      placeholder: >
+        A platform engineer wants to … but currently has to … because …
+    validations:
+      required: true
+
+  - type: textarea
+    id: existing
+    attributes:
+      label: Why existing extension points don't suffice
+      description: >
+        The platform is designed to extend through hooks, capability packs, policy
+        bundles, prompt overlays, and provider implementations. Which of these did
+        you consider, and why doesn't it work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Optional. If you have one in mind, sketch it — but the problem above matters more.
+
+  - type: dropdown
+    id: class
+    attributes:
+      label: Likely contribution class
+      description: Your best guess; maintainers will confirm. See CONTRIBUTING.md.
+      options:
+        - Capability pack content
+        - Hook
+        - Provider implementation
+        - Policy bundle
+        - Portal / UI
+        - Tool registration (MCP server or native tool)
+        - Sealed core (identity, hooks, registries, audit, durability, adapters)
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: architecture
+    attributes:
+      label: Architectural impact
+      options:
+        - label: >
+            This may conflict with, or require changing, an Accepted decision in
+            `docs/adr/` — I've noted which one below
+        - label: This may require a constitutional amendment
+
+  - type: textarea
+    id: adr
+    attributes:
+      label: Affected decisions
+      description: If you checked either box above, which ADRs or principles, and how?
+
+  - type: dropdown
+    id: participation
+    attributes:
+      label: Would you like to write the spec?
+      description: >
+        No obligation — proposing the problem is a real contribution on its own.
+      options:
+        - "Yes, I'd like to write it"
+        - "I'd like to help, with guidance"
+        - "No — proposing only"
+    validations:
+      required: true
