@@ -39,8 +39,26 @@
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*Source of truth: [`.specify/memory/constitution.md`](../../.specify/memory/constitution.md).*
+*A failing gate stops planning — redesign or withdraw the spec; do not proceed to research.*
 
-[Gates determined based on constitution file]
+Mark each principle **Pass** / **Fail** / **N/A** (with a one-line note). **Fail** on any
+implicated principle blocks this plan.
+
+| Principle | Verdict | Notes |
+| --- | --- | --- |
+| I — Build Glue Only | | |
+| II — Total Interception; One Governed Tool Layer | | |
+| III — Fail-Closed, In-Process Enforcement | | |
+| IV — Zero Standing Credentials; Authority Per Task | | |
+| V — Sealed Core, Versioned Seams | | |
+| VI — Lean by Default | | |
+| VII — Anti-Fragmentation | | |
+| VIII — Eval-Gated Promotion; Pinned vs Fresh | | |
+| IX — Evidence Over Claims | | |
+| X — The Decision Record Governs | | |
+
+**Gate result**: [ PASS — proceed to Phase 0 | FAIL — stop ]
 
 ## Project Structure
 
