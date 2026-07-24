@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+
+# Spec Kit / AI coding agent local command directories (per-developer; .specify/ is committed)
+.claude/
+.cursor/
+.windsurf/
+.gemini/
+.github/agents/
+.github/prompts/
+.github/skills/
+
+# Python / tooling (future)
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+*.egg-info/
+
+# Node / portal (future)
+node_modules/
+.next/
+.turbo/
+
+# Env and local secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Editor
+*.swp
+*.swo
+.idea/
+*.iml

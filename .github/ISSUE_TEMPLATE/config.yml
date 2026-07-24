@@ -1,0 +1,22 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/OWNER/REPO/security/advisories/new
+    about: >
+      Never file vulnerabilities as public issues. Report privately here, or by
+      email per SECURITY.md. This includes anything that bypasses governance,
+      amplifies scope, crosses a tenant boundary, tampers with audit, or exposes
+      credentials.
+
+  - name: Design question or proposal
+    url: https://github.com/OWNER/REPO/discussions
+    about: >
+      Open-ended questions, architecture discussions, and "is this the right
+      approach" belong in Discussions. Feature requests with a concrete problem
+      statement can use the form above.
+
+  - name: Documentation
+    url: https://github.com/OWNER/REPO/tree/main/docs
+    about: >
+      Read the constitution, glossary, ADRs, and contributing guide before filing —
+      many questions are answered there, and terms used here are precise.
