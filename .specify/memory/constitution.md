@@ -6,8 +6,8 @@ Sync Impact Report
   per-transport auth flows and scenario detail delegated to cited ADRs
 - Authority: docs/adr/ — where this document conflicts with a later Accepted ADR, the
   ADR wins and this document MUST be amended in the same change
-- Propagation pending: ⚠ plan-template.md (Constitution Check) · ⚠ spec-template.md
-  (traceability section) · ⚠ tasks-template.md (gate task types)
+- Propagation: plan-template.md (Constitution Check I–X) · spec-template.md
+  (Traceability) · tasks-template.md (gate task types) — synced 2026-07-24
 -->
 
 # Enterprise Agent Harness Constitution

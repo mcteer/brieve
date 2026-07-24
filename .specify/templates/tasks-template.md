@@ -19,6 +19,26 @@ description: "Task list template for feature implementation"
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
 - Include exact file paths in descriptions
 
+## Gate Task Types *(mandatory when applicable)*
+
+<!--
+  When the feature touches enforcement, adapters, providers, packs, or sealed core,
+  the task list MUST include explicit gate tasks of the types below. Omit a type
+  only when the feature genuinely does not implicate it — say so in Notes.
+-->
+
+| Gate type | When required | What the task must prove |
+| --- | --- | --- |
+| **Fail-closed** | Any enforcement, identity, hook, policy, or audit path | Denial on internal error; no allow-on-exception path |
+| **Conformance** | Adapters, providers, sealed-core seams, transport surfaces | Shared suite scenarios for the touched seam pass |
+| **Correlation / evidence** | New code paths that participate in a run | Correlation ID propagates; audit/span join is walkable |
+| **Eval** | Packs, prompts/skills, models, policies | Relevant must-deny / must-decline / golden / citation gates |
+| **No-secret-leak** | Any path that handles credentials or tool results | Assertions that secret values never appear in logs, spans, audit, fixtures |
+
+Tag gate tasks in the list with a prefix, e.g. `[GATE:fail-closed]`, so reviewers can
+scan for them. Place gate tasks in the phase that delivers the behavior they guard
+(usually Foundational or the implicated user story), not only in Polish.
+
 ## Path Conventions
 
 - **Single project**: `src/`, `tests/` at repository root
