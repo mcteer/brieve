@@ -8,6 +8,21 @@
 
 **Input**: User description: "$ARGUMENTS"
 
+## Traceability *(mandatory)*
+
+<!--
+  Every feature spec MUST declare which mandated requirements (R1–R17) and ADRs
+  it implements or touches, plus its evidence class where compliance-relevant.
+  Use "None" / "N/A" when nothing in a row applies — blank is not acceptable.
+  Cite ADRs as ADR-NNNN. Prefer the Accepted ADR over superseded ones.
+-->
+
+| Field | Value |
+| --- | --- |
+| **Requirements (R1–R17)** | [e.g., R7, R12 — or "None implicated"] |
+| **ADRs touched** | [e.g., ADR-0006, ADR-0009 — or "None"] |
+| **Evidence class** | [e.g., none / operational / attestation-relevant — or "N/A"] |
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
