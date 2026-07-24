@@ -312,6 +312,11 @@ releasable, linear history via squash-merge.
   feature backport.
 - **Keeping current**: rebase on `main` rather than merging it in; force-push to your own
   branch freely, but re-request review afterward.
+- **Delete the branch on merge.** Once a PR is successfully merged, delete its head
+  branch on the remote (and locally if you still have it). Squash-merge via
+  `gh pr merge --squash --delete-branch` is the preferred path; if you merge another
+  way, delete the branch immediately afterward. Stale feature branches are noise —
+  history lives in `main`.
 
 ## Testing expectations
 
@@ -402,6 +407,8 @@ hide signal from everyone.
    will route your PR if it isn't obvious — say in the description what you believe it
    touches.
 6. Re-request review after force-pushes.
+7. After merge, delete the head branch (remote and local). Do not leave merged branches
+   around — see [Branching](#branching).
 
 Maintainers aim to acknowledge new PRs within a few business days. A redirect into the
 spec process is a normal outcome for code-first feature PRs, not a rejection of the idea.
