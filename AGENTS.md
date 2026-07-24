@@ -61,7 +61,9 @@ Bug fixes and trivial changes (typos, comments, doc clarity) skip the spec: fix,
 regression test, open a PR linking the issue.
 
 The spec PR merges before the implementation PR opens. Branch names bind them:
-`spec/NNN-short-name`, then `feat/NNN-short-name` with the same NNN.
+`spec/NNN-short-name`, then `feat/NNN-short-name` with the same NNN. After any PR
+merges successfully, **delete its head branch** on the remote (and locally if present)
+— prefer `gh pr merge --squash --delete-branch`. Do not leave merged branches around.
 
 ## Commands
 
@@ -160,6 +162,11 @@ required field rather than filing a free-form report.
 Keep the change scoped to one spec or one fix. Update docs in the same PR as the
 behavior change; add a changelog entry for user-visible changes; add new terms to
 `docs/glossary.md`.
+
+**Always delete the PR branch after a successful merge** (remote and local). Prefer
+`gh pr merge --squash --delete-branch`. If the merge was done without deleting the
+branch, delete it immediately afterward. Confirm with `git fetch --prune` / `gh` that
+the remote head is gone before declaring the merge complete.
 
 ## When to stop and ask
 
