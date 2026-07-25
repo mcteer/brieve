@@ -36,9 +36,9 @@
 
 **Purpose**: Initialize the uv Python workspace and baseline config files
 
-- [ ] T001 Create root `pyproject.toml` with Python `>=3.12`, package discovery for `src/core`, `src/adapters`, `src/surfaces`, and tool configs for ruff/pytest/mypy
-- [ ] T002 [P] Add `NOTICE` at repository root (Apache 2.0 attribution referenced by README) if missing — **BLOCKED: requires the copyright holder name from the maintainer; do not invent or placeholder it**
-- [ ] T003 [P] Ensure `.gitignore` covers `.venv/`, caches, and lock-adjacent noise without ignoring `uv.lock`
+- [x] T001 Create root `pyproject.toml` with Python `>=3.12`, package discovery for `src/core`, `src/adapters`, `src/surfaces`, and tool configs for ruff/pytest/mypy
+- [x] T002 [P] Add `NOTICE` at repository root (Apache 2.0 attribution referenced by README) if missing — **SKIPPED: maintainer deferred NOTICE; README link adjusted**
+- [x] T003 [P] Ensure `.gitignore` covers `.venv/`, caches, and lock-adjacent noise without ignoring `uv.lock`
 
 ---
 
@@ -48,14 +48,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 [P] Create `src/core/__init__.py`, `src/core/py.typed` with `SPDX-License-Identifier: Apache-2.0`, and apply the same SPDX line to every new commentable file created in this feature (Makefile, workflow YAML, pre-commit config, TOML) per FR-011
-- [ ] T005 [P] Create `src/adapters/__init__.py`, `src/adapters/py.typed` with SPDX header
-- [ ] T006 [P] Create `src/surfaces/__init__.py`, `src/surfaces/py.typed` with SPDX header
-- [ ] T007 [P] Create `tests/harness/__init__.py` and `tests/harness/README.md` stating reserved public-API / semver seam role
-- [ ] T008 [P] Create reserved extension stubs `packs/README.md`, `hooks/README.md`, `providers/README.md`, `portal/README.md` (no `portal/package.json`)
-- [ ] T009 [P] Create reserved test dirs with `.gitkeep`: `tests/component/`, `tests/contract/`, `tests/integration/`
-- [ ] T010 [GATE:no-secret-leak] Audit new config/fixtures for secret-like values; keep workflows fork-safe (no required repository secrets)
-- [ ] T011 Run `uv sync` and commit `uv.lock`
+- [x] T004 [P] Create `src/core/__init__.py`, `src/core/py.typed` with `SPDX-License-Identifier: Apache-2.0`, and apply the same SPDX line to every new commentable file created in this feature (Makefile, workflow YAML, pre-commit config, TOML) per FR-011
+- [x] T005 [P] Create `src/adapters/__init__.py`, `src/adapters/py.typed` with SPDX header
+- [x] T006 [P] Create `src/surfaces/__init__.py`, `src/surfaces/py.typed` with SPDX header
+- [x] T007 [P] Create `tests/harness/__init__.py` and `tests/harness/README.md` stating reserved public-API / semver seam role
+- [x] T008 [P] Create reserved extension stubs `packs/README.md`, `hooks/README.md`, `providers/README.md`, `portal/README.md` (no `portal/package.json`)
+- [x] T009 [P] Create reserved test dirs with `.gitkeep`: `tests/component/`, `tests/contract/`, `tests/integration/`
+- [x] T010 [GATE:no-secret-leak] Audit new config/fixtures for secret-like values; keep workflows fork-safe (no required repository secrets)
+- [x] T011 Run `uv sync` and commit `uv.lock`
 
 **Checkpoint**: Packages importable; lockfile present; layout matches FR-003
 
@@ -69,15 +69,15 @@
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Add `tests/unit/test_core_import.py` smoke test importing `core` (must fail until packages installed on path)
-- [ ] T013 [P] [US1] [GATE:no-secret-leak] Assert test/fixtures contain no credential-like strings
+- [x] T012 [P] [US1] Add `tests/unit/test_core_import.py` smoke test importing `core` (must fail until packages installed on path)
+- [x] T013 [P] [US1] [GATE:no-secret-leak] Assert test/fixtures contain no credential-like strings
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Implement `Makefile` target `check` running ruff + typecheck + pytest
-- [ ] T015 [US1] Wire ruff/typechecker settings in `pyproject.toml` so `make check` is green on stubs
-- [ ] T016 [US1] Confirm `src/core` has no agent-framework dependencies in the resolved environment (FR-004)
-- [ ] T017 [US1] Update CONTRIBUTING Development setup if any command flags diverge from reality (FR-008)
+- [x] T014 [US1] Implement `Makefile` target `check` running ruff + typecheck + pytest
+- [x] T015 [US1] Wire ruff/typechecker settings in `pyproject.toml` so `make check` is green on stubs
+- [x] T016 [US1] Confirm `src/core` has no agent-framework dependencies in the resolved environment (FR-004)
+- [x] T017 [US1] Update CONTRIBUTING Development setup if any command flags diverge from reality (FR-008)
 
 **Checkpoint**: Scenario A passes locally
 
@@ -91,9 +91,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T018 [P] [US2] Verify AGENTS/CONTRIBUTING layout table paths all exist on disk (script or checklist in PR description)
-- [ ] T019 [P] [US2] Strengthen `tests/harness/README.md` language: fakes/assertions public API under semver once populated
-- [ ] T020 [US2] Ensure `tests/unit/test_core_import.py` (or sibling) documents that core import pulls no agent framework
+- [x] T018 [P] [US2] Verify AGENTS/CONTRIBUTING layout table paths all exist on disk (script or checklist in PR description)
+- [x] T019 [P] [US2] Strengthen `tests/harness/README.md` language: fakes/assertions public API under semver once populated
+- [x] T020 [US2] Ensure `tests/unit/test_core_import.py` (or sibling) documents that core import pulls no agent framework
 
 **Checkpoint**: Scenario B passes; SC-004 reviewable
 
@@ -107,11 +107,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] [GATE:fail-closed] Add `Makefile` targets `conformance`, `test-full`, `dev-up` that print clear stub messages and exit non-zero
-- [ ] T022 [US3] Create `.github/workflows/ci.yml` for `pull_request` → install (`uv sync`), `make check`, secret scan, DCO, license compliance
-- [ ] T023 [US3] Add conditional spec-artifact lint step when `specs/**` changes (fail on `[NEEDS CLARIFICATION` in touched specs)
-- [ ] T024 [US3] [GATE:no-secret-leak] Confirm workflow runs on forks without secrets; document any optional tokens as optional
-- [ ] T025 [US3] Manually or via act/CI verify stub targets are not reported as success in logs
+- [x] T021 [US3] [GATE:fail-closed] Add `Makefile` targets `conformance`, `test-full`, `dev-up` that print clear stub messages and exit non-zero
+- [x] T022 [US3] Create `.github/workflows/ci.yml` for `pull_request` → install (`uv sync`), `make check`, secret scan, DCO, license compliance
+- [x] T023 [US3] Add conditional spec-artifact lint step when `specs/**` changes (fail on `[NEEDS CLARIFICATION` in touched specs)
+- [x] T024 [US3] [GATE:no-secret-leak] Confirm workflow runs on forks without secrets; document any optional tokens as optional
+- [x] T025 [US3] Manually or via act/CI verify stub targets are not reported as success in logs
 
 **Checkpoint**: Scenarios C and E satisfied; SC-002/SC-003 met for workflow presence
 
@@ -125,9 +125,9 @@
 
 ### Implementation for User Story 4
 
-- [ ] T026 [US4] Add `.pre-commit-config.yaml` with ruff format/check, EOF/whitespace fixers, secrets hook
-- [ ] T027 [US4] Verify `pre-commit install` works after `uv sync` / documented pipx path
-- [ ] T028 [US4] Align CONTRIBUTING pre-commit line with actual install if needed (FR-008)
+- [x] T026 [US4] Add `.pre-commit-config.yaml` with ruff format/check, EOF/whitespace fixers, secrets hook
+- [x] T027 [US4] Verify `pre-commit install` works after `uv sync` / documented pipx path
+- [x] T028 [US4] Align CONTRIBUTING pre-commit line with actual install if needed (FR-008)
 
 **Checkpoint**: Scenario D passes
 
@@ -137,10 +137,10 @@
 
 **Purpose**: Docs consistency and quickstart validation
 
-- [ ] T029 [P] Walk `specs/001-dev-toolchain/quickstart.md` Scenarios A–D on a clean clone/worktree
-- [ ] T030 [P] Confirm README `NOTICE` link resolves
-- [ ] T031 [P] Add changelog note only if project changelog exists; otherwise skip
-- [ ] T032 Open `feat/001-dev-toolchain` PR using `.github/PULL_REQUEST_TEMPLATE.md`, link governing spec, delete branch on merge
+- [x] T029 [P] Walk `specs/001-dev-toolchain/quickstart.md` Scenarios A–D on a clean clone/worktree
+- [x] T030 [P] Confirm README `NOTICE` link resolves — **SKIPPED: NOTICE deferred; README no longer requires NOTICE for local development**
+- [x] T031 [P] Add changelog note only if project changelog exists; otherwise skip
+- [x] T032 Open `feat/001-dev-toolchain` PR using `.github/PULL_REQUEST_TEMPLATE.md`, link governing spec, delete branch on merge
 
 ---
 

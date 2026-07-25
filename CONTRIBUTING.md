@@ -177,7 +177,7 @@ Supported development platforms: Linux and macOS natively; Windows via WSL2.
 ```bash
 git clone https://github.com/<org>/<repo>.git && cd <repo>
 uv sync                  # Python toolchain and dependencies
-pre-commit install       # formatting, linting, and hygiene hooks
+uv run pre-commit install  # formatting, linting, and hygiene hooks
 make check               # lint + typecheck + unit tests — your inner loop
 make conformance         # the conformance suite — required before any adapter/provider PR
 make test-full           # PR-tier tests: integration, scenario, fault injection, adversarial

@@ -10,17 +10,24 @@
 .github/prompts/
 .github/skills/
 
-# Python / tooling (future)
+# Python / tooling
 .venv/
+venv/
 __pycache__/
 *.py[cod]
+*$py.class
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
 dist/
+build/
 *.egg-info/
+.eggs/
+*.egg
+# Keep the lockfile: uv.lock is committed
 
 # Node / portal (future)
 node_modules/
