@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-04-15
-- **Relates to**: [ADR-0006](0006-in-process-fail-closed-enforcement.md), [ADR-0017](0017-primary-adapter-selection.md), [ADR-0027](0027-tiered-capabilities.md), [ADR-0040](0040-deferred-tool-disclosure.md), [ADR-0041](0041-code-mode-requires-hook-parity.md)
+- **Relates to**: [ADR-0006](0006-in-process-fail-closed-enforcement.md), [ADR-0017](0017-primary-adapter-selection.md), [ADR-0027](0045-tiered-capabilities.md), [ADR-0040](0040-deferred-tool-disclosure.md), [ADR-0041](0041-code-mode-requires-hook-parity.md)
 
 ## Context
 

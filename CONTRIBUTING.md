@@ -196,6 +196,50 @@ security-maintainer review required.
 
 Supported development platforms: Linux and macOS natively; Windows via WSL2.
 
+### Prerequisites — the local enclave
+
+The platform runs as an enclave: a scheduler, a control-plane Vault, and Postgres, stood up by
+Terraform ([ADR-0025](docs/adr/0025-enclave-is-the-default-topology.md),
+[ADR-0048](docs/adr/0048-nomad-is-the-agent-execution-substrate.md)). **Development runs the same
+components in the same order**, not a lighter approximation — the agent harness is sandboxed in a
+container Nomad schedules, and Nomad's workload identity is the attestation the control-plane
+Vault exchanges for per-task authority. Substituting a simpler scheduler or datastore locally
+would mean the identity and durability paths are never exercised until production.
+
+| Tool | Why | Install |
+| --- | --- | --- |
+| **Docker** | Nomad's task driver; runs Postgres and the harness container | Docker Desktop, or Colima |
+| **Nomad** | Schedules the harness container and the enclave's supporting services | Binary on `PATH` |
+| **Vault** | Control-plane trust fabric — agent registry, ceiling policies, token exchange | Binary on `PATH`. Enterprise features are used; the license attaches to the local binary |
+| **Terraform** | Stands up the trust fabric before any agent exists — the product's front door | Binary on `PATH` |
+
+HashiCorp binaries go in `~/.local/bin` by convention here rather than Homebrew, which keeps
+versions pinned per workstation:
+
+```bash
+# example: Terraform on macOS arm64 — substitute tool, version, and platform as needed
+VER=1.15.8
+curl -fsSLO "https://releases.hashicorp.com/terraform/${VER}/terraform_${VER}_darwin_arm64.zip"
+curl -fsSLO "https://releases.hashicorp.com/terraform/${VER}/terraform_${VER}_SHA256SUMS"
+shasum -a 256 -c --ignore-missing "terraform_${VER}_SHA256SUMS"   # verify before trusting
+unzip -o "terraform_${VER}_darwin_arm64.zip" -d ~/.local/bin && chmod +x ~/.local/bin/terraform
+```
+
+Always verify the checksum before putting a downloaded binary on your `PATH`.
+
+**The bootstrap order is not arbitrary**: `Terraform → Vault → Nomad → harness`. Each link
+establishes trust for the next, which is why Vault is *not* scheduled by Nomad — putting the
+identity record inside the substrate the agents run in would make the containment boundary
+depend on that substrate holding perfectly, forever
+([ADR-0015](docs/adr/0015-control-plane-vault-as-trust-fabric.md)).
+
+> `make dev-up` is the command that stands this up, and it is **still a reserved stub** — it
+> exits 2 until the local-environment feature lands (see [ROADMAP.md](ROADMAP.md)). Until then,
+> the prerequisites above are what you need installed to work on that feature; suites that do
+> not touch identity or durability run without any of it.
+
+### Python toolchain
+
 ```bash
 git clone https://github.com/<org>/<repo>.git && cd <repo>
 uv sync --extra adapters   # Python toolchain and dependencies (the extra installs the
@@ -214,10 +258,22 @@ in production, hooks in **warn mode**, with dev-mode backing services — so "wo
 locally, fails governance in CI" should not happen; if it does, that is itself a bug
 worth filing. The portal (Node/TypeScript) has its own setup in its package directory.
 
-Most contributors never need real infrastructure: the test harness provides fakes for the
-identity fabric and product APIs. If your change genuinely requires a live Terraform or
-Vault estate, say so in your spec — maintainers can advise on the minimum viable setup
-rather than having you stand up an enclave.
+**Which work needs the enclave running, and which does not.** The test harness provides fakes for
+things outside our boundary — product APIs, model providers, external identity providers — and
+those fakes are the right answer permanently. It does *not* substitute for components we deploy
+ourselves. So:
+
+- **No enclave needed** — hook pipeline, audit chain, registry, adapter mappings, policy
+  intersection logic, anything whose fakes stand in for an external system. This is most changes.
+- **Enclave needed** — identity and attestation, per-task token exchange, durability and resume,
+  anything asserting a property of the real substrate rather than of our code's shape.
+
+`fake_identity_fabric` remains a test double for suites in the first group. It is not a stand-in
+for Vault in the second: proving the harness calls the fabric correctly is a weaker claim than
+proving the guarantee, and the second group exists to prove guarantees.
+
+If you are unsure which group a change falls in, say so in the spec — that is exactly the kind of
+scope question the clarify stage exists to settle.
 
 ## Coding standards
 

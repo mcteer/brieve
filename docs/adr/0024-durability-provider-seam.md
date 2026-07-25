@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-05-06
-- **Relates to**: [ADR-0007](0007-lean-and-federated-profiles.md), [ADR-0008](0008-no-gateway-or-registry-product.md), [ADR-0026](0026-delegation-grants-and-per-step-tokens.md), [ADR-0028](0028-named-trigger-for-added-components.md)
+- **Relates to**: [ADR-0007](0007-lean-and-federated-profiles.md), [ADR-0008](0008-no-gateway-or-registry-product.md), [ADR-0026](0026-delegation-grants-and-per-step-tokens.md), [ADR-0028](0028-product-identity.md)
 
 ## Context
 
@@ -42,7 +42,7 @@ and replay implemented as a library over the Postgres the deployment already run
 new operated service, consistent with [ADR-0007](0007-lean-and-federated-profiles.md).
 
 **A dedicated workflow engine attaches through the provider interface** when a named
-trigger justifies it ([ADR-0028](0028-named-trigger-for-added-components.md)) — scale,
+trigger justifies it ([ADR-0028](0028-product-identity.md)) — scale,
 an existing deployment, or requirements the library cannot meet.
 
 **Durable timers and signals are adopted for approval pends and change windows**, so a

@@ -3,7 +3,7 @@
 - **Status**: Accepted (the default-gateway clause superseded by [ADR-0008](0008-no-gateway-or-registry-product.md))
 - **Date**: 2026-02-12
 - **Supersedes**: [ADR-0005](0005-adopt-gateway-substrate.md)
-- **Relates to**: [ADR-0008](0008-no-gateway-or-registry-product.md), [ADR-0019](0019-governance-capability-runs-first.md), [ADR-0037](0037-tool-transport-policy.md), [ADR-0041](0041-code-mode-requires-hook-parity.md)
+- **Relates to**: [ADR-0008](0008-no-gateway-or-registry-product.md), [ADR-0019](0019-adapter-on-framework-capabilities.md), [ADR-0037](0037-tool-transport-policy.md), [ADR-0041](0041-code-mode-requires-hook-parity.md)
 - **Requirements**: R7
 
 ## Context
@@ -70,7 +70,7 @@ invocation. Any execution mode that cannot demonstrate per-call hook parity is
 unadoptable in the governed path regardless of its other merits
 ([ADR-0041](0041-code-mode-requires-hook-parity.md)), and the ordering of the governance
 capability relative to other capabilities becomes a conformance assertion rather than a
-convention ([ADR-0019](0019-governance-capability-runs-first.md)).
+convention ([ADR-0019](0019-adapter-on-framework-capabilities.md)).
 
 Two standing obligations follow: the conformance suite asserts fail-closed behavior on
 every enforcement path, and every hook contributed to the platform ships with a test
