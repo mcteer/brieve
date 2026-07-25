@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import pytest
-from tests.harness import fake_identity_fabric, frozen_clock
+from tests.harness import DEFAULT_AGENT_DEFINITION_ID, fake_identity_fabric, frozen_clock
 
 from core.audit.schema import AuditEntry
 from core.audit.sink import InMemoryAuditSink
@@ -30,6 +30,7 @@ class FailAfterAuditSink(InMemoryAuditSink):
 
 def _start(audit: InMemoryAuditSink) -> None:
     start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-start-fail",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),

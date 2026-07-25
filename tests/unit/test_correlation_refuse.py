@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from tests.harness import fake_identity_fabric, frozen_clock
+from tests.harness import DEFAULT_AGENT_DEFINITION_ID, fake_identity_fabric, frozen_clock
 
 from core.authority.types import AuthorityScope
 from core.errors import CorrelationRequiredError
@@ -17,6 +17,7 @@ from core.run import start_governed_run
 def _kwargs() -> dict[str, Any]:
     return {
         "subject_user_id": "user-1",
+        "agent_definition_id": DEFAULT_AGENT_DEFINITION_ID,
         "requested_scope": AuthorityScope(tool_names=frozenset({"echo"})),
         "identity_fabric": fake_identity_fabric(),
         "clock": frozen_clock(),

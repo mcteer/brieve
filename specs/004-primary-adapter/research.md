@@ -136,11 +136,15 @@
   `tests/conformance`. Do **not** use importorskip to make a bare sync “pass” by skipping
   adapter gates.
 - **Mechanism**: define `UV_RUN := uv run --extra adapters` in the Makefile and route every
-  `check` and `conformance` recipe line through it. A bare `uv run` materializes the project
-  environment from the *default* extra set, so it does not guarantee the `adapters` extra is
-  present regardless of how the developer last synced; naming the extra in the recipe removes
-  that dependence on ambient state. CI's `Sync dependencies` step likewise becomes
-  `uv sync --frozen --extra adapters`.
+  `check` and `conformance` recipe line through it. CI's `Sync dependencies` step likewise
+  becomes `uv sync --frozen --extra adapters`.
+- **Corrected 2026-07-25 (implement time)**: an earlier revision of this decision claimed a
+  bare `uv run` would re-sync the extra *away*. Tested directly after the extra landed — it
+  does not; the package survived. The correct argument is narrower and still holds: `uv run`
+  without `--extra` does not *guarantee* the extra, and the environment CI actually builds is
+  a fresh `uv sync --frozen` in which the extra was never installed at all. Naming it in both
+  the recipe and the CI sync makes the requirement explicit rather than dependent on what a
+  previous command happened to leave behind.
 - **Lockfile**: adding the extra to `pyproject.toml` requires committing the regenerated
   `uv.lock` in the same change. CI syncs with `--frozen`, which by definition will not update
   the lockfile, so a stale lock fails the fast lane before any test runs.

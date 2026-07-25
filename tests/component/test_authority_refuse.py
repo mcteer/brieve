@@ -10,7 +10,12 @@ from core.authority.errors import AuthorityRefuseError
 from core.authority.types import AuthorityScope
 from core.registry.memory import ToolRegistry
 from core.run import start_governed_run
-from tests.harness import capture_audit, fake_identity_fabric, frozen_clock
+from tests.harness import (
+    DEFAULT_AGENT_DEFINITION_ID,
+    capture_audit,
+    fake_identity_fabric,
+    frozen_clock,
+)
 
 
 def test_refuse_exceeds_user() -> None:
@@ -18,6 +23,7 @@ def test_refuse_exceeds_user() -> None:
     audit = capture_audit()
     with pytest.raises(AuthorityRefuseError) as exc:
         start_governed_run(
+            agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
             correlation_id="corr-refuse-user",
             subject_user_id="user-1",
             requested_scope=AuthorityScope(tool_names=frozenset({"echo", "admin"})),
@@ -35,6 +41,7 @@ def test_refuse_exceeds_ceiling() -> None:
     fabric = fake_identity_fabric(tool_names={"echo", "admin"}, ceiling_tools={"echo"})
     with pytest.raises(AuthorityRefuseError):
         start_governed_run(
+            agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
             correlation_id="corr-refuse-ceil",
             subject_user_id="user-1",
             requested_scope=AuthorityScope(tool_names=frozenset({"echo", "admin"})),

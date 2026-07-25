@@ -9,7 +9,12 @@ from typing import Any
 from core.authority.types import AuthorityScope
 from core.registry.memory import ToolRegistry
 from core.run import GovernedRun, start_governed_run
-from tests.harness import capture_audit, fake_identity_fabric, frozen_clock
+from tests.harness import (
+    DEFAULT_AGENT_DEFINITION_ID,
+    capture_audit,
+    fake_identity_fabric,
+    frozen_clock,
+)
 
 
 class CountingHandler:
@@ -51,6 +56,7 @@ def make_run(
     )
     clock = frozen_clock()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id=correlation_id,
         subject_user_id=subject_user_id,
         requested_scope=AuthorityScope(tool_names=frozenset(tools)),

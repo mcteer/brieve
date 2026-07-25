@@ -15,12 +15,16 @@ class IdentityFabric(Protocol):
         """Return the requesting user's harness-domain scope."""
         ...
 
-    def resolve_ceiling(self) -> AuthorityScope:
-        """Return the agent ceiling scope."""
+    def resolve_ceiling(self, agent_definition_id: str) -> AuthorityScope:
+        """Return the ceiling for this agent definition.
+
+        Ceilings are per-definition: an unknown id resolves to unavailable or
+        refuses, never to an open ceiling.
+        """
         ...
 
-    def resolve_policy(self) -> AuthorityScope | None:
-        """Return current policy scope, or None for unrestricted."""
+    def resolve_policy(self, agent_definition_id: str) -> AuthorityScope | None:
+        """Return current policy scope for this definition, or None for unrestricted."""
         ...
 
     def resolve_product_entitlements(self, subject_user_id: str, product: str) -> frozenset[str]:

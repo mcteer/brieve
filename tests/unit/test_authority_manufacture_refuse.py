@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import pytest
-from tests.harness import fake_identity_fabric, frozen_clock
+from tests.harness import DEFAULT_AGENT_DEFINITION_ID, fake_identity_fabric, frozen_clock
 
 from core.authority.errors import AuthorityRefuseError
 from core.authority.manufacture import manufacture_authority
@@ -19,6 +19,7 @@ def test_requested_exceeds_user_refuses() -> None:
             requested_scope=AuthorityScope(tool_names=frozenset({"echo", "admin"})),
             identity_fabric=fabric,
             clock=frozen_clock(),
+            agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         )
     assert exc.value.reason_code == "authority_refused"
 
@@ -31,5 +32,6 @@ def test_requested_exceeds_ceiling_refuses() -> None:
             requested_scope=AuthorityScope(tool_names=frozenset({"echo", "admin"})),
             identity_fabric=fabric,
             clock=frozen_clock(),
+            agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         )
     assert exc.value.reason_code == "authority_refused"

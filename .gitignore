@@ -44,4 +44,5 @@ node_modules/
 *.swp
 *.swo
 .idea/
+.vscode/
 *.iml

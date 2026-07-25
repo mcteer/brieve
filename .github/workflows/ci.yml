@@ -27,10 +27,14 @@ jobs:
           enable-cache: true
 
       - name: Sync dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra adapters
 
       - name: Inner-loop check
         run: make check
+
+      # FR-015: adapter conformance is merge-blocking here, not attested in a PR body.
+      - name: Conformance (primary adapter)
+        run: make conformance
 
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
