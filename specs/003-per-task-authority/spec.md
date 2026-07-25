@@ -6,7 +6,7 @@
 
 **Created**: 2026-07-25
 
-**Status**: Draft
+**Status**: Planned
 
 **Input**: User description: "Deliver per-task authority on top of the governed core: manufacture short-lived credentials for each governed run so effective authority equals the intersection of requesting user, agent ceiling, task scope, and policy — an agent never exceeds its human. Enforce entitlement mirroring for product actions. Hold no standing credentials to managed products. Demonstrate with deterministic tests and harness helpers (including assert_scope_narrowed). Out of scope: production IdP/Vault fabric (use fakes), Control Groups UI, adapters, capability packs, durability/resume, northbound surfaces, live models, and real managed-product APIs."
 
