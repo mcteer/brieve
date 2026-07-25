@@ -229,6 +229,42 @@ Written from the attacker's position, not the user's:
 These belong in the PR lane, not nightly. They are cheap, and they are what a security
 reviewer will look for first in a hook or pack PR.
 
+## Conformance suites
+
+```bash
+uv sync --extra adapters   # required: the suite exercises the primary adapter
+make conformance
+```
+
+Conformance is where an adapter or provider proves it did not weaken the guarantees it
+sits on top of. It is **merge-blocking in the fast lane** — a locally-run result pasted
+into a pull request is a pre-flight, never the gate.
+
+**Which rows are in force is per-feature, not global.** Each gate row binds from the
+moment its underlying feature exists, and before then is absent or a single explicit skip
+naming the ADR that defers it — never a passing stub, because a silent green is
+indistinguishable from a real pass at review time
+([ADR-0047](../adr/0047-conformance-gate-rows-attach-as-features-land.md)). The in-force
+set for a feature is recorded in its conformance contract; a feature that lands without
+adding its rows is a gate regression.
+
+The primary adapter's slice (`tests/conformance/adapter/`) is deliberately three rows:
+
+| Row | What it proves |
+| --- | --- |
+| **Governance order** | The governance capability admits a call before any co-resident capability observes it. Governance declares `position='outermost'`, so this holds regardless of how a caller orders the list |
+| **Fail closed** | An injected fault anywhere in the capability chain denies with zero tool-body executions. No branch converts an enforcement error into an allow |
+| **Governed entry** | Execution reaches `invoke_tool`, never a framework tool body. The fixture's framework bodies raise if called, so a bypass fails loudly |
+
+Deferred rows — four-transport surface parity, deferred-disclosure parity, the full
+ADR-0024 durability matrix, second-adapter cases — attach when those features land. See
+`specs/004-primary-adapter/contracts/conformance-adapter.md` for the per-row ADR citations.
+
+**The break test passes.** `test_governance_order_break.py` is self-verifying: it builds
+the inverted arrangement and asserts the shared ordering assertion *raises*. A gate nobody
+has watched fail is a gate nobody knows works — this is how that is checked without
+leaving a red test in the suite.
+
 ## Writing evals
 
 Evals live with their pack (`packs/<name>/evals/`) and run through `pydantic-evals`

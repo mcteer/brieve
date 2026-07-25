@@ -28,6 +28,7 @@ def manufacture_authority(
     requested_scope: AuthorityScope,
     identity_fabric: IdentityFabric,
     clock: Clock,
+    agent_definition_id: str,
     correlation_id: str | None = None,
 ) -> ManufacturedAuthority:
     """Issue narrowed task authority or raise AuthorityRefuseError."""
@@ -38,10 +39,17 @@ def manufacture_authority(
             correlation_id=correlation_id,
         )
 
+    if not agent_definition_id.strip():
+        raise AuthorityRefuseError(
+            "agent definition is absent",
+            reason_code="identity_unavailable",
+            correlation_id=correlation_id,
+        )
+
     try:
         user = identity_fabric.resolve_user_scope(subject_user_id)
-        ceiling = identity_fabric.resolve_ceiling()
-        policy = identity_fabric.resolve_policy()
+        ceiling = identity_fabric.resolve_ceiling(agent_definition_id)
+        policy = identity_fabric.resolve_policy(agent_definition_id)
     except AuthorityRefuseError:
         raise
     except Exception as exc:

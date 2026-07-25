@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from core.authority.types import AuthorityScope
 from tests.harness.secrets import BROKERED_GRAIN_MARKER
 
+DEFAULT_AGENT_DEFINITION_ID = "agent-def-1"
+
 
 class FabricFault(Exception):
     def __init__(self, message: str, *, reason_code: str) -> None:
@@ -19,6 +21,9 @@ class FabricFault(Exception):
 class FakeIdentityFabric:
     users: dict[str, AuthorityScope] = field(default_factory=dict)
     ceiling: AuthorityScope = field(default_factory=AuthorityScope)
+    # Per-definition ceilings. When populated, an id absent from this map is unknown
+    # and refuses — an unknown definition never resolves to the default ceiling.
+    ceilings: dict[str, AuthorityScope] = field(default_factory=dict)
     policy: AuthorityScope | None = None
     entitlements: dict[tuple[str, str], frozenset[str]] = field(default_factory=dict)
     brokered: dict[str, str] = field(default_factory=dict)
@@ -37,12 +42,16 @@ class FakeIdentityFabric:
             raise FabricFault("unknown user", reason_code="identity_unavailable")
         return self.users[subject_user_id]
 
-    def resolve_ceiling(self) -> AuthorityScope:
+    def resolve_ceiling(self, agent_definition_id: str) -> AuthorityScope:
         if self.fail_ceiling:
             raise FabricFault("ceiling resolution failed", reason_code=self.fail_reason)
+        if self.ceilings:
+            if agent_definition_id not in self.ceilings:
+                raise FabricFault("unknown agent definition", reason_code="identity_unavailable")
+            return self.ceilings[agent_definition_id]
         return self.ceiling
 
-    def resolve_policy(self) -> AuthorityScope | None:
+    def resolve_policy(self, agent_definition_id: str) -> AuthorityScope | None:
         if self.fail_policy:
             raise FabricFault("policy resolution failed", reason_code=self.fail_reason)
         return self.policy
@@ -79,8 +88,13 @@ def fake_identity_fabric(
     ceiling_actions: set[str] | frozenset[str] | None = None,
     policy: AuthorityScope | None = None,
     entitlements: dict[tuple[str, str], frozenset[str]] | None = None,
+    ceilings: dict[str, AuthorityScope] | None = None,
 ) -> FakeIdentityFabric:
-    """Build a happy-path fabric; tools default to {echo} for 002 migration."""
+    """Build a happy-path fabric; tools default to {echo} for 002 migration.
+
+    Pass ``ceilings`` to key ceilings by agent definition id; an id outside that map
+    then refuses rather than falling back to the default ceiling.
+    """
     tools = frozenset(tool_names) if tool_names is not None else frozenset({"echo"})
     actions = frozenset(product_actions) if product_actions is not None else frozenset()
     c_tools = frozenset(ceiling_tools) if ceiling_tools is not None else tools
@@ -89,6 +103,7 @@ def fake_identity_fabric(
     return FakeIdentityFabric(
         users={subject_user_id: user_scope},
         ceiling=AuthorityScope(tool_names=c_tools, product_actions=c_actions),
+        ceilings=ceilings or {},
         policy=policy,
         entitlements=entitlements or {},
     )

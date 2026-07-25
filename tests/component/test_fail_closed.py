@@ -21,6 +21,7 @@ from core.run import GovernedRun, start_governed_run
 from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler
 from tests.harness import (
+    DEFAULT_AGENT_DEFINITION_ID,
     SECRET_MARKER,
     assert_denied_closed,
     assert_no_secret_values,
@@ -62,6 +63,7 @@ def _start(
     include_governance: bool = True,
 ) -> GovernedRun:
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id=correlation_id,
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),
