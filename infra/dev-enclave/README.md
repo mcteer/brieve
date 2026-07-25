@@ -88,5 +88,10 @@ Everything that makes this a *dev* proof rather than the product's front door:
 - **No TLS.** Production uses the control plane's own CA (ADR-0025).
 - **1-of-1 unseal.** A real deployment does not have a single unseal key sitting next to the
   server.
+- **Root token retained.** The bootstrap root token still exists and never expires; it lives in
+  the gitignored `.env` alongside the unseal key. ADR-0015's flow revokes it once configuration
+  is applied, after which every caller authenticates through the attestation chain. Keeping it
+  is what makes re-running `terraform apply` convenient here, and is exactly the shape that must
+  not reach a deployment.
 - **No parameterization for production.** The dev/prod split via a swappable substrate layer is
   the shape this points at, not one it implements.

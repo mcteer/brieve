@@ -55,6 +55,11 @@ actually runs on.
 Replaces `fake_identity_fabric` as the thing guarantees are proven against. The fake remains a
 test double for suites that are not about identity.
 
+**In scope, and easy to lose:** revoking the bootstrap root token once Terraform has applied the
+trust configuration. `infra/dev-enclave` deliberately retains it — that is what makes re-applying
+convenient — and ADR-0015's flow requires that a deployment does not. A dev shape that silently
+becomes the deployed one is the failure this entry exists to prevent.
+
 ### 005 — Durable execution
 
 Attaches the durability Quality Gate row: kill/resume, re-observe-never-re-execute,
