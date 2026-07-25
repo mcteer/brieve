@@ -129,6 +129,12 @@ determines everything downstream.
 | **Tool registration** | New MCP server or native tool | Registry lifecycle (proposed → security review → published); transport per the exists/mature/supported test |
 | **Portal / UI** | Web surface changes | Spec workflow + accessibility conformance |
 
+One clarification on the sealed-core gate, ratified during spec 001: creating empty or
+marker-only stub packages under sealed-core paths (layout reservation — `__init__.py`,
+`py.typed`, READMEs) does not by itself trigger security-maintainer review. The gate
+attaches when behavior lands in those paths: identity, hooks, registries, audit
+schema, durability, or adapter logic.
+
 Not sure which class you're in? Open a discussion issue before writing anything. "Sealed
 core" is defined precisely in the constitution (Principle V) — if your diff touches those
 paths, the security gate applies whether or not you intended it to.
@@ -318,6 +324,10 @@ releasable, linear history via squash-merge.
   `gh pr merge --squash --delete-branch` is the preferred path; if you merge another
   way, delete the branch immediately afterward. Stale feature branches are noise —
   history lives in `main`.
+- **Spec Kit tooling note**: the `specify` scripts create a single `NNN-short-name`
+  branch. This repository keeps the two-branch convention — rename the generated
+  branch to `spec/NNN-short-name`, and open `feat/NNN-short-name` only after the spec
+  PR merges.
 
 ## Testing expectations
 

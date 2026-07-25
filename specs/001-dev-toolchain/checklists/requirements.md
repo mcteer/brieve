@@ -32,5 +32,5 @@
 ## Notes
 
 - Validation pass 1 (2026-07-24): Spec stays at contract level (`uv` / make target *names* appear only where they are already the published contributor contract in CONTRIBUTING — treated as product vocabulary, not stack design). Traceability filled.
-- Clarification pass (2026-07-24): Five markers resolved — sealed-core gate on behavior not empty stubs; SPDX one-line license; Python ≥3.12; `portal/` stub-only; branch protection is maintainer settings (workflow in scope). Zero `[NEEDS CLARIFICATION]` remain. Ready for `/speckit-plan` after spec PR review/merge.
+- Clarification pass (2026-07-24): Five markers resolved by the agent under explicit maintainer delegation; outcomes reviewed and accepted by the maintainer (2026-07-24): sealed-core gate attaches on behavior not empty stubs; SPDX one-line license notice; Python ≥3.12 floor; portal/ stub-only in 001; branch protection is a maintainer settings task. Zero [NEEDS CLARIFICATION] remain.
 - Named commands / `uv` / layout paths remain contract vocabulary inherited from CONTRIBUTING/AGENTS; CI workflow shape and file-level package layout stay plan-stage.
