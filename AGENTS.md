@@ -165,6 +165,13 @@ work you have not verified.
   Never add or update an action by mutable tag.
 - **CI gate scripts are enforcement code.** Never stub a required check to exit 0,
   and ship every gate script with a test proving it fails on violating input.
+- **Pass the narrowest context across any hook or extension seam.** Never hand a
+  whole mutable run/state object, secret material, or an audit sink to code outside
+  the built-in governance set. If an extension needs a field, add the field — not
+  the object that contains everything.
+- **Every assertion must be able to fail.** Never assert against an object,
+  fixture, or value constructed inside the assertion to satisfy it. A gate-tagged
+  test that cannot fail is a governance hole with a green checkmark.
 
 ## Testing
 
