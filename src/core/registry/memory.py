@@ -5,27 +5,47 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from core.errors import RegistryError, ToolNotRegisteredError
 
 ToolHandler = Callable[[Mapping[str, Any]], Any]
+ProductMode = Literal["none", "federate", "broker"]
 
 
 @dataclass(frozen=True)
 class ToolRegistration:
     name: str
     handler: ToolHandler
+    product_mode: ProductMode = "none"
+    product: str | None = None
+    product_action: str | None = None
 
 
 class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, ToolRegistration] = {}
 
-    def register(self, name: str, handler: ToolHandler) -> None:
+    def register(
+        self,
+        name: str,
+        handler: ToolHandler,
+        *,
+        product_mode: ProductMode = "none",
+        product: str | None = None,
+        product_action: str | None = None,
+    ) -> None:
         if not name.strip():
             raise ValueError("tool name must be non-empty")
-        self._tools[name] = ToolRegistration(name=name, handler=handler)
+        if product_mode != "none" and (not product or not product_action):
+            raise ValueError("product and product_action required when product_mode != none")
+        self._tools[name] = ToolRegistration(
+            name=name,
+            handler=handler,
+            product_mode=product_mode,
+            product=product,
+            product_action=product_action,
+        )
 
     def resolve(self, name: str) -> ToolRegistration:
         """Resolve a tool by name.

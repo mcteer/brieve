@@ -16,6 +16,11 @@ class AuditEventType(StrEnum):
     TOOL_OUTCOME = "tool_outcome"
     POST_DECISION = "post_decision"
     ENFORCEMENT_ERROR = "enforcement_error"
+    AUTHORITY_ISSUED = "authority_issued"
+    AUTHORITY_REFUSED = "authority_refused"
+    AUTHORITY_DENIED = "authority_denied"
+    AUTHORITY_EXPIRED = "authority_expired"
+    MIRRORING_DECISION = "mirroring_decision"
 
 
 class AuditEntry(BaseModel):

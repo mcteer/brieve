@@ -7,6 +7,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from core.audit.schema import AuditEntry
 from core.audit.sink import InMemoryAuditSink
+from core.authority.types import AuthorityScope
 from core.errors import RegistryError
 from core.hooks.types import (
     CapabilityKind,
@@ -16,7 +17,7 @@ from core.hooks.types import (
     HookRegistration,
 )
 from core.registry.memory import ToolRegistration, ToolRegistry
-from core.run import start_governed_run
+from core.run import GovernedRun, start_governed_run
 from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler
 from tests.harness import (
@@ -25,6 +26,8 @@ from tests.harness import (
     assert_no_secret_values,
     assert_no_side_effect,
     capture_audit,
+    fake_identity_fabric,
+    frozen_clock,
 )
 
 
@@ -50,6 +53,28 @@ def _raising_pre(_ctx: HookContext) -> HookDecision:
     raise RuntimeError(f"hook failed {SECRET_MARKER}")
 
 
+def _start(
+    *,
+    correlation_id: str,
+    registry: ToolRegistry,
+    audit_sink: InMemoryAuditSink,
+    hooks: list[HookRegistration] | None = None,
+    include_governance: bool = True,
+) -> GovernedRun:
+    run = start_governed_run(
+        correlation_id=correlation_id,
+        subject_user_id="user-1",
+        requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),
+        identity_fabric=fake_identity_fabric(tool_names={"echo"}),
+        clock=frozen_clock(),
+        registry=registry,
+        audit_sink=audit_sink,
+        hooks=hooks,
+        include_governance=include_governance,
+    )
+    return run
+
+
 def test_pre_hook_raise_denies(span_exporter: InMemorySpanExporter) -> None:
     handler = CountingHandler()
     registry = ToolRegistry()
@@ -61,9 +86,8 @@ def test_pre_hook_raise_denies(span_exporter: InMemorySpanExporter) -> None:
         capability_kind=CapabilityKind.OTHER,
         handler=_raising_pre,
     )
-    run = start_governed_run(
+    run = _start(
         correlation_id="corr-fc-1",
-        scope={"echo"},
         registry=registry,
         audit_sink=audit,
         hooks=[bad],
@@ -79,9 +103,8 @@ def test_registry_failure_denies(span_exporter: InMemorySpanExporter) -> None:
     registry = FlakyRegistry()
     registry.register("echo", handler)
     audit = capture_audit()
-    run = start_governed_run(
+    run = _start(
         correlation_id="corr-fc-2",
-        scope={"echo"},
         registry=registry,
         audit_sink=audit,
     )
@@ -96,9 +119,8 @@ def test_missing_governance_dependency_denies(span_exporter: InMemorySpanExporte
     registry = ToolRegistry()
     registry.register("echo", handler)
     audit = capture_audit()
-    run = start_governed_run(
+    run = _start(
         correlation_id="corr-fc-3",
-        scope={"echo"},
         registry=registry,
         audit_sink=audit,
         include_governance=False,
@@ -114,11 +136,10 @@ def test_pre_path_audit_append_failure_denies(span_exporter: InMemorySpanExporte
     handler = CountingHandler()
     registry = ToolRegistry()
     registry.register("echo", handler)
-    # fail_on 1 → run_start succeeds (append 0), next append during invoke fails
-    audit = FailAfterAuditSink(fail_on_append_index=1)
-    run = start_governed_run(
+    # 0=authority_issued, 1=run_start, 2+=invoke path
+    audit = FailAfterAuditSink(fail_on_append_index=2)
+    run = _start(
         correlation_id="corr-fc-4",
-        scope={"echo"},
         registry=registry,
         audit_sink=audit,
     )
@@ -137,21 +158,14 @@ def test_post_path_audit_append_failure_not_clean_success(
     registry.register("echo", handler)
 
     class FailAfterTool(InMemoryAuditSink):
-        def __init__(self) -> None:
-            super().__init__()
-            self._n = 0
-
         def append(self, entry: AuditEntry) -> None:
-            self._n += 1
-            # Allow run_start + pre_decision + tool_outcome, fail on post_decision
             if entry.event_type.value == "post_decision":
                 raise RuntimeError("post audit fail")
             super().append(entry)
 
     audit = FailAfterTool()
-    run = start_governed_run(
+    run = _start(
         correlation_id="corr-fc-5",
-        scope={"echo"},
         registry=registry,
         audit_sink=audit,
     )
