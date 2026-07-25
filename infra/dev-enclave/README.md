@@ -20,13 +20,15 @@ Run against Vault Enterprise 2.0.3+ent and Nomad 2.0.4 on 2026-07-25.
 | The exchange yields a **ceiling-scoped, short-lived** token | ✅ `policies: ["agent-ceiling-demo","default"]`, `lease_duration: 300` |
 | Vault has a first-class **agent registry** | ✅ `/agent-registry/register` with `ceiling_policies`, `entity_id`, lookup by id or display name |
 | Bootstrap order terminates | ✅ Terraform → Vault → Nomad → harness |
+| Secrets engines the design may need are available | ✅ `kv`, `database`, `transit`, `pki`, `ssh`, `nomad`, `consul`, `aws`, `ldap`, `keymgmt` all mount |
 
 No credential was placed in the jobspec. The workload authenticated as *itself*.
 
 ## What it cost to find out
 
-Four things were wrong in the first attempt, and each is a constraint the production tree
-inherits:
+Four things were wrong in the first attempt. Three are constraints the production tree
+inherits; the fourth turned out to be a licensing artifact and is recorded because the failure
+mode is easy to misread:
 
 1. **Vault Enterprise refuses `inmem` storage.** `vault server -dev` is therefore unusable with
    an Enterprise license — raft is required even for a throwaway. This is a stronger reason to
@@ -36,10 +38,15 @@ inherits:
 3. **Nomad's CPU fingerprint is wrong on Apple Silicon** — total reported as ~24 MHz while the
    core count is detected correctly. Any MHz-based resource request above that is unschedulable
    with `Dimension "cpu" exhausted`. Use `cores`.
-4. **This license is module-limited.** `pki` mounts; `kv-v2`, `database`, `transit`, and
-   `spiffe` are rejected as *"not supported by license"*. Anything the platform builds on those
-   engines needs either a different license or a different design — worth settling before a
-   feature depends on one.
+4. **A license can silently constrain the architecture.** The first license carried a
+   `pki-only` module, which is a *restriction* rather than a capability: `pki` mounted and every
+   other secrets engine — `kv`, `database`, `transit`, `ssh`, `nomad`, `consul`, `aws`, `ldap`,
+   `keymgmt` — was refused as *"not supported by license"*, while all auth methods worked. It
+   was a provisioning artifact (selecting every module includes the restrictive one), and
+   reissuing without `pki-only` opened all ten. **No constraint remains**, but the failure mode
+   is worth knowing: a license that refuses secrets engines while permitting auth and identity
+   looks like a scoped restriction, not a missing capability, and the module list is the place
+   to check.
 
 ## Using it
 
