@@ -15,7 +15,7 @@
 | Field | Value |
 | --- | --- |
 | **Requirements (R1–R17)** | R7 (fail-closed enforcement), R4 / R10 / R13 (correlation and evidence planes as implicated by audit/join). Others deferred to later features (notably R2/R3 authority). |
-| **ADRs touched** | ADR-0001 (framework-agnostic core), ADR-0006 (in-process fail-closed enforcement), ADR-0009 (correlation ID joining observability planes; audit never sampled), ADR-0020 (OTel-only emission in core — spans for hook decisions) |
+| **ADRs touched** | ADR-0001 (framework-agnostic core), ADR-0006 (in-process fail-closed enforcement), ADR-0009 (correlation ID joining observability planes; audit never sampled), ADR-0020 (OTel-only emission in core — spans for hook decisions), ADR-0019 (governance runs first among co-resident capabilities — the origin of the conformance-observable ordering in FR-011 / User Story 4) |
 | **Evidence class** | Attestation-relevant — introduces the audit join and fail-closed denial records that later evidence paths will read |
 
 ## User Scenarios & Testing *(mandatory)*
@@ -33,6 +33,7 @@ An operator (or test) starts a governed run and the agent attempts a tool call t
 1. **Given** a run with a correlation ID and a registered in-scope tool, **When** the agent invokes that tool with valid arguments, **Then** pre-hooks allow, the tool executes exactly once, post-hooks run, and the call completes successfully.
 2. **Given** that successful call, **When** an investigator queries audit by the run's correlation ID, **Then** they find ordered records for run start, pre-decision, tool outcome, and post-decision joinable to the same ID.
 3. **Given** that successful call, **When** telemetry for the run is inspected, **Then** each hook decision is represented as a span (or equivalent structured observation) carrying the correlation ID.
+4. **Given** a run with a registered in-scope tool, **When** the tool body itself raises an error during execution, **Then** post-execution hooks still run, the outcome is audited as a failed execution under the run's correlation ID, and no raw error content containing secret values reaches audit, spans, or logs.
 
 ---
 
@@ -93,13 +94,14 @@ A contributor writing later features uses public harness helpers to assert denia
 
 **Acceptance Scenarios**:
 
-1. **Given** the test harness package, **When** a contributor writes a test for an out-of-scope deny, **Then** they can use documented helpers equivalent in purpose to `assert_denied_closed`, `assert_correlated`, `assert_audit_chain`, and `assert_no_secret_values`.
+1. **Given** the test harness package, **When** a contributor writes a test for an out-of-scope deny, **Then** they can use the documented helpers `assert_denied_closed`, `assert_correlated`, `assert_audit_chain`, and `assert_no_secret_values`.
 2. **Given** those helpers, **When** applied to the stories above, **Then** the same properties the helpers claim are what the core actually guarantees.
 
 ### Edge Cases
 
 - What happens when a correlation ID is missing at run start? The run cannot proceed in an uncorrelated state — initiation fails closed (deny/refuse start), rather than inventing silent uncorrelated work.
 - What happens when a post-execution hook errors after the tool already ran? The outcome is recorded as a failed/denied-closed post-path; the audit trail must still show the tool executed and the post-hook failure (no silent success). Side-effect fencing/idempotency beyond recording is deferred to durability features.
+- What happens when the tool body itself errors after pre-hooks allowed it? Post-execution hooks still run (redaction and audit are not skipped on failure); the audit trail shows the allowed decision and the failed execution under the same correlation ID.
 - What happens when two tool calls share a run? Both share the same correlation ID; per-call decisions remain distinct audit/span records under that ID.
 - How are secret-like tool arguments treated in audit? Values are never written; redacted references or hashes/metadata only.
 
@@ -114,13 +116,14 @@ A contributor writing later features uses public harness helpers to assert denia
 - **FR-005**: Tool calls outside the run's declared scope MUST be denied.
 - **FR-006**: Enforcement-path errors (hook exception, registry resolution failure, missing required enforcement dependency) MUST deny; they MUST NOT allow.
 - **FR-007**: Each governed run MUST have exactly one correlation ID from initiation; that ID MUST appear on hook decisions, tool invocation records, audit entries, and hook-decision spans for that run.
-- **FR-008**: Audit records for a run MUST be append-only for that run's trail (no in-place mutation of prior entries) and MUST be retrievable by correlation ID in causal order.
+- **FR-008**: Audit records for a run MUST form an append-only, per-run hash chain: each entry carries a cryptographic link to the prior entry, no in-place mutation of prior entries is possible through any supported path, and the trail MUST be retrievable by correlation ID in causal order with chain integrity verifiable (intact links, no gaps). This is the audit schema later evidence paths read; the chain lands now because the schema is sealed core and retrofitting it would be a breaking change.
 - **FR-009**: Hook decisions MUST emit OpenTelemetry spans (or the core's standard span abstraction that exports as OTel); the core MUST NOT embed a vendor observability SDK.
 - **FR-010**: Audit, logs, and spans MUST NOT contain secret values — references, hashes, or redacted metadata only.
 - **FR-011**: Governance/enforcement MUST run first among co-resident capabilities on a tool call (conformance-observable order).
-- **FR-012**: The test harness MUST provide assertion helpers covering deny-closed, correlation join, audit-chain walkability, and no-secret-values for the scenarios in this feature.
-- **FR-013**: Deterministic tests for FR-001–FR-012 MUST NOT call live models or live managed-product APIs; scripted agents and fakes are required.
+- **FR-012**: The test harness MUST provide the assertion helpers documented in docs/development/testing.md under their exact documented names — `assert_denied_closed`, `assert_correlated`, `assert_audit_chain`, `assert_no_secret_values` — covering the scenarios in this feature. `tests/harness` is public API under the semver seam promise; the documented names are the contract, and "equivalents" are not acceptable.
+- **FR-013**: Deterministic tests for FR-001–FR-015 MUST NOT call live models or live managed-product APIs; scripted agents and fakes are required.
 - **FR-014**: User-facing denial messages MUST explain that the action was denied without disclosing secrets or out-of-scope entitlements the requester must not see.
+- **FR-015**: When a tool body errors after pre-hooks allowed it, post-execution hooks MUST still run, and the failed execution MUST be audited under the run's correlation ID with the same redaction guarantees as any other record. Post-hook processing MUST NOT be skipped because execution failed.
 
 ### Key Entities
 
@@ -145,9 +148,8 @@ A contributor writing later features uses public harness helpers to assert denia
 ## Assumptions
 
 - This feature ships as **core library behavior + test harness fakes/helpers**, exercised by deterministic component/unit tests. A full northbound surface (CLI/API/MCP/portal) and a production agent-framework adapter are later features.
-- "Registry" in this feature means a minimal in-process registration/resolution facility sufficient for registered vs unregistered and in-scope vs out-of-scope decisions — not a full enterprise registry product (ADR-0008).
+- "Registry" in this feature means a minimal in-process registration/resolution facility sufficient for registered vs unregistered and in-scope vs out-of-scope decisions — not a full enterprise registry product (ADR-0008). This minimal registry deliberately does not implement the governed registry lifecycle of R6 / ADR-0037 (proposed → security review → published, transport determinations, semester review) — that machinery arrives with the tool layer, not here.
 - Durable multi-year audit storage, SIEM export, and the governed audit *read* path (ADR-0035) are not required to land in full; an append-only sink with an in-memory test implementation is sufficient if the interface is stable for later providers.
 - Per-task credential manufacture, ceilings, and entitlement mirroring (003) are out of scope; runs may use test doubles for "identity present/absent" only as needed to exercise fail-closed paths.
 - Warn-mode hooks for local `make dev-up` (ADR-0009 develop stage) may be represented as a mode flag later; **002's default and test bar is enforce/fail-closed**.
 - Post-hook failure after a tool has executed records the failure in audit; full idempotent side-effect fencing belongs with durability (later).
-- Named harness helpers may match TESTING.md names (`assert_denied_closed`, etc.) or clear equivalents documented in `tests/harness`.

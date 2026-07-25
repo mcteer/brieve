@@ -32,3 +32,4 @@
 ## Notes
 
 - Validation pass 1 (2026-07-24): WHAT/WHY only. OTel named as the constitution/ADR-mandated telemetry vocabulary (not a stack choice). Harness helper names referenced as already-promised contract in TESTING.md. Defaults for surface/adapter deferral and in-memory audit sink recorded under Assumptions — no clarification markers. Ready for human review, then `/speckit-clarify` only if reviewers disagree with assumptions; otherwise `/speckit-plan` after merge.
+- Maintainer review (2026-07-24): findings applied — ADR-0019 added to traceability; per-run hash-chaining pulled into FR-008 scope; harness helper names bound to the exact testing.md contract (FR-012); tool-body-failure path specified (FR-015); registry-lifecycle deferral made explicit. Assumptions reviewed and accepted by the maintainer. Sealed-core (behavior) and evidence-relevance review gates attach to this feature per CONTRIBUTING.
