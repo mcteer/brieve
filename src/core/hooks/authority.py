@@ -62,7 +62,7 @@ def authority_pre_hook(ctx: HookContext) -> HookDecision:
             )
 
         try:
-            policy = fabric.resolve_policy()
+            policy = fabric.resolve_policy(run.agent_definition_id)
         except Exception:
             return HookDecision(
                 outcome="deny",

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from tests.harness import (
     BROKERED_GRAIN_MARKER,
+    DEFAULT_AGENT_DEFINITION_ID,
     assert_no_secret_values,
     capture_audit,
     fake_identity_fabric,
@@ -20,6 +21,7 @@ def test_run_state_has_no_brokered_secret() -> None:
     fabric = fake_identity_fabric(tool_names={"echo"})
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-state-1",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),

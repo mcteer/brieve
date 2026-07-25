@@ -12,6 +12,7 @@ from core.run import start_governed_run
 from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler
 from tests.harness import (
+    DEFAULT_AGENT_DEFINITION_ID,
     assert_denied_closed,
     assert_no_secret_values,
     assert_no_side_effect,
@@ -26,6 +27,7 @@ def test_identity_unavailable_at_start() -> None:
     fabric.fail_user = True
     with pytest.raises(AuthorityRefuseError) as exc:
         start_governed_run(
+            agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
             correlation_id="corr-id-fail",
             subject_user_id="user-1",
             requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),
@@ -43,6 +45,7 @@ def test_exchange_failed_at_start() -> None:
     fabric.fail_reason = "exchange_failed"
     with pytest.raises(AuthorityRefuseError) as exc:
         start_governed_run(
+            agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
             correlation_id="corr-ex-fail",
             subject_user_id="user-1",
             requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),
@@ -73,6 +76,7 @@ def test_entitlement_resolve_fail_at_invoke() -> None:
     )
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-ent-fail",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(

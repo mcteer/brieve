@@ -35,6 +35,8 @@ class GovernedRun:
     authority: TaskCredentialRef
     run_salt: bytes
     subject_user_id: str
+    # Threaded so live policy re-resolution on every invoke is per-definition, not global.
+    agent_definition_id: str
     identity_fabric: IdentityFabric
     clock: Clock
     hooks: list[HookRegistration] = field(default_factory=list)
@@ -48,6 +50,7 @@ def start_governed_run(
     *,
     correlation_id: str | None,
     subject_user_id: str,
+    agent_definition_id: str,
     requested_scope: AuthorityScope,
     identity_fabric: IdentityFabric,
     registry: ToolRegistry,
@@ -67,6 +70,7 @@ def start_governed_run(
             requested_scope=requested_scope,
             identity_fabric=identity_fabric,
             clock=clk,
+            agent_definition_id=agent_definition_id,
             correlation_id=cid,
         )
     except AuthorityRefuseError as exc:
@@ -94,6 +98,7 @@ def start_governed_run(
         authority=manufactured.credential,
         run_salt=manufactured.run_salt,
         subject_user_id=subject_user_id,
+        agent_definition_id=agent_definition_id,
         identity_fabric=identity_fabric,
         clock=clk,
         hooks=registered,

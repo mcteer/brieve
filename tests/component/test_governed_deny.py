@@ -11,6 +11,7 @@ from core.run import start_governed_run
 from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler
 from tests.harness import (
+    DEFAULT_AGENT_DEFINITION_ID,
     assert_denied_closed,
     assert_no_side_effect,
     capture_audit,
@@ -26,6 +27,7 @@ def test_unregistered_denied(span_exporter: InMemorySpanExporter) -> None:
     registry.register("echo", handler)
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-deny-1",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),
@@ -49,6 +51,7 @@ def test_out_of_scope_denied(span_exporter: InMemorySpanExporter) -> None:
     registry.register("other", handler)
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-deny-2",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),

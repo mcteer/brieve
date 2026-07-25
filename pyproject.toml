@@ -9,9 +9,21 @@ license = "Apache-2.0"
 requires-python = ">=3.12"
 # Runtime deps justified by specs/002-governed-core/research.md (Principle VI):
 # pydantic — boundary validation (CONTRIBUTING); opentelemetry-api — ADR-0020 spans.
+# Floors raised to match the `adapters` extra (pydantic-ai-slim requires pydantic>=2.12
+# and opentelemetry-api>=1.28) so with-extra and without-extra environments resolve the
+# same versions — specs/004-primary-adapter/research.md.
 dependencies = [
-    "opentelemetry-api>=1.27",
-    "pydantic>=2.10",
+    "opentelemetry-api>=1.28",
+    "pydantic>=2.12",
+]
+
+# Primary adapter (ADR-0017), optional so the framework stays out of the core install.
+# Slim, not the `pydantic-ai` meta package: the meta resolves to
+# pydantic-ai-slim[anthropic,cli,evals,google,logfire,mcp,openai,retries,web], installing
+# three live model-provider SDKs for a feature that calls no model (Principle VI, FR-012).
+[project.optional-dependencies]
+adapters = [
+    "pydantic-ai-slim==2.18.0",
 ]
 
 [dependency-groups]

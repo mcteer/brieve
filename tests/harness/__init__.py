@@ -11,7 +11,10 @@ from tests.harness.assertions import (
     assert_scope_narrowed,
 )
 from tests.harness.capture_audit import capture_audit
-from tests.harness.fake_identity_fabric import fake_identity_fabric
+from tests.harness.fake_identity_fabric import (
+    DEFAULT_AGENT_DEFINITION_ID,
+    fake_identity_fabric,
+)
 from tests.harness.fake_product_api import fake_product_api
 from tests.harness.frozen_clock import frozen_clock
 from tests.harness.scripted_agent import scripted_agent
@@ -25,6 +28,7 @@ from tests.harness.secrets import (
 __all__ = [
     "AUTHORITY_SECRET_MARKER",
     "BROKERED_GRAIN_MARKER",
+    "DEFAULT_AGENT_DEFINITION_ID",
     "SECRET_MARKER",
     "SECRET_MARKERS",
     "assert_audit_chain",

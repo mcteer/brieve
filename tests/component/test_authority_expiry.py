@@ -12,6 +12,7 @@ from core.run import start_governed_run
 from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler
 from tests.harness import (
+    DEFAULT_AGENT_DEFINITION_ID,
     assert_denied_closed,
     capture_audit,
     fake_identity_fabric,
@@ -26,6 +27,7 @@ def test_expiry_denies_before_body() -> None:
     clock = frozen_clock()
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-expiry",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),

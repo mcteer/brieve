@@ -14,6 +14,7 @@ from core.run import GovernedRun, start_governed_run
 from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler
 from tests.harness import (
+    DEFAULT_AGENT_DEFINITION_ID,
     assert_denied_closed,
     assert_no_secret_values,
     assert_no_side_effect,
@@ -71,6 +72,7 @@ def _product_run(
     )
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-mirror",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(
@@ -156,6 +158,7 @@ def test_action_in_entitlements_but_not_live_effective() -> None:
     )
     # Request only ACTION_OK in task scope — ACTION_DENY not in issued effective
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-dual-bound",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(

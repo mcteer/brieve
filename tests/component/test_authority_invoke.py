@@ -11,6 +11,7 @@ from core.run import start_governed_run
 from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler
 from tests.harness import (
+    DEFAULT_AGENT_DEFINITION_ID,
     assert_denied_closed,
     assert_no_side_effect,
     capture_audit,
@@ -34,6 +35,7 @@ def test_tool_outside_live_effective_denied() -> None:
     fabric = fake_identity_fabric(tool_names={"echo", "other"}, ceiling_tools={"echo", "other"})
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-inv-deny",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),
@@ -59,6 +61,7 @@ def test_mid_run_policy_shrink_denies() -> None:
     )
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-policy-shrink",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo", "other"})),
@@ -81,6 +84,7 @@ def _make(tools: list[str], requested: set[str]) -> tuple[Any, CountingHandler, 
     fabric = fake_identity_fabric(tool_names=set(tools), ceiling_tools=set(tools))
     audit = capture_audit()
     run = start_governed_run(
+        agent_definition_id=DEFAULT_AGENT_DEFINITION_ID,
         correlation_id="corr-inv-allow",
         subject_user_id="user-1",
         requested_scope=AuthorityScope(tool_names=frozenset(requested)),

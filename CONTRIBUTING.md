@@ -198,7 +198,9 @@ Supported development platforms: Linux and macOS natively; Windows via WSL2.
 
 ```bash
 git clone https://github.com/<org>/<repo>.git && cd <repo>
-uv sync                  # Python toolchain and dependencies
+uv sync --extra adapters   # Python toolchain and dependencies (the extra installs the
+                           # primary adapter; make recipes pass it too, so `make check`
+                           # and `make conformance` cannot run without it)
 uv run pre-commit install  # formatting, linting, and hygiene hooks
 make check               # lint + typecheck + unit tests — your inner loop
 make conformance         # the conformance suite — required before any adapter/provider PR
