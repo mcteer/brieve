@@ -33,3 +33,14 @@
 
 - Validation pass 1 (2026-07-24): WHAT/WHY only. OTel named as the constitution/ADR-mandated telemetry vocabulary (not a stack choice). Harness helper names referenced as already-promised contract in TESTING.md. Defaults for surface/adapter deferral and in-memory audit sink recorded under Assumptions — no clarification markers. Ready for human review, then `/speckit-clarify` only if reviewers disagree with assumptions; otherwise `/speckit-plan` after merge.
 - Maintainer review (2026-07-24): findings applied — ADR-0019 added to traceability; per-run hash-chaining pulled into FR-008 scope; harness helper names bound to the exact testing.md contract (FR-012); tool-body-failure path specified (FR-015); registry-lifecycle deferral made explicit. Assumptions reviewed and accepted by the maintainer. Sealed-core (behavior) and evidence-relevance review gates attach to this feature per CONTRIBUTING.
+- Design review (2026-07-24): import path fixed as `tests.harness` (testing.md
+  amended; installable packaging deferred with interface stable); canonical hash
+  encoding, genesis sentinel, and seq origin pinned in the audit contract;
+  audit-append failure semantics added (un-auditable actions do not proceed);
+  `assert_no_side_effect` pulled into 002 as counter-based; reason-code disclosure
+  flagged for tenancy-era tightening. Decisions ratified by the maintainer.
+- Analyze remediation (2026-07-25): tasks.md gained explicit coverage for
+  multi-invoke same-run correlation, post-hook error after successful body, and
+  missing required enforcement dependency (FR-006). `assert_no_side_effect`
+  moved under assertion helpers (not fakes); SC-004 tightened to OTel span;
+  spec Status set to Planned.
