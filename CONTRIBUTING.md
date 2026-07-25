@@ -157,6 +157,28 @@ travels through ordered stages, each producing a reviewable artifact under
 6. **`/speckit.implement`** — only now does code get written, against the analyzed task
    list.
 
+**Reviewing a spec.** Six questions, learned from the first feature cycles — a spec
+that passes all six is usually sound; a "no" on any is a finding to raise, not a nit:
+
+1. Does every requirement that implements a decided rule cite the ADR that decided
+   it — and are all cited ADRs Accepted, not Proposed?
+2. Does anything the spec promises contradict or under-deliver a merged document
+   (CONTRIBUTING, AGENTS.md, the testing guide)? Specs routinely contain
+   "docs must match reality" clauses, which make such conflicts self-falsifying.
+3. What interfaces, schemas, or paths does it create that later work will depend on
+   — and is each one's hardest stability property (canonical encoding, versioning,
+   exact names) either in scope or explicitly deferred with the interface stable?
+4. Is the failure path specified for every success path — tool errors, dependency
+   failures, records that cannot be written?
+5. Which review gates does the contribution class trigger, and will the record show
+   they ran?
+6. Are all named contracts bound exactly — no "or equivalent" language anywhere in
+   the spec or its design artifacts?
+
+When clarification markers are resolved, the checklist notes record *how*: answered
+directly by a human, or resolved by an agent under explicit delegation and reviewed
+afterward. Both are legitimate; an unrecorded resolution is neither.
+
 **The spec PR precedes the implementation PR.** Specs are reviewed and merged as their
 own pull requests; the implementation PR links its governing spec. This is not ceremony
 — it is how a reviewer distinguishes "the design is wrong" from "the code doesn't match

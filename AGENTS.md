@@ -65,6 +65,40 @@ The spec PR merges before the implementation PR opens. Branch names bind them:
 merges successfully, **delete its head branch** on the remote (and locally if present)
 — prefer `gh pr merge --squash --delete-branch`. Do not leave merged branches around.
 
+## Spec Kit artifacts: hard rules
+
+Learned from the first feature cycles; these are review-blocking, not stylistic.
+
+- **Never regenerate a reviewed artifact.** Once a spec, plan, or tasks file has been
+  human-edited or human-reviewed, re-running its Spec Kit stage destroys reconciled
+  state. Apply corrections as surgical edits to the existing file.
+- **Named contracts bind exactly.** If a merged document names a helper, command,
+  import path, or file, use precisely that name. Never write "or equivalent," "or
+  similar," or a clear-equivalent substitute. If a documented name seems wrong, stop
+  and surface it — the fix is reconciling the document, not improvising around it.
+- **Verify quotes of other documents.** Before writing "as documented in X," read X
+  and confirm it says that. If two merged documents disagree, surface the conflict
+  and stop; never silently pick a side or inherit the inconsistency into a new
+  artifact.
+- **Cite the deciding ADR.** Every requirement that implements an already-decided
+  rule cites the ADR that decided it. Traceability cites Accepted ADRs only —
+  Proposed records are not governing authority.
+- **Plans contain decisions, not alternatives.** "X or Y" in a plan's dependencies or
+  tooling means two contributors build different systems. Resolve it in research, or
+  mark it `[NEEDS CLARIFICATION]` — never leave the fork open.
+- **Every success path has a failure sibling.** When specifying an allow/success
+  flow, specify what happens when the body errors, the dependency fails, or the
+  record cannot be written. Unspecified failure paths in enforcement or evidence code
+  are review blockers.
+- **Creating a seam is a commitment.** A new interface, schema, or import path that
+  later features or operators will depend on must have its stability properties
+  pinned in the contract — canonical encodings, versioning, exact paths — or an
+  explicit deferral recorded with "interface stable now." "Decided at implementation
+  time" is never acceptable on sealed-core schemas.
+- **Never invent facts.** No product names, codenames, copyright holders, email
+  addresses, or dates that have not been decided. Use an obviously neutral
+  placeholder and flag it for the maintainer.
+
 ## Commands
 
 ```bash
