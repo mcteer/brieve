@@ -6,7 +6,8 @@
 ## Decision: Package boundary and dependency shape
 
 - **Decision**: Implement the primary adapter under `src/adapters/pydantic_ai/`.
-  Declare `pydantic-ai` under **`[project.optional-dependencies] adapters`** in
+  Declare **`pydantic-ai-slim==2.18.0`** under
+  **`[project.optional-dependencies] adapters`** in
   `pyproject.toml` (not a uv `[dependency-groups]` entry — those remain for `dev`).
   Install with `uv sync --extra adapters`. `src/core` MUST NOT import `pydantic_ai`
   or any agent framework. After 004 lands, contributor/CI inner loop for `make check`
@@ -16,7 +17,22 @@
   primary); Principle VI (lean core import graph / justified dep at the adapter edge);
   AGENTS.md sealed-adapter layout; `--extra` is the PEP 621 optional-dep knob and
   coexists with existing `[dependency-groups] dev`.
-- **Alternatives considered**: Hard runtime dep on every bare `uv sync` (inflates core
+- **Slim, not the meta package** (resolved 2026-07-25 from the package index): `pydantic-ai`
+  2.18.0 resolves to `pydantic-ai-slim[anthropic,cli,evals,google,logfire,mcp,openai,
+  retries,web]==2.18.0`, installing the Anthropic, Google, and OpenAI SDKs plus a CLI and
+  logfire. 004 calls no model — every one of those is unused weight in a regulated
+  dependency tree (Principle VI), and FR-012's denylist is materially easier to hold when
+  live model SDKs are not installed at all. `pydantic-ai-slim` brings `httpx`, `pydantic`,
+  `pydantic-graph`, `opentelemetry-api`, `genai-prices`, `griffelib`,
+  `typing-inspection` — and `TestModel` / `FunctionModel` plus the capability and toolset
+  APIs 004 binds are all in the slim core. **Consequence to settle at implement time**: slim
+  requires `pydantic>=2.12` and `opentelemetry-api>=1.28`, above this project's `>=2.10` /
+  `>=1.27` floors, so the with-extra and without-extra environments resolve differently
+  unless the base pins are raised (T002).
+- **Alternatives considered**: The `pydantic-ai` meta package (simpler name, but installs
+  three model-provider SDKs for a feature that calls no model; rejected — revisit if a
+  later feature needs a real provider, at which point the extra it needs is added
+  explicitly rather than inherited); hard runtime dep on every bare `uv sync` (inflates core
   consumers; rejected for lean); uv `--group adapters` only (diverges from
   optional-dependencies / packaging extras; rejected); vendoring a fake framework
   (fails ADR-0017 reference adapter goal; rejected).
@@ -153,12 +169,65 @@
   not a silent pass that weakens the primary bar. Constitution Quality Gates also name
   deferred-disclosure parity, four-transport surface parity, registry isolation depth,
   and full ADR-0024 durability scenarios — those rows **attach when those features
-  land**; 004 must not add silent-green stubs for them.
+  land** (now authoritative under Accepted **ADR-0047** / constitution v1.0.1, with the
+  per-row deferring ADR recorded in `contracts/conformance-adapter.md`); 004 must not add
+  silent-green stubs for them.
 - **Rationale**: FR-011; constitution Quality Gates; 001 reserved the command as
   fail-closed until real — 004 is when the **adapter governance** lane becomes real.
 - **Alternatives considered**: Keep stub forever (fails SC-007); run full four-transport
   parity now (no surfaces yet; rejected); mark deferred rows xfail/skip-pass without
   documentation (weakens the suite; rejected).
+
+## Decision: Conformance enforcement lives in CI, not the PR body
+
+- **Decision**: `make conformance` runs as a step in the existing fast-lane job in
+  `.github/workflows/ci.yml`, after `Inner-loop check`, with `Sync dependencies` changed
+  to `uv sync --frozen --extra adapters`. A local run recorded in a PR description is a
+  pre-flight, not the gate.
+- **Rationale**: FR-015; `contracts/conformance-adapter.md` invariant 1 asserts
+  merge-blocking, and Principle IX makes the distinction between a record and a claim
+  load-bearing. A gate verified by a human pasting output is a claim.
+- **Alternatives considered**: Separate conformance job (re-pays checkout + sync ~30s for
+  a sub-second lane, no isolation benefit; rejected for 004 — revisit when the lane grows
+  or needs a different environment); PR-description evidence only (the status quo this
+  replaces; rejected); branch protection without a CI step (nothing to protect against).
+
+## Decision: Core extensions capped at three, enumerated in the spec
+
+- **Decision**: This feature's sealed-core changes are exactly: durability protocol +
+  in-memory default; approval-hook protocol + deny-by-default double; required
+  `agent_definition_id` at run start threaded into ceiling and policy resolution. Anything
+  else in `src/core` is out of scope and needs its own spec.
+- **Rationale**: FR-016. The spec previously described 004 as "adapter glue", which the
+  task list contradicted — an unbounded licence to touch sealed core is exactly what
+  Principle V exists to prevent. Enumerating the three makes a fourth visible at review.
+- **Alternatives considered**: Leave the scope implicit in plan.md (review has nothing to
+  hold a PR against; rejected); split the core seams into their own feature (correct in
+  principle, but the adapter cannot be demonstrated without them — deferring would produce
+  an untestable 004; rejected with the breaking-seam exemption recorded in Assumptions).
+
+## Decision: FR-012 verified by an import guard, not convention
+
+- **Decision**: Add `tests/unit/test_no_live_dependencies.py` with two checks:
+  **(a)** an `ast`-based scan of test module *source* asserting no test directly imports a
+  denylisted network client (`httpx`, `requests`, `urllib.request`, `aiohttp`, `hvac`,
+  model-provider SDKs); **(b)** an assertion that adapter tests resolve only stub models
+  (`TestModel` / `FunctionModel` or the harness wrapper).
+- **Rationale**: FR-012 as amended. FR-010 (no secret values) carries three assertions;
+  FR-012 carried none, so "no live calls" rested on reviewer attention. Determinism that
+  nothing checks degrades silently — the first live call added is also the first flaky test.
+- **Mechanism matters here.** A `sys.modules` check is wrong: `pydantic-ai` imports an HTTP
+  client transitively, so every adapter test would trip it. Scanning source for *direct*
+  imports scopes the property to what a test author controls — "no test reaches for a live
+  client itself" — and (b) covers what (a) cannot, since the realistic path to a live call
+  is a real model provider passed to an agent, not an import statement.
+- **Known limit**: this catches reaching for a client, not a live call through an
+  already-imported one. Accepted for 004 and recorded in the module docstring.
+- **Alternatives considered**: `pytest-socket` (strictly stronger — blocks the call, not the
+  import — but adds a dependency to a regulated tree that must be justified per Principle
+  VI, for a gap the two checks above close in the realistic cases; escalate to it if a live
+  call ever slips through); a `sys.modules` check (wrong for the transitive-import reason
+  above; rejected); trust convention plus review (the status quo this replaces).
 
 ## Decision: Deny surface to the framework
 
