@@ -50,7 +50,7 @@ response make this fail?* If yes, it is an eval.
 | **Unit** | One module, no I/O | none | ms | every push |
 | **Component** | One subsystem with fakes (hook pipeline, registry, token exchange) | stub | ms–s | every push |
 | **Contract** | A seam's interface, both directions | stub | s | every push |
-| **Conformance** | A provider or adapter implementation against the shared suite | stub | s–min | every PR touching it |
+| **Conformance** | A provider or adapter implementation against the shared suite | stub | s–min | every PR touching it — merge-blocking, in the fast lane (`make conformance`) |
 | **Integration** | Real backing services (Postgres, dev-mode identity fabric, local MCP servers) | stub | min | every PR |
 | **Scenario** | Multi-step runs end to end, including approvals and resumption | scripted | min | every PR |
 | **Fault injection** | Kill, expire, partition, duplicate, drain | scripted | min | every PR |
@@ -278,8 +278,8 @@ Coverage reports are advisory in CI; the enforcement-path check is required.
 
 | Tier | Trigger | Contents | Budget |
 | --- | --- | --- | --- |
-| **Fast** | every push | lint, types, unit, component, contract, secret scan, DCO check, license compliance | < 5 min |
-| **Full** | every PR | fast + integration, scenario, fault injection, adversarial, conformance and evals by class, license check, a11y | < 30 min |
+| **Fast** | every push | lint, types, unit, component, contract, **adapter and provider conformance**, secret scan, DCO check, license compliance | < 5 min |
+| **Full** | every PR | fast + integration, scenario, fault injection, adversarial, remaining conformance and evals by class, license check, a11y | < 30 min |
 | **Nightly** | schedule | full + performance, the wider eval matrix, long-horizon durability, dependency audit | unbounded |
 | **Release** | tag | nightly + upgrade/migration from previous released versions, air-gapped bundle verification | unbounded |
 
