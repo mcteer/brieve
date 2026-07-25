@@ -1,7 +1,7 @@
 # Contract: CI fast lane
 
-**Feature**: `specs/001-dev-toolchain`  
-**Audience**: Maintainers, contributors, GitHub Actions  
+**Feature**: `specs/001-dev-toolchain`
+**Audience**: Maintainers, contributors, GitHub Actions
 **Workflow path (planned)**: `.github/workflows/ci.yml`
 
 ## Trigger

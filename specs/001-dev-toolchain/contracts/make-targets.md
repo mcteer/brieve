@@ -1,7 +1,7 @@
 # Contract: Make targets
 
-**Feature**: `specs/001-dev-toolchain`  
-**Audience**: Contributors and CI  
+**Feature**: `specs/001-dev-toolchain`
+**Audience**: Contributors and CI
 **Stability**: Target **names** are stable (CONTRIBUTING); recipes may evolve.
 
 ## Targets

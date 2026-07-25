@@ -80,8 +80,9 @@ was already entitled to do).
 
 ## License
 
-Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for
-attribution requirements when redistributing.
+Licensed under the [Apache License, Version 2.0](LICENSE). A `NOTICE` file for
+redistribution attribution may be added later; it is not required for local
+development.
 
 Contributions are accepted under the same license, certified via the
 [Developer Certificate of Origin](https://developercertificate.org/) — sign off your

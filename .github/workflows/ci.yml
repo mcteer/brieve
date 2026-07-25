@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: Apache-2.0
+# Fast lane (FR-006): fork-safe — uses only GITHUB_TOKEN (automatic); no required secrets.
+
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  fast-lane:
+    name: fast-lane
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Inner-loop check
+        run: make check
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: DCO sign-off
+        uses: christophebedard/dco-check@0.5.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: License compliance
+        run: bash scripts/check-licenses.sh
+
+      - name: Spec-artifact lint (when specs/ changes)
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- 'specs' || true)"
+          if [[ -z "${changed}" ]]; then
+            echo "No specs/ changes; skipping spec lint"
+            exit 0
+          fi
+          # shellcheck disable=SC2086
+          bash scripts/check-specs.sh ${changed}

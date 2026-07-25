@@ -1,7 +1,7 @@
 # Quickstart validation: Developer Toolchain Scaffold
 
-**Feature**: `specs/001-dev-toolchain`  
-**Purpose**: Prove the contributor contract end-to-end after `feat/001-dev-toolchain` lands.  
+**Feature**: `specs/001-dev-toolchain`
+**Purpose**: Prove the contributor contract end-to-end after `feat/001-dev-toolchain` lands.
 **Not**: an implementation guide with full file contents (see `tasks.md`).
 
 ## Prerequisites
