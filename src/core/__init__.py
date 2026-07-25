@@ -1,4 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Framework-agnostic governed core (sealed). Stub package — no behavior yet."""
+"""Framework-agnostic governed core (sealed)."""
 
-__all__: list[str] = []
+from core.run import GovernedRun, start_governed_run
+from core.tools.invoke import InvokeResult, invoke_tool
+
+__all__ = [
+    "GovernedRun",
+    "InvokeResult",
+    "invoke_tool",
+    "start_governed_run",
+]
