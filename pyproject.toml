@@ -7,11 +7,17 @@ description = "Governed runtime for AI agents operating infrastructure products"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12"
-dependencies = []
+# Runtime deps justified by specs/002-governed-core/research.md (Principle VI):
+# pydantic — boundary validation (CONTRIBUTING); opentelemetry-api — ADR-0020 spans.
+dependencies = [
+    "opentelemetry-api>=1.27",
+    "pydantic>=2.10",
+]
 
 [dependency-groups]
 dev = [
     "mypy>=1.14",
+    "opentelemetry-sdk>=1.27",
     "pip-licenses>=5.0",
     "pre-commit>=4.0",
     "pytest>=8.0",
@@ -45,5 +51,5 @@ mypy_path = "src"
 explicit_package_bases = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit"]
-pythonpath = ["src"]
+testpaths = ["tests/unit", "tests/component"]
+pythonpath = ["src", "."]
