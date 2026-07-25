@@ -1,8 +1,14 @@
 <!--
 Sync Impact Report
-- Version: 1.0.0 (draft, pre-ratification) — sourced from architecture v1.14;
-  decision records ADR-0001–0046 plus GR-1 in docs/adr/
-- This revision: wording condensed throughout (no semantic change to any rule);
+- Version: 1.0.1 — sourced from architecture v1.14; decision records ADR-0001–0047 plus
+  GR-1 in docs/adr/
+- This revision (1.0.0 → 1.0.1, PATCH — clarifies when an existing gate binds; no
+  principle removed, redefined, or expanded): Quality Gates conformance row scoped per
+  ADR-0047 — each gate row is blocking from the moment its underlying feature exists, and
+  is absent or explicitly skipped, never stubbed green, before then. Motivated by
+  specs/004-primary-adapter, the first adapter to reach a gate enumerating rows for
+  features scheduled after it. No change to what any row asserts.
+- Prior revision (1.0.0): wording condensed throughout (no semantic change to any rule);
   per-transport auth flows and scenario detail delegated to cited ADRs
 - Authority: docs/adr/ — where this document conflicts with a later Accepted ADR, the
   ADR wins and this document MUST be amended in the same change
@@ -170,7 +176,11 @@ change.
 
 ## Quality Gates
 
-- **Conformance suite** (blocking for adapters and providers): governance-ordering and
+- **Conformance suite** (blocking for adapters and providers). Each row below is blocking
+  from the moment its underlying feature exists, and before then is absent or a single
+  explicit skip carrying the ADR that defers it — never a passing stub (ADR-0047); the
+  rows in force are recorded in each feature's conformance contract, and a feature that
+  lands without adding its rows is a gate regression. Rows: governance-ordering and
   fail-closed assertions; tool-call parity under deferred disclosure (ADR-0040); registry isolation (agent-credential control-plane writes
   observed denied); surface parity across all four transports; durability scenarios per
   ADR-0024/026 — kill/resume, re-observe-never-re-execute, re-auth-never-replay,
@@ -191,4 +201,4 @@ change.
   train for drift against newly Accepted decisions; `/speckit.analyze` findings that
   implicate a principle block `/speckit.implement`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-24
+**Version**: 1.0.1 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-25
