@@ -21,11 +21,24 @@ the human subject’s product entitlements include the required action (ADR-0044
 
 Within governance hooks, order is:
 
-1. Authority gate (expiry + effective tool scope)
+1. Authority gate (expiry + `live_effective` tool/product_action bounds — see
+   `authority-binding.md`)
 2. Entitlement mirroring (this contract)
 3. Remaining 002 governance checks
 
 Non-governance hooks run only after all governance hooks allow.
+
+## Dual-bound product action check (pinned)
+
+For `product_mode` ∈ {`federate`, `broker`}, allow only when **both** hold:
+
+1. `product_action` ∈ `live_effective.product_actions` (authority gate; reason
+   `authority_insufficient` if not)
+2. `product_action` ∈ live user product entitlements from the fabric (this hook;
+   reason `mirroring_denied` if not)
+
+Live entitlements alone MUST NOT authorize an action outside the task’s
+`live_effective.product_actions`.
 
 ## Behavior by mode
 
@@ -35,7 +48,8 @@ Skip mirroring. Tool is harness-local / non-product.
 
 ### `federate`
 
-1. Resolve entitlements for `(subject_user_id, product)` from identity fabric.
+1. Resolve entitlements for `(subject_user_id, product)` from identity fabric on
+   every invoke (no wider cache).
 2. If resolve fails → deny `identity_unavailable` or `exchange_failed`.
 3. If entitlements empty or `product_action` ∉ entitlements → deny `mirroring_denied`.
 4. Append `mirroring_decision` (allow/deny). On allow, proceed; product fake validates
@@ -51,6 +65,7 @@ Skip mirroring. Tool is harness-local / non-product.
 ## Invariants
 
 1. Empty entitlements deny (never “unrestricted”).
-2. Mid-run entitlement shrink is observed on the next invoke.
+2. Mid-run entitlement shrink **and** mid-run policy shrink are observed on the next
+   invoke (`live_effective` + live entitlements).
 3. Deny path: no product side effect; audit + correlation; no secret values.
 4. Caller-visible messages use reason codes; do not dump other users’ entitlements.
