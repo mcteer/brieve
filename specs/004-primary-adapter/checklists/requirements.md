@@ -44,9 +44,3 @@
   `/speckit-plan` after merge.
 - Contribution class at implement time: sealed core (adapters) — security-maintainer
   review mandatory per CONTRIBUTING; `make conformance` becomes load-bearing.
-- Analyze remediations (2026-07-25): dependency extra vs groups pinned; CI always
-  `--extra adapters`; FR-013/FR-005 adapter-path tasks added (T031/T032 after renumber);
-  `resolve_policy` takes definition id; adapter start forces governance included;
-  deferred conformance rows and invoke_tool-vs-MCP notes recorded. LOW re-analyze polish:
-  monotonic T001–T060; T002 concrete pin at implement; T036 break-test path pinned.
-  Zero CRITICAL/HIGH/MEDIUM on final analyze.
