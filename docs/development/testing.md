@@ -278,7 +278,7 @@ Coverage reports are advisory in CI; the enforcement-path check is required.
 
 | Tier | Trigger | Contents | Budget |
 | --- | --- | --- | --- |
-| **Fast** | every push | lint, types, unit, component, contract, secret scan | < 5 min |
+| **Fast** | every push | lint, types, unit, component, contract, secret scan, DCO check, license compliance | < 5 min |
 | **Full** | every PR | fast + integration, scenario, fault injection, adversarial, conformance and evals by class, license check, a11y | < 30 min |
 | **Nightly** | schedule | full + performance, the wider eval matrix, long-horizon durability, dependency audit | unbounded |
 | **Release** | tag | nightly + upgrade/migration from previous released versions, air-gapped bundle verification | unbounded |
