@@ -102,7 +102,7 @@ A contributor installs pre-commit hooks once and, on commit, automatic formattin
 - **FR-008**: Toolchain documentation in CONTRIBUTING (or linked setup section) MUST match the commands that actually exist after this feature merges.
 - **FR-009**: No live model provider, identity fabric, or managed-product API MUST be required to complete install or the inner-loop check.
 - **FR-010**: Secret-like values MUST NOT appear in toolchain config, fixtures, or CI logs introduced by this feature.
-- **FR-011**: Every source file introduced by this feature MUST carry the project's per-file license notice as a one-line `SPDX-License-Identifier: Apache-2.0` (not the full Apache 2.0 header block). Files created by this feature set that precedent for the repository.
+- **FR-011**: Every new file introduced by this feature that supports comments (Python sources, Makefile, YAML, TOML, shell) MUST carry a one-line `SPDX-License-Identifier: Apache-2.0` notice in its comment syntax; files without a comment syntax and generated lockfiles are exempt. This sets the repository precedent (full Apache header blocks are not used).
 
 ### Key Entities
 
