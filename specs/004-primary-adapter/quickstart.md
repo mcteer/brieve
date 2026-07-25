@@ -1,7 +1,7 @@
 # Quickstart validation: Primary Adapter
 
 **Feature**: `specs/004-primary-adapter`
-**Purpose**: Prove FR-001–FR-014 end-to-end after `feat/004-primary-adapter` lands.
+**Purpose**: Prove FR-001–FR-016 end-to-end after `feat/004-primary-adapter` lands.
 **Not**: an implementation guide with full module bodies (see `tasks.md`).
 
 Contracts: [four-mappings](./contracts/four-mappings.md),
@@ -13,7 +13,7 @@ Contracts: [four-mappings](./contracts/four-mappings.md),
 - `main` includes 002 governed core and 003 per-task authority
 - Python 3.12+, `uv`, `make`
 - `uv sync --extra adapters` (required for `make check` and `make conformance` after 004 —
-  installs `pydantic-ai` via `[project.optional-dependencies] adapters`; do not rely on
+  installs `pydantic-ai-slim` via `[project.optional-dependencies] adapters`; do not rely on
   a bare `uv sync` for the inner loop)
 - No Docker, live IdP, Vault, collector, or live model API keys required
 
@@ -88,6 +88,27 @@ pytest tests/unit/test_core_import.py -q
 **Expect**: core import smoke still passes; no agent-framework modules imported from
 `core`.
 
+## Scenario G — No live dependencies (FR-012)
+
+```bash
+pytest tests/unit/test_no_live_dependencies.py -q
+```
+
+**Expect**: no module under the feature's test paths imports a live-network client (HTTP
+client, model SDK, IdP, or Vault client), and no adapter test resolves a real model
+provider. Determinism is asserted, not assumed.
+
+## Scenario H — Conformance is merge-blocking (FR-015)
+
+```bash
+grep -A2 'Inner-loop check' .github/workflows/ci.yml   # conformance step present
+gh pr checks                                           # from an adapter-touching branch
+```
+
+**Expect**: the fast lane syncs with `--extra adapters` and runs `make conformance`; a
+deliberately broken governance order fails the check, not just a local run. A passing
+result pasted into a PR description is a pre-flight, never the gate.
+
 ## Mapping to user stories
 
 | Story | Scenarios |
@@ -96,4 +117,5 @@ pytest tests/unit/test_core_import.py -q
 | US2 deny | B |
 | US3 governance-first + fail closed | C |
 | US4 four mappings only | D, F |
-| US5 conformance command | C, E |
+| US5 conformance command | C, E, H |
+| Cross-cutting (FR-012 determinism) | G |

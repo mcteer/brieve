@@ -135,3 +135,7 @@ unless test injects allow; still no tool body without subsequent successful
 3. GovernanceCapability is first among co-resident capabilities (conformance).
 4. Checkpoint blobs never carry secrets / `run_salt` / brokered material.
 5. Blank `agent_definition_id` cannot start a governed adapter run.
+6. The core entities above — `DurabilityProvider`, `ApprovalHook`, and the `IdentityFabric`
+   definition-keyed extension — are the **complete** set of sealed-core changes this
+   feature makes (FR-016). A fourth core entity appearing in implementation is out of
+   scope and needs its own spec.
