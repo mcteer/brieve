@@ -13,7 +13,6 @@ from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler
 from tests.harness import (
     assert_denied_closed,
-    assert_no_side_effect,
     capture_audit,
     fake_identity_fabric,
     frozen_clock,
@@ -42,4 +41,3 @@ def test_expiry_denies_before_body() -> None:
     assert handler.call_count == 1  # second invoke did not execute
     types = [e.event_type for e in audit.list_by_correlation_id(run.correlation_id)]
     assert AuditEventType.AUTHORITY_EXPIRED in types
-    assert_no_side_effect(type("Z", (), {"call_count": 0})())

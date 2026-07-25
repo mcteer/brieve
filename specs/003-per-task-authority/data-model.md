@@ -44,6 +44,7 @@ Existing 002 entity gains:
 | `authority` | `TaskCredentialRef` | Required after successful start |
 | `run_salt` | `bytes` (len 32) | In-memory only; never audited raw |
 | `scope` | `frozenset[str]` | Remains tool-name projection of `authority.effective.tool_names` |
+| `live_effective` | `AuthorityScope \| None` | Recomputed per invoke by the authority hook (`effective ∩ current_policy`); never persisted; never wider than issue-time effective |
 
 ### IdentityFabric (fake protocol)
 

@@ -15,6 +15,10 @@ from core.hooks.types import (
 
 GOVERNANCE_HOOK_NAME = "governance"
 
+REQUIRED_GOVERNANCE_PRE_HOOKS = frozenset(
+    {AUTHORITY_HOOK_NAME, MIRRORING_HOOK_NAME, GOVERNANCE_HOOK_NAME}
+)
+
 
 def _allow(_ctx: HookContext) -> HookDecision:
     return HookDecision(outcome="allow", reason_code="ok", message="allowed")
@@ -50,10 +54,16 @@ def builtin_governance_hooks() -> list[HookRegistration]:
     ]
 
 
-def has_governance_pre_hook(hooks: list[HookRegistration]) -> bool:
-    return any(
-        h.phase == HookPhase.PRE
-        and h.capability_kind == CapabilityKind.GOVERNANCE
-        and h.name == GOVERNANCE_HOOK_NAME
+def has_required_governance_hooks(hooks: list[HookRegistration]) -> bool:
+    """All built-in governance pre-hooks must be present for enforcement to be whole."""
+    present = {
+        h.name
         for h in hooks
-    )
+        if h.phase == HookPhase.PRE and h.capability_kind == CapabilityKind.GOVERNANCE
+    }
+    return REQUIRED_GOVERNANCE_PRE_HOOKS.issubset(present)
+
+
+def has_governance_pre_hook(hooks: list[HookRegistration]) -> bool:
+    """Alias — requires the full built-in governance pre-hook set (not name alone)."""
+    return has_required_governance_hooks(hooks)

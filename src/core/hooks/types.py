@@ -42,6 +42,8 @@ class HookContext:
     executed: bool = False
     execution_error_code: str | None = None
     probe_log: list[str] = field(default_factory=list)
+    # Populated for built-in governance hooks only. Third-party hooks must not depend on
+    # this attribute; the hook context narrows further before the Hook SDK seam ships.
     run: Any = None  # GovernedRun; duck-typed to avoid import cycles
 
 

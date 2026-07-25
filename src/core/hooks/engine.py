@@ -10,7 +10,7 @@ from core.audit.schema import AuditEventType
 from core.audit.sink import build_next_entry
 from core.authority.errors import AuditAppendFailed
 from core.errors import RegistryError, ToolNotRegisteredError
-from core.hooks.governance import has_governance_pre_hook
+from core.hooks.governance import has_required_governance_hooks
 from core.hooks.types import (
     CapabilityKind,
     HookContext,
@@ -101,14 +101,14 @@ def run_pipeline(
 
     redacted = redact_arguments(arguments)
 
-    # Required enforcement dependency: built-in governance pre-hook must be present.
-    if not has_governance_pre_hook(run.hooks):
+    # Required enforcement dependency: full built-in governance pre-hook set.
+    if not has_required_governance_hooks(run.hooks):
         return _deny_pre(
             run,
             tool_name,
             redacted,
             reason_code="internal_error",
-            message="required governance enforcement dependency is missing",
+            message="required governance enforcement hooks are missing",
             event_type=AuditEventType.ENFORCEMENT_ERROR,
         )
 
@@ -161,7 +161,7 @@ def run_pipeline(
             arguments=arguments,
             phase=HookPhase.PRE,
             probe_log=run.probe_log,
-            run=run,
+            run=run if hook.capability_kind == CapabilityKind.GOVERNANCE else None,
         )
         try:
             run.probe_log.append(f"{HookPhase.PRE}:{hook.capability_kind}")
@@ -268,7 +268,7 @@ def run_pipeline(
             executed=True,
             execution_error_code=execution_error_code,
             probe_log=run.probe_log,
-            run=run,
+            run=run if hook.capability_kind == CapabilityKind.GOVERNANCE else None,
         )
         try:
             run.probe_log.append(f"{HookPhase.POST}:{hook.capability_kind}")

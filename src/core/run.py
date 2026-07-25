@@ -40,6 +40,7 @@ class GovernedRun:
     hooks: list[HookRegistration] = field(default_factory=list)
     state: RunState = RunState.ACTIVE
     probe_log: list[str] = field(default_factory=list)
+    # Recomputed by the authority hook on every invoke; issue-time authority never widens it.
     live_effective: AuthorityScope | None = None
 
 

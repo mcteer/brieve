@@ -71,6 +71,12 @@ governance-first sorting.
    if even that record cannot be written, the InvokeResult MUST report the evidential
    gap — the call never reports clean success with an incomplete trail.
 
+**Hook context exposure (transitional)**: built-in governance hooks receive a run
+reference; `capability_kind=other` hooks receive `run=None` and must operate on the
+context fields alone. The salt, audit sink, and identity fabric are never part of the
+third-party hook surface. This narrows further, never widens, before the Hook SDK
+seam is declared stable.
+
 ## Related
 
 - [../spec.md](../spec.md) — FR-001–FR-007, FR-011, FR-015
