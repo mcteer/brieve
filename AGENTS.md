@@ -57,6 +57,24 @@ Feature or behavior change — run in order, never skip:
 /speckit.implement → only now write code, against the analyzed task list
 ```
 
+**The stages are a pipeline, not a checklist — later artifacts derive from earlier ones.**
+If a stage's output changes after a downstream stage has already run, re-run every stage
+below it. In particular: `/speckit.analyze` routinely sends work back to `/speckit.clarify`,
+and any resulting `spec.md` change invalidates the plan and task artifacts derived from the
+old spec. Re-run `/speckit.plan` **and** `/speckit.tasks`, then `/speckit.analyze` again —
+do not hand-patch `plan.md`, `tasks.md`, or `contracts/` to match a moved spec.
+
+Practical consequences when re-running:
+
+- **Re-running a stage regenerates its artifacts.** Diff before accepting — hand edits
+  recorded in `tasks.md` (analyze remediations, gate notes) are not in the spec the stage
+  regenerates from, and will be lost unless carried forward.
+- **New requirements need new tasks.** An FR added during clarify with no task behind it is
+  exactly the coverage gap the next `/speckit.analyze` will flag.
+- **Constitution version matters.** If the constitution changed since the plan ran, the
+  Constitution Check was performed against a document that no longer exists — re-check and
+  record which version you checked against.
+
 Bug fixes and trivial changes (typos, comments, doc clarity) skip the spec: fix, add a
 regression test, open a PR linking the issue.
 
