@@ -9,6 +9,7 @@
 .github/agents/
 .github/prompts/
 .github/skills/
+.specify/integrations/.cache/
 
 # Python / tooling
 .venv/
