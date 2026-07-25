@@ -161,6 +161,10 @@ work you have not verified.
   transport (MCP vs native) follows the exists/mature/supported test.
 - **Keep schemas terse.** Tool schemas and prompts consume context budget; deferred
   disclosure is the default.
+- **Pin GitHub Actions by full commit SHA** (version tag as a trailing comment).
+  Never add or update an action by mutable tag.
+- **CI gate scripts are enforcement code.** Never stub a required check to exit 0,
+  and ship every gate script with a test proving it fails on violating input.
 
 ## Testing
 

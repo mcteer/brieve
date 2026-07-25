@@ -124,6 +124,7 @@ def test_pre_path_audit_append_failure_denies(span_exporter: InMemorySpanExporte
     )
     result = invoke_tool(run, "echo", {})
     assert_denied_closed(result, reason="internal_error")
+    assert result.evidential_gap is True
     assert_no_side_effect(handler)
     _ = span_exporter
 
