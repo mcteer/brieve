@@ -29,13 +29,33 @@ Security vulnerability? Stop and follow SECURITY.md instead of opening a PR.
 - [ ] Sealed core (identity, hook engine, registries, audit schema, durability, adapters)
 - [ ] Tool registration (MCP server or native tool)
 - [ ] Portal / UI
+- [ ] Governance record (ADR or constitution amendment) <!-- see below -->
+
+<!--
+Governance records: a new or superseding ADR, or an amendment to the constitution.
+Review bar is set by the constitution's Governance section, not CONTRIBUTING.md:
+
+- A constitution amendment REQUIRES a Sync Impact Report in the file header citing the
+  motivating ADRs, and security-maintainer review. MAJOR changes (removing or redefining
+  a principle) additionally require the ADR-0016 quorum.
+- Semver the amendment: MAJOR removes/redefines a principle, MINOR adds/expands, PATCH
+  clarifies. Update the Version and Last Amended footer.
+- If an ADR underlies a principle, amend the constitution in the SAME change — where the
+  two conflict, the ADR wins and the constitution is amended alongside it (Principle X).
+- ADRs are append-only. To change a decision, write a superseding record and update the
+  old one's status line; never edit an Accepted ADR's Decision section to say something
+  different.
+-->
+
 
 ## Constitution impact (required)
 
 <!--
 Which principles does this touch, and how does it satisfy them? "None — no principle
-is implicated" is a valid answer for trivial and most bug-fix PRs. If this amends the
-constitution itself, link the amendment PR and its Sync Impact Report.
+is implicated" is a valid answer for trivial and most bug-fix PRs. If a separate PR
+carries the amendment this change depends on, link it and its Sync Impact Report. If
+*this* PR is the amendment, say which section it changes and point at the Sync Impact
+Report in the file header.
 -->
 
 ## Testing
