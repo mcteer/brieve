@@ -103,6 +103,7 @@ same change.
 | [0044](0044-authz-doctrine-and-credential-translation.md) | Authorization doctrine — two domains, entitlement mirroring, federate before broker | Accepted |
 | [0045](0045-tiered-capabilities.md) | Skills and workflows are authored in competency tiers | Accepted |
 | [0046](0046-multi-tenancy.md) | One platform, isolated tenants — using the products' own isolation primitives | Accepted |
+| [0047](0047-conformance-gate-rows-attach-as-features-land.md) | Conformance gate rows attach as their features land — deferred rows are absent or explicitly skipped, never stubbed green | Accepted |
 
 ## Reviews
 
