@@ -59,6 +59,15 @@ argument is unaffected. Reading this rule as "Vault must not be containerized" w
 misreading with real cost — it would rule out the most convenient way to run a pinned Vault
 version in development.
 
+**There is also a mechanical reason, independent of containment: scheduling Vault under Nomad is
+circular.** Nomad is itself a Vault client — it authenticates to Vault to issue workload secrets.
+Were Vault a Nomad job, Vault's availability would depend on the scheduler whose own function
+depends on Vault, and a cold start would have no order that terminates. This is why the bootstrap
+sequence is not a preference: `Terraform → Vault → Nomad → harness` is the only ordering in which
+each component's dependencies exist before it does. An operator who accepted the containment risk
+would still find the arrangement unable to boot, and would discover it during a recovery rather
+than during design.
+
 The bootstrap order follows from that and is not arbitrary: **Terraform → Vault → Nomad →
 harness**. Each link is established before the one that depends on it.
 
