@@ -135,11 +135,27 @@
   `make check` runs unit + component including adapter tests; `make conformance` runs
   `tests/conformance`. Do **not** use importorskip to make a bare sync “pass” by skipping
   adapter gates.
-- **Rationale**: Analyze I2 — silent skip is a governance hole; sealed adapter work must
-  stay merge-blocking.
-- **Alternatives considered**: pytest skip if pydantic-ai missing (allows green without
-  the adapter; rejected); adapters-only job separate from make check (splits the
-  promised inner loop; rejected for 004).
+- **Mechanism**: define `UV_RUN := uv run --extra adapters` in the Makefile and route every
+  `check` and `conformance` recipe line through it. A bare `uv run` materializes the project
+  environment from the *default* extra set, so it does not guarantee the `adapters` extra is
+  present regardless of how the developer last synced; naming the extra in the recipe removes
+  that dependence on ambient state. CI's `Sync dependencies` step likewise becomes
+  `uv sync --frozen --extra adapters`.
+- **Lockfile**: adding the extra to `pyproject.toml` requires committing the regenerated
+  `uv.lock` in the same change. CI syncs with `--frozen`, which by definition will not update
+  the lockfile, so a stale lock fails the fast lane before any test runs.
+- **Sequencing constraint**: `uv run --extra adapters` and `uv sync --extra adapters` both
+  error with "Extra `adapters` is not defined" until the extra exists in `pyproject.toml`.
+  The Makefile and CI edits therefore ship with or after the dependency declaration, never
+  before — otherwise they break `main` on the commit that introduces them.
+- **Rationale**: silent skip is a governance hole; sealed adapter work must stay
+  merge-blocking. Determinism about *which* environment the gates ran in is part of that —
+  a gate that passes because a dependency was missing is worse than no gate.
+- **Alternatives considered**: pytest skip / `importorskip` if the framework is missing
+  (allows green without the adapter; rejected); adapters-only job separate from make check
+  (splits the promised inner loop; rejected for 004); `[tool.uv] default-extras` instead of
+  naming the extra per recipe (works, but makes the requirement invisible at the call site;
+  rejected as less legible).
 
 ## Decision: Thin approval / interrupt mapping
 
@@ -228,6 +244,19 @@
   VI, for a gap the two checks above close in the realistic cases; escalate to it if a live
   call ever slips through); a `sys.modules` check (wrong for the transitive-import reason
   above; rejected); trust convention plus review (the status quo this replaces).
+
+## Decision: `invoke_tool` entry asserted in two lanes, deliberately
+
+- **Decision**: Both the conformance lane and the unit lane assert that the adapter tool path
+  reaches `invoke_tool`, sharing one probe/counter helper. This is a duplicate assertion and
+  is intended.
+- **Rationale**: the lanes answer different questions and are run at different times. The
+  conformance case is the merge-blocking governance assertion an adapter must satisfy
+  (constitution Quality Gates); the unit case is the fast mapping-purity check that fails
+  first and localizes the break during development. Collapsing them would either slow the
+  inner loop or drop the property from the gate.
+- **Alternatives considered**: conformance only (loses the fast local signal; rejected); unit
+  only (the property stops being conformance-asserted, which ADR-0019 requires; rejected).
 
 ## Decision: Deny surface to the framework
 
