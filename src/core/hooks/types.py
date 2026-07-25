@@ -42,6 +42,7 @@ class HookContext:
     executed: bool = False
     execution_error_code: str | None = None
     probe_log: list[str] = field(default_factory=list)
+    run: Any = None  # GovernedRun; duck-typed to avoid import cycles
 
 
 HookHandler = Callable[[HookContext], HookDecision]

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from core.hooks.authority import AUTHORITY_HOOK_NAME, authority_pre_hook
+from core.hooks.mirroring import MIRRORING_HOOK_NAME, mirroring_pre_hook
 from core.hooks.types import (
     CapabilityKind,
     HookContext,
@@ -19,8 +21,20 @@ def _allow(_ctx: HookContext) -> HookDecision:
 
 
 def builtin_governance_hooks() -> list[HookRegistration]:
-    """Return the required pre/post governance hooks for a governed pipeline."""
+    """Return required governance hooks: authority → mirroring → governance shell."""
     return [
+        HookRegistration(
+            name=AUTHORITY_HOOK_NAME,
+            phase=HookPhase.PRE,
+            capability_kind=CapabilityKind.GOVERNANCE,
+            handler=authority_pre_hook,
+        ),
+        HookRegistration(
+            name=MIRRORING_HOOK_NAME,
+            phase=HookPhase.PRE,
+            capability_kind=CapabilityKind.GOVERNANCE,
+            handler=mirroring_pre_hook,
+        ),
         HookRegistration(
             name=GOVERNANCE_HOOK_NAME,
             phase=HookPhase.PRE,

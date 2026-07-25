@@ -8,6 +8,7 @@ from typing import Any
 
 from core.audit.schema import AuditEventType
 from core.audit.sink import build_next_entry
+from core.authority.errors import AuditAppendFailed
 from core.errors import RegistryError, ToolNotRegisteredError
 from core.hooks.governance import has_governance_pre_hook
 from core.hooks.types import (
@@ -160,6 +161,7 @@ def run_pipeline(
             arguments=arguments,
             phase=HookPhase.PRE,
             probe_log=run.probe_log,
+            run=run,
         )
         try:
             run.probe_log.append(f"{HookPhase.PRE}:{hook.capability_kind}")
@@ -173,6 +175,14 @@ def run_pipeline(
                     "correlation_id": run.correlation_id,
                     "tool_name": tool_name,
                 }
+            )
+        except AuditAppendFailed:
+            return PipelineOutcome(
+                decision="deny",
+                reason_code="internal_error",
+                message="audit append failed on pre-execution path",
+                executed=False,
+                evidential_gap=True,
             )
         except Exception:
             return _deny_pre(
@@ -258,6 +268,7 @@ def run_pipeline(
             executed=True,
             execution_error_code=execution_error_code,
             probe_log=run.probe_log,
+            run=run,
         )
         try:
             run.probe_log.append(f"{HookPhase.POST}:{hook.capability_kind}")

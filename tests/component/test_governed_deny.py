@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from core.authority.types import AuthorityScope
 from core.registry.memory import ToolRegistry
 from core.run import start_governed_run
 from core.tools.invoke import invoke_tool
@@ -13,6 +14,8 @@ from tests.harness import (
     assert_denied_closed,
     assert_no_side_effect,
     capture_audit,
+    fake_identity_fabric,
+    frozen_clock,
     scripted_agent,
 )
 
@@ -24,7 +27,10 @@ def test_unregistered_denied(span_exporter: InMemorySpanExporter) -> None:
     audit = capture_audit()
     run = start_governed_run(
         correlation_id="corr-deny-1",
-        scope={"echo"},
+        subject_user_id="user-1",
+        requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),
+        identity_fabric=fake_identity_fabric(tool_names={"echo"}),
+        clock=frozen_clock(),
         registry=registry,
         audit_sink=audit,
     )
@@ -44,7 +50,10 @@ def test_out_of_scope_denied(span_exporter: InMemorySpanExporter) -> None:
     audit = capture_audit()
     run = start_governed_run(
         correlation_id="corr-deny-2",
-        scope={"echo"},
+        subject_user_id="user-1",
+        requested_scope=AuthorityScope(tool_names=frozenset({"echo"})),
+        identity_fabric=fake_identity_fabric(tool_names={"echo", "other"}),
+        clock=frozen_clock(),
         registry=registry,
         audit_sink=audit,
     )

@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Manufacture or refuse short-lived task authority at run start."""
+
+from __future__ import annotations
+
+import secrets
+from dataclasses import dataclass
+from datetime import timedelta
+
+from core.authority.clock import Clock
+from core.authority.errors import AuthorityRefuseError
+from core.authority.fabric import IdentityFabric
+from core.authority.intersection import intersect_scopes
+from core.authority.types import AuthorityScope, TaskCredentialRef
+
+DEFAULT_TTL = timedelta(minutes=15)
+
+
+@dataclass(frozen=True)
+class ManufacturedAuthority:
+    credential: TaskCredentialRef
+    run_salt: bytes
+
+
+def manufacture_authority(
+    *,
+    subject_user_id: str,
+    requested_scope: AuthorityScope,
+    identity_fabric: IdentityFabric,
+    clock: Clock,
+    correlation_id: str | None = None,
+) -> ManufacturedAuthority:
+    """Issue narrowed task authority or raise AuthorityRefuseError."""
+    if not subject_user_id.strip():
+        raise AuthorityRefuseError(
+            "requesting user identity is absent",
+            reason_code="identity_unavailable",
+            correlation_id=correlation_id,
+        )
+
+    try:
+        user = identity_fabric.resolve_user_scope(subject_user_id)
+        ceiling = identity_fabric.resolve_ceiling()
+        policy = identity_fabric.resolve_policy()
+    except AuthorityRefuseError:
+        raise
+    except Exception as exc:
+        code = getattr(exc, "reason_code", None)
+        if code in {"identity_unavailable", "exchange_failed"}:
+            raise AuthorityRefuseError(
+                str(exc) or code,
+                reason_code=code,
+                correlation_id=correlation_id,
+            ) from exc
+        raise AuthorityRefuseError(
+            "identity fabric unavailable",
+            reason_code="identity_unavailable",
+            correlation_id=correlation_id,
+        ) from exc
+
+    if not requested_scope.issubset(user) or not requested_scope.issubset(ceiling):
+        raise AuthorityRefuseError(
+            "task scope exceeds user or ceiling",
+            reason_code="authority_refused",
+            correlation_id=correlation_id,
+        )
+
+    effective = intersect_scopes(user, ceiling, requested_scope, policy)
+    credential_id = secrets.token_hex(16)
+    run_salt = secrets.token_bytes(32)
+    expires_at = clock.now() + DEFAULT_TTL
+    ref = TaskCredentialRef(
+        credential_id=credential_id,
+        subject_user_id=subject_user_id,
+        expires_at=expires_at,
+        effective=effective,
+    )
+    return ManufacturedAuthority(credential=ref, run_salt=run_salt)
