@@ -52,6 +52,13 @@ forever." Vault is provisioned by the installer's own Terraform before any agent
 outside the substrate deliberately. Scheduling it under Nomad would make the trust fabric depend
 on the thing it exists to constrain.
 
+The constraint is **scheduling, not packaging**. Vault may run as a container; what it may not be
+is a workload the agent substrate schedules, discovers, and governs access to. A container Nomad
+does not manage is a peer of the substrate, not a resource inside it, and the containment
+argument is unaffected. Reading this rule as "Vault must not be containerized" would be a
+misreading with real cost — it would rule out the most convenient way to run a pinned Vault
+version in development.
+
 The bootstrap order follows from that and is not arbitrary: **Terraform → Vault → Nomad →
 harness**. Each link is established before the one that depends on it.
 

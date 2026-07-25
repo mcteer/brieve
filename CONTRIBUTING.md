@@ -210,7 +210,7 @@ would mean the identity and durability paths are never exercised until productio
 | --- | --- | --- |
 | **Docker** | Nomad's task driver; runs Postgres and the harness container | Docker Desktop, or Colima |
 | **Nomad** | Schedules the harness container and the enclave's supporting services | Binary on `PATH` |
-| **Vault** | Control-plane trust fabric — agent registry, ceiling policies, token exchange | Binary on `PATH`. Enterprise features are used; the license attaches to the local binary |
+| **Vault** | Control-plane trust fabric — agent registry, ceiling policies, token exchange | Binary on `PATH`, **or** a standalone container. Enterprise features are used — see licensing below |
 | **Terraform** | Stands up the trust fabric before any agent exists — the product's front door | Binary on `PATH` |
 
 HashiCorp binaries go in `~/.local/bin` by convention here rather than Homebrew, which keeps
@@ -232,6 +232,26 @@ establishes trust for the next, which is why Vault is *not* scheduled by Nomad �
 identity record inside the substrate the agents run in would make the containment boundary
 depend on that substrate holding perfectly, forever
 ([ADR-0015](docs/adr/0015-control-plane-vault-as-trust-fabric.md)).
+
+That rule constrains **scheduling, not packaging**. Running Vault as a standalone container is
+fine — a container Nomad does not manage is a peer of the substrate, not a resource inside it.
+Running Vault *as a Nomad job* is not.
+
+**Vault Enterprise licensing.** Enterprise features are used, so Vault needs a license whichever
+way you run it. Keep it in `.env` as `VAULT_ENT_LICENSE` — `.env` is gitignored, and the license
+is secret-class material under the same rule as every other credential in this project: never in
+code, config, fixtures, logs, commit messages, or PR bodies, including "obviously fake" ones. A
+container reads it from the environment rather than baking it into an image:
+
+```bash
+# illustrative — the real invocation lands with the local-environment feature
+docker run -d --name vault-dev \
+  -e VAULT_LICENSE="${VAULT_ENT_LICENSE:?set VAULT_ENT_LICENSE in .env}" \
+  -p 8200:8200 hashicorp/vault-enterprise:<pinned-version>
+```
+
+Never pass a license on a command line in a shared environment — it lands in shell history and
+process listings.
 
 > `make dev-up` is the command that stands this up, and it is **still a reserved stub** — it
 > exits 2 until the local-environment feature lands (see [ROADMAP.md](ROADMAP.md)). Until then,
