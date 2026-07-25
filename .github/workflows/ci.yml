@@ -48,10 +48,11 @@ jobs:
       - name: Spec-artifact lint (when specs/ changes)
         run: |
           set -euo pipefail
-          changed="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- 'specs' || true)"
-          if [[ -z "${changed}" ]]; then
+          # Fetch base for accurate diff on fork PRs / shallow clones
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}" 2>/dev/null || true
+          mapfile -t changed < <(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- 'specs' || true)
+          if [[ ${#changed[@]} -eq 0 ]]; then
             echo "No specs/ changes; skipping spec lint"
             exit 0
           fi
-          # shellcheck disable=SC2086
-          bash scripts/check-specs.sh ${changed}
+          bash scripts/check-specs.sh "${changed[@]}"
