@@ -302,6 +302,10 @@ registration lifecycle (security review) to run in parallel with your PR.
   fetch unpinned artifacts at build or run time.
 - **Automated updates** are proposed by bots and reviewed like any other PR; security
   updates take priority and may be fast-tracked by maintainers.
+- **GitHub Actions are pinned to full commit SHAs**, with the version tag as a
+  trailing comment. Tags are mutable references; a compromised upstream tag runs
+  arbitrary code in CI with this repository's permissions. Automated update PRs may
+  bump the SHA and comment together.
 
 ## Security practices for contributors
 
@@ -420,6 +424,11 @@ Reproduce failures locally with `make check` and `make conformance` before pushi
 CI is not a debugger. If a failure looks like infrastructure rather than your change, say
 so in a comment rather than blind-retrying — repeated retries on a genuinely broken check
 hide signal from everyone.
+
+CI gate scripts are enforcement code. Every script backing a required check must be
+demonstrably capable of failing — shipped with a test that runs it against a
+violating input and asserts non-zero exit. A gate that always passes is a hole
+wearing a checkmark, and adding one is a review blocker.
 
 ## Pull request process
 

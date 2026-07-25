@@ -3,11 +3,11 @@
 # Spec-artifact lint (FR-006):
 # - Resolve affected feature directories under specs/<nnn-name>/
 # - Require each to contain spec.md
-# - Fail only on unresolved Spec Kit markers in spec.md: [NEEDS CLARIFICATION: ...]
+# - Fail on unresolved Spec Kit markers in spec.md: [NEEDS CLARIFICATION...
 #   (prose mentions of the marker string in checklists/tasks/research are ignored)
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${CHECK_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "${ROOT}"
 
 inputs=()
@@ -27,9 +27,11 @@ fi
 # Collect unique feature directories (specs/<nnn-name>/) from inputs
 feat_list=""
 for path in "${inputs[@]}"; do
-  case "${path}" in
+  # Normalize to path relative to ROOT when absolute under ROOT
+  rel="${path#"${ROOT}/"}"
+  case "${rel}" in
     specs/*/*|specs/*)
-      feat="specs/$(printf '%s' "${path}" | cut -d/ -f2)"
+      feat="specs/$(printf '%s' "${rel}" | cut -d/ -f2)"
       if [[ -n "${feat#specs/}" && "${feat}" != "specs/" ]]; then
         case " ${feat_list} " in
           *" ${feat} "*) ;;
@@ -54,8 +56,8 @@ for feat in ${feat_list}; do
     status=1
     continue
   fi
-  # Real Spec Kit markers use a colon after CLARIFICATION
-  if grep -nE '\[NEEDS CLARIFICATION:' "${spec}"; then
+  # Spec Kit markers begin with [NEEDS CLARIFICATION (colon form is the common case)
+  if grep -nE '\[NEEDS CLARIFICATION' "${spec}"; then
     echo "check-specs: unresolved clarification markers in ${spec}" >&2
     status=1
   else

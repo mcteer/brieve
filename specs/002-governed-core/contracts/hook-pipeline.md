@@ -30,6 +30,9 @@ For each `invoke_tool` call:
    **including when the tool body raised** (FR-015).
 7. **Post-hook failure** after execution → outcome recorded as failed/denied-closed
    post-path; audit MUST still show the tool executed (spec edge case).
+   A post-hook failure short-circuits any remaining post-hooks; this is acceptable
+   because the outcome is already failed-closed — later post-hooks cannot convert it
+   back to success, and their skipped observations are covered by the recorded failure.
 
 ## InvokeResult (logical)
 
@@ -62,10 +65,11 @@ governance-first sorting.
 3. Correlation ID on every decision and span for the call (FR-007, FR-009).
 4. No secret values in decisions, spans, or logs (FR-010).
 5. An action that cannot be audited does not proceed: audit-append failure during the
-   pre-execution path denies the call (reason `internal_error`). Audit-append failure
-   on the post-execution path records the outcome as failed-closed; if even that
-   record cannot be written, the InvokeResult MUST report the evidential gap — the
-   call never reports clean success with an incomplete trail.
+   pre-execution path denies the call (reason `internal_error`) and sets the
+   evidential-gap flag — a denial that could not be recorded is also an evidential gap.
+   Audit-append failure on the post-execution path records the outcome as failed-closed;
+   if even that record cannot be written, the InvokeResult MUST report the evidential
+   gap — the call never reports clean success with an incomplete trail.
 
 ## Related
 

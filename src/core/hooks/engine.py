@@ -205,6 +205,7 @@ def run_pipeline(
                 reason_code="internal_error",
                 message="audit append failed on pre-execution path",
                 executed=False,
+                evidential_gap=True,
             )
 
         if decision.outcome == "deny":
@@ -391,6 +392,7 @@ def _deny_pre(
             reason_code="internal_error",
             message="audit append failed on pre-execution path",
             executed=False,
+            evidential_gap=True,
         )
     return PipelineOutcome(
         decision="deny",

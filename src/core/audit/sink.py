@@ -56,6 +56,14 @@ class InMemoryAuditSink:
         matched = [e for e in self._entries if e.correlation_id == correlation_id]
         return sorted(matched, key=lambda e: e.seq)
 
+    def correlation_ids(self) -> set[str]:
+        """Correlation IDs present in this sink."""
+        return {e.correlation_id for e in self._entries}
+
+    def all_entries(self) -> list[AuditEntry]:
+        """All entries in append order (read-only copy)."""
+        return list(self._entries)
+
     def build_entry(
         self,
         *,
