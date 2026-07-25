@@ -29,7 +29,7 @@ taken; none is a redesign. Sources: ADR-0048, ROADMAP.md, CONTRIBUTING.md.
 - Q: "Production IdP, Vault, and real product APIs remain fakes" — still accurate? → A: Not for Vault. Control-plane Vault Enterprise 2.0.3+ent is part of the local environment, and its agent registry holds registrations with ceiling policies. Product APIs and model providers remain correctly faked — those are outside our boundary.
 - Q: FR-016 and SC-010 forbid tests requiring an operated service or container runtime. Still right? → A: Inverted. Durability tests require the enclave. What survives is the narrower determinism rule: no live models, no live managed-product APIs, and disruption simulated in-process rather than by killing infrastructure.
 - Q: Is "resume re-authenticates, never replays" a harness discipline or a property of the substrate? → A: The substrate. A run is a Nomad allocation; resume is a **new** allocation with a **new** attested identity, so replay is unavailable rather than forbidden. Fencing is likewise an identity check against a superseded allocation, not a race. Demonstrated end to end (`infra/dev-enclave`): a Nomad-scheduled container exchanged its workload identity for a ceiling-scoped 300-second token with no credential in the jobspec.
-- Q: Does this feature still stand alone? → A: No. It depends on the local-environment feature (roadmap 006) landing first, which stands up Terraform → Vault → Nomad → harness and makes `make dev-up` real.
+- Q: Does this feature still stand alone? → A: No. It depends on the local-environment feature (see ROADMAP.md; not yet specified, so it has no number) landing first, which stands up Terraform → Vault → Nomad → harness and makes `make dev-up` real.
 - Q: How does a workload authenticate to Postgres? → A: Dynamic, per-workload credentials issued by Vault. The static password in the dev jobspec is a placeholder; a standing shared credential contradicts Principle IV.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -342,8 +342,8 @@ provider could be substituted without rewriting them.
 ## Assumptions
 
 - This feature ships as **durability and long-running-execution semantics plus conformance
-  scenarios**, on top of landed 002, 003, and 004 **and the local environment** (roadmap 006),
-  which must land first. Model providers and managed-product APIs remain fakes — they are outside
+  scenarios**, on top of landed 002, 003, and 004 **and the local environment** (see ROADMAP.md —
+  not yet specified, so it has no number), which must land first. Model providers and managed-product APIs remain fakes — they are outside
   our boundary. **Vault and Postgres are not fakes**: they are components this project deploys,
   and the guarantees are proven against the real ones.
 - The durability seam, `CheckpointBlob`, and the in-memory provider introduced by 004 are the

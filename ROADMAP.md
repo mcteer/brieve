@@ -30,15 +30,18 @@ being re-derived at the start of every spec.
 
 | # | Feature | ADRs | Status |
 | --- | --- | --- | --- |
-| 006 | Local environment — the enclave in miniature | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Next to spec — **lands first** |
-| 005 | Durable execution | ADR-0024, ADR-0026, ADR-0018 (consumes) | Spec merged (#27); **needs correction**; lands second |
+| *unassigned* | Local environment — the enclave in miniature | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Next to spec — **lands first** |
+| 005 | Durable execution | ADR-0024, ADR-0026, ADR-0018 (consumes) | Spec merged (#27, corrected #30); lands second |
 
-> **Spec numbers are identifiers, not sequence.** They are assigned when `/speckit-specify`
-> runs, so 005 was taken by durable execution before the local environment was understood to
-> precede it. The order below is the order of work; the numbers are just names. Renaming a
-> merged spec directory would churn every reference to it for no gain.
+> **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
+> work by name. Guessing the next number reads as a fact, propagates into merged documents, and
+> is wrong the moment anything is specified out of order.
+>
+> **Numbers are identifiers, not sequence.** 005 was assigned to durable execution before the
+> local environment was understood to precede it, so the order of work here does not match
+> numeric order. Renaming a merged spec directory would churn every reference to it for no gain.
 
-### 006 — Local environment
+### Local environment *(number assigned at specify time)*
 
 Stands up the enclave on a workstation, in the order the trust chain requires:
 **Terraform → Vault → Nomad → harness**. Makes `make dev-up` real, the way 004 made
