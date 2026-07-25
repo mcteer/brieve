@@ -6,7 +6,7 @@
 
 **Created**: 2026-07-24
 
-**Status**: Draft
+**Status**: Planned
 
 **Input**: User description: "Deliver the first security-critical vertical of the harness core: every agent-initiated external interaction is a registered tool call that passes an in-process, fail-closed pre- and post-execution hook pipeline; one correlation ID joins the run from initiation through hook decisions, tool invocation, and audit records; hook decisions emit observable spans; the audit trail for a run is append-only and walkable by that correlation ID. Success means these guarantees are demonstrated with deterministic tests and harness helpers — without yet implementing per-task credential manufacture, a production adapter, capability packs, or a northbound product surface. Out of scope: identity fabric / token exchange, Control Groups, durability/resume, multi-tenancy isolation beyond a single-run model, portal/UI, live models, and real managed-product tools."
 
@@ -32,7 +32,7 @@ An operator (or test) starts a governed run and the agent attempts a tool call t
 
 1. **Given** a run with a correlation ID and a registered in-scope tool, **When** the agent invokes that tool with valid arguments, **Then** pre-hooks allow, the tool executes exactly once, post-hooks run, and the call completes successfully.
 2. **Given** that successful call, **When** an investigator queries audit by the run's correlation ID, **Then** they find ordered records for run start, pre-decision, tool outcome, and post-decision joinable to the same ID.
-3. **Given** that successful call, **When** telemetry for the run is inspected, **Then** each hook decision is represented as a span (or equivalent structured observation) carrying the correlation ID.
+3. **Given** that successful call, **When** telemetry for the run is inspected, **Then** each hook decision is represented as a span carrying the correlation ID.
 4. **Given** a run with a registered in-scope tool, **When** the tool body itself raises an error during execution, **Then** post-execution hooks still run, the outcome is audited as a failed execution under the run's correlation ID, and no raw error content containing secret values reaches audit, spans, or logs.
 
 ---
@@ -141,7 +141,7 @@ A contributor writing later features uses public harness helpers to assert denia
 - **SC-001**: 100% of in-scope registered tool-call tests in this feature's suite show exactly one tool-body execution when allowed, and zero when denied.
 - **SC-002**: 100% of denial and enforcement-error tests end in deny with zero tool-body executions (fail closed).
 - **SC-003**: For every successful or denied tool call in the suite, an investigator can retrieve a non-empty audit trail by correlation ID that includes the hook decision(s) for that call.
-- **SC-004**: 100% of hook decisions in the suite produce a span (or exported OTel equivalent) carrying the run correlation ID.
+- **SC-004**: 100% of hook decisions in the suite produce an OpenTelemetry span carrying the run correlation ID.
 - **SC-005**: Automated secret-scan / fixture assertions find zero raw secret values in audit payloads, span attributes, or logged denial messages produced by the suite.
 - **SC-006**: Governance-first ordering is asserted by at least one deterministic conformance-style test that fails if order is reversed.
 

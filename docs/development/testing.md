@@ -66,7 +66,7 @@ calls and messages — deterministic agent behavior without a model provider.
 `tests/harness/` provides the fakes. Use them; do not hand-roll mocks for these.
 
 ```python
-from harness.testing import (
+from tests.harness import (
     fake_identity_fabric,   # registration, ceilings, token exchange, Control Groups
     fake_product_api,       # Terraform/Vault/VCS endpoints with recorded semantics
     fake_registry,          # tool registry with lifecycle states
