@@ -104,6 +104,7 @@ same change.
 | [0045](0045-tiered-capabilities.md) | Skills and workflows are authored in competency tiers | Accepted |
 | [0046](0046-multi-tenancy.md) | One platform, isolated tenants — using the products' own isolation primitives | Accepted |
 | [0047](0047-conformance-gate-rows-attach-as-features-land.md) | Conformance gate rows attach as their features land — deferred rows are absent or explicitly skipped, never stubbed green | Accepted |
+| [0048](0048-nomad-is-the-agent-execution-substrate.md) | Nomad is the agent execution substrate, and its workload identity is the attestation | Accepted |
 
 ## Reviews
 

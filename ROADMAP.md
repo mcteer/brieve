@@ -30,18 +30,48 @@ being re-derived at the start of every spec.
 
 | # | Feature | ADRs | Status |
 | --- | --- | --- | --- |
-| 005 | Durable execution | ADR-0024, ADR-0026, ADR-0018 (consumes) | Spec drafted |
+| 006 | Local environment — the enclave in miniature | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Next to spec — **lands first** |
+| 005 | Durable execution | ADR-0024, ADR-0026, ADR-0018 (consumes) | Spec merged (#27); **needs correction**; lands second |
+
+> **Spec numbers are identifiers, not sequence.** They are assigned when `/speckit-specify`
+> runs, so 005 was taken by durable execution before the local environment was understood to
+> precede it. The order below is the order of work; the numbers are just names. Renaming a
+> merged spec directory would churn every reference to it for no gain.
+
+### 006 — Local environment
+
+Stands up the enclave on a workstation, in the order the trust chain requires:
+**Terraform → Vault → Nomad → harness**. Makes `make dev-up` real, the way 004 made
+`make conformance` real — the command has been a reserved exit-2 stub since 001, documented
+as "local stack: dev-mode identity fabric, Postgres, collector, harness."
+
+Why it precedes durable execution: 005's central guarantee — resume re-authenticates, never
+replays — is a property of Nomad workload identity rather than harness discipline (ADR-0048).
+Proving it against a fake identity fabric proves the harness calls the fabric correctly, which
+is a weaker claim than the one the spec makes. Postgres is likewise a real stack component;
+substituting something lighter would mean the durability code ships untested against what it
+actually runs on.
+
+Replaces `fake_identity_fabric` as the thing guarantees are proven against. The fake remains a
+test double for suites that are not about identity.
+
+### 005 — Durable execution
 
 Attaches the durability Quality Gate row: kill/resume, re-observe-never-re-execute,
 re-auth-never-replay, double-resume fencing, grant-expiry parking, duplicate-side-effect
 rejection, drain-across-upgrade.
+
+**The merged spec (#27) assumes a hermetic reference provider and defers Postgres.** That
+assumption is now wrong — see ADR-0048 and the local-environment entry above. Correct it via
+`/speckit-clarify` before planning: real Postgres scheduled by Nomad, and real Vault for the
+re-authentication path.
 
 ## Next
 
 Ordered by dependency first, then by which owed gate row it closes. Each entry names what it
 unblocks — that is the argument for its position, and the thing to challenge if you disagree.
 
-### 006 — Control Groups (ADR-0016)
+### 007 — Control Groups (ADR-0016)
 
 Quorum-gated authority changes: who may widen a scope, restore revoked access, or change IdP
 claim-to-role mapping.
@@ -55,32 +85,32 @@ approval-shaped thing downstream depends on.
 **Unblocks:** real human-in-the-loop approvals; 005's parked-run resolution; ADR-0016's
 restoration quorum.
 
-### 007 — Northbound surfaces (ADR-0033, ADR-0034, ADR-0035)
+### 008 — Northbound surfaces (ADR-0033, ADR-0034, ADR-0035)
 
 Four transports — MCP, API, CLI, portal — over one authorization core, with surface parity
 conformance-asserted: the same operation yields the same verdict and equivalent audit events on
 every transport. Includes the audit plane as a governed read path.
 
 **Why here:** the first feature that ships something a user touches directly, and it needs the
-authorization core (002/003) plus an approval surface (006) to be behind it. Attempting it
+authorization core (002/003) plus an approval surface (007) to be behind it. Attempting it
 earlier means building transports over guarantees that are still moving.
 
 **Owed gate row:** four-transport surface parity.
 
-### 008 — Capability packs and eval gates (ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045)
+### 009 — Capability packs and eval gates (ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045)
 
 Packs, prompts, and skills as pinned, eval-gated artifacts; the Qualified Model Matrix; per-role
 model bindings; competency tiers.
 
 **Why here:** brings Principle VIII online, which no feature has needed yet — the eval-gate
-machinery does not exist. It depends on nothing in 006/007 strictly, so it can move earlier if
+machinery does not exist. It depends on nothing in 007/008 strictly, so it can move earlier if
 content work becomes the priority; it sits here because a pack with no surface to invoke it and
 no approval path is hard to evaluate end to end.
 
 **Owed gate rows:** all Eval gates (must-deny safety, must-decline scope, citation accuracy,
 estate-state fixtures, report fidelity).
 
-### 009 — Deferred disclosure and code mode (ADR-0040, ADR-0041)
+### 010 — Deferred disclosure and code mode (ADR-0040, ADR-0041)
 
 Productizes deferred tool/capability disclosure, and ships code mode — but only with verified
 per-call hook parity, which ADR-0041 makes an unconditional gate rather than a default.
@@ -90,7 +120,7 @@ worth doing before there is enough tool surface for the efficiency to matter.
 
 **Owed gate row:** tool-call parity under deferred disclosure.
 
-### 010 — Multi-tenancy (ADR-0046)
+### 011 — Multi-tenancy (ADR-0046)
 
 One platform, isolated tenants, using the products' own isolation primitives.
 
@@ -119,10 +149,10 @@ ADR — never a passing stub.**
 | Row | Attaches with | Status |
 | --- | --- | --- |
 | Governance-ordering, fail-closed, governed entry | 004 | ✅ In force |
-| Durability scenarios (ADR-0024/0026) | 005 | In progress |
-| Four-transport surface parity | 007 | Deferred — ADR-0033 |
-| Tool-call parity under deferred disclosure | 009 | Deferred — ADR-0040 |
-| Eval gates (packs, models, policies) | 008 | Deferred — Principle VIII |
+| Durability scenarios (ADR-0024/0026) | 005 | Planned |
+| Four-transport surface parity | 008 | Deferred — ADR-0033 |
+| Tool-call parity under deferred disclosure | 010 | Deferred — ADR-0040 |
+| Eval gates (packs, models, policies) | 009 | Deferred — Principle VIII |
 | Registry isolation (control-plane write denials) | — | **Unassigned** — see gaps below |
 
 ## Open records

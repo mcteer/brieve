@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-02-19
-- **Relates to**: [ADR-0006](0006-in-process-fail-closed-enforcement.md), [ADR-0008](0008-no-gateway-or-registry-product.md), [ADR-0025](0025-enclave-is-the-default-topology.md), [ADR-0028](0028-named-trigger-for-added-components.md)
+- **Relates to**: [ADR-0006](0006-in-process-fail-closed-enforcement.md), [ADR-0008](0008-no-gateway-or-registry-product.md), [ADR-0025](0025-enclave-is-the-default-topology.md), [ADR-0028](0028-product-identity.md)
 - **Requirements**: R12
 
 ## Context
@@ -45,7 +45,7 @@ A capability that can be a library is a library. State that can be a cached, sig
 snapshot is a snapshot, not a service call. Telemetry that can be emitted asynchronously
 is never in the request path. Adding an operated component to the blocking path requires
 a named trigger recorded as a decision
-([ADR-0028](0028-named-trigger-for-added-components.md)) — not a general argument that
+([ADR-0028](0028-product-identity.md)) — not a general argument that
 it would be useful.
 
 ## Consequences

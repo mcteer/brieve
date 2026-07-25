@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-02-26
-- **Relates to**: [ADR-0009](0009-adlc-stages-and-observability-planes.md), [ADR-0013](0013-adopt-agent-security-framework-taxonomy.md), [ADR-0027](0027-tiered-capabilities.md)
+- **Relates to**: [ADR-0009](0009-adlc-stages-and-observability-planes.md), [ADR-0013](0013-adopt-agent-security-framework-taxonomy.md), [ADR-0027](0045-tiered-capabilities.md)
 - **Requirements**: R14
 
 ## Context
@@ -62,7 +62,7 @@ against every release, and tested — which competes for the same effort as feat
 Objective graduation is also harder to build than a course: it requires defining what
 demonstrated competence looks like for each role and providing a way to demonstrate it.
 
-The tiered capability model ([ADR-0027](0027-tiered-capabilities.md)) is the mechanism
+The tiered capability model ([ADR-0027](0045-tiered-capabilities.md)) is the mechanism
 that makes the ladder operational rather than aspirational — competency tiers in the
 product line up with rungs on the ladder, so progression is enforced by what a definition
 is permitted to pin, not only by training.

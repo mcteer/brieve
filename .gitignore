@@ -35,6 +35,14 @@ node_modules/
 .next/
 .turbo/
 
+# Terraform — state may contain secrets; provider plugins are large and platform-specific
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
 # Env and local secrets — never commit
 .env
 .env.*

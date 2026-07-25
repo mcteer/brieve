@@ -3,7 +3,7 @@
 - **Status**: Accepted
 - **Date**: 2026-03-04
 - **Supersedes**: ADR-0005; the default-gateway clause of [ADR-0006](0006-in-process-fail-closed-enforcement.md)
-- **Relates to**: [ADR-0002](0002-adopt-first-migrate-and-delete.md), [ADR-0006](0006-in-process-fail-closed-enforcement.md), [ADR-0007](0007-lean-profile-by-default.md)
+- **Relates to**: [ADR-0002](0002-adopt-first-migrate-and-delete.md), [ADR-0006](0006-in-process-fail-closed-enforcement.md), [ADR-0007](0007-lean-and-federated-profiles.md)
 - **Requirements**: R6, R16
 
 ## Context
@@ -19,7 +19,7 @@ gateway — which removed the security rationale for owning one. Second, organiz
 adopting this platform increasingly already operate gateways and registries; asking
 them to run ours alongside theirs creates duplication and a policy-jurisdiction
 argument nobody wins. Third, the Lean deployment profile
-([ADR-0007](0007-lean-profile-by-default.md)) runs neither component at all, which
+([ADR-0007](0007-lean-and-federated-profiles.md)) runs neither component at all, which
 means shipping them would mean maintaining infrastructure the default deployment does
 not use.
 

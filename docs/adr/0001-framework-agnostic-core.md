@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-01-15
-- **Relates to**: [ADR-0002](0002-adopt-first-migrate-and-delete.md), [ADR-0017](0017-primary-and-secondary-adapters.md)
+- **Relates to**: [ADR-0002](0002-adopt-first-migrate-and-delete.md), [ADR-0017](0017-primary-adapter-selection.md)
 - **Requirements**: R16
 
 ## Context
