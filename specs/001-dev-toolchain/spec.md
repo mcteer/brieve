@@ -2,6 +2,8 @@
 
 **Feature Branch**: `spec/001-dev-toolchain`
 
+**Path**: `specs/001-dev-toolchain/spec.md`
+
 **Created**: 2026-07-24
 
 **Status**: Draft
@@ -13,7 +15,7 @@
 | Field | Value |
 | --- | --- |
 | **Requirements (R1–R17)** | R12 (lean default posture for what we operate and add), R16 (versioned seams / sealed-core layout boundaries). Others not implicated. |
-| **ADRs touched** | ADR-0001 (framework-agnostic core and layout boundaries), ADR-0007 (lean profile as default), ADR-0011 (harness-first; SDKs at perimeter — layout implication only) |
+| **ADRs touched** | ADR-0001 (framework-agnostic core; layout boundaries), ADR-0007 (lean profile as default), ADR-0017 (Pydantic AI primary adapter — establishes the typed-Python toolchain this feature scaffolds) |
 | **Evidence class** | N/A — toolchain and contributor contract only; no attestation or compliance evidence plane |
 
 ## User Scenarios & Testing *(mandatory)*
@@ -52,7 +54,7 @@ A contributor opening the tree finds the package and test directories named in A
 
 ### User Story 3 - Stable make targets and PR fast-lane CI (Priority: P2)
 
-A contributor discovers the same four make targets documented in CONTRIBUTING (`check`, `conformance`, `test-full`, `dev-up`). Targets that cannot yet do real work still exist as named contracts and fail clearly or no-op with an explicit message — they are not silently missing. Continuous integration runs the fast lane (equivalent to the inner-loop check) on every pull request.
+A contributor discovers the same four make targets documented in CONTRIBUTING (`check`, `conformance`, `test-full`, `dev-up`). Targets that cannot yet do real work still exist as named contracts and fail clearly or no-op with an explicit message — they are not silently missing. Continuous integration runs the fast lane (a superset of the inner-loop check per FR-006) on every pull request.
 
 **Why this priority**: Named contracts prevent each PR from inventing scripts; CI makes the contract non-optional for merges.
 
@@ -61,7 +63,7 @@ A contributor discovers the same four make targets documented in CONTRIBUTING (`
 **Acceptance Scenarios**:
 
 1. **Given** a developer machine with the toolchain installed, **When** they invoke each of `make check`, `make conformance`, `make test-full`, and `make dev-up`, **Then** each target is defined (stub behavior with a clear message is acceptable where no backing implementation exists yet).
-2. **Given** a pull request against `main`, **When** CI runs, **Then** the fast lane (install + inner-loop check) executes and must pass for the PR to be mergeable once branch protection is enabled.
+2. **Given** a pull request against `main`, **When** CI runs, **Then** the fast lane executes (install, inner-loop check, secret scanning, DCO verification, license compliance, and spec-artifact lint when `specs/` changes) and reports results; requiring that check for merge via branch protection is a separate maintainer settings task.
 3. **Given** `make conformance` or `make test-full` has no suite yet, **When** a contributor runs it, **Then** the outcome is an explicit stub/skip message — not a missing-target error and not a silent success that implies suites passed.
 
 ---
@@ -92,19 +94,20 @@ A contributor installs pre-commit hooks once and, on commit, automatic formattin
 
 - **FR-001**: Contributors MUST be able to install project dependencies with a single documented package-manager workflow after clone.
 - **FR-002**: The repository MUST expose an inner-loop check command that succeeds on a fresh install with zero product features implemented.
-- **FR-003**: The repository MUST provide the documented package layout areas as present stubs or packages: at minimum `src/core`, `src/adapters`, `src/surfaces`, `tests/harness`, plus reserved extension roots called out in contributor docs (`packs/`, `hooks/`, `providers/`, `portal/` as stubs where not yet built).
+- **FR-003**: The repository MUST provide the documented package layout areas as present stubs or packages: at minimum `src/core`, `src/adapters`, `src/surfaces`, `tests/harness`, plus reserved extension roots called out in contributor docs (`packs/`, `hooks/`, `providers/`, `portal/` as stubs where not yet built). The `tests/harness` stub MUST be marked as reserved for the shared fakes and assertion helpers, which are public API under the semver seam promise per docs/development/testing.md once populated. Creating empty or marker-only stubs under `src/core`, `src/adapters`, and `src/surfaces` for layout reservation does NOT by itself constitute a sealed-core change requiring security-maintainer review; that gate attaches when behavior, identity, hooks, registries, audit schema, durability, or adapter logic lands in those paths.
 - **FR-004**: `src/core` MUST remain free of agent-framework imports in any code introduced by this feature (including stubs).
 - **FR-005**: The four make targets `check`, `conformance`, `test-full`, and `dev-up` MUST exist as named contracts; incomplete targets MUST fail closed with an explicit stub message rather than being undefined.
-- **FR-006**: Pull-request CI MUST run the fast lane (install + inner-loop check) on every PR.
+- **FR-006**: Pull-request CI MUST run the fast lane on every PR: dependency install, the inner-loop check, secret scanning, DCO sign-off verification, and dependency license compliance, with spec-artifact lint running when files under `specs/` change. Class-gated suites (conformance, evals, accessibility) activate in later features and are out of scope here.
 - **FR-007**: The project MUST ship a pre-commit configuration and documented install step for local hygiene hooks.
 - **FR-008**: Toolchain documentation in CONTRIBUTING (or linked setup section) MUST match the commands that actually exist after this feature merges.
 - **FR-009**: No live model provider, identity fabric, or managed-product API MUST be required to complete install or the inner-loop check.
 - **FR-010**: Secret-like values MUST NOT appear in toolchain config, fixtures, or CI logs introduced by this feature.
+- **FR-011**: Every source file introduced by this feature MUST carry the project's per-file license notice as a one-line `SPDX-License-Identifier: Apache-2.0` (not the full Apache 2.0 header block). Files created by this feature set that precedent for the repository.
 
 ### Key Entities
 
-- **Inner-loop check**: The single documented command contributors run before every commit; encompasses lint, typecheck, and unit smoke as one contract.
-- **Fast lane (CI)**: The PR-required automation equivalent to install + inner-loop check.
+- **Inner-loop check**: The single documented command contributors run before every commit — lint, typecheck, and unit tests as one contract, with component and contract test tiers joining as those suites come to exist. Distinct from the CI fast lane, which is a superset (see Fast lane).
+- **Fast lane (CI)**: The PR-required automation: install, the inner-loop check, secret scanning, DCO verification, and license compliance per FR-006.
 - **Stub make target**: A named make target that documents a future contract and exits with an explicit non-success or clearly labeled stub status when the real suite/stack is absent.
 - **Package layout stub**: An importable or clearly marked directory reserved for a documented role, containing no product behavior yet.
 
@@ -113,17 +116,18 @@ A contributor installs pre-commit hooks once and, on commit, automatic formattin
 ### Measurable Outcomes
 
 - **SC-001**: A new contributor completes clone → install → successful inner-loop check in under 15 minutes on a supported platform (excluding network faults).
-- **SC-002**: 100% of pull requests against `main` execute the fast-lane CI workflow after this feature merges (workflow present and triggered on `pull_request`).
+- **SC-002**: 100% of pull requests against `main` execute the fast-lane CI after this feature merges.
 - **SC-003**: All four documented make contracts (`check`, `conformance`, `test-full`, `dev-up`) are invocable by name; zero "missing target" failures.
 - **SC-004**: A reviewer can map every path in the documented repository layout table to an on-disk directory without gaps for the areas listed in FR-003.
 - **SC-005**: Inner-loop check and fast-lane CI require no credentials, live models, or external product estates.
 
 ## Assumptions
 
+- This feature's subject is the contributor toolchain itself, so the named commands, package manager, and directory paths inherited from merged contributor documents (CONTRIBUTING.md, AGENTS.md) are the contract under specification — not implementation leakage. Runtime versions and CI mechanics remain plan-stage decisions.
 - Supported contributor platforms remain Linux and macOS natively, Windows via WSL2, as stated in CONTRIBUTING.
-- Python 3.12+ is an acceptable default runtime pin unless a later sealed-core decision narrows it; the exact minor version is an implementation detail for the plan stage.
+- Minimum supported Python version is 3.12+; every contributor environment and CI job MUST meet that floor.
 - `uv` is the package manager implied by existing contributor docs; this feature makes that real rather than choosing a different tool.
 - Stubbing `conformance`, `test-full`, and `dev-up` is acceptable until later specs implement suites and the local stack.
-- Portal TypeScript tooling may be a nested stub (`portal/` with a placeholder) without a full Node toolchain in 001, as long as the directory is reserved and documented.
-- Enabling GitHub branch protection to require the fast-lane check is desirable but may be a maintainer settings step outside the repository files; the workflow file itself is in scope.
+- `portal/` is in scope for 001 only as a reserved, documented stub directory; establishing the Node/TypeScript toolchain is out of scope (portal UI was already out of scope for this feature).
+- Enabling GitHub branch protection (required fast-lane check) is a maintainer settings task tracked separately from this feature's definition of done. The workflow file that implements the fast lane is in scope.
 - No product ADRs beyond layout/lean posture are implemented by this feature.

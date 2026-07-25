@@ -174,10 +174,11 @@ uv sync                  # Python toolchain and dependencies
 pre-commit install       # formatting, linting, and hygiene hooks
 make check               # lint + typecheck + unit tests — your inner loop
 make conformance         # the conformance suite — required before any adapter/provider PR
+make test-full           # PR-tier tests: integration, scenario, fault injection, adversarial
 make dev-up              # local stack: dev-mode identity fabric, Postgres, collector, harness
 ```
 
-These five commands are the stable contract; their implementations may evolve, their
+These six commands are the stable contract; their implementations may evolve, their
 names will not. `make dev-up` brings up a local stack running the same harness that runs
 in production, hooks in **warn mode**, with dev-mode backing services — so "works
 locally, fails governance in CI" should not happen; if it does, that is itself a bug

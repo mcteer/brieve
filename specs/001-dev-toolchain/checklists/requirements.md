@@ -31,5 +31,6 @@
 
 ## Notes
 
-- Validation pass 1 (2026-07-24): Spec stays at contract level (`uv` / make target *names* appear only where they are already the published contributor contract in CONTRIBUTING — treated as product vocabulary, not stack design). Traceability filled. No clarification markers. Ready for `/speckit-clarify` only if reviewers raise scope questions; otherwise ready for `/speckit-plan` after spec PR review.
-- Minor tension: SC/FR mention `make` target names and `uv` because those strings are already normative in CONTRIBUTING; plan stage owns versions, workflow YAML shape, and package layout file details.
+- Validation pass 1 (2026-07-24): Spec stays at contract level (`uv` / make target *names* appear only where they are already the published contributor contract in CONTRIBUTING — treated as product vocabulary, not stack design). Traceability filled.
+- Clarification pass (2026-07-24): Five markers resolved — sealed-core gate on behavior not empty stubs; SPDX one-line license; Python ≥3.12; `portal/` stub-only; branch protection is maintainer settings (workflow in scope). Zero `[NEEDS CLARIFICATION]` remain. Ready for `/speckit-plan` after spec PR review/merge.
+- Named commands / `uv` / layout paths remain contract vocabulary inherited from CONTRIBUTING/AGENTS; CI workflow shape and file-level package layout stay plan-stage.
