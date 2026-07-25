@@ -38,24 +38,13 @@
   `[NEEDS CLARIFICATION]` markers — the one genuinely open question was resolved as a stated,
   challengeable Assumption rather than deferred to `/speckit-clarify`; see below.
 
-- **The assumption most worth challenging at review — reference provider vs. the Lean default.**
-  ADR-0024 names library-grade durable execution over an existing Postgres as the Lean default.
-  No feature to date has introduced an operated service, and every suite is hermetic with no
-  container runtime. The spec assumes a hermetic reference provider and defers the
-  Postgres-backed default to a later feature attaching through the same interface. That trades
-  an Accepted ADR's named default against the repository's established test bar. Two readings
-  are defensible:
-  - **As specified** — semantics and conformance scenarios are the deliverable; the provider
-    behind them is interchangeable by construction (FR-012), so proving the guarantees against a
-    hermetic provider proves them for any provider. The Postgres default becomes a later,
-    smaller feature.
-  - **The alternative** — ship the Postgres-backed provider here, because a seam with no
-    production-shaped implementation has not really been exercised, and deferring the named Lean
-    default leaves ADR-0024 only partly honoured.
-
-  If a reviewer prefers the alternative, this is a `/speckit-clarify` question before
-  `/speckit-plan`, not a plan-time adjustment — it changes scope, the dependency surface, and
-  whether CI gains a service dependency.
+- **RESOLVED (2026-07-25) — reference provider vs. the Lean default.** This was flagged as the
+  item most worth challenging at review, and it was challenged and settled. The spec had assumed
+  a hermetic reference provider on the grounds that no feature had introduced an operated
+  service. That was wrong on the facts: `make dev-up` had been reserved since 001 and documented
+  as bringing up Postgres, and the Integration test tier already named it a real backing service.
+  The provider is Postgres, scheduled by Nomad (ADR-0048); Vault is likewise real. See the
+  post-merge Clarifications session in the spec.
 
 - **Scope-bound requirement carried forward from 004.** FR-018 caps sealed-core changes, in the
   spirit of 004's FR-016. The named surface is larger here (checkpoint schema, grant lifetime,

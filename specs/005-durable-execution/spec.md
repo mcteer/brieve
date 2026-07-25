@@ -15,8 +15,22 @@
 | Field | Value |
 | --- | --- |
 | **Requirements (R1–R17)** | R2 / R3 (per-task authority — the delegation grant is the durable authority object and per-step tokens are manufactured under it; resume re-exchanges rather than replays). R16 (sealed core, versioned seams — durability is sealed core, and this feature defines the semantics that hold above the provider interface). R7 as implicated by fail-closed behaviour on the resume path (a run that cannot re-authenticate parks or refuses; it never proceeds on stale authority). Builds on R4 / R10 / R13 (002 evidence) for the receipts re-observation depends on, without re-owning them. |
-| **ADRs touched** | ADR-0024 (durability is a provider seam; harness semantics defined above the interface; the Lean default is a library, not a service), ADR-0026 (delegation grants, per-step tokens, resume as re-observation, single-writer lease with fencing, bounded execution, park on grant expiry), ADR-0018 (grounded reporting — re-observation reuses the same receipts), ADR-0047 (gate rows attach as their features land — this feature is what attaches the durability row). Related deferred: ADR-0028 (named trigger required before a dedicated workflow engine attaches), ADR-0016 (Control Groups re-consent UX — parking is in scope, the consent surface is not). |
+| **ADRs touched** | ADR-0048 (Nomad is the agent execution substrate and its workload identity is the attestation — this is what makes resume-re-authenticates structural rather than a rule the harness enforces), ADR-0024 (durability is a provider seam; harness semantics defined above the interface), ADR-0026 (delegation grants, per-step tokens, resume as re-observation, single-writer lease with fencing, bounded execution, park on grant expiry), ADR-0018 (grounded reporting — re-observation reuses the same receipts), ADR-0047 (gate rows attach as their features land — this feature is what attaches the durability row). Related deferred: ADR-0028 (named trigger required before a dedicated workflow engine attaches), ADR-0016 (Control Groups re-consent UX — parking is in scope, the consent surface is not). |
 | **Evidence class** | Conformance / attestation-relevant — the seven durability scenarios are conformance-asserted; re-observation records and intent/result brackets become part of the audit trail an investigator walks, so evidence integrity from 002 must survive interruption and resume. |
+
+## Clarifications
+
+### Session 2026-07-25 (post-merge correction)
+
+Recorded after PR #27 merged. These correct what the spec describes against decisions since
+taken; none is a redesign. Sources: ADR-0048, ROADMAP.md, CONTRIBUTING.md.
+
+- Q: The spec assumes a hermetic reference provider and defers the Postgres Lean default. Still right? → A: No. Postgres is real and scheduled by Nomad. Fake only what is outside our boundary; run the real thing for components we deploy. A substitute would mean the durability code ships untested against what it actually runs on.
+- Q: "Production IdP, Vault, and real product APIs remain fakes" — still accurate? → A: Not for Vault. Control-plane Vault Enterprise 2.0.3+ent is part of the local environment, and its agent registry holds registrations with ceiling policies. Product APIs and model providers remain correctly faked — those are outside our boundary.
+- Q: FR-016 and SC-010 forbid tests requiring an operated service or container runtime. Still right? → A: Inverted. Durability tests require the enclave. What survives is the narrower determinism rule: no live models, no live managed-product APIs, and disruption simulated in-process rather than by killing infrastructure.
+- Q: Is "resume re-authenticates, never replays" a harness discipline or a property of the substrate? → A: The substrate. A run is a Nomad allocation; resume is a **new** allocation with a **new** attested identity, so replay is unavailable rather than forbidden. Fencing is likewise an identity check against a superseded allocation, not a race. Demonstrated end to end (`infra/dev-enclave`): a Nomad-scheduled container exchanged its workload identity for a ceiling-scoped 300-second token with no credential in the jobspec.
+- Q: Does this feature still stand alone? → A: No. It depends on the local-environment feature (roadmap 006) landing first, which stands up Terraform → Vault → Nomad → harness and makes `make dev-up` real.
+- Q: How does a workload authenticate to Postgres? → A: Dynamic, per-workload credentials issued by Vault. The static password in the dev jobspec is a placeholder; a standing shared credential contradicts Principle IV.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -224,7 +238,10 @@ provider could be substituted without rewriting them.
 - **FR-003**: Checkpoints MUST NOT contain credential, token, or secret material of any kind.
   This MUST hold for every provider and MUST be asserted, not assumed.
 - **FR-004**: On resume the platform MUST re-authenticate and re-exchange under the surviving
-  consent. Replaying a credential held before the disruption MUST NOT be a supported path.
+  consent. Replaying a credential held before the disruption MUST NOT be a supported path. This
+  is enforced by the substrate rather than by the harness: a resumed run is a new allocation with
+  a new attested workload identity, so the prior credential is not merely forbidden but
+  unobtainable (ADR-0048). The harness MUST NOT introduce any path that reintroduces it.
 - **FR-005**: If consent has expired when resume is attempted, the run MUST park for fresh
   consent and MUST NOT resume. Parking MUST be recorded and MUST leave the run resumable if
   consent is renewed.
@@ -238,7 +255,8 @@ provider could be substituted without rewriting them.
   guessing. The run MUST park for human resolution.
 - **FR-009**: Exactly one instance MUST be able to act on a run at a time. A resumed run MUST
   invalidate any prior instance, whose subsequent tool calls and state writes MUST be rejected
-  rather than raced.
+  rather than raced. Rejection MUST be an identity check — a superseded allocation presents a
+  superseded identity — not a timing outcome.
 - **FR-010**: Repeatable steps MUST carry a stable identity such that a repeat of the same step
   is recognizable as the same step rather than a new one.
 - **FR-011**: Execution MUST be bounded by a maximum duration, a limit on steps taken, and a
@@ -258,12 +276,18 @@ provider could be substituted without rewriting them.
 - **FR-015**: Audit evidence MUST survive interruption: a resumed run's records MUST join to the
   same correlation ID as its pre-disruption records, and the hash chain MUST remain intact
   across the boundary.
-- **FR-016**: Deterministic tests for this feature MUST NOT call live models, identity
-  providers, Vault, or managed-product APIs, and MUST NOT require an operated service or
-  container runtime. Disruption MUST be simulated in-process. As with FR-012 of 004, an
-  automated check MUST assert this rather than relying on convention.
+- **FR-016**: Deterministic tests for this feature MUST NOT call live models or live
+  managed-product APIs, and MUST simulate disruption in-process rather than by killing real
+  infrastructure. They MAY — and for the durability scenarios MUST — run against the real local
+  enclave: Vault and Postgres are components this project deploys, and substituting them would
+  mean the guarantees ship unproven against what they actually run on. As with FR-012 of 004, an
+  automated check MUST assert the live-model and live-product-API prohibition rather than relying
+  on convention.
 - **FR-017**: A dedicated workflow-engine provider MUST NOT ship in this feature. It attaches
   later through the same interface, and only under a recorded named trigger (ADR-0028).
+- **FR-017a**: Workload access to Postgres MUST use short-lived, per-workload credentials issued
+  under the workload's own identity. A shared standing database credential MUST NOT be introduced;
+  the static password in the dev jobspec is a bootstrap placeholder, not a design.
 - **FR-018**: Core changes in this feature are bounded to the durability and authority seams
   named above — checkpoint schema and provider protocol, grant lifetime and per-step
   manufacture, lease and fencing, execution bounds, and the intent/result bracket. Any other
@@ -311,24 +335,28 @@ provider could be substituted without rewriting them.
 - **SC-009**: `make conformance` executes all seven durability scenarios as in-force rows and
   passes on a clean tree; each scenario has a break fixture demonstrating it fails when its
   guarantee is weakened.
-- **SC-010**: The full suite runs with no operated service, container runtime, or network access.
+- **SC-010**: Zero suite runs contact a live model provider or a live managed-product API, and
+  zero simulate disruption by terminating real infrastructure. The durability scenarios run
+  against the local enclave; `make dev-up` is a prerequisite for them, not an alternative to them.
 
 ## Assumptions
 
-- This feature ships as **durability and long-running-execution semantics plus a reference
-  provider and conformance scenarios**, on top of landed 002, 003, and 004. Production IdP,
-  Vault, and real product APIs remain fakes.
+- This feature ships as **durability and long-running-execution semantics plus conformance
+  scenarios**, on top of landed 002, 003, and 004 **and the local environment** (roadmap 006),
+  which must land first. Model providers and managed-product APIs remain fakes — they are outside
+  our boundary. **Vault and Postgres are not fakes**: they are components this project deploys,
+  and the guarantees are proven against the real ones.
 - The durability seam, `CheckpointBlob`, and the in-memory provider introduced by 004 are the
   starting point; this feature deepens them rather than replacing them.
-- **The Lean default provider is deferred, and the reference provider used here is hermetic.**
-  ADR-0024 names library-grade durable execution over an existing Postgres as the Lean default,
-  but no feature to date has introduced an operated service and every suite is hermetic with no
-  container runtime. This feature delivers the semantics and the conformance scenarios against a
-  provider that is durable across process restart without requiring an operated service; the
-  Postgres-backed Lean default attaches later through the same interface, and its absence is
-  recorded as a deferred row rather than a silent gap. **This is the assumption most worth
-  challenging at review** — it trades ADR-0024's named default for the repository's hermetic
-  test bar, and reasonable reviewers may want the Postgres provider in scope instead.
+- **The provider is Postgres, scheduled by Nomad — superseding this spec's original assumption.**
+  As merged, this spec assumed a hermetic reference provider and deferred ADR-0024's named Lean
+  default on the grounds that no feature had introduced an operated service. That reasoning was
+  wrong on the facts: `make dev-up` has been reserved since 001 and documented as bringing up
+  "local stack: dev-mode identity fabric, **Postgres**, collector, harness", and the Integration
+  test tier already named Postgres as a real backing service. Substituting a lighter datastore
+  would mean the durability code ships untested against what it actually runs on. A dedicated
+  workflow-engine provider remains deferred under ADR-0028's named-trigger rule; the Lean default
+  is not deferred.
 - Re-observation reuses the receipts grounded reporting already depends on (ADR-0018). This
   feature consumes that evidence; it does not re-own or redefine it.
 - Parking is in scope; the **consent surface** a human uses to grant, refuse, or renew is not.
@@ -339,4 +367,7 @@ provider could be substituted without rewriting them.
   tool is an ongoing obligation, not a one-time task.
 - Drain-across-upgrade is simulated as a controlled handover in-process, not by upgrading a
   running deployment.
+- **Single-node caveat.** The local enclave runs one Vault node and one Nomad server. Fencing and
+  parking are therefore proven against single-node behaviour; multi-node partition is not
+  exercised here. Recorded so the conformance claim is not read as broader than it is.
 - Warn-mode remains out of scope; the default and test bar is enforce/fail-closed, as in 002–004.
