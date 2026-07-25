@@ -41,9 +41,18 @@ Behavior:
 A governance pre-hook MUST:
 
 1. Deny if `clock.now() >= authority.expires_at` with reason `authority_expired`.
-2. Deny if tool name ∉ `authority.effective.tool_names` with reason
+2. Re-resolve **policy** from the identity fabric on every invoke (no wider cache).
+3. Compute live effective bounds (both components):
+   `live_effective = authority.effective ∩ current_policy`
+   (component-wise intersection). Stale wider issued authority MUST NOT win.
+4. Deny if tool name ∉ `live_effective.tool_names` with reason
    `authority_insufficient` (in addition to 002 registry scope checks).
-3. Re-resolve policy/entitlements from the fabric on every invoke (no wider cache).
+5. When the resolved tool has `product_mode` ≠ `none`, deny if
+   `product_action` ∉ `live_effective.product_actions` with reason
+   `authority_insufficient` before mirroring runs.
+
+Entitlement re-resolution for product mirroring is defined in
+`entitlement-mirroring.md` and also runs on every invoke.
 
 ## Reason codes
 

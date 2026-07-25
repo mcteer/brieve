@@ -56,7 +56,7 @@ Test/operator-facing fixture surface — not a durable store.
 | Resolve policy | Returns policy `AuthorityScope` (default unrestricted fixture) |
 | Resolve product entitlements | Returns `frozenset[str]` actions for `(user, product)` |
 | Issue credential material | Stores brokered secret under `credential_id` only inside the fake |
-| Simulate failures | Flags for unavailable / exchange_failed / mid-run shrink |
+| Simulate failures | Flags for unavailable / exchange_failed / mid-run policy shrink / mid-run entitlement shrink |
 
 ### ProductApi (fake)
 

@@ -102,9 +102,10 @@ make check
 
 | Spec | Quickstart |
 | --- | --- |
-| US1 / FR-001–003 | A, B |
-| US3 / invoke bounds | C |
-| US4 / FR-004–006 | D |
-| US5 / FR-007–008 | E |
-| Fail-closed / FR-015 | F |
-| FR-012–013 harness | G |
+| US1 / FR-001–003 (issue + allow) | A, C (allow half) |
+| US2 / FR-002–003 (refuse + insufficient) | B, C (deny half) |
+| US3 / FR-004–006 (mirroring) | D |
+| US4 / FR-007, FR-015 (fail-closed) | F |
+| US5 / FR-008, FR-012 (expiry + harness) | E, G |
+| FR-012–013 harness imports | G |
+| Inner loop / 002 regressions | H |

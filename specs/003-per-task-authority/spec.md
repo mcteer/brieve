@@ -122,7 +122,7 @@ Task credentials expire. After expiry, further tool calls are denied until autho
 - **FR-008**: Expired task credentials MUST NOT authorize further tool execution; the next tool call after expiry MUST deny until authority is re-manufactured under FR-002–FR-003.
 - **FR-009**: Authority issuance, denial, mirroring decisions, and expiry denials MUST appear in the run's append-only audit trail under the run's correlation ID (joining the 002 evidence plane).
 - **FR-010**: Audit, spans, logs, and model-visible context MUST NOT contain raw credential secret values — references, hashes, or redacted metadata only.
-- **FR-011**: Run state and any checkpoint-shaped structures touched by this feature MUST NOT persist credential secret values (ADR-0026).
+- **FR-011**: Run state and any checkpoint-shaped structures touched by this feature MUST NOT persist credential secret values (ADR-0026). This specializes FR-001’s no-standing-credential rule for persistence surfaces; it is not a separate authority model.
 - **FR-012**: The test harness MUST provide `assert_scope_narrowed` under `from tests.harness import …` as documented in docs/development/testing.md, and the helper MUST enforce the narrowing property against real authority objects produced by this feature.
 - **FR-013**: Deterministic tests for this feature MUST NOT call live identity providers, live Vault, live models, or live managed-product APIs; fakes (`fake_identity_fabric` and related harness fakes) are required.
 - **FR-014**: User-facing denial and refusal messages MUST explain that authority was denied or unavailable without disclosing secrets or out-of-scope entitlements the requester must not see.

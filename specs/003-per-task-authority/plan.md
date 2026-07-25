@@ -44,8 +44,9 @@ models, or product APIs.
 **Project Type**: Sealed-core library extension (`src/core/authority/…`) + harness public
 API; integrates with existing `start_governed_run` / `invoke_tool` / hook engine
 
-**Performance Goals**: Authority checks remain on the hot path but stay simple enough
-that `make check` stays within the fast-lane budget; no separate SLO
+**Performance Goals**: N/A — no separate latency/throughput SLO for 003. Authority checks
+stay on the existing `invoke_tool` hot path; success criterion is `make check` green,
+not a measured budget.
 
 **Constraints**: Fail closed on identity/exchange/ceiling/entitlement/expiry errors
 (ADR-0006); scopes only narrow (ADR-0026/0044); federate-before-broker in the model
@@ -111,7 +112,9 @@ specs/003-per-task-authority/
 src/core/
 ├── authority/
 │   ├── __init__.py
-│   ├── types.py              # Scope, Ceiling, EffectiveAuthority, TaskCredentialRef
+│   ├── types.py              # AuthorityScope, TaskCredentialRef
+│   ├── fabric.py             # IdentityFabric protocol (fakes implement)
+│   ├── hashing.py            # HMAC-SHA256(run_salt, material) hex digests
 │   ├── intersection.py       # user ∩ ceiling ∩ task_scope ∩ policy (pure)
 │   ├── manufacture.py        # issue ref at run start or refuse
 │   ├── clock.py              # Clock protocol; system clock default

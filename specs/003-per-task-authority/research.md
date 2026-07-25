@@ -92,10 +92,11 @@
 
 ## Decision: Mid-run stricter policy
 
-- **Decision**: On each invoke, re-read policy/entitlement fixtures from the identity
-  fabric (no caching of wider results across invokes). If fixtures shrink, the next check
-  uses the stricter set.
-- **Rationale**: Spec edge case — stale wider authority must not win.
+- **Decision**: On each invoke, re-read policy from the identity fabric and compute
+  `live_effective = authority.effective ∩ current_policy` (both components). Entitlement
+  mirroring re-resolves live entitlements separately. No caching of wider results across
+  invokes; stale wider issued authority must not win.
+- **Rationale**: Spec edge case — post-issuance policy shrink must be observed.
 - **Alternatives considered**: Cache effective authority for run lifetime (fails edge case).
 
 ## Decision: Per-run salt for secret-class hashes
