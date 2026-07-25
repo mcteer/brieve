@@ -44,6 +44,10 @@ full trail with `list_by_correlation_id` (FR-007, FR-008, SC-003).
 
 Payloads MUST NOT contain raw tool argument values or raw exception text that may embed
 secrets. Prefer argument key lists, content hashes, and stable error codes (FR-010).
+Argument content hashes are currently unsalted SHA-256 — acceptable while no real
+secret-class arguments flow. Before identity and real product tools land (003+),
+hashing moves to a per-run random salt (not a standing key, which Principle IV
+forbids) so low-entropy values cannot be dictionary-recovered from audit records.
 
 ## 002 implementation
 

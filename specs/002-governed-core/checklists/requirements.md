@@ -44,3 +44,10 @@
   missing required enforcement dependency (FR-006). `assert_no_side_effect`
   moved under assertion helpers (not fakes); SC-004 tightened to OTel span;
   spec Status set to Planned.
+- Post-implementation review (2026-07-25): findings applied — CI actions SHA-pinned;
+  plan/impl DCO drift reconciled; evidential-gap flag extended to pre-path audit
+  failures (contract tightened); CI gate scripts verified/hardened with
+  failing-input tests; post-hook short-circuit documented; public sink accessors
+  replace private access; run-start audit-failure test added; future-salt note
+  recorded for 003+. Reminder: the feat/002 PR record must show security-maintainer
+  review (sealed-core behavior) per CONTRIBUTING.

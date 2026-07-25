@@ -45,8 +45,7 @@ def assert_correlated(
 def assert_audit_chain(audit: InMemoryAuditSink | Sequence[AuditEntry]) -> None:
     """Assert append-only hash chain is intact with no gaps."""
     if isinstance(audit, InMemoryAuditSink):
-        # Verify each correlation ID present in the sink.
-        ids = {e.correlation_id for e in audit._entries}  # noqa: SLF001
+        ids = audit.correlation_ids()
         assert ids, "expected audit entries"
         for cid in ids:
             verify_chain(audit.list_by_correlation_id(cid))
@@ -62,7 +61,7 @@ def assert_no_secret_values(
     """Assert fixture secret markers are absent from audit, spans, and model context."""
     blobs: list[str] = []
     if isinstance(audit, InMemoryAuditSink):
-        for entry in audit._entries:  # noqa: SLF001
+        for entry in audit.all_entries():
             blobs.append(entry.model_dump_json())
     elif isinstance(audit, Sequence):
         for entry in audit:

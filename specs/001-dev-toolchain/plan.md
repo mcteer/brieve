@@ -14,7 +14,7 @@ Establish the contributor toolchain promised by CONTRIBUTING/AGENTS: a `uv`-mana
 
 **Language/Version**: Python 3.12+ (floor from clarified spec)
 
-**Primary Dependencies**: `uv` (package/workspace manager); `ruff` (lint + format); `mypy` (static types, strict-ish); `pytest` (unit smoke); `pre-commit`; GitHub Actions for CI; secret scanning via `gitleaks`; DCO via `probot/dco` or `action-dco`; license compliance via `pip-licenses` with an in-repo allowlist
+**Primary Dependencies**: `uv` (package/workspace manager); `ruff` (lint + format); `mypy` (static types, strict-ish); `pytest` (unit smoke); `pre-commit`; GitHub Actions for CI; secret scanning via `gitleaks`; DCO via `christophebedard/dco-check` (GitHub Action); license compliance via `pip-licenses` with an in-repo allowlist
 
 **Storage**: N/A
 
