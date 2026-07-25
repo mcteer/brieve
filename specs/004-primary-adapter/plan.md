@@ -23,8 +23,14 @@ northbound surfaces, no full durability/resume product, no live models or IdP.
 adapter/public boundaries; `src/core` remains free of agent-framework imports
 
 **Primary Dependencies**: Existing (`pydantic`, `opentelemetry-api`). **New (justified)**:
-`pydantic-ai` under **`[project.optional-dependencies] adapters`** (not a uv
-`dependency-groups` entry — `dev` stays a group). Install with `uv sync --extra adapters`.
+`pydantic-ai-slim==2.18.0` under **`[project.optional-dependencies] adapters`** (not a uv
+`dependency-groups` entry — `dev` stays a group). Slim, not the `pydantic-ai` meta package:
+the meta resolves to `pydantic-ai-slim[anthropic,cli,evals,google,logfire,mcp,openai,…]`,
+installing three live model-provider SDKs a feature that calls no model has no use for
+(Principle VI; FR-012). Install with `uv sync --extra adapters`. **Floor consequence**:
+slim requires `pydantic>=2.12` and `opentelemetry-api>=1.28`, above this project's `>=2.10`
+and `>=1.27`, so with-extra and without-extra environments resolve differently until the
+base pins are raised — settle at implement time (T002).
 ADR-0017 primary adapter; Principle VI — not loaded into core import graph. Pin at
 implement time with PR justification for the regulated dependency tree. CI and
 contributor `make check` / `make conformance` always sync with `--extra adapters`.
@@ -61,7 +67,9 @@ code mode out of scope
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
-*Source of truth: [`.specify/memory/constitution.md`](../../.specify/memory/constitution.md).*
+*Source of truth: [`.specify/memory/constitution.md`](../../.specify/memory/constitution.md)
+— **checked against v1.0.1** (Quality Gates scoped by ADR-0047; re-check if the version
+advances).*
 *A failing gate stops planning — redesign or withdraw the spec; do not proceed to research.*
 
 | Principle | Verdict | Notes |
@@ -70,12 +78,12 @@ code mode out of scope
 | II — Total Interception; One Governed Tool Layer | Pass | Framework tools route only through `invoke_tool`; no ungoverned tool-body path |
 | III — Fail-Closed, In-Process Enforcement | Pass | GovernanceCapability first + fail closed; conformance-asserted; errors deny |
 | IV — Zero Standing Credentials; Authority Per Task | Pass | Adapter starts runs via 003 manufacture; no standing product creds; state mapping forbids credential persistence |
-| V — Sealed Core, Versioned Seams | Pass | Adapters are sealed core; approved spec; security-maintainer on feat PR; conformance validates seam |
+| V — Sealed Core, Versioned Seams | Pass | Adapters are sealed core; approved spec; security-maintainer on feat PR; conformance validates seam. Core changes capped at three by FR-016; the required `agent_definition_id` is a breaking seam change, exempt from a deprecation window only because the project is pre-1.0 with no external consumers (recorded in spec Assumptions) |
 | VI — Lean by Default | Pass | Framework dep optional (`adapters` extra); no new operated service; durability is thin library seam/fake |
 | VII — Anti-Fragmentation | Pass | One adapter lane over one core; substrate deltas none for 004 |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | N/A | No packs/models/policies promotion |
 | IX — Evidence Over Claims | Pass | Adapter-started runs keep 002/003 correlation + audit join; secrets never in evidence |
-| X — The Decision Record Governs | Pass | Binds ADR-0001, 0017, 0019, 0006; defers 0024 depth / 0040 / 0041 productization |
+| X — The Decision Record Governs | Pass | Binds ADR-0001, 0017, 0019, 0006, **0047** (gate rows attach as features land — sets which Quality Gate rows are in force here); defers 0024 depth / 0040 / 0041 productization, each row citing its deferring ADR in `contracts/conformance-adapter.md` |
 
 **Gate result**: PASS — proceed to Phase 0
 
@@ -86,6 +94,14 @@ GovernanceCapability ordering, `invoke_tool`-only tool execution, agent-definiti
 run start, thin durability/approval seams without credential persistence, and
 conformance command behavior; structure keeps framework imports exclusively under
 `src/adapters/pydantic_ai` and fakes under `tests/harness` / `tests/conformance`.
+
+Re-checked again after the 2026-07-25 clarification session (constitution v1.0.1, spec
+FR-015/FR-016, amended FR-012): still **PASS**, and two gates got stronger rather than
+weaker. Principle IX — conformance is now enforced in CI (FR-015) rather than attested in
+a PR description. Principle V — core changes are enumerated and capped (FR-016), so a
+fourth sealed-core change is visible at review instead of arriving as a task. Principle
+III is unchanged: nothing in this round touches enforcement ordering or fail-closed
+behavior. No new violations; Complexity Tracking stays empty.
 
 ## Project Structure
 
@@ -145,9 +161,11 @@ tests/conformance/
 
 tests/component/                    # US1–US2 adapter allow/deny through agent path
 tests/unit/                         # mapping purity / definition id plumbing
+└── test_no_live_dependencies.py    # FR-012 import guard (no live model/IdP/Vault client)
 
-Makefile                            # conformance → pytest tests/conformance
-pyproject.toml                      # optional-dependencies.adapters = [pydantic-ai==pin]
+Makefile                            # UV_RUN := uv run --extra adapters; conformance → pytest tests/conformance
+pyproject.toml                      # optional-dependencies.adapters = [pydantic-ai-slim==2.18.0]; uv.lock regenerated
+.github/workflows/ci.yml            # FR-015: sync --extra adapters; make conformance step (merge-blocking)
 ```
 
 **Structure Decision**: Keep all framework imports under `src/adapters/pydantic_ai`.

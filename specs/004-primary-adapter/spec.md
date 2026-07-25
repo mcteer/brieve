@@ -15,8 +15,19 @@
 | Field | Value |
 | --- | --- |
 | **Requirements (R1–R17)** | R16 (sealed adapters / versioned seams — thin primary adapter as sealed-core glue). R7 (fail-closed governance on the adapter path). R5 / R11 as implicated by total interception of tool calls that leave the agent through the adapter (Principle II) — without claiming full registry lifecycle (R6) or all four northbound transports (R15). Builds on R2/R3 (003 authority) and R4/R10/R13 (002 evidence) without re-owning them. |
-| **ADRs touched** | ADR-0001 (framework-agnostic core; exactly four adapter mappings; core never imports a framework), ADR-0017 (Pydantic AI is the primary and reference adapter; LangGraph demand-driven), ADR-0019 (adapter on framework capabilities; GovernanceCapability runs first and fails closed; conformance-asserted), ADR-0006 (in-process fail-closed enforcement — adapter must not open a bypass). Related deferred: ADR-0024 (durability provider depth), ADR-0040/0041 (deferred disclosure / code-mode parity — out of scope productization here). |
+| **ADRs touched** | ADR-0001 (framework-agnostic core; exactly four adapter mappings; core never imports a framework), ADR-0017 (Pydantic AI is the primary and reference adapter; LangGraph demand-driven), ADR-0019 (adapter on framework capabilities; GovernanceCapability runs first and fails closed; conformance-asserted), ADR-0006 (in-process fail-closed enforcement — adapter must not open a bypass), ADR-0047 (conformance gate rows attach as their features land — governs which Quality Gate rows are in force for this adapter, and makes the Deferred section of `contracts/conformance-adapter.md` authoritative rather than advisory). Related deferred: ADR-0024 (durability provider depth), ADR-0040/0041 (deferred disclosure / code-mode parity — out of scope productization here). |
 | **Evidence class** | Conformance / attestation-adjacent — governance-first order and fail-closed adapter-path denials are conformance-asserted; audit join and authority records remain owned by 002/003 and must still be reachable for runs started through the adapter |
+
+## Clarifications
+
+### Session 2026-07-25
+
+- Q: Traceability omits ADR-0047, which now governs which Quality Gate rows are in force for this adapter. Declare it? → A: Yes — added to ADRs touched; it is what makes the contract's Deferred section authoritative, and constitution Development Workflow item 2 requires every spec to declare the ADRs it touches.
+- Q: `contracts/conformance-adapter.md` invariant 1 asserts conformance failures are merge-blocking, but no requirement carries that property — extend FR-011 or add a new one? → A: New **FR-015**. FR-011 keeps its narrower scope (the command executes the cases); merge-blocking is a distinct, separately testable property, and conflating them would hide either behind the other.
+- Q: The spec frames 004 as adapter glue, but plan and tasks extend core seams (durability, approvals, a required `agent_definition_id`). Amend the Assumption, or add a bounding requirement? → A: Both — Assumption amended, and **FR-016** enumerates the permitted core extensions so anything beyond them is visibly out of scope at review time.
+- Q: FR-012 (no live models, IdP, Vault, or product APIs in tests) has no verification, while comparable FR-010 has three. Guard test, or is convention sufficient? → A: Automated guard required — FR-012 extended. A prohibition nothing checks is a convention, and this one protects test determinism.
+- Q: FR-016 is verified only by review, with no Success Criterion — leave it, or make it measurable? → A: Added **SC-008**. Every other FR is measurable; a scope bound that only exists in review prose is the first thing to erode under delivery pressure.
+- Q: How is FR-012's guard actually implemented, given `pydantic-ai` pulls an HTTP client in transitively? → A: Two checks — an `ast` scan of test *source* for direct denylisted imports (not `sys.modules`, which would fail on every adapter test), plus an assertion that adapter tests resolve only stub models. `pytest-socket` is stronger but adds a regulated-tree dependency; escalate only if a live call slips through.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -121,9 +132,11 @@ A contributor changing the primary adapter can run the shared conformance path a
 - **FR-009**: Durability and interrupt mappings MUST bind to core/provider seams (fakes acceptable); they MUST NOT introduce an adapter-local second enforcement or credential store. Full durability resume scenarios and rich approval UX are not required for acceptance of the thin mappings.
 - **FR-010**: Audit, spans, logs, and model-visible context on adapter-path runs MUST NOT contain raw secret or credential values — references, hashes, or redacted metadata only.
 - **FR-011**: The shared conformance suite MUST include primary-adapter cases for governance-first ordering and fail-closed denial; `make conformance` MUST execute those cases (001 command contract becomes real for this adapter).
-- **FR-012**: Deterministic tests for this feature MUST NOT call live models, live identity providers, live Vault, or live managed-product APIs; stub models / scripted agents and harness fakes are required.
+- **FR-012**: Deterministic tests for this feature MUST NOT call live models, live identity providers, live Vault, or live managed-product APIs; stub models / scripted agents and harness fakes are required. An automated check MUST assert this over the feature's test paths — convention alone is not sufficient verification.
 - **FR-013**: User-facing denial and refusal messages on the adapter path MUST explain that the action was denied or unavailable without disclosing secrets or out-of-scope entitlements the requester must not see.
 - **FR-014**: A second framework adapter MUST NOT ship in this feature (ADR-0017 demand-driven fast-follow remains later).
+- **FR-015**: Primary-adapter conformance cases MUST be enforced in continuous integration for changes touching the adapter or its conformance lane; a locally-run result recorded in a pull-request description MUST NOT substitute for that gate (Principle IX — evidence over claims; `contracts/conformance-adapter.md` invariant 1).
+- **FR-016**: Core changes in this feature are bounded to exactly three extensions: (1) a framework-agnostic durability protocol with an in-memory default; (2) a framework-agnostic approval-hook protocol with a deny-by-default double; (3) an agent-definition identifier required at governed run start and threaded into ceiling and policy resolution. Any other sealed-core change — hook algebra, audit schema, registry lifecycle, authority intersection — is out of scope for this feature and requires its own approved spec (Principle V).
 
 ### Key Entities
 
@@ -146,11 +159,12 @@ A contributor changing the primary adapter can run the shared conformance path a
 - **SC-004**: For every adapter-path tool allow or deny in the suite, an investigator can retrieve a non-empty audit trail by correlation ID that includes the decision for that call.
 - **SC-005**: 100% of adapter-started allow-path cases that bind task authority satisfy the 003 narrowing property (`assert_scope_narrowed` or equivalent suite assertion).
 - **SC-006**: Automated fixture assertions find zero raw secret or credential values in audit, spans, logs, or model-visible context produced by the adapter suite.
-- **SC-007**: `make conformance` executes primary-adapter conformance cases (no longer a no-op stub for this lane) and passes on a clean tree.
+- **SC-007**: `make conformance` executes primary-adapter conformance cases (no longer a no-op stub for this lane) and passes on a clean tree, and the same command runs in CI on adapter-touching changes so a failure blocks merge.
+- **SC-008**: The feature's `src/core` diff contains only the three extensions enumerated in FR-016; a reviewer can enumerate every changed core file and match each to one of them.
 
 ## Assumptions
 
-- This feature ships as **adapter glue + conformance/deterministic tests** on top of landed 002 core and 003 authority. Production IdP/Vault and real product APIs remain fakes.
+- This feature ships as **adapter glue + conformance/deterministic tests + three bounded core-seam extensions** on top of landed 002 core and 003 authority. The core extensions are enumerated and capped by FR-016 (durability protocol, approval-hook protocol, required agent-definition identifier); the third is a **breaking change** to `start_governed_run` and is exempt from a deprecation window only because the project is pre-1.0 with no external consumers of that seam. Production IdP/Vault and real product APIs remain fakes.
 - Naming the primary framework follows **Accepted ADR-0017** (Pydantic AI); that choice is a product decision already on the decision record, not an open implementation debate in this spec.
 - Full durability/resume (ADR-0024 scenarios, re-auth-never-replay) remains a later feature; 004 only requires the thin state → durability-seam mapping with fakes sufficient for conformance.
 - Rich human-in-the-loop approval UX, Control Groups (ADR-0016), capability packs, northbound surfaces (ADR-0033), multi-tenancy, code mode (ADR-0041), and deferred-tool-disclosure productization (ADR-0040) remain out of scope; interrupt and loading edges are thin mappings or explicitly deferred.
