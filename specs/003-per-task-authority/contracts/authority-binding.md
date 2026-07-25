@@ -25,6 +25,10 @@ Required inputs beyond 002:
 Behavior:
 
 1. Resolve user, ceiling, and policy scopes from the identity fabric.
+   The fabric's ceiling/policy resolution is definition-agnostic in 003's fakes;
+   production resolution is keyed by agent definition (ADR-0015), and the protocol
+   gains that parameter when the real fabric lands — fakes will follow, not freeze,
+   this signature.
 2. If any resolve path raises/unavailable → raise typed refuse (`identity_unavailable` or
    `exchange_failed` as mapped by the fabric) and append `authority_refused` when the
    audit sink is available.
@@ -65,9 +69,17 @@ Entitlement re-resolution for product mirroring is defined in
 | `exchange_failed` | Credential manufacture/exchange failed |
 | `internal_error` | Fail-closed on unexpected errors |
 
+**Known future tightening**: `authority_insufficient` and `mirroring_denied` join the
+002 note on externally visible reason codes — under multi-tenancy (ADR-0035/ADR-0046)
+externally visible codes are expected to collapse, with distinctions preserved in
+audit only. Callers MUST NOT build logic on these distinctions being externally
+visible.
+
 ## Invariants
 
 1. No active run without a bound `TaskCredentialRef`.
 2. Effective scope never exceeds user ∩ ceiling ∩ requested ∩ policy.
 3. Secret material never appears on the run object, audit, or spans.
 4. Fail closed on identity, exchange, clock, or audit failures affecting authority.
+5. A run missing any built-in governance pre-hook (authority, mirroring, governance)
+   denies every invoke — partial governance is treated as missing governance.

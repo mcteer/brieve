@@ -39,3 +39,13 @@
   manufacture, mirroring, expiry, and un-auditable authority decisions. Zero
   `[NEEDS CLARIFICATION]` markers. Ready for human review; `/speckit-clarify` only if
   reviewers disagree with assumptions; otherwise `/speckit-plan` after merge.
+- Maintainer review (2026-07-25): spec assumptions and validation pass reviewed and
+  ratified (delegation mode, consistent with 001/002 convention). Post-implementation
+  review findings applied: governance dependency check requires the full built-in set
+  (spoof configuration denied, tested); hook-context exposure narrowed — other-kind
+  hooks receive no run reference (transitional contract note added to 002 pipeline
+  contract); `live_effective` declared on GovernedRun and in the data model; a
+  non-falsifiable test assertion removed; reason-code and per-definition-ceiling
+  watch notes recorded for tenancy/004. Sealed-core + attestation-relevant gates
+  attach to feat/003 per CONTRIBUTING; the PR record must show security-maintainer
+  review.

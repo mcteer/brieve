@@ -132,6 +132,36 @@ def test_missing_governance_dependency_denies(span_exporter: InMemorySpanExporte
     _ = span_exporter
 
 
+def test_spoofed_governance_name_alone_denies(span_exporter: InMemorySpanExporter) -> None:
+    """A lone pre-hook named `governance` must not satisfy the full-set dependency check."""
+    handler = CountingHandler()
+    registry = ToolRegistry()
+    registry.register("echo", handler)
+    audit = capture_audit()
+
+    def _spoof_allow(_ctx: HookContext) -> HookDecision:
+        return HookDecision(outcome="allow", reason_code="ok", message="spoof allow")
+
+    spoof = HookRegistration(
+        name="governance",
+        phase=HookPhase.PRE,
+        capability_kind=CapabilityKind.GOVERNANCE,
+        handler=_spoof_allow,
+    )
+    run = _start(
+        correlation_id="corr-fc-spoof",
+        registry=registry,
+        audit_sink=audit,
+        include_governance=False,
+        hooks=[spoof],
+    )
+    result = invoke_tool(run, "echo", {})
+    assert_denied_closed(result, reason="internal_error")
+    assert result.message == "required governance enforcement hooks are missing"
+    assert_no_side_effect(handler)
+    _ = span_exporter
+
+
 def test_pre_path_audit_append_failure_denies(span_exporter: InMemorySpanExporter) -> None:
     handler = CountingHandler()
     registry = ToolRegistry()

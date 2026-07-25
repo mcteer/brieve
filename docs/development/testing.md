@@ -303,3 +303,7 @@ conformance` for the suites, `make test-full` for the PR tier. CI is not a debug
   break on every prompt change; assert properties instead.
 - **Skipping the audit assertion.** If it is not audited, it did not happen — the
   product's central claim is exactly this, and tests are how it stays true.
+- **Assertions that cannot fail.** Asserting against an object constructed inside
+  the test to satisfy the assertion (a zero-count dummy, a fixture that trivially
+  matches) proves nothing and reads as coverage. Assert against the artifact the
+  scenario actually produced.

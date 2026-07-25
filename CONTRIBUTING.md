@@ -265,6 +265,11 @@ compiles, passes unit tests, and quietly breaks the product's central claims.
 - **Context economics matter.** Tool schemas and prompts consume context budget; deferred
   disclosure is the default posture. New tools ship with concise schemas and clear
   descriptions — verbosity is a real cost, not a style preference.
+- **Least context across seams.** Hooks, providers, and extensions receive the
+  narrowest inputs that serve them — specific fields, not container objects. Handing
+  a mutable run, a secret, or an audit sink across an extension boundary is a review
+  blocker even when today's callers are all trusted: seams outlive their first
+  callers.
 
 ## Authoring capability packs
 
