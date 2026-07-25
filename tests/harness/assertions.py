@@ -9,6 +9,7 @@ from typing import Any
 from core.audit.chain import verify_chain
 from core.audit.schema import AuditEntry
 from core.audit.sink import InMemoryAuditSink
+from core.authority.types import AuthorityScope, TaskCredentialRef
 from core.tools.invoke import InvokeResult
 from tests.harness.secrets import SECRET_MARKERS
 
@@ -93,6 +94,17 @@ def assert_no_side_effect(target: Any) -> None:
         assert target.executions == 0, f"expected 0 executions, got {target.executions}"
         return
     raise TypeError("target must expose call_count or executions")
+
+
+def assert_scope_narrowed(token: TaskCredentialRef, *, at_most: AuthorityScope) -> None:
+    """Assert issued effective authority is a subset of the user (or other) bound."""
+    assert token.effective.tool_names <= at_most.tool_names, (
+        f"tool_names amplified: {token.effective.tool_names!r} not ⊆ {at_most.tool_names!r}"
+    )
+    assert token.effective.product_actions <= at_most.product_actions, (
+        f"product_actions amplified: {token.effective.product_actions!r} "
+        f"not ⊆ {at_most.product_actions!r}"
+    )
 
 
 def assert_hook_order(observed: Sequence[str]) -> None:
