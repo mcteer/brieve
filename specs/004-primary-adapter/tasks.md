@@ -7,13 +7,13 @@
 **Tests**: Spec FR-011/FR-012/FR-015, per-story Independent Tests, and constitution Quality
 Gates require deterministic unit/component/conformance tests with stub models and fakes
 only — include test tasks for every user story. No live models, IdP, Vault, or product
-APIs, and that prohibition is itself asserted (T062) rather than left to convention.
-Conformance is merge-blocking in CI (T061), not attested in a PR description.
+APIs, and that prohibition is itself asserted (T059) rather than left to convention.
+Conformance is merge-blocking in CI (T055), not attested in a PR description.
 
 **Scope bound**: FR-016 caps this feature's sealed-core changes at three — durability
 protocol (T005/T006), approval-hook protocol (T007), and required `agent_definition_id`
 (T008/T009). A fourth core change appearing during implementation is out of scope; stop
-and open its own spec (T063 is the review that catches it).
+and open its own spec (T060 is the review that catches it).
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and
 testing of each story.
@@ -197,9 +197,9 @@ adapter-local enforcement engine
 - [ ] T052 [US5] Replace Makefile `conformance` stub with `$(UV_RUN) pytest tests/conformance -q` per `contracts/conformance-adapter.md`, where `UV_RUN` is defined in T054 — the extra must be requested in the recipe, not left to a documented precondition
 - [ ] T053 [US5] Update `docs/development/testing.md` **Conformance section prose** to describe the primary-adapter lane, the intentional 004 slice (governance-order + fail-closed only), and `uv sync --extra adapters` as required for check/conformance. The **CI-tier table and test-type row already landed in PR #22** (conformance moved to the Fast lane, marked merge-blocking) — do not re-edit those; this task is the section prose only
 - [ ] T054 [US5] Ensure `make check` testpaths remain unit+component (conformance stays a separate command) in `pyproject.toml` / `Makefile`; **and** add `UV_RUN := uv run --extra adapters` to the Makefile, routing every `check` and `conformance` recipe line through it. `uv run` materializes the project environment from the default extra set, so a bare `uv run` does not guarantee the `adapters` extra is present — and T025 forbids `importorskip`, so a missing extra must fail loudly rather than skip green. **Sequencing**: `uv run --extra adapters` errors with "Extra `adapters` is not defined" until T002 lands, so this edit ships with or after T002, never before
-- [ ] T061 [US5] [GATE:conformance] Add a conformance step to `.github/workflows/ci.yml` (fast-lane, immediately after `Inner-loop check`) running `make conformance`, and change `Sync dependencies` to `uv sync --frozen --extra adapters`. Without this, `contracts/conformance-adapter.md` invariant 1 ("conformance failures are merge-blocking for adapter changes") is satisfied only by a human running the command locally and pasting output into a PR body — a claim, not a record (Principle IX). Fast-lane rather than a separate job: the lane is sub-second, and a second job re-pays checkout + sync for no isolation benefit. **Sequencing**: depends on T002 (extra defined) and T052/T054 (recipe real)
+- [ ] T055 [US5] [GATE:conformance] Add a conformance step to `.github/workflows/ci.yml` (fast-lane, immediately after `Inner-loop check`) running `make conformance`, and change `Sync dependencies` to `uv sync --frozen --extra adapters`. Without this, `contracts/conformance-adapter.md` invariant 1 ("conformance failures are merge-blocking for adapter changes") is satisfied only by a human running the command locally and pasting output into a PR body — a claim, not a record (Principle IX). Fast-lane rather than a separate job: the lane is sub-second, and a second job re-pays checkout + sync for no isolation benefit. **Sequencing**: depends on T002 (extra defined) and T052/T054 (recipe real)
 
-**Checkpoint**: SC-007 — `make conformance` green on clean tree with adapters extra, **and merge-blocking in CI** (T061)
+**Checkpoint**: SC-007 — `make conformance` green on clean tree with adapters extra, **and merge-blocking in CI** (T055)
 
 ---
 
@@ -208,22 +208,17 @@ adapter-local enforcement engine
 **Purpose**: Inner-loop green, docs, 002/003 regression, scope-bound verification (FR-016),
 determinism guard (FR-012), security-review readiness
 
-> **Task IDs in this phase are not in numeric order.** T062 and T063 were appended by the
-> 2026-07-25 clarify pass and placed at their correct point in the *execution* order. IDs
-> are append-only and never reused or renumbered (both remediation notes and the contracts
-> reference them by number), so listing order — not numeric order — is authoritative here.
-
-- [ ] T055 [P] Update `tests/harness/README.md` with adapter fixture / stub-model usage
-- [ ] T056 [GATE:no-secret-leak] Scan new fixtures under `tests/` and adapter examples for plausible secret-like values; keep only harness markers
-- [ ] T057 Confirm `src/core` still imports no agent frameworks (`tests/unit/test_core_import.py`)
-- [ ] T062 [P] [GATE:determinism] Add `tests/unit/test_no_live_dependencies.py` asserting FR-012 mechanically, by **two** checks with a stated mechanism each:
+- [ ] T056 [P] Update `tests/harness/README.md` with adapter fixture / stub-model usage
+- [ ] T057 [GATE:no-secret-leak] Scan new fixtures under `tests/` and adapter examples for plausible secret-like values; keep only harness markers
+- [ ] T058 Confirm `src/core` still imports no agent frameworks (`tests/unit/test_core_import.py`)
+- [ ] T059 [P] [GATE:determinism] Add `tests/unit/test_no_live_dependencies.py` asserting FR-012 mechanically, by **two** checks with a stated mechanism each:
       **(a) Direct-import scan.** Parse each test module under `tests/` with `ast` and assert none of them *directly* imports a network client from the denylist (`httpx`, `requests`, `urllib.request`, `aiohttp`, `hvac`, and any model-provider SDK). Scan module source, **not** `sys.modules` — `pydantic-ai` pulls an HTTP client in transitively, so a runtime check fails on every adapter test while proving nothing. Transitive framework dependencies are explicitly out of scope for this check; the property is "no test reaches for a live client itself."
       **(b) Model resolution.** Assert every adapter test builds its agent with a stub model (`TestModel` / `FunctionModel` or the harness wrapper) — e.g. the harness builder refuses a model argument that is not a stub, and a test asserts that refusal. This is what actually prevents a live call; (a) alone cannot.
       Convention is not verification — this is the FR-010-style guard FR-012 previously lacked. Note the deliberate limit in the module docstring: this catches reaching for a client, not a live call made through an already-imported one; escalate to a socket-blocking plugin only if that gap is ever exercised
-- [ ] T063 Review the `src/core` diff against FR-016's three permitted extensions (durability protocol, approval-hook protocol, required `agent_definition_id`). Anything else touched under `src/core` — hook algebra, audit schema, registry lifecycle, authority intersection — is out of scope: revert it or stop and open its own spec. This is the core-side counterpart to T049's four-mapping review of the adapter
-- [ ] T058 Run `make check` green (unit + component, including 002/003 regressions) after `uv sync --extra adapters` (same sync CI uses — no skip path)
-- [ ] T059 Run `make conformance` green locally as a pre-flight (CI enforcement is T061 — the PR body records the walkthrough, it does not substitute for the gate); walk quickstart Scenarios A–F and record results in the `feat/004` PR description
-- [ ] T060 Open `feat/004-primary-adapter` implementation PR only after spec/plan/tasks merge path per CONTRIBUTING; request **security-maintainer** review (sealed-core adapters + conformance); fill PR template **Breaking change** section for required `agent_definition_id` on `start_governed_run` (T009/T010 migration) — state the deprecation-window exemption explicitly (pre-1.0 at `version = "0.0.0"`, no external consumers of the seam), since Principle V otherwise requires one; confirm the regenerated `uv.lock` from T002 is committed; state in the PR that the `src/core` diff contains only FR-016's three permitted extensions (T063 verified)
+- [ ] T060 Review the `src/core` diff against FR-016's three permitted extensions (durability protocol, approval-hook protocol, required `agent_definition_id`). Anything else touched under `src/core` — hook algebra, audit schema, registry lifecycle, authority intersection — is out of scope: revert it or stop and open its own spec. This is the core-side counterpart to T049's four-mapping review of the adapter
+- [ ] T061 Run `make check` green (unit + component, including 002/003 regressions) after `uv sync --extra adapters` (same sync CI uses — no skip path)
+- [ ] T062 Run `make conformance` green locally as a pre-flight (CI enforcement is T055 — the PR body records the walkthrough, it does not substitute for the gate); walk quickstart Scenarios A–F and record results in the `feat/004` PR description
+- [ ] T063 Open `feat/004-primary-adapter` implementation PR only after spec/plan/tasks merge path per CONTRIBUTING; request **security-maintainer** review (sealed-core adapters + conformance); fill PR template **Breaking change** section for required `agent_definition_id` on `start_governed_run` (T009/T010 migration) — state the deprecation-window exemption explicitly (pre-1.0 at `version = "0.0.0"`, no external consumers of the seam), since Principle V otherwise requires one; confirm the regenerated `uv.lock` from T002 is committed; state in the PR that the `src/core` diff contains only FR-016's three permitted extensions (T060 verified)
 
 ---
 
@@ -238,7 +233,7 @@ determinism guard (FR-012), security-review readiness
 - **Phase 5 (US3)**: Depends on US1 agent builder; conformance cases can draft tests earlier but need builder for green
 - **Phase 6 (US4)**: Depends on Foundational seams; can parallelize with US2 after US1 for tool mapping probe
 - **Phase 7 (US5)**: Depends on US3 conformance tests existing; order within the phase is
-  Makefile switch (T052/T054) then CI enforcement (T061) — never CI first, or the fast lane
+  Makefile switch (T052/T054) then CI enforcement (T055) — never CI first, or the fast lane
   goes red before the recipe is real
 - **Phase 8 (Polish)**: Depends on US1–US5 complete
 
@@ -284,7 +279,7 @@ determinism guard (FR-012), security-review readiness
 3. US2 → adapter deny / no bypass
 4. US3 → governance-first + fail-closed conformance cases
 5. US4 → four-mapping completeness (durability, approvals, ceilings)
-6. US5 → `make conformance` real (T052/T054), then merge-blocking in CI (T061)
+6. US5 → `make conformance` real (T052/T054), then merge-blocking in CI (T055)
 7. Polish → security-maintainer review on feat PR
 
 ### Notes
@@ -295,9 +290,12 @@ determinism guard (FR-012), security-review readiness
   `dependency-groups` entry).
 - Constitution Quality Gates also name deferred-disclosure parity, four-transport
   surface parity, registry isolation depth, and full ADR-0024 durability scenarios —
-  those rows **attach when those features land**. 004’s conformance slice is
-  governance-order + fail-closed (+ invoke_tool entry); do not add silent-green stubs
+  those rows **attach when those features land** (ADR-0047; constitution v1.0.1), each
+  citing its deferring ADR in `contracts/conformance-adapter.md`. 004’s conformance slice
+  is governance-order + fail-closed (+ invoke_tool entry); do not add silent-green stubs
   for deferred rows.
+- `invoke_tool` entry is asserted in both the conformance and unit lanes (T038, T042) —
+  a deliberate duplicate, rationale in `research.md`.
 - Tool mapping targets `invoke_tool`; MCP transport / northbound surfaces remain later
   (Principle I “MCP calls” wording is not an adapter-local MCP client in 004).
 - Full ADR-0024 durability matrix, LangGraph adapter, northbound surfaces, code mode, and
@@ -305,83 +303,3 @@ determinism guard (FR-012), security-review readiness
 - Reason codes remain owned by core; adapter asserts deny + zero executions.
 - Contribution class at implement: **sealed core (adapters)** — security-maintainer
   review mandatory.
-- Analyze remediations (2026-07-25): I1 optional-dependencies vs groups pinned; I2 CI
-  always `--extra adapters` (no importorskip); U1 FR-013 message assert (T031); U2
-  adapter mirroring (T032); U3 `resolve_policy(agent_definition_id)` required; U4
-  `include_governance=True` on adapter start; C1 deferred conformance rows noted; C2
-  invoke_tool vs MCP note; I3/I4/D1/D2 polish. LOW polish: Task IDs renumbered
-  monotonic T001–T060 (**superseded** — the second pass appended T061 to Phase 7, so IDs
-  are append-only rather than monotonic in phase order; new tasks take the next free ID in
-  their phase, and IDs are never reused or renumbered, since both remediation notes and
-  the contracts reference them by number); T002 pin is concrete-at-implement (`==X.Y.Z`
-  placeholder only in the task text); T036 break test path pinned to
-  `tests/conformance/adapter/test_governance_order_break.py`.
-- Analyze remediations, second pass (2026-07-25): **G1** T061 adds `make conformance` to
-  CI so the merge-blocking claim in `contracts/conformance-adapter.md` is enforced rather
-  than asserted in a PR body; **G2** T054 adds `UV_RUN := uv run --extra adapters` so the
-  extra cannot be re-synced away by a bare `uv run`, with T052 routed through it; **G3**
-  T002 requires the regenerated `uv.lock` (CI uses `uv sync --frozen`, verified to error
-  on an undefined extra); **A1** T036 pins the break test as self-verifying — it passes on
-  a clean tree by asserting the ordering check raises, matching the reworded contract row;
-  **U1** T060 states the pre-1.0 deprecation-window exemption for the `agent_definition_id`
-  seam break. **C1 RESOLVED** (2026-07-25):
-  [ADR-0047](../../docs/adr/0047-conformance-gate-rows-attach-as-features-land.md)
-  **Accepted** — each conformance gate row is blocking from the moment its underlying
-  feature exists, and before then is absent or an explicit skip, never a passing stub; the
-  in-force set is recorded per feature, which makes the "Deferred" section of
-  `contracts/conformance-adapter.md` authoritative rather than advisory. Constitution
-  Quality Gates amended in the same change (v1.0.0 → v1.0.1, PATCH). 004's in-force slice
-  is unchanged: governance-order, fail-closed, `invoke_tool` entry. Still open and
-  Third pass closed **I3** (monotonic-ID claim superseded above; IDs are append-only) and
-  **I4** (Phase 7 dependency order, Incremental Delivery step 6, and the US5 dependency
-  line now name CI enforcement, not just the Makefile switch). Still open and
-  deliberately not auto-fixed: **I1** spec
-  Assumptions frame 004 as adapter glue while tasks change core seams; **U2** FR-012 has no
-  verification task; **A2** T002 still carries the `X.Y.Z` pin placeholder — all three are
-  spec-stage edits, route via `/speckit-clarify` per AGENTS.md rule 5.
-- Clarify + re-plan + re-tasks (2026-07-25, fourth pass): spec gained **FR-015** (adapter
-  conformance enforced in CI, not attested in a PR body), **FR-016** (sealed-core changes
-  capped at three enumerated extensions), an amended **FR-012** (determinism asserted, not
-  assumed), and ADR-0047 in Traceability. Task coverage for the new requirements: FR-015 →
-  T061; FR-016 → T005–T009 build them, **T063** verifies nothing else in `src/core` moved,
-  T060 declares it in the PR; FR-012 → **T062** import guard, new `[GATE:determinism]` row.
-  plan/research/quickstart/data-model refreshed in the same pass (Constitution Check now
-  stamped v1.0.1; quickstart Scenarios G and H added). **Refreshed in place rather than
-  regenerated** — regenerating from the template would have discarded four passes of
-  remediation recorded here; the tradeoff is that these artifacts are no longer reproducible
-  from `spec.md` alone. Remaining open: **A2** (T002 `X.Y.Z` pin needs index access),
-  **I2** (`docs/development/testing.md` tier table still lists conformance under Full —
-  fold into T053), **I5** (plan Project Structure now lists `ci.yml`; resolved).
-- Analyze remediations, fourth pass (2026-07-25): **A3** T062's mechanism pinned — an `ast`
-  scan of test *source* for direct denylisted imports plus a stub-model resolution
-  assertion, because a `sys.modules` check would fail on every adapter test (`pydantic-ai`
-  imports an HTTP client transitively) while proving nothing; the known limit and the
-  `pytest-socket` escalation path are recorded in research.md. **I7** Phase 8 lists T062/T063
-  in execution order with a note that IDs there are append-only and not numeric. **A4**
-  quickstart Scenario H drops the `<pr>` placeholder. **U5** spec gains **SC-008** making
-  FR-016's core-diff bound measurable — covered by T063 (verification) and T060 (declaration),
-  so no new task. SC-008 is additive with existing coverage, which is why plan/tasks were not
-  regenerated for it; a structural spec change would still require the full pipeline re-run
-  per AGENTS.md. Remaining open: **A2** (T002 pin needs index access), **I2** (testing.md tier
-  table, folded into T053).
-- Analyze remediations, fifth pass (2026-07-25): **A2 CLOSED** — pin resolved from the
-  package index to **`pydantic-ai-slim==2.18.0`**, not the `pydantic-ai` meta package. The
-  meta resolves to `pydantic-ai-slim[anthropic,cli,evals,google,logfire,mcp,openai,retries,
-  web]`, installing three live model-provider SDKs, a CLI, and logfire into a regulated tree
-  for a feature that calls no model (Principle VI), and leaving them uninstalled makes
-  FR-012's denylist materially easier to hold. Slim carries the `TestModel`/`FunctionModel`
-  and capability/toolset APIs 004 binds. Open consequence recorded in T002: slim requires
-  `pydantic>=2.12` / `opentelemetry-api>=1.28` against this project's `>=2.10` / `>=1.27`
-  floors — raise the base pins or record why divergence is acceptable. **I2 CLOSED** —
-  `docs/development/testing.md` CI-tier table moves adapter/provider conformance into the
-  Fast lane (matching T061), and the test-type table row now says merge-blocking via
-  `make conformance`; T053 still owns the Conformance *section* prose at implement time.
-- Analyze remediations, sixth pass (2026-07-25): **I8** T053 scoped explicitly to the
-  Conformance section prose, naming PR #22 as the source of the already-landed tier table so
-  it is not edited twice. **I9** plan.md Technical Context now carries the `pydantic-ai-slim`
-  floor consequence (`pydantic>=2.12` / `opentelemetry-api>=1.28` against this project's
-  `>=2.10` / `>=1.27`) that previously lived only in research.md and T002. Accepted without
-  change: **U3** (FR-014 verified by review bar), **C2** (warn-mode N/A — 004 lands no
-  policy), **D1** (T038/T042 duplicate is a deliberate conformance/unit split). Analyze is
-  clean: zero CRITICAL/HIGH/MEDIUM, zero ambiguities, 100% requirement coverage across 24
-  keys and 63 tasks.
