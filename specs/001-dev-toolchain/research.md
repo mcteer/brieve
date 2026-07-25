@@ -12,7 +12,7 @@
 ## Decision: Packaging layout
 
 - **Decision**: Installable packages under `src/core`, `src/adapters`, `src/surfaces` via a uv workspace or src-layout discovery so `import core` / `import adapters` / `import surfaces` (or `from core import …`) works in tests. Prefer explicit package names matching directory names (`core`, `adapters`, `surfaces`) without a conflicting top-level `src` package.
-- **Rationale**: Matches AGENTS repository map; keeps core importable for FR-004 smoke without frameworks.
+- **Rationale**: Matches AGENTS repository map; keeps core importable for FR-004 smoke without frameworks. A future rename to a branded namespace (product name is TBD per ADR-0028) would be a breaking seam change and rides the deprecation process; the bare names are accepted as stable for now.
 - **Alternatives considered**: Nested `harness_core` naming (extra rename vs docs); deferring installable packages (fails US2 independent test).
 
 ## Decision: Linter / formatter
@@ -23,9 +23,9 @@
 
 ## Decision: Type checker
 
-- **Decision**: `ty` (Astral) if stable enough in the pinned toolchain at implementation time; otherwise `mypy` in strict-ish mode for the stub packages. Record the chosen pin in `pyproject.toml` during `feat/001`.
+- **Decision**: `mypy` in strict-ish mode for the stub packages. Record the chosen pin in `pyproject.toml` during `feat/001`.
 - **Rationale**: Typed Python is required by CONTRIBUTING; stubs still benefit from a green typecheck in `make check`.
-- **Alternatives considered**: pyright-only (Node-adjacent tooling); no typecheck until product code (weakens FR-002 contract).
+- **Alternatives considered**: `ty` (Astral) — revisit via ordinary PR when stable; not part of 001; pyright-only (Node-adjacent tooling); no typecheck until product code (weakens FR-002 contract).
 
 ## Decision: Test runner and smoke test
 
@@ -53,9 +53,9 @@
 
 ## Decision: License compliance
 
-- **Decision**: CI step that inventories runtime/dev dependencies and fails on GPL/AGPL/BUSL/SSPL family per CONTRIBUTING supply-chain rules. Tool choice at implement time among `pip-licenses`, `uv tree` + allowlist script, or `licensecheck` — keep allowlist config in-repo.
+- **Decision**: CI step using `pip-licenses` with an in-repo allowlist config; inventories runtime/dev dependencies and fails on GPL/AGPL/BUSL/SSPL family per CONTRIBUTING supply-chain rules.
 - **Rationale**: FR-006; CONTRIBUTING already states license CI check.
-- **Alternatives considered**: Defer until first third-party dep beyond tooling (risks drift); FOSSA SaaS (adds operated dependency — Principle VI).
+- **Alternatives considered**: `uv tree` + custom allowlist script; `licensecheck`; defer until first third-party dep beyond tooling (risks drift); FOSSA SaaS (adds operated dependency — Principle VI).
 
 ## Decision: Spec-artifact lint
 

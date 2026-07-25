@@ -13,7 +13,7 @@
 ## Scenario A — Fresh clone green path (US1 / SC-001)
 
 ```bash
-git clone <repo-url> brieve && cd brieve
+git clone <repo-url> harness-repo && cd harness-repo
 uv sync
 make check
 ```

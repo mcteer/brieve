@@ -181,3 +181,7 @@ Stop and surface the question rather than proceeding if:
   property rather than a style choice.
 - Tests fail in a way you do not understand. Do not disable, skip, or loosen a test to
   make a build pass — a failing governance test is information, not an obstacle.
+- A `[NEEDS CLARIFICATION]` marker is in scope. Never resolve one silently. Default
+  to surfacing the questions and waiting; resolve them yourself only when the human
+  has explicitly delegated that in this session — and then list every resolution
+  prominently for review, so the delegation and its outcomes are on the record.

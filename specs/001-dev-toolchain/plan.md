@@ -8,13 +8,13 @@
 
 ## Summary
 
-Establish the contributor toolchain promised by CONTRIBUTING/AGENTS: a `uv`-managed typed Python workspace with the documented package layout as importable stubs, `make check` as a green inner loop (ruff + ty/mypy + pytest smoke), named stub targets for `conformance` / `test-full` / `dev-up`, pre-commit hygiene, and a GitHub Actions fast-lane workflow covering install, inner-loop check, secret scan, DCO, license compliance, and conditional spec-artifact lint. No product behavior, identity fabric, hooks, adapters, packs, or portal toolchain.
+Establish the contributor toolchain promised by CONTRIBUTING/AGENTS: a `uv`-managed typed Python workspace with the documented package layout as importable stubs, `make check` as a green inner loop (ruff + mypy + pytest smoke), named stub targets for `conformance` / `test-full` / `dev-up`, pre-commit hygiene, and a GitHub Actions fast-lane workflow covering install, inner-loop check, secret scan, DCO, license compliance, and conditional spec-artifact lint. No product behavior, identity fabric, hooks, adapters, packs, or portal toolchain.
 
 ## Technical Context
 
 **Language/Version**: Python 3.12+ (floor from clarified spec)
 
-**Primary Dependencies**: `uv` (package/workspace manager); `ruff` (lint + format); `ty` or `mypy` (static types — see research.md); `pytest` (unit smoke); `pre-commit`; GitHub Actions for CI; secret scanning via `gitleaks` or `detect-secrets`; DCO via `probot/dco` or `action-dco`; license compliance via `pip-licenses` / `uv` audit tooling (see research.md)
+**Primary Dependencies**: `uv` (package/workspace manager); `ruff` (lint + format); `mypy` (static types, strict-ish); `pytest` (unit smoke); `pre-commit`; GitHub Actions for CI; secret scanning via `gitleaks`; DCO via `probot/dco` or `action-dco`; license compliance via `pip-licenses` with an in-repo allowlist
 
 **Storage**: N/A
 
@@ -77,7 +77,7 @@ specs/001-dev-toolchain/
 ### Source Code (repository root)
 
 ```text
-pyproject.toml                 # uv workspace root; Python >=3.12; ruff/pytest/ty config
+pyproject.toml                 # uv workspace root; Python >=3.12; ruff/pytest/mypy config
 uv.lock                        # committed lockfile
 Makefile                       # check, conformance, test-full, dev-up
 .pre-commit-config.yaml
@@ -100,7 +100,7 @@ tests/
 │   ├── __init__.py
 │   └── README.md              # reserved: shared fakes / assertion helpers (semver seam)
 ├── unit/
-│   └── test_core_import.py    # smoke: import src.core succeeds
+│   └── test_core_import.py    # smoke: `import core` succeeds (src-layout; `src` is not a package)
 ├── component/                 # reserved empty (.gitkeep)
 ├── contract/                  # reserved empty (.gitkeep)
 └── integration/               # reserved empty (.gitkeep)

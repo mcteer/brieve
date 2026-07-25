@@ -36,8 +36,8 @@
 
 **Purpose**: Initialize the uv Python workspace and baseline config files
 
-- [ ] T001 Create root `pyproject.toml` with Python `>=3.12`, package discovery for `src/core`, `src/adapters`, `src/surfaces`, and tool configs for ruff/pytest/(ty|mypy)
-- [ ] T002 [P] Add `NOTICE` at repository root (Apache 2.0 attribution referenced by README) if missing
+- [ ] T001 Create root `pyproject.toml` with Python `>=3.12`, package discovery for `src/core`, `src/adapters`, `src/surfaces`, and tool configs for ruff/pytest/mypy
+- [ ] T002 [P] Add `NOTICE` at repository root (Apache 2.0 attribution referenced by README) if missing — **BLOCKED: requires the copyright holder name from the maintainer; do not invent or placeholder it**
 - [ ] T003 [P] Ensure `.gitignore` covers `.venv/`, caches, and lock-adjacent noise without ignoring `uv.lock`
 
 ---
@@ -48,7 +48,7 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 [P] Create `src/core/__init__.py`, `src/core/py.typed` with `SPDX-License-Identifier: Apache-2.0`
+- [ ] T004 [P] Create `src/core/__init__.py`, `src/core/py.typed` with `SPDX-License-Identifier: Apache-2.0`, and apply the same SPDX line to every new commentable file created in this feature (Makefile, workflow YAML, pre-commit config, TOML) per FR-011
 - [ ] T005 [P] Create `src/adapters/__init__.py`, `src/adapters/py.typed` with SPDX header
 - [ ] T006 [P] Create `src/surfaces/__init__.py`, `src/surfaces/py.typed` with SPDX header
 - [ ] T007 [P] Create `tests/harness/__init__.py` and `tests/harness/README.md` stating reserved public-API / semver seam role
