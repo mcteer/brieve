@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# Allowed license names as reported by pip-licenses (semicolon-separated groups
+# are handled by the CI script). Keep aligned with CONTRIBUTING supply-chain rules.
+Apache Software License
+Apache License 2.0
+Apache-2.0
+Apache-2.0 OR BSD-2-Clause
+MIT
+MIT License
+BSD
+BSD License
+BSD-2-Clause
+BSD-3-Clause
+ISC
+ISC License
+PSF
+PSF-2.0
+Python Software Foundation License
+Mozilla Public License 2.0 (MPL 2.0)
+MPL-2.0
+The Unlicense (Unlicense)
+Unlicense
+Public Domain
+CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+# Dual / composite license strings as reported by pip-licenses:
+Apache Software License;BSD License
+MIT License;Apache Software License

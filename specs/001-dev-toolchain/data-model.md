@@ -1,6 +1,6 @@
 # Data Model: Developer Toolchain Scaffold
 
-**Feature**: `specs/001-dev-toolchain`  
+**Feature**: `specs/001-dev-toolchain`
 **Date**: 2026-07-24
 
 This feature has no persistent runtime data store. Entities are contributor-facing contracts and layout reservations.

@@ -1,6 +1,6 @@
 # Research: Developer Toolchain Scaffold
 
-**Feature**: `specs/001-dev-toolchain`  
+**Feature**: `specs/001-dev-toolchain`
 **Date**: 2026-07-24
 
 ## Decision: Package manager and lockfile
