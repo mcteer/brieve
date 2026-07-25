@@ -18,6 +18,15 @@ Pin governance-first composition and fail-closed behavior on the primary adapter
    observable order MUST be governance-first).
 3. GovernanceCapability contributes only glue: lifecycle/tool interception that ends in
    `invoke_tool` / start-time core calls. It MUST NOT reimplement core hook algebra.
+4. Governance is **terminal at the toolset layer** — its wrapper routes execution to
+   `invoke_tool` rather than delegating inward, so no capability downstream can produce
+   an ungoverned execution. A consequence: a co-resident capability's toolset wrapper is
+   unreachable. `build_governed_agent` MUST **reject** such a configuration rather than
+   install it, because a capability that appears active while doing nothing is the
+   silent-pass failure ADR-0047 exists to prevent. The refusal names the capability and
+   points at the supported alternative. GovernanceCapability is exempt from this rule —
+   its wrapper is the terminal one. Observation of governed tool calls is available
+   through the per-call hook chain, which runs around the governed call and is unaffected.
 
 ## Runtime rules
 

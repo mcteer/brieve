@@ -16,6 +16,7 @@ from tests.harness import assert_no_side_effect
 from tests.harness.adapter_fixtures import (
     CountingHandler,
     build_failing_capability,
+    build_probe_capability,
     governed_agent_fixture,
 )
 
@@ -69,6 +70,49 @@ async def test_absent_deps_denies() -> None:
         await toolset.call_tool("echo", {}, _NoDeps(), None)  # type: ignore[arg-type]
 
     assert exc.value.reason_code == "run_unavailable"
+
+
+def test_capability_with_unreachable_toolset_wrapper_is_rejected() -> None:
+    """A capability governance would silently swallow must fail at build time.
+
+    ``GovernedToolset`` is terminal, so a co-resident ``get_wrapper_toolset``
+    never runs. Installing it quietly would leave the capability looking active
+    while doing nothing — the silent-pass failure ADR-0047 exists to prevent.
+    """
+    from pydantic_ai.capabilities.abstract import AbstractCapability
+    from pydantic_ai.toolsets import AbstractToolset, WrapperToolset
+
+    from adapters.pydantic_ai.agent import build_governed_agent
+
+    class _WrappingCapability(AbstractCapability[AdapterRunContext]):
+        def get_wrapper_toolset(
+            self, toolset: AbstractToolset[AdapterRunContext]
+        ) -> AbstractToolset[AdapterRunContext] | None:
+            return WrapperToolset(toolset)
+
+    with pytest.raises(GovernedToolError) as exc:
+        build_governed_agent("test", capabilities=[_WrappingCapability()])
+
+    assert exc.value.reason_code == "unreachable_capability_wrapper"
+    assert "_WrappingCapability" in str(exc.value)
+    assert "wrap_tool_execute" in str(exc.value), "the error must name the supported alternative"
+
+
+@pytest.mark.anyio
+async def test_observing_capability_is_still_accepted() -> None:
+    """The rejection is narrow: wrap_tool_execute capabilities compose normally."""
+    probe: list[str] = []
+    handler = CountingHandler()
+    agent, deps, handlers, _audit = governed_agent_fixture(
+        tool_calls=[("echo", {})],
+        registry_tools={"echo": handler},
+        capabilities=[build_probe_capability(probe)],
+    )
+
+    await agent.run("go", deps=deps)
+
+    assert probe, "wrap_tool_execute capability must still run"
+    assert handlers["echo"].call_count == 1
 
 
 def test_adapter_run_context_reports_inactive_when_run_refused() -> None:
