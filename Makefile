@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status
+.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-digest-diff enclave-boundaries
 
 # Every recipe names the adapters extra so the gates cannot run in an environment
 # that silently lacks the primary adapter (specs/004-primary-adapter/research.md).
@@ -46,6 +46,15 @@ dev-up:
 # Stops the stack. Destroys nothing — the named volumes hold the raft store and run state.
 dev-down:
 	@bash infra/dev-enclave/dev-down.sh
+
+# SC-001: the tree produces identical configuration on every substrate. Runs against no
+# infrastructure — a check needing both environments to exist is a check nobody runs.
+enclave-digest-diff:
+	@bash infra/bin/enclave-digest-diff
+
+# The module boundary, both directions (contracts/module-interface.md) plus FR-004.
+enclave-boundaries:
+	@bash infra/bin/enclave-boundaries
 
 dev-status:
 	@printf 'Nomad    ' ; curl -sf -o /dev/null --max-time 2 http://127.0.0.1:4646/v1/status/leader && echo up || echo down

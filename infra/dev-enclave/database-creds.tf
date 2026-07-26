@@ -72,7 +72,7 @@ resource "vault_database_secret_backend_role" "harness" {
 }
 
 resource "vault_policy" "harness_database" {
-  name = "harness-database"
+  name   = "harness-database"
   policy = <<-HCL
     path "${vault_mount.database.path}/creds/${vault_database_secret_backend_role.harness.name}" {
       capabilities = ["read"]

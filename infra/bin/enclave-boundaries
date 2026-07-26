@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# The module boundary, checked rather than trusted (contracts/module-interface.md).
+#
+# Both directions, symmetrically. One alone lets the delta escape the other way.
+
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fail=0
+report() { printf '\033[31mFAIL\033[0m %s\n' "$*" >&2; fail=1; }
+pass()   { printf '\033[32m ok \033[0m %s\n' "$*"; }
+
+# --- invariant 1: trust-fabric knows no substrate -------------------------------------
+# Match RESOURCE DECLARATIONS, not prose. `resource "docker_container"` is a substrate
+# leak; the word "Docker" in a comment explaining why an endpoint is written the way it
+# is, is not. A check that cannot tell them apart gets disabled by the third person it
+# annoys.
+if grep -rEn '^\s*(resource|data)\s+"(docker|aws|google|azurerm)_' "$ROOT/modules/trust-fabric" >/dev/null 2>&1; then
+  report "trust-fabric references a substrate resource — the delta has escaped its layer"
+else
+  pass "trust-fabric references no substrate resource"
+fi
+
+# --- invariant 2: a substrate configures no trust -------------------------------------
+if grep -rEn '^\s*resource\s+"vault_(policy|mount|jwt_auth|identity|database|pki|generic_endpoint)' \
+     "$ROOT/modules/substrate-docker" "$ROOT/modules/substrate-vm" >/dev/null 2>&1; then
+  report "a substrate module configures trust — the delta has escaped the other way"
+else
+  pass "no substrate module configures trust"
+fi
+
+# --- FR-004: the trust store is never a SCHEDULER workload ----------------------------
+#
+# The constraint is scheduling, not packaging (ADR-0048, verbatim: "A container Nomad
+# does not manage is a peer of the substrate, not a resource inside it"). substrate-docker
+# creating the trust-store container directly is CORRECT and must keep passing. A check
+# that forbids it has read the rule as "must not be containerized", which the ADR calls
+# out as a misreading with real cost.
+# `nomad_job_id` is a CLAIM NAME — the thing Vault binds a role to — and appears all
+# over auth.tf. Matching it would fail a tree that is doing exactly the right thing.
+# What is forbidden is a nomad_job RESOURCE for the trust store, or a jobspec declaring
+# one.
+if grep -rEn '^\s*resource\s+"nomad_job"|^\s*job\s+"vault"' "$ROOT/modules" "$ROOT/jobs" >/dev/null 2>&1; then
+  report "a module submits the trust store as a scheduler workload (FR-004, ADR-0048)"
+else
+  pass "the trust store is not scheduled by any substrate (packaging is fine; scheduling is not)"
+fi
+
+# --- the two roots differ only in substrate and profile -------------------------------
+# Whitespace-normalised: `terraform fmt` aligns the provider block differently when one
+# root has two providers and the other has one, and a re-indent is not a semantic delta.
+norm() { grep -vE '^\s*#|^\s*$' "$1" | tr -s ' ' | sed 's/ *$//'; }
+delta="$(diff <(norm "$ROOT/environments/dev/main.tf") \
+              <(norm "$ROOT/environments/production/main.tf") \
+         | grep -E '^[<>]' \
+         | grep -viE 'substrate|profile|provider|docker|enable_tls|vault_license|vault_address|nomad_jwks_url|database_endpoint' || true)"
+if [ -n "$delta" ]; then
+  report "the roots differ outside substrate and profile:"; printf '%s\n' "$delta" >&2
+else
+  pass "the roots differ only in substrate and profile"
+fi
+
+exit "$fail"

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# SC-001: the configuration the tree produces is identical across substrates.
+#
+# Runs against no infrastructure. If this needed both environments to exist, it would
+# never be run, and the feature's central claim would go unchecked.
+#
+# It holds PROFILE constant and varies SUBSTRATE. Those are the two declared axes and
+# only one is claimed to be neutral — production enabling TLS is a profile difference and
+# is meant to show up.
+
+set -euo pipefail
+DIGEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools/digest" && pwd)"
+cd "$DIGEST_DIR"
+
+[ -d .terraform ] || terraform init -backend=false -input=false >/dev/null
+terraform apply -auto-approve -input=false >/dev/null
+
+a="$(terraform output -raw digest_containers)"
+b="$(terraform output -raw digest_hosts)"
+
+if [ "$a" = "$b" ]; then
+  printf '\033[32mSC-001 holds\033[0m — configuration is identical across substrates\n'
+  printf '  digest %s\n' "$a"
+  exit 0
+fi
+
+# Print the difference. "Digests differ" sends the reader back to do the diff this tool
+# has already done.
+printf '\033[31mSC-001 FAILS\033[0m — the substrate changed the configuration\n\n' >&2
+diff <(terraform output -json elements_containers | python3 -m json.tool --sort-keys) \
+     <(terraform output -json elements_hosts      | python3 -m json.tool --sort-keys) >&2 || true
+exit 1
