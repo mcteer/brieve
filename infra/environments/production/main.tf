@@ -17,6 +17,12 @@ terraform {
 provider "vault" {
   address = module.substrate.vault_address
   token   = var.vault_token
+
+  # Production's trust store is HTTPS by definition, so the provider must trust its CA.
+  # Explicit rather than ambient: leaving it to VAULT_CACERT in the caller's environment
+  # means an apply that works for whoever set it and fails for everyone else, with
+  # "failed to lookup token" — which names neither TLS nor the CA.
+  ca_cert_file = var.ca_cert_file
 }
 
 module "substrate" {

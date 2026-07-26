@@ -32,3 +32,27 @@ variable "agent_definitions" {
     }
   }
 }
+
+# Supplied by the second phase of bring-up, not by a human.
+#
+# The bootstrap circularity, made concrete: the trust store cannot start with a
+# certificate from a CA that is not yet serving. So it starts plaintext, its PKI engine
+# is configured, it issues its own listener certificate, and the substrate is applied
+# again with that certificate in hand. `enclave-up` drives that; these variables are how
+# the second pass carries the material in.
+variable "tls_certificate" {
+  type    = string
+  default = ""
+}
+
+variable "tls_private_key" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "ca_cert_file" {
+  description = "Control-plane CA the provider must trust once the listener is on TLS. Written by bring-up to .enclave/ca.pem; empty while plaintext."
+  type        = string
+  default     = ""
+}

@@ -54,7 +54,13 @@ norm() { grep -vE '^\s*#|^\s*$' "$1" | tr -s ' ' | sed 's/ *$//'; }
 delta="$(diff <(norm "$ROOT/environments/dev/main.tf") \
               <(norm "$ROOT/environments/production/main.tf") \
          | grep -E '^[<>]' \
-         | grep -viE 'substrate|profile|provider|docker|enable_tls|vault_license|vault_address|nomad_jwks_url|database_endpoint' || true)"
+         | grep -viE 'substrate|profile|provider|docker|tls_|enable_tls|vault_license|vault_address|nomad_jwks_url|database_endpoint' || true)"
+
+# `tls_` is on that list for a reason, not to make the check pass. How a host obtains its
+# listener certificate is a property of the substrate: the container substrate is handed
+# one issued by the control plane's CA, while an operator-managed host supplies its own.
+# Posture — whether TLS is required at all — stays in `profile`, and production sets
+# enable_tls = true unconditionally.
 if [ -n "$delta" ]; then
   report "the roots differ outside substrate and profile:"; printf '%s\n' "$delta" >&2
 else

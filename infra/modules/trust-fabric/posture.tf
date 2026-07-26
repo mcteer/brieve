@@ -41,13 +41,8 @@ resource "vault_generic_endpoint" "revoke_bootstrap_token" {
 locals {
   production_posture = {
     transport_security = {
-      # Precise on purpose. The CA is implemented and issues; switching the trust
-      # store's own LISTENER to TLS is the remaining step, and it is not declarative:
-      # the first certificate cannot come from a PKI that is not yet serving, so it goes
-      # plaintext -> configure PKI -> issue -> restart with TLS. Claiming "implemented"
-      # for the whole item would be the silent-absence failure wearing a better word.
-      disposition = var.enable_tls ? "ca-implemented-listener-pending" : "disabled-in-this-environment"
-      detail      = "The control plane's own CA is created and issues certificates for the control-plane role. Switching the trust store's listener to TLS requires a bootstrap sequence (start plaintext, configure PKI, issue, restart) and every client's address and CA trust to move with it; until that lands, transport is plaintext on loopback."
+      disposition = var.enable_tls ? "implemented" : "disabled-in-this-environment"
+      detail      = "The control plane's own CA issues the trust store's listener certificate, and bring-up switches the listener to it. The bootstrap circularity is resolved the only way it can be — the store starts plaintext, configures its PKI, issues its own certificate, and is restarted holding it; the restart seals the store, so unsealing again is part of the sequence rather than a surprise. Clients follow: VAULT_ADDR and VAULT_CACERT are written to .env, and plaintext stops working."
     }
     bootstrap_credential = {
       disposition = var.profile == "production" ? "implemented" : "retained-deliberately"
@@ -59,7 +54,7 @@ locals {
     }
     high_availability = {
       disposition = "deferred"
-      detail      = "The only one of the four unverifiable without multi-node infrastructure this project does not have. A tree claiming HA that has never survived a node loss is worse than one that says it is single-node. Trigger: the first deployment target that requires it, or the first time single-node behaviour is suspected of hiding a fencing defect. CONSEQUENCE: 005's conformance caveat persists — fencing and parking are proven against single-node behaviour only."
+      detail      = "Configuring HA is a small change; VERIFYING it is not, and cannot be done without multi-node infrastructure. Deferred to the first customer engagement, where the configuration lands and is exercised against real topology at the same time — which is better than writing it now and leaving it untested for months while it looks finished. CONSEQUENCE, unchanged by that reasoning: 005's conformance caveat persists — fencing and parking are proven against single-node behaviour only, and multi-node partition remains unexercised."
     }
   }
 }

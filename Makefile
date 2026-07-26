@@ -67,6 +67,10 @@ enclave-verify:
 
 dev-status:
 	@printf 'Nomad    ' ; curl -sf -o /dev/null --max-time 2 http://127.0.0.1:4646/v1/status/leader && echo up || echo down
-	@printf 'Vault    ' ; S=$$(VAULT_ADDR=http://127.0.0.1:8200 vault status 2>/dev/null | awk '/^Sealed/{print $$2}') ; \
+	@printf 'Vault    ' ; \
+		A=$$(grep '^VAULT_ADDR=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+		A=$${A:-http://127.0.0.1:8200} ; \
+		C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+		S=$$(VAULT_ADDR=$$A VAULT_CACERT=$$C vault status 2>/dev/null | awk '/^Sealed/{print $$2}') ; \
 		if [ "$$S" = "false" ]; then echo "up (unsealed)" ; elif [ "$$S" = "true" ]; then echo "up (SEALED — run make dev-up)" ; else echo down ; fi
 	@printf 'Postgres ' ; nc -z 127.0.0.1 5432 2>/dev/null && echo up || echo down

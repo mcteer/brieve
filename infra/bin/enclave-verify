@@ -9,7 +9,12 @@
 
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Follow whatever the listener is. Hardcoding http here is how a working TLS enclave
+# gets reported as down.
+export VAULT_ADDR="${VAULT_ADDR:-$(grep '^VAULT_ADDR=' "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')}"
 export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
+CACERT="$(grep '^VAULT_CACERT=' "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')"
+[ -n "$CACERT" ] && export VAULT_CACERT="$CACERT"
 NOMAD_ADDR="${NOMAD_ADDR:-http://127.0.0.1:4646}"
 
 fail=0

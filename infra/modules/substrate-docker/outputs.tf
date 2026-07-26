@@ -4,7 +4,7 @@
 # change to contracts/module-interface.md, not a variable someone adds.
 
 output "vault_address" {
-  value = "http://127.0.0.1:${var.vault_port}"
+  value = "${local.scheme}://127.0.0.1:${var.vault_port}"
 }
 
 output "nomad_jwks_url" {

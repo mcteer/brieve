@@ -26,3 +26,8 @@ variable "agent_definitions" {
     allowed_paths  = list(string)
   }))
 }
+
+variable "ca_cert_file" {
+  description = "Control-plane CA the provider must trust. Operator-supplied in production."
+  type        = string
+}

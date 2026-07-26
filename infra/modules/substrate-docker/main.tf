@@ -16,6 +16,20 @@ terraform {
   }
 }
 
+locals {
+  # Keyed on the CERTIFICATE, which is public material. Deriving this from the private
+  # key would taint everything downstream as sensitive — including the address — and
+  # Terraform then refuses to output it.
+  #
+  # The half-configured case (certificate without key) is caught by a precondition
+  # instead: such a listener starts and fails every handshake, which is worse than
+  # plaintext because it looks configured.
+  tls_enabled = var.tls_certificate != ""
+  scheme      = local.tls_enabled ? "https" : "http"
+
+  listener_tls = local.tls_enabled ? "        tls_cert_file = \"/vault/config/tls.crt\"\n        tls_key_file  = \"/vault/config/tls.key\"" : "        tls_disable = true"
+}
+
 resource "docker_image" "vault" {
   name         = var.vault_image
   keep_locally = true
@@ -40,13 +54,24 @@ resource "terraform_data" "vault_data_chown" {
   }
 }
 
+resource "terraform_data" "tls_material_complete" {
+  input = local.tls_enabled
+
+  lifecycle {
+    precondition {
+      condition     = var.tls_certificate == "" || var.tls_private_key != ""
+      error_message = "tls_certificate was supplied without tls_private_key: the listener would start and fail every handshake, which is worse than plaintext because it looks configured."
+    }
+  }
+}
+
 resource "docker_container" "vault" {
   name    = "brieve-dev-vault"
   image   = docker_image.vault.image_id
   command = ["server"]
   restart = "unless-stopped"
 
-  depends_on = [terraform_data.vault_data_chown]
+  depends_on = [terraform_data.vault_data_chown, terraform_data.tls_material_complete]
 
   volumes {
     volume_name    = docker_volume.vault_data.name
@@ -55,7 +80,7 @@ resource "docker_container" "vault" {
 
   env = [
     "VAULT_LICENSE=${var.vault_license}",
-    "VAULT_ADDR=http://127.0.0.1:8200",
+    "VAULT_ADDR=${local.scheme}://127.0.0.1:8200",
   ]
 
   # "CAP_IPC_LOCK", not "IPC_LOCK". Docker normalises the name on read, so the short
@@ -67,6 +92,25 @@ resource "docker_container" "vault" {
   ports {
     internal = 8200
     external = var.vault_port
+  }
+
+  # Certificate material, uploaded only when TLS is on. Uploading empty files would make
+  # the listener config valid and the handshake fail, which is a worse failure than not
+  # having TLS: it looks configured.
+  dynamic "upload" {
+    for_each = local.tls_enabled ? [1] : []
+    content {
+      file    = "/vault/config/tls.crt"
+      content = var.tls_certificate
+    }
+  }
+
+  dynamic "upload" {
+    for_each = local.tls_enabled ? [1] : []
+    content {
+      file    = "/vault/config/tls.key"
+      content = var.tls_private_key
+    }
   }
 
   upload {
@@ -82,17 +126,20 @@ resource "docker_container" "vault" {
         node_id = "${var.vault_node_id}"
       }
       listener "tcp" {
-        address     = "0.0.0.0:8200"
-        tls_disable = true
+        address = "0.0.0.0:8200"
+      ${local.listener_tls}
       }
-      api_addr     = "http://127.0.0.1:8200"
-      cluster_addr = "http://127.0.0.1:8201"
+      api_addr     = "${local.scheme}://127.0.0.1:8200"
+      cluster_addr = "${local.scheme}://127.0.0.1:8201"
     CFG
   }
 
   healthcheck {
     # 501 = initialised but sealed; 200 = unsealed. Either means it is serving.
-    test     = ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health?sealedcode=200 || exit 1"]
+    # --no-check-certificate: the healthcheck runs inside the container against the
+    # loopback listener, where the hostname will not match and there is no CA to trust.
+    # It is a liveness probe, not an authentication decision.
+    test     = ["CMD-SHELL", "wget -q --no-check-certificate -O- ${local.scheme}://127.0.0.1:8200/v1/sys/health?sealedcode=200 || exit 1"]
     interval = "3s"
     retries  = 20
   }

@@ -20,11 +20,20 @@ provider "docker" {}
 provider "vault" {
   address = module.substrate.vault_address
   token   = var.vault_token
+
+  # Explicit rather than ambient. Once the listener is on TLS the provider must trust the
+  # control plane's CA, and leaving that to VAULT_CACERT in the caller's environment
+  # means an apply that works for whoever set it and fails for everyone else — with
+  # "failed to lookup token", which names neither TLS nor the CA.
+  ca_cert_file = var.ca_cert_file
 }
 
 module "substrate" {
   source        = "../../modules/substrate-docker"
   vault_license = var.vault_license
+
+  tls_certificate = var.tls_certificate
+  tls_private_key = var.tls_private_key
 }
 
 module "trust_fabric" {

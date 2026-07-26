@@ -53,3 +53,23 @@ output "production_posture" {
   value       = local.production_posture
   description = "Each of the four items with its disposition and reason. Deferral is acceptable; silence is not (FR-010)."
 }
+
+# Listener material, consumed by the substrate to switch its own transport on.
+#
+# Sensitive: the private key is here. Marked so it cannot land in a log by accident —
+# `terraform output` refuses to print it without -raw, and CI log scrapers skip it.
+output "listener_certificate" {
+  value       = var.enable_tls ? vault_pki_secret_backend_cert.listener[0].certificate : ""
+  description = "Control-plane listener certificate, issued by the control plane's own CA."
+}
+
+output "listener_private_key" {
+  value       = var.enable_tls ? vault_pki_secret_backend_cert.listener[0].private_key : ""
+  sensitive   = true
+  description = "Listener private key. One rotatable server key — not the CA, which never leaves the trust store."
+}
+
+output "listener_ca_chain" {
+  value       = var.enable_tls ? vault_pki_secret_backend_cert.listener[0].issuing_ca : ""
+  description = "Issuing CA, for clients that must trust this listener."
+}

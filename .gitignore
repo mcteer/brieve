@@ -54,3 +54,4 @@ crash.log
 .idea/
 .vscode/
 *.iml
+.enclave/

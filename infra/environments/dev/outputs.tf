@@ -11,3 +11,11 @@ output "configuration_elements" { value = module.trust_fabric.configuration_elem
 # FR-010: each of the four items, with its disposition and reason. Deferral is
 # acceptable; silence is the failure this exists to prevent.
 output "production_posture" { value = module.trust_fabric.production_posture }
+
+# Read by enclave-up between phases, to hand back into the substrate.
+output "listener_certificate" { value = module.trust_fabric.listener_certificate }
+output "listener_ca_chain" { value = module.trust_fabric.listener_ca_chain }
+output "listener_private_key" {
+  value     = module.trust_fabric.listener_private_key
+  sensitive = true
+}

@@ -20,3 +20,16 @@ variable "vault_node_id" {
   type        = string
   default     = "brieve-dev-vault-1"
 }
+
+variable "tls_certificate" {
+  description = "Listener certificate, issued by the control plane's CA. Empty means plaintext."
+  type        = string
+  default     = ""
+}
+
+variable "tls_private_key" {
+  description = "Listener private key. Empty means plaintext."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

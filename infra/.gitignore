@@ -6,3 +6,4 @@
 *.tfstate.*
 *.tfvars
 crash.log
+*.auto.tfvars
