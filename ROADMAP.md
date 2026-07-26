@@ -31,29 +31,41 @@ being re-derived at the start of every spec.
 
 | # | Feature | ADRs | Status |
 | --- | --- | --- | --- |
-| *unassigned* | Deployment module tree — the enclave, productized | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Next to spec |
+| *unassigned* | Deployment module tree — the enclave, productized | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Next to spec. `make dev-up` already shipped as tooling (#34); what remains is the parameterized tree and running the suite as a Nomad job |
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
 > is wrong the moment anything is specified out of order.
 >
 > **Numbers are identifiers, not sequence.** 005 was assigned to durable execution before the
-> local environment was understood to precede it, so the order of work here does not match
-> numeric order. Renaming a merged spec directory would churn every reference to it for no gain.
+> local environment was understood to precede it — and then 005 shipped first anyway, because
+> the blocking part of the environment turned out to be one Makefile target. The order of work
+> here does not match numeric order and is not meant to. Renaming a merged spec directory would
+> churn every reference to it for no gain.
 
-### Local environment *(number assigned at specify time)*
+### Deployment module tree *(number assigned at specify time)*
 
-Stands up the enclave on a workstation, in the order the trust chain requires:
-**Terraform → Vault → Nomad → harness**. Makes `make dev-up` real, the way 004 made
-`make conformance` real — the command has been a reserved exit-2 stub since 001, documented
-as "local stack: dev-mode identity fabric, Postgres, collector, harness."
+**Scope changed after 005 shipped, and the record should say so rather than read as though
+the original plan held.** This was written as the feature that precedes durable execution and
+makes `make dev-up` real. It did not: 005 landed first, and `make dev-up` was wired to the
+existing `infra/dev-enclave` as tooling (#34) once it became the thing blocking implementation.
 
-Why it precedes durable execution: 005's central guarantee — resume re-authenticates, never
-replays — is a property of Nomad workload identity rather than harness discipline (ADR-0048).
-Proving it against a fake identity fabric proves the harness calls the fabric correctly, which
-is a weaker claim than the one the spec makes. Postgres is likewise a real stack component;
-substituting something lighter would mean the durability code ships untested against what it
-actually runs on.
+What that leaves is the part that was always the harder half — the **productized** tree.
+`infra/dev-enclave` is labelled a proof and should not become the product front door by
+inertia (ADR-0025).
+
+Three specific gaps it closes:
+
+1. **A parameterized tree** with the substrate as the only permitted delta, so the same
+   configuration applies to a workstation and to customer infrastructure.
+2. **Running the conformance suite as a Nomad job.** This is the honest gap in 005: the
+   durability rows currently run on the host against a development Vault token, so the
+   attestation path is proven *separately* by `jobs/harness-probe.nomad.hcl` rather than
+   exercised *by the tests*. Closing it removes the only place a static token appears
+   anywhere in the tree.
+3. **What `make dev-up` still does not guarantee** — TLS from the control plane's own CA, HA,
+   and an unseal shape that is not 1-of-1 with the key next to the server. All three are
+   deliberately absent today and listed in `infra/dev-enclave/README.md`.
 
 Replaces `fake_identity_fabric` as the thing guarantees are proven against. The fake remains a
 test double for suites that are not about identity.
