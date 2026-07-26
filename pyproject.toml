@@ -72,3 +72,9 @@ explicit_package_bases = true
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/component"]
 pythonpath = ["src", "."]
+markers = [
+    # Requires the local enclave (`make dev-up`). Excluded from `make check` so the
+    # fork-safe CI lane stays hermetic; included in `make conformance`, which is the
+    # gate a human runs against the real stack.
+    "enclave: needs a running Vault and Postgres",
+]

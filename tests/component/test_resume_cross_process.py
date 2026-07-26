@@ -85,6 +85,7 @@ def _run(script: str, run_id: str) -> dict[str, Any]:
     return parsed
 
 
+@pytest.mark.enclave
 def test_checkpoint_written_in_one_process_resumes_in_another() -> None:
     if not _enclave_up():
         pytest.fail(

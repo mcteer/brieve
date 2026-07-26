@@ -356,7 +356,13 @@ make dev-up        # Terraform -> Vault -> Nomad -> Postgres
 make conformance   # includes the seven durability rows
 ```
 
-**It fails loudly when the enclave is absent**, rather than skipping. A skipped
+Enclave-dependent tests carry the `enclave` marker. `make check` deselects them, so the
+hermetic inner loop stays hermetic; `make conformance` runs them. The marker is how the
+requirement is expressed — a test that decides *inside itself* to skip reports the same
+green as one that ran, which is the failure mode this arrangement avoids.
+
+**Within the durability lane it fails loudly when the enclave is absent**, rather than
+skipping. A skipped
 guarantee reads exactly like a passing one in a test summary, which is worse than a red
 lane.
 

@@ -7,11 +7,13 @@
 UV_RUN := uv run --extra adapters
 
 # Inner-loop: lint, typecheck, unit tests
+# Hermetic inner loop. Enclave-dependent tests are excluded by marker rather than by
+# skipping inside them: a test that skips itself reports the same green as one that ran.
 check:
 	$(UV_RUN) ruff check src tests
 	$(UV_RUN) ruff format --check src tests
 	$(UV_RUN) mypy
-	$(UV_RUN) pytest
+	$(UV_RUN) pytest -m "not enclave"
 
 # Adapter/provider conformance — merge-blocking (constitution Quality Gates).
 # Rows in force are recorded per feature; see
@@ -21,6 +23,7 @@ check:
 # than skipping when they are absent.
 conformance:
 	$(UV_RUN) pytest tests/conformance -q
+	$(UV_RUN) pytest -m enclave -q
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
 # Enterprise license and cannot stand one up. This is a real coverage gap and is
