@@ -53,7 +53,7 @@ is no window where a contributor has no working enclave.
 - [X] T002 [P] Move `infra/dev-enclave/jobs/*.nomad.hcl` to `infra/jobs/`, unchanged. Moving before rewriting keeps the diff for the rewrite honest
 - [X] T003 [P] Move `infra/dev-enclave/nomad/client.hcl` to `infra/nomad/client.hcl`. It enables the container driver's volume mounts, which the scheduler refuses by default — a constraint the production tree inherits, not a dev wrinkle
 - [X] T004 Add `infra/.gitignore` covering `.terraform/`, `*.tfstate*`, and `*.tfvars`. State is currently committed-adjacent under `dev-enclave/`; the new roots must never repeat that
-- [ ] T004a Create `infra/README.md` with its section headings and nothing else — layout, the two axes, bring-up contract, posture dispositions, failure catalogue, substrate requirements. **Created first because four later tasks write into it** (T015, T040, T042, T047); a file authored at the end would overwrite them, and the two things lost would be the HA deferral and the failure catalogue — the writing in this feature most worth keeping
+- [X] T004a Create `infra/README.md` with its section headings and nothing else — layout, the two axes, bring-up contract, posture dispositions, failure catalogue, substrate requirements. **Created first because four later tasks write into it** (T015, T040, T042, T047); a file authored at the end would overwrite them, and the two things lost would be the HA deferral and the failure catalogue — the writing in this feature most worth keeping
 
 ---
 
@@ -72,7 +72,7 @@ is no window where a contributor has no working enclave.
 - [X] T011 [GATE:no-secret-leak] Create `infra/modules/trust-fabric/outputs.tf` — auth path, credential path, CA certificate, and `configuration_digest`. Assert no output carries a token, key, or password; a module output is the easiest place for one to escape into a root's state
 - [X] T012 Implement `configuration_digest` per `data-model.md` — a stable hash over auth methods, roles, policies, secrets engines, registry entries, and database roles. **Exclude everything substrate-derived**; including an address makes the digests differ by construction and the comparison worthless. **Compute it from resolved inputs and literal configuration, never from resource attributes** — a digest hashing a mount accessor or an entity id resolves to "known after apply", and SC-001's plan-level comparison then compares two unknowns and passes while proving nothing
 - [ ] T012a [GATE:fail-closed] Assert the digest is a known value at plan time — inspect `terraform show -json <plan>` and fail if the digest output appears under `after_unknown`. Name the mechanism, because otherwise the likely implementation is a human reading a plan, which is what this task exists to replace. Without it the failure in T012 is silent: the comparison succeeds, the criterion reports green, and nobody learns the two trees diverged
-- [ ] T013 (FR-012) [GATE:fail-closed] Add a precondition refusing apply when the trust store is sealed. A configuration tool that cannot read concludes the resources are absent and discards its record of them; the next apply then fails trying to create what exists
+- [X] T013 (FR-012) [GATE:fail-closed] Add a precondition refusing apply when the trust store is sealed. A configuration tool that cannot read concludes the resources are absent and discards its record of them; the next apply then fails trying to create what exists
 
 **Checkpoint**: `trust-fabric` applies against the existing dev Vault and produces a digest.
 
@@ -114,13 +114,13 @@ is no window where a contributor has no working enclave.
 > can state it is ready, and "the suite failed" versus "the environment was not up" is exactly the
 > confusion this story removes.
 
-- [ ] T023 [US3] Create `infra/bin/enclave-verify` asserting each of the six guarantees in `contracts/bring-up-contract.md` against a running environment
-- [ ] T024 [US3] Port `dev-up.sh` to `infra/bin/enclave-up`, driving the environment root instead of a flat directory, and **running `enclave-verify` before reporting success** — otherwise the contract describes intent rather than state
-- [ ] T025 [P] [US3] Port `dev-down.sh` to `infra/bin/enclave-down`. Destroys nothing: the volumes hold the trust store and the run state
-- [ ] T025a [US3] [GATE:fail-closed] Assert the bootstrap order — trust store before scheduler, scheduler before any agent workload (FR-003). Today it holds because `enclave-up` was ported from a script that happens to be ordered correctly; "no supported path may invert this order" is currently untested. It is the only ordering that terminates, and an inverted one fails at cold start, which is the worst time to find out
-- [ ] T026 [US3] [GATE:fail-closed] Make every prerequisite failure name the missing prerequisite (FR-008). "Bring-up failed" withholds the diagnosis the tool already performed
-- [ ] T027 [US3] [GATE:fail-closed] Assert re-running against a configured environment unseals and **never re-initialises** (FR-009). Re-initialising discards the trust store and invalidates every credential derived from it — the most expensive mistake available here
-- [ ] T028 [US3] Point `make dev-up` / `dev-down` / `dev-status` at `infra/bin/*` so the tree's entry points are the documented ones, not tooling beside them
+- [X] T023 [US3] Create `infra/bin/enclave-verify` asserting each of the six guarantees in `contracts/bring-up-contract.md` against a running environment
+- [X] T024 [US3] Port `dev-up.sh` to `infra/bin/enclave-up`, driving the environment root instead of a flat directory, and **running `enclave-verify` before reporting success** — otherwise the contract describes intent rather than state
+- [X] T025 [P] [US3] Port `dev-down.sh` to `infra/bin/enclave-down`. Destroys nothing: the volumes hold the trust store and the run state
+- [X] T025a [US3] [GATE:fail-closed] Assert the bootstrap order — trust store before scheduler, scheduler before any agent workload (FR-003). Today it holds because `enclave-up` was ported from a script that happens to be ordered correctly; "no supported path may invert this order" is currently untested. It is the only ordering that terminates, and an inverted one fails at cold start, which is the worst time to find out
+- [X] T026 [US3] [GATE:fail-closed] Make every prerequisite failure name the missing prerequisite (FR-008). "Bring-up failed" withholds the diagnosis the tool already performed
+- [X] T027 [US3] [GATE:fail-closed] Assert re-running against a configured environment unseals and **never re-initialises** (FR-009). Re-initialising discards the trust store and invalidates every credential derived from it — the most expensive mistake available here
+- [X] T028 [US3] Point `make dev-up` / `dev-down` / `dev-status` at `infra/bin/*` so the tree's entry points are the documented ones, not tooling beside them
 
 **Checkpoint**: Scenarios A–C green; SC-005 and SC-006 hold.
 
@@ -132,13 +132,13 @@ is no window where a contributor has no working enclave.
 
 **Independent Test**: quickstart Scenario E
 
-- [ ] T029 [US2] (FR-005) Create `infra/jobs/conformance.nomad.hcl` — a batch job with an `identity` block (`aud` matching the Vault role, job id matching its `bound_claims`), mounting the working tree and running the durability rows
-- [ ] T030 [US2] Add the Vault role binding for the conformance job in `infra/modules/trust-fabric/auth.tf`, scoped to the database policy only
-- [ ] T031 [US2] Teach `tests/conformance/durability/conftest.py` to obtain credentials through `core.durability.credentials` — the workload's own exchange — with no token branch
-- [ ] T032 [US2] [GATE:no-secret-leak] **Delete `DevVaultCredentials`** from `tests/conformance/durability/conftest.py` (FR-006, SC-003). Deleted, not bypassed: while it exists, someone can reach for it under time pressure
-- [ ] T033 [US2] Point `make conformance` at the job — submit, stream, surface the exit status. The honest cost is worse failure output through allocation logs; surface it well rather than pretend it is free
-- [ ] T034 [US2] [GATE:fail-closed] Assert a run outside an allocation fails naming the absent workload identity, with no fallback (SC-004, FR-007)
-- [ ] T035 [US2] [GATE:conformance] Assert all seven durability rows still pass in their new home, against both providers
+- [X] T029 [US2] (FR-005) Create `infra/jobs/conformance.nomad.hcl` — a batch job with an `identity` block (`aud` matching the Vault role, job id matching its `bound_claims`), mounting the working tree and running the durability rows
+- [X] T030 [US2] Add the Vault role binding for the conformance job in `infra/modules/trust-fabric/auth.tf`, scoped to the database policy only
+- [X] T031 [US2] Teach `tests/conformance/durability/conftest.py` to obtain credentials through `core.durability.credentials` — the workload's own exchange — with no token branch
+- [X] T032 [US2] [GATE:no-secret-leak] **Delete `DevVaultCredentials`** from `tests/conformance/durability/conftest.py` (FR-006, SC-003). Deleted, not bypassed: while it exists, someone can reach for it under time pressure
+- [X] T033 [US2] Point `make conformance` at the job — submit, stream, surface the exit status. The honest cost is worse failure output through allocation logs; surface it well rather than pretend it is free
+- [X] T034 [US2] [GATE:fail-closed] Assert a run outside an allocation fails naming the absent workload identity, with no fallback (SC-004, FR-007)
+- [X] T035 [US2] [GATE:conformance] Assert all seven durability rows still pass in their new home, against both providers
 - [ ] T036 [US2] [GATE:determinism] Update `tests/unit/test_no_live_dependencies.py` — `ENCLAVE_PATHS` shrinks as the conftest stops reaching Vault directly. The list is an explicit allowlist, so it must shrink when the reason for an entry does
 
 **Checkpoint**: Scenario E green; SC-002, SC-003, SC-004 hold. The last static token is gone.
@@ -170,8 +170,8 @@ is no window where a contributor has no working enclave.
 
 - [ ] T042 [US5] Move the six-entry failure catalogue from `infra/dev-enclave/README.md` into `infra/README.md`, keeping for each the condition, the symptom, **and where the symptom points instead of its cause** — that last column is why they cost time
 - [ ] T043 [US5] [GATE:fail-closed] For each catalogue entry, add prevention or detection that names the **cause**, not the symptom (FR-013, SC-009)
-- [ ] T043a [US5] **Migrate Terraform state out of `infra/dev-enclave/` before anything is deleted.** That state tracks 15 live resources — the running trust-store container, both named volumes, and every mount, role, policy and registry entry. Deleting the directory orphans them, and the new dev root then tries to create a container whose name is taken and mounts that already exist. Either `terraform state mv` each resource into `infra/environments/dev/`, or destroy and rebuild — and if rebuilding, say plainly that the volumes go with it, which means re-initialising the trust store and writing new credentials to `.env`. **This failure has already happened twice in this repository**; it is not hypothetical
-- [ ] T043b [US5] [GATE:fail-closed] After migration, assert the new root plans clean against the running environment — no creates for resources that already exist. That is the check that would have caught both prior occurrences
+- [X] T043a [US5] **Migrate Terraform state out of `infra/dev-enclave/` before anything is deleted.** That state tracks 15 live resources — the running trust-store container, both named volumes, and every mount, role, policy and registry entry. Deleting the directory orphans them, and the new dev root then tries to create a container whose name is taken and mounts that already exist. Either `terraform state mv` each resource into `infra/environments/dev/`, or destroy and rebuild — and if rebuilding, say plainly that the volumes go with it, which means re-initialising the trust store and writing new credentials to `.env`. **This failure has already happened twice in this repository**; it is not hypothetical
+- [X] T043b [US5] [GATE:fail-closed] After migration, assert the new root plans clean against the running environment — no creates for resources that already exist. That is the check that would have caught both prior occurrences
 - [ ] T044 [US5] **Delete `infra/dev-enclave/`** (FR-015, SC-010). Only after Phases 4–7 are green **and T043a/T043b have run**: deleting the working environment before its replacement is verified would leave contributors with none, and deleting it before its state is migrated would leave the resources unmanaged
 - [ ] T045 [US5] Update `CONTRIBUTING.md`, `docs/development/testing.md`, and `ROADMAP.md` for the new paths and entry points
 - [ ] T046 [US5] Assert exactly one applicable tree exists — no second directory that can be applied (SC-010)

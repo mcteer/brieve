@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Runs the durability rows as a scheduled workload and surfaces the result.
+#
+# The suite holds its own workload identity; no token is passed to it. A process with no
+# attested identity cannot obtain a state-store credential, and that failure is correct
+# rather than something to work around.
+
+set -euo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+
+command -v nomad >/dev/null || { echo "nomad is not on PATH" >&2; exit 1; }
+curl -sf -o /dev/null --max-time 3 http://127.0.0.1:4646/v1/status/leader \
+  || { echo "scheduler unreachable — run: make dev-up" >&2; exit 1; }
+
+say "Submitting the durability rows as a scheduled workload"
+nomad job run -var="repo=$REPO" "$REPO/infra/jobs/conformance.nomad.hcl" >/dev/null
+
+alloc=""
+for _ in $(seq 1 30); do
+  alloc="$(nomad job status conformance 2>/dev/null | awk '/^[0-9a-f]{8} /{print $1; exit}')"
+  [ -n "$alloc" ] && break
+  sleep 2
+done
+[ -n "$alloc" ] || { echo "no allocation was placed for the conformance job" >&2; exit 1; }
+
+# Wait for the task to actually start before tailing. Tailing too early returns a 404
+# that reads like a failure and is not one — the image is still downloading.
+say "Allocation $alloc — waiting for the task to start"
+for _ in $(seq 1 90); do
+  state="$(nomad alloc status -json "$alloc" 2>/dev/null \
+    | python3 -c 'import json,sys; print((json.load(sys.stdin).get("TaskStates") or {}).get("pytest",{}).get("State","pending"))' 2>/dev/null || echo pending)"
+  [ "$state" != "pending" ] && break
+  sleep 2
+done
+
+say "Streaming"
+nomad alloc logs -f "$alloc" pytest 2>&1 || true
+
+# Wait for a terminal state before reading the exit code. Reading it while the task is
+# still running yields 1 and reports a pass as a failure.
+for _ in $(seq 1 60); do
+  state="$(nomad alloc status -json "$alloc" 2>/dev/null \
+    | python3 -c 'import json,sys; print((json.load(sys.stdin).get("TaskStates") or {}).get("pytest",{}).get("State","running"))' 2>/dev/null || echo running)"
+  [ "$state" = "dead" ] && break
+  sleep 2
+done
+
+# The exit status is the gate. Allocation logs are a worse debugging surface than a local
+# run, so at minimum the verdict must be unambiguous.
+status="$(nomad alloc status -json "$alloc" | python3 -c '
+import json,sys
+a=json.load(sys.stdin)
+for _, tg in (a.get("TaskStates") or {}).items():
+    pass
+ts=(a.get("TaskStates") or {}).get("pytest") or {}
+ev=[e for e in (ts.get("Events") or []) if e.get("Type")=="Terminated"]
+print(ev[-1].get("ExitCode", 1) if ev else 1)
+')"
+
+if [ "$status" = "0" ]; then
+  printf '\033[32mdurability rows passed\033[0m — under an attested workload identity, no token anywhere\n'
+else
+  printf '\033[31mdurability rows failed\033[0m (exit %s) — logs: nomad alloc logs %s pytest\n' "$status" "$alloc" >&2
+fi
+exit "$status"

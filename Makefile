@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-digest-diff enclave-boundaries
+.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries
 
 # Every recipe names the adapters extra so the gates cannot run in an environment
 # that silently lacks the primary adapter (specs/004-primary-adapter/research.md).
@@ -21,8 +21,13 @@ check:
 # Every row, including the seven durability rows (SC-009). Requires `make dev-up`:
 # the durability lane runs against the real Vault and Postgres, and fails loudly rather
 # than skipping when they are absent.
+# The durability rows run as a SCHEDULED WORKLOAD holding their own attested identity —
+# not on the host with a token. That is what makes them exercise the attestation chain
+# rather than sit beside it. The honest cost is that failure output arrives through
+# allocation logs; enclave-conformance streams them and surfaces the exit status.
 conformance:
-	$(UV_RUN) pytest tests/conformance -q
+	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -q
+	@bash infra/bin/enclave-conformance
 	$(UV_RUN) pytest -m enclave -q
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
@@ -41,11 +46,11 @@ test-full:
 # Vault that already has a raft store; that would discard the trust configuration and
 # invalidate the credentials in .env.
 dev-up:
-	@bash infra/dev-enclave/dev-up.sh
+	@bash infra/bin/enclave-up
 
 # Stops the stack. Destroys nothing — the named volumes hold the raft store and run state.
 dev-down:
-	@bash infra/dev-enclave/dev-down.sh
+	@bash infra/bin/enclave-down
 
 # SC-001: the tree produces identical configuration on every substrate. Runs against no
 # infrastructure — a check needing both environments to exist is a check nobody runs.
@@ -55,6 +60,10 @@ enclave-digest-diff:
 # The module boundary, both directions (contracts/module-interface.md) plus FR-004.
 enclave-boundaries:
 	@bash infra/bin/enclave-boundaries
+
+# The full contract, asserted. dev-status is the quick glance; this is the guarantee.
+enclave-verify:
+	@bash infra/bin/enclave-verify
 
 dev-status:
 	@printf 'Nomad    ' ; curl -sf -o /dev/null --max-time 2 http://127.0.0.1:4646/v1/status/leader && echo up || echo down
