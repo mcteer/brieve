@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Stops the enclave WITHOUT destroying state.
+#
+# brieve-dev-vault-data holds the trust store — and the keys in .env unseal that store
+# and nothing else. brieve-dev-pgdata holds run state. Removing either is a deliberate
+# act, not a flag here, because the two are coupled by rotate-root: destroy the state
+# store's volume and it reverts to its bootstrap password while the trust store holds the
+# rotated one, after which nothing can authenticate.
+
+set -euo pipefail
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+
+say "Stopping the state store (the allocation is disposable; the volume is not)"
+nomad job stop -purge postgres >/dev/null 2>&1 || true
+
+say "Stopping the trust store (sealed on next start — unseal, never re-initialise)"
+docker stop brieve-dev-vault >/dev/null 2>&1 || true
+
+say "Stopping the scheduler"
+pkill -f "nomad agent -dev" 2>/dev/null || true
+
+cat <<'EOF'
+
+  Enclave stopped. Nothing was destroyed.
+
+    brieve-dev-vault-data   trust store — the keys in .env unseal it
+    brieve-dev-pgdata       run state
+
+  Back up with: make dev-up
+EOF

@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Brings up the enclave in ADR-0048's order: Terraform -> Vault -> Nomad -> harness.
+# Each link is established before the one that depends on it, and that is the only
+# ordering that terminates — the scheduler is itself a client of the trust store.
+#
+# Idempotent. Re-running against a configured environment UNSEALS; it never
+# re-initialises. Re-initialising discards the raft store and invalidates every
+# credential derived from it, which is the most expensive mistake available here.
+
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ENV_DIR="${ENCLAVE_ENV:-$REPO/infra/environments/dev}"
+export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
+NOMAD_ADDR="${NOMAD_ADDR:-http://127.0.0.1:4646}"
+
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+ok()  { printf '    \033[32mok\033[0m %s\n' "$*"; }
+die() { printf '\033[31mmissing prerequisite:\033[0m %s\n' "$*" >&2; exit 1; }
+
+# .env values are quoted. Passing the quotes through made the trust store reject its
+# licence with "error decoding version: expected integer", which names neither quoting
+# nor the licence.
+env_val() {
+  [ -f "$REPO/.env" ] || die ".env not found at $REPO/.env"
+  grep "^$1=" "$REPO/.env" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'
+}
+
+env_set() {
+  KEY="$1" VAL="$2" python3 - "$REPO/.env" <<'PY'
+import os, re, sys
+p, k, v = sys.argv[1], os.environ["KEY"], os.environ["VAL"]
+t = open(p).read()
+line = f'{k}="{v}"'
+t = re.sub(rf'^{k}=.*$', line, t, flags=re.M) if re.search(rf'^{k}=', t, re.M) else t.rstrip("\n") + "\n" + line + "\n"
+open(p, "w").write(t)
+PY
+}
+
+# ---------------------------------------------------------------- prerequisites
+# Each failure NAMES what is missing. "Bring-up failed" withholds the diagnosis this
+# script has already performed.
+say "Prerequisites"
+for bin in docker nomad vault terraform python3; do
+  command -v "$bin" >/dev/null || die "$bin is not on PATH — see CONTRIBUTING.md"
+done
+docker info >/dev/null 2>&1 || die "Docker is not running — start Docker Desktop"
+LICENSE="$(env_val VAULT_ENT_LICENSE)"
+[ -n "$LICENSE" ] || die "VAULT_ENT_LICENSE is absent from .env"
+[ -d "$ENV_DIR" ] || die "environment root $ENV_DIR does not exist"
+ok "tooling, Docker, licence, environment root"
+
+# ---------------------------------------------------------------- 1. scheduler
+# First: the trust store fetches the scheduler's JWKS at configure time, and the
+# scheduler runs the state store. An inverted order fails at cold start.
+# A leader answering is NOT enough. The agent can keep serving HTTP while its client
+# node is down — which is what happens when the advertised RPC address goes stale after
+# a network change. Jobs then register, report "running", and never place an allocation,
+# so anything waiting on the workload waits forever.
+scheduler_ready() {
+  curl -sf --max-time 3 "$NOMAD_ADDR/v1/nodes" 2>/dev/null \
+    | python3 -c 'import json,sys; print(any(n.get("Status")=="ready" for n in json.load(sys.stdin)))' 2>/dev/null \
+    | grep -q True
+}
+
+say "Scheduler"
+if scheduler_ready; then
+  ok "already running, with a ready client node"
+else
+  # The container driver refuses volume mounts unless the AGENT enables them. A correct
+  # jobspec fails anyway, with a message pointing at the jobspec.
+  nohup nomad agent -dev -bind 0.0.0.0 -config="$REPO/infra/nomad/client.hcl" \
+    > "${TMPDIR:-/tmp}/brieve-nomad.log" 2>&1 &
+  for _ in $(seq 1 45); do scheduler_ready && break; sleep 1; done
+  scheduler_ready \
+    || die "scheduler has no ready client node — log: ${TMPDIR:-/tmp}/brieve-nomad.log. A stale advertised RPC address is the usual cause; see infra/nomad/client.hcl"
+  ok "started, client node ready"
+fi
+
+# ---------------------------------------------------------------- 2. state store
+say "State store"
+cd "$REPO/infra"
+if nomad job status postgres 2>/dev/null | grep -q "^Status *= *running"; then
+  ok "already scheduled"
+else
+  nomad job run jobs/postgres.nomad.hcl >/dev/null
+  ok "scheduled"
+fi
+for _ in $(seq 1 60); do nc -z 127.0.0.1 5432 2>/dev/null && break; sleep 1; done
+nc -z 127.0.0.1 5432 2>/dev/null || die "state store is not listening — try: nomad job status postgres"
+ok "listening (data on brieve-dev-pgdata, which outlives the allocation)"
+
+# ---------------------------------------------------------------- 3. trust store
+say "Trust store"
+cd "$ENV_DIR"
+export TF_VAR_vault_license="$LICENSE"
+[ -d .terraform ] || terraform init -input=false >/dev/null
+
+# Stopping the container drops it from state on the next refresh, so a plain apply then
+# tries to CREATE a container whose name is taken. Reconcile before applying.
+if docker container inspect brieve-dev-vault >/dev/null 2>&1; then
+  docker start brieve-dev-vault >/dev/null 2>&1 || true
+  if ! terraform state list 2>/dev/null | grep -qx 'module.substrate.docker_container.vault'; then
+    terraform import -input=false -var vault_token=placeholder \
+      module.substrate.docker_container.vault \
+      "$(docker container inspect -f '{{.ID}}' brieve-dev-vault)" >/dev/null 2>&1 \
+      && ok "re-imported the existing container into state"
+  fi
+fi
+
+terraform apply -input=false -auto-approve \
+  -target=module.substrate -var vault_token=placeholder >/dev/null
+for _ in $(seq 1 30); do curl -sf -o /dev/null --max-time 2 "$VAULT_ADDR/v1/sys/seal-status" && break; sleep 1; done
+curl -sf -o /dev/null --max-time 2 "$VAULT_ADDR/v1/sys/seal-status" \
+  || die "trust store is not answering — try: docker logs brieve-dev-vault"
+
+initialized="$(vault status -format=json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["initialized"])' || echo False)"
+if [ "$initialized" = "False" ]; then
+  say "Uninitialised — first run"
+  init_json="$(vault operator init -key-shares=1 -key-threshold=1 -format=json)"
+  env_set VAULT_UNSEAL_KEY "$(printf '%s' "$init_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["unseal_keys_b64"][0])')"
+  env_set VAULT_ROOT_TOKEN "$(printf '%s' "$init_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["root_token"])')"
+  ok "initialised; unseal key and root token written to .env (1-of-1 — development only)"
+else
+  ok "already initialised — unsealing, never re-initialising"
+fi
+
+if vault status 2>/dev/null | grep -q "^Sealed *false"; then
+  ok "already unsealed"
+else
+  vault operator unseal "$(env_val VAULT_UNSEAL_KEY)" >/dev/null \
+    || die "unseal failed — is VAULT_UNSEAL_KEY the key for volume brieve-dev-vault-data?"
+  ok "unsealed"
+fi
+for _ in $(seq 1 20); do vault status 2>/dev/null | grep -q "^HA Mode *active" && break; sleep 1; done
+
+# ---------------------------------------------------------------- 4. trust fabric
+# NEVER apply against a sealed store. The provider cannot read, so Terraform concludes
+# the resources are gone and drops them from state; the next apply then tries to create
+# mounts that already exist, and has crashed the provider outright.
+vault status 2>/dev/null | grep -q "^Sealed *false" \
+  || die "trust store is sealed — refusing to apply, which would corrupt Terraform state"
+
+say "Trust fabric"
+# TLS is ON by default. The path you develop against should be the path that ships;
+# an opt-in security property is one most environments never opt into.
+#
+# ENCLAVE_TLS=false exists for diagnosing the transport itself — when the question is
+# "is TLS the problem", not "should we have TLS".
+TLS_ARGS=()
+[ "${ENCLAVE_TLS:-true}" = "true" ] && TLS_ARGS=(-var enable_tls=true)
+terraform apply -input=false -auto-approve -var vault_token="$(env_val VAULT_ROOT_TOKEN)" "${TLS_ARGS[@]}" >/dev/null
+ok "workload identity auth, ceiling policies, agent registry, database engine, dynamic role"
+
+# ---------------------------------------------------------------- 4b. transport
+#
+# The bootstrap circularity, resolved the only way it can be: the trust store cannot
+# start with a certificate from a CA that is not yet serving, so it starts plaintext,
+# issues its own listener certificate, and is then restarted holding it.
+#
+# The restart SEALS it. That is not a failure — it is what happens to a raft-backed store
+# whose process is replaced — but it means unsealing again is part of the sequence rather
+# than something a reader has to notice.
+if [ "${ENCLAVE_TLS:-true}" = "true" ]; then
+  say "Transport security"
+  cert="$(terraform output -raw listener_certificate 2>/dev/null || true)"
+  if [ -z "$cert" ]; then
+    die "TLS was requested but no listener certificate was issued — check the PKI mount"
+  fi
+  key="$(terraform output -raw listener_private_key)"
+  ca="$(terraform output -raw listener_ca_chain)"
+
+  mkdir -p "$REPO/.enclave"
+  printf '%s\n' "$ca" > "$REPO/.enclave/ca.pem"
+  chmod 600 "$REPO/.enclave/ca.pem"
+  ok "CA written to .enclave/ca.pem (public material; clients trust this)"
+
+  # Written as an auto-loaded tfvars file rather than passed on the command line.
+  #
+  # Passing it per-invocation would mean a bare `terraform apply` — the obvious thing to
+  # run — sees no certificate, computes the scheme as http, and SILENTLY REVERTS THE
+  # LISTENER TO PLAINTEXT. A security property that switches itself off when someone
+  # runs the normal command is not a security property.
+  umask 077
+  cat > "$ENV_DIR/tls.auto.tfvars" <<TFVARS
+# Generated by enclave-up. Gitignored (infra/.gitignore covers *.tfvars).
+# Auto-loaded, so TLS survives a bare \`terraform apply\` instead of switching itself off.
+enable_tls      = true
+ca_cert_file    = "$REPO/.enclave/ca.pem"
+tls_certificate = <<CERT
+$cert
+CERT
+tls_private_key = <<KEY
+$key
+KEY
+TFVARS
+  ok "TLS material persisted to the root as auto-loaded vars"
+
+  terraform apply -input=false -auto-approve \
+    -var vault_token="$(env_val VAULT_ROOT_TOKEN)" \
+    -target=module.substrate >/dev/null
+  ok "listener switched to TLS, issued by the control plane's own CA"
+
+  export VAULT_ADDR="https://127.0.0.1:8200"
+  export VAULT_CACERT="$REPO/.enclave/ca.pem"
+  for _ in $(seq 1 30); do curl -sf --cacert "$VAULT_CACERT" -o /dev/null --max-time 2 "$VAULT_ADDR/v1/sys/seal-status" && break; sleep 1; done
+
+  # Replacing the container seals the store. Unseal again, or everything after this
+  # fails with an error that names the seal and not the restart that caused it.
+  if ! vault status 2>/dev/null | grep -q "^Sealed *false"; then
+    vault operator unseal "$(env_val VAULT_UNSEAL_KEY)" >/dev/null \
+      || die "unseal after the TLS restart failed"
+    ok "unsealed again after the restart"
+  fi
+
+  env_set VAULT_ADDR "$VAULT_ADDR"
+  env_set VAULT_CACERT "$VAULT_CACERT"
+  ok "VAULT_ADDR and VAULT_CACERT written to .env — every client moves with the listener"
+fi
+
+# ---------------------------------------------------------------- 5. the contract
+# Verification runs BEFORE success is reported. Otherwise the contract describes intent
+# rather than state.
+say "Verifying"
+"$REPO/infra/bin/enclave-verify"
+
+cat <<EOF
+
+  Enclave up — and the contract above was checked, not assumed.
+
+    Trust store  $VAULT_ADDR
+    Scheduler    $NOMAD_ADDR
+    State store  127.0.0.1:5432
+
+  Credentials are minted per workload; there is no database password to export.
+  Stop without destroying anything:  make dev-down
+EOF

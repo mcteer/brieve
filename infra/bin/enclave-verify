@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Asserts every guarantee in contracts/bring-up-contract.md against a running enclave.
+#
+# The contract is executable for one reason: a contract nobody checks drifts from
+# reality, and the drift surfaces as a confusing failure in whatever suite trusted it.
+# Here it is either true or loudly false.
+
+set -uo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Follow whatever the listener is. Hardcoding http here is how a working TLS enclave
+# gets reported as down.
+export VAULT_ADDR="${VAULT_ADDR:-$(grep '^VAULT_ADDR=' "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')}"
+export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
+CACERT="$(grep '^VAULT_CACERT=' "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')"
+[ -n "$CACERT" ] && export VAULT_CACERT="$CACERT"
+NOMAD_ADDR="${NOMAD_ADDR:-http://127.0.0.1:4646}"
+
+fail=0
+ok()   { printf '    \033[32mok\033[0m %s\n' "$*"; }
+bad()  { printf '  \033[31mFAIL\033[0m %s\n' "$*" >&2; fail=1; }
+
+env_val() { grep "^$1=" "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
+
+printf '\033[1m==>\033[0m Bring-up contract\n'
+
+# 1 — scheduler reachable with a leader
+# Leader AND a ready client node. A leader alone answers happily while nothing can be
+# placed — the failure that presents as a job stuck at "running" with no allocation.
+ready="$(curl -sf --max-time 3 "$NOMAD_ADDR/v1/nodes" 2>/dev/null \
+  | python3 -c 'import json,sys; print(sum(1 for n in json.load(sys.stdin) if n.get("Status")=="ready"))' 2>/dev/null || echo 0)"
+if [ "$ready" -ge 1 ] 2>/dev/null; then
+  ok "scheduler reachable, $ready client node(s) ready"
+else
+  bad "scheduler has no ready client node — jobs will register and never place. Check the advertised RPC address in infra/nomad/client.hcl"
+fi
+
+# 2 — trust store reachable AND unsealed
+seal="$(vault status -format=json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print("unsealed" if not d["sealed"] else "sealed")' 2>/dev/null || echo unreachable)"
+case "$seal" in
+  unsealed) ok "trust store unsealed and serving" ;;
+  sealed)   bad "trust store is SEALED — unseal it; do NOT re-initialise, that discards the store and invalidates the credentials in .env" ;;
+  *)        bad "trust store unreachable at $VAULT_ADDR" ;;
+esac
+
+export VAULT_TOKEN="${VAULT_TOKEN:-$(env_val VAULT_ROOT_TOKEN)}"
+
+# 3 — trust fabric configured
+mounts="$(vault auth list -format=json 2>/dev/null | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)))' 2>/dev/null || echo "")"
+[[ "$mounts" == *"nomad/"* ]] && ok "workload identity auth mounted" || bad "auth/nomad missing — trust fabric not configured"
+
+engines="$(vault secrets list -format=json 2>/dev/null | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)))' 2>/dev/null || echo "")"
+[[ "$engines" == *"database/"* ]] && ok "database engine mounted" || bad "database engine missing"
+[[ "$engines" == *"agent-registry/"* ]] && ok "agent registry present" || bad "agent registry missing"
+
+# 4 — a dynamic credential can be minted AND it authenticates
+creds="$(vault read -format=json database/creds/harness 2>/dev/null || echo "")"
+if [ -n "$creds" ]; then
+  PGUSER="$(printf '%s' "$creds" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["username"])')"
+  PGPASSWORD="$(printf '%s' "$creds" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["password"])')"
+  export PGUSER PGPASSWORD
+  if docker run --rm -e PGPASSWORD -e PGUSER --network host postgres:17-alpine \
+       psql -h 127.0.0.1 -p 5432 -d brieve -tAc 'select 1' >/dev/null 2>&1; then
+    ok "dynamic credential minted and authenticates"
+  else
+    bad "credential minted but does NOT authenticate — if the state-store volume was destroyed it reverted to its bootstrap password while the trust store holds the rotated one; they reset together"
+  fi
+else
+  bad "no dynamic credential could be minted"
+fi
+
+# 5 — state store reachable and migrated
+nc -z 127.0.0.1 5432 2>/dev/null && ok "state store listening" || bad "state store not listening on 5432"
+
+# 6 — persistent state intact
+for vol in brieve-dev-vault-data brieve-dev-pgdata; do
+  docker volume inspect "$vol" >/dev/null 2>&1 && ok "volume $vol intact" || bad "volume $vol missing — persisted state is gone"
+done
+
+[ "$fail" -eq 0 ] && printf '\n\033[32mContract holds.\033[0m\n' || printf '\n\033[31mContract does not hold.\033[0m\n' >&2
+exit "$fail"

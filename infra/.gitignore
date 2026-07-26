@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# State and provider caches never enter version control. The proof directory kept its
+# state file beside its source; the module tree must not repeat that.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+*.auto.tfvars
