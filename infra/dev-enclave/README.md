@@ -95,59 +95,45 @@ mode is easy to misread:
 
 Prerequisites and the reasoning behind them: [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
-Bring it up in ADR-0048's order — each component's dependencies exist before it does.
-
 ```bash
-# .env values are quoted; the trailing sed is not optional.
-env_val() { grep "^$1=" ../../.env | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
-
-# 1. Nomad first — Vault fetches its JWKS at configure time, and Nomad schedules Postgres.
-#    The config enables docker volume mounts, which the driver refuses by default.
-nomad agent -dev -bind 0.0.0.0 -config=nomad/client.hcl &
-
-# 2. Postgres, so Vault's database engine has something to verify against.
-nomad job run jobs/postgres.nomad.hcl
-
-# 3. Vault container only. It comes up sealed; nothing can be configured yet.
-export TF_VAR_vault_license="$(env_val VAULT_ENT_LICENSE)"
-terraform init
-terraform apply -target=docker_container.vault -var vault_token=placeholder
+make dev-up       # brings the whole stack up, in ADR-0048's order
+make dev-status   # what is running
+make dev-down     # stop, destroying nothing
 ```
 
-**First time only**, initialise. On every later start the volume already holds the raft store,
-so **unseal — do not re-initialise**; re-initialising discards everything and invalidates the
-credentials in `.env`.
+`make dev-up` is idempotent — re-run it freely. It brings up Nomad (with the client config
+that enables docker volumes), schedules Postgres, starts Vault, unseals it from `.env`, applies
+the trust fabric and database engine, and verifies the chain by minting a credential.
+
+**On a fresh machine** it initialises Vault and writes the unseal key and root token to `.env`.
+On every later run it **unseals — it never re-initialises**, because re-initialising discards
+the raft store and invalidates both values.
+
+Prove the whole chain end to end:
 
 ```bash
-export VAULT_ADDR=http://127.0.0.1:8200
-vault operator init -key-shares=1 -key-threshold=1   # dev only — never this shape in production
-# put the unseal key and root token in .env, then:
-vault operator unseal "$(env_val VAULT_UNSEAL_KEY)"
-```
-
-```bash
-# 4. Everything else: trust fabric, agent registry, database engine, rotate-root.
-terraform apply -var vault_token="$(env_val VAULT_ROOT_TOKEN)"
-
-# 5. Prove the chain end to end.
-nomad job run jobs/harness-probe.nomad.hcl
+nomad job run infra/dev-enclave/jobs/harness-probe.nomad.hcl
 nomad alloc logs $(nomad job status harness | tail -1 | awk '{print $1}') probe
 ```
 
-Restarting later is just steps 1, 2, unseal, and go — the raft store and the Postgres volume
-both survive.
+The manual sequence is in git history if you need it; `dev-up.sh` is the readable version.
 
-### Resetting
+### Two traps `dev-up` now handles for you
 
-Destroying the Postgres volume resets the database to the bootstrap password while Vault still
-holds the rotated one, and every dynamic credential request then fails. The two must be reset
-together:
+Both cost real time to diagnose, and both are silent until they are not:
 
-```bash
-nomad job stop -purge postgres && docker volume rm brieve-dev-pgdata
-nomad job run jobs/postgres.nomad.hcl
-terraform apply -replace=vault_generic_endpoint.rotate_root -var vault_token="$(env_val VAULT_ROOT_TOKEN)"
-```
+1. **Never run Terraform against a sealed Vault.** The provider cannot read, so Terraform
+   concludes every resource is gone and drops them from state. The next apply then tries to
+   create mounts that already exist (`path is already in use`) and the provider can crash
+   outright. `dev-up` refuses to apply until Vault is unsealed.
+2. **`rotate-root` couples Vault and Postgres in both directions.** Destroy the Postgres volume
+   and the database reverts to its bootstrap password while Vault holds the rotated one; disable
+   Vault's database mount and Vault forgets the rotated password while Postgres still has it.
+   Either way *nothing* can authenticate and the connection cannot be reconfigured. They must be
+   reset together — which `dev-up` does automatically when it detects the drift.
+
+Stopping the Vault container also drops it from Terraform state on the next refresh, so `dev-up`
+re-imports it rather than trying to create a container whose name is taken.
 
 ## Deliberately missing
 
