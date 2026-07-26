@@ -31,7 +31,7 @@ being re-derived at the start of every spec.
 
 | # | Feature | ADRs | Status |
 | --- | --- | --- | --- |
-| *unassigned* | Deployment module tree — the enclave, productized | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Next to spec. `make dev-up` already shipped as tooling (#34); what remains is the parameterized tree and running the suite as a Nomad job |
+| 006 | Deployment module tree — the enclave, productized | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Spec drafted. `make dev-up` already shipped as tooling (#34); what remains is the parameterized tree and running the suite as a Nomad job |
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -43,7 +43,7 @@ being re-derived at the start of every spec.
 > here does not match numeric order and is not meant to. Renaming a merged spec directory would
 > churn every reference to it for no gain.
 
-### Deployment module tree *(number assigned at specify time)*
+### 006 — Deployment module tree
 
 **Scope changed after 005 shipped, and the record should say so rather than read as though
 the original plan held.** This was written as the feature that precedes durable execution and
