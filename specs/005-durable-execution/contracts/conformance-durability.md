@@ -48,11 +48,19 @@ provider must require no rewriting — that is the executable form of ADR-0024's
 which does not, because the lane is fork-safe with no required secrets and cannot stand
 up a licensed Vault Enterprise.
 
-Stated plainly rather than papered over: **the durability rows are merge-blocking for a
-human running them locally, not for CI.** They are not skipped silently — the lane
-simply does not include them, and the durability suite fails loudly rather than skipping
-when the enclave is absent, so there is no arrangement in which a green result means
-less than it appears to.
+Stated plainly rather than papered over: **no required check covers these rows.** Nothing
+in GitHub stops a merge that breaks them.
+
+Calling them "merge-blocking locally" would dress a convention up as a control. What
+actually closes the gap is the **agent harness**: `AGENTS.md` instructs it to bring the
+enclave up and run `make conformance` before merging anything touching durability,
+sealed core, an adapter, a provider, or `infra/` — and to refuse the merge and report the
+gap if it cannot. The mechanism is an instruction the harness follows, which means it is
+only as good as that instruction being kept current and obeyed.
+
+One property holds regardless: the lane **fails loudly when the enclave is absent** rather
+than skipping. A false green is not obtainable by running it in the wrong place — only by
+not running it at all.
 
 Closing this needs a second CI lane with the licence available as a secret, which is a
 deployment-tree concern rather than this feature's.
