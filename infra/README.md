@@ -4,7 +4,7 @@ One parameterized tree. Applied to a workstation and to customer infrastructure,
 **substrate as the only permitted delta** (ADR-0025, Principle VII).
 
 ```bash
-make dev-up        # brings it up, in ADR-0048's order, and verifies its own contract
+make dev-up        # brings it up over TLS, in ADR-0048's order, and verifies its own contract
 make dev-status    # a glance
 make enclave-verify # the full contract, asserted
 make dev-down      # stops; destroys nothing
@@ -50,7 +50,7 @@ make enclave-boundaries    # the boundary, both directions, plus FR-004
 
 | Item | Status |
 | --- | --- |
-| Transport security | **Implemented** — PKI-issued, self-signed bootstrap. `enable_tls`; always on in production |
+| Transport security | **Implemented and on by default.** The control plane's own CA issues the trust store's listener certificate; bring-up switches the listener to it and moves every client with it. `ENCLAVE_TLS=false` exists for diagnosing the transport itself, not as a posture choice |
 | Bootstrap credential | **Implemented** for the production profile. Development keeps the root token deliberately — revoking it there breaks the re-apply loop, and an enclave nobody re-applies costs more safety than the token does on a workstation |
 | Unseal shape | **Seam only** — `seal_config` passes an auto-unseal configuration through untouched. Development default is 1-of-1 shamir. Shipping one KMS variant would privilege a cloud and still leave every other operator writing their own |
 | High availability | **Deferred.** Named trigger: the first deployment target that requires it, or the first time single-node behaviour is suspected of hiding a fencing defect |

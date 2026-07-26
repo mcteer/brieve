@@ -186,7 +186,7 @@ is no window where a contributor has no working enclave.
 - [X] T048 [P] Document in `contracts/substrate-requirements.md` terms what Kubernetes would have to demonstrate — the same conformance assertions, not an analogous story (FR-014)
 - [X] T049 [GATE:no-secret-leak] Sweep state, outputs, digests, and entry-point logs for credential material. `.env` values are quoted, and passing the quotes through once made the trust store reject its licence with an error that named neither quoting nor the licence
 - [X] T050 Review the diff against the scope bound: `src/` untouched, one deletion in `tests/`. Anything else is out of scope for this feature
-- [ ] T051 Open `feat/006-deployment-module-tree` with the FR-010 dispositions, the HA deferral and its consequence, and the `infra/dev-enclave` deletion called out
+- [X] T051 Open `feat/006-deployment-module-tree` with the FR-010 dispositions, the HA deferral and its consequence, and the `infra/dev-enclave` deletion called out
 
 ---
 

@@ -11,9 +11,9 @@ variable "vault_token" {
 }
 
 variable "enable_tls" {
-  description = "Opt-in in development; always on in production."
+  description = "On by default. Development should exercise the same transport production uses; an opt-in security property is one most environments never opt into."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "agent_definitions" {

@@ -144,8 +144,13 @@ vault status 2>/dev/null | grep -q "^Sealed *false" \
   || die "trust store is sealed — refusing to apply, which would corrupt Terraform state"
 
 say "Trust fabric"
+# TLS is ON by default. The path you develop against should be the path that ships;
+# an opt-in security property is one most environments never opt into.
+#
+# ENCLAVE_TLS=false exists for diagnosing the transport itself — when the question is
+# "is TLS the problem", not "should we have TLS".
 TLS_ARGS=()
-[ "${ENCLAVE_TLS:-false}" = "true" ] && TLS_ARGS=(-var enable_tls=true)
+[ "${ENCLAVE_TLS:-true}" = "true" ] && TLS_ARGS=(-var enable_tls=true)
 terraform apply -input=false -auto-approve -var vault_token="$(env_val VAULT_ROOT_TOKEN)" "${TLS_ARGS[@]}" >/dev/null
 ok "workload identity auth, ceiling policies, agent registry, database engine, dynamic role"
 
@@ -158,7 +163,7 @@ ok "workload identity auth, ceiling policies, agent registry, database engine, d
 # The restart SEALS it. That is not a failure — it is what happens to a raft-backed store
 # whose process is replaced — but it means unsealing again is part of the sequence rather
 # than something a reader has to notice.
-if [ "${ENCLAVE_TLS:-false}" = "true" ]; then
+if [ "${ENCLAVE_TLS:-true}" = "true" ]; then
   say "Transport security"
   cert="$(terraform output -raw listener_certificate 2>/dev/null || true)"
   if [ -z "$cert" ]; then
