@@ -227,12 +227,13 @@ one; that is plumbing, and it touches neither the grant nor the lease nor the ru
 
 ### Post-design Constitution Check
 
-Re-checked after Phase 1: still **PASS**. Three notes worth carrying into review rather than
-burying:
+Re-checked after Phase 1 and again after two analyze passes: still **PASS**. Five notes worth
+carrying into review rather than burying:
 
 - **Principle V — breaking seam change.** `DurabilityProvider` gains lease and intent-record
-  operations and `CheckpointBlob` gains resume metadata; 004's protocol cannot satisfy the new
-  guarantees. Pre-1.0 with one in-repo implementation and no external consumers, so the same
+  operations, and `CheckpointBlob` gains resume metadata **plus `run_state` and `stop_reason`** —
+  a resuming process holds only the checkpoint, so terminal state has to live in it. 004's
+  protocol cannot satisfy the new guarantees. Pre-1.0 with one in-repo implementation and no external consumers, so the same
   exemption 004 recorded applies — declared in the contract and the feat PR rather than assumed.
 - **Principle IV — the grant is new durable state about a human's consent.** It holds no
   credential, but it is the first object whose lifetime encodes "the user said yes." Expiry is
@@ -241,6 +242,14 @@ burying:
 - **Principle VI — one new dependency.** A Postgres driver is a library, not an operated
   component, and Postgres was already in the enclave baseline. Pin and justification are an
   implement-time duty.
+- **Principle IV — credential refresh (FR-017b) does not weaken it.** The database credential is
+  still Vault-minted, per-workload, and short-lived; only the *trigger* for replacing it is now
+  specified — the database's rejection rather than a clock. Nothing is held longer, and the
+  workload still fetches it under its own attested identity rather than receiving it from Nomad.
+- **Principle III — three terminal run states, fail-closed in each direction.** `COMPLETED`,
+  `STOPPED`, and `PARKED` are added because 002's `ACTIVE`/`REFUSED` pair cannot express them, and
+  each closes a path rather than opening one: a terminal run is not re-entered, a bounded run is
+  not resumable, and a parked run performs no further steps until a human acts.
 
 ## Project Structure
 
