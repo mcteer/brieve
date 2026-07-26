@@ -162,6 +162,13 @@ able to assert.
 `infra/dev-enclave/` is deleted, not kept alongside (FR-015, SC-010). Its README's hard-won failure
 catalogue moves into the tree's own documentation, because that content is the part worth keeping.
 
+**The deletion has a hazard that is easy to miss.** That directory holds Terraform state tracking
+fifteen live resources — the running trust-store container, both named volumes, and every mount,
+role, policy and registry entry. Deleting it orphans them, and the new dev root then attempts to
+create a container whose name is taken and mounts that already exist. This repository has hit that
+failure twice, so the migration is a gated task with its own verification rather than a step in the
+deletion.
+
 ## Complexity Tracking
 
 > No Constitution Check violations. Table intentionally empty.

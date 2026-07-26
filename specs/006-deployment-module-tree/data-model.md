@@ -38,7 +38,7 @@ while the dev and production roots still differ in posture.
 | `jwt_auth_path` | Mount a workload authenticates against |
 | `database_creds_path` | Where a workload reads a dynamic credential |
 | `ca_certificate` | Control-plane CA, for clients that must trust it |
-| `configuration_digest` | **Stable hash of every configured element.** The thing SC-001 compares |
+| `configuration_digest` | **Stable hash of every configured element.** The thing SC-001 compares. Computed from resolved inputs and literal configuration only — a digest derived from resource attributes is unknown until apply, and comparing two unknowns passes while proving nothing |
 
 **Validation**: this module MUST NOT reference a substrate resource, a container, an instance, or a
 provider that only one substrate has. That is the property making FR-002 checkable rather than
@@ -119,6 +119,7 @@ that symptom points *instead of* its cause — the last column being why these c
 | Trust store data moved to a differently-named node | Unseals, then permanently standby, every call answering "sealed" | The seal, not the node identity |
 | Configuration applied against a sealed store | Resources vanish from state; the next apply fails on conflict | The configuration, not the seal |
 | State store volume destroyed while the trust store holds the rotated credential | Every credential fails authentication | The credential path, not the coupling |
+| Configuration state deleted or orphaned while its resources still run | Next apply fails on a name conflict | The new configuration, not the abandoned state |
 
 **Validation**: FR-013 requires each to be prevented or detected-and-explained. Detection must name
 the cause column, not the symptom column.

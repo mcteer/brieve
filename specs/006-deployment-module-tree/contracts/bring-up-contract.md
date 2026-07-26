@@ -32,7 +32,10 @@ starts.
 4. **Bring-up is repeatable and destroys nothing** (FR-009). Against a configured environment it
    unseals; it never re-initialises. Re-initialising discards the trust store and invalidates every
    credential derived from it, which is the most expensive mistake available here.
-5. **Detection reports causes, not symptoms.** For each entry in the failure catalogue, the message
+5. **The bootstrap order is asserted, not assumed** (FR-003). Trust store before scheduler,
+   scheduler before any agent workload. It is the only ordering that terminates, and an inverted
+   one fails at cold start — the worst time to discover it.
+6. **Detection reports causes, not symptoms.** For each entry in the failure catalogue, the message
    names the cause — the catalogue exists because these symptoms point elsewhere.
 
 ## What bring-up does NOT guarantee

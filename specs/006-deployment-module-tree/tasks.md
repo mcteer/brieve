@@ -49,7 +49,7 @@ is no window where a contributor has no working enclave.
 
 ## Phase 1: Setup
 
-- [ ] T001 Create the module and environment skeleton — `infra/modules/{trust-fabric,substrate-docker,substrate-vm}/`, `infra/environments/{dev,production}/`, `infra/jobs/`, `infra/bin/` — with `versions.tf` in each root pinning Terraform ≥ 1.9 and the vault/docker providers
+- [ ] T001 (FR-001) Create the module and environment skeleton — `infra/modules/{trust-fabric,substrate-docker,substrate-vm}/`, `infra/environments/{dev,production}/`, `infra/jobs/`, `infra/bin/` — with `versions.tf` in each root pinning Terraform ≥ 1.9 and the vault/docker providers
 - [ ] T002 [P] Move `infra/dev-enclave/jobs/*.nomad.hcl` to `infra/jobs/`, unchanged. Moving before rewriting keeps the diff for the rewrite honest
 - [ ] T003 [P] Move `infra/dev-enclave/nomad/client.hcl` to `infra/nomad/client.hcl`. It enables the container driver's volume mounts, which the scheduler refuses by default — a constraint the production tree inherits, not a dev wrinkle
 - [ ] T004 Add `infra/.gitignore` covering `.terraform/`, `*.tfstate*`, and `*.tfvars`. State is currently committed-adjacent under `dev-enclave/`; the new roots must never repeat that
@@ -62,15 +62,16 @@ is no window where a contributor has no working enclave.
 
 **⚠️ CRITICAL**: no story work until this module applies cleanly.
 
-- [ ] T005 Create `infra/modules/trust-fabric/variables.tf` with exactly the inputs in `data-model.md` — `agent_definitions`, `nomad_jwks_url`, `database_endpoint`, `profile`, `seal_config`. **A fourth substrate-derived input is the signal the boundary moved**: it may be right, but it is a deliberate change to `contracts/module-interface.md`, not a variable someone adds
+- [ ] T005 (FR-001, FR-002) Create `infra/modules/trust-fabric/variables.tf` with exactly the inputs in `data-model.md` — `agent_definitions`, `nomad_jwks_url`, `database_endpoint`, `profile`, `seal_config`. **A fourth substrate-derived input is the signal the boundary moved**: it may be right, but it is a deliberate change to `contracts/module-interface.md`, not a variable someone adds
 - [ ] T006 [P] Create `infra/modules/trust-fabric/auth.tf` — JWT auth backend from `nomad_jwks_url`, per-definition agent roles, and the harness role with `bound_claims` on the job id. Without the bound claim any workload could assume the harness role and the attestation is decorative
 - [ ] T007 [P] Create `infra/modules/trust-fabric/policies.tf` — per-definition ceiling policies and the harness database policy. The database policy attaches to the **workload** identity, never to an agent ceiling: database access inside a definition's ceiling would let a model-chosen tool call reach the checkpoint store, which is the run's own record of what it did
 - [ ] T008 [P] Create `infra/modules/trust-fabric/registry.tf` — identity entities and agent-registry registrations with their ceiling policies (ADR-0015's first-class registry, not a convention over kv)
 - [ ] T009 Create `infra/modules/trust-fabric/database.tf` — database secrets engine, connection, dynamic role granting the parent role, and `rotate-root`. Keep `ignore_changes` on the connection password: without it every apply undoes the rotation and quietly restores the standing credential the rotation exists to remove
 - [ ] T010 Create `infra/modules/trust-fabric/pki.tf` — PKI mount, control-plane CA, and a role issuing the trust store's own certificate
 - [ ] T011 [GATE:no-secret-leak] Create `infra/modules/trust-fabric/outputs.tf` — auth path, credential path, CA certificate, and `configuration_digest`. Assert no output carries a token, key, or password; a module output is the easiest place for one to escape into a root's state
-- [ ] T012 Implement `configuration_digest` per `data-model.md` — a stable hash over auth methods, roles, policies, secrets engines, registry entries, and database roles. **Exclude everything substrate-derived**; including an address makes the digests differ by construction and the comparison worthless
-- [ ] T013 [GATE:fail-closed] Add a precondition refusing apply when the trust store is sealed. A configuration tool that cannot read concludes the resources are absent and discards its record of them; the next apply then fails trying to create what exists
+- [ ] T012 Implement `configuration_digest` per `data-model.md` — a stable hash over auth methods, roles, policies, secrets engines, registry entries, and database roles. **Exclude everything substrate-derived**; including an address makes the digests differ by construction and the comparison worthless. **Compute it from resolved inputs and literal configuration, never from resource attributes** — a digest hashing a mount accessor or an entity id resolves to "known after apply", and SC-001's plan-level comparison then compares two unknowns and passes while proving nothing
+- [ ] T012a [GATE:fail-closed] Assert the digest is a known value at plan time. Without this the failure in T012 is silent: the comparison succeeds, the criterion reports green, and nobody learns the two trees diverged
+- [ ] T013 (FR-012) [GATE:fail-closed] Add a precondition refusing apply when the trust store is sealed. A configuration tool that cannot read concludes the resources are absent and discards its record of them; the next apply then fails trying to create what exists
 
 **Checkpoint**: `trust-fabric` applies against the existing dev Vault and produces a digest.
 
@@ -79,7 +80,7 @@ is no window where a contributor has no working enclave.
 ## Phase 3: Foundational — substrates
 
 - [ ] T014 Create `infra/modules/substrate-docker/` from the current `substrate.tf` — trust-store container, named volumes, and the ownership fix. Carry the two traps forward as **code with comments**, not prose: `CAP_IPC_LOCK` in long form, or every apply replaces the container and reseals the store; and a `terraform_data` provisioner for the volume chown rather than a one-shot container, which either self-removes and leaves an unresolvable id or lingers as cruft
-- [ ] T015 [P] Create `infra/modules/substrate-vm/` — the production shape. At minimum the interface and a reference implementation producing the same three outputs. **Not** a stub: an unimplemented substrate makes SC-001 unverifiable, and SC-001 is the feature
+- [ ] T015 [P] Create `infra/modules/substrate-vm/` — the production shape, producing the same three outputs. **Not** a stub: an unimplemented substrate makes SC-001 unverifiable, and SC-001 is the feature. **It must also plan without cloud credentials**, or SC-001 becomes unverifiable in development, which is exactly what the clarification set out to avoid. Target a provider that plans offline — locally-managed VMs, or resources shaped like the real thing with no authenticating provider — and record which was chosen and why in `infra/README.md`
 - [ ] T016 [GATE:fail-closed] Add node-identity validation to `substrate-docker` — raft data is bound to `node_id`, and moving a store to a differently-named node leaves it outside its own peer set: it unseals, reports standby forever, and answers every call "sealed". Nothing in that chain names the cause
 
 ---
@@ -90,12 +91,13 @@ is no window where a contributor has no working enclave.
 
 **Independent Test**: quickstart Scenario D
 
-- [ ] T017 [US1] Create `infra/environments/dev/main.tf` composing `substrate-docker` + `trust-fabric` with `profile = "development"`
-- [ ] T018 [US1] Create `infra/environments/production/main.tf` composing `substrate-vm` + `trust-fabric` with `profile = "production"`
+- [ ] T017 [US1] (FR-001) Create `infra/environments/dev/main.tf` composing `substrate-docker` + `trust-fabric` with `profile = "development"`
+- [ ] T018 [US1] (FR-001) Create `infra/environments/production/main.tf` composing `substrate-vm` + `trust-fabric` with `profile = "production"`
 - [ ] T019 [US1] Add `infra/bin/enclave-digest-diff` — plan both roots, extract both digests, compare, and print the differing elements on mismatch. **Printing the difference is the point**: "digests differ" sends the reader back to do the diff the tool already did
 - [ ] T020 [US1] [GATE:conformance] Wire `make enclave-digest-diff` and assert identical digests across the two roots (SC-001)
 - [ ] T021 [US1] Add a check that `infra/modules/trust-fabric/` references no substrate resource and no substrate-only provider — invariant 1 of `contracts/module-interface.md`, which is a property of the source and so is checkable by reading it
 - [ ] T022 [US1] Add the mirror check: no `substrate-*` module creates a policy, role, registry entry, or secrets engine (invariant 2). One direction alone would let the delta escape the other way
+- [ ] T022a [US1] [GATE:fail-closed] Assert **no substrate module schedules the trust store** (FR-004). Currently satisfied incidentally — `substrate-docker` happens to create the container directly — and a MUST NOT satisfied by accident is a convention. This is the rule ADR-0048 rests on, for two independent reasons: containment (the identity record must not live in the substrate whose access it constrains) and circularity (the scheduler is itself a client of the store, so that arrangement has no cold start that terminates)
 
 **Checkpoint**: Scenario D green; SC-001 holds. The feature is demonstrable.
 
@@ -114,6 +116,7 @@ is no window where a contributor has no working enclave.
 - [ ] T023 [US3] Create `infra/bin/enclave-verify` asserting each of the six guarantees in `contracts/bring-up-contract.md` against a running environment
 - [ ] T024 [US3] Port `dev-up.sh` to `infra/bin/enclave-up`, driving the environment root instead of a flat directory, and **running `enclave-verify` before reporting success** — otherwise the contract describes intent rather than state
 - [ ] T025 [P] [US3] Port `dev-down.sh` to `infra/bin/enclave-down`. Destroys nothing: the volumes hold the trust store and the run state
+- [ ] T025a [US3] [GATE:fail-closed] Assert the bootstrap order — trust store before scheduler, scheduler before any agent workload (FR-003). Today it holds because `enclave-up` was ported from a script that happens to be ordered correctly; "no supported path may invert this order" is currently untested. It is the only ordering that terminates, and an inverted one fails at cold start, which is the worst time to find out
 - [ ] T026 [US3] [GATE:fail-closed] Make every prerequisite failure name the missing prerequisite (FR-008). "Bring-up failed" withholds the diagnosis the tool already performed
 - [ ] T027 [US3] [GATE:fail-closed] Assert re-running against a configured environment unseals and **never re-initialises** (FR-009). Re-initialising discards the trust store and invalidates every credential derived from it — the most expensive mistake available here
 - [ ] T028 [US3] Point `make dev-up` / `dev-down` / `dev-status` at `infra/bin/*` so the tree's entry points are the documented ones, not tooling beside them
@@ -128,7 +131,7 @@ is no window where a contributor has no working enclave.
 
 **Independent Test**: quickstart Scenario E
 
-- [ ] T029 [US2] Create `infra/jobs/conformance.nomad.hcl` — a batch job with an `identity` block (`aud` matching the Vault role, job id matching its `bound_claims`), mounting the working tree and running the durability rows
+- [ ] T029 [US2] (FR-005) Create `infra/jobs/conformance.nomad.hcl` — a batch job with an `identity` block (`aud` matching the Vault role, job id matching its `bound_claims`), mounting the working tree and running the durability rows
 - [ ] T030 [US2] Add the Vault role binding for the conformance job in `infra/modules/trust-fabric/auth.tf`, scoped to the database policy only
 - [ ] T031 [US2] Teach `tests/conformance/durability/conftest.py` to obtain credentials through `core.durability.credentials` — the workload's own exchange — with no token branch
 - [ ] T032 [US2] [GATE:no-secret-leak] **Delete `DevVaultCredentials`** from `tests/conformance/durability/conftest.py` (FR-006, SC-003). Deleted, not bypassed: while it exists, someone can reach for it under time pressure
@@ -148,7 +151,8 @@ is no window where a contributor has no working enclave.
 **Independent Test**: quickstart Scenario G
 
 - [ ] T037 [US4] Implement TLS in `infra/modules/trust-fabric/pki.tf` and the substrate listener config — self-signed bootstrap certificate, replaced by a PKI-issued one **as part of apply**, not as a follow-up someone forgets. The first certificate cannot come from a PKI that is not yet serving; that circularity is the same shape as ADR-0048's, with the same resolution
-- [ ] T038 [US4] Implement bootstrap-credential revocation for `profile = "production"` only. Development keeps the root token deliberately — revoking it there breaks the re-apply loop, and an enclave nobody re-applies costs more safety than the retained token does on a workstation
+- [ ] T038 [US4] (FR-011) Implement bootstrap-credential revocation for `profile = "production"` only. Development keeps the root token deliberately — revoking it there breaks the re-apply loop, and an enclave nobody re-applies costs more safety than the retained token does on a workstation
+- [ ] T038a [US4] Update every client of the trust store for TLS — `Makefile`'s hardcoded `http://127.0.0.1:8200`, `.env`, `infra/bin/*`, the conformance job, and the CA trust each needs. **T037 is not done until this is**: enabling TLS makes the environment correct and every tool talking to it broken, which presents as "the enclave is down" and is not
 - [ ] T039 [P] [US4] Implement the `seal_config` seam: a production root can express auto-unseal without editing `trust-fabric`; the development default remains 1-of-1 shamir
 - [ ] T040 [P] [US4] Record the HA deferral in `infra/README.md` with its named trigger, **and** its consequence: 005's conformance caveat persists, so landing this feature does not close it
 - [ ] T041 [US4] [GATE:fail-closed] Assert all four items carry a non-empty disposition (SC-007). Silence is the failure FR-010 exists to prevent; deferral is not
@@ -165,7 +169,9 @@ is no window where a contributor has no working enclave.
 
 - [ ] T042 [US5] Move the six-entry failure catalogue from `infra/dev-enclave/README.md` into `infra/README.md`, keeping for each the condition, the symptom, **and where the symptom points instead of its cause** — that last column is why they cost time
 - [ ] T043 [US5] [GATE:fail-closed] For each catalogue entry, add prevention or detection that names the **cause**, not the symptom (FR-013, SC-009)
-- [ ] T044 [US5] **Delete `infra/dev-enclave/`** (FR-015, SC-010). Only after Phases 4–7 are green: deleting the working environment before its replacement is verified would leave contributors with none
+- [ ] T043a [US5] **Migrate Terraform state out of `infra/dev-enclave/` before anything is deleted.** That state tracks 15 live resources — the running trust-store container, both named volumes, and every mount, role, policy and registry entry. Deleting the directory orphans them, and the new dev root then tries to create a container whose name is taken and mounts that already exist. Either `terraform state mv` each resource into `infra/environments/dev/`, or destroy and rebuild — and if rebuilding, say plainly that the volumes go with it, which means re-initialising the trust store and writing new credentials to `.env`. **This failure has already happened twice in this repository**; it is not hypothetical
+- [ ] T043b [US5] [GATE:fail-closed] After migration, assert the new root plans clean against the running environment — no creates for resources that already exist. That is the check that would have caught both prior occurrences
+- [ ] T044 [US5] **Delete `infra/dev-enclave/`** (FR-015, SC-010). Only after Phases 4–7 are green **and T043a/T043b have run**: deleting the working environment before its replacement is verified would leave contributors with none, and deleting it before its state is migrated would leave the resources unmanaged
 - [ ] T045 [US5] Update `CONTRIBUTING.md`, `docs/development/testing.md`, and `ROADMAP.md` for the new paths and entry points
 - [ ] T046 [US5] Assert exactly one applicable tree exists — no second directory that can be applied (SC-010)
 
@@ -189,9 +195,11 @@ is no window where a contributor has no working enclave.
 needs an environment that can state it is ready. US5 is last by necessity — it deletes the working
 environment, so everything must be green first.
 
-**Blocking**: Phase 2 (`trust-fabric`) blocks everything. T012's digest blocks US1's comparison.
-T015's substrate blocks it too — SC-001 cannot be verified against a substrate that does not exist.
-T023's verify blocks T024.
+**Blocking**: Phase 2 (`trust-fabric`) blocks everything. T012's digest blocks US1's comparison, and
+T012a blocks trusting it. T015's substrate blocks it too — SC-001 cannot be verified against a
+substrate that does not exist, or one that cannot plan offline. T023's verify blocks T024. T037's
+TLS blocks T038a, and neither is done without the other. **T043a and T043b block T044**: deleting
+the proof directory before its state is migrated orphans 15 live resources.
 
 **Parallel**: T002/T003 in setup; T006–T008 in Phase 2 (different files); T014/T015 across
 substrates; T039/T040 in US4; T047/T048 in polish.
