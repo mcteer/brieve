@@ -12,14 +12,19 @@ requires-python = ">=3.12"
 # Floors raised to match the `adapters` extra (pydantic-ai-slim requires pydantic>=2.12
 # and opentelemetry-api>=1.28) so with-extra and without-extra environments resolve the
 # same versions — specs/004-primary-adapter/research.md.
-# psycopg is a BASE dependency, not an extra: the durability conformance rows are
-# merge-blocking and run against Postgres, so an extra that CI might not install would
-# green the wrong thing (specs/005-durable-execution, T001). psycopg 3, not psycopg2 —
-# the v3 API is what the provider and its credential-refresh path are written against.
-# `[binary]` ships libpq, so contributors need no system package.
+# Postgres driver, a BASE dependency rather than an extra: the durability conformance
+# rows are merge-blocking and run against Postgres, so an extra CI might not install
+# would green the wrong thing (specs/005-durable-execution, T001).
+#
+# pg8000, not psycopg. psycopg 3 was the plan's default choice and is the better-known
+# driver, but it is LGPL-3.0-only, which this repository refuses twice over: it is
+# absent from licenses/allowlist.txt, and scripts/check-licenses.sh hard-denies the GPL
+# family as a second belt. Taking it would mean weakening a governance control to
+# accommodate a dependency, which is backwards. pg8000 is BSD-3-Clause, pure Python
+# (no libpq to install), and DB-API 2.0.
 dependencies = [
     "opentelemetry-api>=1.28",
-    "psycopg[binary]==3.3.4",
+    "pg8000==1.31.5",
     "pydantic>=2.12",
 ]
 
@@ -78,3 +83,9 @@ markers = [
     # gate a human runs against the real stack.
     "enclave: needs a running Vault and Postgres",
 ]
+
+[[tool.mypy.overrides]]
+# pg8000 ships no py.typed marker. The provider wraps it behind typed methods, so the
+# untyped surface stops at the module boundary rather than leaking into core.
+module = ["pg8000.*"]
+ignore_missing_imports = true

@@ -8,7 +8,7 @@ the dev enclave (destroy the Postgres volume and every credential fails auth).
 
 from __future__ import annotations
 
-import psycopg
+import pg8000.dbapi
 import pytest
 
 from core.durability.credentials import (
@@ -30,34 +30,46 @@ class FakeCredentials:
         return DatabaseCredential(f"v-user-{self.fetches}", "unused", f"lease-{self.fetches}")
 
 
-class FakeConn:
+class FakeCursor:
     def __init__(self, fail_with: Exception | None) -> None:
         self._fail_with = fail_with
 
-    def __enter__(self) -> FakeConn:
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        return None
-
-    def execute(self, *args: object, **kwargs: object) -> FakeConn:
+    def execute(self, *args: object, **kwargs: object) -> None:
         if self._fail_with is not None:
             raise self._fail_with
-        return self
 
     def fetchone(self) -> None:
         return None
 
+    def fetchall(self) -> list[object]:
+        return []
 
-def _auth_error() -> psycopg.OperationalError:
-    exc = psycopg.OperationalError("password authentication failed")
-    exc.sqlstate = "28P01"
+    def close(self) -> None:
+        return None
+
+
+class FakeConn:
+    """Minimal DB-API stand-in. autocommit is a plain attribute, as pg8000 has it."""
+
+    def __init__(self, fail_with: Exception | None) -> None:
+        self._fail_with = fail_with
+        self.autocommit = False
+
+    def cursor(self) -> FakeCursor:
+        return FakeCursor(self._fail_with)
+
+    def close(self) -> None:
+        return None
+
+
+def _auth_error() -> Exception:
+    """Shaped the way pg8000 reports a server error: a dict keyed by field letter."""
+    exc: Exception = pg8000.dbapi.DatabaseError({"C": "28P01", "M": "authentication failed"})
     return exc
 
 
-def _network_error() -> psycopg.OperationalError:
-    exc = psycopg.OperationalError("connection refused")
-    exc.sqlstate = "08006"
+def _network_error() -> Exception:
+    exc: Exception = pg8000.dbapi.InterfaceError({"C": "08006", "M": "connection refused"})
     return exc
 
 

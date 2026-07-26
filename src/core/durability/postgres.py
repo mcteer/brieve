@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import psycopg
+import pg8000.dbapi
 
 from core.durability.credentials import (
     CredentialUnavailableError,
@@ -45,39 +45,39 @@ class PostgresDurabilityProvider:
         port: int = 5432,
         dbname: str = "brieve",
         owner_role: str | None = "brieve",
-        connect: Callable[..., psycopg.Connection] | None = None,
+        connect: Callable[..., Any] | None = None,
     ) -> None:
         self._credentials = credentials
         self._host = host
         self._port = port
         self._dbname = dbname
         self._owner = owner_role
-        self._connect = connect or psycopg.connect
+        self._connect = connect or pg8000.dbapi.connect
         self._credential: DatabaseCredential | None = None
 
     # ------------------------------------------------------------------ connection
 
-    def _open(self, *, refresh: bool) -> psycopg.Connection:
+    def _open(self, *, refresh: bool) -> Any:
         if refresh or self._credential is None:
             self._credential = self._credentials.fetch()
         cred = self._credential
         conn = self._connect(
             host=self._host,
             port=self._port,
-            dbname=self._dbname,
+            database=self._dbname,
             user=cred.username,
             password=cred.password,
-            autocommit=True,
         )
+        conn.autocommit = True
         if self._owner:
             # Every credential is a distinct role, so objects created under one are not
             # owned by the next — migrations then fail with "must be owner of table" the
             # first time a lease rolls over. Acting as the shared parent role keeps a
             # single owner across the whole credential lifecycle.
-            conn.execute(f'SET ROLE "{self._owner}"')
+            _exec(conn, f'SET ROLE "{self._owner}"')
         return conn
 
-    def _execute(self, work: Callable[[psycopg.Connection], Any]) -> Any:
+    def _execute(self, work: Callable[[Any], Any]) -> Any:
         """Run ``work``, refreshing the credential once on an authentication failure.
 
         The retry is bounded deliberately, and only on authentication errors. An
@@ -87,29 +87,35 @@ class PostgresDurabilityProvider:
         credential fails auth. That must read as a failure, not a hang.
         """
         for attempt in (0, 1):
+            conn = None
             try:
-                with self._open(refresh=attempt == 1) as conn:
-                    return work(conn)
-            except psycopg.OperationalError as exc:
-                if attempt == 0 and _is_auth_failure(exc):
-                    continue
-                raise DurabilityStoreError(f"durability store unavailable: {exc}") from exc
+                conn = self._open(refresh=attempt == 1)
+                return work(conn)
             except CredentialUnavailableError:
                 raise
-            except psycopg.Error as exc:
+            except Exception as exc:
+                if attempt == 0 and _is_auth_failure(exc):
+                    continue
                 raise DurabilityStoreError(f"durability store error: {exc}") from exc
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:  # noqa: BLE001 - close failures must not mask the real error
+                        pass
         raise DurabilityStoreError("durability store unreachable after credential refresh")
 
     def migrate(self) -> None:
         """Apply the schema. Idempotent — every statement is IF NOT EXISTS."""
         sql = SCHEMA_PATH.read_text()
-        self._execute(lambda conn: conn.execute(sql))
+        self._execute(lambda conn: _exec(conn, sql))
 
     # ------------------------------------------------------------------ checkpoints
 
     def save(self, blob: CheckpointBlob) -> None:
-        def work(conn: psycopg.Connection) -> None:
-            conn.execute(
+        def work(conn: Any) -> None:
+            _exec(
+                conn,
                 """
                 INSERT INTO checkpoints
                     (blob_id, payload, correlation_id, grant_id, step_index,
@@ -140,15 +146,16 @@ class PostgresDurabilityProvider:
         self._execute(work)
 
     def load(self, blob_id: str) -> CheckpointBlob | None:
-        def work(conn: psycopg.Connection) -> CheckpointBlob | None:
-            row = conn.execute(
+        def work(conn: Any) -> CheckpointBlob | None:
+            row = _one(
+                conn,
                 """
                 SELECT payload, correlation_id, grant_id, step_index, written_by,
                        run_state, stop_reason
                 FROM checkpoints WHERE blob_id = %s
                 """,
                 (blob_id,),
-            ).fetchone()
+            )
             if row is None:
                 return None
             payload, correlation_id, grant_id, step_index, written_by, state, reason = row
@@ -168,8 +175,9 @@ class PostgresDurabilityProvider:
     # ----------------------------------------------------------------------- lease
 
     def acquire_lease(self, run_id: str, holder_identity: str) -> None:
-        def work(conn: psycopg.Connection) -> None:
-            conn.execute(
+        def work(conn: Any) -> None:
+            _exec(
+                conn,
                 """
                 INSERT INTO run_leases (run_id, holder_identity)
                 VALUES (%s, %s)
@@ -183,10 +191,8 @@ class PostgresDurabilityProvider:
         self._execute(work)
 
     def check_lease(self, run_id: str, holder_identity: str) -> bool:
-        def work(conn: psycopg.Connection) -> bool:
-            row = conn.execute(
-                "SELECT holder_identity FROM run_leases WHERE run_id = %s", (run_id,)
-            ).fetchone()
+        def work(conn: Any) -> bool:
+            row = _one(conn, "SELECT holder_identity FROM run_leases WHERE run_id = %s", (run_id,))
             return row is not None and row[0] == holder_identity
 
         return bool(self._execute(work))
@@ -194,8 +200,9 @@ class PostgresDurabilityProvider:
     # --------------------------------------------------------------------- bracket
 
     def record_intent(self, record: IntentRecord) -> None:
-        def work(conn: psycopg.Connection) -> None:
-            conn.execute(
+        def work(conn: Any) -> None:
+            _exec(
+                conn,
                 """
                 INSERT INTO intents (run_id, idempotency_key, step_index, tool_name, recorded_at)
                 VALUES (%s, %s, %s, %s, %s)
@@ -213,8 +220,9 @@ class PostgresDurabilityProvider:
         self._execute(work)
 
     def record_result(self, record: ResultRecord) -> None:
-        def work(conn: psycopg.Connection) -> None:
-            conn.execute(
+        def work(conn: Any) -> None:
+            _exec(
+                conn,
                 """
                 INSERT INTO results (run_id, idempotency_key, step_index, recorded_at)
                 VALUES (%s, %s, %s, %s)
@@ -231,8 +239,9 @@ class PostgresDurabilityProvider:
         self._execute(work)
 
     def open_intents(self, run_id: str) -> list[IntentRecord]:
-        def work(conn: psycopg.Connection) -> list[IntentRecord]:
-            rows = conn.execute(
+        def work(conn: Any) -> list[IntentRecord]:
+            rows = _all(
+                conn,
                 """
                 SELECT i.run_id, i.step_index, i.tool_name, i.idempotency_key, i.recorded_at
                 FROM intents i
@@ -242,7 +251,7 @@ class PostgresDurabilityProvider:
                 ORDER BY i.step_index
                 """,
                 (run_id,),
-            ).fetchall()
+            )
             return [
                 IntentRecord(
                     run_id=row[0],
@@ -258,11 +267,50 @@ class PostgresDurabilityProvider:
         return list(result)
 
 
-def _is_auth_failure(exc: Exception) -> bool:
-    """SQLSTATE 28xxx is the authentication class.
+def _run(cursor: Any, sql: str, params: tuple[Any, ...] | None) -> None:
+    """pg8000 rejects an explicit ``None`` for parameters, unlike psycopg — it tries to
+    take ``len()`` of it. Omit the argument entirely instead."""
+    if params is None:
+        cursor.execute(sql)
+    else:
+        cursor.execute(sql, params)
 
-    Matched on the code rather than the message so a localised or reworded server
-    string cannot silently turn a refresh into a hard failure.
+
+def _exec(conn: Any, sql: str, params: tuple[Any, ...] | None = None) -> None:
+    cursor = conn.cursor()
+    try:
+        _run(cursor, sql, params)
+    finally:
+        cursor.close()
+
+
+def _one(conn: Any, sql: str, params: tuple[Any, ...] | None = None) -> Any:
+    cursor = conn.cursor()
+    try:
+        _run(cursor, sql, params)
+        return cursor.fetchone()
+    finally:
+        cursor.close()
+
+
+def _all(conn: Any, sql: str, params: tuple[Any, ...] | None = None) -> list[Any]:
+    cursor = conn.cursor()
+    try:
+        _run(cursor, sql, params)
+        rows: list[Any] = cursor.fetchall()
+        return rows
+    finally:
+        cursor.close()
+
+
+def _is_auth_failure(exc: Exception) -> bool:
+    """SQLSTATE class 28 is authentication.
+
+    Matched on the code rather than the message so a localised or reworded server string
+    cannot silently turn a refresh into a hard failure. pg8000 reports the server error
+    as a dict in ``args[0]`` keyed by field letter, where ``C`` is the SQLSTATE.
     """
     sqlstate = getattr(exc, "sqlstate", None)
+    if sqlstate is None and exc.args and isinstance(exc.args[0], dict):
+        sqlstate = exc.args[0].get("C")
     return bool(sqlstate and str(sqlstate).startswith("28"))
