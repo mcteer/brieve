@@ -12,8 +12,14 @@ requires-python = ">=3.12"
 # Floors raised to match the `adapters` extra (pydantic-ai-slim requires pydantic>=2.12
 # and opentelemetry-api>=1.28) so with-extra and without-extra environments resolve the
 # same versions — specs/004-primary-adapter/research.md.
+# psycopg is a BASE dependency, not an extra: the durability conformance rows are
+# merge-blocking and run against Postgres, so an extra that CI might not install would
+# green the wrong thing (specs/005-durable-execution, T001). psycopg 3, not psycopg2 —
+# the v3 API is what the provider and its credential-refresh path are written against.
+# `[binary]` ships libpq, so contributors need no system package.
 dependencies = [
     "opentelemetry-api>=1.28",
+    "psycopg[binary]==3.3.4",
     "pydantic>=2.12",
 ]
 
@@ -25,6 +31,7 @@ dependencies = [
 adapters = [
     "pydantic-ai-slim==2.18.0",
 ]
+
 
 [dependency-groups]
 dev = [
