@@ -51,8 +51,12 @@ up a licensed Vault Enterprise.
 Stated plainly rather than papered over: **no required check covers these rows.** Nothing
 in GitHub stops a merge that breaks them.
 
+**Responsible party (constitution v1.1.0): the agent harness in the IDE.** Named here
+because the constitution now requires a blocking row with no automated runner to record
+who runs it *in this contract*, rather than leaving it to whoever remembers.
+
 Calling them "merge-blocking locally" would dress a convention up as a control. What
-actually closes the gap is the **agent harness**: `AGENTS.md` instructs it to bring the
+actually closes the gap is that harness: `AGENTS.md` instructs it to bring the
 enclave up and run `make conformance` before merging anything touching durability,
 sealed core, an adapter, a provider, or `infra/` — and to refuse the merge and report the
 gap if it cannot. The mechanism is an instruction the harness follows, which means it is
