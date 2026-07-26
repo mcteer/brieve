@@ -147,15 +147,27 @@ travels through ordered stages, each producing a reviewable artifact under
 
 1. **`/speckit.specify`** — the specification: *what* and *why*, never *how*. Must
    declare which mandated requirements (R1–R17) and ADRs it implements or touches, and
-   its evidence class where compliance-relevant.
-2. **`/speckit.clarify`** — resolve the spec's open questions before planning.
+   its evidence class where compliance-relevant. *Run by the IDE harness, from the
+   context already in the repository — ADRs, roadmap, and prior specs.*
+2. **`/speckit.clarify`** — resolve the spec's open questions before planning. *Run by
+   the IDE harness.* Clarify **describes what the spec covers**; it is not where
+   architecture is decided. A technology choice, a new core package, or anything that
+   changes what contributors or CI must install belongs to the developer, raised as a
+   question rather than resolved as a clarification.
 3. **`/speckit.plan`** — the technical plan. Begins with a **Constitution Check**; a plan
-   that fails it does not proceed, it gets redesigned or the spec is withdrawn.
-4. **`/speckit.tasks`** — the ordered task list derived from the plan.
+   that fails it does not proceed, it gets redesigned or the spec is withdrawn. *Run by
+   the developer.*
+4. **`/speckit.tasks`** — the ordered task list derived from the plan. *Run by the
+   developer.*
 5. **`/speckit.analyze`** — consistency check across spec/plan/tasks. Findings that
-   implicate a constitutional principle block implementation.
+   implicate a constitutional principle block implementation. *Run by the developer.*
 6. **`/speckit.implement`** — only now does code get written, against the analyzed task
-   list.
+   list. *Run by the developer, after the planning PR has merged.*
+
+**Why the stages are split that way.** Specify and clarify describe; plan, tasks, and
+analyze commit to a design; implement commits to code. The stages that commit are invoked
+by a person, so advancing is a decision rather than a side effect of the harness finishing
+the previous stage.
 
 **Reviewing a spec.** Six questions, learned from the first feature cycles — a spec
 that passes all six is usually sound; a "no" on any is a finding to raise, not a nit:
@@ -179,14 +191,25 @@ When clarification markers are resolved, the checklist notes record *how*: answe
 directly by a human, or resolved by an agent under explicit delegation and reviewed
 afterward. Both are legitimate; an unrecorded resolution is neither.
 
-**The spec PR precedes the implementation PR.** Specs are reviewed and merged as their
-own pull requests; the implementation PR links its governing spec. This is not ceremony
-— it is how a reviewer distinguishes "the design is wrong" from "the code doesn't match
-the design," and how the two get fixed in the right place.
+**The planning PR precedes the implementation PR.** Stages 1–5 — specify, clarify, plan,
+tasks, analyze — travel together in **one planning PR** on `spec/NNN-short-name`.
+Implementation is a separate PR on `feat/NNN-short-name`, which links its governing spec.
+This is not ceremony — it is how a reviewer distinguishes "the design is wrong" from "the
+code doesn't match the design," and how the two get fixed in the right place.
+
+Keeping the planning stages in one PR is deliberate. They are not independently
+reviewable: a plan is judged against its spec, a task list against its plan, and analyze
+audits the three together. Splitting them asks a reviewer to approve a plan whose spec
+they cannot see in the same diff, and leaves the tree in a state where `/speckit-analyze`
+has nothing consistent to check. Merge the planning PR when analyze comes back with
+nothing above LOW.
 
 **Working with the generated artifacts**: files under `specs/` are authored through the
 command flow, not hand-edited afterward — if a spec needs to change, re-run the stage so
-plan and tasks stay consistent. Agent command directories (`.claude/`, `.cursor/`, etc.)
+plan and tasks stay consistent. **One standing exception**: a landing feature must update
+the conformance contracts of *earlier* features whose deferred rows it puts in force
+(ADR-0047). That edit is a required part of the later feature's change, not a stray
+hand-edit — a deferral list that goes stale reads as a gap nobody noticed. Agent command directories (`.claude/`, `.cursor/`, etc.)
 are per-developer and gitignored; `.specify/` is committed and governed. Amendments to
 the constitution itself follow its Governance section: PR against
 `.specify/memory/constitution.md` with a Sync Impact Report, citing motivating ADRs,
@@ -412,8 +435,9 @@ Trunk-based, short-lived branches. `main` is protected: no direct pushes, always
 releasable, linear history via squash-merge.
 
 - **Naming declares the class and its governing artifact**: `spec/NNN-short-name` for a
-  spec PR; `feat/NNN-short-name` for its implementation — same NNN, and `feat/NNN` does
-  not open until `spec/NNN` has merged; `fix/issue-NNN`, `docs/…`, `chore/…` for the rest.
+  planning PR — carrying spec, plan, and tasks together; `feat/NNN-short-name` for its
+  implementation — same NNN, and `feat/NNN` does not open until `spec/NNN` has merged;
+  `fix/issue-NNN`, `docs/…`, `chore/…` for the rest.
   Keep feature branches alive for days, not weeks — if one is aging, the spec's task
   breakdown was too coarse; split it.
 - **Release branches per channel**: `release/vX.Y` is cut from `main` at each release
@@ -435,8 +459,8 @@ releasable, linear history via squash-merge.
   history lives in `main`.
 - **Spec Kit tooling note**: the `specify` scripts create a single `NNN-short-name`
   branch. This repository keeps the two-branch convention — rename the generated
-  branch to `spec/NNN-short-name`, and open `feat/NNN-short-name` only after the spec
-  PR merges.
+  branch to `spec/NNN-short-name`, run the remaining planning stages on it, and open
+  `feat/NNN-short-name` only after the planning PR merges.
 
 ## Testing expectations
 

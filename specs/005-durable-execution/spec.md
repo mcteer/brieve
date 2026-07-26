@@ -32,6 +32,15 @@ taken; none is a redesign. Sources: ADR-0048, ROADMAP.md, CONTRIBUTING.md.
 - Q: Does this feature still stand alone? → A: No. It depends on the local-environment feature (see ROADMAP.md; not yet specified, so it has no number) landing first, which stands up Terraform → Vault → Nomad → harness and makes `make dev-up` real.
 - Q: How does a workload authenticate to Postgres? → A: Dynamic, per-workload credentials issued by Vault. The static password in the dev jobspec is a placeholder; a standing shared credential contradicts Principle IV.
 
+### Session 2026-07-25 (analyze pass)
+
+Recorded from `/speckit-analyze` on the planning branch. The first is a requirement the design
+needed and the spec did not state; the second is vocabulary.
+
+- Q: FR-017a mandates dynamic credentials but says nothing about what happens when one expires mid-run. What is required? → A: A credential ending MUST NOT fail the run. The provider obtains a fresh credential and retries once, on authentication failure only, and surfaces a second failure. Reactive rather than clock-driven — the database's rejection is the authoritative signal, and it also covers a credential revoked early or a database restarted underneath the run. Recorded as FR-017b, because the behaviour was implemented by the plan while no requirement mandated it.
+- Q: Where do durability tests execute — inside a Nomad allocation or on the host? → A: In an allocation. Not a new decision: the harness needs a Vault-issued database credential (FR-017a), its only route to Vault is Nomad workload identity (ADR-0048), and a host process has none. The workload performs the exchange itself rather than Nomad brokering the secret into the task — a brokered secret sits in the task's environment for the life of the allocation and renews on Nomad's schedule, which would make FR-017b's refresh-on-rejection unimplementable. The database policy attaches to the workload identity, never to an agent's per-step authority.
+- Q: "Re-authenticate" was being used both for the run re-attesting to Vault and for the provider reconnecting to Postgres. Which keeps the term? → A: The run. The database-side behaviour is "credential refresh". A security guarantee and a connection retry must not share a name.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - An interrupted run resumes without re-doing its work (Priority: P1)
@@ -288,6 +297,12 @@ provider could be substituted without rewriting them.
 - **FR-017a**: Workload access to Postgres MUST use short-lived, per-workload credentials issued
   under the workload's own identity. A shared standing database credential MUST NOT be introduced;
   the static password in the dev jobspec is a bootstrap placeholder, not a design.
+- **FR-017b**: A database credential expiring or being revoked mid-run MUST NOT fail the run. The
+  platform MUST obtain a fresh credential and retry, and MUST bound that retry — one refresh per
+  operation, triggered only by an authentication failure, with a second failure surfaced rather
+  than retried. This MUST remain distinct from consent expiry: a credential ending is plumbing and
+  refreshes silently, while a grant ending parks the run (FR-005). A run designed to outlive a
+  credential lifetime is the ordinary case, not an edge case.
 - **FR-018**: Core changes in this feature are bounded to the durability and authority seams
   named above — checkpoint schema and provider protocol, grant lifetime and per-step
   manufacture, lease and fencing, execution bounds, and the intent/result bracket. Any other
@@ -307,8 +322,13 @@ provider could be substituted without rewriting them.
 - **Run lease**: The single-writer claim on a run, with fencing such that a superseded holder's
   writes are rejected.
 - **Execution bounds**: Maximum duration, step limit, and stuck-wait watchdog.
-- **Parked run**: A run stopped awaiting something only a human can supply — fresh consent, or
-  resolution of a step whose outcome cannot be observed.
+- **Run outcome**: A run ends in one of three ways that must stay distinguishable — it completed
+  its work, it was stopped by an execution bound with the reason recorded, or it **parked**
+  awaiting something only a human can supply (fresh consent, or resolution of a step whose outcome
+  cannot be observed). A parked run is resumable; a bounded one is not, or the bound meant nothing.
+- **Database credential**: How the platform reaches its own state store — Vault-minted, per
+  workload, refreshed on rejection. Distinct from per-step authority, which bounds what the *agent*
+  may do.
 - **Durability provider**: The implementation behind the seam. Interchangeable without changing
   any guarantee in this spec.
 
@@ -343,7 +363,9 @@ provider could be substituted without rewriting them.
 
 - This feature ships as **durability and long-running-execution semantics plus conformance
   scenarios**, on top of landed 002, 003, and 004 **and the local environment** (see ROADMAP.md —
-  not yet specified, so it has no number), which must land first. Model providers and managed-product APIs remain fakes — they are outside
+  not yet specified, so it has no number), which must land first. The durability suite runs as a
+  Nomad job, so the test process holds a workload identity of its own and the attestation path is
+  exercised by the tests rather than sitting adjacent to them. Model providers and managed-product APIs remain fakes — they are outside
   our boundary. **Vault and Postgres are not fakes**: they are components this project deploys,
   and the guarantees are proven against the real ones.
 - The durability seam, `CheckpointBlob`, and the in-memory provider introduced by 004 are the

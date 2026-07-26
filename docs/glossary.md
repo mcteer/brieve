@@ -16,7 +16,13 @@ day-2 operations. (Not to be confused with Pydantic AI's library of the same nam
 
 **Harness core** — the framework-agnostic majority of the codebase: identity, hook
 pipeline, MCP client, policy, durability, telemetry, registry clients, pack loader.
-The core never imports an agent framework.
+The core never imports an agent framework. It is the layer that authenticates to Vault
+and records run state; the agent above it does neither.
+
+**Test harness** (`tests/harness/`) — a *different thing entirely*: the fakes, fixtures,
+and assertion helpers tests import, under its own semver seam promise. Nothing to do
+with the Harness the product is. When both are in play, write "test harness" for this
+one and never bare "harness".
 
 **Enclave** — the default deployment topology (ADR-0025): an isolated, self-scaffolded
 Nomad + control-plane Vault + Postgres cluster, built by the project's own Terraform,
@@ -241,3 +247,23 @@ objects **"capabilities."** In this project, **the Harness** is our governed run
 and **capability packs** are our product-knowledge bundles — realized *as* one or more
 Pydantic AI capability objects by the adapter. When ambiguity is possible, write
 "Pydantic AI Harness" / "framework capability" for theirs.
+
+**"Harness" has a third sense inside this repository**, and it is the one most likely to
+mislead: `tests/harness/` is the test-double package. So the word can mean the product,
+their capability library, or our test fixtures.
+
+The distinction is not pedantic — it decides which layer holds a credential. One process
+runs inside the Nomad allocation and contains three layers:
+
+```text
+Nomad allocation
+└── container
+    └── ONE process — "the Harness"
+        ├── harness core      ← authenticates to Vault, records run state
+        ├── adapter           ← maps the framework's concepts onto core
+        └── agent (framework) ← chooses tools; holds no credential, touches no store
+```
+
+An agent is not a harness. Reasoning about credentials with the layers collapsed is how
+you end up believing the agent can reach its own state store — which it cannot, and must
+not.
