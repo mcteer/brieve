@@ -47,3 +47,7 @@
 - Resolution method: answered by the agent under standing delegation, per CONTRIBUTING's
   spec-driven workflow. None required an architectural decision; the contradiction was resolved
   toward the stricter of two already-merged statements rather than by choosing a new direction.
+
+- Plan (2026-07-25) settled FR-010: TLS and bootstrap-credential revocation implemented, unseal as a
+  seam, high availability deferred with a named trigger. The HA deferral keeps 005's single-node
+  conformance caveat alive, which the plan, the bring-up contract, and the roadmap all state.
