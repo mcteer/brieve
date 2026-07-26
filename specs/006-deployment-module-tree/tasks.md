@@ -139,7 +139,7 @@ is no window where a contributor has no working enclave.
 - [X] T033 [US2] Point `make conformance` at the job — submit, stream, surface the exit status. The honest cost is worse failure output through allocation logs; surface it well rather than pretend it is free
 - [X] T034 [US2] [GATE:fail-closed] Assert a run outside an allocation fails naming the absent workload identity, with no fallback (SC-004, FR-007)
 - [X] T035 [US2] [GATE:conformance] Assert all seven durability rows still pass in their new home, against both providers
-- [ ] T036 [US2] [GATE:determinism] Update `tests/unit/test_no_live_dependencies.py` — `ENCLAVE_PATHS` shrinks as the conftest stops reaching Vault directly. The list is an explicit allowlist, so it must shrink when the reason for an entry does
+- [X] T036 [US2] [GATE:determinism] Update `tests/unit/test_no_live_dependencies.py` — `ENCLAVE_PATHS` shrinks as the conftest stops reaching Vault directly. The list is an explicit allowlist, so it must shrink when the reason for an entry does
 
 **Checkpoint**: Scenario E green; SC-002, SC-003, SC-004 hold. The last static token is gone.
 
@@ -168,13 +168,13 @@ is no window where a contributor has no working enclave.
 
 **Independent Test**: quickstart Scenarios F and H
 
-- [ ] T042 [US5] Move the six-entry failure catalogue from `infra/dev-enclave/README.md` into `infra/README.md`, keeping for each the condition, the symptom, **and where the symptom points instead of its cause** — that last column is why they cost time
-- [ ] T043 [US5] [GATE:fail-closed] For each catalogue entry, add prevention or detection that names the **cause**, not the symptom (FR-013, SC-009)
+- [X] T042 [US5] Move the six-entry failure catalogue from `infra/dev-enclave/README.md` into `infra/README.md`, keeping for each the condition, the symptom, **and where the symptom points instead of its cause** — that last column is why they cost time
+- [X] T043 [US5] [GATE:fail-closed] For each catalogue entry, add prevention or detection that names the **cause**, not the symptom (FR-013, SC-009)
 - [X] T043a [US5] **Migrate Terraform state out of `infra/dev-enclave/` before anything is deleted.** That state tracks 15 live resources — the running trust-store container, both named volumes, and every mount, role, policy and registry entry. Deleting the directory orphans them, and the new dev root then tries to create a container whose name is taken and mounts that already exist. Either `terraform state mv` each resource into `infra/environments/dev/`, or destroy and rebuild — and if rebuilding, say plainly that the volumes go with it, which means re-initialising the trust store and writing new credentials to `.env`. **This failure has already happened twice in this repository**; it is not hypothetical
 - [X] T043b [US5] [GATE:fail-closed] After migration, assert the new root plans clean against the running environment — no creates for resources that already exist. That is the check that would have caught both prior occurrences
-- [ ] T044 [US5] **Delete `infra/dev-enclave/`** (FR-015, SC-010). Only after Phases 4–7 are green **and T043a/T043b have run**: deleting the working environment before its replacement is verified would leave contributors with none, and deleting it before its state is migrated would leave the resources unmanaged
-- [ ] T045 [US5] Update `CONTRIBUTING.md`, `docs/development/testing.md`, and `ROADMAP.md` for the new paths and entry points
-- [ ] T046 [US5] Assert exactly one applicable tree exists — no second directory that can be applied (SC-010)
+- [X] T044 [US5] **Delete `infra/dev-enclave/`** (FR-015, SC-010). Only after Phases 4–7 are green **and T043a/T043b have run**: deleting the working environment before its replacement is verified would leave contributors with none, and deleting it before its state is migrated would leave the resources unmanaged
+- [X] T045 [US5] Update `CONTRIBUTING.md`, `docs/development/testing.md`, and `ROADMAP.md` for the new paths and entry points
+- [X] T046 [US5] Assert exactly one applicable tree exists — no second directory that can be applied (SC-010)
 
 **Checkpoint**: Scenarios F and H green; SC-009 and SC-010 hold.
 
@@ -182,7 +182,7 @@ is no window where a contributor has no working enclave.
 
 ## Phase 9: Polish
 
-- [ ] T047 [P] Complete and review `infra/README.md` — fill the sections T015, T040, and T042 did not, and check the whole reads as one document rather than four appends. **Do not rewrite it**: the substrate rationale, the HA deferral, and the failure catalogue are already there and are the parts worth keeping
+- [X] T047 [P] Complete and review `infra/README.md` — fill the sections T015, T040, and T042 did not, and check the whole reads as one document rather than four appends. **Do not rewrite it**: the substrate rationale, the HA deferral, and the failure catalogue are already there and are the parts worth keeping
 - [ ] T048 [P] Document in `contracts/substrate-requirements.md` terms what Kubernetes would have to demonstrate — the same conformance assertions, not an analogous story (FR-014)
 - [ ] T049 [GATE:no-secret-leak] Sweep state, outputs, digests, and entry-point logs for credential material. `.env` values are quoted, and passing the quotes through once made the trust store reject its licence with an error that named neither quoting nor the licence
 - [ ] T050 Review the diff against the scope bound: `src/` untouched, one deletion in `tests/`. Anything else is out of scope for this feature

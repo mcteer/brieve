@@ -21,9 +21,15 @@ env_val() { grep "^$1=" "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed 
 printf '\033[1m==>\033[0m Bring-up contract\n'
 
 # 1 — scheduler reachable with a leader
-curl -sf -o /dev/null --max-time 3 "$NOMAD_ADDR/v1/status/leader" \
-  && ok "scheduler reachable, leader elected" \
-  || bad "scheduler unreachable at $NOMAD_ADDR"
+# Leader AND a ready client node. A leader alone answers happily while nothing can be
+# placed — the failure that presents as a job stuck at "running" with no allocation.
+ready="$(curl -sf --max-time 3 "$NOMAD_ADDR/v1/nodes" 2>/dev/null \
+  | python3 -c 'import json,sys; print(sum(1 for n in json.load(sys.stdin) if n.get("Status")=="ready"))' 2>/dev/null || echo 0)"
+if [ "$ready" -ge 1 ] 2>/dev/null; then
+  ok "scheduler reachable, $ready client node(s) ready"
+else
+  bad "scheduler has no ready client node — jobs will register and never place. Check the advertised RPC address in infra/nomad/client.hcl"
+fi
 
 # 2 — trust store reachable AND unsealed
 seal="$(vault status -format=json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print("unsealed" if not d["sealed"] else "sealed")' 2>/dev/null || echo unreachable)"

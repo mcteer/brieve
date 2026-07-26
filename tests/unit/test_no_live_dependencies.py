@@ -71,7 +71,12 @@ DENIED_OUTSIDE_ENCLAVE_PATHS = frozenset(
 #: than a directory glob: adding a module here should be a visible decision.
 ENCLAVE_PATHS = frozenset(
     {
-        "conformance/durability/conftest.py",
+        # The conformance conftest is NO LONGER here. It used to reach Vault over HTTP
+        # with a development token; it now obtains credentials the way the harness does,
+        # by presenting a workload identity, so it needs no HTTP client of its own.
+        #
+        # The list shrank because the reason for an entry went away. An allowlist that
+        # only ever grows is not an allowlist.
         "component/test_resume_cross_process.py",
     }
 )

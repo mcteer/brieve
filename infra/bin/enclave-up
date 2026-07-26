@@ -55,18 +55,28 @@ ok "tooling, Docker, licence, environment root"
 # ---------------------------------------------------------------- 1. scheduler
 # First: the trust store fetches the scheduler's JWKS at configure time, and the
 # scheduler runs the state store. An inverted order fails at cold start.
+# A leader answering is NOT enough. The agent can keep serving HTTP while its client
+# node is down — which is what happens when the advertised RPC address goes stale after
+# a network change. Jobs then register, report "running", and never place an allocation,
+# so anything waiting on the workload waits forever.
+scheduler_ready() {
+  curl -sf --max-time 3 "$NOMAD_ADDR/v1/nodes" 2>/dev/null \
+    | python3 -c 'import json,sys; print(any(n.get("Status")=="ready" for n in json.load(sys.stdin)))' 2>/dev/null \
+    | grep -q True
+}
+
 say "Scheduler"
-if curl -sf -o /dev/null --max-time 3 "$NOMAD_ADDR/v1/status/leader"; then
-  ok "already running"
+if scheduler_ready; then
+  ok "already running, with a ready client node"
 else
   # The container driver refuses volume mounts unless the AGENT enables them. A correct
   # jobspec fails anyway, with a message pointing at the jobspec.
   nohup nomad agent -dev -bind 0.0.0.0 -config="$REPO/infra/nomad/client.hcl" \
     > "${TMPDIR:-/tmp}/brieve-nomad.log" 2>&1 &
-  for _ in $(seq 1 30); do curl -sf -o /dev/null --max-time 2 "$NOMAD_ADDR/v1/status/leader" && break; sleep 1; done
-  curl -sf -o /dev/null --max-time 2 "$NOMAD_ADDR/v1/status/leader" \
-    || die "scheduler did not come up — log: ${TMPDIR:-/tmp}/brieve-nomad.log"
-  ok "started"
+  for _ in $(seq 1 45); do scheduler_ready && break; sleep 1; done
+  scheduler_ready \
+    || die "scheduler has no ready client node — log: ${TMPDIR:-/tmp}/brieve-nomad.log. A stale advertised RPC address is the usual cause; see infra/nomad/client.hcl"
+  ok "started, client node ready"
 fi
 
 # ---------------------------------------------------------------- 2. state store
