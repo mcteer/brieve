@@ -343,3 +343,30 @@ conformance` for the suites, `make test-full` for the PR tier. CI is not a debug
   the test to satisfy the assertion (a zero-count dummy, a fixture that trivially
   matches) proves nothing and reads as coverage. Assert against the artifact the
   scenario actually produced.
+
+## The durability lane is not hermetic
+
+Every suite before `specs/005-durable-execution` ran with no operated service. The
+durability lane does not, and the difference is deliberate: Vault and Postgres are
+components this project deploys, so faking them would mean the durability guarantees
+ship unproven against what they actually run on.
+
+```bash
+make dev-up        # Terraform -> Vault -> Nomad -> Postgres
+make conformance   # includes the seven durability rows
+```
+
+**It fails loudly when the enclave is absent**, rather than skipping. A skipped
+guarantee reads exactly like a passing one in a test summary, which is worse than a red
+lane.
+
+What survives of the old determinism rule is narrower and still absolute: no live model
+provider, no live managed-product API, and disruption simulated in-process rather than
+by terminating real infrastructure. `tests/unit/test_no_live_dependencies.py` encodes
+the distinction — one list banned everywhere, one permitted only in the modules that
+talk to our own enclave.
+
+One scenario crosses a genuine process boundary
+(`tests/component/test_resume_cross_process.py`). Restarting a test process is not
+terminating infrastructure; an entirely in-process suite would prove the code reloads
+its own state, not that the state survived anything.

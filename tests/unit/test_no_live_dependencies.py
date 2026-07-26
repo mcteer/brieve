@@ -1,5 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
-"""GATE:determinism — FR-012, asserted rather than assumed.
+"""GATE:determinism — FR-012 (004) and FR-016 (005), asserted rather than assumed.
+
+**The rule changed shape in 005 and this file is where that is encoded.** Every feature
+before it asserted "no operated service"; durable execution *requires* Vault and
+Postgres, because they are components this project deploys and substituting them would
+mean the guarantees ship unproven against what they actually run on.
+
+What survives is narrower, and still absolute: no live model provider, no live
+managed-product API, and no disruption simulated by terminating real infrastructure.
+Written as two lists rather than one so the distinction is visible — a future reader
+must be able to tell "this client is banned everywhere" from "this client is allowed
+only where it talks to our own enclave".
 
 Two checks, because neither alone is sufficient:
 
@@ -28,8 +39,23 @@ from tests.harness.adapter_fixtures import scripted_tool_model
 
 TESTS_ROOT = Path(__file__).resolve().parents[1]
 
-#: Clients that would reach a live model, IdP, Vault, or product API.
-DENIED_IMPORTS = frozenset(
+#: Banned everywhere, without exception: a live model provider or managed-product API.
+#: These are outside our boundary, so a test reaching for one is reaching outside the
+#: system under test (FR-016, SC-010).
+DENIED_EVERYWHERE = frozenset(
+    {
+        "openai",
+        "anthropic",
+        "google.generativeai",
+        "boto3",
+    }
+)
+
+#: Generic HTTP and Vault clients. Banned in ordinary tests, permitted only in the
+#: modules below, which talk to the local enclave — our own Vault and Postgres. A
+#: blanket ban here would now be *wrong*, and would push the durability rows back to
+#: fakes, which is the substitution this project rejects.
+DENIED_OUTSIDE_ENCLAVE_PATHS = frozenset(
     {
         "httpx",
         "httpcore",
@@ -38,10 +64,15 @@ DENIED_IMPORTS = frozenset(
         "urllib3",
         "aiohttp",
         "hvac",
-        "openai",
-        "anthropic",
-        "google.generativeai",
-        "boto3",
+    }
+)
+
+#: Exactly the modules that may reach the enclave. Deliberately an explicit list rather
+#: than a directory glob: adding a module here should be a visible decision.
+ENCLAVE_PATHS = frozenset(
+    {
+        "conformance/durability/conftest.py",
+        "component/test_resume_cross_process.py",
     }
 )
 
@@ -56,17 +87,65 @@ def _imported_names(tree: ast.AST) -> set[str]:
     return names
 
 
-def test_no_test_module_imports_a_live_client() -> None:
+def test_no_test_module_imports_a_live_model_or_product_client() -> None:
+    """No exceptions, no allowlist. These are outside our boundary."""
     offenders: list[str] = []
     for path in TESTS_ROOT.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for name in _imported_names(tree):
-            root = name.split(".")[0]
-            if name in DENIED_IMPORTS or root in DENIED_IMPORTS:
+            if name in DENIED_EVERYWHERE or name.split(".")[0] in DENIED_EVERYWHERE:
                 offenders.append(f"{path.relative_to(TESTS_ROOT)}: {name}")
     assert not offenders, (
-        f"test modules reach for live clients: {offenders}. "
-        "Tests use stub models and harness fakes only (FR-012)."
+        f"test modules reach for a live model or product API: {offenders}. "
+        "Those are outside our boundary and are faked (FR-016, SC-010)."
+    )
+
+
+def test_http_clients_appear_only_where_they_reach_our_own_enclave() -> None:
+    offenders: list[str] = []
+    for path in TESTS_ROOT.rglob("*.py"):
+        relative = str(path.relative_to(TESTS_ROOT))
+        if relative in ENCLAVE_PATHS:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for name in _imported_names(tree):
+            if (
+                name in DENIED_OUTSIDE_ENCLAVE_PATHS
+                or name.split(".")[0] in DENIED_OUTSIDE_ENCLAVE_PATHS
+            ):
+                offenders.append(f"{relative}: {name}")
+    assert not offenders, (
+        f"HTTP clients outside the enclave paths: {offenders}. Reaching the local Vault "
+        "or Postgres is expected in 005; reaching anything else is not. If this module "
+        "genuinely talks to the enclave, add it to ENCLAVE_PATHS as a visible decision."
+    )
+
+
+def test_no_test_terminates_real_infrastructure() -> None:
+    """SC-010: disruption is simulated, never inflicted.
+
+    The cross-process scenario spawns an interpreter, which is fine — restarting a test
+    process is not terminating infrastructure. Killing a container or a Nomad job is.
+    """
+    # Assembled so this module does not itself contain the banned literals — the same
+    # trick tests/unit/test_core_import.py uses, and for the same reason.
+    banned = (
+        "docker " + "stop",
+        "docker " + "kill",
+        "docker " + "rm",
+        "nomad job " + "stop",
+        "SIG" + "KILL",
+        "pk" + "ill",
+    )
+    offenders: list[str] = []
+    for path in TESTS_ROOT.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for needle in banned:
+            if needle in text:
+                offenders.append(f"{path.relative_to(TESTS_ROOT)}: {needle}")
+    assert not offenders, (
+        f"tests terminate real infrastructure: {offenders}. Disruption is simulated "
+        "in-process (FR-016)."
     )
 
 

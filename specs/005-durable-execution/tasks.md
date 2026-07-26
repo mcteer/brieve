@@ -68,7 +68,7 @@ of each story.
 - [X] T001 Add a PostgreSQL driver to `pyproject.toml` — `psycopg[binary]` (v3) is the plan's default choice. Pin the exact version, verify it is current at implement time, and record the ADR-0017 dependency justification in the `feat/005` PR body. Regenerate and **commit `uv.lock` in the same change**: CI runs `uv sync --frozen`, which will not update the lockfile, so a stale lock fails the fast lane before any test runs. Decide and document whether the driver is a base dependency or an extra — the durability lane needs it, so an extra that CI does not install would green the wrong thing
 - [X] T002 [P] Create `tests/conformance/durability/__init__.py`
 - [X] T003 [P] Create `src/core/observation/__init__.py` (contents filled in Phase 2)
-- [ ] T004 Document in `docs/development/testing.md` that the durability lane requires `make dev-up` — a prerequisite for the rows, not an alternative to them — and confirm the rows actually execute. Note that `make conformance` already runs `pytest tests/conformance` recursively, so the new directory is picked up **without** a Makefile change; the work here is the documentation and the confirmation, and this task is not done because a target looks right
+- [X] T004 Document in `docs/development/testing.md` that the durability lane requires `make dev-up` — a prerequisite for the rows, not an alternative to them — and confirm the rows actually execute. Note that `make conformance` already runs `pytest tests/conformance` recursively, so the new directory is picked up **without** a Makefile change; the work here is the documentation and the confirmation, and this task is not done because a target looks right
 
 ---
 
@@ -131,7 +131,7 @@ step showing exactly one execution across the whole run
 - [X] T022 [P] [US1] Add `tests/component/test_resume.py` — disrupt a multi-step run in-process, resume, assert it completes
 - [X] T023 [P] [US1] Assert already-completed steps show **exactly one** execution across the whole run, not one per segment (SC-001) in `tests/component/test_resume.py`
 - [X] T024 [P] [US1] [GATE:correlation] Assert `assert_correlated` / `assert_audit_chain` join both segments under one correlation ID with the hash chain intact across the disruption boundary (FR-015, SC-008)
-- [ ] T024a [US1] Add `tests/component/test_resume_cross_process.py` (quickstart Scenario A2), a Postgres-backed scenario that crosses a **genuine process boundary** — write checkpoints in one process, resume in another — so durability is demonstrated rather than asserted. plan.md and research.md both commit to this; a suite that only tears down and rebuilds in-process proves the code reloads its own state, not that the state survived anything. This is the one exception to in-process simulation, and it does not violate FR-016: restarting a test process is not terminating real infrastructure
+- [X] T024a [US1] Add `tests/component/test_resume_cross_process.py` (quickstart Scenario A2), a Postgres-backed scenario that crosses a **genuine process boundary** — write checkpoints in one process, resume in another — so durability is demonstrated rather than asserted. plan.md and research.md both commit to this; a suite that only tears down and rebuilds in-process proves the code reloads its own state, not that the state survived anything. This is the one exception to in-process simulation, and it does not violate FR-016: restarting a test process is not terminating real infrastructure
 - [X] T025 [P] [US1] [GATE:fail-closed] Add `tests/component/test_checkpoint_failure.py` — an unwritable checkpoint stops the step rather than letting it proceed unrecorded, and an unreadable or corrupt checkpoint parks or refuses rather than resuming on partial state
 
 ### Implementation for User Story 1
@@ -277,13 +277,13 @@ against the seam rather than an implementation
 
 ### Conformance rows
 
-- [ ] T063 [P] [US7] [GATE:conformance] Add `tests/conformance/durability/test_kill_resume.py` and `test_kill_resume_break.py`
-- [ ] T064 [P] [US7] [GATE:conformance] Add `test_reauthenticate_never_replay.py` and its break fixture
-- [ ] T065 [P] [US7] [GATE:conformance] Add `test_reobserve_never_reexecute.py` and its break fixture
-- [ ] T066 [P] [US7] [GATE:conformance] Add `test_fencing_double_resume.py` and its break fixture
-- [ ] T067 [P] [US7] [GATE:conformance] Add `test_park_on_grant_expiry.py` and its break fixture
-- [ ] T068 [P] [US7] [GATE:conformance] Add `test_duplicate_side_effect_rejection.py` and its break fixture
-- [ ] T069 [P] [US7] [GATE:conformance] Add `test_drain_across_upgrade.py` and its break fixture — a controlled in-process handover, honestly labelled as simulated rather than a real rolling upgrade
+- [X] T063 [P] [US7] [GATE:conformance] Add `tests/conformance/durability/test_kill_resume.py` and `test_kill_resume_break.py`
+- [X] T064 [P] [US7] [GATE:conformance] Add `test_reauthenticate_never_replay.py` and its break fixture
+- [X] T065 [P] [US7] [GATE:conformance] Add `test_reobserve_never_reexecute.py` and its break fixture
+- [X] T066 [P] [US7] [GATE:conformance] Add `test_fencing_double_resume.py` and its break fixture
+- [X] T067 [P] [US7] [GATE:conformance] Add `test_park_on_grant_expiry.py` and its break fixture
+- [X] T068 [P] [US7] [GATE:conformance] Add `test_duplicate_side_effect_rejection.py` and its break fixture
+- [X] T069 [P] [US7] [GATE:conformance] Add `test_drain_across_upgrade.py` and its break fixture — a controlled in-process handover, honestly labelled as simulated rather than a real rolling upgrade
 
 Break fixtures follow 004's pattern: **self-verifying**, constructing the weakened arrangement and
 asserting the check raises, so they pass on a clean tree. A row whose failure nobody has observed
@@ -291,9 +291,9 @@ is a row nobody knows works (FR-014).
 
 ### Provider independence and the gate
 
-- [ ] T070 [US7] Parameterize the durability conformance lane by provider — a `--provider` pytest option in `tests/conformance/durability/conftest.py` supplying the provider fixture, as `quickstart.md` Scenario G shows — so the same rows run against both the in-memory double and Postgres **without rewriting** — that is the executable form of ADR-0024's central claim (SC-009)
-- [ ] T071 [US7] Update `contracts/conformance-adapter.md` in `specs/004-primary-adapter/` to move the durability rows from deferred to in force, in this same change — ADR-0047 requires the deferral list stay accurate, and a stale one reads as a gap nobody noticed
-- [ ] T072 [US7] Make the durability conformance lane merge-blocking in `.github/workflows/ci.yml` for changes touching the durability seam, as 004 did for the adapter lane. If the enclave cannot run in CI, say so explicitly in the PR and record what that means for the claim — **do not** let the rows silently skip
+- [X] T070 [US7] Parameterize the durability conformance lane by provider — a `--provider` pytest option in `tests/conformance/durability/conftest.py` supplying the provider fixture, as `quickstart.md` Scenario G shows — so the same rows run against both the in-memory double and Postgres **without rewriting** — that is the executable form of ADR-0024's central claim (SC-009)
+- [X] T071 [US7] Update `contracts/conformance-adapter.md` in `specs/004-primary-adapter/` to move the durability rows from deferred to in force, in this same change — ADR-0047 requires the deferral list stay accurate, and a stale one reads as a gap nobody noticed
+- [X] T072 [US7] Make the durability conformance lane merge-blocking in `.github/workflows/ci.yml` for changes touching the durability seam, as 004 did for the adapter lane. If the enclave cannot run in CI, say so explicitly in the PR and record what that means for the claim — **do not** let the rows silently skip
 
 **Checkpoint**: `make conformance` runs all seven rows in force and passes on a clean tree
 
@@ -301,11 +301,11 @@ is a row nobody knows works (FR-014).
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T073 [P] [GATE:determinism] Extend `tests/unit/test_no_live_dependencies.py` so the prohibition covers this feature's paths: no live model provider, no live managed-product API, and no test that simulates disruption by terminating real infrastructure (FR-016, SC-010). Note that the check's shape changes here — Vault and Postgres are now **permitted and required**, so a blanket "no network" assertion would be wrong
-- [ ] T074 [P] Document the durability lane in `docs/development/testing.md` — what `make dev-up` must be running, what fails loudly when it is not, and why this lane is not hermetic when every earlier one was
-- [ ] T075 [P] Update `ROADMAP.md` to move durable execution from Next to Shipped and record the seven gate rows as attached
-- [ ] T076 [GATE:fail-closed] Review every new failure path for catch-and-continue: unwritable checkpoint, unreadable checkpoint, unobservable step, expired grant, lost lease. Each must refuse or park; none may proceed on partial state
-- [ ] T077 Review the sealed-core diff against FR-018's list before opening the PR. A core change outside checkpoint schema, provider protocol, grant lifetime, per-step manufacture, lease and fencing, bounds, and the bracket is out of scope and needs its own spec. Confirm FR-017 as well: no dedicated workflow-engine provider has appeared, which attaches later and only under ADR-0028's named-trigger rule
+- [X] T073 [P] [GATE:determinism] Extend `tests/unit/test_no_live_dependencies.py` so the prohibition covers this feature's paths: no live model provider, no live managed-product API, and no test that simulates disruption by terminating real infrastructure (FR-016, SC-010). Note that the check's shape changes here — Vault and Postgres are now **permitted and required**, so a blanket "no network" assertion would be wrong
+- [X] T074 [P] Document the durability lane in `docs/development/testing.md` — what `make dev-up` must be running, what fails loudly when it is not, and why this lane is not hermetic when every earlier one was
+- [X] T075 [P] Update `ROADMAP.md` to move durable execution from Next to Shipped and record the seven gate rows as attached
+- [X] T076 [GATE:fail-closed] Review every new failure path for catch-and-continue: unwritable checkpoint, unreadable checkpoint, unobservable step, expired grant, lost lease. Each must refuse or park; none may proceed on partial state
+- [X] T077 Review the sealed-core diff against FR-018's list before opening the PR. A core change outside checkpoint schema, provider protocol, grant lifetime, per-step manufacture, lease and fencing, bounds, and the bracket is out of scope and needs its own spec. Confirm FR-017 as well: no dedicated workflow-engine provider has appeared, which attaches later and only under ADR-0028's named-trigger rule
 - [ ] T078 Open `feat/005-durable-execution` with the breaking-seam declaration (T009), the dependency justification (T001), the single-node caveat, and security-maintainer review — contribution class is **sealed core**
 
 ---

@@ -44,12 +44,14 @@ class PostgresDurabilityProvider:
         host: str = "127.0.0.1",
         port: int = 5432,
         dbname: str = "brieve",
+        owner_role: str | None = "brieve",
         connect: Callable[..., psycopg.Connection] | None = None,
     ) -> None:
         self._credentials = credentials
         self._host = host
         self._port = port
         self._dbname = dbname
+        self._owner = owner_role
         self._connect = connect or psycopg.connect
         self._credential: DatabaseCredential | None = None
 
@@ -59,7 +61,7 @@ class PostgresDurabilityProvider:
         if refresh or self._credential is None:
             self._credential = self._credentials.fetch()
         cred = self._credential
-        return self._connect(
+        conn = self._connect(
             host=self._host,
             port=self._port,
             dbname=self._dbname,
@@ -67,6 +69,13 @@ class PostgresDurabilityProvider:
             password=cred.password,
             autocommit=True,
         )
+        if self._owner:
+            # Every credential is a distinct role, so objects created under one are not
+            # owned by the next — migrations then fail with "must be owner of table" the
+            # first time a lease rolls over. Acting as the shared parent role keeps a
+            # single owner across the whole credential lifecycle.
+            conn.execute(f'SET ROLE "{self._owner}"')
+        return conn
 
     def _execute(self, work: Callable[[psycopg.Connection], Any]) -> Any:
         """Run ``work``, refreshing the credential once on an authentication failure.
