@@ -33,13 +33,21 @@ seam is drawn so a provider *cannot* affect it.
    for two holders is non-conforming.
 4. **Failures are visible.** A silently dropped checkpoint write is indistinguishable on resume
    from a step that never ran, which is the failure re-observation exists to prevent.
-5. The conformance rows in [conformance-durability.md](./conformance-durability.md) run against
+5. **A terminal run is not re-entered.** `COMPLETED` and `STOPPED` are recognisable from the
+   checkpoint alone; a provider that loses them turns "already finished" into "resume from the
+   last step," which would re-run work under a consent the user believes is spent.
+6. **How the provider reaches its own store is below this seam.** Credential acquisition and
+   refresh (FR-017a/FR-017b) are provider-internal and change no guarantee above the line. Note
+   the vocabulary: the *run* re-authenticates to Vault on resume; the *provider* refreshes a
+   database credential. Same mechanism, different stakes.
+7. The conformance rows in [conformance-durability.md](./conformance-durability.md) run against
    any provider and MUST pass identically.
 
 ## Breaking change
 
 004's `DurabilityProvider` is `save`/`load` only and cannot satisfy the lease or bracket
-guarantees. This is a genuine break to a seam shipped one feature ago. Exempt from a deprecation
+guarantees, and `CheckpointBlob` gains `run_state` and `stop_reason` alongside the resume metadata
+— a resuming process holds only the checkpoint, so terminal state has to be *in* it. This is a genuine break to a seam shipped one feature ago. Exempt from a deprecation
 window on the same grounds 004 recorded — pre-1.0 (`version = "0.0.0"`), one in-repo
 implementation, no external consumers — and declared in the `feat/005` PR under the template's
 breaking-change section rather than assumed.

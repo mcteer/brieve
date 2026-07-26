@@ -38,9 +38,16 @@ absence from durable state is what makes resume-re-authenticates trivially true.
 | `grant_id` | `str` | **New** — which consent this run proceeds under |
 | `step_index` | `int` | **New** — resume point |
 | `written_by` | `str` | **New** — allocation identity that wrote it; fencing input |
+| `run_state` | `RunState` | **New** — so a resuming process can recognise a run that is already terminal |
+| `stop_reason` | `str \| None` | **New** — set when `run_state` is `STOPPED`; `None` otherwise |
 
 **Validation**: MUST NOT contain credential, token, or secret material — enforced structurally as
 in 004, not by convention, and asserted for every provider (FR-003).
+
+**Why state is persisted and not merely held in memory**: a resuming process has only the
+checkpoint. Without `run_state` on the blob there is no way to tell a run that finished from one
+that was interrupted mid-step, and the rule below that a terminal run is not re-entered would be
+unenforceable rather than merely untested.
 
 ### RunLease
 
@@ -152,11 +159,17 @@ with a password (FR-017a).
 **Expiry is expected, not exceptional.** The lease is on the order of an hour and a durable run is
 designed to outlive that, so a credential ending mid-run MUST NOT fail the run.
 
-Re-authentication is **reactive**: the provider attempts the operation, and on an authentication
+**Credential refresh is reactive**: the provider attempts the operation, and on an authentication
 failure obtains a fresh credential from Vault and retries **once**. The database's rejection is
 the authoritative signal — a renewal timer would predict only ordinary expiry and miss a
 credential revoked early, a lease invalidated by a Vault operation, or a database restarted
 underneath the run, and it would require Vault, Postgres, and the harness to agree on a clock.
+
+> **Called "credential refresh", not "re-authentication", deliberately.** This feature already
+> uses "re-authenticate" for the run re-attesting to Vault on resume (US2) — a security guarantee
+> Principle IV rests on. Reusing the word for a connection retry would put a load-bearing term and
+> a plumbing detail under one name, which is exactly the sort of collision that survives review by
+> looking familiar.
 
 The retry is bounded on purpose: once per operation, only on authentication failure — not on
 connection-refused or permission-denied-on-object — and the second failure surfaces. An unbounded
@@ -204,7 +217,10 @@ touch the grant, the lease, or per-step authority. A run whose *grant* expires s
 5. Reaching any execution bound moves the run to `STOPPED` with `stop_reason` recorded.
 6. Correlation ID and hash chain survive the disruption boundary.
 7. Postgres access uses short-lived per-workload credentials — no shared standing credential.
-8. An authentication failure against the database triggers one fresh-credential retry, never run
-   failure; a second failure surfaces. Grant expiry, by contrast, parks — plumbing and consent are
-   not the same thing.
-9. A resume attempt against a `COMPLETED` or `STOPPED` run does not re-enter the run loop.
+8. An authentication failure against the database triggers one credential refresh and retry, never
+   run failure; a second failure surfaces. Grant expiry, by contrast, parks — plumbing and consent
+   are not the same thing.
+9. A run's terminal state is written to its checkpoint, and a resume attempt against a `COMPLETED`
+   or `STOPPED` run does not re-enter the run loop.
+10. A run that finishes its work is moved to `COMPLETED`; a state nothing writes is a state nothing
+    can be trusted to mean.

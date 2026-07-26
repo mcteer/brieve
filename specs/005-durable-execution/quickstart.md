@@ -21,6 +21,9 @@ Model: [data-model](./data-model.md).
   database secrets engine, under the workload's own identity. If you find yourself looking for a
   DSN to export, something is wrong — that is the failure mode this arrangement exists to make
   loud
+- **A run outliving its database credential is normal.** The provider refreshes on rejection
+  (FR-017b), so a long scenario is not expected to fail at the one-hour mark. If it does, read it
+  as a refresh bug rather than a lease that needs lengthening
 - No live model provider, no live managed-product API — that part of the determinism bar survives
   unchanged (SC-010)
 
@@ -37,7 +40,21 @@ pytest tests/component/test_resume.py -q
 
 **Expect**: a run disrupted mid-flight resumes from its checkpoint and completes; every
 already-completed step shows **exactly one** execution across the whole run; correlation ID and
-hash chain join across the disruption boundary (SC-001, SC-008).
+hash chain join across the disruption boundary (SC-001, SC-008). A run that finishes ends in
+`COMPLETED`, and a resume attempt against it does not re-enter the loop.
+
+### A2 — across a real process boundary
+
+```bash
+pytest tests/component/test_resume_cross_process.py -q
+```
+
+**Expect**: checkpoints written by one process, resumed by another, against Postgres.
+
+This is the one scenario that does not simulate disruption in-process, and it is deliberate: an
+entirely in-process suite proves the code can reload its own state, not that the state survived
+anything. It does not violate FR-016 — restarting a test process is not terminating real
+infrastructure.
 
 ## Scenario B — Re-authenticate, never replay (US2)
 
@@ -92,8 +109,9 @@ pytest tests/unit/test_bounds.py -q     # no enclave needed
 make conformance
 ```
 
-**Expect**: each of the three bounds — duration, step limit, stuck-wait — stops a run that exceeds
-it, with the reason recorded (SC-007). `make conformance` executes all **seven** durability rows
+**Expect**: each of the three bounds — duration, step limit, stuck-wait — moves the run to
+`STOPPED` with `stop_reason` recorded (SC-007). A `STOPPED` run is **not** resumable; if it were,
+the bound would mean nothing. `make conformance` executes all **seven** durability rows
 as in force, not deferred, and they pass (SC-009). Each row's break fixture demonstrates the row
 fails when its guarantee is weakened (FR-014).
 

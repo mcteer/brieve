@@ -88,13 +88,16 @@
   bootstrap DSN for tests with dynamic credentials proven separately (proves the mechanism in a
   place the product does not use it, which is the substitution this project's principle rejects).
 
-## Decision: Database re-authentication is reactive — the rejection is the signal
+## Decision: Database credential refresh is reactive — the rejection is the signal
 
 - **Decision**: `src/core/durability/credentials.py` obtains a dynamic Postgres credential from
   the control-plane Vault under the workload's attested identity. When a connection attempt fails
-  authentication, it fetches a fresh credential and retries **once**. Re-authentication is
-  reactive — driven by the database's own rejection — rather than scheduled against the lease
-  clock.
+  authentication, it fetches a fresh credential and retries **once**. The refresh is reactive —
+  driven by the database's own rejection — rather than scheduled against the lease clock.
+- **Named "credential refresh" on purpose**: "re-authenticate" is already spoken for by the run
+  re-attesting to Vault on resume (US2), which is a Principle IV guarantee. A connection retry and
+  a security property under one word is a collision that reads as familiar and hides a difference
+  that matters.
 - **Rationale**: FR-017a with FR-002. The Vault role's lease is on the order of an hour; a durable
   run is designed to outlive that. Treating expiry as fatal would mean a feature built for
   long-running execution cannot run longer than one credential lifetime — and the failure would

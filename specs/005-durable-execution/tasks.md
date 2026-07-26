@@ -88,13 +88,13 @@ provider, lease, bracket, bounds, parked state, and the harness fixtures
 
 ### Durability seam
 
-- [ ] T009 Extend `CheckpointBlob` in `src/core/durability/types.py` with `grant_id`, `step_index`, `written_by`; extend the `DurabilityProvider` protocol with `acquire_lease`, `check_lease`, `record_intent`, `record_result`, `open_intents` per `contracts/durability-seam.md`. **This is a breaking change to a seam 004 shipped one feature ago** — declare it in the `feat/005` PR under the template's breaking-change section, citing the same pre-1.0 exemption 004 recorded, rather than assuming it
+- [ ] T009 Extend `CheckpointBlob` in `src/core/durability/types.py` with `grant_id`, `step_index`, `written_by`, `run_state`, and `stop_reason`. **`run_state` on the blob is not optional bookkeeping**: a resuming process has only the checkpoint, so without it there is no way to tell a run that finished from one interrupted mid-step, and T017a's rule would be unenforceable rather than merely untested. Also extend extend the `DurabilityProvider` protocol with `acquire_lease`, `check_lease`, `record_intent`, `record_result`, `open_intents` per `contracts/durability-seam.md`. **This is a breaking change to a seam 004 shipped one feature ago** — declare it in the `feat/005` PR under the template's breaking-change section, citing the same pre-1.0 exemption 004 recorded, rather than assuming it
 - [ ] T010 Extend `InMemoryDurabilityProvider` in `src/core/durability/memory.py` to satisfy the full protocol. It remains a **test double for suites that are not about durability** — the durability rows run against Postgres
 - [ ] T011 [P] Create `src/core/durability/schema.sql` with tables for checkpoints, leases, and intent/result records per `data-model.md`. Lease acquisition must be expressible as a single conditional update
 - [ ] T011a [P] Create `src/core/durability/credentials.py` — obtain a dynamic Postgres credential from the control-plane Vault under the workload's attested Nomad identity, per `data-model.md`'s `DatabaseCredential`. **No path accepts a DSN with a password** (FR-017a). Its own module rather than a clause inside the provider: this is where the attestation chain is actually exercised, and it should be readable and testable without a database attached. `infra/dev-enclave/jobs/harness-probe.nomad.hcl` is the working reference for the exchange
-- [ ] T011b Implement **reactive** re-authentication in `credentials.py`: attempt the connection, and on an authentication failure obtain a fresh credential from Vault and retry once. Reactive rather than clock-driven — a proactive timer only handles the expiry it predicts, while an auth failure is the actual signal and also covers a credential revoked early, a lease invalidated by a Vault operation, or a database restarted underneath the run. The Vault lease is on the order of an hour and a durable run is designed to outlive it, so **this path is on the happy path, not the error path**. Do **not** conflate it with grant expiry: a database credential ending is plumbing and re-authenticates silently; consent ending parks the run (FR-005). Auto-renewing consent would defeat ADR-0026, and parking on a database credential would report lost permission when the platform only lost a socket
-- [ ] T011c Bound the retry and keep it honest: **retry once per operation**, only on an authentication failure — distinguished from connection-refused, permission-denied-on-object, and every other error — and surface the second failure rather than looping. An unbounded retry would spin forever against a genuine misconfiguration, and the enclave has a real one waiting: destroying the Postgres volume resets the database to its bootstrap password while Vault holds the rotated one, so *every* credential fails auth. That must present as a clear failure, not as a hang
-- [ ] T011d [P] Unit test `tests/unit/test_credential_expiry.py` — an expired credential produces one Vault round trip and the operation succeeds on retry; a non-auth error does **not** trigger a credential fetch; a second auth failure surfaces rather than retrying; and no credential material is logged, checkpointed, or placed in a span
+- [ ] T011b Implement **reactive credential refresh** in `credentials.py` (FR-017b): attempt the operation, and on an authentication failure obtain a fresh credential from Vault and retry **once**. Reactive rather than clock-driven — a timer handles only the expiry it predicts, while the database's rejection is the authoritative signal and also covers a credential revoked early, a lease invalidated by a Vault operation, or a database restarted underneath the run. The lease is on the order of an hour and a durable run is designed to outlive it, so **this is the happy path, not the error path**. Call it *credential refresh*, never *re-authentication* — that term belongs to the run re-attesting to Vault (US2), and putting a security guarantee and a connection retry under one name is a collision that survives review by looking familiar. Keep it distinct from grant expiry too: a credential ending refreshes silently, consent ending parks the run (FR-005)
+- [ ] T011c Classify the errors that trigger a refresh: **authentication failure only**, distinguished from connection-refused, permission-denied-on-object, and everything else, with the second failure surfaced rather than retried. This is the task that keeps T011b bounded — an unbounded retry would spin against a genuine misconfiguration, and the enclave has one reachable today: destroying the Postgres volume resets the database to its bootstrap password while Vault holds the rotated one, so *every* credential fails auth. That must present as a clear failure, not a hang
+- [ ] T011d [P] Unit test `tests/unit/test_credential_refresh.py` — an expired credential produces one Vault round trip and the operation succeeds on retry; a non-auth error does **not** trigger a fetch; a second auth failure surfaces; and no credential material is logged, checkpointed, or placed in a span
 - [ ] T012 Create `src/core/durability/postgres.py` with `PostgresDurabilityProvider`, taking its connection from `credentials.py` (T011a). A failed save propagates; a partial or corrupt blob is never returned as valid
 - [ ] T013 [P] Create `src/core/durability/lease.py` with `RunLease` — acquire as a conditional update that supersedes atomically, and fence by **comparing holder identity**, not by racing
 - [ ] T014 [P] Create `src/core/observation/types.py` with the `Observer` protocol and `ObservationOutcome` as a **three-way** result (`happened` / `did_not_happen` / `cannot_determine`) per `data-model.md`
@@ -130,13 +130,14 @@ step showing exactly one execution across the whole run
 - [ ] T022 [P] [US1] Add `tests/component/test_resume.py` — disrupt a multi-step run in-process, resume, assert it completes
 - [ ] T023 [P] [US1] Assert already-completed steps show **exactly one** execution across the whole run, not one per segment (SC-001) in `tests/component/test_resume.py`
 - [ ] T024 [P] [US1] [GATE:correlation] Assert `assert_correlated` / `assert_audit_chain` join both segments under one correlation ID with the hash chain intact across the disruption boundary (FR-015, SC-008)
-- [ ] T024a [US1] Add a Postgres-backed scenario that crosses a **genuine process boundary** — write checkpoints in one process, resume in another — so durability is demonstrated rather than asserted. plan.md and research.md both commit to this; a suite that only tears down and rebuilds in-process proves the code reloads its own state, not that the state survived anything. This is the one exception to in-process simulation, and it does not violate FR-016: restarting a test process is not terminating real infrastructure
+- [ ] T024a [US1] Add `tests/component/test_resume_cross_process.py` (quickstart Scenario A2), a Postgres-backed scenario that crosses a **genuine process boundary** — write checkpoints in one process, resume in another — so durability is demonstrated rather than asserted. plan.md and research.md both commit to this; a suite that only tears down and rebuilds in-process proves the code reloads its own state, not that the state survived anything. This is the one exception to in-process simulation, and it does not violate FR-016: restarting a test process is not terminating real infrastructure
 - [ ] T025 [P] [US1] [GATE:fail-closed] Add `tests/component/test_checkpoint_failure.py` — an unwritable checkpoint stops the step rather than letting it proceed unrecorded, and an unreadable or corrupt checkpoint parks or refuses rather than resuming on partial state
 
 ### Implementation for User Story 1
 
 - [ ] T026 [US1] Create `src/core/durability/resume.py` with `resume_run` — load checkpoint, acquire lease, re-manufacture authority, resolve open intents, continue
-- [ ] T027 [US1] Record `step_index` and `written_by` on every checkpoint write in the invoke path so resume has a point to resume from and fencing has an identity to compare
+- [ ] T026a [US1] Move a run to `COMPLETED` when its work finishes, and write that state to its checkpoint. **A state nothing writes is a state nothing can be trusted to mean** — T017 adds the value and T017a asserts on it, so without this the test passes against something no code produces
+- [ ] T027 [US1] Record `step_index`, `written_by`, and the current `run_state` on every checkpoint write in the invoke path so resume has a point to resume from and fencing has an identity to compare
 - [ ] T028 [US1] Ensure the resumed run invokes through the **same** `invoke_tool` path as the original — the bracket wraps that path rather than creating a second one (Principle II)
 - [ ] T029 [US1] Make checkpoint-write failure propagate at the call site; no swallow-and-continue anywhere on the durability path
 
@@ -328,7 +329,7 @@ assertions, US3's parking, and US6's bounded stop.
 ### Parallel Example: After Foundational + US1 MVP
 
 ```bash
-# Developer A: US2 re-authentication + US3 parking
+# Developer A: US2 re-attestation + US3 parking
 # Developer B: US4 re-observation + the bracket
 # Developer C: US5 fencing + US6 bounds
 ```
@@ -369,9 +370,10 @@ assertions, US3's parking, and US6's bounded stop.
   express a run that finished, one a bound halted, or one waiting on a human — and resume needs
   all three distinctions. Without `COMPLETED` a resume attempt against a finished run re-enters
   the loop; treating a bounded stop as `PARKED` invites resuming past the bound.
-- **Database re-authentication is reactive and bounded.** The rejection is the signal, not a
-  renewal clock; retry once, only on an authentication failure, and surface the second. Keep it
-  distinct from grant expiry — the credential is plumbing, the grant is consent.
+- **"Credential refresh" and "re-authentication" are different things.** The run re-authenticates
+  to Vault on resume — that is US2 and Principle IV. The provider refreshes a database credential
+  after a rejection — that is plumbing. They must not share a word, or a reviewer skims one
+  thinking they read the other.
 - **Two guarantees are the substrate's, not this code's.** Resume-re-authenticates and fencing are
   properties of Nomad workload identity (ADR-0048). The tasks that touch them are written to prove
   no path *undoes* them — a different and easier job than enforcement, and worth stating so nobody
