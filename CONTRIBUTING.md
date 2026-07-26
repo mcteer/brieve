@@ -527,6 +527,17 @@ secret scanning, and — by contribution class — the conformance suite, eval g
 accessibility checks. Required checks must be green before merge; advisory checks are
 labeled as such.
 
+**One gate CI does not run, and who closes it.** The durability conformance rows execute
+against a real Vault and Postgres. The fast lane is fork-safe with no required secrets
+and cannot stand up a licensed Vault, so it runs `make conformance-hermetic` and skips
+them. That is a coverage gap, not a judgement that those rows matter less.
+
+It is closed by the **agent harness**, not by discipline: `AGENTS.md` instructs it to
+bring up the enclave and run `make conformance` before merging anything touching
+durability, sealed core, an adapter, a provider, or `infra/`, and to refuse the merge if
+it cannot. Whoever merges — human or agent — owes that step, and owes saying so when it
+was not possible.
+
 Reproduce failures locally with `make check` and `make conformance` before pushing again;
 CI is not a debugger. If a failure looks like infrastructure rather than your change, say
 so in a comment rather than blind-retrying — repeated retries on a genuinely broken check

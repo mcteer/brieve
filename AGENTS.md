@@ -128,9 +128,31 @@ make dev-up          # local stack (dev identity fabric, Postgres, collector, ha
 pre-commit run -a    # formatting and hygiene
 ```
 
-Run `make check` before declaring any task complete. Run `make conformance` if you
-touched an adapter, a provider, or anything in sealed core. Do not report success on
-work you have not verified.
+Run `make check` before declaring any task complete. Do not report success on work you
+have not verified.
+
+### You are the conformance gate
+
+**CI does not run the durability rows.** The fast lane is fork-safe and cannot hold a
+Vault Enterprise licence, so it runs `make conformance-hermetic`, which skips them. No
+required check covers them. Nothing in GitHub will stop a merge that breaks them.
+
+So before merging anything that touches durability, sealed core, an adapter, a provider,
+or `infra/`:
+
+1. `make dev-up` — the enclave must be **running**, not assumed
+2. `make conformance` — all rows, including the durability lane, which executes as a
+   scheduled workload under an attested identity
+3. Merge only if it passed. If the enclave cannot be brought up, **say so and do not
+   merge** — report the gap rather than merging past it
+
+This is not ceremony. ADR-0047 says a gate row is blocking from the moment its feature
+exists, and for these rows the only thing standing between a regression and `main` is
+this step. A conformance suite nobody runs is a conformance suite that does not exist.
+
+The one property you get for free: the durability lane **fails loudly when the enclave is
+absent** rather than skipping. You cannot obtain a false green by running it in the wrong
+place — only by not running it.
 
 ## Repository layout
 

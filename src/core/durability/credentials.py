@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import ssl
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -116,6 +117,12 @@ class VaultDatabaseCredentials:
         self._role = role
         self._creds_path = creds_path
         self._timeout = timeout
+        # The control plane serves TLS from its own CA, which is not in any system trust
+        # store. urllib does NOT read VAULT_CACERT — that is a Vault CLI convention — so
+        # without building the context here every request fails verification, and the
+        # error surfaces as a credential problem rather than a certificate one.
+        cacert = os.environ.get("VAULT_CACERT")
+        self._ssl_context = ssl.create_default_context(cafile=cacert) if cacert else None
 
     def _post(
         self, path: str, payload: dict[str, object], token: str | None = None
@@ -127,7 +134,9 @@ class VaultDatabaseCredentials:
             | ({"X-Vault-Token": token} if token else {}),
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=self._timeout) as response:  # noqa: S310
+        with urllib.request.urlopen(  # noqa: S310
+            request, timeout=self._timeout, context=self._ssl_context
+        ) as response:
             parsed: dict[str, Any] = json.loads(response.read())
             return parsed
 
@@ -135,7 +144,9 @@ class VaultDatabaseCredentials:
         request = urllib.request.Request(  # noqa: S310
             f"{self._addr}/v1/{path}", headers={"X-Vault-Token": token}
         )
-        with urllib.request.urlopen(request, timeout=self._timeout) as response:  # noqa: S310
+        with urllib.request.urlopen(  # noqa: S310
+            request, timeout=self._timeout, context=self._ssl_context
+        ) as response:
             parsed: dict[str, Any] = json.loads(response.read())
             return parsed
 

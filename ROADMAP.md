@@ -126,7 +126,7 @@ ADR — never a passing stub.**
 | Row | Attaches with | Status |
 | --- | --- | --- |
 | Governance-ordering, fail-closed, governed entry | 004 | ✅ In force |
-| Durability scenarios (ADR-0024/0026) | 005 | ✅ In force — all seven, both providers. **Not run by CI**: the fast lane is fork-safe and cannot stand up a licensed Vault. See `specs/005-durable-execution/contracts/conformance-durability.md` |
+| Durability scenarios (ADR-0024/0026) | 005 | ✅ In force — all seven, both providers, under an attested identity. **Not run by CI** (the fork-safe lane cannot hold a licensed Vault); the agent harness runs them before merge per `AGENTS.md`, and refuses the merge if the enclave cannot come up |
 | Four-transport surface parity | 008 | Deferred — ADR-0033 |
 | Tool-call parity under deferred disclosure | 010 | Deferred — ADR-0040 |
 | Eval gates (packs, models, policies) | 009 | Deferred — Principle VIII |
