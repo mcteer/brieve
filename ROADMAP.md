@@ -26,12 +26,12 @@ being re-derived at the start of every spec.
 | 003 | Per-task authority | ADR-0015, ADR-0026 (partial), ADR-0042, ADR-0044 | — |
 | 004 | Primary adapter | ADR-0001, ADR-0017, ADR-0019, ADR-0047 | Governance-ordering, fail-closed, governed entry |
 | 005 | Durable execution | ADR-0024, ADR-0026, ADR-0048, ADR-0018 (consumes) | All seven durability rows |
+| 006 | Deployment module tree | ADR-0025, ADR-0048, ADR-0015, ADR-0007 | — (infrastructure; the durability rows now run under an attested identity) |
 
 ## In progress
 
-| # | Feature | ADRs | Status |
-| --- | --- | --- | --- |
-| 006 | Deployment module tree — the enclave, productized | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Spec drafted. `make dev-up` already shipped as tooling (#34); what remains is the parameterized tree and running the suite as a Nomad job |
+Nothing. The next feature is the top of [Next](#next) — Control Groups (ADR-0016), which is
+what 005's parked runs currently have no surface to resolve against.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -42,49 +42,6 @@ being re-derived at the start of every spec.
 > the blocking part of the environment turned out to be one Makefile target. The order of work
 > here does not match numeric order and is not meant to. Renaming a merged spec directory would
 > churn every reference to it for no gain.
-
-### 006 — Deployment module tree
-
-**Scope changed after 005 shipped, and the record should say so rather than read as though
-the original plan held.** This was written as the feature that precedes durable execution and
-makes `make dev-up` real. It did not: 005 landed first, and `make dev-up` was wired to the
-existing `infra/dev-enclave` as tooling (#34) once it became the thing blocking implementation.
-
-What that leaves is the part that was always the harder half — the **productized** tree.
-`infra/dev-enclave` is labelled a proof and should not become the product front door by
-inertia (ADR-0025).
-
-Three specific gaps it closes:
-
-1. **A parameterized tree** with the substrate as the only permitted delta, so the same
-   configuration applies to a workstation and to customer infrastructure.
-2. **Running the conformance suite as a Nomad job.** This is the honest gap in 005: the
-   durability rows currently run on the host against a development Vault token, so the
-   attestation path is proven *separately* by `jobs/harness-probe.nomad.hcl` rather than
-   exercised *by the tests*. Closing it removes the only place a static token appears
-   anywhere in the tree.
-3. **What `make dev-up` still does not guarantee** — TLS from the control plane's own CA, HA,
-   and an unseal shape that is not 1-of-1 with the key next to the server. All three are
-   deliberately absent today and listed in `infra/dev-enclave/README.md`.
-
-Replaces `fake_identity_fabric` as the thing guarantees are proven against. The fake remains a
-test double for suites that are not about identity.
-
-**In scope, and easy to lose:** revoking the bootstrap root token once Terraform has applied the
-trust configuration. `infra/dev-enclave` deliberately retains it — that is what makes re-applying
-convenient — and ADR-0015's flow requires that a deployment does not. A dev shape that silently
-becomes the deployed one is the failure this entry exists to prevent.
-
-### 005 — Durable execution
-
-Attaches the durability Quality Gate row: kill/resume, re-observe-never-re-execute,
-re-auth-never-replay, double-resume fencing, grant-expiry parking, duplicate-side-effect
-rejection, drain-across-upgrade.
-
-**The merged spec (#27) assumes a hermetic reference provider and defers Postgres.** That
-assumption is now wrong — see ADR-0048 and the local-environment entry above. Correct it via
-`/speckit-clarify` before planning: real Postgres scheduled by Nomad, and real Vault for the
-re-authentication path.
 
 ## Next
 
