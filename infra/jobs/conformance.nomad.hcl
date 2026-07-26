@@ -10,6 +10,18 @@
 # READ THIS JOBSPEC FOR WHAT IS ABSENT: no token, no password, no DSN, no mounted secret.
 # The only thing this job is given is proof of who it is.
 
+variable "vault_addr" {
+  type        = string
+  default     = "https://127.0.0.1:8200"
+  description = "Where the trust store answers. HTTPS once bring-up has switched the listener."
+}
+
+variable "vault_cacert" {
+  type        = string
+  default     = "/repo/.enclave/ca.pem"
+  description = "Control-plane CA, as seen INSIDE the container — the repo is mounted at /repo."
+}
+
 variable "repo" {
   type        = string
   description = "Working tree to mount. Mounted rather than baked into an image: an image build per run would make the durability rows something people avoid running, and they are already the only place those guarantees are checked."
@@ -73,7 +85,15 @@ job "conformance" {
       }
 
       env {
-        VAULT_ADDR = "http://127.0.0.1:8200"
+        # Must follow the listener. Hardcoding http here is how a working TLS enclave
+        # produces "could not obtain a database credential ... HTTPError" — which names
+        # the credential path and not the scheme that actually broke.
+        VAULT_ADDR = var.vault_addr
+
+        # The CA lives in the mounted working tree, so the path is a container path.
+        # Without it every request fails certificate verification, which surfaces as the
+        # same credential error.
+        VAULT_CACERT = var.vault_cacert
       }
 
       resources {
