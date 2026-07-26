@@ -206,7 +206,10 @@ nothing above LOW.
 
 **Working with the generated artifacts**: files under `specs/` are authored through the
 command flow, not hand-edited afterward — if a spec needs to change, re-run the stage so
-plan and tasks stay consistent. Agent command directories (`.claude/`, `.cursor/`, etc.)
+plan and tasks stay consistent. **One standing exception**: a landing feature must update
+the conformance contracts of *earlier* features whose deferred rows it puts in force
+(ADR-0047). That edit is a required part of the later feature's change, not a stray
+hand-edit — a deferral list that goes stale reads as a gap nobody noticed. Agent command directories (`.claude/`, `.cursor/`, etc.)
 are per-developer and gitignored; `.specify/` is committed and governed. Amendments to
 the constitution itself follow its Governance section: PR against
 `.specify/memory/constitution.md` with a Sync Impact Report, citing motivating ADRs,

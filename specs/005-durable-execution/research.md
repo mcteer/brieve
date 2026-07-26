@@ -88,6 +88,42 @@
   bootstrap DSN for tests with dynamic credentials proven separately (proves the mechanism in a
   place the product does not use it, which is the substitution this project's principle rejects).
 
+## Decision: Database re-authentication is reactive — the rejection is the signal
+
+- **Decision**: `src/core/durability/credentials.py` obtains a dynamic Postgres credential from
+  the control-plane Vault under the workload's attested identity. When a connection attempt fails
+  authentication, it fetches a fresh credential and retries **once**. Re-authentication is
+  reactive — driven by the database's own rejection — rather than scheduled against the lease
+  clock.
+- **Rationale**: FR-017a with FR-002. The Vault role's lease is on the order of an hour; a durable
+  run is designed to outlive that. Treating expiry as fatal would mean a feature built for
+  long-running execution cannot run longer than one credential lifetime — and the failure would
+  surface only in the longest runs, which are precisely the ones this exists for.
+- **Why reactive rather than a renewal timer**: a timer only handles the expiry it predicts. The
+  authentication failure is the authoritative signal, and it also covers what a timer misses — a
+  credential revoked early, a lease invalidated by a Vault operation, or a database restarted
+  underneath the run. It needs no clock agreement between Vault, Postgres, and the harness.
+- **The bound that keeps it honest**: retry once, only on an authentication failure, and surface
+  the second one. An unbounded retry would spin against a genuine misconfiguration — and the
+  enclave has one waiting: destroying the Postgres volume resets the database to its bootstrap
+  password while Vault still holds the rotated one, so every credential fails auth. That must
+  present as a clear failure rather than a hang.
+- **The distinction that must not blur**: a *database credential* expiring is plumbing and
+  reconnects silently; a *grant* expiring is withdrawn consent and parks the run (FR-005).
+  Collapsing them in either direction is a real error — auto-renewing consent would defeat
+  ADR-0026, and parking on a database lease would make the platform look like it lost permission
+  when it only lost a socket.
+- **Why its own module rather than a clause inside the provider**: the acquisition path is where
+  the attestation chain is actually exercised — identity, exchange, lease, renewal — and it is
+  worth being able to test and read it without a database attached. Folding it into
+  `postgres.py` would also make it invisible to a second provider that needs the same thing.
+- **Alternatives considered**: a renewal timer keyed to the lease duration (predicts one failure
+  mode and misses the rest, and depends on clocks agreeing). A long-lived credential sized to the
+  longest plausible run (a standing credential by another name, which is what Principle IV
+  forbids). Fail the run and resume it (turns a socket problem into a durability event, and the
+  resume would hit the same expiry). A static role with rotation (still standing between
+  rotations).
+
 ## Decision: Non-repeatable tool calls are bracketed; repeatability is registry metadata
 
 - **Decision**: `ToolRegistration` gains a repeatable flag and an optional `Observer`. Calls to

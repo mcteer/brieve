@@ -34,9 +34,9 @@ dependency-tree bar. No other addition; the lease, bracket, and bounds are libra
 container in the stack**, not stood up per suite. The harness obtains its database credentials
 from the **control-plane Vault's dynamic database secrets engine**, under its own attested
 identity; the connection is opened with a credential Vault minted moments earlier and that expires
-on its own (FR-017a). The static password in the dev jobspec is bootstrap scaffolding to be
-removed, not a design. The 004 `InMemoryDurabilityProvider` survives as a test double for suites
-that are not about durability
+on its own (FR-017a). Credential expiry mid-run is expected rather than exceptional — the provider
+reconnects under a fresh credential; only *grant* expiry parks a run. The 004
+`InMemoryDurabilityProvider` survives as a test double for suites that are not about durability
 
 **Testing**: `pytest` unit + component; new `tests/conformance/durability/` lane carrying the
 seven in-force rows. Disruption is simulated **in-process** — a run is torn down and rebuilt from
@@ -48,8 +48,10 @@ managed-product APIs
 require it; suites that do not touch identity or durability continue to run without it
 
 **Project Type**: Sealed-core feature. Extends `src/core/durability/` and `src/core/authority/`;
-adds `src/core/observation/`, lease, and bounds modules. No adapter changes beyond surfacing the
-new run state
+adds `src/core/observation/`, lease, credential, and bounds modules. `RunState` gains three
+terminal states — `COMPLETED`, `STOPPED`, `PARKED` — because 002's `ACTIVE`/`REFUSED` pair cannot
+express a run that finished, one a bound halted, or one waiting on a human. No adapter changes
+beyond surfacing the new run states
 
 **Performance Goals**: N/A — success is `make check` + `make conformance` green. The durability
 lane's runtime is a real constraint on the fast lane's <5 min budget and is a design input for
@@ -167,6 +169,7 @@ src/core/
 ├── durability/
 │   ├── types.py                    # CheckpointBlob + resume metadata; extended provider protocol
 │   ├── memory.py                   # InMemoryDurabilityProvider — test double, extended to match
+│   ├── credentials.py              # dynamic Postgres credential from Vault; reconnect on expiry
 │   ├── postgres.py                 # PostgresDurabilityProvider — the real one
 │   ├── schema.sql                  # checkpoints, leases, intent records
 │   ├── lease.py                    # RunLease: acquire, fence, reject superseded writers

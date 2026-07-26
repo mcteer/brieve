@@ -95,10 +95,30 @@ the run advances, not by a background timer.
 
 ### RunState *(extended from 002)*
 
-`ACTIVE` → `REFUSED` (002) → **`PARKED`** (new).
+002 shipped `ACTIVE` and `REFUSED` only, which was sufficient while nothing had to survive a
+restart. It is not sufficient now: a resumed run must be able to tell a run that *finished* from
+one that was interrupted, and a run stopped by a bound is neither refused nor waiting.
 
-Parked is *waiting*, not failed: durable, queryable, and resumable once the blocking condition
-clears. Modelling it as an error would lose the distinction an operator most needs.
+| State | Meaning | New? |
+| --- | --- | --- |
+| `ACTIVE` | Running | 002 |
+| `REFUSED` | Refused at start — authority insufficient | 002 |
+| `COMPLETED` | Finished its work | **new** |
+| `STOPPED` | Halted by an execution bound; `stop_reason` records which | **new** |
+| `PARKED` | Waiting for something only a human can supply | **new** |
+
+`GovernedRun` gains `stop_reason: str | None`, set on the transition to `STOPPED` so FR-011's
+"with the reason recorded" is satisfied by data rather than by a log line.
+
+Three distinctions worth keeping apart, because collapsing any of them loses something an
+operator needs:
+
+- **`PARKED` is waiting, not failed.** Durable, queryable, and resumable once the blocking
+  condition clears. Modelling it as an error would lose exactly the signal that matters.
+- **`STOPPED` is not `PARKED`.** A bounded run is not waiting for consent or for a human to
+  resolve a step; nothing will unblock it. Resuming it would defeat the bound.
+- **`COMPLETED` is not `ACTIVE`.** Without it, a resume attempt against a finished run has no way
+  to recognise that there is nothing to resume, and would re-enter the loop.
 
 ### DurabilityProvider *(extended from 004 — breaking)*
 
@@ -114,12 +134,47 @@ clears. Modelling it as an error would lose the distinction an operator most nee
 in-repo implementation, no external consumers — the exemption 004 recorded applies, declared
 rather than assumed.
 
+### DatabaseCredential
+
+The Postgres provider's connection credential, obtained from the control-plane Vault's dynamic
+database secrets engine under the workload's attested identity. Distinct from `TaskCredentialRef`:
+that one bounds what the *agent* may do, this one is how the *platform* reaches its own store.
+
+| Field | Rules |
+| --- | --- |
+| `username` / `password` | Vault-minted, per workload. Never checkpointed, never logged |
+| `lease_id` | Vault's handle for renewal and revocation |
+| `expires_at` | Wall-clock expiry, from the lease duration |
+
+**Validation**: obtaining one requires an attested identity — there is no path that accepts a DSN
+with a password (FR-017a).
+
+**Expiry is expected, not exceptional.** The lease is on the order of an hour and a durable run is
+designed to outlive that, so a credential ending mid-run MUST NOT fail the run.
+
+Re-authentication is **reactive**: the provider attempts the operation, and on an authentication
+failure obtains a fresh credential from Vault and retries **once**. The database's rejection is
+the authoritative signal — a renewal timer would predict only ordinary expiry and miss a
+credential revoked early, a lease invalidated by a Vault operation, or a database restarted
+underneath the run, and it would require Vault, Postgres, and the harness to agree on a clock.
+
+The retry is bounded on purpose: once per operation, only on authentication failure — not on
+connection-refused or permission-denied-on-object — and the second failure surfaces. An unbounded
+retry would spin against a real misconfiguration, and one is reachable in the enclave today:
+destroying the Postgres volume resets the database to its bootstrap password while Vault holds the
+rotated one, so every credential fails auth. That must read as a failure, not as a hang.
+
+Reconnection is a provider-internal concern and changes no guarantee above the seam: it does not
+touch the grant, the lease, or per-step authority. A run whose *grant* expires still parks
+(FR-005) — that is consent, not plumbing, and the two must not be conflated.
+
 ## State transitions
 
 ```text
 [grant issued] ──► ACTIVE ──► (steps, each under a fresh per-step credential)
                      │
-                     ├─ bound reached ─────────────► stopped, reason recorded
+                     ├─ work finished ─────────────► COMPLETED
+                     ├─ bound reached ─────────────► STOPPED (stop_reason recorded)
                      ├─ lease superseded ──────────► writes rejected (this instance is done)
                      │
                      └─ disruption
@@ -127,6 +182,8 @@ rather than assumed.
                             ▼
                      resume attempt (NEW allocation, NEW attested identity)
                             │
+                            ├─ run already COMPLETED ► nothing to resume
+                            ├─ run STOPPED ─────────► not resumable; the bound stands
                             ├─ grant expired ──────► PARKED (await fresh consent)
                             ├─ checkpoint unreadable ► PARKED / refuse
                             │
@@ -144,6 +201,10 @@ rather than assumed.
    credential — and none is written for a path to accept.
 3. A superseded lease holder's writes and tool calls are rejected by identity comparison.
 4. An interrupted non-repeatable step is resolved by observation; `cannot_determine` parks.
-5. Reaching any execution bound stops the run with the reason recorded.
+5. Reaching any execution bound moves the run to `STOPPED` with `stop_reason` recorded.
 6. Correlation ID and hash chain survive the disruption boundary.
 7. Postgres access uses short-lived per-workload credentials — no shared standing credential.
+8. An authentication failure against the database triggers one fresh-credential retry, never run
+   failure; a second failure surfaces. Grant expiry, by contrast, parks — plumbing and consent are
+   not the same thing.
+9. A resume attempt against a `COMPLETED` or `STOPPED` run does not re-enter the run loop.
