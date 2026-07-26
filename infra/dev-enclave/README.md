@@ -24,6 +24,28 @@ Run against Vault Enterprise 2.0.3+ent and Nomad 2.0.4 on 2026-07-25.
 
 No credential was placed in the jobspec. The workload authenticated as *itself*.
 
+### Second pass — dynamic database credentials (2026-07-25)
+
+The enclave is now persistent and the database path is real. `jobs/harness-probe.nomad.hcl`
+runs the whole chain in one allocation:
+
+| Claim | Result |
+| --- | --- |
+| A Nomad workload exchanges its identity for a Vault token | ✅ `auth/nomad/login` as role `harness`, ttl 300s |
+| Vault mints a **per-request** Postgres credential | ✅ `database/creds/harness`, distinct user each read, lease 3600s |
+| That credential actually opens a connection | ✅ `connected as v-nomad-ha-harness-…` |
+| It can write, not only read | ✅ created a table and inserted through the dynamic role |
+| The bootstrap password is **dead after rotate-root** | ✅ `password authentication failed for user "brieve"` — only Vault holds it |
+| Postgres data survives a new allocation | ✅ job purged and re-run; rows intact on the named volume |
+| Vault state survives container recreation | ✅ raft on `brieve-dev-vault-data`; unseal, do not re-initialise |
+
+The jobspec is worth reading for what is *absent*: no password, no DSN, no token, no mounted
+secret. The only thing the job is given is proof of who it is.
+
+**One ordering consequence to internalise before debugging any of this**: the harness cannot
+reach the database until it has an attested identity. A connection failure is therefore quite
+often an identity failure one step earlier, and looking at Postgres first will waste your time.
+
 ## What it cost to find out
 
 Four things were wrong in the first attempt. Three are constraints the production tree
@@ -38,7 +60,28 @@ mode is easy to misread:
 3. **Nomad's CPU fingerprint is wrong on Apple Silicon** — total reported as ~24 MHz while the
    core count is detected correctly. Any MHz-based resource request above that is unschedulable
    with `Dimension "cpu" exhausted`. Use `cores`.
-4. **A license can silently constrain the architecture.** The first license carried a
+4. **Nomad's docker driver refuses volume mounts by default.** A stateful task fails with
+   `volumes are not enabled` and nothing pointing at the *agent* configuration as the fix —
+   `nomad/client.hcl` here enables it. Any Nomad deployment scheduling a stateful workload
+   inherits this, so it is not a dev-only wrinkle.
+5. **A Docker named volume is owned by root; Vault runs as uid 100.** The server crash-loops on
+   `permission denied` opening its own bolt file, with no hint that ownership is the cause. The
+   fix is a chown, but *how* it is expressed matters: a `docker_container` that removes itself
+   leaves Terraform holding an ID that no longer resolves and every later apply fails, and one
+   that does not remove itself is permanent cruft in `docker ps -a`. A `terraform_data`
+   provisioner keyed to the volume avoids both.
+6. **`IPC_LOCK` must be written `CAP_IPC_LOCK`.** Docker normalises the name on read, so the
+   short form is a permanent diff — and because capability changes force replacement, every
+   `terraform apply` recreated the Vault container and **resealed it**. The symptom is an apply
+   that half-succeeds with `Vault is sealed`, which reads like a race and is not one.
+7. **Raft data is bound to `node_id`.** Moving a raft store to a Vault configured with a
+   different `node_id` leaves the node outside its own peer set: it unseals, reports
+   `HA Mode: standby` forever, and answers every API call with `Vault is sealed`. There is no
+   error message connecting the two. Migrating a store means carrying the node ID with it.
+8. **`.env` values are quoted**, and a naive `cut -d= -f2-` passes the quotes through. Vault
+   rejected the license with `error decoding version: expected integer` — which does not sound
+   like a quoting problem. Strip them.
+9. **A license can silently constrain the architecture.** The first license carried a
    `pki-only` module, which is a *restriction* rather than a capability: `pki` mounted and every
    other secrets engine — `kv`, `database`, `transit`, `ssh`, `nomad`, `consul`, `aws`, `ldap`,
    `keymgmt` — was refused as *"not supported by license"*, while all auth methods worked. It
@@ -52,30 +95,58 @@ mode is easy to misread:
 
 Prerequisites and the reasoning behind them: [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
-```bash
-# 1. Nomad must be running first — Vault fetches its JWKS at configure time.
-nomad agent -dev -bind 0.0.0.0
+Bring it up in ADR-0048's order — each component's dependencies exist before it does.
 
-# 2. Apply. The license comes from the gitignored .env; it is never committed
-#    and never passed on a command line.
-export TF_VAR_vault_license="$(grep '^VAULT_ENT_LICENSE=' ../../.env | cut -d= -f2-)"
+```bash
+# .env values are quoted; the trailing sed is not optional.
+env_val() { grep "^$1=" ../../.env | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'; }
+
+# 1. Nomad first — Vault fetches its JWKS at configure time, and Nomad schedules Postgres.
+#    The config enables docker volume mounts, which the driver refuses by default.
+nomad agent -dev -bind 0.0.0.0 -config=nomad/client.hcl &
+
+# 2. Postgres, so Vault's database engine has something to verify against.
+nomad job run jobs/postgres.nomad.hcl
+
+# 3. Vault container only. It comes up sealed; nothing can be configured yet.
+export TF_VAR_vault_license="$(env_val VAULT_ENT_LICENSE)"
 terraform init
-terraform apply -var vault_token=<root-token>
+terraform apply -target=docker_container.vault -var vault_token=placeholder
 ```
 
-Vault starts sealed because it uses raft. Initialise and unseal it once before applying the
-trust configuration; keep the unseal material out of the repository.
+**First time only**, initialise. On every later start the volume already holds the raft store,
+so **unseal — do not re-initialise**; re-initialising discards everything and invalidates the
+credentials in `.env`.
 
 ```bash
 export VAULT_ADDR=http://127.0.0.1:8200
 vault operator init -key-shares=1 -key-threshold=1   # dev only — never this shape in production
-vault operator unseal <key>
+# put the unseal key and root token in .env, then:
+vault operator unseal "$(env_val VAULT_UNSEAL_KEY)"
 ```
 
-Then schedule Postgres:
+```bash
+# 4. Everything else: trust fabric, agent registry, database engine, rotate-root.
+terraform apply -var vault_token="$(env_val VAULT_ROOT_TOKEN)"
+
+# 5. Prove the chain end to end.
+nomad job run jobs/harness-probe.nomad.hcl
+nomad alloc logs $(nomad job status harness | tail -1 | awk '{print $1}') probe
+```
+
+Restarting later is just steps 1, 2, unseal, and go — the raft store and the Postgres volume
+both survive.
+
+### Resetting
+
+Destroying the Postgres volume resets the database to the bootstrap password while Vault still
+holds the rotated one, and every dynamic credential request then fails. The two must be reset
+together:
 
 ```bash
+nomad job stop -purge postgres && docker volume rm brieve-dev-pgdata
 nomad job run jobs/postgres.nomad.hcl
+terraform apply -replace=vault_generic_endpoint.rotate_root -var vault_token="$(env_val VAULT_ROOT_TOKEN)"
 ```
 
 ## Deliberately missing
@@ -85,6 +156,9 @@ Everything that makes this a *dev* proof rather than the product's front door:
 - **No HA.** Single Vault node, single Nomad server. Fencing and failover behaviour under
   partition are therefore *not* exercised — relevant to the durability feature, which asserts
   single-writer guarantees.
+- **Nomad's own state is ephemeral.** `-dev` keeps nothing across restarts, so jobs must be
+  re-run. The *data* survives on named volumes, which is the property durability needs; the
+  scheduling does not.
 - **No TLS.** Production uses the control plane's own CA (ADR-0025).
 - **1-of-1 unseal.** A real deployment does not have a single unseal key sitting next to the
   server.
