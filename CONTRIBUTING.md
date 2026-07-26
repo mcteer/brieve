@@ -179,10 +179,18 @@ When clarification markers are resolved, the checklist notes record *how*: answe
 directly by a human, or resolved by an agent under explicit delegation and reviewed
 afterward. Both are legitimate; an unrecorded resolution is neither.
 
-**The spec PR precedes the implementation PR.** Specs are reviewed and merged as their
-own pull requests; the implementation PR links its governing spec. This is not ceremony
-— it is how a reviewer distinguishes "the design is wrong" from "the code doesn't match
-the design," and how the two get fixed in the right place.
+**The planning PR precedes the implementation PR.** Stages 1–5 — specify, clarify, plan,
+tasks, analyze — travel together in **one planning PR** on `spec/NNN-short-name`.
+Implementation is a separate PR on `feat/NNN-short-name`, which links its governing spec.
+This is not ceremony — it is how a reviewer distinguishes "the design is wrong" from "the
+code doesn't match the design," and how the two get fixed in the right place.
+
+Keeping the planning stages in one PR is deliberate. They are not independently
+reviewable: a plan is judged against its spec, a task list against its plan, and analyze
+audits the three together. Splitting them asks a reviewer to approve a plan whose spec
+they cannot see in the same diff, and leaves the tree in a state where `/speckit-analyze`
+has nothing consistent to check. Merge the planning PR when analyze comes back with
+nothing above LOW.
 
 **Working with the generated artifacts**: files under `specs/` are authored through the
 command flow, not hand-edited afterward — if a spec needs to change, re-run the stage so
@@ -412,8 +420,9 @@ Trunk-based, short-lived branches. `main` is protected: no direct pushes, always
 releasable, linear history via squash-merge.
 
 - **Naming declares the class and its governing artifact**: `spec/NNN-short-name` for a
-  spec PR; `feat/NNN-short-name` for its implementation — same NNN, and `feat/NNN` does
-  not open until `spec/NNN` has merged; `fix/issue-NNN`, `docs/…`, `chore/…` for the rest.
+  planning PR — carrying spec, plan, and tasks together; `feat/NNN-short-name` for its
+  implementation — same NNN, and `feat/NNN` does not open until `spec/NNN` has merged;
+  `fix/issue-NNN`, `docs/…`, `chore/…` for the rest.
   Keep feature branches alive for days, not weeks — if one is aging, the spec's task
   breakdown was too coarse; split it.
 - **Release branches per channel**: `release/vX.Y` is cut from `main` at each release
@@ -435,8 +444,8 @@ releasable, linear history via squash-merge.
   history lives in `main`.
 - **Spec Kit tooling note**: the `specify` scripts create a single `NNN-short-name`
   branch. This repository keeps the two-branch convention — rename the generated
-  branch to `spec/NNN-short-name`, and open `feat/NNN-short-name` only after the spec
-  PR merges.
+  branch to `spec/NNN-short-name`, run the remaining planning stages on it, and open
+  `feat/NNN-short-name` only after the planning PR merges.
 
 ## Testing expectations
 

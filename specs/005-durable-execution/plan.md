@@ -30,9 +30,13 @@ substrate already prevents, and to prove that it did not.
 the current default choice, pinned and justified at implement time per the regulated
 dependency-tree bar. No other addition; the lease, bracket, and bounds are library code
 
-**Storage**: PostgreSQL, scheduled by Nomad, for checkpoints, leases, and intent/result records.
-Vault issues per-workload database credentials (FR-017a). The 004 `InMemoryDurabilityProvider`
-survives as a test double for suites that are not about durability
+**Storage**: PostgreSQL for checkpoints, leases, and intent/result records — a **long-lived
+container in the stack**, not stood up per suite. The harness obtains its database credentials
+from the **control-plane Vault's dynamic database secrets engine**, under its own attested
+identity; the connection is opened with a credential Vault minted moments earlier and that expires
+on its own (FR-017a). The static password in the dev jobspec is bootstrap scaffolding to be
+removed, not a design. The 004 `InMemoryDurabilityProvider` survives as a test double for suites
+that are not about durability
 
 **Testing**: `pytest` unit + component; new `tests/conformance/durability/` lane carrying the
 seven in-force rows. Disruption is simulated **in-process** — a run is torn down and rebuilt from
@@ -57,25 +61,42 @@ every resume path; sealed-core changes capped by FR-018; security-maintainer rev
 **Scale/Scope**: Single-node enclave. Per the spec's stated caveat, fencing and parking are
 proven against single-node behaviour; multi-node partition is not exercised
 
+### Settled — Postgres lifetime and credential path
+
+Postgres is a **long-lived container in the stack**. Whether Nomad schedules it or something else
+does is not a property this feature depends on; what it depends on is that the database outlives
+any individual run, which is what makes a checkpoint worth writing.
+
+The harness obtains its credentials from the **control-plane Vault's dynamic database secrets
+engine** — a Vault-minted, short-lived, per-workload credential, not a DSN handed to the process.
+This closes FR-017a's plumbing question in the shape the requirement always implied, and removes
+the last standing credential in the enclave.
+
+It also has a consequence worth stating rather than discovering: **the harness must authenticate
+to Vault before it can reach the database.** Under ADR-0048 the only supported way it does that is
+its Nomad workload identity. So the database path is not merely adjacent to the attestation
+chain — it runs *through* it. A harness with no attested identity cannot open a connection at all,
+which is the correct failure and a stronger one than a policy check.
+
 ### NEEDS CLARIFICATION — owned by the deployment-tree feature, not by this plan
 
-These are interface questions about infrastructure this feature consumes. They are recorded
-rather than answered because answering them here would define another feature's surface from
-inside this one. Each has a working reference in [`infra/dev-enclave`](../../infra/dev-enclave/),
-which constrains the answer without settling it.
+Recorded rather than answered; answering them here would define another feature's surface from
+inside this one. [`infra/dev-enclave`](../../infra/dev-enclave/) is a working reference that
+constrains both without settling them.
 
-1. **Where do durability tests execute** — inside a Nomad allocation, or on the host against
-   scheduled services? This determines whether the test process has a workload identity of its
-   own, and therefore whether the attestation path is exercised by the tests or merely adjacent
-   to them. It is the highest-impact unknown here.
-2. **How does the test harness obtain a Postgres connection** — dynamic Vault-issued credentials
-   under the workload's identity (the FR-017a shape), or a bootstrap DSN with dynamic credentials
-   proven separately? The requirement is settled; the plumbing is not.
-3. **What does `make dev-up` guarantee on exit** — services reachable, Vault unsealed and
-   configured, Postgres migrated? Determines what test setup may assume versus must check.
+1. **Where do durability tests execute** — inside a Nomad allocation, or on the host against the
+   long-lived services? The credential decision above narrows this sharply but does not close it.
+   A test process running on the host has no Nomad workload identity, so under the settled path it
+   has no route to a database credential; either the durability suite runs as a scheduled
+   allocation, or the deployment tree defines some other attested identity for a host-run test
+   process. The former exercises the real chain and is the more likely answer; the latter is a
+   deliberate choice someone would have to make, not a default to fall into.
+2. **What does `make dev-up` guarantee on exit** — services reachable, Vault unsealed with the
+   database engine configured and the dynamic role created, Postgres migrated? Determines what
+   test setup may assume versus must check.
 
-None blocks writing the design below: the seam, the entities, and the conformance rows are
-unaffected by how the environment is reached.
+Neither blocks the design below: the seam, the entities, and the conformance rows are unaffected
+by how the environment is reached.
 
 ## Constitution Check
 

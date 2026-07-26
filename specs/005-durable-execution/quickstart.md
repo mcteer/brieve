@@ -14,8 +14,13 @@ Model: [data-model](./data-model.md).
 - `main` includes 002 governed core, 003 per-task authority, 004 primary adapter
 - Python 3.12+, `uv`, `make`
 - **The local enclave.** Unlike 001–004, durability validation is not hermetic. `make dev-up`
-  brings up Terraform → Vault → Nomad → the scheduled Postgres, per
-  [CONTRIBUTING.md](../../CONTRIBUTING.md) and [`infra/dev-enclave`](../../infra/dev-enclave/)
+  brings up Terraform → Vault → Nomad → the long-lived Postgres, per
+  [CONTRIBUTING.md](../../CONTRIBUTING.md) and [`infra/dev-enclave`](../../infra/dev-enclave/).
+  Postgres persists across runs — a checkpoint that vanishes with the process proves nothing
+- **No database password anywhere.** Credentials come from the control-plane Vault's dynamic
+  database secrets engine, under the workload's own identity. If you find yourself looking for a
+  DSN to export, something is wrong — that is the failure mode this arrangement exists to make
+  loud
 - No live model provider, no live managed-product API — that part of the determinism bar survives
   unchanged (SC-010)
 

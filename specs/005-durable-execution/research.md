@@ -47,11 +47,16 @@
   they hold it). A monotonic fencing token independent of identity (works, but duplicates
   information the allocation identity already carries).
 
-## Decision: PostgreSQL as the durability provider, scheduled by Nomad
+## Decision: PostgreSQL as the durability provider, long-lived in the stack
 
-- **Decision**: `PostgresDurabilityProvider` is the real implementation.
-  `InMemoryDurabilityProvider` from 004 survives as a test double for suites unrelated to
-  durability. The durability conformance rows run against Postgres.
+- **Decision**: `PostgresDurabilityProvider` is the real implementation, backed by a **long-lived
+  Postgres container** rather than one stood up per suite. `InMemoryDurabilityProvider` from 004
+  survives as a test double for suites unrelated to durability. The durability conformance rows
+  run against Postgres.
+- **On who schedules it**: Nomad does today (see the jobspec in `infra/dev-enclave/jobs/`), and
+  nothing in this feature depends on that. What the feature depends on is that the database
+  **outlives any individual run** — a checkpoint written to storage that disappears with the
+  process is not durability, it is a variable with extra steps.
 - **Rationale**: The spec's corrected assumption, ADR-0024's Lean default, ADR-0048. Postgres is
   a component this project deploys; substituting a lighter datastore means the durability code
   ships untested against what it runs on. It also gives the transactional conditional update the
@@ -63,6 +68,25 @@
 - **Alternatives considered**: SQLite (a different technology from what production runs — the
   substitution this project's principle rejects). A file-backed provider (same objection, plus it
   would have to reimplement the transactional guarantees Postgres provides).
+
+## Decision: Database credentials come from Vault's dynamic database secrets engine
+
+- **Decision**: The harness obtains its Postgres credentials from the control-plane Vault's
+  **database secrets engine**, minted per workload and short-lived. No DSN with a password is
+  handed to the process, and no shared standing database credential exists.
+- **Rationale**: FR-017a and Principle IV. A static database password is a standing credential
+  wherever it sits — jobspec, environment, secret file — and Principle IV admits no exception for
+  "it's only the database." The licensed engine is available, so the compliant path is also the
+  available one.
+- **The consequence worth naming**: the harness must authenticate to Vault *before* it can reach
+  the database, and under ADR-0048 its only route to doing so is its Nomad workload identity. The
+  database path therefore runs **through** the attestation chain rather than beside it. A process
+  with no attested identity cannot open a connection at all — a stronger and earlier failure than
+  a policy check, and one that cannot be forgotten.
+- **Alternatives considered**: A static role with a rotated password (still standing between
+  rotations, and rotation is an operational promise rather than a structural property). A
+  bootstrap DSN for tests with dynamic credentials proven separately (proves the mechanism in a
+  place the product does not use it, which is the substitution this project's principle rejects).
 
 ## Decision: Non-repeatable tool calls are bracketed; repeatability is registry metadata
 
@@ -127,12 +151,15 @@
 
 ## Open — owned by the deployment-tree feature
 
-Recorded rather than resolved; see plan.md's Technical Context. Each has a working reference in
-`infra/dev-enclave` that constrains the answer without settling it.
+Recorded rather than resolved; see plan.md's Technical Context. `infra/dev-enclave` is a working
+reference that constrains both without settling them.
 
-1. Whether durability tests execute inside a Nomad allocation or on the host.
-2. Whether the harness gets Postgres credentials dynamically from Vault or via a bootstrap DSN.
-3. What `make dev-up` guarantees on exit.
+1. Whether durability tests execute inside a Nomad allocation or on the host. The credential
+   decision above narrows this: a host-run test process has no workload identity and therefore no
+   route to a database credential, so either the suite runs as an allocation or the deployment
+   tree defines another attested identity for it.
+2. What `make dev-up` guarantees on exit — including whether the database secrets engine and its
+   dynamic role are configured by then.
 
-None affects the seam, the entities, or the conformance rows below — which is why the design
-proceeds without them.
+Neither affects the seam, the entities, or the conformance rows — which is why the design proceeds
+without them.
