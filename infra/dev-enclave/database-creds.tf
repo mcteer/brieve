@@ -48,6 +48,11 @@ resource "vault_database_secret_backend_role" "harness" {
 
   creation_statements = [
     "CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';",
+    # Membership in the parent role is what makes the schema usable across credentials.
+    # Without it, tables created under one dynamic user are unowned by the next, and
+    # migrations fail with "must be owner of table" the moment a lease rolls over. The
+    # provider does SET ROLE on connect so every object is owned by ${var.postgres_bootstrap_user}.
+    "GRANT \"${var.postgres_bootstrap_user}\" TO \"{{name}}\";",
     "GRANT ALL PRIVILEGES ON DATABASE \"${var.postgres_database}\" TO \"{{name}}\";",
     "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"{{name}}\";",
     "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"{{name}}\";",

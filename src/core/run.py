@@ -5,12 +5,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from core.audit.schema import AuditEventType
 from core.audit.sink import AuditSink, InMemoryAuditSink, build_next_entry
 from core.authority.clock import Clock, SystemClock
 from core.authority.errors import AuthorityRefuseError
 from core.authority.fabric import IdentityFabric
+from core.authority.grant import DelegationGrant
 from core.authority.hashing import content_hash
 from core.authority.manufacture import manufacture_authority
 from core.authority.types import AuthorityScope, TaskCredentialRef
@@ -20,10 +22,35 @@ from core.hooks.governance import builtin_governance_hooks
 from core.hooks.types import HookRegistration
 from core.registry.memory import ToolRegistry
 
+if TYPE_CHECKING:
+    # Type-only: importing the durability package at runtime would cycle back here
+    # through resume.py, which needs RunState.
+    from core.bounds import BoundsTracker
+    from core.durability.lease import RunLease
+    from core.durability.types import DurabilityProvider
+
 
 class RunState(StrEnum):
+    """Terminal states are three, not one.
+
+    002 shipped ACTIVE and REFUSED, which sufficed while nothing had to survive a
+    restart. Durable execution needs all three distinctions: without COMPLETED a resume
+    attempt against a finished run re-enters the loop, and calling a bounded stop PARKED
+    would invite resuming past the bound.
+    """
+
     ACTIVE = "active"
     REFUSED = "refused"
+    #: Finished its work.
+    COMPLETED = "completed"
+    #: Halted by an execution bound; ``stop_reason`` records which one.
+    STOPPED = "stopped"
+    #: Waiting for something only a human can supply. Resumable; not failed.
+    PARKED = "parked"
+
+    def is_terminal(self) -> bool:
+        """True when there is nothing left to resume."""
+        return self in {RunState.REFUSED, RunState.COMPLETED, RunState.STOPPED}
 
 
 @dataclass
@@ -41,6 +68,20 @@ class GovernedRun:
     clock: Clock
     hooks: list[HookRegistration] = field(default_factory=list)
     state: RunState = RunState.ACTIVE
+    #: Set on the transition to STOPPED, so FR-011's "reason recorded" is data.
+    stop_reason: str | None = None
+    #: Durable consent this run proceeds under (005). None for un-granted 002/003 runs.
+    grant: DelegationGrant | None = None
+    #: Single-writer claim. None when the run is not durability-managed.
+    lease: RunLease | None = None
+    #: Stable id for lease and bracket records. Defaults to the correlation id.
+    run_id: str = ""
+    #: Where checkpoints and brackets go. None for 002/003-era runs.
+    durability: DurabilityProvider | None = None
+    #: Progress against execution bounds, advanced by the invoke path.
+    bounds: BoundsTracker | None = None
+    #: Monotonic step counter; the resume point recorded on each checkpoint.
+    step_index: int = 0
     probe_log: list[str] = field(default_factory=list)
     # Recomputed by the authority hook on every invoke; issue-time authority never widens it.
     live_effective: AuthorityScope | None = None

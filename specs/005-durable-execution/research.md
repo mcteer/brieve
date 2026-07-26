@@ -65,6 +65,13 @@
   no feature had introduced an operated service. That was wrong on the facts — `make dev-up` had
   been reserved since 001 and documented as bringing up Postgres, and the Integration test tier
   already named it a real backing service.
+- **Driver: pg8000, not psycopg.** The plan named `psycopg` (v3) as the default choice and
+  it is the better-known driver, but it is **LGPL-3.0-only**, which this repository
+  refuses twice over: absent from `licenses/allowlist.txt`, and matched by
+  `scripts/check-licenses.sh`'s second-belt deny on the GPL family. Taking it would have
+  meant weakening a governance control to accommodate a dependency choice, which is
+  backwards. pg8000 is BSD-3-Clause, pure Python (no libpq to install), and DB-API 2.0.
+  Found by CI, not by review — the gate did its job.
 - **Alternatives considered**: SQLite (a different technology from what production runs — the
   substitution this project's principle rejects). A file-backed provider (same objection, plus it
   would have to reimplement the transactional guarantees Postgres provides).
