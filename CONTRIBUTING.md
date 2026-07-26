@@ -147,15 +147,27 @@ travels through ordered stages, each producing a reviewable artifact under
 
 1. **`/speckit.specify`** — the specification: *what* and *why*, never *how*. Must
    declare which mandated requirements (R1–R17) and ADRs it implements or touches, and
-   its evidence class where compliance-relevant.
-2. **`/speckit.clarify`** — resolve the spec's open questions before planning.
+   its evidence class where compliance-relevant. *Run by the IDE harness, from the
+   context already in the repository — ADRs, roadmap, and prior specs.*
+2. **`/speckit.clarify`** — resolve the spec's open questions before planning. *Run by
+   the IDE harness.* Clarify **describes what the spec covers**; it is not where
+   architecture is decided. A technology choice, a new core package, or anything that
+   changes what contributors or CI must install belongs to the developer, raised as a
+   question rather than resolved as a clarification.
 3. **`/speckit.plan`** — the technical plan. Begins with a **Constitution Check**; a plan
-   that fails it does not proceed, it gets redesigned or the spec is withdrawn.
-4. **`/speckit.tasks`** — the ordered task list derived from the plan.
+   that fails it does not proceed, it gets redesigned or the spec is withdrawn. *Run by
+   the developer.*
+4. **`/speckit.tasks`** — the ordered task list derived from the plan. *Run by the
+   developer.*
 5. **`/speckit.analyze`** — consistency check across spec/plan/tasks. Findings that
-   implicate a constitutional principle block implementation.
+   implicate a constitutional principle block implementation. *Run by the developer.*
 6. **`/speckit.implement`** — only now does code get written, against the analyzed task
-   list.
+   list. *Run by the developer, after the planning PR has merged.*
+
+**Why the stages are split that way.** Specify and clarify describe; plan, tasks, and
+analyze commit to a design; implement commits to code. The stages that commit are invoked
+by a person, so advancing is a decision rather than a side effect of the harness finishing
+the previous stage.
 
 **Reviewing a spec.** Six questions, learned from the first feature cycles — a spec
 that passes all six is usually sound; a "no" on any is a finding to raise, not a nit:
