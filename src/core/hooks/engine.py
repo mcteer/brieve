@@ -18,6 +18,7 @@ from core.hooks.types import (
     HookPhase,
     HookRegistration,
 )
+from core.observation.bracket import bracket_call
 from core.redaction import redact_arguments, safe_error_code
 from core.run import GovernedRun, RunState
 from core.telemetry.spans import emit_hook_decision_span
@@ -226,11 +227,36 @@ def run_pipeline(
                 executed=False,
             )
 
-    # Execute tool body (attempt always counts as executed for post-hook / audit paths)
+    # Execute tool body (attempt always counts as executed for post-hook / audit paths).
+    #
+    # A non-repeatable tool is bracketed: an intent record before the effect and a
+    # result record after, so an interruption between them is resolvable by observation
+    # instead of by guessing (FR-007). Repeatable tools skip the bracket — paying for
+    # observation on every call would be correct but expensive, and repeatability is the
+    # tool author's declaration.
     execution_error_code: str | None = None
     tool_result: Any = None
+    bracket = (
+        run.durability is not None
+        and not registration.repeatable
+        and _idempotency_key(run, tool_name) is not None
+    )
     try:
-        tool_result = registration.handler(arguments)
+        if bracket:
+            assert run.durability is not None  # narrowed by `bracket`
+            key = _idempotency_key(run, tool_name)
+            assert key is not None
+            tool_result = bracket_call(
+                run.durability,
+                run_id=run.run_id or run.correlation_id,
+                step_index=run.step_index,
+                tool_name=tool_name,
+                idempotency_key=key,
+                clock=run.clock,
+                call=lambda: registration.handler(arguments),
+            )
+        else:
+            tool_result = registration.handler(arguments)
     except Exception as exc:
         execution_error_code = safe_error_code(exc)
 
@@ -411,3 +437,16 @@ def _deny_pre(
         message=message,
         executed=False,
     )
+
+
+def _idempotency_key(run: GovernedRun, tool_name: str) -> str | None:
+    """Stable across retries of the same step, distinct across steps (FR-010).
+
+    Derived from run and step rather than from arguments: two identical calls at
+    different points in a run are different steps, and a retry of one step is the same
+    step even if its arguments were re-serialised differently.
+    """
+    run_id = run.run_id or run.correlation_id
+    if not run_id:
+        return None
+    return f"{run_id}:{run.step_index}:{tool_name}"

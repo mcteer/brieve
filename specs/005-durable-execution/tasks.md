@@ -128,19 +128,19 @@ step showing exactly one execution across the whole run
 
 ### Tests for User Story 1
 
-- [ ] T022 [P] [US1] Add `tests/component/test_resume.py` — disrupt a multi-step run in-process, resume, assert it completes
-- [ ] T023 [P] [US1] Assert already-completed steps show **exactly one** execution across the whole run, not one per segment (SC-001) in `tests/component/test_resume.py`
-- [ ] T024 [P] [US1] [GATE:correlation] Assert `assert_correlated` / `assert_audit_chain` join both segments under one correlation ID with the hash chain intact across the disruption boundary (FR-015, SC-008)
+- [X] T022 [P] [US1] Add `tests/component/test_resume.py` — disrupt a multi-step run in-process, resume, assert it completes
+- [X] T023 [P] [US1] Assert already-completed steps show **exactly one** execution across the whole run, not one per segment (SC-001) in `tests/component/test_resume.py`
+- [X] T024 [P] [US1] [GATE:correlation] Assert `assert_correlated` / `assert_audit_chain` join both segments under one correlation ID with the hash chain intact across the disruption boundary (FR-015, SC-008)
 - [ ] T024a [US1] Add `tests/component/test_resume_cross_process.py` (quickstart Scenario A2), a Postgres-backed scenario that crosses a **genuine process boundary** — write checkpoints in one process, resume in another — so durability is demonstrated rather than asserted. plan.md and research.md both commit to this; a suite that only tears down and rebuilds in-process proves the code reloads its own state, not that the state survived anything. This is the one exception to in-process simulation, and it does not violate FR-016: restarting a test process is not terminating real infrastructure
-- [ ] T025 [P] [US1] [GATE:fail-closed] Add `tests/component/test_checkpoint_failure.py` — an unwritable checkpoint stops the step rather than letting it proceed unrecorded, and an unreadable or corrupt checkpoint parks or refuses rather than resuming on partial state
+- [X] T025 [P] [US1] [GATE:fail-closed] Add `tests/component/test_checkpoint_failure.py` — an unwritable checkpoint stops the step rather than letting it proceed unrecorded, and an unreadable or corrupt checkpoint parks or refuses rather than resuming on partial state
 
 ### Implementation for User Story 1
 
-- [ ] T026 [US1] Create `src/core/durability/resume.py` with `resume_run` — load checkpoint, acquire lease, re-manufacture authority, resolve open intents, continue
-- [ ] T026a [US1] Move a run to `COMPLETED` when its work finishes, and write that state to its checkpoint. **A state nothing writes is a state nothing can be trusted to mean** — T017 adds the value and T017a asserts on it, so without this the test passes against something no code produces
-- [ ] T027 [US1] Record `step_index`, `written_by`, and the current `run_state` on every checkpoint write in the invoke path so resume has a point to resume from and fencing has an identity to compare
-- [ ] T028 [US1] Ensure the resumed run invokes through the **same** `invoke_tool` path as the original — the bracket wraps that path rather than creating a second one (Principle II)
-- [ ] T029 [US1] Make checkpoint-write failure propagate at the call site; no swallow-and-continue anywhere on the durability path
+- [X] T026 [US1] Create `src/core/durability/resume.py` with `resume_run` — load checkpoint, acquire lease, re-manufacture authority, resolve open intents, continue
+- [X] T026a [US1] Move a run to `COMPLETED` when its work finishes, and write that state to its checkpoint. **A state nothing writes is a state nothing can be trusted to mean** — T017 adds the value and T017a asserts on it, so without this the test passes against something no code produces
+- [X] T027 [US1] Record `step_index`, `written_by`, and the current `run_state` on every checkpoint write in the invoke path so resume has a point to resume from and fencing has an identity to compare
+- [X] T028 [US1] Ensure the resumed run invokes through the **same** `invoke_tool` path as the original — the bracket wraps that path rather than creating a second one (Principle II)
+- [X] T029 [US1] Make checkpoint-write failure propagate at the call site; no swallow-and-continue anywhere on the durability path
 
 **Checkpoint**: Scenario A green; SC-001 and SC-008 hold; MVP demoable
 
@@ -160,14 +160,14 @@ credential recovered from durable state
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Add `tests/component/test_resume_authority.py` — resume under a valid grant manufactures fresh authority (SC-002)
-- [ ] T031 [P] [US2] [GATE:no-secret-leak] Assert a pre-disruption credential presented directly after resume is **rejected rather than honoured**
-- [ ] T032 [P] [US2] Extend `tests/unit/test_checkpoint_purity.py` to scan every checkpoint the whole suite produces, not only fixtures — SC-003 says "anywhere in the suite" and a scan of hand-built blobs would not show that
+- [X] T030 [P] [US2] Add `tests/component/test_resume_authority.py` — resume under a valid grant manufactures fresh authority (SC-002)
+- [X] T031 [P] [US2] [GATE:no-secret-leak] Assert a pre-disruption credential presented directly after resume is **rejected rather than honoured**
+- [X] T032 [P] [US2] Extend `tests/unit/test_checkpoint_purity.py` to scan every checkpoint the whole suite produces, not only fixtures — SC-003 says "anywhere in the suite" and a scan of hand-built blobs would not show that
 
 ### Implementation for User Story 2
 
-- [ ] T033 [US2] Implement re-attestation in `resume_run`: re-exchange under the surviving grant using the **current** allocation's identity; no parameter, field, or cache accepts a prior credential
-- [ ] T034 [US2] [GATE:no-secret-leak] Add a source-level check that no module under `src/core/durability/` or `src/core/authority/` reads credential material out of a checkpoint — a structural guard, since the property is the absence of a path rather than a behaviour to exercise
+- [X] T033 [US2] Implement re-attestation in `resume_run`: re-exchange under the surviving grant using the **current** allocation's identity; no parameter, field, or cache accepts a prior credential
+- [X] T034 [US2] [GATE:no-secret-leak] Add a source-level check that no module under `src/core/durability/` or `src/core/authority/` reads credential material out of a checkpoint — a structural guard, since the property is the absence of a path rather than a behaviour to exercise
 
 **Checkpoint**: Scenario B green; SC-002 and SC-003 hold
 
@@ -182,15 +182,15 @@ consent is renewed
 
 ### Tests for User Story 3
 
-- [ ] T035 [P] [US3] Add `tests/component/test_park_on_expiry.py` — disrupt, advance the frozen clock past grant expiry, attempt resume, assert `PARKED` and **zero** subsequent step executions (SC-004)
-- [ ] T036 [P] [US3] Assert a parked run is durable and queryable, and that supplying fresh consent lets it resume from its checkpoint
-- [ ] T037 [P] [US3] [GATE:fail-closed] Assert consent expiring **mid-run** parks at the same boundary it would on resume — the next step cannot be authorized, so there is one behaviour, not two
+- [X] T035 [P] [US3] Add `tests/component/test_park_on_expiry.py` — disrupt, advance the frozen clock past grant expiry, attempt resume, assert `PARKED` and **zero** subsequent step executions (SC-004)
+- [X] T036 [P] [US3] Assert a parked run is durable and queryable, and that supplying fresh consent lets it resume from its checkpoint
+- [X] T037 [P] [US3] [GATE:fail-closed] Assert consent expiring **mid-run** parks at the same boundary it would on resume — the next step cannot be authorized, so there is one behaviour, not two
 
 ### Implementation for User Story 3
 
-- [ ] T038 [US3] Implement the park transition in `src/core/run.py` and `resume.py` — parked is *waiting*, not failed, and is recorded as such
-- [ ] T039 [US3] Ensure grant expiry is checked before any step executes on resume, and that a parked run holds no live authority
-- [ ] T040 [US3] Record parking in the audit trail with the blocking reason, so an operator can tell "needs fresh consent" from "needs a human to resolve a step"
+- [X] T038 [US3] Implement the park transition in `src/core/run.py` and `resume.py` — parked is *waiting*, not failed, and is recorded as such
+- [X] T039 [US3] Ensure grant expiry is checked before any step executes on resume, and that a parked run holds no live authority
+- [X] T040 [US3] Record parking in the audit trail with the blocking reason, so an operator can tell "needs fresh consent" from "needs a human to resolve a step"
 
 **Checkpoint**: Scenario C green; SC-004 holds
 
@@ -205,18 +205,18 @@ directions, and an unobservable one parks
 
 ### Tests for User Story 4
 
-- [ ] T041 [P] [US4] Add `tests/component/test_reobservation.py` — interrupt between intent and result; `happened` → step not repeated
-- [ ] T042 [P] [US4] Add the opposite direction to the same module — `did_not_happen` → step proceeds. **Both directions are required**: a suite that only tests one proves the platform can skip, not that it can decide
-- [ ] T043 [P] [US4] [GATE:fail-closed] Assert `cannot_determine` parks for human resolution and never resolves to a guess (FR-008)
-- [ ] T044 [P] [US4] [GATE:correlation] Assert the intent record, the observation, and the resolution are all present in the audit trail and joined to the run (SC-005)
-- [ ] T045 [P] [US4] Assert an unreachable external system yields `cannot_determine` rather than an assumed outcome
+- [X] T041 [P] [US4] Add `tests/component/test_reobservation.py` — interrupt between intent and result; `happened` → step not repeated
+- [X] T042 [P] [US4] Add the opposite direction to the same module — `did_not_happen` → step proceeds. **Both directions are required**: a suite that only tests one proves the platform can skip, not that it can decide
+- [X] T043 [P] [US4] [GATE:fail-closed] Assert `cannot_determine` parks for human resolution and never resolves to a guess (FR-008)
+- [X] T044 [P] [US4] [GATE:correlation] Assert the intent record, the observation, and the resolution are all present in the audit trail and joined to the run (SC-005)
+- [X] T045 [P] [US4] Assert an unreachable external system yields `cannot_determine` rather than an assumed outcome
 
 ### Implementation for User Story 4
 
-- [ ] T046 [US4] Wrap calls to non-repeatable tools in the intent/result bracket in the invoke path
-- [ ] T047 [US4] Implement open-intent resolution in `resume_run` — ask the tool's `Observer`, act on the answer, record the resolution
-- [ ] T048 [US4] Identify which currently registered tools are non-repeatable and mark them. Record in the PR that this is an **ongoing obligation** every future non-repeatable tool inherits, not a one-time pass — ADR-0026 puts the implementation difficulty here
-- [ ] T049 [US4] Implement stable idempotency keys so a repeat of the same step is recognizable as the same step rather than a new one (FR-010)
+- [X] T046 [US4] Wrap calls to non-repeatable tools in the intent/result bracket in the invoke path
+- [X] T047 [US4] Implement open-intent resolution in `resume_run` — ask the tool's `Observer`, act on the answer, record the resolution
+- [X] T048 [US4] Identify which currently registered tools are non-repeatable and mark them. Record in the PR that this is an **ongoing obligation** every future non-repeatable tool inherits, not a one-time pass — ADR-0026 puts the implementation difficulty here
+- [X] T049 [US4] Implement stable idempotency keys so a repeat of the same step is recognizable as the same step rather than a new one (FR-010)
 
 **Checkpoint**: Scenario D green; SC-005 holds
 
@@ -231,16 +231,16 @@ comparison — zero side effects, zero state mutation
 
 ### Tests for User Story 5
 
-- [ ] T050 [P] [US5] Add `tests/component/test_fencing.py` — resume while a prior instance is still active; the prior instance's tool call is rejected with **no side effect** (SC-006)
-- [ ] T051 [P] [US5] Assert the prior instance's checkpoint write is rejected and does not overwrite current state
-- [ ] T052 [P] [US5] Assert the rejection is **distinguishable from an ordinary denial** in the audit trail — an operator reading "denied" should be able to tell a superseded writer from a policy refusal
-- [ ] T053 [P] [US5] Assert two simultaneous resume attempts end with exactly one lease holder and the other **refused, not queued**
+- [X] T050 [P] [US5] Add `tests/component/test_fencing.py` — resume while a prior instance is still active; the prior instance's tool call is rejected with **no side effect** (SC-006)
+- [X] T051 [P] [US5] Assert the prior instance's checkpoint write is rejected and does not overwrite current state
+- [X] T052 [P] [US5] Assert the rejection is **distinguishable from an ordinary denial** in the audit trail — an operator reading "denied" should be able to tell a superseded writer from a policy refusal
+- [X] T053 [P] [US5] Assert two simultaneous resume attempts end with exactly one lease holder and the other **refused, not queued**
 
 ### Implementation for User Story 5
 
-- [ ] T054 [US5] Implement lease acquisition and fencing in `src/core/durability/lease.py` and the Postgres provider as a single conditional update
-- [ ] T055 [US5] Gate every tool call and checkpoint write on `check_lease`, rejecting a superseded holder on comparison rather than racing
-- [ ] T056 [US5] Add a distinct reason code for supersession so T052's assertion has something to assert on
+- [X] T054 [US5] Implement lease acquisition and fencing in `src/core/durability/lease.py` and the Postgres provider as a single conditional update
+- [X] T055 [US5] Gate every tool call and checkpoint write on `check_lease`, rejecting a superseded holder on comparison rather than racing
+- [X] T056 [US5] Add a distinct reason code for supersession so T052's assertion has something to assert on
 
 **Checkpoint**: Scenario E green; SC-006 holds
 
@@ -254,15 +254,15 @@ comparison — zero side effects, zero state mutation
 
 ### Tests for User Story 6
 
-- [ ] T057 [P] [US6] Add `tests/unit/test_bounds.py` — maximum duration stops the run with the reason recorded
-- [ ] T058 [P] [US6] Add the step-limit case to the same module
-- [ ] T059 [P] [US6] Add the stuck-wait watchdog case to the same module (SC-007 requires all three)
-- [ ] T060 [P] [US6] [GATE:fail-closed] Assert a bounded stop performs no further steps and releases authority
+- [X] T057 [P] [US6] Add `tests/unit/test_bounds.py` — maximum duration stops the run with the reason recorded
+- [X] T058 [P] [US6] Add the step-limit case to the same module
+- [X] T059 [P] [US6] Add the stuck-wait watchdog case to the same module (SC-007 requires all three)
+- [X] T060 [P] [US6] [GATE:fail-closed] Assert a bounded stop performs no further steps and releases authority
 
 ### Implementation for User Story 6
 
-- [ ] T061 [US6] Check bounds where the run advances in `src/core/tools/invoke.py` and `src/core/run.py` — not in a background timer, whose failure would silently unbound the run
-- [ ] T062 [US6] Move the run to `STOPPED` and set `stop_reason` on the transition, so SC-007's "with the reason recorded" is satisfied by data rather than by a log line
+- [X] T061 [US6] Check bounds where the run advances in `src/core/tools/invoke.py` and `src/core/run.py` — not in a background timer, whose failure would silently unbound the run
+- [X] T062 [US6] Move the run to `STOPPED` and set `stop_reason` on the transition, so SC-007's "with the reason recorded" is satisfied by data rather than by a log line
 
 **Checkpoint**: Scenario F first half green; SC-007 holds
 

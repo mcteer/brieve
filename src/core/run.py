@@ -25,7 +25,9 @@ from core.registry.memory import ToolRegistry
 if TYPE_CHECKING:
     # Type-only: importing the durability package at runtime would cycle back here
     # through resume.py, which needs RunState.
+    from core.bounds import BoundsTracker
     from core.durability.lease import RunLease
+    from core.durability.types import DurabilityProvider
 
 
 class RunState(StrEnum):
@@ -72,6 +74,14 @@ class GovernedRun:
     grant: DelegationGrant | None = None
     #: Single-writer claim. None when the run is not durability-managed.
     lease: RunLease | None = None
+    #: Stable id for lease and bracket records. Defaults to the correlation id.
+    run_id: str = ""
+    #: Where checkpoints and brackets go. None for 002/003-era runs.
+    durability: DurabilityProvider | None = None
+    #: Progress against execution bounds, advanced by the invoke path.
+    bounds: BoundsTracker | None = None
+    #: Monotonic step counter; the resume point recorded on each checkpoint.
+    step_index: int = 0
     probe_log: list[str] = field(default_factory=list)
     # Recomputed by the authority hook on every invoke; issue-time authority never widens it.
     live_effective: AuthorityScope | None = None
