@@ -53,6 +53,7 @@ is no window where a contributor has no working enclave.
 - [ ] T002 [P] Move `infra/dev-enclave/jobs/*.nomad.hcl` to `infra/jobs/`, unchanged. Moving before rewriting keeps the diff for the rewrite honest
 - [ ] T003 [P] Move `infra/dev-enclave/nomad/client.hcl` to `infra/nomad/client.hcl`. It enables the container driver's volume mounts, which the scheduler refuses by default — a constraint the production tree inherits, not a dev wrinkle
 - [ ] T004 Add `infra/.gitignore` covering `.terraform/`, `*.tfstate*`, and `*.tfvars`. State is currently committed-adjacent under `dev-enclave/`; the new roots must never repeat that
+- [ ] T004a Create `infra/README.md` with its section headings and nothing else — layout, the two axes, bring-up contract, posture dispositions, failure catalogue, substrate requirements. **Created first because four later tasks write into it** (T015, T040, T042, T047); a file authored at the end would overwrite them, and the two things lost would be the HA deferral and the failure catalogue — the writing in this feature most worth keeping
 
 ---
 
@@ -70,7 +71,7 @@ is no window where a contributor has no working enclave.
 - [ ] T010 Create `infra/modules/trust-fabric/pki.tf` — PKI mount, control-plane CA, and a role issuing the trust store's own certificate
 - [ ] T011 [GATE:no-secret-leak] Create `infra/modules/trust-fabric/outputs.tf` — auth path, credential path, CA certificate, and `configuration_digest`. Assert no output carries a token, key, or password; a module output is the easiest place for one to escape into a root's state
 - [ ] T012 Implement `configuration_digest` per `data-model.md` — a stable hash over auth methods, roles, policies, secrets engines, registry entries, and database roles. **Exclude everything substrate-derived**; including an address makes the digests differ by construction and the comparison worthless. **Compute it from resolved inputs and literal configuration, never from resource attributes** — a digest hashing a mount accessor or an entity id resolves to "known after apply", and SC-001's plan-level comparison then compares two unknowns and passes while proving nothing
-- [ ] T012a [GATE:fail-closed] Assert the digest is a known value at plan time. Without this the failure in T012 is silent: the comparison succeeds, the criterion reports green, and nobody learns the two trees diverged
+- [ ] T012a [GATE:fail-closed] Assert the digest is a known value at plan time — inspect `terraform show -json <plan>` and fail if the digest output appears under `after_unknown`. Name the mechanism, because otherwise the likely implementation is a human reading a plan, which is what this task exists to replace. Without it the failure in T012 is silent: the comparison succeeds, the criterion reports green, and nobody learns the two trees diverged
 - [ ] T013 (FR-012) [GATE:fail-closed] Add a precondition refusing apply when the trust store is sealed. A configuration tool that cannot read concludes the resources are absent and discards its record of them; the next apply then fails trying to create what exists
 
 **Checkpoint**: `trust-fabric` applies against the existing dev Vault and produces a digest.
@@ -97,7 +98,7 @@ is no window where a contributor has no working enclave.
 - [ ] T020 [US1] [GATE:conformance] Wire `make enclave-digest-diff` and assert identical digests across the two roots (SC-001)
 - [ ] T021 [US1] Add a check that `infra/modules/trust-fabric/` references no substrate resource and no substrate-only provider — invariant 1 of `contracts/module-interface.md`, which is a property of the source and so is checkable by reading it
 - [ ] T022 [US1] Add the mirror check: no `substrate-*` module creates a policy, role, registry entry, or secrets engine (invariant 2). One direction alone would let the delta escape the other way
-- [ ] T022a [US1] [GATE:fail-closed] Assert **no substrate module schedules the trust store** (FR-004). Currently satisfied incidentally — `substrate-docker` happens to create the container directly — and a MUST NOT satisfied by accident is a convention. This is the rule ADR-0048 rests on, for two independent reasons: containment (the identity record must not live in the substrate whose access it constrains) and circularity (the scheduler is itself a client of the store, so that arrangement has no cold start that terminates)
+- [ ] T022a [US1] [GATE:fail-closed] Assert **no substrate module submits the trust store as a scheduler workload** (FR-004) — no jobspec, no scheduler API call, no scheduler-managed allocation for it. **The constraint is scheduling, not packaging** (ADR-0048, verbatim: "A container Nomad does not manage is a peer of the substrate, not a resource inside it"). `substrate-docker` creating the trust-store container directly is *correct* and must keep passing this check; a check that forbids it has read the rule as "must not be containerized", which ADR-0048 calls out as a misreading with real cost — it would rule out the most convenient way to run a pinned version in development. The rule matters for two independent reasons: containment (the identity record must not live in the substrate whose access it constrains) and circularity (the scheduler is itself a client of the store, so that arrangement has no cold start that terminates)
 
 **Checkpoint**: Scenario D green; SC-001 holds. The feature is demonstrable.
 
@@ -181,7 +182,7 @@ is no window where a contributor has no working enclave.
 
 ## Phase 9: Polish
 
-- [ ] T047 [P] Write `infra/README.md` — layout, the two axes (substrate and profile), bring-up contract, posture dispositions, failure catalogue, and what an alternative substrate must supply per `contracts/substrate-requirements.md`
+- [ ] T047 [P] Complete and review `infra/README.md` — fill the sections T015, T040, and T042 did not, and check the whole reads as one document rather than four appends. **Do not rewrite it**: the substrate rationale, the HA deferral, and the failure catalogue are already there and are the parts worth keeping
 - [ ] T048 [P] Document in `contracts/substrate-requirements.md` terms what Kubernetes would have to demonstrate — the same conformance assertions, not an analogous story (FR-014)
 - [ ] T049 [GATE:no-secret-leak] Sweep state, outputs, digests, and entry-point logs for credential material. `.env` values are quoted, and passing the quotes through once made the trust store reject its licence with an error that named neither quoting nor the licence
 - [ ] T050 Review the diff against the scope bound: `src/` untouched, one deletion in `tests/`. Anything else is out of scope for this feature
@@ -203,6 +204,9 @@ the proof directory before its state is migrated orphans 15 live resources.
 
 **Parallel**: T002/T003 in setup; T006–T008 in Phase 2 (different files); T014/T015 across
 substrates; T039/T040 in US4; T047/T048 in polish.
+
+**`infra/README.md` accretes**: T004a creates the skeleton, T015/T040/T042 write into it, T047
+completes and reviews. Anything that *rewrites* it drops the earlier three.
 
 ### Parallel example after Phase 3
 
