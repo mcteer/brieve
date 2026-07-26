@@ -15,6 +15,25 @@ DIGEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools/digest" && pwd)"
 cd "$DIGEST_DIR"
 
 [ -d .terraform ] || terraform init -backend=false -input=false >/dev/null
+
+# The digest must be a KNOWN value at plan time, not "known after apply". A digest
+# derived from resource attributes resolves to unknown, and the comparison then compares
+# two unknowns and passes while proving nothing — a green that means less than it looks.
+plan="$(mktemp -t enclave-digest)"
+terraform plan -out="$plan" -input=false >/dev/null
+if terraform show -json "$plan" | python3 -c '
+import json, sys
+p = json.load(sys.stdin)
+after_unknown = (p.get("output_changes", {}).get("digest_containers", {}) or {}).get("after_unknown")
+sys.exit(0 if after_unknown is True else 1)
+'; then
+  printf "\033[31mSC-001 CANNOT BE CHECKED\033[0m — the digest is unknown until apply.\n" >&2
+  printf "  It is derived from a resource attribute somewhere; it must come from resolved\n" >&2
+  printf "  inputs and literal configuration only.\n" >&2
+  rm -f "$plan"; exit 1
+fi
+rm -f "$plan"
+
 terraform apply -auto-approve -input=false >/dev/null
 
 a="$(terraform output -raw digest_containers)"

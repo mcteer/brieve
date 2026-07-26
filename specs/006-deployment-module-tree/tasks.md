@@ -151,12 +151,12 @@ is no window where a contributor has no working enclave.
 
 **Independent Test**: quickstart Scenario G
 
-- [ ] T037 [US4] Implement TLS in `infra/modules/trust-fabric/pki.tf` and the substrate listener config — self-signed bootstrap certificate, replaced by a PKI-issued one **as part of apply**, not as a follow-up someone forgets. The first certificate cannot come from a PKI that is not yet serving; that circularity is the same shape as ADR-0048's, with the same resolution
-- [ ] T038 [US4] (FR-011) Implement bootstrap-credential revocation for `profile = "production"` only. Development keeps the root token deliberately — revoking it there breaks the re-apply loop, and an enclave nobody re-applies costs more safety than the retained token does on a workstation
+- [X] T037 [US4] Implement TLS in `infra/modules/trust-fabric/pki.tf` and the substrate listener config — self-signed bootstrap certificate, replaced by a PKI-issued one **as part of apply**, not as a follow-up someone forgets. The first certificate cannot come from a PKI that is not yet serving; that circularity is the same shape as ADR-0048's, with the same resolution
+- [X] T038 [US4] (FR-011) Implement bootstrap-credential revocation for `profile = "production"` only. Development keeps the root token deliberately — revoking it there breaks the re-apply loop, and an enclave nobody re-applies costs more safety than the retained token does on a workstation
 - [ ] T038a [US4] Update every client of the trust store for TLS — `Makefile`'s hardcoded `http://127.0.0.1:8200`, `.env`, `infra/bin/*`, the conformance job, and the CA trust each needs. **T037 is not done until this is**: enabling TLS makes the environment correct and every tool talking to it broken, which presents as "the enclave is down" and is not
-- [ ] T039 [P] [US4] Implement the `seal_config` seam: a production root can express auto-unseal without editing `trust-fabric`; the development default remains 1-of-1 shamir
-- [ ] T040 [P] [US4] Record the HA deferral in `infra/README.md` with its named trigger, **and** its consequence: 005's conformance caveat persists, so landing this feature does not close it
-- [ ] T041 [US4] [GATE:fail-closed] Assert all four items carry a non-empty disposition (SC-007). Silence is the failure FR-010 exists to prevent; deferral is not
+- [X] T039 [P] [US4] Implement the `seal_config` seam: a production root can express auto-unseal without editing `trust-fabric`; the development default remains 1-of-1 shamir
+- [X] T040 [P] [US4] Record the HA deferral in `infra/README.md` with its named trigger, **and** its consequence: 005's conformance caveat persists, so landing this feature does not close it
+- [X] T041 [US4] [GATE:fail-closed] Assert all four items carry a non-empty disposition (SC-007). Silence is the failure FR-010 exists to prevent; deferral is not
 
 **Checkpoint**: Scenario G green; SC-007 and SC-008 hold.
 
@@ -183,9 +183,9 @@ is no window where a contributor has no working enclave.
 ## Phase 9: Polish
 
 - [X] T047 [P] Complete and review `infra/README.md` — fill the sections T015, T040, and T042 did not, and check the whole reads as one document rather than four appends. **Do not rewrite it**: the substrate rationale, the HA deferral, and the failure catalogue are already there and are the parts worth keeping
-- [ ] T048 [P] Document in `contracts/substrate-requirements.md` terms what Kubernetes would have to demonstrate — the same conformance assertions, not an analogous story (FR-014)
-- [ ] T049 [GATE:no-secret-leak] Sweep state, outputs, digests, and entry-point logs for credential material. `.env` values are quoted, and passing the quotes through once made the trust store reject its licence with an error that named neither quoting nor the licence
-- [ ] T050 Review the diff against the scope bound: `src/` untouched, one deletion in `tests/`. Anything else is out of scope for this feature
+- [X] T048 [P] Document in `contracts/substrate-requirements.md` terms what Kubernetes would have to demonstrate — the same conformance assertions, not an analogous story (FR-014)
+- [X] T049 [GATE:no-secret-leak] Sweep state, outputs, digests, and entry-point logs for credential material. `.env` values are quoted, and passing the quotes through once made the trust store reject its licence with an error that named neither quoting nor the licence
+- [X] T050 Review the diff against the scope bound: `src/` untouched, one deletion in `tests/`. Anything else is out of scope for this feature
 - [ ] T051 Open `feat/006-deployment-module-tree` with the FR-010 dispositions, the HA deferral and its consequence, and the `infra/dev-enclave` deletion called out
 
 ---

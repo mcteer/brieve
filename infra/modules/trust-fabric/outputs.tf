@@ -48,3 +48,8 @@ output "configuration_elements" {
   value       = module.digest.elements
   description = "The digest's inputs, so a mismatch can be diffed rather than merely reported."
 }
+
+output "production_posture" {
+  value       = local.production_posture
+  description = "Each of the four items with its disposition and reason. Deferral is acceptable; silence is not (FR-010)."
+}
