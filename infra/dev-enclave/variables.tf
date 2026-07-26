@@ -28,6 +28,36 @@ variable "nomad_jwks_url" {
   default     = "http://host.docker.internal:4646/.well-known/jwks.json"
 }
 
+variable "postgres_host" {
+  description = "Postgres as reachable FROM the Vault container. On Docker Desktop the host is host.docker.internal."
+  type        = string
+  default     = "host.docker.internal:5432"
+}
+
+variable "postgres_database" {
+  type    = string
+  default = "brieve"
+}
+
+variable "postgres_bootstrap_user" {
+  description = "Account Vault's database engine connects as to create dynamic roles. Not used by the harness."
+  type        = string
+  default     = "brieve"
+}
+
+variable "postgres_bootstrap_password" {
+  description = "Bootstrap only, and rotated out of this value on first apply. See database-creds.tf."
+  type        = string
+  sensitive   = true
+  default     = "dev-only-not-a-secret"
+}
+
+variable "harness_job_id" {
+  description = "Nomad job ID permitted to read dynamic database credentials. Bound as a JWT claim so the attestation is load-bearing rather than decorative."
+  type        = string
+  default     = "harness"
+}
+
 variable "agent_definitions" {
   description = "Agent definitions registered in Vault's agent registry, each with its ceiling policies (Principle IV)."
   type = map(object({
