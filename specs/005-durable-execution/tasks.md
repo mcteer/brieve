@@ -48,7 +48,7 @@ of each story.
 - Core durability: `src/core/durability/` (`types.py`, `memory.py`, `postgres.py`, `schema.sql`, `lease.py`, `resume.py`)
 - Core observation: `src/core/observation/` (`types.py`, `bracket.py`)
 - Core: `src/core/bounds.py`, `src/core/run.py`, `src/core/registry/memory.py`
-- Harness: `tests/harness/durability_fixtures.py`
+- Test harness (fakes/fixtures, not the product): `tests/harness/durability_fixtures.py`
 - Tests: `tests/unit/`, `tests/component/`, `tests/conformance/durability/`
 - Config: `pyproject.toml`, `Makefile`, `.github/workflows/ci.yml`
 
@@ -107,7 +107,7 @@ provider, lease, bracket, bounds, parked state, and the harness fixtures
 - [ ] T017a [P] Unit test `tests/unit/test_run_states.py` — a resume attempt against a `COMPLETED` or `STOPPED` run does not re-enter the run loop; `STOPPED` carries a `stop_reason`
 - [ ] T018 [P] Add a repeatable flag and an optional `Observer` to `ToolRegistration` in `src/core/registry/memory.py`; repeatability is the tool author's declaration, not inferred from `product_mode`
 
-### Harness
+### Test harness
 
 - [ ] T018a [P] [GATE:no-secret-leak] Unit test `tests/unit/test_database_policy_placement.py` — the database policy belongs to the **workload identity**, never to per-step authority manufactured for an agent. Assert no agent definition's ceiling and no manufactured `TaskCredentialRef` can reach the credential path. Backwards, this is serious: database access inside a definition's ceiling would let a model-chosen tool call reach the checkpoint store, which is the run's own record of what it has done
 - [ ] T019 Create `tests/harness/durability_fixtures.py` — in-process disruption (tear a run down, rebuild from checkpoint), a fake `Observer` scriptable to each of the three outcomes, grant helpers, and a Postgres-backed provider fixture that obtains credentials the way the harness does

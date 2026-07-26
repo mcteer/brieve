@@ -119,6 +119,91 @@ done.
 the suite in an allocation and returns exit status and output. That is a build detail, and it
 changes nothing below.
 
+### How run state is recorded and retrieved
+
+Written out because the design was not legible from the artifacts without it, and because the
+layers are easy to collapse — with real consequences, since collapsing them is how one concludes
+the agent can reach its own state store.
+
+**One process, three layers.** "Harness" means this product, not the agent framework and not
+`tests/harness/` (see [docs/glossary.md](../../docs/glossary.md)):
+
+```text
+Nomad allocation
+└── container
+    └── ONE process — the Harness
+        ├── harness core      ← authenticates to Vault, records run state
+        ├── adapter           ← maps Pydantic AI's concepts onto core
+        └── agent (framework) ← chooses tools; holds no credential, touches no store
+```
+
+**Two credential paths that never cross.** The core reaches Postgres as *itself*; the agent
+reaches tools under the user's grant. An agent's per-step authority cannot reach the database —
+if it could, a model-chosen tool call could rewrite the run's own record of what it has done.
+
+| Path | Identity | Yields | Used for |
+| --- | --- | --- | --- |
+| core → Postgres | Nomad workload identity | Dynamic database credential | Recording and retrieving run state |
+| agent → tools | `DelegationGrant` | Short-lived `TaskCredentialRef` | Tool calls only |
+
+**Recording:**
+
+```text
+Nomad schedules allocation, issues a workload identity JWT to the task
+       │
+       ▼
+core → POST /v1/auth/nomad/login        (presents the JWT; no secret anywhere)
+       └─ Vault returns a token carrying the database policy
+            │
+            ▼
+core → GET /v1/database/creds/harness   → fresh Postgres user, short lease
+            │
+            ▼
+       connect; acquire the run lease
+            │
+     ┌──── per step ───────────────────────────────────────┐
+     │  agent chooses a tool                               │
+     │  core manufactures per-step authority under the     │
+     │    grant and invokes through invoke_tool            │
+     │  non-repeatable? intent record → effect → result    │
+     │  core writes CheckpointBlob: step_index, grant_id,  │
+     │    written_by, run_state, stop_reason               │
+     └─────────────────────────────────────────────────────┘
+            │
+            ▼
+       work finishes → run_state = COMPLETED
+```
+
+**Retrieving.** Disruption kills the allocation; Nomad schedules a new one, so nothing carries
+over — which is what makes replay unavailable rather than forbidden:
+
+```text
+new allocation → new workload identity → Vault → NEW database credential
+       │
+       ▼
+load checkpoint by run id
+       ├─ COMPLETED or STOPPED?    → nothing to resume
+       ├─ grant expired?           → PARKED
+       ├─ checkpoint unreadable?   → PARKED / refuse
+       │
+       ▼
+acquire lease → supersedes the prior holder; its writes are now rejected
+       │
+       ▼
+re-manufacture per-step authority under the surviving grant
+       │
+       ▼
+resolve open intents by observation
+       ├─ happened          → skip, continue
+       ├─ did_not_happen    → redo, continue
+       └─ cannot_determine  → PARKED
+```
+
+**The two similar-sounding events are not the same event.** The *run* re-authenticates — new
+allocation, new identity, fresh per-step authority under the surviving grant; that is the
+Principle IV guarantee. The *provider* refreshes a credential when Postgres rejects an expired
+one; that is plumbing, and it touches neither the grant nor the lease nor the run.
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
