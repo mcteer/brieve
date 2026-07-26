@@ -2,7 +2,14 @@
 Sync Impact Report
 - Version: 1.0.1 — sourced from architecture v1.14; decision records ADR-0001–0047 plus
   GR-1 in docs/adr/
-- This revision (1.0.0 → 1.0.1, PATCH — clarifies when an existing gate binds; no
+- This revision (1.0.1 → 1.1.0, MINOR — expands an existing gate; no principle removed
+  or redefined): Quality Gates now require that a blocking row no automated check
+  executes have a named party responsible for running it before merge, recorded in the
+  feature's conformance contract. Motivated by specs/005-durable-execution, whose
+  durability rows run against a real Vault and Postgres that the fork-safe CI lane
+  cannot stand up — the first blocking rows in this repository with no automated runner.
+  No change to what any row asserts.
+- Prior revision (1.0.0 → 1.0.1, PATCH — clarifies when an existing gate binds; no
   principle removed, redefined, or expanded): Quality Gates conformance row scoped per
   ADR-0047 — each gate row is blocking from the moment its underlying feature exists, and
   is absent or explicitly skipped, never stubbed green, before then. Motivated by
@@ -12,8 +19,9 @@ Sync Impact Report
   per-transport auth flows and scenario detail delegated to cited ADRs
 - Authority: docs/adr/ — where this document conflicts with a later Accepted ADR, the
   ADR wins and this document MUST be amended in the same change
-- Propagation: plan-template.md (Constitution Check I–X) · spec-template.md
-  (Traceability) · tasks-template.md (gate task types) — synced 2026-07-24
+- Propagation: plan-template.md (Constitution Check I–X, plus the named-runner
+  obligation added in 1.1.0) · spec-template.md (Traceability) · tasks-template.md
+  (gate task types) — synced 2026-07-26
 -->
 
 # Enterprise Agent Harness Constitution
@@ -180,7 +188,11 @@ change.
   from the moment its underlying feature exists, and before then is absent or a single
   explicit skip carrying the ADR that defers it — never a passing stub (ADR-0047); the
   rows in force are recorded in each feature's conformance contract, and a feature that
-  lands without adding its rows is a gate regression. Rows: governance-ordering and
+  lands without adding its rows is a gate regression. **A blocking row that no automated
+  check executes MUST have a named party responsible for running it before merge,
+  recorded in that same contract; merging without that run is a gate regression, and
+  "the check is not automated" is not a defence.** A gate whose only enforcement is
+  everyone remembering is not a gate. Rows: governance-ordering and
   fail-closed assertions; tool-call parity under deferred disclosure (ADR-0040); registry isolation (agent-credential control-plane writes
   observed denied); surface parity across all four transports; durability scenarios per
   ADR-0024/026 — kill/resume, re-observe-never-re-execute, re-auth-never-replay,
@@ -201,4 +213,4 @@ change.
   train for drift against newly Accepted decisions; `/speckit.analyze` findings that
   implicate a principle block `/speckit.implement`.
 
-**Version**: 1.0.1 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-25
+**Version**: 1.1.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-26

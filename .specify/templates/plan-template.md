@@ -39,6 +39,9 @@
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*If this feature adds a blocking conformance row that no automated check executes, the
+Constitution Check MUST name who runs it before merge (constitution v1.1.0, Quality
+Gates), and the feature's conformance contract MUST record that name.*
 *Source of truth: [`.specify/memory/constitution.md`](../../.specify/memory/constitution.md).*
 *A failing gate stops planning — redesign or withdraw the spec; do not proceed to research.*
 
