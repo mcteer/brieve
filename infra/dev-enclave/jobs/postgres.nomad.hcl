@@ -23,13 +23,33 @@ job "postgres" {
       config {
         image = "postgres:17-alpine"
         ports = ["pg"]
+
+        # A Docker named volume rather than a Nomad host volume: it needs no
+        # client configuration, so `nomad agent -dev` can use it unchanged. The
+        # data outlives both the allocation and the Nomad agent, which is the
+        # point — a checkpoint store that dies with the process is not durable.
+        mount {
+          type   = "volume"
+          target = "/var/lib/postgresql/data"
+          source = "brieve-dev-pgdata"
+        }
       }
 
       env {
-        POSTGRES_USER     = "brieve"
-        POSTGRES_DB       = "brieve"
-        # Dev bootstrap only. The durability feature replaces this with a
-        # credential the workload obtains from Vault under its own identity.
+        POSTGRES_USER = "brieve"
+        POSTGRES_DB   = "brieve"
+
+        # BOOTSTRAP SCAFFOLDING — to be removed, not kept.
+        #
+        # This root account exists so Vault's database secrets engine has
+        # something to connect as while it creates dynamic roles. The harness
+        # never uses it: it authenticates to the control-plane Vault with its
+        # Nomad workload identity and receives a short-lived, per-workload
+        # credential minted on demand (FR-017a, Principle IV).
+        #
+        # Configuring that engine belongs to the deployment module tree. Until
+        # it lands, this password is the only standing credential in the
+        # enclave, and it is a placeholder rather than a design.
         POSTGRES_PASSWORD = "dev-only-not-a-secret"
       }
 
