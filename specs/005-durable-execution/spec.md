@@ -38,6 +38,7 @@ Recorded from `/speckit-analyze` on the planning branch. The first is a requirem
 needed and the spec did not state; the second is vocabulary.
 
 - Q: FR-017a mandates dynamic credentials but says nothing about what happens when one expires mid-run. What is required? → A: A credential ending MUST NOT fail the run. The provider obtains a fresh credential and retries once, on authentication failure only, and surfaces a second failure. Reactive rather than clock-driven — the database's rejection is the authoritative signal, and it also covers a credential revoked early or a database restarted underneath the run. Recorded as FR-017b, because the behaviour was implemented by the plan while no requirement mandated it.
+- Q: Where do durability tests execute — inside a Nomad allocation or on the host? → A: In an allocation. Not a new decision: the harness needs a Vault-issued database credential (FR-017a), its only route to Vault is Nomad workload identity (ADR-0048), and a host process has none. The workload performs the exchange itself rather than Nomad brokering the secret into the task — a brokered secret sits in the task's environment for the life of the allocation and renews on Nomad's schedule, which would make FR-017b's refresh-on-rejection unimplementable. The database policy attaches to the workload identity, never to an agent's per-step authority.
 - Q: "Re-authenticate" was being used both for the run re-attesting to Vault and for the provider reconnecting to Postgres. Which keeps the term? → A: The run. The database-side behaviour is "credential refresh". A security guarantee and a connection retry must not share a name.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -362,7 +363,9 @@ provider could be substituted without rewriting them.
 
 - This feature ships as **durability and long-running-execution semantics plus conformance
   scenarios**, on top of landed 002, 003, and 004 **and the local environment** (see ROADMAP.md —
-  not yet specified, so it has no number), which must land first. Model providers and managed-product APIs remain fakes — they are outside
+  not yet specified, so it has no number), which must land first. The durability suite runs as a
+  Nomad job, so the test process holds a workload identity of its own and the attestation path is
+  exercised by the tests rather than sitting adjacent to them. Model providers and managed-product APIs remain fakes — they are outside
   our boundary. **Vault and Postgres are not fakes**: they are components this project deploys,
   and the guarantees are proven against the real ones.
 - The durability seam, `CheckpointBlob`, and the in-memory provider introduced by 004 are the

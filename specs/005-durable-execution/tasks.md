@@ -58,7 +58,7 @@ of each story.
 
 **Purpose**: The precondition for the entire feature, not a setup step
 
-- [ ] T000 [GATE:determinism] Verify the deployment module tree has landed and `make dev-up` brings up Vault + Postgres with the dynamic database role configured; confirm the answer to "where do durability tests execute" (allocation vs host) is recorded in that feature's spec. **Do not start T001 on a promise** — every durability task below assumes a reachable enclave, and a suite that silently skips when it is absent is worse than one that fails
+- [ ] T000 [GATE:determinism] Verify the deployment module tree has landed: `make dev-up` brings up Vault + Postgres with the dynamic database role configured, and **the suite can be invoked as a Nomad job with its exit status returned**. That the suite runs in an allocation is settled (plan.md); what T000 checks is that the mechanism exists. **Do not start T001 on a promise** — every durability task below assumes a reachable enclave, and a suite that silently skips when it is absent is worse than one that fails
 ---
 
 ## Phase 1: Setup (Shared Infrastructure)
@@ -91,7 +91,7 @@ provider, lease, bracket, bounds, parked state, and the harness fixtures
 - [ ] T009 Extend `CheckpointBlob` in `src/core/durability/types.py` with `grant_id`, `step_index`, `written_by`, `run_state`, and `stop_reason`. **`run_state` on the blob is not optional bookkeeping**: a resuming process has only the checkpoint, so without it there is no way to tell a run that finished from one interrupted mid-step, and T017a's rule would be unenforceable rather than merely untested. Also extend extend the `DurabilityProvider` protocol with `acquire_lease`, `check_lease`, `record_intent`, `record_result`, `open_intents` per `contracts/durability-seam.md`. **This is a breaking change to a seam 004 shipped one feature ago** — declare it in the `feat/005` PR under the template's breaking-change section, citing the same pre-1.0 exemption 004 recorded, rather than assuming it
 - [ ] T010 Extend `InMemoryDurabilityProvider` in `src/core/durability/memory.py` to satisfy the full protocol. It remains a **test double for suites that are not about durability** — the durability rows run against Postgres
 - [ ] T011 [P] Create `src/core/durability/schema.sql` with tables for checkpoints, leases, and intent/result records per `data-model.md`. Lease acquisition must be expressible as a single conditional update
-- [ ] T011a [P] Create `src/core/durability/credentials.py` — obtain a dynamic Postgres credential from the control-plane Vault under the workload's attested Nomad identity, per `data-model.md`'s `DatabaseCredential`. **No path accepts a DSN with a password** (FR-017a). Its own module rather than a clause inside the provider: this is where the attestation chain is actually exercised, and it should be readable and testable without a database attached. `infra/dev-enclave/jobs/harness-probe.nomad.hcl` is the working reference for the exchange
+- [ ] T011a [P] Create `src/core/durability/credentials.py` — the **workload performs the exchange itself**: present its Nomad workload identity to Vault, receive a dynamic Postgres credential, per `data-model.md`'s `DatabaseCredential`. **No path accepts a DSN with a password** (FR-017a), and **do not use Nomad's `vault` stanza / `template` to broker the secret into the task** — a brokered secret sits in the task's environment or filesystem for the life of the allocation, and it renews on Nomad's schedule rather than on the database's rejection, which would make FR-017b unimplementable. Its own module rather than a clause inside the provider: this is where the attestation chain is exercised, and it should be readable and testable without a database attached. `infra/dev-enclave/jobs/harness-probe.nomad.hcl` is the working reference for the exchange
 - [ ] T011b Implement **reactive credential refresh** in `credentials.py` (FR-017b): attempt the operation, and on an authentication failure obtain a fresh credential from Vault and retry **once**. Reactive rather than clock-driven — a timer handles only the expiry it predicts, while the database's rejection is the authoritative signal and also covers a credential revoked early, a lease invalidated by a Vault operation, or a database restarted underneath the run. The lease is on the order of an hour and a durable run is designed to outlive it, so **this is the happy path, not the error path**. Call it *credential refresh*, never *re-authentication* — that term belongs to the run re-attesting to Vault (US2), and putting a security guarantee and a connection retry under one name is a collision that survives review by looking familiar. Keep it distinct from grant expiry too: a credential ending refreshes silently, consent ending parks the run (FR-005)
 - [ ] T011c Classify the errors that trigger a refresh: **authentication failure only**, distinguished from connection-refused, permission-denied-on-object, and everything else, with the second failure surfaced rather than retried. This is the task that keeps T011b bounded — an unbounded retry would spin against a genuine misconfiguration, and the enclave has one reachable today: destroying the Postgres volume resets the database to its bootstrap password while Vault holds the rotated one, so *every* credential fails auth. That must present as a clear failure, not a hang
 - [ ] T011d [P] Unit test `tests/unit/test_credential_refresh.py` — an expired credential produces one Vault round trip and the operation succeeds on retry; a non-auth error does **not** trigger a fetch; a second auth failure surfaces; and no credential material is logged, checkpointed, or placed in a span
@@ -109,6 +109,7 @@ provider, lease, bracket, bounds, parked state, and the harness fixtures
 
 ### Harness
 
+- [ ] T018a [P] [GATE:no-secret-leak] Unit test `tests/unit/test_database_policy_placement.py` — the database policy belongs to the **workload identity**, never to per-step authority manufactured for an agent. Assert no agent definition's ceiling and no manufactured `TaskCredentialRef` can reach the credential path. Backwards, this is serious: database access inside a definition's ceiling would let a model-chosen tool call reach the checkpoint store, which is the run's own record of what it has done
 - [ ] T019 Create `tests/harness/durability_fixtures.py` — in-process disruption (tear a run down, rebuild from checkpoint), a fake `Observer` scriptable to each of the three outcomes, grant helpers, and a Postgres-backed provider fixture that obtains credentials the way the harness does
 - [ ] T020 [P] [GATE:no-secret-leak] Unit test `tests/unit/test_checkpoint_purity.py` — no checkpoint written by **any** provider contains credential, token, or secret material (FR-003, SC-003). Runs without the enclave for the in-memory provider; with it for Postgres
 - [ ] T021 [P] Export the new public symbols from `src/core/durability/__init__.py`, `src/core/observation/__init__.py`, and `tests/harness/__init__.py`
@@ -321,7 +322,7 @@ assertions, US3's parking, and US6's bounded stop.
 
 **Parallel opportunities**:
 
-- T005/T006, T011, T011a, T011d, T013–T016, T017a, T018 in Foundational (different files)
+- T005/T006, T011, T011a, T011d, T013–T016, T017a, T018, T018a in Foundational (different files)
 - Within each story, test modules marked [P] can be drafted before implementation
 - All seven conformance rows (T063–T069) are independent of each other
 - After US1: US2's authority work and US6's bounds work touch different modules
@@ -366,6 +367,10 @@ assertions, US3's parking, and US6's bounded stop.
   service"; here Vault and Postgres are required. What survives is narrower: no live models, no
   live managed-product APIs, and disruption simulated in-process. T073 must encode the narrower
   rule, not the old one.
+- **The suite runs as a Nomad job.** Settled, not open — a host process has no workload identity
+  and therefore no route to a database credential, and the alternatives are a DSN (FR-017a
+  forbids it) or a second Vault auth method (a standing credential on a workstation). What the
+  deployment tree still owes is the mechanism, not the decision.
 - **`RunState` gains three terminal states, not one.** 002's `ACTIVE`/`REFUSED` pair cannot
   express a run that finished, one a bound halted, or one waiting on a human — and resume needs
   all three distinctions. Without `COMPLETED` a resume attempt against a finished run re-enters

@@ -188,17 +188,38 @@
 - **Alternatives considered**: Kill real infrastructure (non-deterministic, slow, and the spec
   forbids it). Purely in-process (cheaper, but proves the weaker claim).
 
+## Decision: The durability suite runs as a Nomad job, and the workload fetches its own credential
+
+- **Decision**: Durability tests execute inside a Nomad allocation. The test workload presents its
+  own Nomad workload identity to Vault and fetches its own database credential; Nomad does not
+  broker the secret into the task.
+- **Rationale**: the decisions already taken leave one arrangement standing. The harness reaches
+  Postgres with a Vault-issued credential (FR-017a); its only route to Vault is workload identity
+  (ADR-0048); a host process has none. Handing it a DSN is what FR-017a forbids, and giving it a
+  second Vault auth method is a standing credential on a developer's workstation.
+- **Why not Nomad's `vault` stanza and `template`**, which is the other native path and the one
+  most people reach for first: a brokered secret lands in the task's environment or filesystem and
+  sits there for the life of the allocation, whereas a fetched one lives in process memory only as
+  long as it works. More decisively, FR-017b refreshes on the *database's rejection*, and a
+  templated secret renews on Nomad's schedule — the workload would have no way to re-fetch in
+  response to the signal that matters, which makes the requirement unimplementable rather than
+  merely awkward.
+- **The identity that carries the database policy is the workload's, never the agent's per-step
+  authority.** Backwards, this is serious: database access inside a definition's ceiling would let
+  a model-chosen tool call reach the checkpoint store — the run's own record of what it has done.
+- **Correcting the record**: this was carried as an open question through two planning passes. It
+  was not open. `make dev-up` and the Integration test tier had already settled the Postgres
+  question the same way, and the same lesson applies — search for prior intent before concluding
+  something is undecided.
+- **Alternatives considered**: run on the host with a bootstrap token (standing credential). Run on
+  the host and pass credentials in from an allocation (a DSN by another route). Use Nomad's
+  template stanza (above).
+
 ## Open — owned by the deployment-tree feature
 
-Recorded rather than resolved; see plan.md's Technical Context. `infra/dev-enclave` is a working
-reference that constrains both without settling them.
+One item, and it is mechanical rather than architectural: **what `make dev-up` guarantees on
+exit** — services reachable, Vault unsealed with the database engine and dynamic role configured,
+Postgres migrated, and how the suite is invoked in an allocation with its exit status returned.
+That determines what test setup may assume versus must check.
 
-1. Whether durability tests execute inside a Nomad allocation or on the host. The credential
-   decision above narrows this: a host-run test process has no workload identity and therefore no
-   route to a database credential, so either the suite runs as an allocation or the deployment
-   tree defines another attested identity for it.
-2. What `make dev-up` guarantees on exit — including whether the database secrets engine and its
-   dynamic role are configured by then.
-
-Neither affects the seam, the entities, or the conformance rows — which is why the design proceeds
-without them.
+It affects neither the seam, the entities, nor the conformance rows.

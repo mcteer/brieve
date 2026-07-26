@@ -10,7 +10,8 @@ Split authority into a durable `DelegationGrant` — the human's consent, ceilin
 definition's maximum duration — and the short-lived per-step credential 003 already manufactures
 under it. Add a fenced single-writer run lease, an intent/result bracket around non-repeatable
 tool calls, an `Observer` seam that resolves an interrupted step by re-reading external state,
-execution bounds, and a `PARKED` run state for anything only a human can settle. Extend
+execution bounds, and terminal run states — including `PARKED` for anything only a human can
+settle. Extend
 `DurabilityProvider` so a checkpoint can actually be resumed, and back it with Postgres scheduled
 by Nomad. Attach the seven durability conformance rows.
 
@@ -35,7 +36,7 @@ container in the stack**, not stood up per suite. The harness obtains its databa
 from the **control-plane Vault's dynamic database secrets engine**, under its own attested
 identity; the connection is opened with a credential Vault minted moments earlier and that expires
 on its own (FR-017a). Credential expiry mid-run is expected rather than exceptional — the provider
-reconnects under a fresh credential; only *grant* expiry parks a run. The 004
+refreshes on the database's rejection; only *grant* expiry parks a run. The 004
 `InMemoryDurabilityProvider` survives as a test double for suites that are not about durability
 
 **Testing**: `pytest` unit + component; new `tests/conformance/durability/` lane carrying the
@@ -44,8 +45,10 @@ its checkpoint — with the Postgres-backed provider additionally exercised acro
 boundary so durability is demonstrated rather than asserted. No live models, no live
 managed-product APIs
 
-**Target Platform**: The local enclave (Terraform → Vault → Nomad → harness). Durability tests
-require it; suites that do not touch identity or durability continue to run without it
+**Target Platform**: The local enclave (Terraform → Vault → Nomad → harness). The durability suite
+runs **as a Nomad job**, so the test process has a workload identity of its own and the attestation
+path is exercised by the tests rather than adjacent to them; suites that do not touch identity or
+durability continue to run on the host without it
 
 **Project Type**: Sealed-core feature. Extends `src/core/durability/` and `src/core/authority/`;
 adds `src/core/observation/`, lease, credential, and bounds modules. `RunState` gains three
@@ -80,25 +83,41 @@ its Nomad workload identity. So the database path is not merely adjacent to the 
 chain — it runs *through* it. A harness with no attested identity cannot open a connection at all,
 which is the correct failure and a stronger one than a policy check.
 
-### NEEDS CLARIFICATION — owned by the deployment-tree feature, not by this plan
+### Settled — the suite runs as a Nomad job, and the workload does its own exchange
 
-Recorded rather than answered; answering them here would define another feature's surface from
-inside this one. [`infra/dev-enclave`](../../infra/dev-enclave/) is a working reference that
-constrains both without settling them.
+Durability tests execute **inside a Nomad allocation**, not on the host. This is not a preference;
+it is the only arrangement the decisions already taken permit. The harness reaches Postgres with a
+Vault-issued credential (FR-017a), its only route to Vault is Nomad workload identity (ADR-0048),
+and a host process has no such identity. The alternatives are the ones this project has already
+rejected: hand the process a DSN (forbidden by FR-017a), or give it a second Vault auth method —
+approle, userpass, a token — which is a standing credential on a developer's machine.
 
-1. **Where do durability tests execute** — inside a Nomad allocation, or on the host against the
-   long-lived services? The credential decision above narrows this sharply but does not close it.
-   A test process running on the host has no Nomad workload identity, so under the settled path it
-   has no route to a database credential; either the durability suite runs as a scheduled
-   allocation, or the deployment tree defines some other attested identity for a host-run test
-   process. The former exercises the real chain and is the more likely answer; the latter is a
-   deliberate choice someone would have to make, not a default to fall into.
-2. **What does `make dev-up` guarantee on exit** — services reachable, Vault unsealed with the
-   database engine configured and the dynamic role created, Postgres migrated? Determines what
-   test setup may assume versus must check.
+`infra/dev-enclave/jobs/harness-probe.nomad.hcl` is already the shape: a job whose ID is bound in
+the Vault JWT role, authenticating as itself. Running the suite is that job with a different
+command.
 
-Neither blocks the design below: the seam, the entities, and the conformance rows are unaffected
-by how the environment is reached.
+**The workload performs the exchange itself.** Nomad *is* a Vault client — that is why Vault
+cannot be a Nomad job (ADR-0048's circularity argument) — and it can broker secrets into a task
+through a `vault` stanza and `template`. This design deliberately does not use that path. The
+workload presents its own identity and fetches its own credential, for two reasons:
+
+1. A brokered secret lands in the task's environment or filesystem, where it is a credential at
+   rest for the life of the allocation. A fetched one lives in process memory for as long as it
+   works.
+2. FR-017b refreshes **on the database's rejection**. A Nomad-templated secret is renewed on
+   Nomad's schedule, so the workload cannot re-fetch in response to the signal that actually
+   matters. Brokering would make the requirement unimplementable.
+
+**Which identity carries the database policy** is worth stating precisely, because getting it
+backwards would be serious: the policy sits on the **workload identity**, never on the per-step
+authority manufactured for the agent. The harness process may reach its own state store; the
+agent's tool calls may not. If database access ever appeared in a definition's ceiling, a
+model-chosen call could reach the checkpoint store — which is the run's own memory of what it has
+done.
+
+**What remains for the deployment-tree feature** is mechanical, not architectural: how it invokes
+the suite in an allocation and returns exit status and output. That is a build detail, and it
+changes nothing below.
 
 ## Constitution Check
 
