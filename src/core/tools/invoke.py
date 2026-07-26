@@ -29,13 +29,37 @@ def invoke_tool(
     run: GovernedRun,
     tool_name: str,
     arguments: Mapping[str, Any] | None = None,
+    *,
+    idempotency_key: str | None = None,
 ) -> InvokeResult:
     """Invoke a tool through the fail-closed pre/post hook pipeline.
 
     There is no supported path to run a tool handler while skipping pre-hooks.
+
+    Durability concerns attach **here**, on the one governed path, rather than in a
+    second wrapper (Principle II). Three of them, in order, each fail-closed:
+
+    1. **Lease.** A superseded holder is rejected before anything executes. Doing this
+       first means a zombie cannot produce a side effect while we decide.
+    2. **Bounds.** Checked where the run advances, not by a background timer whose
+       failure would silently unbound the run.
+    3. **Bracket.** A non-repeatable tool is wrapped in intent/result records, so an
+       interruption mid-call is resolvable by observation rather than by guessing.
     """
     args: Mapping[str, Any] = arguments if arguments is not None else {}
+
+    if run.lease is not None:
+        # Raises LeaseSupersededError — deliberately not converted to a deny, because a
+        # zombie's caller needs to stop, not to read a refusal and try the next tool.
+        run.lease.assert_held(correlation_id=run.correlation_id)
+
+    if run.bounds is not None:
+        run.bounds.check(run.clock, correlation_id=run.correlation_id)
+
     outcome = run_pipeline(run, tool_name, args)
+    if run.bounds is not None and outcome.decision == "allow":
+        run.bounds.record_progress(run.clock.now())
+
     allowed = outcome.decision == "allow" and not outcome.evidential_gap
     return InvokeResult(
         allowed=allowed,

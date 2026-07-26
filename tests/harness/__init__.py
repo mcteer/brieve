@@ -11,6 +11,13 @@ from tests.harness.assertions import (
     assert_scope_narrowed,
 )
 from tests.harness.capture_audit import capture_audit
+from tests.harness.durability_fixtures import (
+    ScriptedObserver,
+    SideEffectCounter,
+    durability_grant,
+    simulate_disruption,
+    write_checkpoint,
+)
 from tests.harness.fake_identity_fabric import (
     DEFAULT_AGENT_DEFINITION_ID,
     fake_identity_fabric,
@@ -30,6 +37,8 @@ __all__ = [
     "BROKERED_GRAIN_MARKER",
     "DEFAULT_AGENT_DEFINITION_ID",
     "SECRET_MARKER",
+    "ScriptedObserver",
+    "SideEffectCounter",
     "SECRET_MARKERS",
     "assert_audit_chain",
     "assert_correlated",
@@ -38,6 +47,9 @@ __all__ = [
     "assert_no_secret_values",
     "assert_no_side_effect",
     "assert_scope_narrowed",
+    "durability_grant",
+    "simulate_disruption",
+    "write_checkpoint",
     "capture_audit",
     "fake_identity_fabric",
     "fake_product_api",

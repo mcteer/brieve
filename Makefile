@@ -1,23 +1,36 @@
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: check conformance test-full dev-up dev-down dev-status
+.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status
 
 # Every recipe names the adapters extra so the gates cannot run in an environment
 # that silently lacks the primary adapter (specs/004-primary-adapter/research.md).
 UV_RUN := uv run --extra adapters
 
 # Inner-loop: lint, typecheck, unit tests
+# Hermetic inner loop. Enclave-dependent tests are excluded by marker rather than by
+# skipping inside them: a test that skips itself reports the same green as one that ran.
 check:
 	$(UV_RUN) ruff check src tests
 	$(UV_RUN) ruff format --check src tests
 	$(UV_RUN) mypy
-	$(UV_RUN) pytest
+	$(UV_RUN) pytest -m "not enclave"
 
 # Adapter/provider conformance — merge-blocking (constitution Quality Gates).
 # Rows in force are recorded per feature; see
 # specs/004-primary-adapter/contracts/conformance-adapter.md (ADR-0047).
+# Every row, including the seven durability rows (SC-009). Requires `make dev-up`:
+# the durability lane runs against the real Vault and Postgres, and fails loudly rather
+# than skipping when they are absent.
 conformance:
 	$(UV_RUN) pytest tests/conformance -q
+	$(UV_RUN) pytest -m enclave -q
+
+# The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
+# Enterprise license and cannot stand one up. This is a real coverage gap and is
+# recorded as one in specs/005-durable-execution/contracts/conformance-durability.md —
+# the durability rows are merge-blocking for a human running them, not for CI.
+conformance-hermetic:
+	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -q
 
 test-full:
 	@echo "make test-full: stub — PR-tier suites not implemented yet" >&2

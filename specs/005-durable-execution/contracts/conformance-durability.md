@@ -42,6 +42,21 @@ a row nobody knows works.
 Rows are written against the seam, not an implementation (FR-012). Running them against a second
 provider must require no rewriting — that is the executable form of ADR-0024's central claim.
 
+## CI does not run these rows, and that is a gap
+
+`make conformance` runs all seven. The CI fast lane runs `make conformance-hermetic`,
+which does not, because the lane is fork-safe with no required secrets and cannot stand
+up a licensed Vault Enterprise.
+
+Stated plainly rather than papered over: **the durability rows are merge-blocking for a
+human running them locally, not for CI.** They are not skipped silently — the lane
+simply does not include them, and the durability suite fails loudly rather than skipping
+when the enclave is absent, so there is no arrangement in which a green result means
+less than it appears to.
+
+Closing this needs a second CI lane with the licence available as a secret, which is a
+deployment-tree concern rather than this feature's.
+
 ## Honest limits
 
 - **Single-node.** The enclave runs one Vault node and one Nomad server. Fencing and parking are

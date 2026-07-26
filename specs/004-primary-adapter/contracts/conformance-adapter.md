@@ -37,16 +37,22 @@ These constitution Quality Gate rows **attach when those features land**
 Accepted; constitution v1.0.1 — this section is the per-feature record that ADR makes
 authoritative) — 004 must not add silent-green stubs for them:
 
-Each row names the ADR that defers it, as constitution v1.0.1 requires; a skip marker in
-the suite MUST carry the same reference:
+> **No longer deferred: the durability matrix.** All seven rows — kill/resume,
+> re-observe-never-re-execute, re-auth-never-replay, double-resume fencing, grant-expiry
+> parking, duplicate-side-effect rejection, drain-across-upgrade — are **in force** as of
+> `specs/005-durable-execution`, and run under `make conformance` against both the
+> in-memory double and Postgres. See
+> [conformance-durability.md](../../005-durable-execution/contracts/conformance-durability.md).
+>
+> Updated here by the feature that put them in force, per ADR-0047: a deferral list that
+> goes stale reads as a gap nobody noticed.
+
+Each remaining row names the ADR that defers it, as constitution v1.0.1 requires; a skip
+marker in the suite MUST carry the same reference:
 
 - Second (LangGraph) adapter cases —
   [ADR-0017](../../../docs/adr/0017-primary-adapter-selection.md) (second adapter is
   demand-driven). Absent, or a single explicit skip citing ADR-0017 — never a silent green
-- Full durability scenario matrix —
-  [ADR-0024](../../../docs/adr/0024-durability-provider-seam.md) (provider seam depth) and
-  [ADR-0026](../../../docs/adr/0026-delegation-grants-and-per-step-tokens.md)
-  (resume as re-observation, re-auth-never-replay)
 - Four-transport surface parity —
   [ADR-0033](../../../docs/adr/0033-four-transports-one-authorization-core.md); no
   northbound surface has shipped, so there is nothing to assert parity across

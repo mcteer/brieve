@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from core.errors import RegistryError, ToolNotRegisteredError
+from core.observation.types import Observer
 
 ToolHandler = Callable[[Mapping[str, Any]], Any]
 ProductMode = Literal["none", "federate", "broker"]
@@ -20,6 +21,15 @@ class ToolRegistration:
     product_mode: ProductMode = "none"
     product: str | None = None
     product_action: str | None = None
+    #: False when repeating the call could duplicate an external effect. Declared by
+    #: the tool author — only they know — and deliberately NOT inferred from
+    #: ``product_mode``, which is orthogonal: a federated call can be non-repeatable
+    #: and a brokered one idempotent.
+    repeatable: bool = True
+    #: How to find out what actually happened, for a call interrupted mid-flight.
+    #: Required in practice for a non-repeatable tool: without one, an interrupted
+    #: step resolves to CANNOT_DETERMINE and parks the run.
+    observer: Observer | None = None
 
 
 class ToolRegistry:
@@ -34,6 +44,8 @@ class ToolRegistry:
         product_mode: ProductMode = "none",
         product: str | None = None,
         product_action: str | None = None,
+        repeatable: bool = True,
+        observer: Observer | None = None,
     ) -> None:
         if not name.strip():
             raise ValueError("tool name must be non-empty")
@@ -45,7 +57,13 @@ class ToolRegistry:
             product_mode=product_mode,
             product=product,
             product_action=product_action,
+            repeatable=repeatable,
+            observer=observer,
         )
+
+    def observers(self) -> dict[str, Observer]:
+        """Observers by tool name, for resolving open intents on resume."""
+        return {name: reg.observer for name, reg in self._tools.items() if reg.observer is not None}
 
     def resolve(self, name: str) -> ToolRegistration:
         """Resolve a tool by name.

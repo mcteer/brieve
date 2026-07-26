@@ -25,13 +25,13 @@ being re-derived at the start of every spec.
 | 002 | Governed core | ADR-0006, ADR-0009, ADR-0020, ADR-0037 | — |
 | 003 | Per-task authority | ADR-0015, ADR-0026 (partial), ADR-0042, ADR-0044 | — |
 | 004 | Primary adapter | ADR-0001, ADR-0017, ADR-0019, ADR-0047 | Governance-ordering, fail-closed, governed entry |
+| 005 | Durable execution | ADR-0024, ADR-0026, ADR-0048, ADR-0018 (consumes) | All seven durability rows |
 
 ## In progress
 
 | # | Feature | ADRs | Status |
 | --- | --- | --- | --- |
-| *unassigned* | Local environment — the enclave in miniature | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Next to spec — **lands first** |
-| 005 | Durable execution | ADR-0024, ADR-0026, ADR-0018 (consumes) | Spec merged (#27, corrected #30); lands second |
+| *unassigned* | Deployment module tree — the enclave, productized | ADR-0048, ADR-0025, ADR-0015, ADR-0007 | Next to spec |
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -157,7 +157,7 @@ ADR — never a passing stub.**
 | Row | Attaches with | Status |
 | --- | --- | --- |
 | Governance-ordering, fail-closed, governed entry | 004 | ✅ In force |
-| Durability scenarios (ADR-0024/0026) | 005 | Planned |
+| Durability scenarios (ADR-0024/0026) | 005 | ✅ In force — all seven, both providers. **Not run by CI**: the fast lane is fork-safe and cannot stand up a licensed Vault. See `specs/005-durable-execution/contracts/conformance-durability.md` |
 | Four-transport surface parity | 008 | Deferred — ADR-0033 |
 | Tool-call parity under deferred disclosure | 010 | Deferred — ADR-0040 |
 | Eval gates (packs, models, policies) | 009 | Deferred — Principle VIII |

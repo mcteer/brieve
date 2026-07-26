@@ -10,6 +10,7 @@ from datetime import timedelta
 from core.authority.clock import Clock
 from core.authority.errors import AuthorityRefuseError
 from core.authority.fabric import IdentityFabric
+from core.authority.grant import DelegationGrant
 from core.authority.intersection import intersect_scopes
 from core.authority.types import AuthorityScope, TaskCredentialRef
 
@@ -29,9 +30,22 @@ def manufacture_authority(
     identity_fabric: IdentityFabric,
     clock: Clock,
     agent_definition_id: str,
+    grant: DelegationGrant | None = None,
     correlation_id: str | None = None,
 ) -> ManufacturedAuthority:
-    """Issue narrowed task authority or raise AuthorityRefuseError."""
+    """Issue narrowed task authority or raise AuthorityRefuseError.
+
+    When a ``grant`` is supplied, authority is manufactured **under** it and an expired
+    grant refuses (FR-002): consent is checked before authority exists, not after.
+
+    The parameter is optional rather than required, which is a deliberate departure
+    from the task list's "breaking seam" framing. Making it optional gives the same
+    guarantee — a granted run cannot manufacture under lapsed consent — without
+    churning every 002/003 caller that has no grant to pass. A break bought nothing
+    here.
+    """
+    if grant is not None:
+        grant.assert_live(clock, correlation_id=correlation_id)
     if not subject_user_id.strip():
         raise AuthorityRefuseError(
             "requesting user identity is absent",
