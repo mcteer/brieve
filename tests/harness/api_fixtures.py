@@ -63,6 +63,4 @@ def surface_under_test(
         run_dispatcher=dispatcher,
         audit_sink=audit,
     )
-    return SurfaceUnderTest(
-        app=app, idp=idp, audit=audit, dispatcher=dispatcher, subject=subject
-    )
+    return SurfaceUnderTest(app=app, idp=idp, audit=audit, dispatcher=dispatcher, subject=subject)
