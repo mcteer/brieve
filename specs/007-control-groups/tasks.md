@@ -159,7 +159,7 @@ true, because nobody notices the day a pause is added.
 - [X] T033 [P] Document the quorum policy in `infra/README.md` — what is gated, what is not, who owns the policy, and the bootstrap sequence
 - [X] T034 [P] [GATE:determinism] Extend `tests/unit/test_no_live_dependencies.py` for this feature's paths; the enclave is required and permitted, live models and product APIs are not
 - [X] T036 Review the diff against the scope bound: one core module that observes, zero new dependencies, no approval engine. Growth beyond that is the signal the premise broke
-- [ ] T037 Open `feat/007-control-groups` with the asymmetry, the bootstrap sequence, and the negative requirements called out
+- [X] T037 Open `feat/007-control-groups` with the asymmetry, the bootstrap sequence, and the negative requirements called out
 
 ---
 
