@@ -112,3 +112,26 @@ def unique_correlation_id(request: pytest.FixtureRequest) -> str:
     written the positions this one expects to start at.
     """
     return f"api-conformance-{request.node.name}-{uuid.uuid4().hex[:12]}"
+
+
+@pytest.fixture
+def run_connection(run_credentials: VaultDatabaseCredentials) -> Any:
+    """A factory for connections under the RUN role.
+
+    The integrity check needs this rather than the evidence role: audit_stream_heads
+    carries no grant for the read path at all, which is what stops it learning what it
+    would need to forge.
+    """
+    import pg8000.dbapi
+
+    def _open() -> Any:
+        cred = run_credentials.fetch()
+        return pg8000.dbapi.connect(
+            host="127.0.0.1",
+            port=5432,
+            database="brieve",
+            user=cred.username,
+            password=cred.password,
+        )
+
+    return _open

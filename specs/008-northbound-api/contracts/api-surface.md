@@ -1,7 +1,7 @@
 # Contract: The API surface and its description
 
 **Feature**: `specs/008-northbound-api`
-**Status**: Planned
+**Status**: In force (008 landed)
 **Depends on**: ADR-0033; ADR-0047; Principle II
 
 ## What the surface exposes

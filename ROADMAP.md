@@ -116,6 +116,8 @@ the decision, not an omission.
 | Dedicated workflow-engine durability provider | ADR-0024, ADR-0028 | A named trigger: scale, an existing deployment, or a requirement the library provider cannot meet |
 | Wire-level guardrail (second protection layer) | ADR-0014 | Optional by design; in-process hooks are the primary layer |
 | Retrieval | ADR-0029 | Runs in the Postgres a deployment already has — needs that Postgres to exist first |
+| Continuous evidence-stream verification | 008 (FR-010e) | Needs a long-lived home. 008 ships `verify_stream_integrity` and calls it from `make enclave-verify`, which covers bring-up but not the running estate. Belongs with the MCP service alongside ADR-0049's resume sweeper — recorded here because a deferral living only in a spec is invisible to whoever plans that feature, which is exactly who needs it |
+| Row-level security on the evidence store | 008 | The tenant boundary on evidence reads is enforced by the application, not the database. `exists_outside_tenant` shows why that matters: the SQL role can see that rows exist under another tenant even though no content crosses. Postgres RLS moves the enforcement a layer down and is the right eventual home |
 | Vertical policy/content profiles | ADR-0003 | Horizontal first. Profiles ship as policy and content, not as forks |
 
 ## Owed Quality Gate rows
@@ -128,7 +130,7 @@ ADR — never a passing stub.**
 | --- | --- | --- |
 | Governance-ordering, fail-closed, governed entry | 004 | ✅ In force |
 | Durability scenarios (ADR-0024/0026) | 005 | ✅ In force — all seven, both providers, under an attested identity. **Not run by CI** (the fork-safe lane cannot hold a licensed Vault); the agent harness runs them before merge per `AGENTS.md`, and refuses the merge if the enclave cannot come up |
-| Four-transport surface parity | 008 | Deferred — ADR-0033 |
+| Four-transport surface parity | 008 | **Still Deferred** — ADR-0033. 008 has landed and deliberately does not claim this row: parity is a property *between* transports and there is one, so a green row would be the passing stub ADR-0047 forbids. What 008 owes instead is making the comparison possible, and it does: `specs/008-northbound-api/contracts/operations.snapshot.json` records the operation set, diffed by a conformance row. The second transport compares against that rather than against whatever the API happens to do by then |
 | Tool-call parity under deferred disclosure | 010 | Deferred — ADR-0040 |
 | Eval gates (packs, models, policies) | 009 | Deferred — Principle VIII |
 | Registry isolation (control-plane write denials) | — | **Unassigned** — see gaps below |

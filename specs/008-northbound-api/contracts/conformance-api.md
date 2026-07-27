@@ -1,7 +1,7 @@
 # Contract: Northbound API conformance lane
 
 **Feature**: `specs/008-northbound-api`
-**Status**: Planned
+**Status**: In force (008 landed)
 **Depends on**: Constitution Quality Gates (v1.1.0); ADR-0033; ADR-0035; ADR-0047
 
 ## Purpose
