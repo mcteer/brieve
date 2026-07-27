@@ -94,6 +94,19 @@ job "conformance" {
         # Without it every request fails certificate verification, which surfaces as the
         # same credential error.
         VAULT_CACERT = var.vault_cacert
+
+        # Build the virtualenv OUTSIDE the mounted tree.
+        #
+        # The mount is writable, so `uv run` in /repo resolved .venv to the DEVELOPER'S
+        # virtualenv and rebuilt it against the container's interpreter — after which the
+        # host's `uv run` found ".venv/bin/python3 -> python" dangling and rebuilt it
+        # back. Every alternation between a local command and this workload paid for a
+        # full reinstall, which is what pushed a cold run past the wait bound above and
+        # made the gate report red on rows that passed.
+        #
+        # Running the merge gate should not damage the environment of the person running
+        # it. A container path keeps the two apart.
+        UV_PROJECT_ENVIRONMENT = "/tmp/venv"
       }
 
       resources {
