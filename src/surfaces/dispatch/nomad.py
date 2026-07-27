@@ -122,6 +122,15 @@ class NomadDispatcher:
             state=RunState.ACTIVE,
         )
 
+    def dispatched_job_id(self, run_id: str) -> str | None:
+        """The scheduler's id for this run's dispatch, if this dispatcher started it.
+
+        Substrate detail, deliberately **not** on :class:`RunHandle` — a caller who can see
+        it has learned the scheduler. Exposed here for operators and for the conformance
+        row, both of which are already inside the substrate boundary.
+        """
+        return self._dispatched.get(run_id)
+
     def state_of(self, run_id: str) -> RunHandle | None:
         dispatched_id = self._dispatched.get(run_id)
         if dispatched_id is None:

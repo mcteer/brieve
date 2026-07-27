@@ -29,6 +29,7 @@ def create_app(
     run_dispatcher: RunDispatcher,
     evidence_query: EvidenceQuery | None = None,
     audit_sink: AuditSink | None = None,
+    authority_submitter: Any | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -41,9 +42,11 @@ def create_app(
     app.state.run_dispatcher = run_dispatcher
     app.state.evidence_query = evidence_query
     app.state.audit_sink = audit_sink
+    app.state.authority_submitter = authority_submitter
 
     app.include_router(runs.build_router())
-    app.include_router(mappings.build_router())
+    if authority_submitter is not None:
+        app.include_router(mappings.build_router())
     if evidence_query is not None:
         app.include_router(evidence.build_router())
     return app

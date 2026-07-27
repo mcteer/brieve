@@ -82,6 +82,12 @@ ENCLAVE_PATHS = frozenset(
         # fake: one that always approves proves the caller can proceed, one that never
         # approves proves it handles denial, and neither proves the gate holds.
         "harness/vault_control_groups.py",
+        # Talks to the local scheduler to prove a run start actually dispatches (008).
+        # There is no useful fake: `InProcessDispatcher` proves the surface returns a
+        # handle without blocking and proves nothing about dispatch — which is exactly
+        # what this feature shipped at first, with NomadDispatcher exercised by no test
+        # and the job it dispatches to nonexistent.
+        "conformance/api/test_run_start_does_not_block.py",
     }
 )
 

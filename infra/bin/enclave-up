@@ -309,6 +309,16 @@ if [ -z "$(env_val HARNESS_DEFAULT_TENANT)" ]; then
 fi
 ok "HARNESS_DEFAULT_TENANT=$(env_val HARNESS_DEFAULT_TENANT)"
 
+# ---------------------------------------------------------------- 4c. run job
+# The parameterized job a dispatched run becomes. Registered here rather than left to
+# whoever runs the tests, because `NomadDispatcher` submitting to a job that does not
+# exist fails at the moment a customer starts their first run — not at bring-up, where it
+# would be noticed.
+say "Run job"
+nomad job run -var="repo=$REPO" "$REPO/infra/jobs/agent-run.nomad.hcl" >/dev/null 2>&1 \
+  && ok "agent-run registered (parameterized; one allocation and one identity per run)" \
+  || die "could not register the agent-run job — dispatched runs would have nothing to run"
+
 # ---------------------------------------------------------------- 5. the contract
 # Verification runs BEFORE success is reported. Otherwise the contract describes intent
 # rather than state.

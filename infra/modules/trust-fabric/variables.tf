@@ -85,6 +85,23 @@ variable "conformance_job_id" {
   default     = "conformance"
 }
 
+variable "agent_run_job_id_patterns" {
+  description = <<-DESC
+    Scheduler job ids a dispatched agent run may present.
+
+    **Both forms, because the workload identity carries the PARENT job id** — not the
+    dispatch-derived `agent-run/dispatch-<timestamp>-<hash>` that appears in `nomad job
+    status`. Binding only the derived form fails every login with "claim nomad_job_id does
+    not match any associated bound claim values", and the role looks correctly configured
+    the whole time. The derived form is kept in case a Nomad version populates it instead.
+
+    Listed explicitly rather than globbed to `agent-run*`, which would also admit a job
+    named `agent-runner`.
+  DESC
+  type        = list(string)
+  default     = ["agent-run", "agent-run/dispatch-*"]
+}
+
 variable "enable_tls" {
   description = "Issue control-plane certificates from the PKI engine. Production always; development opt-in."
   type        = bool

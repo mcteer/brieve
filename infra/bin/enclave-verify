@@ -105,6 +105,14 @@ else
   bad "no evidence credential could be minted — the SELECT-only role is missing"
 fi
 
+# 5c — the job a dispatched run becomes
+if curl -sf "http://127.0.0.1:4646/v1/job/agent-run" 2>/dev/null \
+   | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ParameterizedJob") else 1)' 2>/dev/null; then
+  ok "agent-run registered and parameterized"
+else
+  bad "agent-run is missing or not parameterized — the API would dispatch to nothing"
+fi
+
 # 6 — persistent state intact
 for vol in brieve-dev-vault-data brieve-dev-pgdata; do
   docker volume inspect "$vol" >/dev/null 2>&1 && ok "volume $vol intact" || bad "volume $vol missing — persisted state is gone"

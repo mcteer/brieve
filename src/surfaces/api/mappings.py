@@ -21,19 +21,19 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.audit.schema import AuditEventType
 from core.authority.changes import (
-    AuthorityChangeEvent,
     BlockedPendingApprovalError,
     ChangeDisposition,
     observe_change,
 )
 from core.identity.claims import ClaimMapping
-from surfaces.api.dependencies import AuditDep, SubjectDep
+from surfaces.api.authority_submit import AuthorityChangeRefused, AuthoritySubmitUnavailable
+from surfaces.api.dependencies import AuditDep, AuthoritySubmitterDep, SubjectDep
 
 CONTROLLED_PATH = "identity/claim-mappings"
 
@@ -67,6 +67,7 @@ def build_router() -> APIRouter:
         body: ClaimMappingChangeRequest,
         subject: SubjectDep,
         audit: AuditDep,
+        submitter: AuthoritySubmitterDep,
     ) -> JSONResponse:
         """Submit the change for quorum and report what the trust fabric said.
 
@@ -75,17 +76,31 @@ def build_router() -> APIRouter:
         the path even if it were otherwise acceptable — which FR-015 says it is not.
         """
         correlation_id = f"authority-change:{subject.tenant_id}"
+        accessor: str | None = None
         try:
-            event = _submit(subject.subject_user_id, body.mapping)
+            disposition = submitter.submit(requester=subject.subject_user_id, mapping=body.mapping)
         except BlockedPendingApprovalError as pending:
-            event = observe_change(
-                correlation_id=correlation_id,
-                controlled_path=CONTROLLED_PATH,
-                disposition=ChangeDisposition.REQUESTED,
-                identities=[subject.subject_user_id],
-                occurred_at=datetime.now(UTC),
-                accessor=pending.accessor,
-            )
+            disposition = ChangeDisposition.REQUESTED
+            accessor = pending.accessor
+        except AuthorityChangeRefused:
+            disposition = ChangeDisposition.DENIED
+        except AuthoritySubmitUnavailable as exc:
+            # Fail closed on the CHANGE, and only on the change. Runs already holding
+            # authority are untouched — failing closed on the wrong thing here would halt
+            # the platform during a Vault blip.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "the trust fabric is unreachable; the change was not submitted",
+            ) from exc
+
+        event = observe_change(
+            correlation_id=correlation_id,
+            controlled_path=CONTROLLED_PATH,
+            disposition=disposition,
+            identities=[subject.subject_user_id],
+            occurred_at=datetime.now(UTC),
+            accessor=accessor,
+        )
 
         audit.append_event(
             correlation_id=correlation_id,
@@ -94,8 +109,16 @@ def build_router() -> APIRouter:
             payload=event.public_dict() | {"reason": body.reason},
         )
 
+        # 202 for requested AND approved; 403 only for an outright denial. A pending
+        # change must never read as a refusal — a client that sees 403 stops asking, so a
+        # change approved twenty minutes later is never collected.
+        code = (
+            status.HTTP_403_FORBIDDEN
+            if event.disposition is ChangeDisposition.DENIED
+            else status.HTTP_202_ACCEPTED
+        )
         return JSONResponse(
-            status_code=status.HTTP_202_ACCEPTED,
+            status_code=code,
             content=ClaimMappingChangeResponse(
                 disposition=event.disposition,
                 accessor=event.accessor,
@@ -103,20 +126,6 @@ def build_router() -> APIRouter:
         )
 
     return router
-
-
-def _submit(requester: str, mapping: ClaimMapping) -> AuthorityChangeEvent:
-    """Hand the change to the trust fabric.
-
-    Always blocked pending approval in this feature: the gate is Vault's Control Groups
-    (007), and a surface that could return anything else would be a surface that could
-    approve its own request.
-    """
-    raise BlockedPendingApprovalError(
-        f"claim mapping {mapping.claim_name}={mapping.claim_value} -> {mapping.role} "
-        f"requested by {requester}",
-        accessor=None,
-    )
 
 
 __all__ = [

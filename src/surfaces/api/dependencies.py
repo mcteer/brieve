@@ -72,6 +72,10 @@ def evidence_query(request: Request) -> EvidenceQuery:
     return query
 
 
+def authority_submitter(request: Request) -> Any:
+    return _component(request, "authority_submitter")
+
+
 def audit_sink(request: Request) -> AuditSink:
     sink: AuditSink = _component(request, "audit_sink")
     return sink
@@ -83,13 +87,16 @@ SubjectDep = Annotated[AuthenticatedSubject, Depends(current_subject)]
 DispatcherDep = Annotated[RunDispatcher, Depends(run_dispatcher)]
 EvidenceDep = Annotated[EvidenceQuery, Depends(evidence_query)]
 AuditDep = Annotated[AuditSink, Depends(audit_sink)]
+AuthoritySubmitterDep = Annotated[Any, Depends(authority_submitter)]
 
 __all__ = [
     "AuditDep",
+    "AuthoritySubmitterDep",
     "DispatcherDep",
     "EvidenceDep",
     "SubjectDep",
     "audit_sink",
+    "authority_submitter",
     "current_subject",
     "evidence_query",
     "run_dispatcher",

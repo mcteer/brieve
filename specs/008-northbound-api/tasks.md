@@ -135,7 +135,7 @@ correlation ID.
 - [X] T027 [US1] Implement `POST /runs` and `GET /runs/{run_id}` in `src/surfaces/api/runs.py`, returning a `RunHandle` through the dispatcher. **Never blocks** (FR-007a)
 - [X] T028 [P] [US1] [GATE:correlation] Component test in `tests/component/test_api_subject_is_root.py`: the authenticated subject appears in the manufactured authority and in **every** audit record for the correlation ID — every, not the first
 - [X] T029 [P] [US1] [GATE:conformance] Conformance rows in `tests/conformance/api/test_identity_rows.py` for identity-is-the-subject and fail-closed-on-identity, plus self-verifying break fixtures per 004's pattern
-- [ ] T030 [US1] [GATE:conformance] Enclave row in `tests/conformance/api/test_run_start_does_not_block.py`: start a run outlasting the request and assert the response returns with a handle while it still executes. Response time unrelated to run duration
+- [X] T030 [US1] [GATE:conformance] Enclave row in `tests/conformance/api/test_run_start_does_not_block.py`: start a run outlasting the request and assert the response returns with a handle while it still executes. Response time unrelated to run duration
 - [X] T031 [P] [US1] [GATE:no-secret-leak] Add `tests/component/test_api_no_secret_leak.py` asserting no token, JWKS private material, or authorization header value reaches any audit record, span, or log line
 
 **Checkpoint**: US1 alone is the MVP — a governed run can be started by a verified human whose identity is the subject of everything that follows.
@@ -219,25 +219,9 @@ Grouped here rather than attached to an unrelated one, so nothing is covered by 
 - [X] T053 [GATE:fail-closed] Implement JWKS caching with a **bounded TTL** in `src/surfaces/api/verification.py`, and assert in `tests/unit/test_idp_unreachable_fails_closed.py` that a cold or expired cache against an unreachable provider refuses (FR-016). Keys are public verification material and may be cached; **identities are never honoured past their own `exp`** (research.md D3)
 - [X] T054 [GATE:conformance] Add `tests/unit/test_surface_never_pauses.py` asserting no path in `src/surfaces/` pauses, interrupts, or blocks a run (FR-015). Strip comments before matching, as T033 does
 - [X] T055 Implement `POST /claim-mappings` in `src/surfaces/api/mappings.py`, routing through `core.authority.changes` and returning **pending, not denied** (FR-013). A client seeing a refusal stops asking, so a change approved minutes later is never collected — 007's docstring already names this trap
-- [ ] T056 [GATE:conformance] Enclave row in `tests/conformance/api/test_claim_mapping_gated.py` asserting a mapping change returns pending and takes effect **only on approval**, against the real Control Groups rather than a fake
+- [X] T056 [GATE:conformance] Enclave row in `tests/conformance/api/test_claim_mapping_gated.py` asserting a mapping change returns pending and takes effect **only on approval**, against the real Control Groups rather than a fake
 
 ---
-
-## Known incomplete (recorded rather than left to be discovered)
-
-Two rows are **not** what their tasks describe, and were briefly marked complete in error.
-
-- **T030** asks for an enclave row starting a real run through `NomadDispatcher`. What
-  exists is a hermetic component test using `InProcessDispatcher`. It proves the surface
-  returns a handle without blocking; it proves nothing about dispatch.
-- **T056** asks for an enclave row against the real Control Groups. What exists is a
-  component test against `_submit`, which unconditionally raises pending without
-  submitting anything anywhere.
-
-`NomadDispatcher` is exercised by **no test at all**, and `agent-run` — the job it
-dispatches to — has no jobspec in `infra/jobs/`. Nomad and Vault Control Groups are both
-inside our boundary, so proving these against doubles is the thing the project's own rule
-forbids.
 
 ## Phase 9: Polish
 
