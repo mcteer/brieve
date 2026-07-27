@@ -113,3 +113,31 @@
 - **Alternatives considered**: a sensible default (decides for the customer, and a quorum of
   two chosen by us is a security posture we do not know is right for them). No seeding at
   all (leaves a window where the paths are ungated and nobody notices).
+
+## Correcting the record: two mechanisms, and root bypasses both
+
+Established by testing against the running enclave during implementation. Both corrections
+change the design rather than refining it, so they are recorded here rather than left in a
+commit message.
+
+- **The approval workflow is an ACL `control_group` stanza, not a Sentinel EGP.** The plan
+  said "Sentinel endorsement policy". Testing showed an EGP produces a flat **permission
+  denied** — while a policy carrying a `control_group` stanza returns a **wrapping token**,
+  which *is* the pending approval request. That matters because the spec requires
+  "blocked pending approval" to be distinguishable from denial (`contracts/evidence.md`),
+  and Vault already makes that distinction natively. We do not have to invent it.
+- **But the stanza lives in a policy, so the gate is only as complete as the set of
+  policies granting those paths.** A new policy granting the same path without the stanza
+  bypasses it silently. So the EGP stays as a **backstop**: path-attached, catching exactly
+  that case, denying rather than queuing — the correct outcome for a path someone granted
+  without a gate.
+- **A root token bypasses both.** Verified: root wrote to a gated path with no approval and
+  no denial. This is not a flaw to work around. It is why the production profile revokes the
+  bootstrap credential — revocation is not hygiene, it is what makes the gate real. It also
+  means the development enclave, which retains its root token deliberately, **cannot
+  demonstrate the gate through that token**, and tests must use a non-root identity.
+
+The generalisable lesson: this feature's premise was "configure the mechanism rather than
+build one", and configuring a mechanism still requires knowing what it actually does. Two
+readings of the documentation were both plausible and one was wrong; ten minutes against a
+real Vault settled it.

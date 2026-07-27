@@ -90,3 +90,33 @@ variable "enable_tls" {
   type        = bool
   default     = false
 }
+
+variable "quorum_policy" {
+  description = <<-DESC
+    Quorum on authority changes (ADR-0016). NULL means no gate — which is the development
+    default and must never be the production one.
+
+    **No default for the values themselves.** A quorum shipped by us would be a security
+    posture chosen for every customer by whoever wrote this module. The customer's
+    control-plane Vault administrator specifies it: humans build the foundations that
+    determine how agents may behave, and the platform enforces what they set rather than
+    deciding it for them.
+
+    The bootstrap, named: this policy gates its own changes, so it cannot create itself.
+    Provisioning applies it before the bootstrap credential is revoked — the same shape as
+    TLS, where something outside the loop goes first. Without that sequence the control
+    either never exists or keeps a permanent back door.
+  DESC
+
+  type = object({
+    required_approvals   = number
+    authorized_approvers = list(string)
+    request_ttl          = string
+  })
+  default = null
+
+  validation {
+    condition     = var.quorum_policy == null || var.quorum_policy.required_approvals >= 2
+    error_message = "required_approvals must be at least 2: a quorum of one is not a quorum, and FR-008 already excludes the requester's own endorsement."
+  }
+}

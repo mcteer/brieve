@@ -78,6 +78,10 @@ ENCLAVE_PATHS = frozenset(
         # The list shrank because the reason for an entry went away. An allowlist that
         # only ever grows is not an allowlist.
         "component/test_resume_cross_process.py",
+        # Talks to the control-plane Vault to exercise Control Groups (007). There is no
+        # fake: one that always approves proves the caller can proceed, one that never
+        # approves proves it handles denial, and neither proves the gate holds.
+        "harness/vault_control_groups.py",
     }
 )
 
