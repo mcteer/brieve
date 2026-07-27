@@ -33,7 +33,8 @@ import pytest
 from core.run import RunState
 from surfaces.dispatch.nomad import NomadDispatcher
 
-pytestmark = pytest.mark.enclave
+# Drives the scheduler, so it cannot run inside something the scheduler placed.
+pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
 NOMAD_ADDR = "http://127.0.0.1:4646"
 JOB_ID = "agent-run"

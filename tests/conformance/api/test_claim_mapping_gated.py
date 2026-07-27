@@ -28,7 +28,9 @@ from core.identity.claims import ClaimMapping
 from surfaces.api.authority_submit import AuthorityChangeRefused, VaultAuthoritySubmitter
 from tests.harness.vault_control_groups import VaultAdmin, reachable
 
-pytestmark = pytest.mark.enclave
+# Sets up a Control Group with an admin token, which the allocation deliberately
+# lacks — no token in that jobspec is the property it exists to demonstrate.
+pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
 MAPPING = ClaimMapping(claim_name="groups", claim_value="sre", role="operator")
 

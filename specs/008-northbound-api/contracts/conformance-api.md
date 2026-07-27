@@ -16,7 +16,15 @@ check executes**.
 make conformance
 ```
 
-Gains `tests/conformance/api`. Rows marked *enclave* below need `make dev-up`: they run
+Gains `tests/conformance/api`, which runs in **two places** and the split is structural:
+
+- Most rows run **inside a Nomad allocation**, holding their own attested workload
+  identity. That is what makes them exercise the attestation chain rather than sit beside
+  it.
+- Two run on the **host**, marked `host_enclave`. One drives the scheduler, so it cannot
+  run inside something the scheduler placed; the other sets up a Control Group with an
+  admin token, which the allocation deliberately does not have — no token in that jobspec
+  is the property it exists to demonstrate. Rows marked *enclave* below need `make dev-up`: they run
 against the real Vault, the real Postgres, and a real allocation, and **fail loudly when
 the enclave is absent rather than skipping**. A test that skips itself reports the same
 green as one that ran.

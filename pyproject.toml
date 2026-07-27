@@ -102,6 +102,12 @@ markers = [
     # fork-safe CI lane stays hermetic; included in `make conformance`, which is the
     # gate a human runs against the real stack.
     "enclave: needs a running Vault and Postgres",
+    # Needs the enclave AND must run on the HOST rather than inside an allocation.
+    # Two reasons, both structural rather than incidental: a row that drives the scheduler
+    # cannot run inside something the scheduler placed, and a row that sets up a Control
+    # Group needs an admin token the allocation deliberately does not have — no token in
+    # that jobspec is the property it exists to demonstrate.
+    "host_enclave: needs the enclave, and cannot run inside an allocation",
 ]
 
 # No mypy override is needed for the `surfaces` extra: fastapi, uvicorn, pyjwt, and

@@ -143,8 +143,9 @@ So before merging anything that touches durability, sealed core, an adapter, a p
 `src/surfaces/`, `src/core/audit/`, or `infra/`:
 
 1. `make dev-up` — the enclave must be **running**, not assumed
-2. `make conformance` — all rows: the durability lane and the API evidence rows, both of
-   which execute under an attested workload identity rather than a supplied token
+2. `make conformance` — all rows. Most execute under an attested workload identity inside
+   an allocation rather than a supplied token; two run on the host because one drives the
+   scheduler and the other holds an admin token the allocation deliberately lacks
 3. Merge only if it passed. If the enclave cannot be brought up, **say so and do not
    merge** — report the gap rather than merging past it
 

@@ -34,6 +34,9 @@ conformance:
 	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
 	@bash infra/bin/enclave-conformance
 	$(UV_RUN) pytest -m enclave -q
+	# The rows that must run HERE rather than in the allocation: one drives the
+	# scheduler, the other holds an admin token the allocation deliberately lacks.
+	$(UV_RUN) pytest tests/conformance/api -m host_enclave -q
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
 # Enterprise license and cannot stand one up. This is a real coverage gap and is
