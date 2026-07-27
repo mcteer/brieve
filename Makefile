@@ -35,8 +35,18 @@ conformance:
 # Enterprise license and cannot stand one up. This is a real coverage gap and is
 # recorded as one in specs/005-durable-execution/contracts/conformance-durability.md —
 # the durability rows are merge-blocking for a human running them, not for CI.
+# Two exclusions, and both are load-bearing for different reasons.
+#
+# The path ignore stays because the durability rows are parameterized memory/postgres and
+# are NOT marker-excluded — their memory half is genuinely hermetic, so a marker would
+# either drop coverage or force the postgres half into this lane.
+#
+# The marker is new, for tests/conformance/api, which holds hermetic AND enclave rows in
+# one directory. Ignoring that path would drop the hermetic ones; collecting the enclave
+# ones fails the lane, since they fail loudly rather than skipping when the enclave is
+# absent. Neither exclusion alone is sufficient (specs/008-northbound-api T057a).
 conformance-hermetic:
-	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -q
+	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
 
 test-full:
 	@echo "make test-full: stub — PR-tier suites not implemented yet" >&2

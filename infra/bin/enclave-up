@@ -195,6 +195,40 @@ TLS_ARGS=()
 terraform apply -input=false -auto-approve -var vault_token="$(env_val VAULT_ROOT_TOKEN)" "${TLS_ARGS[@]}" >/dev/null
 ok "workload identity auth, ceiling policies, agent registry, database engine, dynamic role"
 
+# ---------------------------------------------------------------- 4a. evidence schema
+#
+# Applied HERE, between the trust fabric and anything that draws evidence credentials,
+# because the evidence role's creation_statements name `audit_entries` explicitly. Vault
+# evaluates those statements when it issues a credential, not when Terraform creates the
+# role — so if the table does not exist yet, credential issuance FAILS OUTRIGHT rather
+# than degrading. An ordering requirement nothing owns is a comment; this owns it.
+#
+# Applied under the harness (run) role, which is the only one holding CREATE ON SCHEMA
+# public. The evidence role could not create this schema even if asked to, which is the
+# point of it.
+say "Evidence store"
+ev_creds="$(vault read -format=json database/creds/harness 2>/dev/null || echo "")"
+[ -n "$ev_creds" ] || die "could not mint a harness credential to apply the evidence schema"
+EV_USER="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["username"])')"
+EV_PASS="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["password"])')"
+if docker run --rm -i -e PGPASSWORD="$EV_PASS" --network host postgres:17-alpine \
+     psql -h 127.0.0.1 -p 5432 -U "$EV_USER" -d brieve -v ON_ERROR_STOP=1 -q \
+     < "$REPO/src/core/audit/evidence_schema.sql" >/dev/null 2>&1; then
+  ok "audit_entries and audit_stream_heads applied"
+else
+  die "evidence schema failed to apply — the evidence role cannot issue credentials without it"
+fi
+
+# The tenant every audit entry carries. Runs started without a surface — the adapter, the
+# older suites — have no identity provider to draw a claim from, and core refuses rather
+# than inventing a value, so the deployment names one.
+# Written only if absent, so a deployment that has chosen its own tenant keeps it across
+# re-runs. Everything else in this script is idempotent for the same reason.
+if [ -z "$(env_val HARNESS_DEFAULT_TENANT)" ]; then
+  env_set HARNESS_DEFAULT_TENANT "tenant-local"
+fi
+ok "HARNESS_DEFAULT_TENANT=$(env_val HARNESS_DEFAULT_TENANT)"
+
 # ---------------------------------------------------------------- 4b. transport
 #
 # The bootstrap circularity, resolved the only way it can be: the trust store cannot

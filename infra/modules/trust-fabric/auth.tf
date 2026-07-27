@@ -71,7 +71,13 @@ resource "vault_jwt_auth_backend_role" "conformance" {
     nomad_job_id = var.conformance_job_id
   }
 
-  token_policies = [vault_policy.harness_database.name]
-  token_ttl      = 1800
-  token_type     = "service"
+  # Both, because the conformance rows exercise the write path and the read path: the
+  # evidence rows have to draw a real SELECT-only credential to prove Postgres refuses a
+  # write through it. Proving that against a fake connection would prove nothing.
+  token_policies = [
+    vault_policy.harness_database.name,
+    vault_policy.evidence_database.name,
+  ]
+  token_ttl  = 1800
+  token_type = "service"
 }

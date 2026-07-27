@@ -87,8 +87,17 @@ resource "vault_database_secret_backend_role" "harness" {
 #   3. No membership in the parent role. Membership is what makes the harness role able to
 #      own and alter objects; granting it here would quietly undo the whole point.
 #
-# ALTER DEFAULT PRIVILEGES covers evidence tables created after this role exists, so a
-# later migration does not silently escape the grant.
+# The task list called for ALTER DEFAULT PRIVILEGES so later tables would not escape the
+# grant. That is the wrong instrument HERE, and the conflict is worth recording rather
+# than resolving silently: default privileges apply to every future table in the schema,
+# which would hand this role `audit_stream_heads` the moment that table is created — the
+# exact grant narrowness #2 exists to withhold. A convenience that re-grants the one thing
+# you deliberately withheld is not a convenience.
+#
+# Instead the grants are explicit and re-evaluated on every credential issuance, so they
+# are always current for the tables named. Adding a readable evidence table is then a
+# deliberate edit here rather than something that happens by default, and enclave-verify
+# asserts both halves: the role CAN read audit_entries and CANNOT read the heads.
 resource "vault_database_secret_backend_role" "evidence" {
   backend = vault_mount.database.path
   name    = local.evidence_role_name
@@ -99,6 +108,10 @@ resource "vault_database_secret_backend_role" "evidence" {
     "GRANT CONNECT ON DATABASE \"${var.database_name}\" TO \"{{name}}\";",
     "GRANT USAGE ON SCHEMA public TO \"{{name}}\";",
     "GRANT SELECT ON audit_entries TO \"{{name}}\";",
+    # Belt and braces. The role was never granted this and inherits nothing, but the
+    # table is the one thing whose exposure would defeat truncation detection, so the
+    # withholding is stated rather than left implied.
+    "REVOKE ALL PRIVILEGES ON audit_stream_heads FROM \"{{name}}\";",
   ]
 
   revocation_statements = [
