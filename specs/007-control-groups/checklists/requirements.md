@@ -45,3 +45,9 @@
   the bootstrap credential is revoked); what happens to a request nobody answers (it expires,
   and expiry means no change); and which policy version governs a request in flight (the one
   in force when it completes, or tightening is advisory).
+- Plan (2026-07-26) confirmed the premise by checking rather than assuming: Control Groups
+  is licensed on the running enclave. The whole design is "configure the trust fabric's
+  mechanism", so a false premise there would have made the plan wrong end to end rather
+  than merely inconvenient.
+- The plan adds one small core module (observe and record) and no dependencies. If a later
+  pass finds this feature growing an approval engine, that is the signal the premise broke.
