@@ -132,8 +132,9 @@ agent can authenticate as it. Complete quorum; assert it can.
 
 **Acceptance Scenarios**:
 
-1. **Given** a proposed registration, **When** it lacks quorum, **Then** no workload can
-   authenticate as that definition.
+1. **Given** a proposed registration, **When** it lacks quorum, **Then** the definition is
+   not created — not merely unusable. A definition existing ungated with no workload yet is
+   a different and weaker property.
 2. **Given** quorum, **When** approvals complete, **Then** the definition exists with its
    ceiling and is recorded in the agent registry.
 3. **Given** an approved definition, **When** instances of it are scheduled or restarted,
@@ -189,14 +190,23 @@ none requires approval and none is blocked.
   authorized identity before taking effect.
 - **FR-002**: Creating an agent definition MUST require the same approval as changing one.
   Authority that did not exist before is being created.
-- **FR-003**: Manual writes to the control plane, and break-glass access, MUST be gated by
-  the same mechanism.
-- **FR-004**: Reactivating a suspended agent MUST be gated.
+- **FR-003**: Direct writes to the gated paths — through the CLI, the API, or the
+  deployment tree — MUST be subject to the same gate. Gating attaches to the path, so it
+  holds regardless of which tool reaches it.
+- **FR-003a**: Break-glass is **not** gated by this mechanism and MUST NOT be. Regenerating
+  a root token requires a quorum of unseal-share holders, which is a stronger multi-party
+  control than approvals and one Control Groups cannot intercept — root generation is a
+  `sys` operation deliberately outside normal policy paths. Its strength is therefore set
+  by **the unseal threshold**, not by anything in this feature. A 1-of-1 unseal makes
+  break-glass a single-person act no matter what is configured here.
 - **FR-005**: Operations on instances of an already-approved definition — scheduling,
   restarting, scaling, registering an instance — MUST NOT require approval.
 - **FR-006**: Revocation of authority MUST take effect immediately on the action of a single
   authorized identity, with no approval required.
-- **FR-007**: Restoration of revoked authority MUST require quorum.
+- **FR-007**: Restoration of revoked authority MUST require quorum. Reactivating a
+  suspended agent is this act, not a separate one — an earlier draft stated both, which
+  would let one be satisfied while the other was forgotten and would show a reviewer two
+  ticks for one test.
 - **FR-008**: The requester MUST NOT be able to satisfy the quorum requirement themselves.
 - **FR-009**: A change that has not obtained quorum MUST NOT take partial effect, and MUST
   NOT take effect by timeout, default, or escalation.

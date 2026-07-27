@@ -75,9 +75,10 @@
   approves proves the caller handles denial. Neither proves the gate holds, which is the
   only claim that matters. This is the same reasoning that put the durability rows on real
   Postgres.
-- **Cost, stated**: these tests need `make dev-up`, so they join the durability rows in the
-  lane CI cannot run — and under constitution v1.1.0 that means naming who runs them before
-  merge, in this feature's conformance contract.
+- **Cost, stated**: these tests need `make dev-up`, so CI cannot run them. They are
+  component tests rather than conformance rows, so v1.1.0's named-runner requirement does
+  not attach — that rule governs blocking rows in the Quality Gates list, and this feature
+  adds none.
 - **Alternatives considered**: a fake control group (above). Unit-testing the policy
   document as text (asserts the policy says what we wrote, not that Vault enforces it).
 

@@ -51,3 +51,11 @@
   than merely inconvenient.
 - The plan adds one small core module (observe and record) and no dependencies. If a later
   pass finds this feature growing an approval engine, that is the signal the premise broke.
+- Analyze (2026-07-26) found six issues, all fixed. Two were worth the pass on their own:
+  FR-004 and FR-007 described one act in two requirements, which would have shown a
+  reviewer two ticks for one test; and break-glass was specified as gated by Control
+  Groups, which is impossible — root regeneration already requires a quorum of unseal-share
+  holders and is a `sys` operation outside normal policy paths. Verified against the CLI
+  rather than corrected from memory.
+- Two tasks assumed this feature adds a conformance row. It does not; both were removed
+  rather than left as scaffolding for something that does not exist.

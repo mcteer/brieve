@@ -40,7 +40,7 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 - Trust fabric: `infra/modules/trust-fabric/control-groups.tf`, `policies.tf`, `variables.tf`
 - Core: `src/core/authority/changes.py`, `errors.py`
-- Tests: `tests/unit/`, `tests/component/`, `tests/conformance/authority/`
+- Tests: `tests/unit/`, `tests/component/` — no conformance lane; see T002
 
 ---
 
@@ -52,8 +52,8 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 ## Phase 1: Setup
 
-- [ ] T002 [P] Create `infra/modules/trust-fabric/control-groups.tf` and `tests/conformance/authority/__init__.py` as empty scaffolding
-- [ ] T003 [P] Add quorum policy inputs to `infra/modules/trust-fabric/variables.tf` — required approvals, authorized approvers, and request TTL, **per class of change and with no defaults** (FR-015). A default quorum would be a security posture chosen for every customer by whoever wrote the module
+- [ ] T002 [P] Create `infra/modules/trust-fabric/control-groups.tf` as empty scaffolding. **No conformance directory**: this feature adds no row to the constitution's blocking gate list, so a `tests/conformance/authority/` would be a folder nobody fills. Its tests are component tests against the real Vault, which is sufficient and pretends nothing else
+- [ ] T003 [P] Add quorum policy inputs to `infra/modules/trust-fabric/variables.tf` — required approvals, authorized identities, and request TTL, **per class of change and with no defaults** (FR-015). A default quorum would be a security posture chosen for every customer by whoever wrote the module
 
 ---
 
@@ -64,7 +64,8 @@ an approval engine, the premise broke — stop and say so rather than building o
 **⚠️ CRITICAL**: no story work until the gate applies cleanly against the enclave.
 
 - [ ] T004 Write the Control Group configuration in `infra/modules/trust-fabric/control-groups.tf` — the Sentinel endorsement policy and its approver sets, parameterized by T003's inputs
-- [ ] T005 Attach the gate to the controlled **paths** per `contracts/gated-paths.md`: ceiling policies, definitions and registry entries, workload identity role bindings, break-glass, reactivation, and the quorum policy itself. **Attach to paths, not callers** — a gate on callers is a gate on the callers someone thought of
+- [ ] T005 Attach the gate to the controlled **paths** per `contracts/gated-paths.md`: ceiling policies, definitions and registry entries, workload identity role bindings, restoration, and the quorum policy itself. **Attach to paths, not callers** — a gate on callers is a gate on the callers someone thought of
+- [ ] T005a [GATE:fail-closed] Assert break-glass is **not** routed through this gate, and document why in `infra/README.md`: regenerating a root token requires a quorum of unseal-share holders — verified against the CLI, which states it "generates a new root token by combining a quorum of share holders". That is a stronger multi-party control and a `sys` operation Control Groups cannot intercept. **Record the consequence**: break-glass strength is set by the unseal threshold, so the development enclave's 1-of-1 makes it a single-person act regardless of anything configured here
 - [ ] T006 [GATE:fail-closed] Assert revocation paths are **not** controlled (FR-006). Deliberate asymmetry: a gate making revocation as slow as granting is one people route around in an incident, after which the route-around is the normal path
 - [ ] T007 Sequence the policy application in provisioning so it lands **before** the bootstrap credential is revoked (FR-016). A control gating its own changes cannot create itself; without this the alternatives are a control that never exists or one with a permanent back door
 - [ ] T008 [GATE:no-secret-leak] Assert no quorum policy content or credential material reaches Terraform state, module outputs, or logs
@@ -122,7 +123,8 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 **Independent Test**: quickstart Scenario A, registration variant
 
-- [ ] T023 [US4] Assert a definition lacking quorum leaves **no workload able to authenticate as it**
+- [ ] T023 [US4] Assert a definition lacking quorum is **not created** — not merely unusable. A definition existing ungated with no workload yet is a different and weaker property, and asserting only the second would pass against an ungated creation path
+- [ ] T023a [US4] Assert no workload can authenticate as an unapproved definition (the second, weaker property — worth holding as well)
 - [ ] T024 [US4] Assert an approved definition exists with its ceiling and appears in the agent registry
 - [ ] T025 [US4] [GATE:fail-closed] Assert changing the quorum policy is itself gated (FR-015), and that after provisioning completes and the bootstrap credential is revoked, zero authority changes are possible outside the mechanism (SC-011)
 
@@ -156,7 +158,6 @@ true, because nobody notices the day a pause is added.
 
 - [ ] T033 [P] Document the quorum policy in `infra/README.md` — what is gated, what is not, who owns the policy, and the bootstrap sequence
 - [ ] T034 [P] [GATE:determinism] Extend `tests/unit/test_no_live_dependencies.py` for this feature's paths; the enclave is required and permitted, live models and product APIs are not
-- [ ] T035 Create `specs/007-control-groups/contracts/conformance-authority.md` recording which rows are in force **and naming the party responsible for running them before merge** — required by constitution v1.1.0, because these rows need the enclave and CI cannot run them
 - [ ] T036 Review the diff against the scope bound: one core module that observes, zero new dependencies, no approval engine. Growth beyond that is the signal the premise broke
 - [ ] T037 Open `feat/007-control-groups` with the asymmetry, the bootstrap sequence, and the negative requirements called out
 
@@ -210,8 +211,11 @@ each other; T033/T034 in polish.
 - **Eval gate type omitted** (N/A) — no packs, prompts, models, or policies.
 - **No fake Control Group exists anywhere in this feature.** Tests run against the real
   Vault, for the same reason the durability rows run against real Postgres.
-- **These rows need the enclave, so CI cannot run them.** Constitution v1.1.0 requires
-  naming who runs them before merge — that is T035, and it is not optional.
+- **These tests need the enclave, so CI cannot run them** — but they are component tests,
+  not conformance rows. Constitution v1.1.0's named-runner requirement applies to blocking
+  rows in the Quality Gates list, and this feature adds none. Applying it here would have
+  documented rows that do not exist. If authority-change gating should be such a row, that
+  is a constitution amendment argued on its merits, not implied by a task.
 - **004's approval hook is deliberately untouched.** Under ADR-0049 (Proposed) a run-time
   approval interrupt is the shape being removed; settling it belongs to 0049.
 - Contribution class at implement: **sealed core (authority)** — security-maintainer review

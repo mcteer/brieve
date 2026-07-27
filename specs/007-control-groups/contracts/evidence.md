@@ -45,8 +45,9 @@ Component tests run against the real control-plane Vault. A faked Control Group 
 approves proves the caller can proceed; one that never approves proves the caller handles
 denial. Neither proves the gate holds, which is the only claim that matters.
 
-That puts these tests in the lane CI cannot run — so under constitution v1.1.0, this
-feature's conformance contract must name who runs them before merge.
+That puts these tests in the lane CI cannot run. They are component tests rather than
+conformance rows, so v1.1.0's named-runner requirement does not attach — it governs
+blocking rows in the Quality Gates list, and this feature adds none.
 
 ## Related
 

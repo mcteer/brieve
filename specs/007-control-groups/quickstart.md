@@ -94,6 +94,5 @@ make check
 make conformance    # requires the enclave
 ```
 
-Both green is the completion bar. Per constitution v1.1.0, the party responsible for
-running the enclave-dependent rows before merge is named in this feature's conformance
-contract.
+Both green is the completion bar. These are component tests against the real Vault rather
+than conformance rows — this feature adds no row to the constitution's blocking list.

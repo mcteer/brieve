@@ -137,6 +137,8 @@ tests/
 ├── component/test_authority_change_quorum.py
 ├── component/test_revocation_asymmetry.py
 └── unit/test_no_run_interrupt.py     # the negative requirement, asserted
+                                      # no conformance lane — this feature adds no
+                                      # blocking row to the constitution's list
 ```
 
 **Structure Decision**: the gate lives in `infra/modules/trust-fabric/`, beside the

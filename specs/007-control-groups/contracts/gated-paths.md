@@ -16,7 +16,6 @@ that gets widened until it is unusable, or narrowed until it is decorative.
 | Ceiling policies | The outer bound on everything an agent may ever do |
 | Agent definitions and registry entries | Creating authority that did not exist |
 | Workload identity role bindings | What may authenticate as a definition |
-| Break-glass access | By construction |
 | Reactivation of a suspended agent | Restoration, which is the gated half of the asymmetry |
 | The quorum policy itself | Or the control can be lowered by whoever it constrains |
 
@@ -28,6 +27,7 @@ that gets widened until it is unusable, or narrowed until it is decorative.
 | Registering an instance of an approved definition | Same |
 | Issuing per-step credentials within a ceiling | This is the per-task authority model working |
 | **Revocation** | Unilateral and immediate, deliberately |
+| **Break-glass (root regeneration)** | Cannot be gated here, and does not need to be. It requires a quorum of unseal-share holders — a stronger multi-party control, and a `sys` operation outside normal policy paths |
 
 ## Invariants
 
@@ -43,6 +43,10 @@ that gets widened until it is unusable, or narrowed until it is decorative.
    people route around in an incident, after which the route-around is the normal path.
 5. **No gated path can pause a run.** These are authority changes; runs hold authority
    already granted.
+6. **Break-glass strength comes from the unseal threshold, not from this feature.** A
+   1-of-1 unseal makes root regeneration a single-person act regardless of what is
+   configured here — which is the development enclave's posture today, and the reason the
+   unseal shape matters in production.
 
 ## Related
 
