@@ -53,14 +53,16 @@ unblocks — that is the argument for its position, and the thing to challenge i
 Quorum-gated authority changes: who may widen a scope, restore revoked access, or change IdP
 claim-to-role mapping.
 
-**Why here:** 004 left the approval hook as a deny-by-default stub, and 005 parks runs awaiting
-consent that nothing can currently grant. Both are honest interim states, but they compound —
-each additional feature that parks or requires approval widens a gap with no surface behind it.
-This is also the first feature whose subject is *humans authorizing*, which every
-approval-shaped thing downstream depends on.
+**Why here:** the first feature whose subject is *humans authorizing*, which every
+authority-shaped thing downstream depends on. An agent's ceiling is the outer bound on
+everything it may ever do, and nothing currently stops one person raising it alone.
 
-**Unblocks:** real human-in-the-loop approvals; 005's parked-run resolution; ADR-0016's
-restoration quorum.
+**Scope correction:** an earlier version of this entry claimed it unblocks "005's parked-run
+resolution". It does not. Control Groups gate **authority**, not **runs** — humans authorize at
+design time and are never in the loop during a run (ADR-0049, Proposed). That claim assumed
+run-time consent, which is the thing 0049 rejects.
+
+**Unblocks:** quorum on ceiling and definition changes; ADR-0016's restoration asymmetry.
 
 ### 008 — Northbound surfaces (ADR-0033, ADR-0034, ADR-0035)
 
