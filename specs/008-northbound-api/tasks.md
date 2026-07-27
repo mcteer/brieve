@@ -108,12 +108,12 @@ governed *read* of it; this phase builds the thing being read.
 
 - [X] T018 Create the `RunDispatcher` protocol in `src/surfaces/dispatch/types.py` returning a `RunHandle` of `run_id` and `correlation_id` only. Nothing naming an allocation, container, or scheduler — the caller must not learn the substrate any more than the surface does
 - [X] T019 [P] Implement `InProcessDispatcher` in `src/surfaces/dispatch/inprocess.py` for hermetic tests
-- [ ] T020 Implement `NomadDispatcher` in `src/surfaces/dispatch/nomad.py`, submitting a jobspec the way `infra/bin/enclave-conformance` already does. **Not optional**: Nomad is inside our boundary, and a run-start path proven only against a double has not been proven
+- [X] T020 Implement `NomadDispatcher` in `src/surfaces/dispatch/nomad.py`, submitting a jobspec the way `infra/bin/enclave-conformance` already does. **Not optional**: Nomad is inside our boundary, and a run-start path proven only against a double has not been proven
 
 ### The application and the double
 
 - [ ] T021 Create the app factory in `src/surfaces/api/app.py`. **Routes are registered here and nowhere else**, so the route-walking checks in US3 and US5 have one place to enumerate
-- [ ] T022 [GATE:determinism] Create `tests/harness/fake_oidc_provider.py` issuing **real signed JWTs from a real generated key**, serving a real JWKS document, and supporting expired, wrong-issuer, wrong-audience, and bad-signature tokens. A double that skips signing would leave FR-004's guarantee untested while every test passed
+- [X] T022 [GATE:determinism] Create `tests/harness/fake_oidc_provider.py` issuing **real signed JWTs from a real generated key**, serving a real JWKS document, and supporting expired, wrong-issuer, wrong-audience, and bad-signature tokens. A double that skips signing would leave FR-004's guarantee untested while every test passed
 
 **Checkpoint**: the store exists, the seam exists, the subject exists. User stories can now proceed in parallel.
 
@@ -128,9 +128,9 @@ calls, and every audit record for that correlation ID.
 subject appears in the manufactured authority and in every audit record for that
 correlation ID.
 
-- [ ] T023 [US1] Implement OIDC token verification in `src/surfaces/api/verification.py` using `PyJWKClient` — signature, issuer, audience, `exp`, and `nbf`, with the algorithm **pinned** rather than read from the token header
-- [ ] T024 [US1] [GATE:fail-closed] Refuse absent, expired, and unverifiable identities in `src/surfaces/api/verification.py` with **nothing executed** — the refusal must precede any core call, not follow one
-- [ ] T025 [US1] [GATE:fail-closed] Refuse claims mapping to no role via `src/core/identity/claims.py` (FR-006), asserting in `tests/component/test_api_refusal_kinds.py` the refusal is distinguishable in audit from a failed signature — an operator debugging an integration needs to tell "your token is bad" from "your claim is not mapped"
+- [X] T023 [US1] Implement OIDC token verification in `src/surfaces/api/verification.py` using `PyJWKClient` — signature, issuer, audience, `exp`, and `nbf`, with the algorithm **pinned** rather than read from the token header
+- [X] T024 [US1] [GATE:fail-closed] Refuse absent, expired, and unverifiable identities in `src/surfaces/api/verification.py` with **nothing executed** — the refusal must precede any core call, not follow one
+- [X] T025 [US1] [GATE:fail-closed] Refuse claims mapping to no role via `src/core/identity/claims.py` (FR-006), asserting in `tests/component/test_api_refusal_kinds.py` the refusal is distinguishable in audit from a failed signature — an operator debugging an integration needs to tell "your token is bad" from "your claim is not mapped"
 - [ ] T026 [US1] Wire the verified subject into `start_governed_run` as `subject_user_id` in `src/surfaces/api/runs.py`, unchanged and untranslated
 - [ ] T027 [US1] Implement `POST /runs` and `GET /runs/{run_id}` in `src/surfaces/api/runs.py`, returning a `RunHandle` through the dispatcher. **Never blocks** (FR-007a)
 - [ ] T028 [P] [US1] [GATE:correlation] Component test in `tests/component/test_api_subject_is_root.py`: the authenticated subject appears in the manufactured authority and in **every** audit record for the correlation ID — every, not the first

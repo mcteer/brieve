@@ -1,0 +1,143 @@
+# SPDX-License-Identifier: Apache-2.0
+"""The real dispatcher: a run is a Nomad allocation.
+
+Not optional, and not replaceable by the in-process double for anything that matters.
+Nomad is inside our boundary — we deploy it — so a run-start path exercised only against a
+fake has not been exercised. That is the same rule that put the durability rows on real
+Postgres.
+
+**Nothing above this module knows Nomad exists.** The surface depends on
+:class:`~surfaces.dispatch.types.RunDispatcher`; this is one implementation of it, and a
+Kubernetes one would be another. Principle VII's "the substrate is the only permitted
+delta" cannot hold if the layer a customer touches first names the scheduler.
+
+Why an allocation rather than a thread: 005 made a run's identity structural. Resume is a
+*new* allocation with a *new* attested workload identity, which is what makes replaying a
+pre-disruption credential unavailable rather than merely forbidden. A dispatcher that ran
+work in the API's own process would put the run's lifetime inside the surface's, and the
+feature that exists to let work outlive a process would be the thing preventing it.
+"""
+
+from __future__ import annotations
+
+import json
+import urllib.error
+import urllib.request
+from typing import Any
+
+from core.errors import CoreError
+from core.run import RunState
+from surfaces.dispatch.types import RunHandle
+
+DEFAULT_NOMAD_ADDR = "http://127.0.0.1:4646"
+DEFAULT_JOB_ID = "agent-run"
+
+
+class DispatchError(CoreError):
+    """The run could not be scheduled. Never swallowed — an unscheduled run is not a run."""
+
+
+#: Nomad allocation client states mapped onto run states.
+#:
+#: ``pending`` is deliberately ACTIVE rather than a state of its own. A caller polling a
+#: handle cares whether the run is still going, and inventing a surface-only "scheduling"
+#: state would leak exactly the substrate detail this seam exists to hide.
+_STATE_BY_CLIENT_STATUS = {
+    "pending": RunState.ACTIVE,
+    "running": RunState.ACTIVE,
+    "complete": RunState.COMPLETED,
+    "failed": RunState.STOPPED,
+    "lost": RunState.STOPPED,
+}
+
+
+class NomadDispatcher:
+    """Submits a parameterized job dispatch per run."""
+
+    def __init__(
+        self,
+        *,
+        nomad_addr: str = DEFAULT_NOMAD_ADDR,
+        job_id: str = DEFAULT_JOB_ID,
+        timeout: float = 10.0,
+    ) -> None:
+        self._addr = nomad_addr.rstrip("/")
+        self._job_id = job_id
+        self._timeout = timeout
+        self._dispatched: dict[str, str] = {}
+
+    def _request(self, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        url = f"{self._addr}/v1/{path}"
+        data = json.dumps(payload).encode() if payload is not None else None
+        request = urllib.request.Request(  # noqa: S310 — fixed scheme, operator-supplied addr
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST" if data is not None else "GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self._timeout) as response:  # noqa: S310
+                body = response.read().decode()
+        except urllib.error.HTTPError as exc:
+            raise DispatchError(f"scheduler refused {path}: {exc.code} {exc.reason}") from exc
+        except OSError as exc:
+            raise DispatchError(f"scheduler unreachable at {self._addr}: {exc}") from exc
+        return json.loads(body) if body else {}
+
+    def dispatch(
+        self,
+        *,
+        correlation_id: str,
+        subject_user_id: str,
+        tenant_id: str,
+        agent_definition_id: str,
+        requested_tools: frozenset[str],
+    ) -> RunHandle:
+        """Schedule the run and return immediately.
+
+        Metadata carries identity and scope; **no credential is passed**. The allocation
+        presents its own workload identity to Vault and receives a ceiling-scoped token,
+        which is the whole point of ADR-0048's attestation path. A dispatcher that handed
+        the job a token would put a static credential in a jobspec — the single thing this
+        architecture is built to avoid.
+        """
+        payload = {
+            "Meta": {
+                "correlation_id": correlation_id,
+                "subject_user_id": subject_user_id,
+                "tenant_id": tenant_id,
+                "agent_definition_id": agent_definition_id,
+                "requested_tools": ",".join(sorted(requested_tools)),
+            },
+        }
+        result = self._request(f"job/{self._job_id}/dispatch", payload)
+        dispatched_id = str(result.get("DispatchedJobID", "") or "")
+        if not dispatched_id:
+            raise DispatchError("scheduler accepted the dispatch but named no job")
+
+        self._dispatched[correlation_id] = dispatched_id
+        return RunHandle(
+            run_id=correlation_id,
+            correlation_id=correlation_id,
+            state=RunState.ACTIVE,
+        )
+
+    def state_of(self, run_id: str) -> RunHandle | None:
+        dispatched_id = self._dispatched.get(run_id)
+        if dispatched_id is None:
+            return None
+        allocations = self._request(f"job/{dispatched_id}/allocations")
+        if not isinstance(allocations, list) or not allocations:
+            # Dispatched but not yet placed. Still active — reporting "unknown" here would
+            # make a normal scheduling delay look like a failure to a polling caller.
+            return RunHandle(run_id=run_id, correlation_id=run_id, state=RunState.ACTIVE)
+        latest = max(allocations, key=lambda a: int(a.get("CreateIndex", 0)))
+        status = str(latest.get("ClientStatus", "")).lower()
+        return RunHandle(
+            run_id=run_id,
+            correlation_id=run_id,
+            state=_STATE_BY_CLIENT_STATUS.get(status, RunState.ACTIVE),
+        )
+
+
+__all__ = ["DispatchError", "NomadDispatcher"]
