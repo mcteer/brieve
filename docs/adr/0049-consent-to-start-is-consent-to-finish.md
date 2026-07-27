@@ -130,11 +130,14 @@ removed from the design.
 The real answer is to keep trying until the platform knows. That is what suspension and
 the sweeper are for.
 
-**What this genuinely costs is new machinery**: dependency health monitoring, a denial
-class that did not exist, and a sweeper. None of it exists today. Until it does, the
-honest description is that this ADR is a decision, not a shipped capability — and a run
-that cannot observe has no automatic path back. That gap belongs on the roadmap rather
-than being assumed closed by accepting this.
+**What this costs is two pieces of new machinery and one piece of scheduling.** Dependency
+health monitoring and an availability denial class do not exist and have no home yet. The
+**sweeper does have one**: it belongs in the harness's MCP service, and lands and is
+tested when that service is built rather than standing as a separate obligation.
+
+Until the first two exist, the honest description is that this ADR is a decision rather
+than a shipped capability, and a run that cannot observe has no automatic path back. That
+gap belongs on the roadmap — not assumed closed by accepting this.
 
 It also sharpens what evidence is for. A stopped run's audit trail is no longer a prompt
 for someone to act on mid-flight; it is the record an investigator reads afterwards to
