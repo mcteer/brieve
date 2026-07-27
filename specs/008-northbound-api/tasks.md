@@ -112,7 +112,7 @@ governed *read* of it; this phase builds the thing being read.
 
 ### The application and the double
 
-- [ ] T021 Create the app factory in `src/surfaces/api/app.py`. **Routes are registered here and nowhere else**, so the route-walking checks in US3 and US5 have one place to enumerate
+- [X] T021 Create the app factory in `src/surfaces/api/app.py`. **Routes are registered here and nowhere else**, so the route-walking checks in US3 and US5 have one place to enumerate
 - [X] T022 [GATE:determinism] Create `tests/harness/fake_oidc_provider.py` issuing **real signed JWTs from a real generated key**, serving a real JWKS document, and supporting expired, wrong-issuer, wrong-audience, and bad-signature tokens. A double that skips signing would leave FR-004's guarantee untested while every test passed
 
 **Checkpoint**: the store exists, the seam exists, the subject exists. User stories can now proceed in parallel.
@@ -131,11 +131,11 @@ correlation ID.
 - [X] T023 [US1] Implement OIDC token verification in `src/surfaces/api/verification.py` using `PyJWKClient` — signature, issuer, audience, `exp`, and `nbf`, with the algorithm **pinned** rather than read from the token header
 - [X] T024 [US1] [GATE:fail-closed] Refuse absent, expired, and unverifiable identities in `src/surfaces/api/verification.py` with **nothing executed** — the refusal must precede any core call, not follow one
 - [X] T025 [US1] [GATE:fail-closed] Refuse claims mapping to no role via `src/core/identity/claims.py` (FR-006), asserting in `tests/component/test_api_refusal_kinds.py` the refusal is distinguishable in audit from a failed signature — an operator debugging an integration needs to tell "your token is bad" from "your claim is not mapped"
-- [ ] T026 [US1] Wire the verified subject into `start_governed_run` as `subject_user_id` in `src/surfaces/api/runs.py`, unchanged and untranslated
-- [ ] T027 [US1] Implement `POST /runs` and `GET /runs/{run_id}` in `src/surfaces/api/runs.py`, returning a `RunHandle` through the dispatcher. **Never blocks** (FR-007a)
-- [ ] T028 [P] [US1] [GATE:correlation] Component test in `tests/component/test_api_subject_is_root.py`: the authenticated subject appears in the manufactured authority and in **every** audit record for the correlation ID — every, not the first
+- [X] T026 [US1] Wire the verified subject into `start_governed_run` as `subject_user_id` in `src/surfaces/api/runs.py`, unchanged and untranslated
+- [X] T027 [US1] Implement `POST /runs` and `GET /runs/{run_id}` in `src/surfaces/api/runs.py`, returning a `RunHandle` through the dispatcher. **Never blocks** (FR-007a)
+- [X] T028 [P] [US1] [GATE:correlation] Component test in `tests/component/test_api_subject_is_root.py`: the authenticated subject appears in the manufactured authority and in **every** audit record for the correlation ID — every, not the first
 - [ ] T029 [P] [US1] [GATE:conformance] Conformance rows in `tests/conformance/api/test_identity_rows.py` for identity-is-the-subject and fail-closed-on-identity, plus self-verifying break fixtures per 004's pattern
-- [ ] T030 [US1] [GATE:conformance] Enclave row in `tests/conformance/api/test_run_start_does_not_block.py`: start a run outlasting the request and assert the response returns with a handle while it still executes. Response time unrelated to run duration
+- [X] T030 [US1] [GATE:conformance] Enclave row in `tests/conformance/api/test_run_start_does_not_block.py`: start a run outlasting the request and assert the response returns with a handle while it still executes. Response time unrelated to run duration
 - [ ] T031 [P] [US1] [GATE:no-secret-leak] Add `tests/component/test_api_no_secret_leak.py` asserting no token, JWKS private material, or authorization header value reaches any audit record, span, or log line
 
 **Checkpoint**: US1 alone is the MVP — a governed run can be started by a verified human whose identity is the subject of everything that follows.

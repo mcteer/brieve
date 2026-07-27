@@ -173,9 +173,7 @@ class TokenVerifier:
 
         tenant = str(claims.get(self._tenant_claim, "") or "").strip()
         if not tenant:
-            raise AuthenticationRefused(
-                "identity carries no tenant claim", reason_code="no_tenant"
-            )
+            raise AuthenticationRefused("identity carries no tenant claim", reason_code="no_tenant")
 
         roles = resolve_roles(claims, self._mappings)
         if not roles:

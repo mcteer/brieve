@@ -149,7 +149,9 @@ def test_cached_keys_survive_a_provider_blip_but_expiry_still_applies(
     assert exc.value.reason_code == "expired_identity"
 
 
-def test_list_valued_claims_match_per_element(idp: FakeOIDCProvider, verifier: TokenVerifier) -> None:
+def test_list_valued_claims_match_per_element(
+    idp: FakeOIDCProvider, verifier: TokenVerifier
+) -> None:
     subject = verifier.verify(idp.token(claims={"groups": ["other", "platform"]}))
     assert subject.roles == frozenset({"operator"})
 
