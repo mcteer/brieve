@@ -31,8 +31,8 @@ being re-derived at the start of every spec.
 
 ## In progress
 
-Nothing. The next feature is the top of [Next](#next) — northbound surfaces (ADR-0033),
-which is the first thing a user touches directly.
+Nothing. The next feature is the top of [Next](#next) — the northbound **API**, first of the
+four transports, and the one the other three consume.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -49,17 +49,31 @@ which is the first thing a user touches directly.
 Ordered by dependency first, then by which owed gate row it closes. Each entry names what it
 unblocks — that is the argument for its position, and the thing to challenge if you disagree.
 
-### 008 — Northbound surfaces (ADR-0033, ADR-0034, ADR-0035)
+### Northbound surfaces — split into four (ADR-0033, ADR-0034, ADR-0035)
 
-Four transports — MCP, API, CLI, portal — over one authorization core, with surface parity
-conformance-asserted: the same operation yields the same verdict and equivalent audit events on
-every transport. Includes the audit plane as a governed read path.
+**One feature per transport, not one feature for four.** ADR-0033 requires all four to yield the
+same verdict and equivalent audit events, and that parity is asserted *between* them — but
+building four surfaces in one pass means getting parity right across four things that are all
+still moving. Splitting lets each land against a settled core.
 
-**Why here:** the first feature that ships something a user touches directly, and it needs the
-authorization core (002/003) plus an approval surface (007) to be behind it. Attempting it
-earlier means building transports over guarantees that are still moving.
+**The API goes first**, because the other three consume it rather than reimplementing the
+authorization path. A CLI that talks to the core directly is a second authorization path
+wearing a different name.
 
-**Owed gate row:** four-transport surface parity.
+| # | Transport | Notes |
+| --- | --- | --- |
+| 008 | **API** | The surface the others consume. Carries the audit plane as a governed read path |
+| — | MCP | The persistent service coding IDEs talk to. **Scope includes** the dependency health checks and the resume sweeper decided in ADR-0049 — both need a long-lived home, and this is it |
+| — | CLI | Over the API |
+| — | Portal | Over the API |
+
+**Owed gate row:** four-transport surface parity. It stays owed until at least two transports
+exist — parity cannot be asserted against a single surface, and a row claiming otherwise would
+be a stub.
+
+**Why here:** the first features that ship something a user touches directly. They need the
+authorization core (002/003) and the approval gate (007) settled behind them; attempting them
+earlier means building transports over guarantees still in motion.
 
 ### 009 — Capability packs and eval gates (ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045)
 
