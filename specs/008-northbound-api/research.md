@@ -66,8 +66,11 @@ widely deployed, and does exactly this and nothing else.
 - **python-jose.** Less actively maintained, and has had CVEs in exactly the algorithm-
   confusion class this decision exists to avoid.
 
-**Licensing**: `Apache-2.0 OR BSD-2-Clause` already appears in `licenses/allowlist.txt`,
-which is `cryptography`'s reported string.
+**Licensing**: `cryptography` reports **`Apache-2.0 OR BSD-3-Clause`** — this document
+originally said BSD-2-Clause, and T001 caught it, which is what T001 is for. Both branches of
+the disjunction were already on the allowlist independently; only the composite string was
+absent, and `pip-licenses` matches the string rather than resolving the disjunction. Added
+under T001. Every other new package reports MIT, MIT-0, or BSD-3-Clause, all already listed.
 
 ---
 
