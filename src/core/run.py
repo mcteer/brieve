@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from core.audit.schema import AuditEventType
-from core.audit.sink import AuditSink, InMemoryAuditSink, build_next_entry
+from core.audit.sink import AuditSink, InMemoryAuditSink
 from core.authority.clock import Clock, SystemClock
 from core.authority.errors import AuthorityRefuseError
 from core.authority.fabric import IdentityFabric
@@ -20,6 +20,7 @@ from core.correlation import validate_correlation_id
 from core.errors import CoreError, CorrelationRequiredError
 from core.hooks.governance import builtin_governance_hooks
 from core.hooks.types import HookRegistration
+from core.identity.tenant import resolve_tenant
 from core.registry.memory import ToolRegistry
 
 if TYPE_CHECKING:
@@ -56,6 +57,8 @@ class RunState(StrEnum):
 @dataclass
 class GovernedRun:
     correlation_id: str
+    #: Bounding dimension carried onto every audit entry this run writes (008, FR-010d).
+    tenant_id: str
     scope: frozenset[str]
     registry: ToolRegistry
     audit_sink: AuditSink
@@ -91,6 +94,7 @@ def start_governed_run(
     *,
     correlation_id: str | None,
     subject_user_id: str,
+    tenant_id: str | None = None,
     agent_definition_id: str,
     requested_scope: AuthorityScope,
     identity_fabric: IdentityFabric,
@@ -100,8 +104,14 @@ def start_governed_run(
     hooks: list[HookRegistration] | None = None,
     include_governance: bool = True,
 ) -> GovernedRun:
-    """Start an active governed run with bound task authority, or refuse."""
+    """Start an active governed run with bound task authority, or refuse.
+
+    ``tenant_id`` is the claim a surface established, when there was a surface. Runs
+    started without one — the adapter, the older suites — resolve the configured default.
+    Resolved before anything is audited, because the refusal path writes an entry too.
+    """
     cid = validate_correlation_id(correlation_id)
+    tenant = resolve_tenant(tenant_id)
     clk: Clock = clock if clock is not None else SystemClock()
     sink: AuditSink = audit_sink if audit_sink is not None else InMemoryAuditSink()
 
@@ -116,13 +126,12 @@ def start_governed_run(
         )
     except AuthorityRefuseError as exc:
         try:
-            entry = build_next_entry(
-                sink,
+            sink.append_event(
                 correlation_id=cid,
+                tenant_id=tenant,
                 event_type=AuditEventType.AUTHORITY_REFUSED,
                 payload={"reason_code": exc.reason_code},
             )
-            sink.append(entry)
         except Exception:
             pass
         raise
@@ -133,6 +142,7 @@ def start_governed_run(
 
     run = GovernedRun(
         correlation_id=cid,
+        tenant_id=tenant,
         scope=frozenset(manufactured.credential.effective.tool_names),
         registry=registry,
         audit_sink=sink,
@@ -158,13 +168,12 @@ def start_governed_run(
     }
 
     try:
-        issued = build_next_entry(
-            sink,
+        sink.append_event(
             correlation_id=cid,
+            tenant_id=tenant,
             event_type=AuditEventType.AUTHORITY_ISSUED,
             payload=issued_payload,
         )
-        sink.append(issued)
     except Exception as exc:
         run.state = RunState.REFUSED
         raise AuthorityRefuseError(
@@ -173,14 +182,13 @@ def start_governed_run(
             correlation_id=cid,
         ) from exc
 
-    entry = build_next_entry(
-        sink,
-        correlation_id=cid,
-        event_type=AuditEventType.RUN_START,
-        payload={"scope": sorted(run.scope)},
-    )
     try:
-        sink.append(entry)
+        sink.append_event(
+            correlation_id=cid,
+            tenant_id=tenant,
+            event_type=AuditEventType.RUN_START,
+            payload={"scope": sorted(run.scope)},
+        )
     except Exception as exc:
         run.state = RunState.REFUSED
         raise CoreError(

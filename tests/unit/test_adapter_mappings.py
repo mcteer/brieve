@@ -39,7 +39,7 @@ def test_adapter_holds_no_authority_or_audit_logic() -> None:
         "manufacture_authority",
         "intersect_scopes",
         "live_effective",
-        "build_next_entry",
+        "append_event",
         "verify_chain",
         "run_pipeline",
     }

@@ -6,7 +6,6 @@ from __future__ import annotations
 from typing import Any
 
 from core.audit.schema import AuditEventType
-from core.audit.sink import build_next_entry
 from core.authority.errors import AuditAppendFailed
 from core.hooks.types import HookContext, HookDecision
 
@@ -16,14 +15,13 @@ MIRRORING_HOOK_NAME = "mirroring"
 def _append(run: Any, payload: dict[str, Any]) -> None:
     sink = run.audit_sink
     cid = run.correlation_id
-    entry = build_next_entry(
-        sink,
-        correlation_id=cid,
-        event_type=AuditEventType.MIRRORING_DECISION,
-        payload=payload,
-    )
     try:
-        sink.append(entry)
+        sink.append_event(
+            correlation_id=cid,
+            tenant_id=run.tenant_id,
+            event_type=AuditEventType.MIRRORING_DECISION,
+            payload=payload,
+        )
     except Exception as exc:
         raise AuditAppendFailed(
             f"mirroring audit append failed: {type(exc).__name__}",
