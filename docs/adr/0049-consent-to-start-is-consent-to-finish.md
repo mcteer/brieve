@@ -130,12 +130,28 @@ removed from the design.
 The real answer is to keep trying until the platform knows. That is what suspension and
 the sweeper are for.
 
-**What this costs is two pieces of new machinery and one piece of scheduling.** Dependency
-health monitoring and an availability denial class do not exist and have no home yet. The
-**sweeper does have one**: it belongs in the harness's MCP service, and lands and is
-tested when that service is built rather than standing as a separate obligation.
+**What this costs is machinery that does not exist yet, and it now has a likely home.**
+The harness's MCP service — the persistent container that coding IDEs and other clients
+talk to — is a **service** workload rather than a batch one: long-lived, with its own
+workload identity, unlike the agent containers that end with their work. That makes it the
+natural place for both the **dependency health checks** and the **sweeper**, since both
+need to run continuously and neither belongs in a container that exists for one job.
 
-Until the first two exist, the honest description is that this ADR is a decision rather
+The denial itself does not live there. It happens in the governed core, on the invoke
+path, inside an ephemeral agent container — so the two need connecting, and *how* is a
+decision worth making deliberately rather than by default:
+
+- **Health state written to the state store**, read by the invoke path. It is already the
+  durable store, and it keeps the MCP service out of the hot path of every tool call.
+- **Agents querying the MCP service directly.** Fewer moving parts, but every tool call
+  then depends on that service being reachable — and an availability check that fails when
+  its own dependency is down is a poor shape for the thing whose job is knowing what is
+  down.
+
+The first is preferred, for the same reason durability state lives there. Recorded as a
+leaning, not a decision: it belongs to whichever spec builds the MCP service.
+
+Until that machinery exists, the honest description is that this ADR is a decision rather
 than a shipped capability, and a run that cannot observe has no automatic path back. That
 gap belongs on the roadmap — not assumed closed by accepting this.
 
