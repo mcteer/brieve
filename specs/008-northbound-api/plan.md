@@ -197,7 +197,8 @@ specs/008-northbound-api/
 ```text
 src/core/identity/                 # Sealed core — Principle V names identity flows
 ├── types.py                       # AuthenticatedSubject, SubjectKind
-└── claims.py                      # Claim-to-role mapping (pure; no token library)
+├── claims.py                      # Claim-to-role mapping (pure; no token library)
+└── tenant.py                      # Tenant resolution; subject claim, else HARNESS_DEFAULT_TENANT
 
 src/surfaces/
 ├── __init__.py                    # Exists as a stub; gains the app factory
@@ -216,9 +217,9 @@ src/core/audit/
 ├── schema.py                      # + tenant_id on AuditEntry; + two AuditEventType members
 ├── chain.py                       # compute_entry_hash takes tenant_id — shape change
 ├── query.py                       # EvidenceQuery protocol — read only, by construction
-├── postgres_sink.py               # Durable AuditSink — writes
+├── postgres_sink.py               # Durable AuditSink — transactional append, chain + head
 ├── postgres_query.py              # EvidenceQuery — reads, separate connection and role
-└── evidence_schema.sql            # Audit tables; SELECT granted to the evidence role
+└── evidence_schema.sql            # audit_entries + audit_stream_heads; SELECT on the first only
 
 infra/modules/trust-fabric/
 └── database.tf                    # + the evidence dynamic role (SELECT only)

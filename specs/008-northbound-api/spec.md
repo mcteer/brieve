@@ -213,6 +213,20 @@ maintained beside it.
   would leave every record a chain of one — linked to nothing, and therefore **deletable
   without detection**, which defeats the reason the record exists. A per-tenant stream gives
   both: records are tamper-evident against each other and touch no run's chain.
+- **FR-010b**: If the evidence-access record cannot be written, the read MUST fail and
+  return nothing. FR-010 says every access is audited; an access that succeeded while its
+  record did not is exactly the case the requirement exists to prevent. This matches how run
+  start already behaves — it refuses when its own audit write fails.
+- **FR-010c**: Writing an evidence-access record MUST be safe under concurrent readers. The
+  stream is shared by every reader in a tenant, so two simultaneous reads must not race for
+  the same position, and neither may be silently dropped. Run chains have one writer each and
+  never needed this; the evidence stream has one writer per reader, by design.
+- **FR-010d**: Each stream's highest position MUST be recorded where the evidence read path
+  cannot reach it, so that **truncation** is detectable. A hash chain proves that records were
+  not modified and that none was removed from the middle; it cannot prove that the most recent
+  records still exist, because a truncated chain remains internally valid. Deleting the latest
+  entries is the likeliest tampering against a record of who read what.
+
 - **FR-011**: A query that reaches beyond the caller's tenant MUST return nothing, and MUST
   be distinguishable in the audit trail from a query that legitimately found nothing.
   **The reachable form of this attempt must be the one tested**: the request carries no
@@ -270,7 +284,11 @@ maintained beside it.
   100% of cases.
 - **SC-009a**: 100% of evidence-access records land on the evidence-access stream and chain
   to their predecessor; zero are appended to the chain of a run they read, and zero are
-  unchained singletons. Removing one is detectable.
+  unchained singletons. Modifying a record and removing one from the middle are both detected
+  by the chain; **removing the most recent records is detected by the recorded head**
+  (FR-010d), which the chain alone cannot do.
+- **SC-009b**: Under concurrent readers in one tenant, 100% of evidence-access records are
+  written; zero are lost and zero collide. Zero reads succeed whose record failed to write.
 - **SC-010**: 100% of exposed operations appear in the generated description; an operation
   added without one is detected.
 - **SC-011**: Zero runs are paused, interrupted, or blocked by anything in this feature.

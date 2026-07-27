@@ -34,7 +34,8 @@ green as one that ran.
 | Evidence is scope-bounded | Two identities with differing entitlements each see only their own scope; neither can widen it | FR-008, SC-006 | **yes** |
 | Read path cannot mutate | A write attempted on the evidence connection is refused **by Postgres**, not by application code | FR-009, SC-007 | **yes** |
 | Evidence access is audited | Every read produces exactly one meta-audit record naming who and when | FR-010, SC-008 | **yes** |
-| Evidence-access records chain | Records land on the per-tenant evidence-access stream and chain to their predecessor; removing one is detectable, and no run's chain is touched | FR-010a, SC-009a | **yes** |
+| Evidence-access records chain | Records land on the per-tenant evidence-access stream and chain to their predecessor; a modified or middle-removed record breaks the chain, a **truncated tail** is caught by the recorded head, and no run's chain is touched | FR-010a / FR-010d, SC-009a | **yes** |
+| Concurrent reads are all recorded | Concurrent readers in one tenant each produce a record; zero lost, zero collided, and zero reads succeed whose record failed | FR-010b / FR-010c, SC-009b | **yes** |
 | Zero rows are distinguishable | A cross-tenant *attempt* — narrowing by another tenant's correlation or run ID, since no tenant parameter exists — and a legitimately empty query both return zero rows and are distinguishable in the trail | FR-011, SC-009 | **yes** |
 | Description is complete | Every exposed operation appears in the generated description; an operation added without updating the snapshot is detected | FR-012, SC-010 | no |
 | Mapping change is gated | A claim-to-role mapping change returns **pending**, not denied, and takes effect only on approval | FR-013 | **yes** |
@@ -75,18 +76,23 @@ than to check:
 - **Evidence-access records chain** — the break fixture writes each record under a freshly
   minted correlation ID and asserts the check catches the unchained singleton. That
   arrangement satisfies "the record was written" and still leaves it deletable without trace,
-  so a fixture that only counts records would pass against it.
+  so a fixture that only counts records would pass against it. A second fixture truncates the
+  newest entries: the chain still verifies, and only the recorded head catches it.
+- **Concurrent reads are all recorded** — the break fixture restores the read-then-write
+  path (`build_next_entry` outside the insert transaction) and asserts the race is detected.
+  A sequential test passes against that arrangement every time, which is why the row has to
+  drive concurrent readers rather than assert on one.
 
 ## CI does not run the enclave rows, and that is the same gap 005 recorded
 
-Seven of the fifteen rows need the enclave. The CI fast lane runs `make conformance-hermetic`
+Eight of the sixteen rows need the enclave. The CI fast lane runs `make conformance-hermetic`
 and cannot stand up a licensed Vault Enterprise, so **no required GitHub check covers those
 six.** Stated plainly rather than papered over.
 
 **That lane must exclude by marker, not by path.** It currently passes
 `--ignore=tests/conformance/durability`, which worked while every enclave-dependent row
 lived in one directory. `tests/conformance/api/` holds both kinds, so the path exclusion
-would collect the seven enclave rows and **fail the fork-safe lane on the merge commit** —
+would collect the eight enclave rows and **fail the fork-safe lane on the merge commit** —
 they fail loudly when the enclave is absent, by design. T057a changes it to `-m "not
 enclave"`.
 

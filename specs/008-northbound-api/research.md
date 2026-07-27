@@ -118,11 +118,19 @@ It lands in `src/core/audit/` rather than under `src/surfaces/` because the evid
 belongs to the platform whether or not anyone reads it through HTTP. Putting persistence
 behind a transport would mean the trail exists only when that transport is deployed.
 
-**Hash chaining across storage**: the chain is per-correlation-ID and already computed in
-`build_next_entry`. The Postgres sink verifies the same invariants `InMemoryAuditSink`
-does — sequence, `prev_hash` linkage, and `entry_hash` recomputation — on append, so
-integrity is a property of the entry rather than of the store that holds it, and both
-implementations reject the same malformed entry.
+**Hash chaining across storage**: the chain is per-correlation-ID. The Postgres sink verifies
+the same invariants `InMemoryAuditSink` does — sequence, `prev_hash` linkage, and `entry_hash`
+recomputation — so integrity is a property of the entry rather than of the store that holds it,
+and both implementations reject the same malformed entry.
+
+**It does not use `build_next_entry`.** That helper reads the chain, computes the next position,
+and returns an entry to append separately — a read-then-write that is safe only when there is
+exactly one writer. Run chains satisfy that through 005's single-writer lease, which was an
+undocumented coupling rather than a property of the audit layer. The evidence-access stream is
+shared by every reader in a tenant and does not satisfy it, so the Postgres sink computes
+position and link **inside the insert transaction** under a row lock. This also avoids
+`list_by_correlation_id`, which returns every prior entry — bounded for a run, unbounded for a
+stream that only ever grows.
 
 **Alternatives considered**:
 

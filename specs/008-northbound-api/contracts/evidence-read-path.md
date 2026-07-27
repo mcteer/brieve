@@ -99,12 +99,39 @@ destroys the other:
   nothing and **can be removed without detection** — which is exactly what a record of who
   read what must not permit.
 
-A stable per-tenant stream gives both: records chain to each other, so a deletion breaks the
-chain, and no run's chain is touched.
+A stable per-tenant stream gives both: records chain to each other and no run's chain is
+touched. It also brings two costs that the per-run chains never had, because a shared stream
+is **contended** where a run chain is not:
+
+- **Concurrency.** `build_next_entry` reads the chain, takes the next position, then appends —
+  safe for a run only because 005's single-writer lease guarantees one writer, which nothing
+  had written down. This stream has one writer per reader. Position and link are therefore
+  computed **inside the insert transaction**, under a row lock (FR-010c).
+- **Unbounded reads.** `list_by_correlation_id` returns every prior entry. For a run that is
+  tens of rows; for a tenant's evidence stream it is every read ever performed, fetched again
+  on every write. The same transactional append fixes it — the last row is what is needed, not
+  the list.
 
 **This terminates.** A read writes one record regardless of how many rows matched. Reading
 the meta-audit records is itself a read and writes one more. Stated because it is obvious
 once said and expensive once shipped wrong.
+
+**And if the record cannot be written, the read fails** (FR-010b) — returning nothing rather
+than returning evidence unrecorded. `start_governed_run` already behaves this way when its own
+audit write fails. An access that succeeded while its record did not is the precise case this
+whole section exists to prevent.
+
+## What the chain proves, and what it does not
+
+A hash chain proves that no record was modified and that none was removed from the middle: both
+break the `seq` sequence or the `prev_hash` link.
+
+**It does not prove the newest records still exist.** Truncate the last three and `seq 0..N-4`
+verifies perfectly — which is unfortunate, because deleting the most recent entries is the
+obvious move against a log of who read what. So each stream's highest position is recorded in
+`audit_stream_heads`, updated in the same transaction as the append, and the evidence role
+holds **no grant on that table at all** — not even `SELECT`, so the read path cannot learn what
+it would need to forge.
 
 ## No verdicts
 

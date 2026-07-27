@@ -146,9 +146,27 @@ once, and the obvious fix for either breaks the other:
   entire reason FR-010 exists; an unchained record does not provide it.
 
 The stream is `evidence-access:{tenant_id}` — one per tenant, stable across reads. Records
-chain to their predecessor, so removing one breaks the chain, and no run's chain is touched.
-`validate_correlation_id` accepts any non-empty string, so this needs no change to the
-correlation contract.
+chain to their predecessor, and no run's chain is touched. `validate_correlation_id` accepts
+any non-empty string, so this needs no change to the correlation contract.
+
+**A shared stream is a contended chain, which run chains never were.** `build_next_entry`
+reads the existing entries, takes `seq = len(existing)` and `prev_hash = existing[-1]`, then
+`append` requires the sequence to match exactly. That read-then-write is safe for a run chain
+only because 005's single-writer lease guarantees one writer — a coupling that was never
+written down anywhere. The evidence stream has **one writer per reader**, so two simultaneous
+reads in a tenant would both compute the same position and one would fail (FR-010c).
+
+`PostgresAuditSink` therefore computes `seq` and `prev_hash` **inside the same transaction as
+the insert**, taking a row lock on the stream's last entry, rather than going through
+`build_next_entry`. That fixes a second problem at the same time: `list_by_correlation_id`
+returns *every* prior entry, which on a per-run chain is tens of rows and on a per-tenant
+stream is every evidence read ever performed — an unbounded fetch on every write.
+
+**Truncation needs something the chain cannot give** (FR-010d). A chain proves records were
+not modified and none was removed from the middle. It cannot prove the newest ones still
+exist: delete the last three and `seq 0..N-4` verifies perfectly. So each stream's highest
+position is recorded in `audit_stream_heads`, which the evidence role has **no grant on at
+all** — it cannot read it, and it certainly cannot roll it back to match a truncated chain.
 
 **Termination**: one record per read, regardless of how many rows matched. Reading the
 meta-audit records is itself a read and produces one more record. This terminates; it is
@@ -246,6 +264,18 @@ CREATE TABLE IF NOT EXISTS audit_entries (
 -- Every query is tenant-bounded first, so the index leads with it.
 CREATE INDEX IF NOT EXISTS audit_by_tenant_time
     ON audit_entries (tenant_id, timestamp);
+
+-- The highest position written to each chain. Exists because a hash chain cannot detect
+-- truncation: a chain missing its most recent entries is still internally valid, and
+-- deleting the newest records is the likeliest tampering against a log of who read what.
+-- The evidence role holds NO grant here — not SELECT either, so the read path cannot even
+-- learn what it would need to forge.
+CREATE TABLE IF NOT EXISTS audit_stream_heads (
+    correlation_id TEXT PRIMARY KEY,
+    highest_seq    INTEGER     NOT NULL,
+    head_hash      TEXT        NOT NULL,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
 
 **No `UPDATE` or `DELETE` path exists in application code, and the evidence role is granted
@@ -264,3 +294,7 @@ applied as part of bring-up rather than on first write.
 **`tenant_id` on the row rather than joined**: the bounding dimension must be present on
 the record being filtered. A join would make the boundary depend on another table being
 correct.
+
+**Appends are transactional**: position, chain link, entry insert, and head update happen in
+one transaction under a row lock. Splitting them would reintroduce the race the shared stream
+creates, and would let the head drift from the chain it describes.

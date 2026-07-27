@@ -69,3 +69,16 @@
   could be deleted undetected, defeating the reason the record exists. Records now go on a
   stable per-tenant evidence-access stream, which is a third option neither earlier pass
   considered.
+- Analyze pass 3 (2026-07-27) found that the per-tenant evidence stream — pass 2's fix —
+  introduced a **contended chain**. `build_next_entry` reads then writes, which is safe for a
+  run chain only because 005's single-writer lease guarantees one writer, a coupling nothing
+  had recorded. A stream shared by every reader in a tenant does not have that property, and
+  the same helper also refetches every prior entry on each write, unbounded. Position and
+  link now happen inside the insert transaction.
+- It also found SC-009a overclaiming: a hash chain detects modification and middle-deletion,
+  **not truncation**. Deleting the newest records leaves the remainder internally valid, and
+  that is the obvious move against a log of who read what. Closed with `audit_stream_heads`,
+  which the evidence role has no grant on at all.
+- Three passes, and the top finding each time came from the previous pass's remediation. The
+  evidence-access record was designed four ways before one held. That is the honest cost of
+  a mechanism whose failure modes are all silent.
