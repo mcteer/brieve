@@ -58,5 +58,20 @@ class EvidenceQuery(Protocol):
         """Return entries within the request's scope. Never widens it."""
         ...
 
+    def exists_outside_tenant(self, *, correlation_id: str, tenant_id: str) -> bool:
+        """Whether this stream exists under some **other** tenant.
+
+        Required for FR-011 to be satisfiable at all. A cross-tenant attempt and a
+        legitimately empty query both return zero rows, so the distinction cannot be
+        derived from the result — something has to know that the named stream exists but
+        is not yours. Without this the trail would record both as "empty", and an
+        investigator could never tell "nothing happened" from "you may not see it".
+
+        Returns a **boolean and nothing else**. No content crosses the tenant boundary,
+        and the answer never reaches the caller: it selects which disposition is recorded,
+        while the caller sees zero rows either way.
+        """
+        ...
+
 
 __all__ = ["EvidenceQuery", "EvidenceQueryRequest"]

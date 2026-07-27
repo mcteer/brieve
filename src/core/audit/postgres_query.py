@@ -113,6 +113,35 @@ class PostgresEvidenceQuery:
             except Exception:
                 pass
 
+    def exists_outside_tenant(self, *, correlation_id: str, tenant_id: str) -> bool:
+        """See :meth:`core.audit.query.EvidenceQuery.exists_outside_tenant`.
+
+        Note what this implies and does not: the SQL role can see that rows exist under
+        another tenant, because the tenant boundary is enforced by this application rather
+        than by the database. Postgres row-level security would move that enforcement one
+        layer down and is the right eventual home for it; it is not in this feature's
+        scope, and pretending the current arrangement is stronger than it is would be
+        worse than recording the gap here.
+        """
+        try:
+            conn = self._open(refresh=False)
+        except Exception:
+            conn = self._open(refresh=True)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT 1 FROM audit_entries WHERE correlation_id = %s AND tenant_id <> %s LIMIT 1",
+                (correlation_id, tenant_id),
+            )
+            return cur.fetchone() is not None
+        except Exception as exc:
+            raise EvidenceReadError(f"evidence scope check failed: {exc}") from exc
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
 
 def _row_to_entry(row: Any) -> AuditEntry:
     payload = row[5]

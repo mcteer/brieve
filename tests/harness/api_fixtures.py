@@ -19,6 +19,7 @@ from surfaces.api.verification import TokenVerifier
 from surfaces.dispatch.inprocess import InProcessDispatcher
 from tests.harness.fake_identity_fabric import fake_identity_fabric
 from tests.harness.fake_oidc_provider import AUDIENCE, ISSUER, FakeOIDCProvider
+from tests.harness.memory_evidence import InMemoryEvidenceQuery
 
 DEFAULT_MAPPINGS = [
     ClaimMapping(claim_name="groups", claim_value="platform", role="operator"),
@@ -61,6 +62,7 @@ def surface_under_test(
     app = create_app(
         token_verifier=verifier,
         run_dispatcher=dispatcher,
+        evidence_query=InMemoryEvidenceQuery(audit),
         audit_sink=audit,
     )
     return SurfaceUnderTest(app=app, idp=idp, audit=audit, dispatcher=dispatcher, subject=subject)
