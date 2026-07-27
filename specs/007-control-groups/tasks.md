@@ -46,14 +46,14 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 ## Phase 0: Premise Gate
 
-- [ ] T001 [GATE:conformance] Re-verify Control Groups is licensed on the target Vault — `vault read sys/license/status` and assert `Control Groups` is in `features`. **Everything after this depends on it.** If absent, stop: the design is "configure the trust fabric's mechanism", and the alternative is an approval engine that FR-014 forbids
+- [X] T001 [GATE:conformance] Re-verify Control Groups is licensed on the target Vault — `vault read sys/license/status` and assert `Control Groups` is in `features`. **Everything after this depends on it.** If absent, stop: the design is "configure the trust fabric's mechanism", and the alternative is an approval engine that FR-014 forbids
 
 ---
 
 ## Phase 1: Setup
 
-- [ ] T002 [P] Create `infra/modules/trust-fabric/control-groups.tf` as empty scaffolding. **No conformance lane for this feature**: it adds no row to the constitution's blocking gate list, so such a directory would be a folder nobody fills. Its tests are component tests against the real Vault, which is sufficient and pretends nothing else
-- [ ] T003 [P] Add quorum policy inputs to `infra/modules/trust-fabric/variables.tf` — required approvals, authorized identities, and request TTL, **per class of change and with no defaults** (FR-015). A default quorum would be a security posture chosen for every customer by whoever wrote the module
+- [X] T002 [P] Create `infra/modules/trust-fabric/control-groups.tf` as empty scaffolding. **No conformance lane for this feature**: it adds no row to the constitution's blocking gate list, so such a directory would be a folder nobody fills. Its tests are component tests against the real Vault, which is sufficient and pretends nothing else
+- [X] T003 [P] Add quorum policy inputs to `infra/modules/trust-fabric/variables.tf` — required approvals, authorized identities, and request TTL, **per class of change and with no defaults** (FR-015). A default quorum would be a security posture chosen for every customer by whoever wrote the module
 
 ---
 
@@ -63,10 +63,10 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 **⚠️ CRITICAL**: no story work until the gate applies cleanly against the enclave.
 
-- [ ] T004 Write the Control Group configuration in `infra/modules/trust-fabric/control-groups.tf` — the Sentinel endorsement policy and its approver sets, parameterized by T003's inputs
-- [ ] T005 Attach the gate to the controlled **paths** per `contracts/gated-paths.md`: ceiling policies, definitions and registry entries, workload identity role bindings, restoration, and the quorum policy itself. **Attach to paths, not callers** — a gate on callers is a gate on the callers someone thought of
-- [ ] T005a [GATE:fail-closed] (FR-003a, SC-013) Assert break-glass is **not** routed through this gate, and document why in `infra/README.md`: regenerating a root token requires a quorum of unseal-share holders — verified against the CLI, which states it "generates a new root token by combining a quorum of share holders". That is a stronger multi-party control and a `sys` operation Control Groups cannot intercept. **Record the consequence**: break-glass strength is set by the unseal threshold, so the development enclave's 1-of-1 makes it a single-person act regardless of anything configured here
-- [ ] T006 [GATE:fail-closed] Assert revocation paths are **not** controlled (FR-006). Deliberate asymmetry: a gate making revocation as slow as granting is one people route around in an incident, after which the route-around is the normal path
+- [X] T004 Write the Control Group configuration in `infra/modules/trust-fabric/control-groups.tf` — the Sentinel endorsement policy and its approver sets, parameterized by T003's inputs
+- [X] T005 Attach the gate to the controlled **paths** per `contracts/gated-paths.md`: ceiling policies, definitions and registry entries, workload identity role bindings, restoration, and the quorum policy itself. **Attach to paths, not callers** — a gate on callers is a gate on the callers someone thought of
+- [X] T005a [GATE:fail-closed] (FR-003a, SC-013) Assert break-glass is **not** routed through this gate, and document why in `infra/README.md`: regenerating a root token requires a quorum of unseal-share holders — verified against the CLI, which states it "generates a new root token by combining a quorum of share holders". That is a stronger multi-party control and a `sys` operation Control Groups cannot intercept. **Record the consequence**: break-glass strength is set by the unseal threshold, so the development enclave's 1-of-1 makes it a single-person act regardless of anything configured here
+- [X] T006 [GATE:fail-closed] Assert revocation paths are **not** controlled (FR-006). Deliberate asymmetry: a gate making revocation as slow as granting is one people route around in an incident, after which the route-around is the normal path
 - [ ] T007 Sequence the policy application in provisioning so it lands **before** the bootstrap credential is revoked (FR-016). A control gating its own changes cannot create itself; without this the alternatives are a control that never exists or one with a permanent back door
 - [ ] T008 [GATE:no-secret-leak] Assert no quorum policy content or credential material reaches Terraform state, module outputs, or logs
 
