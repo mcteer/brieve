@@ -39,7 +39,12 @@ def _b64url_uint(value: int) -> str:
 
 @dataclass
 class FakeOIDCProvider:
-    """Generates a signing key and issues genuinely signed tokens."""
+    """Generates a signing key and issues genuinely signed tokens.
+
+    Instantiate more than one to model separate providers — the human IdP and the workload
+    identity issuer are different systems with different keys, and a double that shared a
+    key between them would hide a verifier that ignored the issuer.
+    """
 
     issuer: str = ISSUER
     audience: str = AUDIENCE

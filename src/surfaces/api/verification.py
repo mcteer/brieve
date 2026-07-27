@@ -193,8 +193,55 @@ class TokenVerifier:
         )
 
 
+class FederatedVerifier:
+    """Accepts a human identity or a federated workload identity — and nothing else.
+
+    Machines authenticate by presenting a token from their own workload identity provider,
+    verified exactly as a human's is: real signature, pinned algorithm, checked issuer and
+    audience. **There is no third branch**, and that is the point of the class existing.
+    A static-key path would naturally be added here, beside two working mechanisms, as
+    "just for automation" — so this is the place the absence has to be visible and tested.
+
+    Order matters only for the reason code a caller sees. Each verifier is tried, and the
+    refusal reported is the *most specific* one encountered: a token that verified but
+    mapped to no role should say so rather than being reported as unverifiable just
+    because a later issuer also rejected it.
+    """
+
+    #: Lower is more specific. A refusal that got further into verification tells the
+    #: caller more, so it wins over one that failed at the first check.
+    _SPECIFICITY = {
+        "unmapped_claim": 0,
+        "no_tenant": 1,
+        "expired_identity": 2,
+        "idp_unreachable": 3,
+        "unverifiable_identity": 4,
+        "absent_identity": 5,
+    }
+
+    def __init__(self, verifiers: list[TokenVerifier]) -> None:
+        if not verifiers:  # pragma: no cover - assembly error
+            raise ValueError("at least one verifier is required")
+        self._verifiers = verifiers
+
+    def verify(self, token: str | None) -> AuthenticatedSubject:
+        best: AuthenticationRefused | None = None
+        for verifier in self._verifiers:
+            try:
+                return verifier.verify(token)
+            except AuthenticationRefused as exc:
+                if best is None or self._rank(exc) < self._rank(best):
+                    best = exc
+        assert best is not None
+        raise best
+
+    def _rank(self, exc: AuthenticationRefused) -> int:
+        return self._SPECIFICITY.get(exc.reason_code, 99)
+
+
 __all__ = [
     "ALLOWED_ALGORITHMS",
     "AuthenticationRefused",
+    "FederatedVerifier",
     "TokenVerifier",
 ]

@@ -150,10 +150,10 @@ correlation ID.
 platform-issued long-lived credential and that a machine caller authenticates by federated
 workload identity.
 
-- [ ] T032 [US2] Implement workload identity federation in `src/surfaces/api/verification.py`, exchanging the attested identity the way `core.durability.credentials` already does rather than inventing a second exchange
-- [ ] T033 [US2] [GATE:no-secret-leak] Add `tests/unit/test_no_static_credentials.py` enumerating every authentication path and asserting what is **absent**. Strip comments before matching, following 007's `test_no_run_interrupt.py` — prose about API keys is not an API key, and this repository has already twice had a check match a comment
-- [ ] T034 [P] [US2] [GATE:conformance] Conformance row for no-static-credential in `tests/conformance/api/test_no_static_credential.py`, with a break fixture that **adds** a static-key path and asserts the check catches it
-- [ ] T035 [P] [US2] Extend `tests/unit/test_no_static_credentials.py` to assert there is no supported configuration creating a static credential — no settings field, no environment variable, no Terraform input
+- [X] T032 [US2] Implement workload identity federation in `src/surfaces/api/verification.py`, exchanging the attested identity the way `core.durability.credentials` already does rather than inventing a second exchange
+- [X] T033 [US2] [GATE:no-secret-leak] Add `tests/unit/test_no_static_credentials.py` enumerating every authentication path and asserting what is **absent**. Strip comments before matching, following 007's `test_no_run_interrupt.py` — prose about API keys is not an API key, and this repository has already twice had a check match a comment
+- [X] T034 [P] [US2] [GATE:conformance] Conformance row for no-static-credential in `tests/conformance/api/test_no_static_credential.py`, with a break fixture that **adds** a static-key path and asserts the check catches it
+- [X] T035 [P] [US2] Extend `tests/unit/test_no_static_credentials.py` to assert there is no supported configuration creating a static credential — no settings field, no environment variable, no Terraform input
 
 ---
 
@@ -165,8 +165,8 @@ reaches the governed path.
 **Independent test**: walk the application's registered routes; assert none reaches a tool
 body.
 
-- [ ] T036 [US3] [GATE:conformance] Implement the route-walking check in `tests/conformance/api/test_no_tool_route.py`, enumerating routes from the app object and inspecting what each reaches. **Not a text search** — a grep passes a docstring mentioning `invoke_tool` and misses a route reaching a tool through an alias
-- [ ] T037 [US3] Break fixture in `tests/conformance/api/test_no_tool_route.py` registering a route that reaches a tool **through an alias**, asserting the check catches it. A fixture using the literal name proves only that the literal name is caught
+- [X] T036 [US3] [GATE:conformance] Implement the route-walking check in `tests/conformance/api/test_no_tool_route.py`, enumerating routes from the app object and inspecting what each reaches. **Not a text search** — a grep passes a docstring mentioning `invoke_tool` and misses a route reaching a tool through an alias
+- [X] T037 [US3] Break fixture in `tests/conformance/api/test_no_tool_route.py` registering a route that reaches a tool **through an alias**, asserting the check catches it. A fixture using the literal name proves only that the literal name is caught
 - [ ] T038 [P] [US3] [GATE:conformance] Assert in `tests/component/test_api_denied_operation.py` that a denied operation executes nothing and the denial is audited
 - [ ] T039 [P] [US3] Component test in `tests/component/test_api_reaches_governed_path.py` asserting a run started through the API reaches tools through `core.tools.invoke` with hooks intact — the governed path is the same one, not an equivalent one
 

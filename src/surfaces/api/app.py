@@ -47,22 +47,47 @@ def create_app(
 
 
 def registered_routes(app: FastAPI) -> list[dict[str, Any]]:
-    """Every route this application serves, for the FR-007 and FR-012 checks."""
+    """Every route this application serves, for the FR-007 and FR-012 checks.
+
+    **Recurses into included routers.** ``app.routes`` does not hold a flat list: including
+    a router leaves a wrapper object in it whose own ``.routes`` holds the real endpoints.
+    A version of this that only looked one level deep returned the four framework defaults
+    and none of ours — so the FR-007 check would have reported "no route reaches a tool"
+    while never having seen a single route of this application. That is worse than no
+    check, because it is believed.
+
+    The guard test in the conformance row (`test_the_walk_actually_visits_routes`) exists
+    for exactly that failure and is what caught it.
+    """
     described: list[dict[str, Any]] = []
-    for route in app.routes:
-        path = getattr(route, "path", None)
-        methods = getattr(route, "methods", None)
-        endpoint = getattr(route, "endpoint", None)
-        if path is None or methods is None:
-            continue
-        described.append(
-            {
-                "path": path,
-                "methods": sorted(m for m in methods if m not in {"HEAD", "OPTIONS"}),
-                "endpoint": endpoint,
-                "name": getattr(route, "name", ""),
-            }
-        )
+
+    def _walk(routes: Any) -> None:
+        for route in routes:
+            # Including a router leaves a wrapper in `app.routes` that exposes neither a
+            # path nor a `.routes` list — the real endpoints hang off `original_router`.
+            # Both attribute names are tried so this keeps working if the internal shape
+            # changes again; what must never happen is silently finding nothing.
+            nested = getattr(route, "routes", None)
+            if nested is None:
+                inner = getattr(route, "original_router", None)
+                nested = getattr(inner, "routes", None) if inner is not None else None
+            if nested:
+                _walk(nested)
+                continue
+            path = getattr(route, "path", None)
+            methods = getattr(route, "methods", None)
+            if path is None or methods is None:
+                continue
+            described.append(
+                {
+                    "path": path,
+                    "methods": sorted(m for m in methods if m not in {"HEAD", "OPTIONS"}),
+                    "endpoint": getattr(route, "endpoint", None),
+                    "name": getattr(route, "name", ""),
+                }
+            )
+
+    _walk(app.routes)
     return described
 
 
