@@ -19,12 +19,13 @@ locals {
   # from the role is a dependency cycle Terraform rejects.
   database_connection_name = "brieve"
   database_role_name       = "harness"
+  evidence_role_name       = "evidence"
 }
 
 resource "vault_database_secret_backend_connection" "state_store" {
   backend       = vault_mount.database.path
   name          = local.database_connection_name
-  allowed_roles = [local.database_role_name]
+  allowed_roles = [local.database_role_name, local.evidence_role_name]
 
   postgresql {
     connection_url = "postgresql://{{username}}:{{password}}@${var.database_endpoint}/${var.database_name}?sslmode=disable"
@@ -59,6 +60,50 @@ resource "vault_database_secret_backend_role" "harness" {
 
   revocation_statements = [
     "REASSIGN OWNED BY \"{{name}}\" TO \"${var.database_bootstrap_user}\";",
+    "DROP OWNED BY \"{{name}}\";",
+    "DROP ROLE IF EXISTS \"{{name}}\";",
+  ]
+
+  default_ttl = 3600
+  max_ttl     = 86400
+}
+
+# The evidence read path's role. SELECT on audit_entries, and nothing else, anywhere.
+#
+# This is defence #2 of the two that keep the audit read path incapable of mutation
+# (ADR-0035, specs/008-northbound-api). Defence #1 is that `EvidenceQuery` names no write
+# method — which holds only while application code is correct, and is the one a future
+# refactor removes by handing the read path a writable connection. This one holds
+# regardless of what the Python does, because Postgres refuses the write.
+#
+# Three deliberate narrownesses, each of which would be easy to widen by accident:
+#
+#   1. `audit_entries` by name, NOT `ON ALL TABLES IN SCHEMA public` as the harness role
+#      above uses. All-tables would also hand the evidence path durability's checkpoints,
+#      which is wider than anything the read path is supposed to see.
+#   2. No grant on `audit_stream_heads` at all — not even SELECT. The heads are what make
+#      truncation detectable, so the read path must not be able to learn what it would
+#      need to forge.
+#   3. No membership in the parent role. Membership is what makes the harness role able to
+#      own and alter objects; granting it here would quietly undo the whole point.
+#
+# ALTER DEFAULT PRIVILEGES covers evidence tables created after this role exists, so a
+# later migration does not silently escape the grant.
+resource "vault_database_secret_backend_role" "evidence" {
+  backend = vault_mount.database.path
+  name    = local.evidence_role_name
+  db_name = vault_database_secret_backend_connection.state_store.name
+
+  creation_statements = [
+    "CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';",
+    "GRANT CONNECT ON DATABASE \"${var.database_name}\" TO \"{{name}}\";",
+    "GRANT USAGE ON SCHEMA public TO \"{{name}}\";",
+    "GRANT SELECT ON audit_entries TO \"{{name}}\";",
+  ]
+
+  revocation_statements = [
+    "REVOKE ALL PRIVILEGES ON audit_entries FROM \"{{name}}\";",
+    "REVOKE ALL PRIVILEGES ON DATABASE \"${var.database_name}\" FROM \"{{name}}\";",
     "DROP OWNED BY \"{{name}}\";",
     "DROP ROLE IF EXISTS \"{{name}}\";",
   ]
