@@ -13,8 +13,27 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_DIR="${ENCLAVE_ENV:-$REPO/infra/environments/dev}"
-export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
 NOMAD_ADDR="${NOMAD_ADDR:-http://127.0.0.1:4646}"
+
+# The listener's scheme is a PROPERTY OF THE ENVIRONMENT, not a constant.
+#
+# Once TLS has been bootstrapped, tls.auto.tfvars is auto-loaded (deliberately — see
+# section 4b) and Terraform brings the listener up on HTTPS. A probe hardcoded to http
+# then fails against a store that is working perfectly. That is exactly what happens when
+# the container is lost but the TLS material survives: this script recreates it on https,
+# probes http, and reports "trust store is not answering" — which names neither TLS nor
+# the scheme, and sends the reader to `docker logs` where nothing is wrong.
+#
+# Detected from the tfvars file rather than from ENCLAVE_TLS, because it is the tfvars
+# file that decides: the certificate reaches the substrate module through auto-loading,
+# so ENCLAVE_TLS=false does NOT put an already-bootstrapped listener back on plaintext.
+CA_FILE="$REPO/.enclave/ca.pem"
+if [ -f "$ENV_DIR/tls.auto.tfvars" ] && [ -f "$CA_FILE" ]; then
+  export VAULT_ADDR="${VAULT_ADDR:-https://127.0.0.1:8200}"
+  export VAULT_CACERT="${VAULT_CACERT:-$CA_FILE}"
+else
+  export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
+fi
 
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
 ok()  { printf '    \033[32mok\033[0m %s\n' "$*"; }
@@ -37,6 +56,18 @@ line = f'{k}="{v}"'
 t = re.sub(rf'^{k}=.*$', line, t, flags=re.M) if re.search(rf'^{k}=', t, re.M) else t.rstrip("\n") + "\n" + line + "\n"
 open(p, "w").write(t)
 PY
+}
+
+# Probes the listener with whatever CA is in force AT CALL TIME. Reading VAULT_CACERT
+# inside the function rather than baking flags into a variable is load-bearing: section 4b
+# moves the listener from plaintext to TLS mid-run, and a probe that captured its flags
+# earlier would keep speaking the scheme the run started with.
+seal_status_ok() {
+  if [ -n "${VAULT_CACERT:-}" ]; then
+    curl -sf --cacert "$VAULT_CACERT" -o /dev/null --max-time 2 "$VAULT_ADDR/v1/sys/seal-status"
+  else
+    curl -sf -o /dev/null --max-time 2 "$VAULT_ADDR/v1/sys/seal-status"
+  fi
 }
 
 # ---------------------------------------------------------------- prerequisites
@@ -112,11 +143,21 @@ fi
 
 terraform apply -input=false -auto-approve \
   -target=module.substrate -var vault_token=placeholder >/dev/null
-for _ in $(seq 1 30); do curl -sf -o /dev/null --max-time 2 "$VAULT_ADDR/v1/sys/seal-status" && break; sleep 1; done
-curl -sf -o /dev/null --max-time 2 "$VAULT_ADDR/v1/sys/seal-status" \
-  || die "trust store is not answering — try: docker logs brieve-dev-vault"
+for _ in $(seq 1 30); do seal_status_ok && break; sleep 1; done
+seal_status_ok \
+  || die "trust store is not answering at $VAULT_ADDR — try: docker logs brieve-dev-vault"
 
-initialized="$(vault status -format=json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["initialized"])' || echo False)"
+# `vault status` EXITS NONZERO when the store is sealed or uninitialised, while still
+# printing perfectly valid JSON. Under `set -o pipefail` the old one-liner therefore ran
+# BOTH python's `False` and the `|| echo False` fallback, and `initialized` became the
+# two-line string "False\nFalse" — which matches neither branch below. A true first run
+# thus took the "already initialised" path and died unsealing with an empty key.
+#
+# Capture first, parse second. `printf` cannot fail, so the fallback now fires only when
+# there is genuinely nothing to parse — and when python does fail it writes no stdout,
+# so the two cannot both contribute.
+status_json="$(vault status -format=json 2>/dev/null || true)"
+initialized="$(printf '%s' "$status_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["initialized"])' 2>/dev/null || echo False)"
 if [ "$initialized" = "False" ]; then
   say "Uninitialised — first run"
   init_json="$(vault operator init -key-shares=1 -key-threshold=1 -format=json)"
@@ -205,7 +246,7 @@ TFVARS
 
   export VAULT_ADDR="https://127.0.0.1:8200"
   export VAULT_CACERT="$REPO/.enclave/ca.pem"
-  for _ in $(seq 1 30); do curl -sf --cacert "$VAULT_CACERT" -o /dev/null --max-time 2 "$VAULT_ADDR/v1/sys/seal-status" && break; sleep 1; done
+  for _ in $(seq 1 30); do seal_status_ok && break; sleep 1; done
 
   # Replacing the container seals the store. Unseal again, or everything after this
   # fails with an error that names the seal and not the restart that caused it.
