@@ -25,7 +25,7 @@
 - Q: Does this feature resolve 005's parked runs, as the roadmap claims? → A: No. Control Groups gate **authority**, not **runs**. Humans authorize at design time — registering agents, changing privileges, managing tier-0 Vault policy — and are never in the loop during a run (ADR-0049, Proposed). The roadmap entry claiming otherwise predates that reasoning and is corrected by this feature.
 - Q: Is the quorum mechanism built here or consumed? → A: Consumed. The control-plane Vault provides Control Groups under the current licence, verified against the running enclave. Building a second approval mechanism beside the trust fabric's own would violate Principle I and put the authority record somewhere other than the trust fabric (ADR-0015).
 - Q: What is gated, exactly? → A: What ADR-0016 names: ceiling changes, agent definition changes, manual control-plane writes, break-glass access, and reactivation of a suspended agent. Instance operations within an already-approved definition — scaling, restarting, scheduling, registering an instance — are **not** gated; the approval already happened at the definition.
-- Q: Who establishes the first quorum policy, given that it gates its own changes? → A: Provisioning, before the bootstrap credential is revoked. The trust fabric (006) applies the initial policy during setup; production then revokes the bootstrap token, after which the policy can only be changed through itself. This is the same bootstrap shape as TLS in 006 — something outside the loop goes first — and it must be explicit, because a control that cannot be created without itself either never exists or has a permanent back door.
+- Q: Who specifies the quorum policies? → A: The customer's control-plane Vault administrator, in their environment. Humans build the foundations that determine how agents may behave; the platform enforces what they set, and does not decide it for them. The deployment tree may provision a starting configuration during setup, before the bootstrap credential is revoked — that is the bootstrap shape, since a control gating its own changes cannot create itself — but the policy belongs to the administrator, not to the platform.
 - Q: Does a pending request linger forever? → A: No. A request that has not reached quorum expires, and expiry means **the change does not happen**. That is fail-closed and safe: the risk of an expiring request is a change someone has to propose again, while the risk of an immortal one is an approval collected months after the context that justified it. FR-009 already forbids a timeout that *grants*; this is the opposite direction.
 - Q: What happens to an in-flight request when the quorum policy changes under it? → A: It is evaluated against the policy in force when it completes, not when it was raised. Otherwise raising a request just before a tightening would let it through under the looser rule, which makes the tightening advisory.
 - Q: Is revocation symmetric with restoration? → A: No, deliberately. Revocation is unilateral and immediate; any authorized individual acts alone. Only restoration requires quorum. Easy to make safe, hard to make permissive.
@@ -214,10 +214,11 @@ none requires approval and none is blocked.
 - **FR-015**: Quorum size and who may approve MUST be configurable per class of change, and
   that configuration MUST itself be gated — otherwise the control can be lowered by whoever
   it constrains.
-- **FR-016**: The initial quorum policy MUST be established during provisioning, before the
-  bootstrap credential is revoked. A control that cannot be created without already existing
-  either never exists or keeps a permanent back door; naming the bootstrap explicitly is what
-  avoids both.
+- **FR-016**: Quorum policies MUST be specified by the customer's control-plane Vault
+  administrator, in their environment. The deployment tree MAY provision a starting
+  configuration during setup — before the bootstrap credential is revoked — but the policy is
+  the administrator's to define and own, not the platform's to assume. Humans build the
+  foundations that determine how agents may behave; the platform enforces what they set.
 - **FR-017**: A request that has not reached quorum MUST expire, and expiry MUST mean the
   change does not take effect. An immortal request invites an approval collected long after
   the context that justified it.
