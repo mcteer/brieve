@@ -40,3 +40,8 @@
   a second one.
 - The roadmap's "unblocks 005's parked-run resolution" claim is deliberately not carried
   forward; it assumed run-time consent, which ADR-0049 (Proposed) rejects.
+- Clarify (2026-07-26) added three requirements the first draft missed, all of the same
+  kind — the gate's own lifecycle. Who creates the first quorum policy (provisioning, before
+  the bootstrap credential is revoked); what happens to a request nobody answers (it expires,
+  and expiry means no change); and which policy version governs a request in flight (the one
+  in force when it completes, or tightening is advisory).
