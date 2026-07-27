@@ -43,6 +43,18 @@ a security posture chosen for every customer by whoever wrote the module.
    runs already holding authority continue. Failing closed on the wrong thing here would
    halt the platform during a Vault blip.
 
+## Root bypasses the gate
+
+Verified against a running Vault: a root token writes to a gated path with no approval and
+no denial.
+
+This is why the production profile revokes the bootstrap credential. Revocation is not
+tidiness — **it is what makes this gate real**. A deployment that keeps a root token has an
+authority gate anyone holding that token can walk around.
+
+The development enclave retains its root token deliberately, so the gate cannot be
+demonstrated through it. Tests use a non-root identity for that reason, not by preference.
+
 ## Related
 
 - [gated-paths.md](./gated-paths.md)
