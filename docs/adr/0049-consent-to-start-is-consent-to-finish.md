@@ -1,4 +1,4 @@
-# ADR-0049: Consent to start a run is consent to finish it
+# ADR-0049: Consent to start a run is consent to finish it; dependencies are monitored, not escalated
 
 - **Status**: Proposed
 - **Date**: 2026-07-26
@@ -54,19 +54,51 @@ park, and there is no re-consent. The two-level split ADR-0026 established survi
 intact: short-lived per-step credentials manufactured under a longer-lived grant, with
 resume re-authenticating rather than replaying.
 
-**An unresolvable step stops the run; it does not wait.** Re-observation still governs: a
-step observed to have taken effect is not repeated, one observed not to have is, and a
-step whose outcome **cannot be determined** is still never guessed. What changes is what
-happens next — the run stops, records what it knows, and a human investigates on their own
-schedule. Nothing is pending on them.
+**An unresolvable step suspends the run; it does not wait on a person.** Re-observation
+still governs, and a step whose outcome **cannot be determined** is still never guessed.
+What changes is what happens next: the run records which dependency it could not reach and
+suspends. It is resumed automatically when that dependency recovers.
 
-**There is no waiting run state.** `PARKED` is removed. A run is active, completed,
-stopped with a reason, or refused at start. Resuming after investigation is a *new run*,
-which is also the honest description of what it is: fresh authorization, fresh context.
+**A run may wait on a machine condition; never on a human.** That distinction is the whole
+of this decision. Waiting on something automatic clears itself; waiting on a person does
+not. `PARKED` — "stopped for a human to resolve" — is removed. What replaces it is
+suspension pending a *named dependency*, which something else is responsible for clearing.
+
+**A suspended run is a record, not a running process.** The container ends when its work
+ends — including when that work ends in suspension. It does not idle holding a slot while
+a dependency is down. Resumption starts a **new allocation**, which is also what makes
+resume re-attest: a new allocation has a new attested identity by construction
+(ADR-0048), so the guarantee falls out of the lifecycle rather than being enforced.
+
+**Suspension expires against the run's maximum duration** — the existing ceiling, not a new
+one. A dependency down long enough to exhaust it indicates a failure well beyond this
+platform's concern.
 
 **Human authorization moves entirely to design time.** Registering an agent, changing its
 privileges, and managing user and agent policy at the control-plane Vault remain
 quorum-gated per ADR-0016. That is the loop humans are in, and it is the whole of it.
+
+**Dependency availability is monitored, and known-unavailable dependencies are refused
+upfront.** The harness monitors the reachability of the products agents operate. When one
+is known down, tool calls against it are **denied before execution** rather than attempted
+and observed to fail.
+
+This is not an optimisation. Attempting a call against a dead dependency writes an intent
+record that must later be resolved by re-observation — against the same dead dependency.
+Refusing upfront means there is nothing to resolve. It also means one signal, raised once,
+instead of every affected run independently rediscovering the same outage.
+
+**An availability denial is a different kind of "no" from a policy denial, and they must
+stay distinguishable.** A tool call refused for scope must NOT teach an agent to find
+another route; that is the governance boundary holding. A call refused because a
+dependency is down *invites* a legitimate alternative — writing the Terraform and handing
+it back, rather than applying it. Only the availability class is model-visible as an
+invitation to adapt. Blurring them would teach agents that denials are obstacles to route
+around, which inverts Principles II and III.
+
+**A sweeper resumes suspended runs when their dependency recovers.** Recovery is a
+platform-level event, so the response is platform-level: one sweep resumes every run
+waiting on that dependency. No run polls, and no person is told to press anything.
 
 **After that, the control surface is audit and alerting — not intervention.** Once it is
 established what an agent and a person may reach, enforcement is continuous and automatic:
@@ -87,18 +119,22 @@ The platform gets simpler, which is the surprise. A waiting state is not just an
 value — it implies a queue, a notification path, an owner, an escalation when nobody
 answers, and a story for a run parked over a weekend. None of that has to exist now.
 
-The cost is a real one and should not be glossed: **a run that cannot determine what it
-did now stops rather than preserving the option to continue**. Work is lost that a human
-could in principle have rescued by answering one question. That trade is accepted because
-the alternative is worse in aggregate — a platform where any run might block on a person is
-one whose throughput is bounded by human availability, and where the standing volume of
-pending questions trains people to answer without reading.
+An earlier draft of this ADR described a cost that does not exist: that a run unable to
+determine its own state loses work a human could have rescued by answering one question.
+That framing survived because it *sounds* like a trade-off. It is not one — a person
+asked whether a `terraform apply` succeeded has no way to answer except by reading the
+same system the agent just failed to read. The rescue was imaginary, and writing it down
+as a cost kept the human-in-the-loop premise alive in the reasoning after it had been
+removed from the design.
 
-It also puts real weight on alerting, which this platform does not yet have. A stopped run
-that nobody is told about is a silent failure, and "audit and alerting" is currently half
-a sentence and one implemented half. Until an alerting path exists, the honest description
-is that stopped runs are *discoverable*, not *reported* — and that gap should be named on
-the roadmap rather than assumed closed by this decision.
+The real answer is to keep trying until the platform knows. That is what suspension and
+the sweeper are for.
+
+**What this genuinely costs is new machinery**: dependency health monitoring, a denial
+class that did not exist, and a sweeper. None of it exists today. Until it does, the
+honest description is that this ADR is a decision, not a shipped capability — and a run
+that cannot observe has no automatic path back. That gap belongs on the roadmap rather
+than being assumed closed by accepting this.
 
 It also sharpens what evidence is for. A stopped run's audit trail is no longer a prompt
 for someone to act on mid-flight; it is the record an investigator reads afterwards to
@@ -115,6 +151,17 @@ FR-008, `RunState.PARKED`, `park_run`, and one of the seven durability conforman
 the constitution's Quality Gates name that row explicitly, so it requires a constitution
 amendment as well. Recorded here rather than discovered later.
 
+**A naming defect this surfaced.** `issue_grant` refuses a duration exceeding "the agent
+definition's maximum run duration", but nothing resolves that from a definition — it is a
+platform default of eight hours, taken as a parameter. Eight hours is the right value; the
+message is wrong about where it comes from, and sends a reader looking for a definition
+field that does not exist. Fix the language, not the number.
+
+**Container lifetime is not run lifetime.** The eight hours bounds how long a run remains
+*resumable*; it is not a reservation. An allocation exists to do work and ends when that
+work ends — including when it ends in suspension. A five-minute job is a five-minute
+container.
+
 ## Notes
 
 The superseded rules were not careless. Requiring re-consent for lapsed authority is the
@@ -125,3 +172,9 @@ What they missed is that "ask a human" is only conservative when a human is actu
 available and actually informed. At the frequency an agent platform generates such
 questions, it is neither — and a safety mechanism people learn to click through is worse
 than one that never asks.
+
+The sharper miss was one of layer. A run failing to reach a managed product is a *symptom*
+of a condition the platform should already know: that product is down. Escalating it
+per-run turns one outage into thousands of prompts, each describing the same fact and none
+individually actionable. Monitor the dependency, refuse the calls, resume when it returns —
+and tell someone once.
