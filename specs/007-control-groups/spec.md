@@ -24,7 +24,9 @@
 
 - Q: Does this feature resolve 005's parked runs, as the roadmap claims? → A: No. Control Groups gate **authority**, not **runs**. Humans authorize at design time — registering agents, changing privileges, managing tier-0 Vault policy — and are never in the loop during a run (ADR-0049, Proposed). The roadmap entry claiming otherwise predates that reasoning and is corrected by this feature.
 - Q: Is the quorum mechanism built here or consumed? → A: Consumed. The control-plane Vault provides Control Groups under the current licence, verified against the running enclave. Building a second approval mechanism beside the trust fabric's own would violate Principle I and put the authority record somewhere other than the trust fabric (ADR-0015).
-- Q: What is gated, exactly? → A: What ADR-0016 names: ceiling changes, agent definition changes, manual control-plane writes, break-glass access, and reactivation of a suspended agent. Instance operations within an already-approved definition — scaling, restarting, scheduling, registering an instance — are **not** gated; the approval already happened at the definition.
+- Q: What is gated, exactly? → A: Ceiling changes, agent definition changes and registrations, workload identity role bindings, restoration of revoked authority, and the quorum policy itself — reached through any tool, since gating attaches to the path. Instance operations within an already-approved definition — scaling, restarting, scheduling, registering an instance — are **not** gated; the approval already happened at the definition.
+- Q: Is break-glass gated by this mechanism? → A: **No, and it cannot be.** An earlier answer in this session said it was, following ADR-0016's wording without checking. Regenerating a root token requires a quorum of unseal-share holders — verified against the CLI, which describes it as combining "a quorum of share holders" — and it is a `sys` operation outside normal policy paths, so Control Groups cannot intercept it. It is already a stronger multi-party control. Its strength is set by the **unseal threshold**, which is why a 1-of-1 development unseal makes break-glass a single-person act no matter what this feature configures.
+- Q: Is reactivating a suspended agent separate from restoring revoked authority? → A: No; they are one act. An earlier draft stated both as requirements, which would have let one be satisfied while the other was forgotten.
 - Q: Who specifies the quorum policies? → A: The customer's control-plane Vault administrator, in their environment. Humans build the foundations that determine how agents may behave; the platform enforces what they set, and does not decide it for them. The deployment tree may provision a starting configuration during setup, before the bootstrap credential is revoked — that is the bootstrap shape, since a control gating its own changes cannot create itself — but the policy belongs to the administrator, not to the platform.
 - Q: Does a pending request linger forever? → A: No. A request that has not reached quorum expires, and expiry means **the change does not happen**. That is fail-closed and safe: the risk of an expiring request is a change someone has to propose again, while the risk of an immortal one is an approval collected months after the context that justified it. FR-009 already forbids a timeout that *grants*; this is the opposite direction.
 - Q: What happens to an in-flight request when the quorum policy changes under it? → A: It is evaluated against the policy in force when it completes, not when it was raised. Otherwise raising a request just before a tightening would let it through under the looser rule, which makes the tightening advisory.
@@ -251,8 +253,9 @@ none requires approval and none is blocked.
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% of ceiling widenings, definition changes, registrations, break-glass
-  grants, and reactivations require more than one approving identity; zero take effect on one.
+- **SC-001**: 100% of ceiling widenings, definition changes, registrations, and
+  restorations require more than one approving identity; zero take effect on one.
+  Break-glass is deliberately absent — see SC-013.
 - **SC-002**: Zero authority changes take effect by timeout, default, or escalation when
   quorum is not reached.
 - **SC-003**: Zero requests are satisfiable by their own requester.
@@ -271,6 +274,10 @@ none requires approval and none is blocked.
 - **SC-011**: After provisioning completes and the bootstrap credential is revoked, zero
   authority changes are possible outside the quorum mechanism.
 - **SC-012**: 100% of requests that reach expiry without quorum result in no change.
+- **SC-013**: Break-glass (root regeneration) is routed through this feature's gate in zero
+  cases, and the deployment documents that its strength is set by the unseal threshold. A
+  1-of-1 unseal is recorded as making it a single-person act regardless of anything
+  configured here.
 
 ## Assumptions
 
