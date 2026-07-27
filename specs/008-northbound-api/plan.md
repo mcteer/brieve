@@ -93,14 +93,22 @@ implementation would be a plan that mis-sized the feature.
 
 2. **There is no tenant.** `tenant` appears nowhere in `src/` or `tests/`, yet ADR-0035
    says the read path is tenant-scoped and FR-011 requires a cross-tenant query to return
-   nothing distinguishably. The resolution is a single `tenant_id` on the authenticated
-   subject, sourced from an IdP claim, enforced as the outermost dimension of every
-   evidence query — with one tenant configured. This is **not** multi-tenancy, which 006
-   put out of scope and which means isolating runs, storage, and policy. It is the
-   evidence-scope dimension FR-011 requires, enforced now so that multi-tenancy later
-   populates a check that already runs rather than adding an enforcement point to a system
-   that never had one. A dimension introduced with the check is cheap; a dimension
-   retrofitted across an existing evidence store is not.
+   nothing distinguishably. The dimension lands in **two** places, and the second is easy to
+   miss: on the authenticated subject, and on `AuditEntry` **inside the hash chain**. A
+   tenant column beside the chain would leave the field deciding who may see a record
+   alterable without detection.
+
+   That makes the field required on every audit entry, including entries from runs no
+   surface started — `start_governed_run` is reached from the adapter and from the 002–007
+   suites, none of which has an identity provider. So tenant resolves from the subject's
+   claim where a surface established one, and from a **configured default tenant** in core
+   otherwise. One tenant is configured, so both paths currently yield the same value.
+
+   This is **not** multi-tenancy, which 006 put out of scope and which means isolating runs,
+   storage, and policy. It is the evidence-scope dimension FR-011 requires, enforced now so
+   that multi-tenancy later changes what populates it rather than adding a field the existing
+   records lack. A dimension introduced with the check is cheap; a dimension retrofitted
+   across an existing evidence store is not.
 
 3. **There is no way to start a run from outside a Python process.** `start_governed_run`
    is a function call. FR-007a needs a dispatch seam. Hence `RunDispatcher`.
@@ -251,3 +259,5 @@ here rather than reconstruct it.
 |-----------|------------|-------------------------------------|
 | Durable audit store (`src/core/audit/postgres.py` + schema) | FR-008 requires reading the audit trail; today it exists only in the memory of a running process | Reading `InMemoryAuditSink` would work only for runs that have not finished, which is the opposite of what an audit trail is for |
 | New runtime dependencies (FastAPI, PyJWT + cryptography) | An HTTP surface and verified OIDC tokens | Stdlib `http.server` gives no ASGI, no request validation, and no generated description, so FR-012 would become a hand-maintained document — the exact thing FR-012 forbids. Hand-rolling JWT verification means hand-rolling signature checking, which is how this goes wrong quietly |
+| **A sealed seam changes shape**: `AuditEntry` gains `tenant_id` and `compute_entry_hash` takes it as an input | The read path is tenant-bounded, so the bounding dimension must sit inside the integrity guarantee rather than beside it | A `tenant_id` column outside the hash was the cheaper fix and the wrong one — the field deciding who may see a record would be alterable without breaking the chain, making the scoping decision the one thing in an audit record nobody could prove. Every existing caller must then supply a tenant, which is why core resolves a configured default |
+| A dedicated evidence-access correlation stream | Evidence-access records must be tamper-evident **and** must not touch the chain they read | Both single-sided fixes fail. Appending to the queried run's chain lets reads write into what they read; a fresh ID per read makes each record a chain of one — unlinked, and deletable without detection, which is precisely what the record exists to prevent |

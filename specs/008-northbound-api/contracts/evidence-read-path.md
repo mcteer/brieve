@@ -87,11 +87,20 @@ It records **who, when, the query shape, the result count, and the disposition**
 **not** record the rows returned: that would copy evidence into the record describing it,
 growing the trail proportionally to reads and duplicating what it points at.
 
-**It carries its own correlation ID** and names the ones it read (FR-010a). Appending it to
-the chain of the run it queried would mean reading evidence writes into the evidence being
-read — a later read of that run would return a record the earlier read created. That is the
-subtlest way to break the guarantee this section exists to protect, and it looks harmless
-until an investigator asks why the trail grew while nobody was running anything.
+**It goes on a dedicated evidence-access stream**, `evidence-access:{tenant_id}`, and names
+the correlation IDs it read (FR-010a). Two properties must hold at once, and each obvious fix
+destroys the other:
+
+- **Append to the queried run's chain** and reading evidence writes into the evidence being
+  read — a later read of that run returns a record the earlier read created. Harmless-looking
+  until an investigator asks why the trail grew while nobody was running anything.
+- **Mint a fresh correlation ID per read** and every record becomes a chain of one. Chains
+  are per-correlation-ID and `seq == 0` takes `GENESIS_PREV_HASH`, so the record links to
+  nothing and **can be removed without detection** — which is exactly what a record of who
+  read what must not permit.
+
+A stable per-tenant stream gives both: records chain to each other, so a deletion breaks the
+chain, and no run's chain is touched.
 
 **This terminates.** A read writes one record regardless of how many rows matched. Reading
 the meta-audit records is itself a read and writes one more. Stated because it is obvious

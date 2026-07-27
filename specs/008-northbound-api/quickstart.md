@@ -12,7 +12,7 @@ make dev-up        # Terraform -> Vault -> Nomad -> harness (ADR-0048's order)
 make dev-status    # Nomad up, Vault up (unsealed), Postgres up
 ```
 
-The enclave is a prerequisite for six of the fourteen conformance rows, not an alternative
+The enclave is a prerequisite for seven of the fifteen conformance rows, not an alternative
 to them. `make dev-up` is idempotent — re-running with parts already up is fine, and it
 never re-initialises a Vault that already has a raft store.
 
@@ -45,7 +45,7 @@ unreachable.
 make conformance
 ```
 
-Adds the six enclave rows. **Fails loudly if the enclave is absent** rather than skipping.
+Adds the seven enclave rows. **Fails loudly if the enclave is absent** rather than skipping.
 
 ### 3. The three things worth checking by hand
 
@@ -86,9 +86,11 @@ The caller must not be able to tell the difference — that would leak the exist
 they may not see. The trail must. An investigator needs to distinguish "nothing happened"
 from "you may not see it," and that distinction is the whole of FR-011.
 
-**And check where the meta-audit record landed.** It must carry its own correlation ID, not
-the one it read (FR-010a) — otherwise reading a run's evidence appends to that run's chain,
-and the next read returns a record the previous read created.
+**And check where the meta-audit record landed.** It belongs on the per-tenant
+`evidence-access` stream, chained to the record before it (FR-010a). Two ways to get this
+wrong: on the queried run's chain, reading evidence appends to what it read; on a fresh
+correlation ID per read, the record is a chain of one and can be deleted without trace. Read
+two records and confirm the second's `prev_hash` is the first's `entry_hash`.
 
 ### 4. The description snapshot
 

@@ -122,7 +122,7 @@ integrity question.
 | `query_shape` | `dict` | The narrowing supplied — **never the rows returned** |
 | `result_count` | `int` | How many records matched |
 | `disposition` | `EvidenceDisposition` | `SCOPED` or `OUT_OF_SCOPE` |
-| `correlation_id` | `str` | **Its own, freshly minted.** Not the correlation ID of the run it read |
+| `correlation_id` | `str` | The **evidence-access stream** for this tenant — stable, so records chain to each other |
 | `read_correlation_ids` | `list[str]` | What it read, so the record is still discoverable by run |
 
 **Why `disposition` exists rather than inferring from `result_count`**: FR-011 requires a
@@ -134,11 +134,21 @@ that distinction is the whole point of the requirement.
 into the meta-audit record, growing the trail proportionally to reads and duplicating the
 records it describes.
 
-**Why its own correlation ID** (FR-010a): appending the record to the chain of the run it
-queried would mean **reading evidence writes into the evidence being read** — a later read
-of that run would return something the earlier read created. FR-009 exists to keep the read
-path from altering what it reads, and this is the subtlest way to violate it. Naming the
-correlation IDs read preserves discoverability without the entanglement.
+**Why a dedicated stream and not a per-read ID** (FR-010a). Two properties must hold at
+once, and the obvious fix for either breaks the other:
+
+- Appending to the queried run's chain means **reading evidence writes into the evidence
+  being read** — a later read of that run returns something the earlier read created. FR-009
+  exists to stop the read path altering what it reads, and this is the subtlest way to do it.
+- Minting a fresh correlation ID per read avoids that, but chains are per-correlation-ID and
+  `seq == 0` takes `GENESIS_PREV_HASH` — so every record becomes **a chain of one, linked to
+  nothing and deletable without detection**. A tamper-evident trail of who read what is the
+  entire reason FR-010 exists; an unchained record does not provide it.
+
+The stream is `evidence-access:{tenant_id}` — one per tenant, stable across reads. Records
+chain to their predecessor, so removing one breaks the chain, and no run's chain is touched.
+`validate_correlation_id` accepts any non-empty string, so this needs no change to the
+correlation contract.
 
 **Termination**: one record per read, regardless of how many rows matched. Reading the
 meta-audit records is itself a read and produces one more record. This terminates; it is
@@ -172,6 +182,18 @@ tenant_id: str          # bounding dimension; covered by compute_entry_hash
 
 `compute_entry_hash` in `src/core/audit/chain.py` takes `tenant_id` as an input alongside
 `correlation_id`, `seq`, `event_type`, `timestamp`, `payload`, and `prev_hash`.
+
+**Where the value comes from when no surface is involved.** Making the field required
+without a source would break every existing caller: `start_governed_run` is reached from
+`src/adapters/pydantic_ai/agent.py` and from the 002–007 test suites, none of which has an
+identity provider to read a claim from. So tenant resolves in this order:
+
+1. The authenticated subject's tenant claim, when a surface established one.
+2. Otherwise a **configured default tenant**, resolved in core.
+
+One tenant is configured today, so in practice both paths yield the same value — which is
+the point. The dimension is enforced everywhere from the first commit, and multi-tenancy
+later changes what populates it rather than adding a field the existing records lack.
 
 ### `AuditEventType` — two new members
 

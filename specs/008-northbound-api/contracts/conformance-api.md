@@ -33,7 +33,8 @@ green as one that ran.
 | Run start does not block | Starting a run returns a handle; zero requests hold a connection for a run's duration | FR-007a, SC-005a | **yes** |
 | Evidence is scope-bounded | Two identities with differing entitlements each see only their own scope; neither can widen it | FR-008, SC-006 | **yes** |
 | Read path cannot mutate | A write attempted on the evidence connection is refused **by Postgres**, not by application code | FR-009, SC-007 | **yes** |
-| Evidence access is audited | Every read produces exactly one meta-audit record naming who and when, carrying **its own** correlation ID rather than being appended to the chain it read | FR-010 / FR-010a, SC-008 / SC-009a | **yes** |
+| Evidence access is audited | Every read produces exactly one meta-audit record naming who and when | FR-010, SC-008 | **yes** |
+| Evidence-access records chain | Records land on the per-tenant evidence-access stream and chain to their predecessor; removing one is detectable, and no run's chain is touched | FR-010a, SC-009a | **yes** |
 | Zero rows are distinguishable | A cross-tenant *attempt* — narrowing by another tenant's correlation or run ID, since no tenant parameter exists — and a legitimately empty query both return zero rows and are distinguishable in the trail | FR-011, SC-009 | **yes** |
 | Description is complete | Every exposed operation appears in the generated description; an operation added without updating the snapshot is detected | FR-012, SC-010 | no |
 | Mapping change is gated | A claim-to-role mapping change returns **pending**, not denied, and takes effect only on approval | FR-013 | **yes** |
@@ -71,17 +72,21 @@ than to check:
 - **Zero rows are distinguishable** — the break fixture makes both cases return the same
   disposition and asserts detection. Both already return zero rows, so a fixture comparing
   row counts would pass against a broken implementation.
+- **Evidence-access records chain** — the break fixture writes each record under a freshly
+  minted correlation ID and asserts the check catches the unchained singleton. That
+  arrangement satisfies "the record was written" and still leaves it deletable without trace,
+  so a fixture that only counts records would pass against it.
 
 ## CI does not run the enclave rows, and that is the same gap 005 recorded
 
-Six of the fourteen rows need the enclave. The CI fast lane runs `make conformance-hermetic`
+Seven of the fifteen rows need the enclave. The CI fast lane runs `make conformance-hermetic`
 and cannot stand up a licensed Vault Enterprise, so **no required GitHub check covers those
 six.** Stated plainly rather than papered over.
 
 **That lane must exclude by marker, not by path.** It currently passes
 `--ignore=tests/conformance/durability`, which worked while every enclave-dependent row
 lived in one directory. `tests/conformance/api/` holds both kinds, so the path exclusion
-would collect the six enclave rows and **fail the fork-safe lane on the merge commit** —
+would collect the seven enclave rows and **fail the fork-safe lane on the merge commit** —
 they fail loudly when the enclave is absent, by design. T057a changes it to `-m "not
 enclave"`.
 
@@ -109,7 +114,7 @@ This feature changes sealed core in four places, and **one of them is not additi
 - **Not additive**: `AuditEntry` gains `tenant_id` and `compute_entry_hash` takes it as an
   input, changing the shape of an existing seam.
 - Identity flows move *into* `src/core/identity/` rather than living in a transport, per
-  Principle V.
+  Principle V, which also houses the tenant resolver every existing caller now needs.
 
 An earlier draft of this contract claimed all of it was additive. It could not have been:
 the evidence table required a `tenant_id` that `AuditEntry` had no field for. Putting the

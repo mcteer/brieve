@@ -60,3 +60,12 @@
   tools, which FR-007 forbids. **Third occurrence of the same pattern**: a decision corrected
   in the requirements while its restatement in a story went unswept. Every artifact was
   swept this time rather than only the ones the pass named.
+- Analyze pass 2 (2026-07-27) found that **both of pass 1's fixes had consequences one layer
+  out**, which is the more useful lesson than either fix. Adding `tenant_id` to `AuditEntry`
+  created a required field whose only supplier was the API, leaving the adapter and the
+  002–007 suites unable to start a run; core now resolves a configured default. And giving
+  evidence-access records their own correlation ID removed the entanglement but made each
+  record a chain of one — `seq == 0` takes the genesis hash — so it linked to nothing and
+  could be deleted undetected, defeating the reason the record exists. Records now go on a
+  stable per-tenant evidence-access stream, which is a third option neither earlier pass
+  considered.

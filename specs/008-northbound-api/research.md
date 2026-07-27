@@ -170,6 +170,14 @@ enforced as the outermost dimension of every evidence query. One tenant is confi
 the read path is tenant-scoped and FR-011 requires a cross-tenant query to return nothing,
 distinguishably. Something has to carry that dimension.
 
+**Every audit entry needs one, including entries from runs no surface started.**
+`start_governed_run` is reached from `src/adapters/pydantic_ai/agent.py` and from the 002–007
+suites, none of which has an identity provider to read a claim from. So tenant resolves from
+the subject's claim where a surface established one, and from a **configured default tenant**
+in core otherwise. Making the field required without that source would stop the adapter
+starting a run at all — a requirement whose only supplier is the newest component is a
+requirement the rest of the system cannot meet.
+
 **And it has to be inside the hash chain.** `AuditEntry` gains `tenant_id` and
 `compute_entry_hash` takes it as an input. A column beside the chain would leave the field
 that decides who may see a record alterable without detection — the one field in an audit

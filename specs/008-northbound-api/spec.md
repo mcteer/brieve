@@ -205,11 +205,14 @@ maintained beside it.
   querying identity's own entitlements.
 - **FR-009**: The audit read path MUST NOT be able to mutate, delete, or mask any record.
 - **FR-010**: Evidence access MUST itself be audited — who read which evidence, and when.
-- **FR-010a**: An evidence-access record MUST carry its **own** correlation ID and name the
-  correlation IDs it read, rather than being appended to the chain of the run it queried.
-  Reading evidence must not write into the evidence being read: appending to the queried
-  run's chain would change what a later read of that run returns, which is the property
-  FR-009 exists to protect.
+- **FR-010a**: Evidence-access records MUST be written to a **dedicated, stable
+  evidence-access stream**, chained among themselves, and MUST name the correlation IDs they
+  read. Two properties have to hold at once and each is easy to obtain by sacrificing the
+  other. Appending to the queried run's chain would let reading evidence write into the
+  evidence being read, which is what FR-009 protects. Minting a fresh correlation ID per read
+  would leave every record a chain of one — linked to nothing, and therefore **deletable
+  without detection**, which defeats the reason the record exists. A per-tenant stream gives
+  both: records are tamper-evident against each other and touch no run's chain.
 - **FR-011**: A query that reaches beyond the caller's tenant MUST return nothing, and MUST
   be distinguishable in the audit trail from a query that legitimately found nothing.
   **The reachable form of this attempt must be the one tested**: the request carries no
@@ -265,8 +268,9 @@ maintained beside it.
 - **SC-009**: A query narrowing to another tenant's correlation or run ID returns zero
   records and is distinguishable in the audit trail from a legitimately empty result, in
   100% of cases.
-- **SC-009a**: 100% of evidence-access records carry their own correlation ID; zero are
-  appended to the chain of a run they read.
+- **SC-009a**: 100% of evidence-access records land on the evidence-access stream and chain
+  to their predecessor; zero are appended to the chain of a run they read, and zero are
+  unchained singletons. Removing one is detectable.
 - **SC-010**: 100% of exposed operations appear in the generated description; an operation
   added without one is detected.
 - **SC-011**: Zero runs are paused, interrupted, or blocked by anything in this feature.
@@ -300,6 +304,11 @@ their absence from the story list is a decision rather than an oversight.
   evidence is itself an auditable act.
 - Claim-to-role mapping changes route through 007's quorum gate. This feature surfaces the
   request; it does not decide it.
+- **Every audit record carries a tenant, including records from runs no surface started.**
+  The adapter and the existing test suites call `start_governed_run` directly and have no
+  identity provider to draw a claim from, so the platform resolves a **configured default
+  tenant** and a subject's claim overrides it where one exists. Without this, adding tenant
+  to the audit entry would stop the adapter from starting a run at all.
 - MCP, CLI, and portal are each their own spec. The MCP one additionally carries the
   dependency health checks and resume sweeper decided in ADR-0049 (Proposed), because both
   need a long-lived home and the MCP service is the persistent one.
