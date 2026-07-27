@@ -27,11 +27,12 @@ being re-derived at the start of every spec.
 | 004 | Primary adapter | ADR-0001, ADR-0017, ADR-0019, ADR-0047 | Governance-ordering, fail-closed, governed entry |
 | 005 | Durable execution | ADR-0024, ADR-0026, ADR-0048, ADR-0018 (consumes) | All seven durability rows |
 | 006 | Deployment module tree | ADR-0025, ADR-0048, ADR-0015, ADR-0007 | — (infrastructure; the durability rows now run under an attested identity) |
+| 007 | Control Groups | ADR-0016, ADR-0015, ADR-0048 | — (no new blocking row; component tests against the real Vault) |
 
 ## In progress
 
-Nothing. The next feature is the top of [Next](#next) — Control Groups (ADR-0016), which is
-what 005's parked runs currently have no surface to resolve against.
+Nothing. The next feature is the top of [Next](#next) — northbound surfaces (ADR-0033),
+which is the first thing a user touches directly.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -47,22 +48,6 @@ what 005's parked runs currently have no surface to resolve against.
 
 Ordered by dependency first, then by which owed gate row it closes. Each entry names what it
 unblocks — that is the argument for its position, and the thing to challenge if you disagree.
-
-### 007 — Control Groups (ADR-0016)
-
-Quorum-gated authority changes: who may widen a scope, restore revoked access, or change IdP
-claim-to-role mapping.
-
-**Why here:** the first feature whose subject is *humans authorizing*, which every
-authority-shaped thing downstream depends on. An agent's ceiling is the outer bound on
-everything it may ever do, and nothing currently stops one person raising it alone.
-
-**Scope correction:** an earlier version of this entry claimed it unblocks "005's parked-run
-resolution". It does not. Control Groups gate **authority**, not **runs** — humans authorize at
-design time and are never in the loop during a run (ADR-0049, Proposed). That claim assumed
-run-time consent, which is the thing 0049 rejects.
-
-**Unblocks:** quorum on ceiling and definition changes; ADR-0016's restoration asymmetry.
 
 ### 008 — Northbound surfaces (ADR-0033, ADR-0034, ADR-0035)
 
