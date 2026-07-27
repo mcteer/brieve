@@ -33,11 +33,27 @@ TOOL_ENTRYPOINTS = {"invoke_tool"}
 MAX_DEPTH = 6
 
 
+class UnanalysableRoute(Exception):
+    """The checker could not read a route's source.
+
+    Raised rather than returning "no calls found", which is the distinction that matters:
+    an unreadable route is **unknown**, not clean. The first version of this checker
+    swallowed the failure and reported zero offenders — so in any environment where source
+    was unavailable, the platform's central containment property would have been reported
+    as holding without a single route having been examined. That is the vacuous-check
+    failure mode, and it is worse than no check because it is believed.
+    """
+
+
 def _called_names(func: Any) -> set[str]:
     try:
         source = inspect.getsource(func)
-    except (OSError, TypeError):
-        return set()
+    except (OSError, TypeError) as exc:
+        raise UnanalysableRoute(
+            f"cannot read source for {getattr(func, '__qualname__', func)!r} "
+            f"(file: {getattr(getattr(func, '__code__', None), 'co_filename', '?')}). "
+            "Refusing to report this route as clean."
+        ) from exc
     try:
         tree = ast.parse(inspect.cleandoc(source))
     except SyntaxError:

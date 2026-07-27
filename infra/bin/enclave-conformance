@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# Runs the durability rows as a scheduled workload and surfaces the result.
+# Runs the durability and API evidence rows as a scheduled workload, and surfaces the result.
 #
 # The suite holds its own workload identity; no token is passed to it. A process with no
 # attested identity cannot obtain a state-store credential, and that failure is correct
@@ -27,7 +27,7 @@ curl -sf -o /dev/null --max-time 3 http://127.0.0.1:4646/v1/status/leader \
 #
 # This does mean an invocation abandons a run already in flight. That is the right
 # trade for a gate: the verdict must belong to the tree in front of you.
-say "Submitting the durability rows as a scheduled workload"
+say "Submitting the durability and API evidence rows as a scheduled workload"
 nomad job stop -purge conformance >/dev/null 2>&1 || true
 nomad job run -var="repo=$REPO" "$REPO/infra/jobs/conformance.nomad.hcl" >/dev/null
 

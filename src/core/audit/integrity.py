@@ -45,11 +45,17 @@ class IntegrityReport:
         return not self.findings
 
 
-def verify_stream_integrity(conn_factory: Callable[[], Any]) -> IntegrityReport:
+def verify_stream_integrity(
+    conn_factory: Callable[[], Any], *, only: set[str] | None = None
+) -> IntegrityReport:
     """Walk every stream, verify its chain, and compare its tail to the recorded head.
 
     ``conn_factory`` returns a connection holding the **run** role, since the evidence
     role cannot read the heads table.
+
+    ``only`` restricts the walk to named streams. Operationally this is how a targeted
+    check is run without scanning an estate's whole history; in tests it is what keeps one
+    row's deliberate tampering from being reported by another row asserting a clean store.
     """
     report = IntegrityReport()
     conn = conn_factory()
@@ -61,7 +67,10 @@ def verify_stream_integrity(conn_factory: Callable[[], Any]) -> IntegrityReport:
         cur.execute("SELECT DISTINCT correlation_id FROM audit_entries")
         streams = {str(r[0]) for r in cur.fetchall()}
 
-        for correlation_id in sorted(streams | set(heads)):
+        candidates = streams | set(heads)
+        if only is not None:
+            candidates &= only
+        for correlation_id in sorted(candidates):
             report.streams_checked += 1
             cur.execute(
                 "SELECT tenant_id, correlation_id, seq, event_type, timestamp, payload, "

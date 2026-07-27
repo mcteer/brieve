@@ -231,7 +231,7 @@ Grouped here rather than attached to an unrelated one, so nothing is covered by 
 - [X] T058a [P] Add continuous evidence-stream verification to `ROADMAP.md`'s deferral table, attaching to the MCP feature alongside the resume sweeper (FR-010e). `ROADMAP.md` says it itself: a deferral recorded only in a spec is invisible to whoever plans the next feature, which is exactly who needs this one
 - [X] T059 [P] Record the seventeen rows in force in `contracts/conformance-api.md` as **In force** rather than Planned, and confirm the named responsible party for the nine enclave rows is present (constitution v1.1.0)
 - [X] T060 [P] Update `AGENTS.md` so the harness runs `make conformance` before merging anything touching `src/surfaces/` or `src/core/audit/`
-- [ ] T061 Run `make check` and `make conformance` against a live enclave, and confirm every break fixture passes on a clean tree — a row whose failure nobody has observed is a row nobody knows works
+- [X] T061 Run `make check` and `make conformance` against a live enclave, and confirm every break fixture passes on a clean tree — a row whose failure nobody has observed is a row nobody knows works
 
 ---
 

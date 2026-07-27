@@ -43,6 +43,9 @@ class PostgresEvidenceQuery:
         dbname: str = "brieve",
         connect: Callable[..., Any] | None = None,
     ) -> None:
+        # Deliberately no owner_role here. The read path must NOT act as the parent role:
+        # that role owns the tables and can write them, which would hand the evidence path
+        # exactly the capability the SELECT-only grant exists to withhold.
         self._credentials = credentials
         self._host = host
         self._port = port

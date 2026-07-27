@@ -53,12 +53,14 @@ class PostgresAuditSink:
         host: str = "127.0.0.1",
         port: int = 5432,
         dbname: str = "brieve",
+        owner_role: str | None = "brieve",
         connect: Callable[..., Any] | None = None,
     ) -> None:
         self._credentials = credentials
         self._host = host
         self._port = port
         self._dbname = dbname
+        self._owner = owner_role
         self._connect = connect or pg8000.dbapi.connect
         self._credential: DatabaseCredential | None = None
 
@@ -68,13 +70,24 @@ class PostgresAuditSink:
         if refresh or self._credential is None:
             self._credential = self._credentials.fetch()
         cred = self._credential
-        return self._connect(
+        conn = self._connect(
             host=self._host,
             port=self._port,
             database=self._dbname,
             user=cred.username,
             password=cred.password,
         )
+        if self._owner:
+            # The same trap 005 paid for, in a second place. Every dynamic credential is a
+            # distinct role, so a table created under one is not owned by the next and DDL
+            # fails with "must be owner of table" the first time a lease rolls over —
+            # including `CREATE INDEX IF NOT EXISTS`, which checks ownership before it
+            # checks existence. Acting as the shared parent role keeps one owner across the
+            # whole credential lifecycle.
+            cur = conn.cursor()
+            cur.execute(f'SET ROLE "{self._owner}"')
+            conn.commit()
+        return conn
 
     def _with_connection(self, fn: Callable[[Any], Any]) -> Any:
         """Run ``fn`` against a connection, refreshing credentials once on auth failure.

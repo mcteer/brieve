@@ -49,10 +49,16 @@ def test_records_chain_to_their_predecessor(
 def test_integrity_check_is_clean_on_an_untampered_store(
     audit_sink: PostgresAuditSink, unique_correlation_id: str, run_connection: Any
 ) -> None:
-    """The false-positive half. A check that always fires gets disabled."""
+    """The false-positive half. A check that always fires gets disabled.
+
+    Scoped to this row's own stream. The sibling rows below tamper deliberately, and the
+    store is shared — an unscoped assertion here would report their findings as this row's
+    failure, which is a flaky test rather than a real one.
+    """
     _write(audit_sink, unique_correlation_id, 3)
-    report = verify_stream_integrity(lambda: run_connection())
-    assert report.ok, f"clean store reported findings: {report.findings}"
+    report = verify_stream_integrity(lambda: run_connection(), only={unique_correlation_id})
+    assert report.ok, f"clean stream reported findings: {report.findings}"
+    assert report.streams_checked == 1
 
 
 def test_truncation_is_caught_by_the_head_and_not_by_the_chain(
@@ -78,7 +84,7 @@ def test_truncation_is_caught_by_the_head_and_not_by_the_chain(
     # The chain alone still passes. This assertion is the point of the row.
     verify_chain(audit_sink.list_by_correlation_id(unique_correlation_id))
 
-    report = verify_stream_integrity(lambda: run_connection())
+    report = verify_stream_integrity(lambda: run_connection(), only={unique_correlation_id})
     truncated = [f for f in report.findings if f.correlation_id == unique_correlation_id]
     assert truncated and truncated[0].kind == "truncated"
 
@@ -97,7 +103,7 @@ def test_middle_deletion_is_caught_by_the_chain(
     conn.commit()
     conn.close()
 
-    report = verify_stream_integrity(lambda: run_connection())
+    report = verify_stream_integrity(lambda: run_connection(), only={unique_correlation_id})
     broken = [f for f in report.findings if f.correlation_id == unique_correlation_id]
     assert broken and broken[0].kind == "chain_broken"
 

@@ -26,8 +26,12 @@ check:
 # not on the host with a token. That is what makes them exercise the attestation chain
 # rather than sit beside it. The honest cost is that failure output arrives through
 # allocation logs; enclave-conformance streams them and surfaces the exit status.
+# Step 1 runs only what a host process legitimately can. The durability rows and the
+# enclave-marked API rows both hold their OWN workload identity, so running them here
+# would fail for the right reason and the wrong purpose — a host process has no attested
+# identity and should not be able to reach the state store. They run in the allocation.
 conformance:
-	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -q
+	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
 	@bash infra/bin/enclave-conformance
 	$(UV_RUN) pytest -m enclave -q
 
