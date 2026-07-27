@@ -1,0 +1,22 @@
+[
+  {
+    "method": "POST",
+    "name": "request_mapping_change",
+    "path": "/claim-mappings"
+  },
+  {
+    "method": "GET",
+    "name": "read_evidence",
+    "path": "/evidence"
+  },
+  {
+    "method": "POST",
+    "name": "start_run",
+    "path": "/runs"
+  },
+  {
+    "method": "GET",
+    "name": "get_run",
+    "path": "/runs/{run_id}"
+  }
+]

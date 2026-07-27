@@ -37,6 +37,11 @@ class AuditEventType(StrEnum):
     MIRRORING_DECISION = "mirroring_decision"
     EVIDENCE_READ = "evidence_read"
     EVIDENCE_READ_REFUSED = "evidence_read_refused"
+    #: An authority change the harness observed the trust fabric decide (ADR-0016, 007).
+    #: Added here rather than reusing AUTHORITY_ISSUED: a change that was *requested* and
+    #: is awaiting quorum has not issued anything, and filing it as an issuance would make
+    #: the trail claim authority was granted at the moment it was asked for.
+    AUTHORITY_CHANGE_OBSERVED = "authority_change_observed"
 
 
 class AuditEntry(BaseModel):

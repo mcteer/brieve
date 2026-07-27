@@ -167,8 +167,8 @@ body.
 
 - [X] T036 [US3] [GATE:conformance] Implement the route-walking check in `tests/conformance/api/test_no_tool_route.py`, enumerating routes from the app object and inspecting what each reaches. **Not a text search** — a grep passes a docstring mentioning `invoke_tool` and misses a route reaching a tool through an alias
 - [X] T037 [US3] Break fixture in `tests/conformance/api/test_no_tool_route.py` registering a route that reaches a tool **through an alias**, asserting the check catches it. A fixture using the literal name proves only that the literal name is caught
-- [ ] T038 [P] [US3] [GATE:conformance] Assert in `tests/component/test_api_denied_operation.py` that a denied operation executes nothing and the denial is audited
-- [ ] T039 [P] [US3] Component test in `tests/component/test_api_reaches_governed_path.py` asserting a run started through the API reaches tools through `core.tools.invoke` with hooks intact — the governed path is the same one, not an equivalent one
+- [X] T038 [P] [US3] [GATE:conformance] Assert in `tests/component/test_api_denied_operation.py` that a denied operation executes nothing and the denial is audited
+- [X] T039 [P] [US3] Component test in `tests/component/test_api_reaches_governed_path.py` asserting a run started through the API reaches tools through `core.tools.invoke` with hooks intact — the governed path is the same one, not an equivalent one
 
 ---
 
@@ -204,10 +204,10 @@ something written down.
 **Independent test**: assert every exposed operation appears in a generated description, and
 that adding one without recording it is detected.
 
-- [ ] T049 [US5] Generate the operation description from the app in `src/surfaces/api/description.py`, deriving it from the same signatures and Pydantic models that validate requests
-- [ ] T050 [US5] Commit a snapshot of the operation set and its dispositions to `specs/008-northbound-api/contracts/operations.snapshot.json`
-- [ ] T051 [US5] [GATE:conformance] Add a snapshot diff check in the shape `enclave-digest-diff` uses, so an operation added without updating the snapshot fails. Generation alone does not satisfy SC-010 — a new route would simply appear, silently
-- [ ] T052 [P] [US5] [GATE:no-secret-leak] Assert in `tests/unit/test_description_no_leak.py` that the description exposes no internal path, credential field, or scheduler detail
+- [X] T049 [US5] Generate the operation description from the app in `src/surfaces/api/description.py`, deriving it from the same signatures and Pydantic models that validate requests
+- [X] T050 [US5] Commit a snapshot of the operation set and its dispositions to `specs/008-northbound-api/contracts/operations.snapshot.json`
+- [X] T051 [US5] [GATE:conformance] Add a snapshot diff check in the shape `enclave-digest-diff` uses, so an operation added without updating the snapshot fails. Generation alone does not satisfy SC-010 — a new route would simply appear, silently
+- [X] T052 [P] [US5] [GATE:no-secret-leak] Assert in `tests/unit/test_description_no_leak.py` that the description exposes no internal path, credential field, or scheduler detail
 
 ---
 
@@ -216,9 +216,9 @@ that adding one without recording it is detected.
 Three requirements arrived from clarification and edge cases without landing in a story.
 Grouped here rather than attached to an unrelated one, so nothing is covered by accident.
 
-- [ ] T053 [GATE:fail-closed] Implement JWKS caching with a **bounded TTL** in `src/surfaces/api/verification.py`, and assert in `tests/unit/test_idp_unreachable_fails_closed.py` that a cold or expired cache against an unreachable provider refuses (FR-016). Keys are public verification material and may be cached; **identities are never honoured past their own `exp`** (research.md D3)
-- [ ] T054 [GATE:conformance] Add `tests/unit/test_surface_never_pauses.py` asserting no path in `src/surfaces/` pauses, interrupts, or blocks a run (FR-015). Strip comments before matching, as T033 does
-- [ ] T055 Implement `POST /claim-mappings` in `src/surfaces/api/mappings.py`, routing through `core.authority.changes` and returning **pending, not denied** (FR-013). A client seeing a refusal stops asking, so a change approved minutes later is never collected — 007's docstring already names this trap
+- [X] T053 [GATE:fail-closed] Implement JWKS caching with a **bounded TTL** in `src/surfaces/api/verification.py`, and assert in `tests/unit/test_idp_unreachable_fails_closed.py` that a cold or expired cache against an unreachable provider refuses (FR-016). Keys are public verification material and may be cached; **identities are never honoured past their own `exp`** (research.md D3)
+- [X] T054 [GATE:conformance] Add `tests/unit/test_surface_never_pauses.py` asserting no path in `src/surfaces/` pauses, interrupts, or blocks a run (FR-015). Strip comments before matching, as T033 does
+- [X] T055 Implement `POST /claim-mappings` in `src/surfaces/api/mappings.py`, routing through `core.authority.changes` and returning **pending, not denied** (FR-013). A client seeing a refusal stops asking, so a change approved minutes later is never collected — 007's docstring already names this trap
 - [ ] T056 [GATE:conformance] Enclave row in `tests/conformance/api/test_claim_mapping_gated.py` asserting a mapping change returns pending and takes effect **only on approval**, against the real Control Groups rather than a fake
 
 ---

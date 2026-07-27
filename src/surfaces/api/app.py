@@ -16,7 +16,7 @@ from fastapi import FastAPI
 
 from core.audit.query import EvidenceQuery
 from core.audit.sink import AuditSink
-from surfaces.api import evidence, runs
+from surfaces.api import evidence, mappings, runs
 from surfaces.api.verification import TokenVerifier
 from surfaces.dispatch.types import RunDispatcher
 
@@ -43,6 +43,7 @@ def create_app(
     app.state.audit_sink = audit_sink
 
     app.include_router(runs.build_router())
+    app.include_router(mappings.build_router())
     if evidence_query is not None:
         app.include_router(evidence.build_router())
     return app
