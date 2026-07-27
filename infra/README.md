@@ -60,6 +60,53 @@ fencing and parking are proven against single-node behaviour, and multi-node par
 exercised. A tree that claimed HA and had never survived a node loss would be worse than one that
 says it is single-node.
 
+## Quorum on authority changes (ADR-0016)
+
+Off by default. `quorum_policy = null` means no gate, which is the development posture and
+must never be the production one.
+
+**What is gated** — anything that changes what an agent may *become*: ceiling policies,
+definitions and registry entries, workload identity role bindings, restoration of revoked
+authority, and the quorum policy itself. Gating attaches to the **path**, so it holds for
+the CLI, Terraform, the API, and a northbound surface that does not exist yet.
+
+**What is not** — and each for a reason worth knowing:
+
+| Not gated | Why |
+| --- | --- |
+| Revocation | Unilateral and immediate. A control making revocation as slow as granting is one people route around during an incident, after which the route-around is the normal path |
+| Instance operations | Scheduling, restarting, scaling within an approved definition. The approval already happened, at the definition. Gating routine work trains people to approve without reading, which destroys the gate that matters |
+| Break-glass | Regenerating a root token requires a quorum of unseal-share holders — a `sys` operation Control Groups cannot intercept, and already a stronger multi-party control |
+
+### Two mechanisms, and why both
+
+Established by testing against a running Vault, not from documentation:
+
+1. An ACL **`control_group` stanza** returns a *wrapping token* rather than performing the
+   write — that token is the pending approval request. This is where "blocked pending
+   approval" comes from, and it is native: Vault already distinguishes it from denial.
+2. A Sentinel **EGP as a backstop**. The stanza lives in a policy, so the gate is only as
+   complete as the set of policies granting those paths — a new policy without the stanza
+   would bypass it silently. The EGP is path-attached and catches that, denying rather than
+   queuing.
+
+### Root bypasses both
+
+Verified: a root token wrote to a gated path with no approval and no denial.
+
+**This is why the production profile revokes the bootstrap credential.** Revocation is not
+hygiene — it is what makes the gate real. A deployment keeping a root token has an
+authority gate anyone holding that token walks around, and the development enclave keeps
+one deliberately.
+
+### Who owns the policy
+
+The customer's control-plane Vault administrator. The tree may seed a starting
+configuration during provisioning — before the bootstrap credential is revoked, since a
+control gating its own changes cannot create itself — but the policy is theirs to define.
+Humans build the foundations that determine how agents may behave; the platform enforces
+what they set rather than choosing it for them.
+
 ## The failure catalogue
 
 Six conditions already diagnosed once. The third column is why they cost time — each presents with

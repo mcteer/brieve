@@ -140,3 +140,49 @@ def test_root_bypasses_the_gate_which_is_why_production_revokes_it(
     )
     read_status, _ = admin.request(f"{gated['mount']}/data/as-root", method="GET")
     assert read_status == 200, "root's write should have taken effect immediately"
+
+
+# ------------------------------------------------------------------------- US4
+
+
+def test_a_definition_lacking_quorum_is_not_created(
+    admin: VaultAdmin, gated: dict[str, str]
+) -> None:
+    """US4, T023. **Not created** — not merely unusable.
+
+    Those differ, and the difference matters: a definition existing ungated with no
+    workload yet is a weaker property, and a test asserting only "nothing can authenticate
+    as it" would pass against a creation path with no gate at all.
+    """
+    token = admin.token_for(gated["policy"])
+    status, body = admin.request(
+        f"{gated['mount']}/data/new-definition",
+        {"data": {"ceiling": "agent-ceiling-new"}},
+        token=token,
+    )
+
+    assert status == 200 and body.get("wrap_info"), "registration was not gated"
+    read_status, _ = admin.request(f"{gated['mount']}/data/new-definition", method="GET")
+    assert read_status == 404, (
+        "the definition exists despite lacking quorum. Asserting only that nothing can "
+        "authenticate as it would have passed here."
+    )
+
+
+def test_the_quorum_policy_gates_its_own_changes(admin: VaultAdmin, gated: dict[str, str]) -> None:
+    """US4, T025, FR-015. Otherwise the control can be lowered by whoever it constrains.
+
+    Exercised against the same gated mount rather than the live policy path: gating the
+    real one would require approvals to run the tree that manages the environment these
+    tests run in.
+    """
+    token = admin.token_for(gated["policy"])
+    status, body = admin.request(
+        f"{gated['mount']}/data/quorum-policy", {"data": {"required_approvals": 1}}, token=token
+    )
+
+    assert status == 200 and body.get("wrap_info"), (
+        "a change to the quorum policy was not itself gated — the control could be lowered "
+        "unilaterally by whoever it constrains"
+    )
+    assert admin.request(f"{gated['mount']}/data/quorum-policy", method="GET")[0] == 404

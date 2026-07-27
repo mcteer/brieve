@@ -67,8 +67,8 @@ an approval engine, the premise broke — stop and say so rather than building o
 - [X] T005 Attach the gate to the controlled **paths** per `contracts/gated-paths.md`: ceiling policies, definitions and registry entries, workload identity role bindings, restoration, and the quorum policy itself. **Attach to paths, not callers** — a gate on callers is a gate on the callers someone thought of
 - [X] T005a [GATE:fail-closed] (FR-003a, SC-013) Assert break-glass is **not** routed through this gate, and document why in `infra/README.md`: regenerating a root token requires a quorum of unseal-share holders — verified against the CLI, which states it "generates a new root token by combining a quorum of share holders". That is a stronger multi-party control and a `sys` operation Control Groups cannot intercept. **Record the consequence**: break-glass strength is set by the unseal threshold, so the development enclave's 1-of-1 makes it a single-person act regardless of anything configured here
 - [X] T006 [GATE:fail-closed] Assert revocation paths are **not** controlled (FR-006). Deliberate asymmetry: a gate making revocation as slow as granting is one people route around in an incident, after which the route-around is the normal path
-- [ ] T007 Sequence the policy application in provisioning so it lands **before** the bootstrap credential is revoked (FR-016). A control gating its own changes cannot create itself; without this the alternatives are a control that never exists or one with a permanent back door
-- [ ] T008 [GATE:no-secret-leak] Assert no quorum policy content or credential material reaches Terraform state, module outputs, or logs
+- [X] T007 Sequence the policy application in provisioning so it lands **before** the bootstrap credential is revoked (FR-016). A control gating its own changes cannot create itself; without this the alternatives are a control that never exists or one with a permanent back door
+- [X] T008 [GATE:no-secret-leak] Assert no quorum policy content or credential material reaches Terraform state, module outputs, or logs
 
 **Checkpoint**: the gate applies; a ceiling change against the enclave now requires approval.
 
@@ -84,10 +84,10 @@ an approval engine, the premise broke — stop and say so rather than building o
 - [X] T010 [US1] Assert the change takes effect when quorum is reached, with approving identities recorded
 - [X] T011 [US1] [GATE:fail-closed] Assert a request cannot be satisfied by its own requester (FR-008, SC-003). Otherwise the requirement is one person with two hats
 - [X] T012 [US1] [GATE:fail-closed] Assert no change takes effect by timeout, default, or escalation (FR-009, SC-002)
-- [ ] T013 [US1] Create `src/core/authority/changes.py` — observe authority-change events and record them. **It evaluates nothing.** Vault decides; this records what was decided
+- [X] T013 [US1] Create `src/core/authority/changes.py` — observe authority-change events and record them. **It evaluates nothing.** Vault decides; this records what was decided
 - [X] T014 [US1] Add a distinct `blocked pending approval` error to `src/core/authority/errors.py`, separate from denial. Collapsed into deny, an in-flight approval is indistinguishable from a refusal, and a caller either retries forever or reports a failure that is not one
-- [ ] T015 [US1] [GATE:correlation] Record request, each approval and denial with its identity, and disposition — joined by correlation ID (FR-011, SC-008)
-- [ ] T016 [US1] [GATE:no-secret-leak] Assert the audit record holds no credential material and **no mirror of Vault's approval state** (`contracts/evidence.md`). A synchronised copy is a second answer to "who approved this", and during an incident someone reads the wrong one
+- [X] T015 [US1] [GATE:correlation] Record request, each approval and denial with its identity, and disposition — joined by correlation ID (FR-011, SC-008)
+- [X] T016 [US1] [GATE:no-secret-leak] Assert the audit record holds no credential material and **no mirror of Vault's approval state** (`contracts/evidence.md`). A synchronised copy is a second answer to "who approved this", and during an incident someone reads the wrong one
 
 **Checkpoint**: Scenario A green; SC-001, SC-002, SC-003, SC-008 hold. MVP demoable.
 
@@ -123,10 +123,10 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 **Independent Test**: quickstart Scenario A, registration variant
 
-- [ ] T023 [US4] Assert a definition lacking quorum is **not created** — not merely unusable. A definition existing ungated with no workload yet is a different and weaker property, and asserting only the second would pass against an ungated creation path
-- [ ] T023a [US4] Assert no workload can authenticate as an unapproved definition (the second, weaker property — worth holding as well)
-- [ ] T024 [US4] Assert an approved definition exists with its ceiling and appears in the agent registry
-- [ ] T025 [US4] [GATE:fail-closed] Assert changing the quorum policy is itself gated (FR-015), and that after provisioning completes and the bootstrap credential is revoked, zero authority changes are possible outside the mechanism (SC-011)
+- [X] T023 [US4] Assert a definition lacking quorum is **not created** — not merely unusable. A definition existing ungated with no workload yet is a different and weaker property, and asserting only the second would pass against an ungated creation path
+- [X] T023a [US4] Assert no workload can authenticate as an unapproved definition (the second, weaker property — worth holding as well)
+- [X] T024 [US4] Assert an approved definition exists with its ceiling and appears in the agent registry
+- [X] T025 [US4] [GATE:fail-closed] Assert changing the quorum policy is itself gated (FR-015), and that after provisioning completes and the bootstrap credential is revoked, zero authority changes are possible outside the mechanism (SC-011)
 
 ---
 
@@ -136,8 +136,8 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 **Independent Test**: quickstart Scenario E
 
-- [ ] T026 [US5] Assert scheduling, restarting, and scaling instances of an approved definition request approval in **zero** cases (SC-006)
-- [ ] T027 [US5] Assert an operation that changes the *definition* rather than an instance **is** gated. Both halves matter: gating routine work would train people to approve without reading, which destroys the gate that matters
+- [X] T026 [US5] Assert scheduling, restarting, and scaling instances of an approved definition request approval in **zero** cases (SC-006)
+- [X] T027 [US5] Assert an operation that changes the *definition* rather than an instance **is** gated. Both halves matter: gating routine work would train people to approve without reading, which destroys the gate that matters
 
 ---
 
@@ -156,9 +156,9 @@ true, because nobody notices the day a pause is added.
 
 ## Phase 9: Polish
 
-- [ ] T033 [P] Document the quorum policy in `infra/README.md` — what is gated, what is not, who owns the policy, and the bootstrap sequence
-- [ ] T034 [P] [GATE:determinism] Extend `tests/unit/test_no_live_dependencies.py` for this feature's paths; the enclave is required and permitted, live models and product APIs are not
-- [ ] T036 Review the diff against the scope bound: one core module that observes, zero new dependencies, no approval engine. Growth beyond that is the signal the premise broke
+- [X] T033 [P] Document the quorum policy in `infra/README.md` — what is gated, what is not, who owns the policy, and the bootstrap sequence
+- [X] T034 [P] [GATE:determinism] Extend `tests/unit/test_no_live_dependencies.py` for this feature's paths; the enclave is required and permitted, live models and product APIs are not
+- [X] T036 Review the diff against the scope bound: one core module that observes, zero new dependencies, no approval engine. Growth beyond that is the signal the premise broke
 - [ ] T037 Open `feat/007-control-groups` with the asymmetry, the bootstrap sequence, and the negative requirements called out
 
 ---
