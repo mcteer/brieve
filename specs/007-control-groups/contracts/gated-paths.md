@@ -16,7 +16,7 @@ that gets widened until it is unusable, or narrowed until it is decorative.
 | Ceiling policies | The outer bound on everything an agent may ever do |
 | Agent definitions and registry entries | Creating authority that did not exist |
 | Workload identity role bindings | What may authenticate as a definition |
-| Reactivation of a suspended agent | Restoration, which is the gated half of the asymmetry |
+| Restoration of revoked authority | The gated half of the asymmetry. Reactivating a suspended agent **is** this act, not a separate one |
 | The quorum policy itself | Or the control can be lowered by whoever it constrains |
 
 ## Not gated — operating within what was approved

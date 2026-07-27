@@ -68,6 +68,20 @@ without reading, which destroys the gate that matters.
 cases (SC-007) — **and agent runs already holding authority continue.** Failing closed on
 the wrong thing here would halt the platform during a Vault blip.
 
+## Scenario F2 — Break-glass is not routed through this gate (FR-003a, SC-013)
+
+**Expect**: root regeneration is subject to the **unseal threshold**, not to Control
+Groups — in zero cases does it pass through this feature's mechanism.
+
+```bash
+vault operator generate-root -h    # "combining a quorum of share holders"
+```
+
+**Also expect**: the deployment records where break-glass strength actually comes from. On
+the development enclave that is a 1-of-1 unseal with the key in `.env`, which makes root
+regeneration a single-person act **regardless of anything configured here**. That is
+acceptable for development and is exactly why the unseal shape matters in production.
+
 ## Scenario G — A pending request expires without granting (FR-017)
 
 **Expect**: a request that reaches its TTL without quorum results in no change (SC-012).

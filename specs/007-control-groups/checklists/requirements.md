@@ -59,3 +59,11 @@
   rather than corrected from memory.
 - Two tasks assumed this feature adds a conformance row. It does not; both were removed
   rather than left as scaffolding for something that does not exist.
+- Analyze pass 3 found the same defect twice more, in the two documents pass 2 did not
+  check: the plan's Summary and the quickstart. The pattern is worth recording — each pass
+  fixed the requirements and missed a document that *restates* them, and those restatements
+  are what a reader trusts most (the Summary because it is first, the quickstart because it
+  is what you run).
+- The fix applied this time was a sweep of all seven artifacts for restatements of the
+  superseded design, not just the two findings the pass reported. That turned up three more
+  in research.md, data-model.md, and the gated-paths contract.

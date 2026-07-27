@@ -8,8 +8,14 @@
 
 Configure the control-plane Vault's **own** Control Groups to gate authority changes, and
 add the seam through which the harness observes and records them. Ceiling changes,
-definition changes, registration, manual control-plane writes, break-glass, and
-reactivation require quorum. Revocation stays unilateral and immediate.
+definition changes and registrations, workload identity role bindings, restoration of
+revoked authority, and the quorum policy itself require quorum — reached through any tool,
+since gating attaches to the path.
+
+Two things are deliberately **outside** that gate. Revocation stays unilateral and
+immediate. And break-glass cannot be gated here at all: regenerating a root token requires
+a quorum of unseal-share holders and is a `sys` operation outside normal policy paths, so
+its strength comes from the unseal threshold rather than from anything in this feature.
 
 The shape of this feature is unusual and worth stating up front: **most of it is
 configuration and evidence, not mechanism.** Vault Enterprise ships Control Groups, and

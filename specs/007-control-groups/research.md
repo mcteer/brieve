@@ -23,10 +23,14 @@
 ## Decision: Gate the paths, not the callers
 
 - **Decision**: The controlled paths are those that change what an agent may become — the
-  ceiling policies, the definition and registry entries, the JWT role bindings — plus
-  break-glass. Gating attaches to the *path*, so it holds regardless of who calls it or
-  through what tool.
-- **Rationale**: FR-001–FR-004. A gate on a caller is a gate on the callers you thought of.
+  ceiling policies, the definition and registry entries, the JWT role bindings, restoration
+  of revoked authority, and the quorum policy itself. Gating attaches to the *path*, so it
+  holds regardless of who calls it or through what tool.
+- **Break-glass is deliberately not among them.** Root regeneration requires a quorum of
+  unseal-share holders and is a `sys` operation outside normal policy paths — Control Groups
+  cannot intercept it, and it is already a stronger multi-party control. Its strength is set
+  by the unseal threshold, not by this feature.
+- **Rationale**: FR-001–FR-003. A gate on a caller is a gate on the callers you thought of.
   A gate on the path holds for the CLI, the API, Terraform, and whatever comes next —
   including a future northbound surface that does not exist yet.
 - **The consequence worth knowing**: this means *our own Terraform* is subject to the gate

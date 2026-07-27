@@ -24,7 +24,7 @@ harness that could lower the gate constraining it.
 
 | Field | Rules |
 | --- | --- |
-| `change_class` | Which class of change this governs — ceiling, definition, registration, break-glass, reactivation |
+| `change_class` | Which class of change this governs — ceiling, definition, registration, role binding, restoration, or the quorum policy itself. **Not break-glass**: root regeneration is gated by the unseal threshold, which this policy cannot reach |
 | `required_approvals` | How many distinct identities must assent. No default: a quorum chosen by us is a security posture we do not know is right for them |
 | `authorized_approvers` | Who may assent |
 | `request_ttl` | How long a request may remain pending before it expires |
