@@ -47,3 +47,16 @@
 - It also settled that starting a run returns a handle rather than blocking. Runs are
   durable and long by design; an API that blocked until completion would contradict the
   feature that exists to let work outlive a process.
+- Analyze (2026-07-27) found two CRITICAL issues, both now fixed in the planning artifacts.
+  The evidence table required a `tenant_id` that `AuditEntry` had no field for and forbids
+  extras, so nothing could have written the column — `AuditEntry` now carries it, **inside
+  the hash chain**, because a column beside the chain would leave the field deciding who may
+  see a record alterable without detection. And identity flows were placed in a transport
+  module despite Principle V naming them sealed core; they now live in `src/core/identity/`.
+- It also caught that `conformance-hermetic` excludes enclave rows **by path**, which would
+  have broken the fork-safe CI lane on the merge commit once `tests/conformance/api/` held
+  both kinds. Now excluded by marker.
+- US3 was stale against its own clarification — it still described operations that invoke
+  tools, which FR-007 forbids. **Third occurrence of the same pattern**: a decision corrected
+  in the requirements while its restatement in a story went unswept. Every artifact was
+  swept this time rather than only the ones the pass named.

@@ -22,9 +22,14 @@ correlation ID of. **A durable, queryable audit store is in scope here**, in
 `src/core/audit/`, because the evidence store belongs to the platform whether or not
 anyone reads it over HTTP.
 
-Chain integrity is unchanged: the Postgres sink verifies the same sequence, `prev_hash`,
-and `entry_hash` invariants `InMemoryAuditSink` verifies, so integrity is a property of the
-entry rather than of the store holding it, and both reject the same malformed entry.
+Chain integrity is verified identically in both sinks — sequence, `prev_hash`, and
+`entry_hash` — so integrity is a property of the entry rather than of the store holding it,
+and both reject the same malformed entry.
+
+The chain's *inputs* do change: `tenant_id` joins them, because the dimension bounding every
+read must sit inside the guarantee rather than beside it. A tenant column outside the hash
+could be altered without breaking the chain, which would make the scoping decision the one
+field in the record nobody could prove.
 
 ## Cannot mutate — two independent defences
 
@@ -56,6 +61,11 @@ Everything a caller *can* supply — correlation ID, run ID, time range, event t
 narrows. FR-011's cross-tenant case then resolves to zero rows structurally, rather than to
 a permission check that could be written wrong.
 
+**Which makes the reachable attempt worth naming**, because the row that tests it must
+construct something a caller can actually do: narrowing by a `correlation_id` or `run_id`
+that belongs to another tenant. A check written against a tenant parameter would assert
+something this surface does not expose, and pass regardless of behaviour.
+
 ## Zero rows means two different things
 
 | Case | Rows | `disposition` | What an investigator concludes |
@@ -76,6 +86,12 @@ would be a second trail with its own integrity question.
 It records **who, when, the query shape, the result count, and the disposition**. It does
 **not** record the rows returned: that would copy evidence into the record describing it,
 growing the trail proportionally to reads and duplicating what it points at.
+
+**It carries its own correlation ID** and names the ones it read (FR-010a). Appending it to
+the chain of the run it queried would mean reading evidence writes into the evidence being
+read — a later read of that run would return a record the earlier read created. That is the
+subtlest way to break the guarantee this section exists to protect, and it looks harmless
+until an investigator asks why the trail grew while nobody was running anything.
 
 **This terminates.** A read writes one record regardless of how many rows matched. Reading
 the meta-audit records is itself a read and writes one more. Stated because it is obvious

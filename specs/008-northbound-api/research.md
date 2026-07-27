@@ -104,7 +104,9 @@ token outlives its own `exp`, and a cold cache against an unreachable provider r
 ## D4 — The durable audit store, and why it lands here
 
 **Decision**: a `PostgresAuditSink` implementing the existing `AuditSink` protocol, plus a
-separate read-only `EvidenceQuery` protocol, against new tables in `src/core/audit/`.
+separate read-only `EvidenceQuery` protocol, against new tables in `src/core/audit/`. Sink
+and query live in **separate modules** (`postgres_sink.py`, `postgres_query.py`) so that
+"the query cannot reach the sink" holds in the import graph rather than by convention.
 
 **Rationale**: this is not an enhancement, it is the missing prerequisite. `AuditSink` today
 has one implementation, `InMemoryAuditSink`, which loses everything when its process exits,
@@ -167,6 +169,13 @@ enforced as the outermost dimension of every evidence query. One tenant is confi
 **Rationale**: `tenant` currently appears nowhere in `src/` or `tests/`, but ADR-0035 says
 the read path is tenant-scoped and FR-011 requires a cross-tenant query to return nothing,
 distinguishably. Something has to carry that dimension.
+
+**And it has to be inside the hash chain.** `AuditEntry` gains `tenant_id` and
+`compute_entry_hash` takes it as an input. A column beside the chain would leave the field
+that decides who may see a record alterable without detection — the one field in an audit
+record where that is least acceptable. This changes the shape of a sealed seam and is
+recorded as such rather than filed under "additive"; no migration is needed only because
+audit has never been persisted.
 
 The choice is when to introduce it, not whether. Introducing the dimension **now, with the
 check enforced against one configured value**, means multi-tenancy later populates a check

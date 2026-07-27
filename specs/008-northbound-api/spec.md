@@ -55,6 +55,10 @@ authority and in every audit record for that correlation ID.
    appears in every record for that correlation ID.
 3. **Given** an absent, expired, or unverifiable identity, **When** an operation is
    attempted, **Then** it is refused and nothing executes.
+4. **Given** a run whose work outlasts the request, **When** it is started, **Then** the
+   response returns a handle while the run is still executing (FR-007a).
+5. **Given** that handle, **When** run state is queried, **Then** it is returned without the
+   caller having held a connection open.
 
 ---
 
@@ -84,23 +88,27 @@ caller authenticates by federated workload identity.
 
 ### User Story 3 - An API operation cannot bypass governance (Priority: P1)
 
-Every operation that reaches a tool goes through the same governed path as everything else —
-the same hooks, the same authority checks, the same audit records.
+The API exposes no way to invoke a tool. Tools are reached by an agent within a run the
+API started, through the same governed path as everything else — the same hooks, the same
+authority checks, the same audit records.
 
 **Why this priority**: A transport is exactly where a second execution path grows, because
 it is easy to add "just this one endpoint" that calls a handler directly. Principle II
 exists because that is the failure that ends the platform's guarantees quietly.
 
-**Independent Test**: For every operation the API exposes that touches a tool, assert it
-reaches `invoke_tool` and that no path executes a tool body otherwise.
+**Independent Test**: Walk the application's registered routes and assert none reaches a
+tool body; then assert that a run started through the API reaches tools through the
+governed path with its hooks intact.
 
 **Acceptance Scenarios**:
 
-1. **Given** any API operation that invokes a tool, **When** it executes, **Then** it passes
+1. **Given** the application's registered routes, **When** they are enumerated, **Then**
+   none exposes direct tool invocation.
+2. **Given** a run the API started, **When** it invokes a tool, **Then** the call passes
    through the governed path with its hooks.
-2. **Given** a denied operation, **When** it is attempted, **Then** nothing executes and the
+3. **Given** a denied operation, **When** it is attempted, **Then** nothing executes and the
    denial is audited.
-3. **Given** the implementation, **When** it is inspected, **Then** no route executes a tool
+4. **Given** the implementation, **When** it is inspected, **Then** no route executes a tool
    body outside the governed path.
 
 ---
@@ -197,8 +205,18 @@ maintained beside it.
   querying identity's own entitlements.
 - **FR-009**: The audit read path MUST NOT be able to mutate, delete, or mask any record.
 - **FR-010**: Evidence access MUST itself be audited — who read which evidence, and when.
-- **FR-011**: A query for a tenant the caller does not belong to MUST return nothing, and
-  MUST be distinguishable in the audit trail from a query that legitimately found nothing.
+- **FR-010a**: An evidence-access record MUST carry its **own** correlation ID and name the
+  correlation IDs it read, rather than being appended to the chain of the run it queried.
+  Reading evidence must not write into the evidence being read: appending to the queried
+  run's chain would change what a later read of that run returns, which is the property
+  FR-009 exists to protect.
+- **FR-011**: A query that reaches beyond the caller's tenant MUST return nothing, and MUST
+  be distinguishable in the audit trail from a query that legitimately found nothing.
+  **The reachable form of this attempt must be the one tested**: the request carries no
+  tenant parameter (a caller-supplied tenant would be a request to widen scope), so a
+  cross-tenant attempt is made by narrowing to a correlation ID or run ID belonging to
+  another tenant. A check written against a parameter the surface does not expose would
+  assert something unreachable and pass regardless of behaviour.
 - **FR-012**: Every exposed operation MUST appear in a machine-readable description
   generated from the implementation, so a later transport can compare against it.
 - **FR-013**: Changing claim-to-role mapping through the API MUST be an authority change
@@ -216,8 +234,9 @@ maintained beside it.
   root of the delegation chain, and the subject of every downstream record.
 - **Claim-to-role mapping**: Governed configuration translating provider claims into platform
   roles. Changing it is an authority change.
-- **Audit query**: A read against the evidence plane, bounded by the querying identity's
-  entitlements.
+- **Evidence query**: A read against the evidence plane, bounded by the querying identity's
+  entitlements. Called this consistently across every artifact — "audit query" and "audit
+  read" are the same thing and the drift is not meaningful.
 - **Evidence-access record**: The meta-audit entry recording who read which evidence — because
   the integrity of an audit trail includes knowing who read it.
 - **Run handle**: What starting a run returns. The thing a caller holds to ask what
@@ -243,12 +262,26 @@ maintained beside it.
   bounded by the querying identity's scope; zero leak across that boundary.
 - **SC-007**: Audit queries mutate, delete, or mask records in zero cases.
 - **SC-008**: 100% of evidence accesses produce a meta-audit record naming who and when.
-- **SC-009**: A cross-tenant query returns zero records and is distinguishable in the audit
-  trail from a legitimately empty result, in 100% of cases.
+- **SC-009**: A query narrowing to another tenant's correlation or run ID returns zero
+  records and is distinguishable in the audit trail from a legitimately empty result, in
+  100% of cases.
+- **SC-009a**: 100% of evidence-access records carry their own correlation ID; zero are
+  appended to the chain of a run they read.
 - **SC-010**: 100% of exposed operations appear in the generated description; an operation
   added without one is detected.
 - **SC-011**: Zero runs are paused, interrupted, or blocked by anything in this feature.
 - **SC-012**: With the identity provider unreachable, authentications succeed in zero cases.
+
+## Requirements without a dedicated user story
+
+Three requirements are cross-cutting rather than story-shaped, and are recorded here so
+their absence from the story list is a decision rather than an oversight.
+
+- **FR-007a** (run start returns a handle) is exercised by US1's scenarios 4 and 5 — it is a
+  property of starting a run, not a story of its own.
+- **FR-013** (claim-to-role mapping is an authority change) and **FR-016** (fail closed when
+  the identity provider is unreachable) are covered by the Edge Cases above and by the
+  conformance rows. Neither describes a user's goal; both describe what must not happen.
 
 ## Assumptions
 

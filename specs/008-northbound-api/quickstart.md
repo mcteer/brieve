@@ -71,10 +71,13 @@ the application-layer Protocol, which is the one a refactor removes silently.
 A surface that blocks would contradict 005 outright — the feature that exists to let work
 outlive a process.
 
-**Zero rows, twice, differently.** Query as a subject in the tenant over an empty window,
-then as a subject outside it:
+**Zero rows, twice, differently.** The request carries no tenant parameter, so the
+cross-tenant attempt has to be made the way a caller actually could — by narrowing to a
+correlation ID belonging to another tenant:
 
 ```bash
+# 1. Query your own tenant over an empty window.
+# 2. Query narrowing to a correlation ID from another tenant.
 # Expected: both return zero records to the caller.
 # Expected in the trail: SCOPED for the first, OUT_OF_SCOPE for the second.
 ```
@@ -82,6 +85,10 @@ then as a subject outside it:
 The caller must not be able to tell the difference — that would leak the existence of what
 they may not see. The trail must. An investigator needs to distinguish "nothing happened"
 from "you may not see it," and that distinction is the whole of FR-011.
+
+**And check where the meta-audit record landed.** It must carry its own correlation ID, not
+the one it read (FR-010a) — otherwise reading a run's evidence appends to that run's chain,
+and the next read returns a record the previous read created.
 
 ### 4. The description snapshot
 
