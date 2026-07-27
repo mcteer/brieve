@@ -80,12 +80,12 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 **Independent Test**: quickstart Scenario A
 
-- [ ] T009 [US1] Add `tests/component/test_authority_change_quorum.py` — propose a ceiling widening against the real Vault; assert the agent's effective authority is **unchanged** below quorum (SC-001)
-- [ ] T010 [US1] Assert the change takes effect when quorum is reached, with approving identities recorded
-- [ ] T011 [US1] [GATE:fail-closed] Assert a request cannot be satisfied by its own requester (FR-008, SC-003). Otherwise the requirement is one person with two hats
-- [ ] T012 [US1] [GATE:fail-closed] Assert no change takes effect by timeout, default, or escalation (FR-009, SC-002)
+- [X] T009 [US1] Add `tests/component/test_authority_change_quorum.py` — propose a ceiling widening against the real Vault; assert the agent's effective authority is **unchanged** below quorum (SC-001)
+- [X] T010 [US1] Assert the change takes effect when quorum is reached, with approving identities recorded
+- [X] T011 [US1] [GATE:fail-closed] Assert a request cannot be satisfied by its own requester (FR-008, SC-003). Otherwise the requirement is one person with two hats
+- [X] T012 [US1] [GATE:fail-closed] Assert no change takes effect by timeout, default, or escalation (FR-009, SC-002)
 - [ ] T013 [US1] Create `src/core/authority/changes.py` — observe authority-change events and record them. **It evaluates nothing.** Vault decides; this records what was decided
-- [ ] T014 [US1] Add a distinct `blocked pending approval` error to `src/core/authority/errors.py`, separate from denial. Collapsed into deny, an in-flight approval is indistinguishable from a refusal, and a caller either retries forever or reports a failure that is not one
+- [X] T014 [US1] Add a distinct `blocked pending approval` error to `src/core/authority/errors.py`, separate from denial. Collapsed into deny, an in-flight approval is indistinguishable from a refusal, and a caller either retries forever or reports a failure that is not one
 - [ ] T015 [US1] [GATE:correlation] Record request, each approval and denial with its identity, and disposition — joined by correlation ID (FR-011, SC-008)
 - [ ] T016 [US1] [GATE:no-secret-leak] Assert the audit record holds no credential material and **no mirror of Vault's approval state** (`contracts/evidence.md`). A synchronised copy is a second answer to "who approved this", and during an incident someone reads the wrong one
 
@@ -99,9 +99,9 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 **Independent Test**: quickstart Scenario C (first half)
 
-- [ ] T017 [US2] Add `tests/component/test_revocation_asymmetry.py` — a single authorized identity revokes with **zero** approvals, taking effect immediately (SC-004)
-- [ ] T018 [US2] Assert a revoked agent cannot obtain new authority
-- [ ] T019 [US2] [GATE:correlation] Assert who revoked what, and when, is recorded
+- [X] T017 [US2] Add `tests/component/test_revocation_asymmetry.py` — a single authorized identity revokes with **zero** approvals, taking effect immediately (SC-004)
+- [X] T018 [US2] Assert a revoked agent cannot obtain new authority
+- [X] T019 [US2] [GATE:correlation] Assert who revoked what, and when, is recorded
 
 ---
 
@@ -111,9 +111,9 @@ an approval engine, the premise broke — stop and say so rather than building o
 
 **Independent Test**: quickstart Scenario C (second half)
 
-- [ ] T020 [US3] Assert restoration proposed by one person does **not** take effect (SC-005), in `tests/component/test_revocation_asymmetry.py`
-- [ ] T021 [US3] Assert restoration with quorum takes effect, with approvers recorded
-- [ ] T022 [US3] [GATE:correlation] Assert a restoration is distinguishable in the audit trail from an original grant — otherwise an incident's aftermath reads like ordinary provisioning
+- [X] T020 [US3] Assert restoration proposed by one person does **not** take effect (SC-005), in `tests/component/test_revocation_asymmetry.py`
+- [X] T021 [US3] Assert restoration with quorum takes effect, with approvers recorded
+- [X] T022 [US3] [GATE:correlation] Assert a restoration is distinguishable in the audit trail from an original grant — otherwise an incident's aftermath reads like ordinary provisioning
 
 ---
 
@@ -146,11 +146,11 @@ an approval engine, the premise broke — stop and say so rather than building o
 **Purpose**: the things that must stay untrue. These are the ones that quietly stop being
 true, because nobody notices the day a pause is added.
 
-- [ ] T028 [GATE:fail-closed] Add `tests/unit/test_no_run_interrupt.py` — assert **zero** runs are paused, interrupted, or blocked by anything in this feature (FR-012, SC-009). A feature about humans authorizing is exactly where a run-time interrupt grows back
-- [ ] T029 [GATE:fail-closed] Assert a narrowed ceiling applies to authority manufactured **after** the change and reaches into **zero** running steps (FR-013, SC-010)
-- [ ] T030 [GATE:fail-closed] Assert that with the approval mechanism unreachable, authority changes succeed in zero cases — **and runs already holding authority continue** (FR-010, SC-007). Failing closed on the wrong thing here would halt the platform during a Vault blip
-- [ ] T031 Assert a pending request that reaches its TTL results in no change (FR-017, SC-012)
-- [ ] T032 Assert a request is evaluated against the policy in force when it **completes**, not when raised (FR-018). Otherwise raising one just ahead of a tightening slips it through under the looser rule, making tightening advisory
+- [X] T028 [GATE:fail-closed] Add `tests/unit/test_no_run_interrupt.py` — assert **zero** runs are paused, interrupted, or blocked by anything in this feature (FR-012, SC-009). A feature about humans authorizing is exactly where a run-time interrupt grows back
+- [X] T029 [GATE:fail-closed] Assert a narrowed ceiling applies to authority manufactured **after** the change and reaches into **zero** running steps (FR-013, SC-010)
+- [X] T030 [GATE:fail-closed] Assert that with the approval mechanism unreachable, authority changes succeed in zero cases — **and runs already holding authority continue** (FR-010, SC-007). Failing closed on the wrong thing here would halt the platform during a Vault blip
+- [X] T031 Assert a pending request that reaches its TTL results in no change (FR-017, SC-012)
+- [X] T032 Assert a request is evaluated against the policy in force when it **completes**, not when raised (FR-018). Otherwise raising one just ahead of a tightening slips it through under the looser rule, making tightening advisory
 
 ---
 
