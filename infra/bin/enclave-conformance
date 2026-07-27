@@ -15,7 +15,20 @@ command -v nomad >/dev/null || { echo "nomad is not on PATH" >&2; exit 1; }
 curl -sf -o /dev/null --max-time 3 http://127.0.0.1:4646/v1/status/leader \
   || { echo "scheduler unreachable — run: make dev-up" >&2; exit 1; }
 
+# PURGE FIRST. A completed batch job is not re-run by `job run`: Nomad compares an
+# identical jobspec against the dead job, changes nothing, and places no allocation. The
+# script then read the PREVIOUS allocation's logs and exit code and reported them as this
+# run's verdict.
+#
+# Measured: a real run places a new allocation and takes ~15s; a second run took 3s,
+# reported the first run's result, and never executed a row. A merge gate that replays an
+# earlier pass is worse than no gate, because it is believed — code can change underneath
+# it and it keeps answering green.
+#
+# This does mean an invocation abandons a run already in flight. That is the right
+# trade for a gate: the verdict must belong to the tree in front of you.
 say "Submitting the durability rows as a scheduled workload"
+nomad job stop -purge conformance >/dev/null 2>&1 || true
 nomad job run -var="repo=$REPO" "$REPO/infra/jobs/conformance.nomad.hcl" >/dev/null
 
 alloc=""
@@ -36,17 +49,51 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 
+# Streamed in the BACKGROUND, and stopped by us when the task is done.
+#
+# `nomad alloc logs -f` does NOT return when the task dies. Verified against Nomad 2.0.4:
+# it was still following an allocation whose task had been `dead` for ten minutes, while
+# the same command without -f returned in one second. Waiting on it in the foreground
+# therefore hung the gate forever AFTER every row had already passed — which reads as
+# "conformance is slow" rather than as a bug, and is the worst place to lose someone's
+# afternoon, because nothing is wrong.
 say "Streaming"
-nomad alloc logs -f "$alloc" pytest 2>&1 || true
+nomad alloc logs -f "$alloc" pytest 2>&1 &
+logs_pid=$!
 
 # Wait for a terminal state before reading the exit code. Reading it while the task is
 # still running yields 1 and reports a pass as a failure.
-for _ in $(seq 1 60); do
+#
+# GENEROUSLY bounded, because a cold run is legitimately slow: the workload builds a
+# virtualenv and downloads ~50 packages inside the container, which measured at over two
+# minutes. The previous 120s bound was invisible only because the foreground `alloc
+# logs -f` above never returned — with the stream no longer blocking, a cold run overran
+# it and the gate reported RED on 31 rows that had all passed.
+wait_secs="${CONFORMANCE_WAIT_SECS:-900}"
+deadline=$(( SECONDS + wait_secs ))
+state=running
+while [ "$SECONDS" -lt "$deadline" ]; do
   state="$(nomad alloc status -json "$alloc" 2>/dev/null \
     | python3 -c 'import json,sys; print((json.load(sys.stdin).get("TaskStates") or {}).get("pytest",{}).get("State","running"))' 2>/dev/null || echo running)"
   [ "$state" = "dead" ] && break
   sleep 2
 done
+
+# Drain before stopping. The task reaches `dead` before its last chunk has necessarily
+# crossed the stream, and the line most worth not truncating is pytest's summary — the
+# one someone needs when the gate is red.
+sleep 2
+kill "$logs_pid" 2>/dev/null || true
+wait "$logs_pid" 2>/dev/null || true
+
+# Running out of patience is NOT a verdict on the rows, and must not be reported as one.
+# A gate that says "failed" when it means "I stopped waiting" sends someone to debug
+# passing tests — exit 2, distinct from the rows' own 1, and say which it is.
+if [ "$state" != "dead" ]; then
+  printf '\033[31mno verdict\033[0m — task still %s after %ss; the rows did not fail, this run did not finish: nomad alloc logs %s pytest\n' \
+    "$state" "$wait_secs" "$alloc" >&2
+  exit 2
+fi
 
 # The exit status is the gate. Allocation logs are a worse debugging surface than a local
 # run, so at minimum the verdict must be unambiguous.
