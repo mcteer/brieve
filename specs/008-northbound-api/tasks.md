@@ -101,13 +101,13 @@ governed *read* of it; this phase builds the thing being read.
 
 ### The authenticated subject and the tenant dimension
 
-- [ ] T016 Create `AuthenticatedSubject` and `SubjectKind` in `src/core/identity/types.py` per data-model.md, with `tenant_id` required — a subject with no tenant refuses rather than defaulting, because defaulting it would default it to something. **In core, not in a transport**: Principle V names identity flows as sealed core, and a type defined inside the first transport would make the second import it or duplicate it
-- [ ] T017 [P] Create the claim-to-role mapping in `src/core/identity/claims.py` — pure data-to-roles with no dependency on how a token arrived, so every transport shares it. An **empty role set means refuse**; an unmapped claim is not a default role (FR-006)
+- [X] T016 Create `AuthenticatedSubject` and `SubjectKind` in `src/core/identity/types.py` per data-model.md, with `tenant_id` required — a subject with no tenant refuses rather than defaulting, because defaulting it would default it to something. **In core, not in a transport**: Principle V names identity flows as sealed core, and a type defined inside the first transport would make the second import it or duplicate it
+- [X] T017 [P] Create the claim-to-role mapping in `src/core/identity/claims.py` — pure data-to-roles with no dependency on how a token arrived, so every transport shares it. An **empty role set means refuse**; an unmapped claim is not a default role (FR-006)
 
 ### The dispatch seam
 
-- [ ] T018 Create the `RunDispatcher` protocol in `src/surfaces/dispatch/types.py` returning a `RunHandle` of `run_id` and `correlation_id` only. Nothing naming an allocation, container, or scheduler — the caller must not learn the substrate any more than the surface does
-- [ ] T019 [P] Implement `InProcessDispatcher` in `src/surfaces/dispatch/inprocess.py` for hermetic tests
+- [X] T018 Create the `RunDispatcher` protocol in `src/surfaces/dispatch/types.py` returning a `RunHandle` of `run_id` and `correlation_id` only. Nothing naming an allocation, container, or scheduler — the caller must not learn the substrate any more than the surface does
+- [X] T019 [P] Implement `InProcessDispatcher` in `src/surfaces/dispatch/inprocess.py` for hermetic tests
 - [ ] T020 Implement `NomadDispatcher` in `src/surfaces/dispatch/nomad.py`, submitting a jobspec the way `infra/bin/enclave-conformance` already does. **Not optional**: Nomad is inside our boundary, and a run-start path proven only against a double has not been proven
 
 ### The application and the double
