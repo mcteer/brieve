@@ -40,3 +40,10 @@
   itself an auditable act — the integrity of an audit trail includes knowing who read it.
 - FR-003 is stated absolutely because a single exception would become the integration path
   everyone uses. ADR-0033's wording is "no static API keys, on any surface, ever".
+- Clarify (2026-07-27) settled what the surface actually is, which the first draft assumed
+  without stating: **run lifecycle and evidence, not direct tool invocation.** A caller
+  invoking a tool through the API would act beside the agent rather than through it — a
+  second path to the governed core, which is the shape Principle II exists to prevent.
+- It also settled that starting a run returns a handle rather than blocking. Runs are
+  durable and long by design; an API that blocked until completion would contradict the
+  feature that exists to let work outlive a process.

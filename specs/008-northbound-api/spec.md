@@ -27,6 +27,10 @@
 - Q: Does the API introduce its own authentication? → A: No. Humans authenticate against the organization's own OIDC provider; machines use workload identity federation. **There are no static API keys, on any surface, ever** (ADR-0033). The platform holds no credential store, which is also why it cannot leak one.
 - Q: Is reading the audit trail just another read? → A: No — it is a new class of access, and this feature is where it first exists. Evidence access is itself audited (ADR-0035): a meta-audit record of who reviewed which evidence and when, because the integrity of an audit trail includes knowing who read it.
 
+- Q: What operations does the API actually expose? The first draft said "every operation that invokes a tool" without saying what the surface is. → A: **Run lifecycle and evidence, not direct tool invocation.** Start a governed run, query its state, and read audit. A caller invoking a tool directly through the API would be acting *beside* the agent rather than through it — a second path to the governed core, which is the shape Principle II exists to prevent. Tools are reached by an agent within a run; the API starts runs and reads what happened.
+- Q: Then what does FR-007 govern, if the API does not invoke tools? → A: The run a caller starts. Everything that run does reaches tools through the governed path, and the API adds no route around it. Reworded so it constrains the right thing.
+- Q: Does starting a run block until it finishes? → A: No. Runs are durable and long by design (005); an API that blocked until completion would contradict the feature that exists to let work outlive a process. Starting a run returns a handle, and state is queried. This also keeps the API honest about what it is — a way to *start* and *observe* work, not a way to *perform* it.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A person authenticates as themselves, and stays themselves (Priority: P1)
@@ -180,9 +184,15 @@ maintained beside it.
   nothing executed.
 - **FR-006**: Claims that map to no role MUST refuse. An unmapped claim MUST NOT resolve to
   a default or implied role.
-- **FR-007**: Every API operation that invokes a tool MUST reach it through the governed
-  path. No route may execute a tool body otherwise, and that MUST be asserted rather than
-  reviewed.
+- **FR-007**: The API MUST NOT expose direct tool invocation. Tools are reached by an agent
+  within a run; a caller invoking one directly would be acting beside the agent rather than
+  through it, which is a second path to the governed core. Every tool call made by a run the
+  API starts MUST reach the governed path, and no route may execute a tool body otherwise —
+  asserted rather than reviewed.
+- **FR-007a**: Starting a run MUST return a handle rather than blocking until completion,
+  and run state MUST be queryable through that handle. Runs are durable and long by design;
+  an API that blocked until a run finished would contradict the feature that exists to let
+  work outlive a process.
 - **FR-008**: Audit MUST be readable through the API as a governed read path, bounded by the
   querying identity's own entitlements.
 - **FR-009**: The audit read path MUST NOT be able to mutate, delete, or mask any record.
@@ -210,6 +220,8 @@ maintained beside it.
   entitlements.
 - **Evidence-access record**: The meta-audit entry recording who read which evidence — because
   the integrity of an audit trail includes knowing who read it.
+- **Run handle**: What starting a run returns. The thing a caller holds to ask what
+  happened, rather than a connection they hold open while it happens.
 - **Operation description**: The machine-readable enumeration a later transport compares
   against.
 
@@ -223,8 +235,10 @@ maintained beside it.
 - **SC-003**: 100% of absent, expired, or unverifiable identities refuse with zero
   executions.
 - **SC-004**: 100% of unmapped claims refuse; zero resolve to a default role.
-- **SC-005**: 100% of tool-invoking operations reach the governed path; zero execute a tool
-  body outside it.
+- **SC-005**: 100% of tool calls made by API-started runs reach the governed path; zero
+  execute a tool body outside it, and zero API routes expose direct tool invocation.
+- **SC-005a**: 100% of run starts return a handle without blocking; zero hold a connection
+  open for the duration of a run.
 - **SC-006**: For two identities with differing entitlements, 100% of audit query results are
   bounded by the querying identity's scope; zero leak across that boundary.
 - **SC-007**: Audit queries mutate, delete, or mask records in zero cases.
