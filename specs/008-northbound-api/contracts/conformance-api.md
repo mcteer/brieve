@@ -35,6 +35,7 @@ green as one that ran.
 | Read path cannot mutate | A write attempted on the evidence connection is refused **by Postgres**, not by application code | FR-009, SC-007 | **yes** |
 | Evidence access is audited | Every read produces exactly one meta-audit record naming who and when | FR-010, SC-008 | **yes** |
 | Evidence-access records chain | Records land on the per-tenant evidence-access stream and chain to their predecessor; a modified or middle-removed record breaks the chain, a **truncated tail** is caught by the recorded head, and no run's chain is touched | FR-010a / FR-010d, SC-009a | **yes** |
+| Stream integrity is checked | `verify_stream_integrity` detects a truncated stream and a modified record, and reports clean on an untampered store | FR-010e, SC-009c | **yes** |
 | Concurrent reads are all recorded | Concurrent readers in one tenant each produce a record; zero lost, zero collided, and zero reads succeed whose record failed | FR-010b / FR-010c, SC-009b | **yes** |
 | Zero rows are distinguishable | A cross-tenant *attempt* — narrowing by another tenant's correlation or run ID, since no tenant parameter exists — and a legitimately empty query both return zero rows and are distinguishable in the trail | FR-011, SC-009 | **yes** |
 | Description is complete | Every exposed operation appears in the generated description; an operation added without updating the snapshot is detected | FR-012, SC-010 | no |
@@ -85,14 +86,14 @@ than to check:
 
 ## CI does not run the enclave rows, and that is the same gap 005 recorded
 
-Eight of the sixteen rows need the enclave. The CI fast lane runs `make conformance-hermetic`
+Nine of the seventeen rows need the enclave. The CI fast lane runs `make conformance-hermetic`
 and cannot stand up a licensed Vault Enterprise, so **no required GitHub check covers those
 six.** Stated plainly rather than papered over.
 
 **That lane must exclude by marker, not by path.** It currently passes
 `--ignore=tests/conformance/durability`, which worked while every enclave-dependent row
 lived in one directory. `tests/conformance/api/` holds both kinds, so the path exclusion
-would collect the eight enclave rows and **fail the fork-safe lane on the merge commit** —
+would collect the nine enclave rows and **fail the fork-safe lane on the merge commit** —
 they fail loudly when the enclave is absent, by design. T057a changes it to `-m "not
 enclave"`.
 
@@ -113,12 +114,16 @@ deployment-tree concern rather than this feature's.
 
 ## Sealed-core review
 
-This feature changes sealed core in four places, and **one of them is not additive**:
+This feature changes sealed core in five places, and **two of them are not additive**:
 
 - Additive: two `AuditEventType` members, `EvidenceDisposition`, and the `EvidenceQuery`
   protocol.
 - **Not additive**: `AuditEntry` gains `tenant_id` and `compute_entry_hash` takes it as an
   input, changing the shape of an existing seam.
+- **Not additive**: the write seam becomes `append_event`, which assigns position and link
+  rather than accepting them. `append(entry)` and `build_next_entry` are removed, not kept
+  alongside — a second write path that computes position outside the store keeps the
+  concurrency defect reachable by whoever calls the older function. Five core call sites move.
 - Identity flows move *into* `src/core/identity/` rather than living in a transport, per
   Principle V, which also houses the tenant resolver every existing caller now needs.
 

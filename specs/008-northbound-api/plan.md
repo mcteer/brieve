@@ -134,7 +134,7 @@ happens to do by then.
 | II — Total Interception; One Governed Tool Layer | **Pass, and this is the feature's spine** | FR-007 forbids exposing tool invocation at all — a caller reaching a tool through the API would be acting beside the agent rather than through it. Asserted by walking the app's routes, not by review |
 | III — Fail-Closed, In-Process Enforcement | Pass | Absent, expired, unverifiable, and unmapped identities all refuse with nothing executed. Enforcement stays in the governed core; the surface is a client of it, never an enforcement point |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass, and most exercised here** | No static keys, no credential store, no exception. The API process itself holds an attested workload identity and draws dynamic database credentials per its own lifecycle — including the SELECT-only evidence role |
-| V — Sealed Core, Versioned Seams | **Pass, and the heaviest review burden in this feature** | Four sealed-core changes, and **one of them is not additive**: `AuditEntry` gains `tenant_id` and `compute_entry_hash` takes it as an input, which changes the shape of an existing seam. The other three are additive — two `AuditEventType` members, the `EvidenceQuery` protocol, and `EvidenceDisposition`. Identity flows move *into* core rather than living in a transport. No migration is needed because audit has only ever existed in memory. Security-maintainer review required per the Development Workflow and CODEOWNERS |
+| V — Sealed Core, Versioned Seams | **Pass, and by far the heaviest review burden in this feature** | Five sealed-core changes, **two of them not additive**: `AuditEntry` gains `tenant_id` and `compute_entry_hash` takes it as an input; and the write seam becomes `append_event`, which *assigns* position rather than accepting one, replacing `append(entry)` and `build_next_entry` across five core call sites. The additive three are two `AuditEventType` members, `EvidenceDisposition`, and the `EvidenceQuery` protocol. Identity flows move *into* core rather than living in a transport. No data migration is needed because audit has only ever existed in memory. Security-maintainer review required per the Development Workflow and CODEOWNERS |
 | VI — Lean by Default | Pass, with the trigger named | An API server is an additional operated component; its named trigger is ADR-0033, Accepted. The new libraries are libraries, which is what this principle asks for rather than forbids |
 | VII — Anti-Fragmentation | Pass | The `RunDispatcher` seam is what keeps this true. The surface is identical on every substrate because it never learns which one it is on |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | N/A | No packs, prompts, models, or policies promoted |
@@ -146,6 +146,13 @@ happens to do by then.
 ### Post-design Constitution Check
 
 Re-checked after Phase 1: still **PASS**. Four notes for review:
+
+- **Principle V grew across three analyze passes, which is itself the finding.** The audit
+  seam was designed when there was one writer per correlation ID and nothing was persisted.
+  Every pass since has been discovering that a durable, shared, contended stream is a
+  different thing wearing the same interface — first the missing tenant field, then the
+  contended chain, then the write seam whose very shape assumes read-then-write. A surface
+  feature reshaping a 002-era seam deserves saying out loud rather than burying in a task.
 
 - **Principle V carries the risk this time, and the first draft understated it.** 007's core
   addition was one small observation seam. This one touches the audit schema and the hash
@@ -217,6 +224,8 @@ src/core/audit/
 ├── schema.py                      # + tenant_id on AuditEntry; + two AuditEventType members
 ├── chain.py                       # compute_entry_hash takes tenant_id — shape change
 ├── query.py                       # EvidenceQuery protocol — read only, by construction
+├── sink.py                        # append_event replaces append + build_next_entry
+├── integrity.py                   # verify_stream_integrity — reads heads back (FR-010e)
 ├── postgres_sink.py               # Durable AuditSink — transactional append, chain + head
 ├── postgres_query.py              # EvidenceQuery — reads, separate connection and role
 └── evidence_schema.sql            # audit_entries + audit_stream_heads; SELECT on the first only

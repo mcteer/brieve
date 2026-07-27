@@ -82,3 +82,16 @@
 - Three passes, and the top finding each time came from the previous pass's remediation. The
   evidence-access record was designed four ways before one held. That is the honest cost of
   a mechanism whose failure modes are all silent.
+- Analyze pass 4 (2026-07-27) found that the transactional append could not honour the seam
+  it implements. `AuditSink.append(entry)` receives `seq`, `prev_hash`, and `entry_hash`
+  already computed by the caller — 14 call sites, five in core — so its shape *is*
+  read-then-write. A transactional store could only verify what it was handed (the race
+  returns) or overwrite it (the caller's hash goes stale). `append_event` now assigns and
+  returns; `append` and `build_next_entry` are removed rather than kept alongside, because
+  the older function is the one people would reach for.
+- Also: a recorded head with no reader makes truncation detectable and undetected.
+  `verify_stream_integrity` reads it back from `make enclave-verify`; continuous verification
+  is deferred to the service that will carry the resume sweeper, and recorded as deferred.
+- Four passes. The audit seam was designed when there was one writer per correlation ID and
+  nothing was persisted, and each pass has been discovering the same thing from a different
+  angle: a durable, shared, contended stream is a different thing wearing the same interface.

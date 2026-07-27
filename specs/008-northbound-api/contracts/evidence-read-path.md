@@ -126,12 +126,25 @@ whole section exists to prevent.
 A hash chain proves that no record was modified and that none was removed from the middle: both
 break the `seq` sequence or the `prev_hash` link.
 
+**The write seam had to change shape for this to be possible at all.** `append(entry)` takes
+an entry whose position the caller already computed — that shape *is* read-then-write, so a
+transactional store cannot honour it. `append_event` assigns position and link inside the
+transaction and returns what it stored. Recorded here because it is the least visible
+consequence of the least visible requirement.
+
 **It does not prove the newest records still exist.** Truncate the last three and `seq 0..N-4`
 verifies perfectly — which is unfortunate, because deleting the most recent entries is the
 obvious move against a log of who read what. So each stream's highest position is recorded in
 `audit_stream_heads`, updated in the same transaction as the append, and the evidence role
 holds **no grant on that table at all** — not even `SELECT`, so the read path cannot learn what
 it would need to forge.
+
+And something reads it back (FR-010e). `verify_stream_integrity` walks each stream, checks the
+chain, and compares the last entry to its recorded head; `make enclave-verify` calls it. A head
+nobody reads makes truncation detectable in principle and unnoticed in practice, which is the
+shape the constitution names as a gate whose only enforcement is everyone remembering.
+Continuous verification is deferred to the persistent service that will carry the resume
+sweeper — recorded as deferred rather than left absent.
 
 ## No verdicts
 

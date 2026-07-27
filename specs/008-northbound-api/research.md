@@ -123,7 +123,16 @@ the same invariants `InMemoryAuditSink` does — sequence, `prev_hash` linkage, 
 recomputation — so integrity is a property of the entry rather than of the store that holds it,
 and both implementations reject the same malformed entry.
 
-**It does not use `build_next_entry`.** That helper reads the chain, computes the next position,
+**It cannot use `build_next_entry`, and that means the seam changes.** The helper reads the
+chain, computes the next position, and hands back an entry to append separately. `AuditSink`'s
+`append(entry)` is shaped around that: `seq`, `prev_hash`, and `entry_hash` are required fields
+the caller supplies. A store that assigns position inside a transaction cannot honour that
+interface — it can only verify what it was handed, which is the race again, or overwrite it,
+which strands the caller's hash. So `append_event` replaces both, and they are removed rather
+than kept alongside: leaving the older, more familiar function in place leaves the defect
+reachable.
+
+**Why it cannot use `build_next_entry`.** That helper reads the chain, computes the next position,
 and returns an entry to append separately — a read-then-write that is safe only when there is
 exactly one writer. Run chains satisfy that through 005's single-writer lease, which was an
 undocumented coupling rather than a property of the audit layer. The evidence-access stream is

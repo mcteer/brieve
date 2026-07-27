@@ -12,7 +12,7 @@ make dev-up        # Terraform -> Vault -> Nomad -> harness (ADR-0048's order)
 make dev-status    # Nomad up, Vault up (unsealed), Postgres up
 ```
 
-The enclave is a prerequisite for eight of the sixteen conformance rows, not an alternative
+The enclave is a prerequisite for nine of the seventeen conformance rows, not an alternative
 to them. `make dev-up` is idempotent — re-running with parts already up is fine, and it
 never re-initialises a Vault that already has a raft store.
 
@@ -45,7 +45,7 @@ unreachable.
 make conformance
 ```
 
-Adds the eight enclave rows. **Fails loudly if the enclave is absent** rather than skipping.
+Adds the nine enclave rows. **Fails loudly if the enclave is absent** rather than skipping.
 
 ### 3. The three things worth checking by hand
 
@@ -92,9 +92,10 @@ wrong: on the queried run's chain, reading evidence appends to what it read; on 
 correlation ID per read, the record is a chain of one and can be deleted without trace. Read
 two records and confirm the second's `prev_hash` is the first's `entry_hash`.
 
-Then try the thing the chain cannot catch: delete the newest record and re-verify. The chain
-still passes — only `audit_stream_heads` reveals it (FR-010d). If that check is missing, the
-row goes green while the likeliest tampering succeeds.
+Then try the thing the chain cannot catch: delete the newest record and run
+`make enclave-verify`. The chain alone still passes — only the recorded head reveals it
+(FR-010d), and only because `verify_stream_integrity` reads it back (FR-010e). A head nobody
+reads makes truncation detectable in principle and unnoticed in practice.
 
 ### 4. The description snapshot
 

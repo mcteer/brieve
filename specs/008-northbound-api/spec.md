@@ -226,6 +226,11 @@ maintained beside it.
   not modified and that none was removed from the middle; it cannot prove that the most recent
   records still exist, because a truncated chain remains internally valid. Deleting the latest
   entries is the likeliest tampering against a record of who read what.
+- **FR-010e**: Something MUST actually perform that check. A recorded head makes truncation
+  *detectable*; a detector is what makes it *detected*, and the difference is the whole value.
+  This feature ships the verification as a callable check run by the enclave's own contract
+  verification; running it continuously is deferred to the persistent service that will also
+  carry the resume sweeper, and is recorded as deferred rather than left absent.
 
 - **FR-011**: A query that reaches beyond the caller's tenant MUST return nothing, and MUST
   be distinguishable in the audit trail from a query that legitimately found nothing.
@@ -289,6 +294,8 @@ maintained beside it.
   (FR-010d), which the chain alone cannot do.
 - **SC-009b**: Under concurrent readers in one tenant, 100% of evidence-access records are
   written; zero are lost and zero collide. Zero reads succeed whose record failed to write.
+- **SC-009c**: The integrity check detects 100% of truncated streams and 100% of modified
+  records, and reports zero false positives on an untampered store.
 - **SC-010**: 100% of exposed operations appear in the generated description; an operation
   added without one is detected.
 - **SC-011**: Zero runs are paused, interrupted, or blocked by anything in this feature.

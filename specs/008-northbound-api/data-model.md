@@ -229,6 +229,37 @@ Beside the audit schema, not in a surface module. It types a field on a record w
 the core audit trail; defining it in `src/surfaces/` would leave core either importing a
 transport or holding a record it cannot name.
 
+### `AuditSink.append_event` — the write seam changes shape, and this is the fourth such change
+
+`AuditSink.append(entry)` takes an entry that **already carries** `seq`, `prev_hash`, and
+`entry_hash`. The caller computes them through `build_next_entry` — 14 call sites, five of
+them in core. That shape *is* read-then-write: the protocol's premise is that the caller
+determined the position before calling.
+
+Which means the transactional append cannot honour the interface it implements. Handed an
+entry that already has a position, the sink can only verify it — reintroducing the race — or
+reassign it, in which case `entry_hash` must be recomputed and the entry stored is not the
+entry the caller built, leaving every caller holding a stale hash.
+
+So the write seam becomes:
+
+```python
+def append_event(
+    self, *, correlation_id: str, tenant_id: str,
+    event_type: AuditEventType, payload: dict[str, Any],
+) -> AuditEntry: ...     # assigns position and link; returns what was stored
+```
+
+**`append` and `build_next_entry` go away rather than remaining alongside it.** Keeping a
+second write path that computes position outside the store is keeping the race available to
+whoever reaches for the older function — and it is the older, more familiar one, which is
+exactly who would reach for it. `list_by_correlation_id` stays; reads were never the problem.
+
+This reshapes a 002-era seam on behalf of a surface feature, which is worth saying plainly
+rather than burying: the audit seam was designed when there was one writer per correlation ID
+and nothing was persisted. A durable, shared, contended stream is a different thing wearing
+the same interface. Security-maintainer review applies.
+
 ### `EvidenceQuery` — a new Protocol, deliberately separate from `AuditSink`
 
 ```python
@@ -297,4 +328,13 @@ correct.
 
 **Appends are transactional**: position, chain link, entry insert, and head update happen in
 one transaction under a row lock. Splitting them would reintroduce the race the shared stream
-creates, and would let the head drift from the chain it describes.
+creates, and would let the head drift from the chain it describes. This is why the write seam
+had to change shape — a caller-supplied position cannot participate in a transaction it is
+computed outside of.
+
+**And something reads the heads back** (FR-010e). `verify_stream_integrity` walks each stream,
+checks the chain, and compares the last entry against its recorded head. It runs under the run
+role, not the evidence role, which has no grant here at all. `make enclave-verify` calls it, so
+the enclave's exit contract covers evidence integrity the way it already covers durability.
+Running it continuously belongs to the persistent service that will carry the resume sweeper,
+and is deferred there rather than left unstated.

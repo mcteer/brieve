@@ -33,7 +33,7 @@ and say so rather than adding a second authorization path.
 | Gate type | When required | What the task must prove |
 | --- | --- | --- |
 | **Fail-closed** | Absent, expired, unverifiable, or unmapped identity; IdP unreachable | Refused with **zero executions** — not refused after something ran |
-| **Conformance** | Every row in `contracts/conformance-api.md` | Sixteen rows; eight need the enclave and fail loudly without it |
+| **Conformance** | Every row in `contracts/conformance-api.md` | Seventeen rows; nine need the enclave and fail loudly without it |
 | **Correlation / evidence** | Every operation, and every evidence read | Identity present in every record for the correlation ID; one meta-audit record per read |
 | **Eval** | N/A | No packs, prompts, models, or policies promoted |
 | **No-secret-leak** | Audit records, logs, spans, the description | No token material, no JWKS private half, no credential in any emitted artifact |
@@ -79,21 +79,24 @@ governed *read* of it; this phase builds the thing being read.
 - [ ] T006a Add `tenant_id` to `AuditEntry` in `src/core/audit/schema.py` and to `compute_entry_hash` in `src/core/audit/chain.py`, so the bounding dimension is **covered by the chain**. This **changes the shape of a sealed seam** and is not additive — the earlier plan said otherwise and was wrong. A `tenant_id` column outside the hash would leave the field deciding who may see a record alterable without breaking the chain
 - [ ] T006b Add a tenant resolver in `src/core/identity/tenant.py`: the authenticated subject's claim where a surface established one, otherwise `HARNESS_DEFAULT_TENANT` from the environment — following `src/core/durability/credentials.py`, which is core's only precedent for configuration and reads `os.environ` directly. **Absent means refuse**, not a literal default, consistent with a subject carrying no tenant. `infra/bin/enclave-up` and `tests/conftest.py` each set it, which is one line apiece. Required before T006c — `start_governed_run` is reached from `src/adapters/pydantic_ai/agent.py` and from the 002–007 suites, none of which has an identity provider, so a required `tenant_id` with no source would stop the adapter starting a run at all
 - [ ] T006c Update `build_next_entry`, `InMemoryAuditSink`, `start_governed_run`, and every existing caller in `src/core/`, `src/adapters/`, and `tests/` to carry `tenant_id` from the resolver. **No data migration is required** — audit has only ever existed in memory, so no persisted entry has a hash computed the old way. Say so in the commit, because that will not be true for the next such change
-- [ ] T007 Create the `EvidenceQuery` protocol and `EvidenceQueryRequest` in `src/core/audit/query.py`, with **no `append` method**. Not "append raises" — no append. `AuditSink` in `sink.py` keeps its shape unchanged
+- [ ] T006d Replace `AuditSink.append(entry)` with `append_event(*, correlation_id, tenant_id, event_type, payload) -> AuditEntry` in `src/core/audit/sink.py`, which **assigns** position and link and returns what was stored. `append(entry)` takes an entry that already carries `seq`, `prev_hash`, and `entry_hash`, so its shape *is* read-then-write — a transactional store cannot honour it without either verifying the caller's position (the race returns) or reassigning it (the caller's `entry_hash` goes stale). Delete `build_next_entry` rather than leaving it beside the new seam: a second write path that computes position outside the store keeps the race available to whoever reaches for the older, more familiar function
+- [ ] T006e Migrate the five core call sites to `append_event` — `src/core/run.py` (three), `src/core/hooks/engine.py`, `src/core/hooks/mirroring.py`, `src/core/hooks/authority.py` — plus the test call sites. `list_by_correlation_id` is unchanged; reads were never the problem
+- [ ] T007 Create the `EvidenceQuery` protocol and `EvidenceQueryRequest` in `src/core/audit/query.py`, with **no write method at all**. Not "it raises" — absent from the type
 - [ ] T008 [P] Add a unit test in `tests/unit/test_evidence_query_is_read_only.py` asserting `EvidenceQuery` exposes no method that writes, by inspecting the protocol rather than by convention
 
 ### The durable evidence store
 
 - [ ] T009 Create `src/core/audit/evidence_schema.sql` with the `audit_entries` table and the `audit_by_tenant_time` index per data-model.md. `tenant_id` on the row, not joined — the bounding dimension must live on the record being filtered
 - [ ] T010 Implement `PostgresAuditSink` in `src/core/audit/postgres_sink.py` against the `AuditSink` protocol, drawing credentials through `core.durability.credentials` exactly as the durability provider does. No code path may accept a DSN carrying a password
-- [ ] T011 [GATE:conformance] Verify in `PostgresAuditSink.append` the same chain invariants `InMemoryAuditSink` enforces — sequence, `prev_hash` linkage, `entry_hash` recomputation — so integrity is a property of the entry rather than of the store holding it
-- [ ] T011a Compute `seq` and `prev_hash` **inside the insert transaction** in `src/core/audit/postgres_sink.py`, under a row lock on the stream's last entry, rather than through `build_next_entry` (FR-010c). Two problems, one fix: `build_next_entry` reads then writes, which is safe for a run chain only because 005's lease makes it single-writer — a coupling written down nowhere until now — and the evidence stream has one writer per reader. It also calls `list_by_correlation_id`, which returns *every* prior entry: tens of rows for a run, and every evidence read ever performed for a tenant stream
-- [ ] T011b Add the `audit_stream_heads` table to `src/core/audit/evidence_schema.sql` and update it in the **same transaction** as each append (FR-010d). A hash chain cannot detect truncation — delete the newest entries and the remainder verifies perfectly — and deleting the latest records is the likeliest tampering against a log of who read what
-- [ ] T012 [P] Add a component test in `tests/component/test_audit_sink_parity.py` asserting both sinks accept the same valid entry and reject the same malformed one. Two implementations that disagree about validity are two audit schemas
+- [ ] T011 [GATE:conformance] Have `PostgresAuditSink.append_event` produce entries satisfying the same chain invariants `InMemoryAuditSink` produces — contiguous `seq`, `prev_hash` linkage, `entry_hash` over the stored values. Both sinks now **assign** rather than verify, so parity is about what they write, not about rejecting the same malformed input
+- [ ] T011a Compute `seq`, `prev_hash`, and `entry_hash` **inside the insert transaction** in `src/core/audit/postgres_sink.py`, under a row lock on the stream's last entry (FR-010c). Depends on T006d — the old seam has no shape this can be written against. Two problems, one fix: `build_next_entry` reads then writes, which is safe for a run chain only because 005's lease makes it single-writer — a coupling written down nowhere until now — and the evidence stream has one writer per reader. It also calls `list_by_correlation_id`, which returns *every* prior entry: tens of rows for a run, and every evidence read ever performed for a tenant stream
+- [ ] T011b Add the `audit_stream_heads` table to `src/core/audit/evidence_schema.sql` and update it in the **same transaction** as each append (FR-010d). Splitting the update from the insert lets the head drift from the chain it describes. A hash chain cannot detect truncation — delete the newest entries and the remainder verifies perfectly — and deleting the latest records is the likeliest tampering against a log of who read what
+- [ ] T012 [P] Add a component test in `tests/component/test_audit_sink_parity.py` asserting both sinks, given the same sequence of `append_event` calls, produce identical entries — same `seq`, same linkage, same `entry_hash`. Two implementations that disagree about what they write are two audit schemas
 - [ ] T013 Implement `PostgresEvidenceQuery` in `src/core/audit/postgres_query.py` — a **separate module**, holding a separate connection drawn from the evidence role, importing nothing from `postgres_sink.py`. Separate modules rather than one file so "the query cannot reach the sink" is a property of the import graph rather than of everyone in the same file being careful
 - [ ] T014 [GATE:no-secret-leak] Add the evidence dynamic role to `infra/modules/trust-fabric/database.tf` granting **`SELECT` only** on `audit_entries` — not `ON ALL TABLES`, which would also expose durability's checkpoints, and **no grant at all on `audit_stream_heads`**, so the read path cannot even learn what it would need to forge. Comment that this is defence #2 and holds regardless of what the Python does (ADR-0035, research.md D5)
 - [ ] T014a Apply `evidence_schema.sql` from `infra/bin/enclave-up`, using the **run role** (the only one holding `CREATE ON SCHEMA public`), **before** the evidence role issues its first credential. Naming an owner matters: `creation_statements` referencing `audit_entries` fail outright if the table does not exist yet, so credential issuance breaks rather than degrades — and an ordering requirement nothing owns is a comment. Add `ALTER DEFAULT PRIVILEGES` so later tables do not silently escape the grant
 - [ ] T014b Extend `infra/bin/enclave-verify` to assert the evidence schema is present and the evidence role can `SELECT` it, so `make dev-up`'s exit contract covers the evidence store the way it already covers durability
+- [ ] T014c Implement `verify_stream_integrity` in `src/core/audit/integrity.py` — walk each stream, check the chain, compare the last entry against its recorded head — and call it from `infra/bin/enclave-verify` (FR-010e). Runs under the **run role**; the evidence role has no grant on `audit_stream_heads` at all. A recorded head makes truncation detectable; without something reading it back, nothing detects it, which is the shape the constitution calls a gate whose only enforcement is everyone remembering
 - [ ] T015 [GATE:conformance] Add an enclave test in `tests/conformance/api/test_evidence_role_cannot_write.py` attempting `INSERT`, `UPDATE`, and `DELETE` on the evidence connection and asserting **Postgres** refuses each. Marked `enclave`; fails loudly when absent rather than skipping
 
 ### The authenticated subject and the tenant dimension
@@ -182,6 +185,7 @@ only its own scope and neither can widen it.
 - [ ] T042a [US4] [GATE:correlation] Write the record to the **evidence-access stream** `evidence-access:{tenant_id}` in `src/surfaces/api/evidence.py`, naming what it read in `read_correlation_ids` (FR-010a). Both single-sided designs fail: appending to the queried run's chain lets reading evidence write into the evidence being read, and a freshly minted ID per read makes each record a chain of one — `seq == 0` takes `GENESIS_PREV_HASH`, so it links to nothing and can be deleted undetected. A stable per-tenant stream gives tamper-evidence without touching any run's chain
 - [ ] T042b [US4] [GATE:conformance] Assert in `tests/conformance/api/test_evidence_stream_chains.py` that consecutive evidence-access records chain to their predecessor, that **removing a middle record breaks the chain**, and that **truncating the newest records is caught by the recorded head** — the chain alone cannot catch that second case. Break fixture writes each record under a fresh correlation ID and asserts the check catches the unchained singleton
 - [ ] T042c [US4] [GATE:fail-closed] Make the read fail and return nothing when its evidence-access record cannot be written (FR-010b), matching how `start_governed_run` already refuses when its own audit write fails. An access that succeeded while its record did not is the exact case FR-010 exists to prevent
+- [ ] T042e [US4] [GATE:conformance] Enclave row in `tests/conformance/api/test_stream_integrity_check.py`: `verify_stream_integrity` detects a truncated stream and a modified record, and reports clean on an untampered store (FR-010e, SC-009c). The false-positive half matters as much — a check that always fires is a check that gets disabled
 - [ ] T042d [US4] [GATE:conformance] Enclave row in `tests/conformance/api/test_evidence_concurrent_reads.py`: concurrent readers in one tenant each produce a record; zero are lost, zero collide, and zero reads succeed whose record failed (FR-010c, SC-009b). Break fixture restores the read-then-write path and asserts the race is detected — a sequential test would pass against it
 - [ ] T043 [US4] Set `disposition` to `SCOPED` or `OUT_OF_SCOPE`. Both cases return zero rows to the caller; only the trail distinguishes them, because telling the caller would leak the existence of what they may not see
 - [ ] T044 [P] [US4] [GATE:conformance] Enclave row in `tests/conformance/api/test_evidence_scope.py`: two identities with differing entitlements each bounded by their own scope, zero leakage across the boundary
@@ -224,7 +228,7 @@ Grouped here rather than attached to an unrelated one, so nothing is covered by 
 - [ ] T057 Wire `tests/conformance/api` into `make conformance` and confirm the enclave-marked rows **fail loudly when the enclave is absent** rather than skipping — a test that skips itself reports the same green as one that ran
 - [ ] T057a Change `conformance-hermetic` in `Makefile` to exclude by **marker** (`-m "not enclave"`) rather than by path. `--ignore=tests/conformance/durability` sufficed while every enclave row lived in one directory; `tests/conformance/api/` holds both kinds, so as-is the fork-safe CI lane would collect the enclave rows and **fail on the merge commit**. Verify by running `make conformance-hermetic` with the enclave stopped
 - [ ] T058 [P] Update `ROADMAP.md`: 008 lands; the four-transport parity row **stays Deferred**. Updating it now would be the stub FR-014 refuses
-- [ ] T059 [P] Record the sixteen rows in force in `contracts/conformance-api.md` as **In force** rather than Planned, and confirm the named responsible party for the eight enclave rows is present (constitution v1.1.0)
+- [ ] T059 [P] Record the seventeen rows in force in `contracts/conformance-api.md` as **In force** rather than Planned, and confirm the named responsible party for the nine enclave rows is present (constitution v1.1.0)
 - [ ] T060 [P] Update `AGENTS.md` so the harness runs `make conformance` before merging anything touching `src/surfaces/` or `src/core/audit/`
 - [ ] T061 Run `make check` and `make conformance` against a live enclave, and confirm every break fixture passes on a clean tree — a row whose failure nobody has observed is a row nobody knows works
 
@@ -235,7 +239,7 @@ Grouped here rather than attached to an unrelated one, so nothing is covered by 
 ```text
 T001 (license gate)
   └─> Phase 1 (T002–T005)
-        └─> Phase 2 (T006–T022, incl. T006a–T006c, T014a/T014b)  ← blocking for every story
+        └─> Phase 2 (T006–T022, incl. T006a–T006e, T014a–T014c)  ← blocking for every story
               ├─> US1 (T023–T031) 🎯 MVP
               ├─> US2 (T032–T035)
               ├─> US3 (T036–T039)   [needs T021's single registration point]
@@ -250,11 +254,11 @@ Phase 1 is built on a package that cannot ship.
 
 **Within Phase 2, two chains run and must not be interleaved carelessly:**
 
-- **T006 → T006a → T006b → T006c** — the sealed-core change. `tenant_id` on `AuditEntry` and
+- **T006 → T006a → T006b → T006c → T006d → T006e** — the sealed-core changes. `tenant_id` on `AuditEntry` and
   inside `compute_entry_hash` breaks every existing caller until T006c lands, so the tree is
   red in between. T006b (the resolver) must precede T006c, or there is nothing for the
-  adapter and the older suites to supply. Land the four together rather than across commits.
-- **T009 → T010 → T011a → T011b → T013 → T014 → T014a → T014b → T015** — schema, sink, read object, grant, applying
+  adapter and the older suites to supply. Land them together rather than across commits: T006d replaces the write seam and T006e migrates its five core call sites, so the tree does not compile in between.
+- **T006d → T009 → T010 → T011a → T011b → T013 → T014 → T014a → T014b → T015** — schema, sink, read object, grant, applying
   the schema before the first credential, then the proof the grant holds. T014a sits where it
   does because the grant statement fails outright if `audit_entries` does not exist yet.
 
@@ -294,11 +298,11 @@ infrastructure that did not exist.
 
 ### Notes
 
-- **The parity row is not in this feature.** Sixteen rows land; the four-transport parity
+- **The parity row is not in this feature.** Seventeen rows land; the four-transport parity
   row stays owed until a second transport exists (FR-014). A task claiming it would be the
   stub ADR-0047 forbids.
-- **Sealed core changes (T006, T006a, T006b, T006c, T007) need security-maintainer review, and one
-  of them is not additive.** T006a changes the shape of `compute_entry_hash`, which is the
+- **Sealed core changes (T006, T006a–T006e, T007) need security-maintainer review, and two of
+  them are not additive.** T006a changes the shape of `compute_entry_hash`, which is the
   guarantee every other claim is reconciled against. The plan originally called all of this
   additive; the analyze pass showed it could not be, since the evidence table required a
   `tenant_id` that `AuditEntry` had no field for. The cheaper fix — a column outside the hash
