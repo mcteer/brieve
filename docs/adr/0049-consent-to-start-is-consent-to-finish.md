@@ -137,19 +137,15 @@ workload identity, unlike the agent containers that end with their work. That ma
 natural place for both the **dependency health checks** and the **sweeper**, since both
 need to run continuously and neither belongs in a container that exists for one job.
 
-The denial itself does not live there. It happens in the governed core, on the invoke
-path, inside an ephemeral agent container — so the two need connecting, and *how* is a
-decision worth making deliberately rather than by default:
+**Checks run on the MCP service; health state is written to Postgres.** The denial itself
+happens in the governed core, on the invoke path, inside an ephemeral agent container — so
+it reads the state store rather than calling the MCP service.
 
-- **Health state written to the state store**, read by the invoke path. It is already the
-  durable store, and it keeps the MCP service out of the hot path of every tool call.
-- **Agents querying the MCP service directly.** Fewer moving parts, but every tool call
-  then depends on that service being reachable — and an availability check that fails when
-  its own dependency is down is a poor shape for the thing whose job is knowing what is
-  down.
-
-The first is preferred, for the same reason durability state lives there. Recorded as a
-leaning, not a decision: it belongs to whichever spec builds the MCP service.
+That split is deliberate. Querying the MCP service on every tool call would put it in the
+hot path of all agent work, and an availability check that fails when its own dependency is
+unreachable is a poor shape for the component whose job is knowing what is unreachable.
+Postgres already holds durable run state, is already reachable from every agent container
+under the same credential path, and does not care whether the MCP service is up.
 
 Until that machinery exists, the honest description is that this ADR is a decision rather
 than a shipped capability, and a run that cannot observe has no automatic path back. That
