@@ -90,3 +90,17 @@
   each accepts exactly what its original caller passed. Four extensions are enumerated, and
   the rule that prevents two of the three findings on its own is: **optional-by-default
   wherever a prior caller exists.**
+- Analyze pass 4 (2026-07-27) found **no criticals** — the first pass on this feature that
+  did not. What it did find: the fix for the previous critical landed in the wrong phase.
+  The `GovernedRun` health field is blocking for anything that constructs a run, and it sat
+  inside US3's phase, unlabelled, while the plan's own parallel example has someone working
+  US1 at the same time. Moved to Foundational.
+- It also found the **seam table itself incomplete** — `verify_stream_integrity`'s connection
+  factory was a fifth instance of the class the table exists to record. An enumeration that
+  reads as exhaustive and is not is worse than none, so the plan now says to add rows rather
+  than absorb consumptions into tasks.
+- And two smaller ones: the health checker's subject set was never stated (it is the
+  registry's distinct products, not a config list, or a newly registered product goes
+  unmonitored while the mechanism reports healthy), and the parity amendment is better framed
+  as a **correction toward ADR-0033** — which says "any transport", never "all four" — than
+  as a policy change. Principle X applies directly, which is a much easier argument.

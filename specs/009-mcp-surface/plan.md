@@ -119,10 +119,17 @@ Enumerated here so implementation confirms rather than discovers:
 | `RunDispatcher.dispatch()` | 008 | Five keyword arguments | Optional `run_id`, `step_index` for resume | T042a1 |
 | `agent-run` jobspec `meta_required` | 008 | correlation, subject, tenant, definition | `run_id`, `step_index` | T042a |
 | Vault JWT auth roles | 006 | `harness`, `conformance`, `agent-run`, per-agent | An `mcp` role | T022a |
+| `verify_stream_integrity(conn_factory)` | 008 | A run-role connection factory | The MCP service to build one | T053b |
 
 Each extension is **optional-by-default where a prior caller exists**, which is the rule that
-would have prevented two of the three findings on its own: a required parameter added to a
-seam breaks the caller that was already using it.
+would have prevented two of the findings on its own: a required parameter added to a seam
+breaks the caller that was already using it.
+
+**This table has itself been incomplete once** — the fourth analyze pass found
+`verify_stream_integrity`'s connection factory missing from it, having found the class of
+problem the table exists to record. An enumeration that reads as exhaustive and is not is
+worse than none, so treat a new consumption of a prior feature's seam as a row to add here
+rather than a detail to absorb into a task.
 
 ### The CI lane cannot be fork-safe, and that is not a compromise
 
