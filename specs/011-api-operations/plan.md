@@ -78,7 +78,7 @@ The check 009 wrote and 010 institutionalised, applied in advance:
 | `RunDispatcher.dispatch()` | 008/010 | **Yes for the signature** — subject, tenant, definition all flow through it already. The index write is a new consumer of existing arguments |
 | `checkpoints` table | 005 | **No** — no subject/tenant, and deliberately not widened (research F1). The run index is the remedy |
 | `BlockedPendingApprovalError.accessor` | 008 | **Partly** — the accessor reaches the caller and nothing else. The change-request record is the remedy (research F2) |
-| `RunOutcome` / terminal checkpoint | 005 | Yes — `payload` carries the result under a reserved key (research F4) |
+| `RunOutcome` / terminal checkpoint | 005 | **No** — `save` is last-write-wins, so a routine checkpoint (which carries `NULL` state) would erase a stop and resurrect the run. Remedied by terminal-once semantics on the upsert (research F3, corrected). The `payload` half is fine (research F4) |
 | Sweeper `_is_suspended` | 009 | Yes — a STOPPED checkpoint is already unresumable; FR-009 is asserted, not built |
 | `harness-authority-read` policy | 010 | **No** — `read` without `list` (research F5). One line |
 | `VaultIdentityFabric` reads | 010 | Yes — registration and ceiling reads exist; enumeration composes them |
@@ -95,8 +95,12 @@ Stop must not become the pause ADR-0049 removed. The plan's mechanism *is* the a
   and invisible to the sweeper by `_is_suspended` — both existing, both asserted by rows.
 - Nothing waits. The stopping caller returns immediately with the durable state; the run
   observes it at its next step boundary and ends after bracketing the in-flight step.
-- The one race — stop lands as the run finishes — resolves in the store: one row, last
-  terminal write loses, record shows one outcome (edge case from the spec, asserted).
+- The one race — stop lands as the run finishes — resolves in the store **only after
+  `save` becomes terminal-once**: the shipped upsert was last-write-wins, and analyze
+  pass 1 caught the research asserting the opposite of the SQL. With the COALESCE guard,
+  the first terminal write wins, a routine checkpoint cannot clear a terminal state, and
+  the record shows one outcome (edge case from the spec, asserted — including the
+  resurrection fixture).
 
 ## Constitution Check
 

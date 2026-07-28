@@ -91,10 +91,25 @@ timeout.
   has only the checkpoint" — the same argument gives the stop its durable home.
 
 **What does not exist**: nothing on the invoke path reads the durable run state. Policy is
-read per step (010); run state is not. The step boundary gains that read, and the write
-race in the edge case ("stop arrives as the run finishes") resolves in the store: both
-writers target one row, the terminal write that lands second loses, and the record shows
-one outcome.
+read per step (010); run state is not. The step boundary gains that read.
+
+**Correction, from reading `save()`'s SQL rather than describing it.** This finding
+originally claimed the stop-versus-finish race "resolves in the store: the terminal write
+that lands second loses." The actual upsert is the opposite — `ON CONFLICT DO UPDATE SET
+run_state = EXCLUDED.run_state`, unconditional, **last write wins**. And the sharper
+consequence is not the race at all: a mid-flight checkpoint carries `outcome=None`, so the
+running allocation's next *routine* save writes `run_state = NULL` — **erasing the stop
+and silently resurrecting the run**. As originally planned, the stop held only until the
+run next checkpointed.
+
+The remedy is terminal-once semantics on `save`: guard the state columns with
+`COALESCE(checkpoints.run_state, EXCLUDED.run_state)`, so a routine save can never clear
+a terminal state and the *first* terminal write wins — which makes the original claim true
+by construction instead of false by assumption. Legitimate today: nothing overwrites a
+terminal state on purpose (resume refuses terminal runs, suspension rows carry `NULL`
+state), so the guard forbids only the write that was always a defect. A sealed-core change
+to 005's seam, and the reason the plan's seam table entry for the terminal checkpoint is
+"no" rather than "yes".
 
 ---
 
@@ -165,7 +180,7 @@ the development loop rather than a post-hoc check.
 | --- | --- | --- |
 | D1 | Run index table, written at dispatch, owned by the list operation | Checkpoints have no subject/tenant; fourth instance of the one-caller seam; `suspended_runs` is the template |
 | D2 | Change-request record written on 202; collect verifies requester+tenant before polling Vault | Without it the accessor is a cross-tenant capability and scenario 3 is unimplementable |
-| D3 | Stop = terminal state written durably, observed at the step boundary | STOPPED is already terminal and already sweeper-proof; C3's semantics fall out of placement |
+| D3 | Stop = terminal state written durably, observed at the step boundary; **`save` becomes terminal-once** | STOPPED is terminal and sweeper-proof — but the shipped upsert was last-write-wins, so a routine checkpoint erased a stop. The COALESCE guard is what makes 'terminal' mean terminal |
 | D4 | Result lives in the terminal checkpoint payload under a reserved key | The one place a run's ending is already recorded; two records of one ending will disagree |
 | D5 | Enumeration via `list` capability + ceiling records; available = scope ∩ ceiling ≠ ∅ | Subset would mark startable agents unavailable, inverting C2 |
 | D6 | Snapshot-first sequencing per operation | Makes the parity row the loop, not the audit |

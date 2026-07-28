@@ -27,6 +27,7 @@ helper" is cheapest to add.
 | Stop is terminal and attributable | Terminal state, `stopped_by:<subject>` in the trail, distinguishable from a bound | FR-008, FR-012, SC-006 | **yes** |
 | Stop leaves no open intent | The in-flight step completes and brackets; zero intents open after a stop | FR-008a, SC-006 | **yes** |
 | The sweeper ignores stopped runs | A stopped run suspended-on-nothing is never resumed — asserted against 009's machinery, not rebuilt | FR-009, SC-006 | **yes** |
+| A routine checkpoint cannot resurrect a stop | Stop a run mid-flight, let it checkpoint, assert it is still stopped. Held by `save`'s terminal-once guard — the shipped upsert was last-write-wins, and this row is what catches the guard simplifying away | FR-008, FR-009 | **yes** |
 | Only the starter stops | Another subject's stop refuses; the trail records `not_permitted` | FR-010, SC-007 | **yes** |
 | Stopping twice is idempotent | A second stop reports the existing state | FR-011 | no |
 | Enumeration shows and marks | Both subjects see the same definitions with different `may_start`; zero cross-tenant entries | FR-013, FR-013a, SC-008 | **yes** |
@@ -42,6 +43,11 @@ helper" is cheapest to add.
 - **A cursor that carries the total.** Keyset pagination implemented with `OFFSET/COUNT`
   reads identically in the happy path; the fixture inspects the cursor for anything
   monotonic with the withheld count.
+- **A save that un-terminals.** The original upsert: `SET run_state = EXCLUDED.run_state`,
+  unconditional. It reads as obviously correct, passed every 005 row for three features,
+  and erases a stop the next time the running allocation checkpoints. The fixture stops a
+  run, forces a routine checkpoint, and asserts the terminal state survived — because the
+  COALESCE guard is one simplification away from the defect at all times.
 - **A result endpoint that returns the checkpoint payload.** Passes every disposition row
   — the result *is* in there — and makes resume state a compatibility surface. The fixture
   asserts resume-internal keys are absent from the response.
