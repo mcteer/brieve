@@ -104,3 +104,21 @@
   unmonitored while the mechanism reports healthy), and the parity amendment is better framed
   as a **correction toward ADR-0033** — which says "any transport", never "all four" — than
   as a policy change. Principle X applies directly, which is a much easier argument.
+- Analyze pass 5 (2026-07-27) probed a category the first four never entered: state
+  consistency rather than seam wiring. Suspension had **two sources of truth** — 005's
+  checkpoint `run_state` and the new `suspended_runs` table — with no rule for which wins.
+  The failure modes are silent and asymmetric: absent from the table, a suspended run is
+  invisible to the sweeper forever and presents exactly like the hang ADR-0049 exists to
+  prevent; stale in the table, the sweeper resumes a finished run. Resolved as the
+  `audit_stream_heads` shape: the checkpoint is authoritative, the table is an index written
+  in the same transaction, and the sweeper re-reads before resuming.
+- It also found the **sixth seam instance, worse than the previous five**: the health
+  checker's subject set named "the tool registry" as though one readable instance existed.
+  `ToolRegistry` is per-process and in-memory — 002 built it for one caller in one process —
+  so no instance existed that the persistent service could read. The MCP service's registry
+  is now declared the registry of record, with the ADR-0008 boundary stated: the platform's
+  own registry gaining a persistent home, not a registry product; it ships no API for third
+  parties, and growing one would be the violation.
+- And `is_terminal()` — the method that gives run states their meaning — is now named in
+  T013 and asserted in T015a, because wrong in one direction the sweeper can resume nothing,
+  and wrong in the other a stopped run resumes past its bound.

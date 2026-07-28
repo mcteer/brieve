@@ -65,6 +65,20 @@ real budget against the run's maximum duration.
 A record, **not a process**. The container ended when its work ended, including when that
 work ended in suspension (FR-011).
 
+**And an *index*, not a second source of truth.** 005's checkpoint already records
+`run_state`, and it will say `SUSPENDED` — so this table repeating that fact creates two
+places that can disagree, silently and asymmetrically: a run SUSPENDED in its checkpoint but
+absent here is **invisible to the sweeper forever**, which presents exactly like the hang
+ADR-0049 exists to prevent; a row here whose checkpoint has since reached `COMPLETED` has
+the sweeper resuming a finished run. So:
+
+- **The checkpoint is authoritative.** It survives 005's whole lifecycle already.
+- **Both writes happen in one transaction.** A suspension that recorded one and not the
+  other is the failure mode, and splitting the writes is how it happens.
+- **The sweeper re-reads the checkpoint before resuming**, and treats this table as a
+  candidate list. Same shape as `audit_stream_heads`: a head over a chain, never a second
+  chain.
+
 | Field | Type | Notes |
 | --- | --- | --- |
 | `run_id` | `str` | 005's run id, stable across resumption |
@@ -134,6 +148,12 @@ CREATE TABLE IF NOT EXISTS dependency_health (
 -- One row per suspended run. Deliberately NOT a column on a runs table: a suspended run
 -- is a record of something waiting, and the sweeper's query is "what is waiting on this
 -- product", which wants an index on the dependency rather than a scan of every run.
+--
+-- An INDEX over the checkpoint, not a second record of state. The checkpoint's run_state
+-- is authoritative; this table is the sweeper's candidate list, written in the same
+-- transaction as the suspension checkpoint, and re-verified against the checkpoint before
+-- any resume. Two stores that can disagree about whether a run is suspended would fail
+-- silently in both directions.
 CREATE TABLE IF NOT EXISTS suspended_runs (
     run_id         TEXT PRIMARY KEY,
     correlation_id TEXT        NOT NULL,

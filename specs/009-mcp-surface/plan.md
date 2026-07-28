@@ -120,6 +120,7 @@ Enumerated here so implementation confirms rather than discovers:
 | `agent-run` jobspec `meta_required` | 008 | correlation, subject, tenant, definition | `run_id`, `step_index` | T042a |
 | Vault JWT auth roles | 006 | `harness`, `conformance`, `agent-run`, per-agent | An `mcp` role | T022a |
 | `verify_stream_integrity(conn_factory)` | 008 | A run-role connection factory | The MCP service to build one | T053b |
+| `ToolRegistry` | 002 | Per-process, in-memory, one caller | A readable instance in the persistent service — the registry of record | T042c |
 
 Each extension is **optional-by-default where a prior caller exists**, which is the rule that
 would have prevented two of the findings on its own: a required parameter added to a seam
