@@ -283,6 +283,29 @@ class PostgresDependencyStore:
 
         self._run(_write)
 
+    def awaited_products(self) -> list[str]:
+        """The distinct products something is currently suspended on.
+
+        What the sweeper iterates. Deriving it from the **index** rather than from the
+        registry is deliberate: a run can be suspended on a product whose tools have since
+        been deregistered, and that run still has to come back. Sweeping the registry
+        instead would strand it silently — the one outcome ADR-0049 removed a human to
+        avoid, arrived at by a different route.
+
+        It is also the cheap direction. An estate with nothing suspended returns an empty
+        list and the sweep costs one query, rather than a health lookup per registered
+        product every interval forever.
+        """
+
+        def _read(conn: Any) -> list[str]:
+            cur = conn.cursor()
+            cur.execute("SELECT DISTINCT awaiting FROM suspended_runs")
+            return [str(r[0]) for r in cur.fetchall()]
+
+        result = self._run(_read)
+        assert isinstance(result, list)
+        return result
+
     def awaiting(self, product: str) -> list[SuspendedRunRecord]:
         def _read(conn: Any) -> list[SuspendedRunRecord]:
             cur = conn.cursor()

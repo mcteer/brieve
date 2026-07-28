@@ -34,14 +34,17 @@ import os
 import signal
 import sys
 import time
+from collections.abc import Callable
 from types import FrameType
 from typing import Any
 
 from core.audit.integrity import IntegrityReport, verify_stream_integrity
 from core.dependencies.store import PostgresDependencyStore
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
+from core.durability.postgres import PostgresDurabilityProvider
 from core.durability.sweeper import Sweeper
 from core.registry.memory import ToolRegistry
+from surfaces.dispatch.nomad import NomadDispatcher
 from surfaces.dispatch.types import RunDispatcher
 from surfaces.mcp.health import HealthChecker, Probe
 
@@ -186,6 +189,64 @@ class _Supervisor:
             remaining -= step
 
 
+def unconfigured_probe(product: str) -> tuple[bool, str]:
+    """What a product with no probe reports: unreachable.
+
+    Deliberately not "healthy". A registered product nobody knows how to reach is exactly
+    the "we do not know" case FR-006 sends to unhealthy, and defaulting the other way would
+    mean the mechanism reported everything fine for precisely the products it cannot see.
+
+    Probing a real managed product is that product's adapter's business — this platform
+    fakes product APIs by constitutional decision, so there is nothing here to reach yet.
+    Stated as a default rather than left as an unimplemented branch, because the difference
+    between "no products registered" and "no way to check them" is the difference between
+    a quiet system and a broken one.
+    """
+    return False, "no probe configured for this product"
+
+
+def _pass(name: str, work: Callable[[], None]) -> None:
+    """Run one supervisory pass, reporting rather than propagating a failure."""
+    try:
+        work()
+    except Exception as exc:  # noqa: BLE001 — a failed pass must not end the service
+        print(f"{name} pass failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+
+
+def _report_health(checker: HealthChecker) -> None:
+    for health in checker.sweep():
+        if not health.state.permits_calls():
+            print(
+                f"::dependency:: {health.product} {health.state.value}: {health.detail}",
+                file=sys.stderr,
+                flush=True,
+            )
+
+
+def _report_sweep(sweeper: Sweeper, store: PostgresDependencyStore) -> None:
+    """Sweep every product something is actually waiting on.
+
+    Driven from the suspension index rather than from the registry: a run can be suspended
+    on a product whose tools are no longer registered, and that run still has to come back.
+    Sweeping the registry instead would strand it silently, which is the one outcome
+    ADR-0049 removed a human to avoid.
+    """
+    outcome = sweeper.sweep(store.awaited_products())
+    if outcome.resumed:
+        print(f"resumed {len(outcome.resumed)} suspended run(s): {outcome.resumed}", flush=True)
+    for run_id, why in outcome.failed:
+        print(f"::sweep:: {run_id} could not be resumed: {why}", file=sys.stderr, flush=True)
+
+
+def _report_integrity(report: IntegrityReport) -> None:
+    for finding in report.findings:
+        print(
+            f"::integrity:: {finding.correlation_id} {finding.kind}: {finding.detail}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 def main() -> int:
     """Start the service.
 
@@ -203,6 +264,11 @@ def main() -> int:
     store.migrate()
 
     registry = ToolRegistry()
+    checker = build_health_checker(registry, store, unconfigured_probe)
+
+    checkpoints = PostgresDurabilityProvider(credentials=credentials)
+    sweeper = build_sweeper(store, NomadDispatcher(), checkpoints.load)
+
     tenant = os.environ.get("HARNESS_DEFAULT_TENANT", "").strip()
     interval = float(os.environ.get("MCP_INTERVAL_SECONDS", DEFAULT_INTERVAL_SECONDS))
     print(
@@ -213,25 +279,18 @@ def main() -> int:
 
     supervisor = _Supervisor(interval)
     while supervisor.running:
-        # Each pass is independent and failures are reported rather than fatal. A
-        # supervisory loop that died on a transient database error would take the health
+        # Three passes, each independent, and a failure in one reported rather than fatal.
+        # A supervisory loop that died on a transient database error would take the health
         # checker and the sweeper with it — and the platform would then trust whatever was
         # last recorded until staleness caught up.
-        try:
-            report = check_integrity(credentials)
-            if not report.ok:
-                for finding in report.findings:
-                    print(
-                        f"::integrity:: {finding.correlation_id} {finding.kind}: {finding.detail}",
-                        file=sys.stderr,
-                        flush=True,
-                    )
-        except Exception as exc:  # noqa: BLE001 — a failed pass must not end the service
-            print(
-                f"integrity pass failed: {type(exc).__name__}: {exc}",
-                file=sys.stderr,
-                flush=True,
-            )
+        #
+        # Health before sweep, in that order and not the reverse. The sweeper resumes runs
+        # whose dependency `state_of` reports healthy, so sweeping first would decide on
+        # the previous pass's health — one full interval of resuming into an outage that
+        # this pass already knows about.
+        _pass("health", lambda: _report_health(checker))
+        _pass("sweep", lambda: _report_sweep(sweeper, store))
+        _pass("integrity", lambda: _report_integrity(check_integrity(credentials)))
 
         supervisor.sleep()
 
