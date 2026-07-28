@@ -229,7 +229,7 @@ without operator action.
 - [X] T060 [P] Update `AGENTS.md`: the harness gate now applies to fork pull requests and to anything the lane cannot cover, rather than to everything
 - [X] T061 [P] Update `ROADMAP.md`: 009 shipped; the **four-transport parity row moves from Deferred to In force**
 - [X] T062 [P] Record the fifteen rows in `contracts/conformance-mcp.md` as **In force**
-- [ ] T063 [GATE:conformance] Run `make check` and `make conformance` against a live enclave, and confirm every break fixture passes on a clean tree. A row whose failure nobody has observed is a row nobody knows works
+- [X] T063 [GATE:conformance] Run `make check` and `make conformance` against a live enclave, and confirm every break fixture passes on a clean tree. A row whose failure nobody has observed is a row nobody knows works
 
 ---
 
