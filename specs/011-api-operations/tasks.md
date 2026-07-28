@@ -67,11 +67,11 @@ session.
 
 **Independent test**: three runs by A, one by B; A lists exactly three.
 
-- [ ] T016 [US2] Snapshot += `GET /runs` / `list_runs`; parity red, then surfaces
-- [ ] T017 [US2] [GATE:fail-closed] Implement the list query in `src/core/runs/index.py`: tenant first, subject second, keyset cursor `(created_at, run_id)`, bounded page, **stateless between calls** (FR-005). The cursor is opaque and carries no total — a count is the withholding disclosure FR-004 forbids
-- [ ] T018 [US2] Add `GET /runs` to `src/surfaces/api/runs.py` (run summaries per [data-model.md](data-model.md) — state joined from the checkpoint **via the T009a provider**, everything else from the **T009a index reader**) and `list_runs` to the MCP surface
-- [ ] T019 [P] [US2] [GATE:conformance] Enclave rows in `tests/conformance/identity/test_list_runs.py`: mine-and-only-mine across two subjects and two tenants (SC-002, SC-003); bounded pages; empty list for a subject with no runs is an answer, not an error
-- [ ] T020 [P] [US2] [GATE:conformance] **Break fixture — a cursor that carries the total**: inspect the cursor across pages for anything monotonic with the withheld count. `OFFSET/COUNT` pagination reads identically in the happy path, and this is the row that distinguishes it
+- [X] T016 [US2] Snapshot += `GET /runs` / `list_runs`; parity red, then surfaces
+- [X] T017 [US2] [GATE:fail-closed] Implement the list query in `src/core/runs/index.py`: tenant first, subject second, keyset cursor `(created_at, run_id)`, bounded page, **stateless between calls** (FR-005). The cursor is opaque and carries no total — a count is the withholding disclosure FR-004 forbids
+- [X] T018 [US2] Add `GET /runs` to `src/surfaces/api/runs.py` (run summaries per [data-model.md](data-model.md) — state joined from the checkpoint **via the T009a provider**, everything else from the **T009a index reader**) and `list_runs` to the MCP surface
+- [X] T019 [P] [US2] [GATE:conformance] Enclave rows in `tests/conformance/identity/test_list_runs.py`: mine-and-only-mine across two subjects and two tenants (SC-002, SC-003); bounded pages; empty list for a subject with no runs is an answer, not an error
+- [X] T020 [P] [US2] [GATE:conformance] **Break fixture — a cursor that carries the total**: inspect the cursor across pages for anything monotonic with the withheld count. `OFFSET/COUNT` pagination reads identically in the happy path, and this is the row that distinguishes it
 - [ ] T021 [P] [US2] [GATE:conformance] **The divergence row** in `tests/conformance/identity/test_index_trail_agree.py` (plan, post-design IX): a dispatched run appears in both the run index and the audit trail. **The two writes are minutes apart on a cold dispatch** — the index at `dispatch()`, `run_start` inside the allocation — so the row waits for the allocation to reach a terminal state before comparing (the 010 end-to-end wait and budget), and says so, because a divergence row that flakes on the window teaches people to re-run the one row whose job is to be believed. Two accounts of what ran; this row is what makes silent disagreement impossible — an investigator who finds them differing must be finding a loud failure, not a quiet drift
 
 ---

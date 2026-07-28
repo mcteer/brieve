@@ -91,6 +91,7 @@ class McpTransport:
             "read_evidence": self._read_evidence,
             "request_mapping_change": self._request_mapping_change,
             "collect_mapping_change": self._collect_mapping_change,
+            "list_runs": self._list_runs,
         }.get(tool_name)
 
         if handler is None:
@@ -147,6 +148,25 @@ class McpTransport:
                 "disposition": str(disposition),
             },
         )
+
+    def _list_runs(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from core.runs.index import DEFAULT_PAGE_SIZE, RunIndexError
+        from surfaces.api.runs import list_runs_for
+
+        try:
+            page = list_runs_for(
+                subject=subject,
+                index=self._index,
+                durability=self._durability,
+                limit=int(args.get("limit") or DEFAULT_PAGE_SIZE),
+                cursor=args.get("cursor"),
+            )
+        except RunIndexError:
+            # 503 on both transports, because parity compares verdicts and "we could not
+            # look" must never arrive as an empty list on either.
+            return McpResult(ok=False, status=503, payload={"reason": "run index unavailable"})
+
+        return McpResult(ok=True, status=200, payload=page.model_dump(mode="json"))
 
     def _collect_mapping_change(
         self, args: dict[str, Any], subject: AuthenticatedSubject

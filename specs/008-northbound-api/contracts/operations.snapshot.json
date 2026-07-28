@@ -14,6 +14,10 @@
     "path": "/evidence"
   },
   {
+    "method": "GET",
+    "path": "/runs"
+  },
+  {
     "method": "POST",
     "name": "start_run",
     "path": "/runs"

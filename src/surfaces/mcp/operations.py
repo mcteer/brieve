@@ -32,6 +32,7 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "read_evidence": ("GET", "/evidence"),
     "request_mapping_change": ("POST", "/claim-mappings"),
     "collect_mapping_change": ("GET", "/claim-mappings/{accessor}"),
+    "list_runs": ("GET", "/runs"),
 }
 
 
@@ -115,6 +116,25 @@ def operations() -> list[McpOperation]:
                     "reason": {"type": "string", "minLength": 1},
                 },
                 "required": ["mapping", "reason"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="list_runs",
+            method="GET",
+            path="/runs",
+            description=(
+                "The runs you have started, newest first. Bounded; pass the returned "
+                "cursor for the next page. Absent cursor means there is nothing further."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "minimum": 1},
+                    "cursor": {"type": ["string", "null"]},
+                },
+                # No subject and no tenant. Both come from the authenticated caller, and a
+                # parameter for either would be a request to list someone else's work.
                 "additionalProperties": False,
             },
         ),
