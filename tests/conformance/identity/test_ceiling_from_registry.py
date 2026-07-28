@@ -5,11 +5,10 @@ Every row asserting "authority cannot exceed the ceiling" has passed since 002 a
 dictionary in `FakeIdentityFabric`. They were not wrong; they were narrower than they read.
 This is the first time the number comes from the thing an operator actually edits.
 
-# HYBRID(ceiling): migrated at T046a
-The ceiling resolves through the production fabric; user scope and policy still resolve
-through the fake. `manufacture_authority` takes all three from one object, so proving one
-term before the others exist requires composing them — see `tests/harness/hybrid_fabric.py`,
-which is scaffolding with a recorded expiry rather than a pattern.
+**Nothing here is faked.** Ceiling, user scope, and policy all resolve from the live trust
+fabric. These rows ran through a hybrid harness during implementation, because
+`manufacture_authority` takes all three from one object and no story could be proven until
+every story had landed; T046a migrated them and deleted the hybrid.
 
 **Two definitions, not one.** "The ceiling bounds authority" is only demonstrable against a
 ceiling that excludes something a run would otherwise get. With one definition, every
@@ -24,9 +23,9 @@ from core.authority.errors import AuthorityRefuseError, ResolutionRefused
 from core.authority.types import AuthorityScope
 from core.run import start_governed_run
 from tests.conformance.identity.conftest import (
-    hybrid,
     production_fabric,
     registry_of_known_tools,
+    subject_fabric,
 )
 from tests.harness import capture_audit, frozen_clock
 
@@ -48,7 +47,7 @@ def test_row_the_same_request_refuses_under_the_narrow_ceiling() -> None:
             subject_user_id="user-1",
             agent_definition_id="planner-agent",
             requested_scope=AuthorityScope(tool_names=frozenset({"echo", "plan", "apply"})),
-            identity_fabric=hybrid("ceiling"),
+            identity_fabric=subject_fabric("operator"),
             registry=registry_of_known_tools(),
             clock=frozen_clock(),
             audit_sink=capture_audit(),
@@ -68,7 +67,7 @@ def test_row_the_same_request_succeeds_under_the_wide_ceiling() -> None:
         subject_user_id="user-1",
         agent_definition_id="applier-agent",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo", "plan", "apply"})),
-        identity_fabric=hybrid("ceiling"),
+        identity_fabric=subject_fabric("operator"),
         registry=registry_of_known_tools(),
         clock=frozen_clock(),
         audit_sink=capture_audit(),
@@ -88,7 +87,7 @@ def test_row_a_request_within_the_narrow_ceiling_is_granted() -> None:
         subject_user_id="user-1",
         agent_definition_id="planner-agent",
         requested_scope=AuthorityScope(tool_names=frozenset({"echo", "plan"})),
-        identity_fabric=hybrid("ceiling"),
+        identity_fabric=subject_fabric("operator"),
         registry=registry_of_known_tools(),
         clock=frozen_clock(),
         audit_sink=capture_audit(),

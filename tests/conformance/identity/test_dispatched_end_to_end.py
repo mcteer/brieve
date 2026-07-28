@@ -3,14 +3,13 @@
 
 **This is the row that proves the plumbing.** The per-term rows prove the mechanism: that a
 ceiling read from the registry bounds authority, that two roles resolve to different scopes.
-Each of them runs through the hybrid harness, so each proves its own term with the others
-faked. A feature that stopped there would have a correct identity fabric that nothing
-instantiated — which is precisely what 008 shipped for the dispatch path, and what this
+Each proves its own term. A feature that stopped there would have a correct identity fabric
+that nothing instantiated — which is precisely what 008 shipped for the dispatch path, and what this
 repository has now recorded eleven times under different names.
 
 So this row dispatches a real allocation, whose entrypoint constructs the production fabric
 from its own attested identity, and reads the audit trail back to see what happened. Nothing
-here is stubbed: no hybrid, no fake, no supplied token.
+here is stubbed: no fake, no supplied token.
 
 Runs on the HOST rather than in an allocation, because it drives the scheduler — a row
 placed by the scheduler cannot watch the scheduler place something.

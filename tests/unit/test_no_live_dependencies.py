@@ -94,6 +94,10 @@ ENCLAVE_PATHS = frozenset(
         # in-process would be asserting that the code it just imported does what it says,
         # which every other row in the feature already covers.
         "conformance/identity/test_dispatched_end_to_end.py",
+        # Presents an AGENT's credential to the trust fabric to prove it is refused (010).
+        # A fake cannot express this: the assertion is that VAULT denies, and a double
+        # denying proves only that we wrote a double that denies.
+        "conformance/identity/test_fabric_unreachable_from_a_tool.py",
     }
 )
 

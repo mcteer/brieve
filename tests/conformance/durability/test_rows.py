@@ -31,6 +31,16 @@ from tests.harness import (
 )
 from tests.harness.frozen_clock import FrozenClock
 
+#: FR-014 — this row supplies a FAKE identity fabric, deliberately.
+#:
+#: Its subject is checkpointing, resume, and single-writer fencing, not authority resolution. It
+#: needs *a* fabric the way it needs a clock: to construct a run at all.
+#: Substituting the production fabric would make the
+#: row depend on registry contents that have nothing to do with what it asserts, and would
+#: not strengthen it — authority resolution against the live trust fabric is proven by
+#: `tests/conformance/identity/`, which is where SC-001 points.
+FAKE_FABRIC_IS_FAULT_INJECTION = "checkpointing, resume, and single-writer fencing"
+
 
 def _write(
     provider: DurabilityProvider,

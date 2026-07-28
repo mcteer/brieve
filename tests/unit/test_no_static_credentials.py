@@ -21,6 +21,9 @@ SURFACES = pathlib.Path(__file__).resolve().parents[2] / "src" / "surfaces"
 #: Names that would indicate a platform-issued or platform-accepted long-lived credential.
 #: `api_key` and friends are the shapes someone reaches for when adding "just one" path
 #: for automation.
+#: The authority package, added by 010 — see `_surface_sources`.
+AUTHORITY = pathlib.Path(__file__).resolve().parents[2] / "src" / "core" / "authority"
+
 FORBIDDEN = (
     "api_key",
     "apikey",
@@ -55,7 +58,14 @@ def _code_without_prose(path: pathlib.Path) -> str:
 
 
 def _surface_sources() -> list[pathlib.Path]:
-    return sorted(SURFACES.rglob("*.py"))
+    """Surfaces, plus the authority package, as of 010.
+
+    The identity fabric is the newest thing in this platform that could hold a credential
+    and the one with the strongest reason to: it authenticates to the trust fabric on every
+    step, and a cached token would be the obvious optimisation. It authenticates by
+    presenting an attested workload identity instead, and this is what keeps it that way.
+    """
+    return sorted(SURFACES.rglob("*.py")) + sorted(AUTHORITY.rglob("*.py"))
 
 
 def test_the_check_has_something_to_check() -> None:
