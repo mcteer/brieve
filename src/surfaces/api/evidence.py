@@ -54,6 +54,48 @@ class EvidenceReadResponse(BaseModel):
     count: int
 
 
+def read_evidence_for(
+    *,
+    query: EvidenceQuery,
+    audit: AuditSink,
+    subject: AuthenticatedSubject,
+    correlation_id: str | None = None,
+    run_id: str | None = None,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    limit: int = 1000,
+) -> tuple[list[AuditEntry], EvidenceDisposition]:
+    """The governed read, independent of transport.
+
+    Extracted from the route so MCP reaches *this* rather than reimplementing it. ADR-0033
+    asks for the same verdict on every transport, and two implementations agreeing by
+    inspection would make that a measure of how carefully they were written — which is
+    exactly what a conformance row cannot check.
+    """
+    request = EvidenceQueryRequest(
+        # From the subject. Not accepted from any caller, on any transport.
+        tenant_id=subject.tenant_id,
+        correlation_id=correlation_id,
+        run_id=run_id,
+        start_time=start_time,
+        end_time=end_time,
+        limit=limit,
+    )
+    entries = query.search(request)
+    disposition = _disposition(entries, request, query)
+    if disposition is EvidenceDisposition.OUT_OF_SCOPE:
+        entries = []
+
+    _record_access(
+        audit=audit,
+        subject=subject,
+        request=request,
+        entries=entries,
+        disposition=disposition,
+    )
+    return entries, disposition
+
+
 def build_router() -> APIRouter:
     router = APIRouter(tags=["evidence"])
 
@@ -68,30 +110,18 @@ def build_router() -> APIRouter:
         end_time: datetime | None = None,
         limit: int = 1000,
     ) -> EvidenceReadResponse:
-        request = EvidenceQueryRequest(
-            # From the subject. Not accepted from the caller, and there is no parameter
-            # above through which it could be.
-            tenant_id=subject.tenant_id,
+        # The route is a thin binding onto the shared implementation. Zero rows either
+        # way when out of scope: the caller must not learn which, because telling them
+        # would leak the existence of what they may not see.
+        entries, _ = read_evidence_for(
+            query=query,
+            audit=audit,
+            subject=subject,
             correlation_id=correlation_id,
             run_id=run_id,
             start_time=start_time,
             end_time=end_time,
             limit=limit,
-        )
-        entries = query.search(request)
-        disposition = _disposition(entries, request, query)
-        if disposition is EvidenceDisposition.OUT_OF_SCOPE:
-            # Zero rows either way. The caller must not learn which, because telling them
-            # would leak the existence of what they may not see; the trail records it,
-            # which is the only place the distinction is both useful and safe.
-            entries = []
-
-        _record_access(
-            audit=audit,
-            subject=subject,
-            request=request,
-            entries=entries,
-            disposition=disposition,
         )
         return EvidenceReadResponse(entries=entries, count=len(entries))
 
