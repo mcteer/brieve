@@ -52,16 +52,16 @@ rather than adjusting the test.
 Both are cheap, and each can invalidate a large part of this plan. Run them before anything
 is built on top.
 
-- [ ] T001 [GATE:conformance] Add `mcp` to a scratch environment and run `bash scripts/check-licenses.sh`. **Already verified during Phase 0 research** — `mcp` 1.28.1 is MIT and its tree (`sse-starlette`, `python-multipart`, `jsonschema`, `referencing`, `rpds-py`, `python-dotenv`, `httpx-sse`, `pydantic-settings`) clears the allowlist with no changes. Re-run as the gate rather than trusting a note, since 008's premise gate caught a wrong licence claim in exactly this position
-- [ ] T002 [GATE:conformance] **Prove the enclave can come up on a Linux GitHub runner at all**, on a throwaway branch, before building the lane on the assumption. `infra/bin/enclave-up` requires `docker nomad vault terraform python3` on PATH and starts `nomad agent -dev` reachable on `127.0.0.1`; the runner has Docker but none of the others, and the docker-driver-plus-agent arrangement is only ever exercised on Docker Desktop. If it cannot come up, the lane's design is wrong and everything after T012 changes shape
+- [X] T001 [GATE:conformance] Add `mcp` to a scratch environment and run `bash scripts/check-licenses.sh`. **Already verified during Phase 0 research** — `mcp` 1.28.1 is MIT and its tree (`sse-starlette`, `python-multipart`, `jsonschema`, `referencing`, `rpds-py`, `python-dotenv`, `httpx-sse`, `pydantic-settings`) clears the allowlist with no changes. Re-run as the gate rather than trusting a note, since 008's premise gate caught a wrong licence claim in exactly this position
+- [X] T002 [GATE:conformance] **ANSWERED: no, not unmodified.** Three substrate assumptions surfaced, each fixed in the substrate module or the lane — see the commits. **Prove the enclave can come up on a Linux GitHub runner at all**, on a throwaway branch, before building the lane on the assumption. `infra/bin/enclave-up` requires `docker nomad vault terraform python3` on PATH and starts `nomad agent -dev` reachable on `127.0.0.1`; the runner has Docker but none of the others, and the docker-driver-plus-agent arrangement is only ever exercised on Docker Desktop. If it cannot come up, the lane's design is wrong and everything after T012 changes shape
 
 ---
 
 ## Phase 1: Setup
 
-- [ ] T003 Pin `mcp==1.28.1` in the `surfaces` extra in `pyproject.toml`, with a comment recording that the protocol is adopted rather than implemented (Principle I; ADR-0033's "migrate onto official servers as they mature")
+- [X] T003 Pin `mcp==1.28.1` in the `surfaces` extra in `pyproject.toml`, with a comment recording that the protocol is adopted rather than implemented (Principle I; ADR-0033's "migrate onto official servers as they mature")
 - [ ] T004 [P] Create `src/surfaces/mcp/__init__.py` and `src/core/dependencies/__init__.py`, and `tests/conformance/mcp/__init__.py`. Under `mypy` strict with `explicit_package_bases`, a missing `__init__.py` is a build error rather than an inconvenience
-- [ ] T005 [P] Fix the fast lane's sync step in `.github/workflows/ci.yml`: it runs `uv sync --frozen --extra adapters` while `make check` uses `--extra adapters --extra surfaces`. It works because `uv run` resolves the missing extra, at the cost of the cache the sync step exists to warm
+- [X] T005 [P] Fix the fast lane's sync step in `.github/workflows/ci.yml`: it runs `uv sync --frozen --extra adapters` while `make check` uses `--extra adapters --extra surfaces`. It works because `uv run` resolves the missing extra, at the cost of the cache the sync step exists to warm
 
 ---
 
@@ -75,13 +75,13 @@ merge is blocked without a human having run anything.
 
 **This phase lands before the rest of the feature on purpose** — see the note at the top.
 
-- [ ] T006 [US6] [GATE:no-secret-leak] Create `.github/workflows/enclave.yml` triggered on `pull_request`, with the enclave job conditioned on `github.event.pull_request.head.repo.full_name == github.repository`. **Not `pull_request_target`**: that runs base-branch workflows with secrets available while the fork controls the code under test, which would hand a licence and a live enclave to arbitrary pull requests — a credential-disclosure problem traded for a coverage gap
-- [ ] T007 [US6] Install `nomad`, `vault`, and `terraform` in the lane, pinned by version and checksum. Docker is already present on the runner; the other three are not
-- [ ] T008 [US6] [GATE:no-secret-leak] Write the Vault Enterprise licence from `secrets.VAULT_ENT_LICENSE` into the environment `enclave-up` expects, and assert it never reaches a log. **Quote handling is the trap 006 paid for**: `.env` values are quoted, and passing the quotes through made Vault reject the licence with "error decoding version: expected integer"
-- [ ] T009 [US6] (FR-018) Run **`make dev-up` then `make conformance`** — the same commands a human runs, not a bespoke sequence (Principle VII). Two ways to run the gate is two gates, and the one nobody runs locally is the one that rots
-- [ ] T010 [US6] [GATE:fail-closed] Assert in `.github/workflows/enclave.yml` that a failure to stand up the enclave reads as a **failure**, never a pass or a skip (FR-020). Verify by running the lane with the licence secret deliberately absent
-- [ ] T011 [US6] Assert the job conditions in `.github/workflows/ci.yml` and `.github/workflows/enclave.yml` keep the fast lane running for fork pull requests while the enclave lane does not (FR-019), and that a fork contributor's experience is unchanged
-- [ ] T012 [US6] [GATE:conformance] (SC-011, SC-012) **Prove `.github/workflows/enclave.yml` fails on a broken row.** Push a branch with a deliberately broken enclave row and confirm the lane goes red. A lane that has only ever seen green is a lane nobody knows works — the same reason every conformance row here ships a break fixture
+- [X] T006 [US6] [GATE:no-secret-leak] Create `.github/workflows/enclave.yml` triggered on `pull_request`, with the enclave job conditioned on `github.event.pull_request.head.repo.full_name == github.repository`. **Not `pull_request_target`**: that runs base-branch workflows with secrets available while the fork controls the code under test, which would hand a licence and a live enclave to arbitrary pull requests — a credential-disclosure problem traded for a coverage gap
+- [X] T007 [US6] Install `nomad`, `vault`, and `terraform` in the lane, pinned by version and checksum. Docker is already present on the runner; the other three are not
+- [X] T008 [US6] [GATE:no-secret-leak] Write the Vault Enterprise licence from `secrets.VAULT_ENT_LICENSE` into the environment `enclave-up` expects, and assert it never reaches a log. **Quote handling is the trap 006 paid for**: `.env` values are quoted, and passing the quotes through made Vault reject the licence with "error decoding version: expected integer"
+- [X] T009 [US6] (FR-018) Run **`make dev-up` then `make conformance`** — the same commands a human runs, not a bespoke sequence (Principle VII). Two ways to run the gate is two gates, and the one nobody runs locally is the one that rots
+- [X] T010 [US6] [GATE:fail-closed] **Observed three times before the lane first went green**, which is stronger evidence than a contrived run: every bring-up failure reported failure and skipped conformance. Assert in `.github/workflows/enclave.yml` that a failure to stand up the enclave reads as a **failure**, never a pass or a skip (FR-020). Verify by running the lane with the licence secret deliberately absent
+- [X] T011 [US6] Assert the job conditions in `.github/workflows/ci.yml` and `.github/workflows/enclave.yml` keep the fast lane running for fork pull requests while the enclave lane does not (FR-019), and that a fork contributor's experience is unchanged
+- [X] T012 [US6] [GATE:conformance] (SC-011, SC-012) **Prove `.github/workflows/enclave.yml` fails on a broken row.** Push a branch with a deliberately broken enclave row and confirm the lane goes red. A lane that has only ever seen green is a lane nobody knows works — the same reason every conformance row here ships a break fixture
 
 **Checkpoint**: from here, every subsequent change in this feature is covered by an automated gate.
 

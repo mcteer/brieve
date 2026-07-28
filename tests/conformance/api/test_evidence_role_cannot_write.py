@@ -36,8 +36,6 @@ def _refused(conn: Any, sql: str) -> bool:
 
 
 def test_insert_is_refused(evidence_connection: Any) -> None:
-    # TEMPORARY (T012): deliberately broken to prove the lane goes red. Reverted next commit.
-    assert False, "T012: deliberate failure to prove the enclave lane fails on a broken row"
     assert _refused(
         evidence_connection,
         "INSERT INTO audit_entries "
