@@ -33,3 +33,23 @@ variable "tls_private_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "vault_host_network" {
+  description = <<-DESC
+    Run the trust store in the HOST network namespace instead of publishing a port.
+
+    A substrate difference, and the only permitted kind (Principle VII). Docker Desktop
+    provides `host.docker.internal`, so a bridged trust store reaches the state store by
+    name. Linux Docker provides no such name, and `host-gateway` only helps if the state
+    store's published port is bound to the bridge address — Nomad binds it to one
+    interface, and on a Linux runner that is loopback. The trust store then resolves the
+    host correctly and gets "connection refused", which reads as a database problem.
+
+    Host networking sidesteps the whole question: both processes share the host's
+    namespace and reach each other at 127.0.0.1. It is wrong for Docker Desktop, where the
+    namespace is the VM's and the port would stop being reachable from macOS at all —
+    which is why this is a variable and not a change.
+  DESC
+  type        = bool
+  default     = false
+}

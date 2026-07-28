@@ -1,0 +1,145 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Enclave lane (specs/009-mcp-surface, US6) — the automated runner the enclave-dependent
+# conformance rows have never had.
+#
+# The constitution requires a blocking row with no automated runner to name who runs it.
+# 005 named the agent harness for seven durability rows; 008 named it again for nine more.
+# That naming was honest and it was still an instruction being followed rather than a
+# control. This is the control.
+#
+# WHY NOT `pull_request_target`: it would let this lane run for fork pull requests, which
+# is the only way to give a fork's rows automated coverage. It does so by running
+# base-branch workflows with secrets available while the FORK controls the code under
+# test — handing a Vault Enterprise licence and a live enclave to arbitrary pull requests.
+# That trades a coverage gap for a credential-disclosure one, which is the wrong direction.
+#
+# So fork pull requests get the fork-safe fast lane (ci.yml) and their enclave rows are run
+# by a maintainer. That is today's situation for every contributor, narrowed to a much
+# smaller set of pull requests.
+
+name: enclave
+
+on:
+  pull_request:
+    branches: [main]
+  # Manual runs, so a maintainer can exercise the lane without opening a pull request —
+  # and so its first run could answer T002 (does the enclave come up on a Linux runner at
+  # all) before anything was built on the assumption that it does.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Pinned by version AND checksum. An unpinned install makes this lane's result depend on
+  # whatever upstream published this morning, which is the opposite of a gate.
+  NOMAD_VERSION: "2.0.4"
+  VAULT_VERSION: "2.0.3+ent"
+  TERRAFORM_VERSION: "1.15.8"
+
+jobs:
+  enclave:
+    name: enclave
+    # Fork pull requests cannot reach secrets at all, so the job would fail obscurely at
+    # the licence step. Skipping explicitly says why (FR-019).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    # Generous, because the lane pulls images and installs a virtualenv inside an
+    # allocation. Not unbounded: a hung bring-up must fail rather than burn the runner.
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          enable-cache: true
+
+      # Docker is already on the runner. Nomad, Vault, and Terraform are not, and
+      # `enclave-up` refuses without all three on PATH.
+      - name: Install HashiCorp tooling
+        run: |
+          set -euo pipefail
+          install_hashicorp() {
+            name="$1"; version="$2"
+            # '+ent' is legal in a version string and not in a URL path component.
+            encoded="${version//+/%2B}"
+            base="https://releases.hashicorp.com/${name}/${version}"
+            zip="${name}_${version}_linux_amd64.zip"
+            curl -fsSL -o "/tmp/${name}.zip" "${base}/${zip//+/%2B}"
+            curl -fsSL -o "/tmp/${name}.sums" "${base}/${name}_${encoded}_SHA256SUMS"
+            ( cd /tmp && grep " ${zip}\$" "${name}.sums" | sed "s| ${zip}| ${name}.zip|" | sha256sum -c - )
+            sudo unzip -o -q "/tmp/${name}.zip" -d /usr/local/bin
+            "${name}" version | head -1
+          }
+          install_hashicorp nomad "${NOMAD_VERSION}"
+          install_hashicorp vault "${VAULT_VERSION}"
+          install_hashicorp terraform "${TERRAFORM_VERSION}"
+
+      # Nomad allocations run with host networking and reach the trust store and state
+      # store at `host.docker.internal`. Docker Desktop provides that name; Linux Docker
+      # does not, so the runner needs it explicitly. The Vault container gets it through
+      # `host-gateway` in the substrate module — this is the other half, for workloads
+      # that share the host's resolver rather than a container's.
+      #
+      # This is what 009's T002 existed to find: the enclave does not come up unmodified
+      # on a Linux runner, and the reason is a Docker Desktop convenience baked into how
+      # containers address the host.
+      - name: Make host.docker.internal resolvable
+        run: |
+          set -euo pipefail
+          echo '127.0.0.1 host.docker.internal' | sudo tee -a /etc/hosts >/dev/null
+          getent hosts host.docker.internal
+
+      # `enclave-up` reads the licence from .env, not the environment — so the lane writes
+      # one. The value is written UNQUOTED: `env_val` strips surrounding quotes, but 006
+      # paid for the case where they survive, and Vault then rejects the licence with
+      # "error decoding version: expected integer", which names the version and not the
+      # quoting that caused it.
+      - name: Write the environment file
+        env:
+          VAULT_ENT_LICENSE: ${{ secrets.VAULT_ENT_LICENSE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VAULT_ENT_LICENSE}" ]; then
+            echo "::error::VAULT_ENT_LICENSE is not set. The enclave lane cannot run without it." >&2
+            exit 1
+          fi
+          # printf, not echo, and no surrounding quotes. Written with `set +x` already the
+          # default; the value is never echoed.
+          printf 'VAULT_ENT_LICENSE=%s\n' "${VAULT_ENT_LICENSE}" > .env
+          printf 'HARNESS_DEFAULT_TENANT=%s\n' "tenant-ci" >> .env
+          # Prove the file has what it needs without printing what it contains.
+          grep -q '^VAULT_ENT_LICENSE=.' .env || { echo "::error::licence did not reach .env" >&2; exit 1; }
+          echo "wrote .env with a licence of ${#VAULT_ENT_LICENSE} characters"
+
+      # The same command a human runs. Principle VII: two ways to run the gate is two
+      # gates, and the one nobody runs locally is the one that rots.
+      # Linux Docker: the trust store joins the host namespace rather than being bridged.
+      # See infra/modules/substrate-docker/variables.tf for why this is a substrate
+      # difference — Principle VII's only permitted kind — and not a fix applied everywhere.
+      - name: Stand up the enclave
+        env:
+          ENCLAVE_VAULT_HOST_NETWORK: "true"
+        run: make dev-up
+
+      - name: Conformance (all rows)
+        run: make conformance
+
+      # A failure to bring the enclave up must read as a failure, never a pass or a skip
+      # (FR-020). `set -e` in the steps above gives that; this makes the intent legible to
+      # anyone reading the lane rather than inferring it from shell semantics.
+      - name: Report
+        if: always()
+        run: |
+          if [ "${{ job.status }}" != "success" ]; then
+            echo "::error::enclave lane failed — this blocks the merge. A lane that cannot" \
+                 "stand the stack up reports failure; it never reports a pass."
+            exit 1
+          fi
+          echo "enclave rows passed under an automated runner"

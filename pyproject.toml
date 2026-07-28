@@ -52,6 +52,7 @@ adapters = [
 # PyJWT rather than a hand-rolled verifier: a JWT check that accepts `alg: none` or fails to
 # pin the algorithm fails OPEN and passes every test anyone thinks to write.
 surfaces = [
+    "mcp==1.28.1",
     "fastapi==0.140.7",
     "pyjwt[crypto]==2.13.0",
     "uvicorn==0.51.0",

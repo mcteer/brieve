@@ -27,7 +27,7 @@ jobs:
           enable-cache: true
 
       - name: Sync dependencies
-        run: uv sync --frozen --extra adapters
+        run: uv sync --frozen --extra adapters --extra surfaces
 
       - name: Inner-loop check
         run: make check

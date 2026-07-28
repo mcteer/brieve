@@ -9,9 +9,9 @@ output "vault_address" {
 
 output "nomad_jwks_url" {
   # As reachable FROM the trust store's container, not from the operator's shell.
-  value = "http://host.docker.internal:4646/.well-known/jwks.json"
+  value = var.vault_host_network ? "http://127.0.0.1:4646/.well-known/jwks.json" : "http://host.docker.internal:4646/.well-known/jwks.json"
 }
 
 output "database_endpoint" {
-  value = "host.docker.internal:5432"
+  value = var.vault_host_network ? "127.0.0.1:5432" : "host.docker.internal:5432"
 }
