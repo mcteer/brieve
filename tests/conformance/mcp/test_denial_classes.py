@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from core.dependencies.gate import DEPENDENCY_UNAVAILABLE, denial_class_for
 from core.dependencies.types import DenialClass, HealthState
-from core.tools.invoke import invoke_tool
+from core.tools.invoke import InvokeResult, invoke_tool
 from tests.component.conftest import CountingHandler, make_run
 
 
@@ -24,7 +24,7 @@ class Unhealthy:
         return HealthState.UNHEALTHY
 
 
-def _availability_refusal():  # type: ignore[no-untyped-def]
+def _availability_refusal() -> InvokeResult:
     handler = CountingHandler()
     run, h, _ = make_run(tool_name="provision", scope={"provision"}, handler=handler)
     run.registry.register("provision", h, product="terraform-cloud")
@@ -32,7 +32,7 @@ def _availability_refusal():  # type: ignore[no-untyped-def]
     return invoke_tool(run, "provision", {})
 
 
-def _policy_refusal():  # type: ignore[no-untyped-def]
+def _policy_refusal() -> InvokeResult:
     """Out of scope: the tool is not in the run's authority."""
     handler = CountingHandler()
     run, h, _ = make_run(tool_name="echo", scope={"echo"}, handler=handler)

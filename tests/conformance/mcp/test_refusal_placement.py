@@ -15,6 +15,8 @@ guarded here is the one where everything passes.
 
 from __future__ import annotations
 
+from typing import Any
+
 from core.dependencies.gate import DEPENDENCY_HOOK_NAME, dependency_pre_hook
 from core.dependencies.types import HealthState
 from core.hooks.governance import builtin_governance_hooks
@@ -85,7 +87,7 @@ def test_break_fixture_a_working_pre_flight_is_detected() -> None:
     is asserted rather than inferred from outcomes.
     """
 
-    def pre_flight_guard(run, tool_name):  # type: ignore[no-untyped-def]
+    def pre_flight_guard(run: Any, tool_name: str) -> str | None:
         """The tempting version: check first, skip the pipeline entirely."""
         reader = getattr(run, "dependency_health", None)
         if reader is None:
@@ -106,8 +108,8 @@ def test_break_fixture_a_working_pre_flight_is_detected() -> None:
     assert handler.call_count == 0
 
     # And it is not a registered hook, which is what the row above would catch.
-    registered = {hook.handler for hook in builtin_governance_hooks()}
-    assert pre_flight_guard not in registered, (
+    registered = {id(hook.handler) for hook in builtin_governance_hooks()}
+    assert id(pre_flight_guard) not in registered, (
         "a pre-flight guard was registered as a hook, which would hide the very "
         "arrangement this fixture models"
     )
