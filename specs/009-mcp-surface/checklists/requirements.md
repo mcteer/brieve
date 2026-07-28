@@ -63,3 +63,16 @@
   008 shipping `NomadDispatcher` with no job to dispatch to.
 - ADR-0026 now records being partially superseded (Principle X), and every SC carries a task
   reference rather than only the FRs.
+- Analyze pass 2 (2026-07-27) found the fix for the sweeper's dispatch route had stopped one
+  layer short: the jobspec now *requires* `run_id` and `step_index`, and `RunDispatcher.dispatch()`
+  accepts neither, so the sweeper could not pass what the job demanded. **Third instance of
+  "a mechanism specified without the thing it acts through" across two features, and the
+  first where fixing one produced the next.** The mechanical check that would have caught
+  all three: when a task says "wire A to B", verify A's interface accepts what B requires.
+- It also found `ROADMAP.md` still saying "Claimed by 009" after spec, plan, contracts, and
+  checklist had all been corrected — **fourth occurrence of restatement drift**, and in the
+  file the next feature's planner reads. `ROADMAP.md` belongs in every sweep for that reason.
+- And it found T015 telling someone to change Principle VIII's "parks" to "stops" without
+  saying why. That "parks" has a different trigger — no eval-qualified model cell — where
+  `SUSPENDED` looks like the right answer and would restore human-waiting through the
+  model-fallback path, since qualifying a cell is eval-gated human work.

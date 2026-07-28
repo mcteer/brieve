@@ -68,9 +68,11 @@ wearing a different name.
 | — | CLI | Over the API |
 | — | Portal | Over the API |
 
-**Owed gate row:** four-transport surface parity. It stayed owed through 008 because parity
-cannot be asserted against a single surface. **009 claims it** — two transports exist, so the
-comparison is possible, and deferring it again would stop being rigour.
+**Owed gate row:** surface parity. It stayed owed through 008 because parity cannot be
+asserted against a single surface. **009 amends the row and satisfies the amended version** —
+it was worded "across all four transports", which two cannot satisfy, so it now binds across
+every pair of implemented transports. That makes it bind at each transport rather than only
+at the fourth.
 
 **Why here:** the first features that ship something a user touches directly. They need the
 authorization core (002/003) and the approval gate (007) settled behind them; attempting them
@@ -135,7 +137,7 @@ ADR — never a passing stub.**
 | --- | --- | --- |
 | Governance-ordering, fail-closed, governed entry | 004 | ✅ In force |
 | Durability scenarios (ADR-0024/0026) | 005 | ✅ In force — all seven, both providers, under an attested identity. **Not run by CI** (the fork-safe lane cannot hold a licensed Vault); the agent harness runs them before merge per `AGENTS.md`, and refuses the merge if the enclave cannot come up |
-| Four-transport surface parity | 009 | **Claimed by 009.** Deferred through 008 because parity is a property *between* transports and there was one — a green row would have been the stub ADR-0047 forbids. What 008 shipped instead was the thing that makes the comparison possible: `specs/008-northbound-api/contracts/operations.snapshot.json`, a recorded operation set diffed by a conformance row, so the second transport compares against something written down rather than against whatever the API happens to do by then |
+| Surface parity | 009 | **Row amended, then satisfied.** It read "across all four transports"; 009 has two, so claiming it would have asserted something untrue — the stub ADR-0047 forbids. 009 amends it to bind **incrementally**, across every pair of implemented transports, and satisfies it for the API/MCP pair. Better than claiming or deferring: the gate now binds at two, three, and four rather than catching nothing until the last transport lands, which is well after divergence would start. Compared against `specs/008-northbound-api/contracts/operations.snapshot.json` |
 | Tool-call parity under deferred disclosure | Deferred-disclosure feature | Deferred — ADR-0040 |
 | Eval gates (packs, models, policies) | Capability packs | Deferred — Principle VIII |
 | Registry isolation (control-plane write denials) | — | **Unassigned** — see gaps below |
