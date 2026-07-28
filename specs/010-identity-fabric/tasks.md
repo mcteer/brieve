@@ -39,6 +39,7 @@ Gates bind rows as features land (ADR-0047). Test tasks are not optional here.
 - [ ] T008 [GATE:conformance] Assert in `tests/unit/test_ceiling_record_shape.py` that a ceiling record with an unknown `schema_version` refuses rather than being partially parsed. A record written by a newer platform must not be half-understood by an older one — and half-understanding a ceiling means enforcing a subset of it
 - [ ] T009 Register an agent definition in `infra/environments/dev/variables.tf` whose ceiling **resolves to something real**, and mount whatever it names. **Blocks every enclave row.** `demo-agent`'s ceiling grants `secret/data/demo/*` and `secret/` is not mounted (research Finding 4), so every assertion against it passes whether enforcement works or not
 - [ ] T010 Update `infra/bin/enclave-verify` to assert the ceiling records exist and are readable by the reader role and by nothing else. A missing ceiling store must fail at bring-up rather than appearing later as runs that refuse for reasons nobody can trace
+- [ ] T010a Build a **hybrid fabric** in `tests/harness/hybrid_fabric.py`: a delegating wrapper that routes named resolutions to the production fabric and the rest to the fake. **This is the mechanism behind the plan's claim that US1–US4 are independently provable, and pass 2 found that no task built it**: `manufacture_authority` resolves user scope, ceiling, and policy from one fabric object, so a per-story enclave row can only exercise its own term against the real fabric if something composes the terms — and the composition cannot live in `src/`, because production code importing the fake is FR-015's own violation. It lives here, in the harness, where importing both is legitimate. Every row using it marks itself per FR-014 and is fully migrated by T046a
 
 ---
 
@@ -55,9 +56,9 @@ imports from `tests/`.
 - [ ] T011 [US5] Remove `issue_brokered_material` and `get_brokered_material` from the protocol in `src/core/authority/fabric.py` (FR-013), and delete the "fakes implement; core never calls a live IdP" module docstring, which stops being true in this feature
 - [ ] T012 [US5] [GATE:fail-closed] Make the **broker branch refuse** `broker_not_implemented` in `src/core/hooks/mirroring.py`. **This is the task research Finding 6 created and it is not a rename.** That branch is production code performing a *simulated* exchange — it writes the literal string `HARNESS_FIXTURE_BROKERED_GRAIN_MARKER_NOT_A_REAL_SECRET` and returns `allow`. Principle IV names the brokered path's management token as the platform's one permitted standing credential; the mechanism it exists for does not exist. Refusing makes the gap visible when someone configures a brokered product, which is when they need to know
 - [ ] T013 [US5] Keep both methods on `tests/harness/fake_identity_fabric.py` as ordinary methods. The fake needed them; it simply stops claiming they are part of the contract
-- [ ] T014 [P] [US5] [GATE:conformance] Assert in `tests/unit/test_protocol_has_no_test_affordances.py` that the protocol declares no method whose name or docstring marks it test-only, **stripping docstrings via AST with a positive control** proving the stripper did not swallow the body — **and** that the production fabric structurally satisfies the protocol with no method raising "not supported" (SC-009, both halves: a clean protocol nobody implements is as vacuous as a dirty one everybody does). Without this row the next test-only convenience arrives exactly as this one did — as the shortest path at the time
+- [ ] T014 [P] [US5] [GATE:conformance] Assert in `tests/unit/test_protocol_has_no_test_affordances.py` that the protocol declares no method whose name or docstring marks it test-only, **stripping docstrings via AST with a positive control** proving the stripper did not swallow the body (SC-009, first half). Without this row the next test-only convenience arrives exactly as this one did — as the shortest path at the time. *(The second half of SC-009 — the production fabric satisfies what remains — is T045a, in Polish: pass 2 caught this row asserting a class that does not exist until Phase 4, a defect pass 1's own remediation introduced.)*
 - [ ] T015 [P] [US5] [GATE:conformance] Assert in `tests/unit/test_src_does_not_import_tests.py` that **zero modules under `src/` import from `tests/`** (FR-015, SC-008), resolving imports by AST rather than by string match — a check that grepped for `tests` would match this task's own docstring
-- [ ] T016 [US5] Move the dispatched-run entrypoint from `tests/harness/dispatched_run.py` into `src/`, or record why it cannot (FR-015). It lives under `tests/` because a production entrypoint had no fabric to resolve through; that reason expires with this feature, and if it does not, the reason it survives is worth more than the move
+- [ ] T016 [US5] Record in `tests/harness/dispatched_run.py`'s docstring that it moves to `src/` at T038a and why not now: the production fabric it will construct does not exist until US1–US3 land, and moving it earlier would force it to import the fake from `src/` — FR-015's violation, committed by the task meant to satisfy FR-015. *(Pass 2 caught the move scheduled here, in a phase where it is impossible; the move itself is T038a.)*
 
 ---
 
@@ -73,9 +74,8 @@ authority in a live enclave, and neither exceeds its record.
 - [ ] T019 [US1] Read the harness ceiling record and build an `AuthorityScope` in `src/core/authority/ceiling.py` (FR-004)
 - [ ] T020 [US1] [GATE:fail-closed] Refuse `missing_ceiling_record` when a definition is registered but has no harness ceiling, and **never infer either jurisdiction from the other** (FR-005). That substitution is how a secrets grant quietly becomes a tool grant
 - [ ] T021 [US1] [GATE:fail-closed] Refuse `unknown_ceiling_entry`, **naming the entry**, when a ceiling names a tool or product action the platform does not know (FR-005a). Silently dropping it narrows a ceiling with no trace, which is a change to authority nobody can audit
-- [ ] T022 [US1] Record both **declared and effective** `ceiling_policies` when reading a registration (research Finding 2). Vault appends `default` and `default-ceiling` unless `no_default_ceiling_policy` is set, which this repository has never set. A reader seeing only its own declaration is reading something that does not exist
-- [ ] T022a [US1] [GATE:conformance] **Construct the production fabric in the run path**: the dispatched-run entrypoint (post-T016 location) and the surface assembly in `src/surfaces/api/app.py` build `VaultIdentityFabric` and pass it to `start_governed_run`, replacing the fake. **The task G2 named before it became a discovery.** Every task before this builds the mechanism; this is the thing it acts through, and 009 recorded eight features' worth of the difference. Without it, T023 fails as a mystery — the fabric exists, is correct, is tested, and nothing instantiates it
-- [ ] T023 [P] [US1] [GATE:conformance] Enclave row in `tests/conformance/identity/test_ceiling_from_registry.py` (SC-002): two definitions, two ceilings, different manufactured authority, neither exceeding its record. Depends on T009 — against the current fixture this passes whether enforcement works or not
+- [ ] T022 [US1] Record both **declared and effective** `ceiling_policies` — in the resolution's audit payload, where an investigator will look — when reading a registration (research Finding 2). Vault appends `default` and `default-ceiling` unless `no_default_ceiling_policy` is set, which this repository has never set. A reader seeing only its own declaration is reading something that does not exist
+- [ ] T023 [P] [US1] [GATE:conformance] Enclave row in `tests/conformance/identity/test_ceiling_from_registry.py`: two definitions, two ceilings, different manufactured authority, neither exceeding its record — **via the hybrid fabric (T010a)**: ceiling resolves through the production fabric, the other terms through the fake, marked per FR-014. Depends on T009 — against the current fixture this passes whether enforcement works or not. *(SC-002's dispatched end-to-end claim lands at T038c, once the run path is wired; this row proves the term, not the plumbing.)*
 - [ ] T024 [P] [US1] [GATE:conformance] Enclave row in `tests/conformance/identity/test_jurisdictions_stay_disjoint.py`: a registration with a credential policy and no harness ceiling refuses. **Break fixture**: a reader that falls back to `ceiling_policies` — plausible as a "be resilient" change, and it converts a secrets grant into a tool grant
 - [ ] T025 [P] [US1] [GATE:conformance] Row in `tests/conformance/identity/test_declared_vs_effective.py` asserting the appended default policies are observed and accounted for rather than discovered later
 
@@ -91,7 +91,7 @@ for the same run request.
 - [ ] T026 [US2] Resolve roles to a scope via the role-binding records in `src/core/authority/vault_fabric.py`, consuming `resolve_roles` from `core/identity/claims.py` (FR-006). 008 built claims→roles and 007 governs the mappings; only roles→scope is missing
 - [ ] T027 [US2] [GATE:fail-closed] Take the **union** of multiple roles' bindings in `src/core/authority/vault_fabric.py` before intersecting downstream. Union is the only choice that makes adding a role additive — intersection would let a second role *remove* access, which nobody would predict from being granted one
 - [ ] T028 [US2] [GATE:fail-closed] Keep the three "no scope" cases distinct (FR-007): `no_role_for_subject`, `unbound_role`, and a legitimately empty binding. Nobody knows who you are, nobody has said what your role means, and your role means nothing — only the third is a real empty scope, and collapsing them makes a platform failure look like a permissions decision
-- [ ] T029 [P] [US2] [GATE:conformance] Enclave row in `tests/conformance/identity/test_scope_from_claims.py` (SC-004): two users, two roles, measurably different authority
+- [ ] T029 [P] [US2] [GATE:conformance] Enclave row in `tests/conformance/identity/test_scope_from_claims.py` (SC-004): two users, two roles, measurably different authority — via the hybrid fabric (T010a), user scope real, marked per FR-014
 - [ ] T030 [P] [US2] [GATE:conformance] Row in `tests/unit/test_no_scope_cases_stay_distinct.py` (SC-005) covering all three cases and asserting three different reason codes
 
 ---
@@ -106,10 +106,28 @@ for the same run request.
 - [ ] T032 [US3] [GATE:fail-closed] Ensure a mid-run **widening** does not enlarge the grant issued at run start, in `src/core/authority/manufacture.py` (FR-009). Narrowing binds immediately; widening waits for a new run
 - [ ] T033 [US3] [GATE:fail-closed] Suspend naming `trust-fabric` when the fabric cannot be reached mid-run (FR-008a), through 009's `suspend_run(run, *, awaiting=...)` in `src/core/durability/resume.py`. `awaiting` is a free string, so the seam already accepts this — verified in the plan's seam table rather than discovered here
 - [ ] T034 [US3] [GATE:fail-closed] Refuse rather than suspend in `src/core/run.py` when the fabric is unreachable **at run start**. There is no grant, no checkpoint, and nothing to resume — the asymmetry falls out of a run existing or not existing yet, and is not a special case
-- [ ] T035 [US3] Assert the **recovery ordering** in `src/surfaces/mcp/server.py`'s supervisory pass and in `tests/conformance/identity/test_recovery_order.py` (FR-008b): fabric returns → checker login succeeds → credentials obtained → health recorded → sweep resumes. **The trust fabric is a dependency of the mechanism that monitors dependencies**, so this is the only order that terminates. Nothing else in this platform has this property and no existing row asserts an ordering constraint of this kind
+- [ ] T035 [US3] Assert the **recovery ordering** in `src/surfaces/mcp/server.py`'s supervisory pass and in `tests/conformance/identity/test_recovery_order.py` (FR-008b), consuming T036a's probe — the ordering row is vacuous until something can actually record the fabric healthy: fabric returns → checker login succeeds → credentials obtained → health recorded → sweep resumes. **The trust fabric is a dependency of the mechanism that monitors dependencies**, so this is the only order that terminates. Nothing else in this platform has this property and no existing row asserts an ordering constraint of this kind
 - [ ] T036 [US3] [GATE:fail-closed] Ensure nothing that failed to reach the fabric can mark it healthy, in `src/core/dependencies/store.py` (FR-008c). A monitor that cannot run leaves the state unknown, and unknown already refuses
-- [ ] T037 [P] [US3] [GATE:conformance] Enclave row in `tests/conformance/identity/test_policy_read_per_step.py` (SC-006): a mid-run narrowing bounds the next step, with **zero steps served from cache**. **Break fixture**: a resolver caching policy for a few seconds — an obvious optimisation, and the row that catches it is the zero-cached-steps assertion, not the one asserting the narrowing eventually applies
+- [ ] T036a [US3] [GATE:fail-closed] Implement the **trust-fabric probe** in the MCP service's health pass (`src/surfaces/mcp/server.py`): a successful credential acquisition records `trust-fabric` healthy in the dependency store; a failed one records unreachable. **Pass 2 found SC-006a had no mechanism**: the only probe in the platform is `unconfigured_probe`, which reports unreachable, and "trust-fabric" is not a registered product — so its state stays UNKNOWN forever, `permits_calls()` never becomes true, and the sweeper never resumes a fabric-suspended run. The probe is deliberately not a new check: **the checker's own login is the probe**, which is FR-008b's ordering made executable — the pass cannot record healthy without having first obtained credentials, so the order asserts itself
+- [ ] T037 [P] [US3] [GATE:conformance] Enclave row in `tests/conformance/identity/test_policy_read_per_step.py` (SC-006), via the hybrid fabric (T010a), policy real: a mid-run narrowing bounds the next step, with **zero steps served from cache**. **Break fixture**: a resolver caching policy for a few seconds — an obvious optimisation, and the row that catches it is the zero-cached-steps assertion, not the one asserting the narrowing eventually applies
 - [ ] T038 [P] [US3] [GATE:conformance] Enclave row in `tests/conformance/identity/test_fabric_outage_suspends.py` (SC-006a): the run suspends naming the fabric, holds no container, and resumes with **zero operator actions**
+
+---
+
+## Phase 6a: Integration — the run path uses the production fabric
+
+**Goal**: the mechanism built in US1–US3 is the thing dispatched runs actually resolve through.
+
+**Why a phase of its own, after US3 and before US4**: `manufacture_authority` resolves user
+scope, ceiling, and policy from one fabric object, so the wiring needs all three real —
+which is exactly why pass 1's wiring task (placed inside US1) could not work, and why pass 2
+moved it here. Entitlements are not needed first: the production fabric's
+`resolve_product_entitlements` refusing `entitlement_unavailable` until US4 configures the
+seam is fail-closed behaviour, not absence.
+
+- [ ] T038a Move the dispatched-run entrypoint from `tests/harness/dispatched_run.py` into `src/`, completing what T016 recorded (FR-015). The reason it lived under `tests/` — no fabric to resolve through — expires at this task and not before
+- [ ] T038b [GATE:conformance] **Construct the production fabric in the run path**: the moved entrypoint and the surface assembly in `src/surfaces/api/app.py` build `VaultIdentityFabric` and pass it to `start_governed_run`, replacing the fake. The task pass 1 named G2 and placed where it could not work; every task before this builds the mechanism, and this is the thing it acts through
+- [ ] T038c [GATE:conformance] Dispatched end-to-end row in `tests/conformance/identity/test_dispatched_end_to_end.py` (SC-002): a run dispatched through the real entrypoint, resolving every term from the live trust fabric under an attested identity, bounded by the registered ceiling. **This is the row that proves the plumbing** — T023 proved the term through the hybrid; a feature that stopped there would have a correct fabric nothing instantiates
 
 ---
 
@@ -131,6 +149,7 @@ for the same run request.
 
 - [ ] T044 [GATE:fail-closed] Assert in `tests/conformance/identity/test_fabric_unreachable_from_a_tool.py` that with an **agent's own credential** the ceiling paths are denied **by Vault** (FR-016). A refusal produced by our code would satisfy the behaviour and miss the point — ADR-0015 puts the fabric structurally outside every agent ceiling, and "structurally" means the denial is not ours to make
 - [ ] T045 [GATE:fail-closed] Extend `tests/unit/test_no_static_credentials.py` to cover the fabric's configuration and environment (FR-002, SC-010), reusing the assertion the durability and evidence paths already carry
+- [ ] T045a [P] [GATE:conformance] Assert in `tests/unit/test_production_fabric_satisfies_protocol.py` that `VaultIdentityFabric` structurally satisfies `IdentityFabric` with **no method raising "not supported"** (SC-009, second half — a clean protocol nobody implements is as vacuous as a dirty one everybody does). Here rather than in US5, where pass 1 put it and pass 2 found it asserting a class that did not exist yet
 - [ ] T046 [GATE:conformance] Break fixture in `tests/conformance/identity/test_break_empty_scope_on_error.py`: **a fabric returning an empty scope on error**. Every "denied" row still passes, because denial is what an empty scope produces — only the reason code fails. This is the most likely regression in the feature, since returning `AuthorityScope()` in an exception handler is the shortest path and reads as fail-closed
 - [ ] T046a [GATE:conformance] **Sweep every existing row that resolves authority through the fake** (FR-014, SC-001) — the task without which this feature's headline criterion is false on its own merge commit. For each conformance and component row importing `fake_identity_fabric`: migrate it to the production fabric where its subject allows, or mark it fault-injection with the explicit statement FR-014 requires. Record the resulting mapping — which rows moved, which stayed and why — in `contracts/conformance-identity.md`, which is FR-019's deliverable and falls out of this sweep rather than being written separately
 - [ ] T046b [P] [GATE:conformance] Gate check in `tests/unit/test_fake_fabric_is_fault_injection_only.py`: no conformance or component row imports the fake without the fault-injection marker (SC-001, mechanically). **Imports resolved by AST, not by string match**, with a positive control — this repository has had five checks match prose instead of code, and a grep for the fake's name would match the marker comments this check requires
@@ -148,28 +167,40 @@ for the same run request.
 
 ```
 Phase 1 Setup (T001–T002)
-  └─> Phase 2 Foundational (T003–T010)          [T009 blocks every enclave row]
+  └─> Phase 2 Foundational (T003–T010a)         [T009 blocks every enclave row;
+        │                                        T010a is what makes the stories
+        │                                        independently provable at all]
         └─> Phase 3 US5 protocol (T011–T016)     [sealed core; everything sits on it]
-              ├─> Phase 4 US1 ceilings (T017–T025)   🎯 MVP
+              ├─> Phase 4 US1 ceilings (T017–T025)   🎯 MVP (term proven via hybrid)
               ├─> Phase 5 US2 user scope (T026–T030)
-              ├─> Phase 6 US3 policy (T031–T038)
+              ├─> Phase 6 US3 policy + fabric health (T031–T038)
+              │     └─> Phase 6a Integration (T038a–T038c)
+              │           [needs US1+US2+US3: manufacture resolves scope, ceiling,
+              │            AND policy from one fabric object — entitlements refuse
+              │            fail-closed until US4, which is behaviour, not absence]
               └─> Phase 7 US4 entitlements (T039–T043)
                     └─> Phase 8 Polish (T044–T053)
-                          [T046a needs all four stories real — a row can only
-                           migrate off the fake once its resolution has somewhere
-                           real to go; T046b needs T046a's markers to exist]
+                          [T046a needs all four stories real AND the integration
+                           landed — a row can only migrate off the fake once its
+                           resolution has somewhere real to go; T046b needs
+                           T046a's markers to exist]
 ```
 
-**Two orderings are not free**, and both are recorded in the plan:
+**Three orderings are not free**:
 
 1. **US5 before US1–US4** despite being P5. A sealed-core protocol change made after three
    implementations exist means changing three implementations.
 2. **T009 before every enclave row.** The current fixture's ceiling grants a path under an
    unmounted mount, so rows written against it are green regardless of enforcement.
+3. **Integration after US3, not inside US1.** The run path resolves three terms from one
+   object, so wiring the production fabric in before all three exist breaks every dispatched
+   run — pass 1 placed the wiring task inside US1 and pass 2 caught it.
 
-**US1, US2, US3, US4 are independent of each other** once US5 lands. The intersection narrows
-whichever term is real, so a story can be proven while the others still resolve through the
-fake — which is what makes each independently testable.
+**US1, US2, US3, US4 are independent of each other** once US5 lands — *through the hybrid
+fabric (T010a)*, which is what makes the claim true rather than aspirational: each story's
+rows exercise their own term against the production fabric while the others resolve through
+the fake, marked per FR-014 and fully migrated at T046a. The **dispatched run path** is not
+independent; it is Phase 6a, and it needs three stories done.
 
 ## Parallel opportunities
 
@@ -177,16 +208,18 @@ fake — which is what makes each independently testable.
 - **Phase 3**: T014 and T015 are separate test files over separate concerns
 - **Phase 4**: T023, T024, T025 are three separate row files
 - **Phase 5**: T029 and T030
-- **Phase 6**: T037 and T038
+- **Phase 6**: T037 and T038 (T036a precedes T035's row)
 - **Phase 7**: T042 and T043
 - **Phase 8**: T046b runs beside T046a's tail; T048–T052 are documentation in different files
 
 ## Implementation strategy
 
-**MVP is Phase 1 + Phase 2 + Phase 3 + Phase 4** — through T025. That delivers the property
-the feature exists for: an agent's ceiling comes from what an operator configured, proven end
-to end against a live trust fabric. The remaining stories each replace one more fake, and the
-intersection means each is independently demonstrable.
+**MVP is Phase 1 + Phase 2 + Phase 3 + Phase 4** — through T025. That proves the property
+the feature exists for — an agent's ceiling comes from what an operator configured, enforced
+against a live trust fabric — via the hybrid harness, with the other terms still faked and
+marked. **The dispatched end-to-end claim is deliberately not in the MVP**: it lands at
+Phase 6a, because the run path needs scope and policy real too, and claiming end-to-end
+before then would be claiming the plumbing while only the term is proven.
 
 **Stop-and-check point after T012.** Making the broker branch refuse is a behaviour change to
 a path that currently returns `allow`. If anything depends on that `allow` — including a test
@@ -195,9 +228,14 @@ one.
 
 ## Task count
 
-**56 tasks** — 2 setup, 8 foundational, 6 US5, 10 US1, 5 US2, 8 US3, 5 US4, 12 polish.
+**61 tasks** — 2 setup, 9 foundational, 6 US5, 9 US1, 5 US2, 9 US3, 3 integration, 5 US4,
+13 polish.
 
-Three were added by the analyze pass rather than the original generation, and each has a
-finding behind it: T022a (G2 — the wiring task, the ninth instance of the seam pattern
-caught before implementation instead of during), and T046a/T046b (G1 — the sweep and its
-enforcement, without which SC-001 is false on the feature's own merge commit).
+Eight exist because analyze looked, across two passes. Pass 1 added the SC-001 sweep and its
+enforcement (T046a/T046b) and a wiring task; pass 2 found that wiring task could not work
+where it sat — the run path resolves three terms from one fabric object — and replaced it
+with the hybrid harness (T010a), the Integration phase (T038a–c), and the trust-fabric probe
+(T036a), without which no fabric-suspended run would ever have resumed. Three of pass 2's
+four findings were introduced by pass 1's remediation, which is the same fix-introduces-defect
+streak every 008 and 009 pass showed — recorded here because the next feature's passes should
+expect it rather than be surprised by it.

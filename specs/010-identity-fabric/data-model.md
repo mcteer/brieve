@@ -136,6 +136,7 @@ reason code invented at the call site is one nothing can assert on.
 | `fabric_unreachable` | The trust fabric did not answer | What, unknown |
 | `fabric_timeout` | It answered too slowly (FR-018) | What, unknown |
 | `entitlement_unavailable` | The product could not be asked | What, unknown |
+| `broker_not_implemented` | The brokered credential path does not exist yet; the call is refused rather than allowed on a placeholder | What, unknown — the mechanism, not the permission |
 | `outside_scope` | Resolution succeeded; the action is not permitted | What, permitted |
 
 **Only the last is a policy answer.** Everything above it is the platform declining to guess,

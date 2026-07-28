@@ -218,7 +218,7 @@ would advertise a choice the architecture does not offer.
 
 ### Sequencing notes for whoever writes tasks
 
-The user stories are independently testable, but two orderings are not free:
+The user stories are independently testable, but three orderings are not free:
 
 1. **The protocol narrowing (US5) goes first, not last.** It is a sealed-core change that
    every other story's code sits on; doing it after three implementations exist means
@@ -226,6 +226,15 @@ The user stories are independently testable, but two orderings are not free:
 2. **The enclave fixture (research D4) precedes every enclave row.** `demo-agent`'s ceiling
    grants a path under a mount that is not mounted, so rows written against it would pass
    whether enforcement worked or not.
+3. **Integration is its own step, after ceilings, scope, and policy all exist.**
+   `manufacture_authority` resolves three terms from one fabric object, so the production
+   fabric cannot be wired into the run path until all three resolve for real — and until
+   then, per-story rows prove their term through a **test-harness hybrid** that delegates
+   one resolution to the production fabric and the rest to the fake. The hybrid lives in
+   the harness because production code composing with the fake would violate FR-015; that
+   asymmetry is what makes the stories independently provable at all. *(Added after analyze
+   pass 2, which found the wiring task placed inside US1, where the run path would have
+   broken on the first dispatched run.)*
 
 Everything else follows spec priority: ceilings, then user scope, then policy, then
 entitlements.
