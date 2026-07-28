@@ -138,11 +138,11 @@ seam is fail-closed behaviour, not absence.
 
 **Independent test**: a user narrower than the credential cannot exceed themselves.
 
-- [ ] T039 [US4] Define the entitlement-resolution seam in `src/core/authority/entitlements.py` — ours, real — and implement it on `tests/harness/fake_product_api.py`. The product's authorization system is outside our boundary and correctly stays faked; the interface that asks it is not (spec C2)
-- [ ] T040 [US4] [GATE:fail-closed] Refuse `entitlement_unavailable` when a product cannot be asked (FR-011). Unknown entitlement is not empty and is certainly not full
-- [ ] T041 [US4] [GATE:fail-closed] Keep both authorization domains independent in `src/core/hooks/mirroring.py` — either refusing refuses the call (FR-010, ADR-0044). Two checks that must agree are not one check consulted twice
-- [ ] T042 [P] [US4] [GATE:conformance] Row in `tests/conformance/identity/test_mirroring_bites.py` (SC-007): a user narrower than the credential cannot exceed themselves, with **zero side effects** on the attempt
-- [ ] T043 [P] [US4] [GATE:conformance] Row in `tests/conformance/identity/test_broker_refuses.py` asserting the broker branch refuses `broker_not_implemented` rather than allowing on a placeholder (research Finding 6)
+- [X] T039 [US4] Define the entitlement-resolution seam in `src/core/authority/entitlements.py` — ours, real — and implement it on `tests/harness/fake_product_api.py`. The product's authorization system is outside our boundary and correctly stays faked; the interface that asks it is not (spec C2)
+- [X] T040 [US4] [GATE:fail-closed] Refuse `entitlement_unavailable` when a product cannot be asked (FR-011). Unknown entitlement is not empty and is certainly not full
+- [X] T041 [US4] [GATE:fail-closed] Keep both authorization domains independent in `src/core/hooks/mirroring.py` — either refusing refuses the call (FR-010, ADR-0044). Two checks that must agree are not one check consulted twice
+- [X] T042 [P] [US4] [GATE:conformance] Row in `tests/conformance/identity/test_mirroring_bites.py` (SC-007): a user narrower than the credential cannot exceed themselves, with **zero side effects** on the attempt
+- [X] T043 [P] [US4] [GATE:conformance] Row in `tests/conformance/identity/test_broker_refuses.py` asserting the broker branch refuses `broker_not_implemented` rather than allowing on a placeholder (research Finding 6)
 
 ---
 
