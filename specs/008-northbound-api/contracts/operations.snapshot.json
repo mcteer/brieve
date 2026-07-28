@@ -6,6 +6,10 @@
   },
   {
     "method": "GET",
+    "path": "/claim-mappings/{accessor}"
+  },
+  {
+    "method": "GET",
     "name": "read_evidence",
     "path": "/evidence"
   },

@@ -89,9 +89,43 @@ EvidenceDep = Annotated[EvidenceQuery, Depends(evidence_query)]
 AuditDep = Annotated[AuditSink, Depends(audit_sink)]
 AuthoritySubmitterDep = Annotated[Any, Depends(authority_submitter)]
 
+
+# 011's collaborators, resolved the same way and for the same reason: a route that reached
+# for its own handle could be stood up with different security properties than production.
+def run_index(request: Request) -> Any:
+    return _component(request, "run_index")
+
+
+def durability(request: Request) -> Any:
+    return _component(request, "durability")
+
+
+def change_requests(request: Request) -> Any:
+    return _component(request, "change_requests")
+
+
+def change_status(request: Request) -> Any:
+    return _component(request, "change_status")
+
+
+def definitions(request: Request) -> Any:
+    return _component(request, "definitions")
+
+
+RunIndexDep = Annotated[Any, Depends(run_index)]
+DurabilityDep = Annotated[Any, Depends(durability)]
+ChangeRequestsDep = Annotated[Any, Depends(change_requests)]
+ChangeStatusDep = Annotated[Any, Depends(change_status)]
+DefinitionsDep = Annotated[Any, Depends(definitions)]
+
 __all__ = [
     "AuditDep",
     "AuthoritySubmitterDep",
+    "ChangeRequestsDep",
+    "ChangeStatusDep",
+    "DefinitionsDep",
+    "DurabilityDep",
+    "RunIndexDep",
     "DispatcherDep",
     "EvidenceDep",
     "SubjectDep",

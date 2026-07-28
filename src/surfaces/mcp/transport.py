@@ -90,6 +90,7 @@ class McpTransport:
             "get_run": self._get_run,
             "read_evidence": self._read_evidence,
             "request_mapping_change": self._request_mapping_change,
+            "collect_mapping_change": self._collect_mapping_change,
         }.get(tool_name)
 
         if handler is None:
@@ -144,6 +145,44 @@ class McpTransport:
                 "entries": [e.model_dump(mode="json") for e in entries],
                 "count": len(entries),
                 "disposition": str(disposition),
+            },
+        )
+
+    def _collect_mapping_change(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        if self._change_status is None:
+            return McpResult(ok=False, status=503, payload={"reason": "trust fabric unavailable"})
+
+        from core.runs.refusals import OperationRefused
+        from surfaces.api.mappings import collect_mapping_change
+
+        try:
+            disposition = collect_mapping_change(
+                accessor=str(args["accessor"]),
+                subject=subject,
+                change_requests=self._changes,
+                change_status=self._change_status,
+                audit=self._audit,
+            )
+        except OperationRefused as refused:
+            # The same two-way split the route makes, and it must stay the same: parity
+            # compares verdicts, so a transport that reported these differently would fail
+            # the row — which is the row working rather than an inconvenience.
+            return McpResult(
+                ok=False,
+                status=403 if refused.is_visible_to_caller else 404,
+                payload={"reason": "no such change request"},
+            )
+
+        return McpResult(
+            ok=True,
+            status=200,
+            payload={
+                "accessor": disposition.accessor,
+                "disposition": disposition.disposition,
+                "approvals": disposition.approvals,
+                "required": disposition.required,
             },
         )
 

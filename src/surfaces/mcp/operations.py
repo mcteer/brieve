@@ -31,6 +31,7 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "get_run": ("GET", "/runs/{run_id}"),
     "read_evidence": ("GET", "/evidence"),
     "request_mapping_change": ("POST", "/claim-mappings"),
+    "collect_mapping_change": ("GET", "/claim-mappings/{accessor}"),
 }
 
 
@@ -114,6 +115,26 @@ def operations() -> list[McpOperation]:
                     "reason": {"type": "string", "minLength": 1},
                 },
                 "required": ["mapping", "reason"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="collect_mapping_change",
+            method="GET",
+            path="/claim-mappings/{accessor}",
+            description=(
+                "Report what became of a change you requested. Pending is a legitimate "
+                "answer for as long as approvers have not acted — it is not a failure, "
+                "and asking again never advances the request."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "accessor": {"type": "string", "minLength": 1},
+                },
+                "required": ["accessor"],
+                # No requester. Who is asking comes from the authenticated subject, and a
+                # requester parameter would be a request to read someone else's change.
                 "additionalProperties": False,
             },
         ),
