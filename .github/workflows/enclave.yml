@@ -81,6 +81,21 @@ jobs:
           install_hashicorp vault "${VAULT_VERSION}"
           install_hashicorp terraform "${TERRAFORM_VERSION}"
 
+      # Nomad allocations run with host networking and reach the trust store and state
+      # store at `host.docker.internal`. Docker Desktop provides that name; Linux Docker
+      # does not, so the runner needs it explicitly. The Vault container gets it through
+      # `host-gateway` in the substrate module — this is the other half, for workloads
+      # that share the host's resolver rather than a container's.
+      #
+      # This is what 009's T002 existed to find: the enclave does not come up unmodified
+      # on a Linux runner, and the reason is a Docker Desktop convenience baked into how
+      # containers address the host.
+      - name: Make host.docker.internal resolvable
+        run: |
+          set -euo pipefail
+          echo '127.0.0.1 host.docker.internal' | sudo tee -a /etc/hosts >/dev/null
+          getent hosts host.docker.internal
+
       # `enclave-up` reads the licence from .env, not the environment — so the lane writes
       # one. The value is written UNQUOTED: `env_val` strips surrounding quotes, but 006
       # paid for the case where they survive, and Vault then rejects the licence with

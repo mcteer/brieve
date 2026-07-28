@@ -94,6 +94,23 @@ resource "docker_container" "vault" {
     external = var.vault_port
   }
 
+  # `host.docker.internal` is a Docker DESKTOP convenience. On Linux Docker it does not
+  # exist, and the trust store then cannot reach the state store at all — Terraform fails
+  # configuring the database engine with "hostname resolving error: lookup
+  # host.docker.internal ... no such host", which names DNS and not the platform
+  # assumption behind it.
+  #
+  # `host-gateway` is the portable spelling: Docker resolves it to the host on Linux, and
+  # Docker Desktop already honours it, so this is not a Linux special case — it is the
+  # same arrangement expressed in a way both substrates understand.
+  #
+  # Found by 009's T002, which existed to ask whether the enclave comes up on a Linux CI
+  # runner before a lane was built assuming it does. It does not, unmodified.
+  host {
+    host = "host.docker.internal"
+    ip   = "host-gateway"
+  }
+
   # Certificate material, uploaded only when TLS is on. Uploading empty files would make
   # the listener config valid and the handshake fail, which is a worse failure than not
   # having TLS: it looks configured.

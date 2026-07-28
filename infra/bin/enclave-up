@@ -78,6 +78,34 @@ for bin in docker nomad vault terraform python3; do
   command -v "$bin" >/dev/null || die "$bin is not on PATH — see CONTRIBUTING.md"
 done
 docker info >/dev/null 2>&1 || die "Docker is not running — start Docker Desktop"
+
+# `host.docker.internal` must resolve for a HOST-NETWORKED CONTAINER.
+#
+# Nomad allocations here run with `network_mode = host`, and reach the trust store and
+# state store by that name. Where "host" is depends on the substrate, which is why this
+# is checked the way a workload experiences it rather than by resolving on this machine:
+#
+#   - Docker Desktop runs containers inside a Linux VM and provides the name there. The
+#     macOS host itself does NOT resolve it, and does not need to.
+#   - Linux Docker shares the machine's own network namespace and provides nothing, so
+#     the name has to exist in /etc/hosts.
+#
+# A check against the local resolver would therefore fail on every Docker Desktop
+# machine while the enclave worked perfectly — which is how this check was first written,
+# and what running it caught.
+#
+# Checked rather than fixed: the fix needs root, and a script that silently edits
+# /etc/hosts is a worse thing to run than one that tells you what to do.
+if ! docker run --rm --network host alpine:3 getent hosts host.docker.internal >/dev/null 2>&1; then
+  die "host.docker.internal does not resolve inside a host-networked container.
+
+  Docker Desktop provides it; Linux Docker does not. Scheduled workloads use host
+  networking and reach the trust store and state store by that name, so without it they
+  fail later with a connection error that names DNS and not this.
+
+  Add it once:
+      echo '127.0.0.1 host.docker.internal' | sudo tee -a /etc/hosts"
+fi
 LICENSE="$(env_val VAULT_ENT_LICENSE)"
 [ -n "$LICENSE" ] || die "VAULT_ENT_LICENSE is absent from .env"
 [ -d "$ENV_DIR" ] || die "environment root $ENV_DIR does not exist"
