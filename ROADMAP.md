@@ -28,11 +28,12 @@ being re-derived at the start of every spec.
 | 005 | Durable execution | ADR-0024, ADR-0026, ADR-0048, ADR-0018 (consumes) | All seven durability rows |
 | 006 | Deployment module tree | ADR-0025, ADR-0048, ADR-0015, ADR-0007 | — (infrastructure; the durability rows now run under an attested identity) |
 | 007 | Control Groups | ADR-0016, ADR-0015, ADR-0048 | — (no new blocking row; component tests against the real Vault) |
+| 008 | Northbound API | ADR-0033 (first transport), ADR-0035, ADR-0016 (consumes), ADR-0015 | Seventeen API rows, nine needing the enclave. **Parity deliberately not claimed** — one transport is nothing to compare |
 
 ## In progress
 
-Nothing. The next feature is the top of [Next](#next) — the northbound **API**, first of the
-four transports, and the one the other three consume.
+**009 — MCP surface.** The second transport, the persistent service ADR-0049 assumes, and the
+CI lane that turns sixteen merge-blocking rows from an instruction into a control.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -62,20 +63,23 @@ wearing a different name.
 
 | # | Transport | Notes |
 | --- | --- | --- |
-| 008 | **API** | The surface the others consume. Carries the audit plane as a governed read path |
-| — | MCP | The persistent service coding IDEs talk to. **Scope includes** the dependency health checks and the resume sweeper decided in ADR-0049 — both need a long-lived home, and this is it |
+| 008 | **API** | ✅ Shipped. The surface the others consume. Carries the audit plane as a governed read path |
+| 009 | **MCP** | The persistent service coding IDEs talk to. **Scope includes** the dependency health checks and the resume sweeper decided in ADR-0049 — both need a long-lived home, and this is it — plus the continuous evidence-stream verification 008 deferred here, and the second CI lane |
 | — | CLI | Over the API |
 | — | Portal | Over the API |
 
-**Owed gate row:** four-transport surface parity. It stays owed until at least two transports
-exist — parity cannot be asserted against a single surface, and a row claiming otherwise would
-be a stub.
+**Owed gate row:** four-transport surface parity. It stayed owed through 008 because parity
+cannot be asserted against a single surface. **009 claims it** — two transports exist, so the
+comparison is possible, and deferring it again would stop being rigour.
 
 **Why here:** the first features that ship something a user touches directly. They need the
 authorization core (002/003) and the approval gate (007) settled behind them; attempting them
 earlier means building transports over guarantees still in motion.
 
-### 009 — Capability packs and eval gates (ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045)
+### Capability packs and eval gates (ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045)
+
+> Previously headed "009", which guessed a number this file's own rule says not to guess —
+> and it was wrong the moment MCP was specified first. Unnumbered until its directory exists.
 
 Packs, prompts, and skills as pinned, eval-gated artifacts; the Qualified Model Matrix; per-role
 model bindings; competency tiers.
@@ -116,7 +120,7 @@ the decision, not an omission.
 | Dedicated workflow-engine durability provider | ADR-0024, ADR-0028 | A named trigger: scale, an existing deployment, or a requirement the library provider cannot meet |
 | Wire-level guardrail (second protection layer) | ADR-0014 | Optional by design; in-process hooks are the primary layer |
 | Retrieval | ADR-0029 | Runs in the Postgres a deployment already has — needs that Postgres to exist first |
-| Continuous evidence-stream verification | 008 (FR-010e) | Needs a long-lived home. 008 ships `verify_stream_integrity` and calls it from `make enclave-verify`, which covers bring-up but not the running estate. Belongs with the MCP service alongside ADR-0049's resume sweeper — recorded here because a deferral living only in a spec is invisible to whoever plans that feature, which is exactly who needs it |
+| Continuous evidence-stream verification | 009 | Needs a long-lived home. 008 ships `verify_stream_integrity` and calls it from `make enclave-verify`, which covers bring-up but not the running estate. Belongs with the MCP service alongside ADR-0049's resume sweeper — recorded here because a deferral living only in a spec is invisible to whoever plans that feature, which is exactly who needs it |
 | A production `IdentityFabric` | **Unassigned** | Every feature from 002 to 008 resolves user scope, ceilings, policy, and entitlements through a **fake**. `IdentityFabric` is a protocol and `fabric.py` says so in its first line; ADR-0048 anticipates a Vault-backed implementation and notes the fake was "a consequence of the gap, not a deliberate deferral". 008 made it concrete: a dispatched run's entrypoint had to live under `tests/harness/` because a production one has no fabric to resolve scope through, and putting a production-looking entrypoint in `src/` that imported the test fake would have hidden that. **No feature currently claims this.** Nothing downstream of it is proven against a real identity source |
 | Row-level security on the evidence store | 008 | The tenant boundary on evidence reads is enforced by the application, not the database. `exists_outside_tenant` shows why that matters: the SQL role can see that rows exist under another tenant even though no content crosses. Postgres RLS moves the enforcement a layer down and is the right eventual home |
 | Vertical policy/content profiles | ADR-0003 | Horizontal first. Profiles ship as policy and content, not as forks |
@@ -131,9 +135,9 @@ ADR — never a passing stub.**
 | --- | --- | --- |
 | Governance-ordering, fail-closed, governed entry | 004 | ✅ In force |
 | Durability scenarios (ADR-0024/0026) | 005 | ✅ In force — all seven, both providers, under an attested identity. **Not run by CI** (the fork-safe lane cannot hold a licensed Vault); the agent harness runs them before merge per `AGENTS.md`, and refuses the merge if the enclave cannot come up |
-| Four-transport surface parity | 008 | **Still Deferred** — ADR-0033. 008 has landed and deliberately does not claim this row: parity is a property *between* transports and there is one, so a green row would be the passing stub ADR-0047 forbids. What 008 owes instead is making the comparison possible, and it does: `specs/008-northbound-api/contracts/operations.snapshot.json` records the operation set, diffed by a conformance row. The second transport compares against that rather than against whatever the API happens to do by then |
-| Tool-call parity under deferred disclosure | 010 | Deferred — ADR-0040 |
-| Eval gates (packs, models, policies) | 009 | Deferred — Principle VIII |
+| Four-transport surface parity | 009 | **Claimed by 009.** Deferred through 008 because parity is a property *between* transports and there was one — a green row would have been the stub ADR-0047 forbids. What 008 shipped instead was the thing that makes the comparison possible: `specs/008-northbound-api/contracts/operations.snapshot.json`, a recorded operation set diffed by a conformance row, so the second transport compares against something written down rather than against whatever the API happens to do by then |
+| Tool-call parity under deferred disclosure | Deferred-disclosure feature | Deferred — ADR-0040 |
+| Eval gates (packs, models, policies) | Capability packs | Deferred — Principle VIII |
 | Registry isolation (control-plane write denials) | — | **Unassigned** — see gaps below |
 
 ## Open records
