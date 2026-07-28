@@ -30,19 +30,12 @@ being re-derived at the start of every spec.
 | 007 | Control Groups | ADR-0016, ADR-0015, ADR-0048 | — (no new blocking row; component tests against the real Vault) |
 | 008 | Northbound API | ADR-0033 (first transport), ADR-0035, ADR-0016 (consumes), ADR-0015 | Seventeen API rows, nine needing the enclave. **Parity deliberately not claimed** — one transport is nothing to compare |
 | 009 | MCP surface | ADR-0033 (second transport), ADR-0049 (**resolved by building it**), ADR-0035, ADR-0048 | Fifteen MCP rows. **Surface parity claimed** — the row 008 could not assert, now that there are two transports to compare |
+| 010 | Production identity fabric | ADR-0015 (**first feature that reads the registry at runtime**), ADR-0050 (new), ADR-0044 (mirroring seam; credential translation still deferred), ADR-0048 | Identity rows against the live trust fabric, in-allocation. **The gap every prior feature rested on** |
 
 ## In progress
 
-**010 — Production identity fabric.** The gap recorded below since 008 and unclaimed since:
-every feature from 002 to 009 resolves user scope, agent ceilings, policy, and product
-entitlements through a **fake**. This is the feature that reads them from the control-plane
-trust fabric instead.
-
-**Why now, ahead of the CLI.** The remaining transports are human-facing, and a CLI is the
-first thing a real person authenticates to expecting real scope. Shipping it over a fake
-authority source would put the gap in front of users before it was closed — and northbound's
-next honest step is arguably widening the API's four operations anyway, which the CLI would
-otherwise have to be specified around twice.
+Nothing. 010 shipped; the next feature has no number until `/speckit-specify` creates its
+directory.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -136,8 +129,11 @@ the decision, not an omission.
 | Dedicated workflow-engine durability provider | ADR-0024, ADR-0028 | A named trigger: scale, an existing deployment, or a requirement the library provider cannot meet |
 | Wire-level guardrail (second protection layer) | ADR-0014 | Optional by design; in-process hooks are the primary layer |
 | Retrieval | ADR-0029 | Runs in the Postgres a deployment already has — needs that Postgres to exist first |
-| A production `IdentityFabric` | **010** | Every feature from 002 to 009 resolves user scope, ceilings, policy, and entitlements through a **fake**. `IdentityFabric` is a protocol and `fabric.py` says so in its first line; ADR-0048 anticipates a Vault-backed implementation and notes the fake was "a consequence of the gap, not a deliberate deferral". 008 made it concrete: a dispatched run's entrypoint had to live under `tests/harness/` because a production one has no fabric to resolve scope through, and putting a production-looking entrypoint in `src/` that imported the test fake would have hidden that. **Claimed by 010** — the row stays here until it ships, because a gap moved to the plan is not a gap closed |
 | Row-level security on the evidence store | 008 | The tenant boundary on evidence reads is enforced by the application, not the database. `exists_outside_tenant` shows why that matters: the SQL role can see that rows exist under another tenant even though no content crosses. Postgres RLS moves the enforcement a layer down and is the right eventual home |
+| RFC 8693 + RAR authority manufacture | **Unassigned** | Principle IV describes manufacture as "attested workload identity → control-plane Vault → **RFC 8693 + RAR** against ceiling policies". The implementation is a JWT auth-method login against a named role. The ceiling IS enforced, by the role's `token_policies` — but RAR is what would let a *task* request a narrowed subset at exchange time, which is the "task scope" term in Principle IV's own intersection. The pieces exist unused: the registry exposes `optional_authorization_details`, the identity store has an OIDC provider with `/token` and no clients. Found by 010, which is the feature that reads ceilings and therefore the last honest moment to notice |
+| Brokered credential translation | ADR-0044 | Principle IV names the broker's rotated management token as **the platform's single permitted standing credential**, and the mechanism it exists for does not exist. Until 010 the branch wrote a placeholder string and returned `allow`; it now refuses `broker_not_implemented`, which makes the gap visible when a deployment configures a brokered product. The entitlement-mirroring check in front of it is real and enforced |
+| `no_default_ceiling_policy` on registrations | ADR-0050 | Vault appends `default` and `default-ceiling` to every registration unless this is set, which nothing here has ever set — so the effective ceiling has never been the declared one. The added policies are benign; the point is that a difference existed where the mechanism's whole claim is that none does. Setting it changes the posture of every registration and deserves its own decision |
+| Ceiling / policy jurisdiction coherence | ADR-0050 | Two records for one definition can disagree: an agent granted a tool whose secrets it cannot read, or the reverse. A consequence of ADR-0044's disjoint jurisdictions rather than a defect, and nothing reports it. A cross-check would be a rule duplicated across engines, which is what ADR-0044 forbids — so the fix is probably an operator-facing report, not a gate |
 | Vertical policy/content profiles | ADR-0003 | Horizontal first. Profiles ship as policy and content, not as forks |
 
 ## Owed Quality Gate rows
