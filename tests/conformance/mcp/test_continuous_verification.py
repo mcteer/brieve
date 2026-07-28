@@ -25,15 +25,15 @@ class FakeConn:
     database cannot tell you is wrong.
     """
 
-    def __init__(self, heads: list[tuple], entries: list[tuple]) -> None:
+    def __init__(self, heads: list[tuple[Any, ...]], entries: list[tuple[Any, ...]]) -> None:
         self._heads = heads
         self._entries = entries
-        self._result: list[tuple] = []
+        self._result: list[tuple[Any, ...]] = []
 
     def cursor(self) -> FakeConn:
         return self
 
-    def execute(self, sql: str, params: tuple = ()) -> None:
+    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
         if "audit_stream_heads" in sql:
             self._result = self._heads
         elif "DISTINCT correlation_id" in sql:
@@ -41,7 +41,7 @@ class FakeConn:
         else:
             self._result = [e for e in self._entries if e[1] == params[0]]
 
-    def fetchall(self) -> list[tuple]:
+    def fetchall(self) -> list[tuple[Any, ...]]:
         return self._result
 
     def close(self) -> None:
@@ -69,9 +69,7 @@ def test_row_entries_with_no_recorded_head_are_reported() -> None:
 
 def test_row_a_head_with_no_entries_is_reported() -> None:
     """The stream was emptied. The head is what remembers it existed."""
-    report = verify_stream_integrity(
-        lambda: FakeConn(heads=[("stream-1", 2, "h2")], entries=[])
-    )
+    report = verify_stream_integrity(lambda: FakeConn(heads=[("stream-1", 2, "h2")], entries=[]))
 
     assert not report.ok
     assert {f.kind for f in report.findings} == {"stream_emptied"}
@@ -79,9 +77,7 @@ def test_row_a_head_with_no_entries_is_reported() -> None:
 
 def test_row_findings_carry_enough_for_an_operator_to_act() -> None:
     """A finding that named nothing would be an alert nobody can act on."""
-    report = verify_stream_integrity(
-        lambda: FakeConn(heads=[("stream-1", 5, "h5")], entries=[])
-    )
+    report = verify_stream_integrity(lambda: FakeConn(heads=[("stream-1", 5, "h5")], entries=[]))
     finding = report.findings[0]
 
     assert isinstance(finding, IntegrityFinding)

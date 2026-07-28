@@ -217,18 +217,18 @@ without operator action.
 - [X] T054 [US5] Run `verify_stream_integrity` (008) periodically from the MCP service in `src/surfaces/mcp/server.py` using T053b's factory, scoped so one pass does not walk an estate's whole history
 - [X] T055 [US5] [GATE:correlation] Surface findings from `src/surfaces/mcp/server.py` (FR-017) where an operator will see them, not only recorded. A finding written to a table nobody reads is the same as no finding
 - [X] T056 [US5] [GATE:conformance] Enclave row in `tests/conformance/mcp/test_continuous_verification.py` (SC-010): tampering is reported with no operator action, **and a clean store reports clean**. The false-positive half matters as much — a check that always fires gets disabled
-- [ ] T057 [P] [US5] Update `ROADMAP.md`: continuous evidence-stream verification moves from deferred to shipped
+- [X] T057 [P] [US5] Update `ROADMAP.md`: continuous evidence-stream verification moves from deferred to shipped
 
 ---
 
 ## Phase 9: Polish and the record
 
-- [ ] T058 [GATE:conformance] Resolve **ADR-0049** in `docs/adr/0049-*.md` — Accepted, amended, or withdrawn on the evidence of having built it (FR-021, SC-013). It was left Proposed deliberately, until something built it. Leaving it Proposed is a failure of this requirement, not a deferral
-- [ ] T058a Record the supersession in `docs/adr/0026-*.md`: its re-consent and human-resolution rules are superseded by ADR-0049, the rest stands. Principle X requires superseding be **recorded, never edited in place**, and an ADR silently outlived by another is exactly the failure that principle names
-- [ ] T059 Update `specs/008-northbound-api/contracts/conformance-api.md` and `specs/005-durable-execution/contracts/conformance-durability.md` to say which rows CI now covers and which remain named to a human — fork pull requests only (FR-022). A contract still claiming no automated runner exists is wrong in the direction that makes people trust the gate less than they should
-- [ ] T060 [P] Update `AGENTS.md`: the harness gate now applies to fork pull requests and to anything the lane cannot cover, rather than to everything
-- [ ] T061 [P] Update `ROADMAP.md`: 009 shipped; the **four-transport parity row moves from Deferred to In force**
-- [ ] T062 [P] Record the fifteen rows in `contracts/conformance-mcp.md` as **In force**
+- [X] T058 [GATE:conformance] Resolve **ADR-0049** in `docs/adr/0049-*.md` — Accepted, amended, or withdrawn on the evidence of having built it (FR-021, SC-013). It was left Proposed deliberately, until something built it. Leaving it Proposed is a failure of this requirement, not a deferral
+- [X] T058a Record the supersession in `docs/adr/0026-*.md`: its re-consent and human-resolution rules are superseded by ADR-0049, the rest stands. Principle X requires superseding be **recorded, never edited in place**, and an ADR silently outlived by another is exactly the failure that principle names
+- [X] T059 Update `specs/008-northbound-api/contracts/conformance-api.md` and `specs/005-durable-execution/contracts/conformance-durability.md` to say which rows CI now covers and which remain named to a human — fork pull requests only (FR-022). A contract still claiming no automated runner exists is wrong in the direction that makes people trust the gate less than they should
+- [X] T060 [P] Update `AGENTS.md`: the harness gate now applies to fork pull requests and to anything the lane cannot cover, rather than to everything
+- [X] T061 [P] Update `ROADMAP.md`: 009 shipped; the **four-transport parity row moves from Deferred to In force**
+- [X] T062 [P] Record the fifteen rows in `contracts/conformance-mcp.md` as **In force**
 - [ ] T063 [GATE:conformance] Run `make check` and `make conformance` against a live enclave, and confirm every break fixture passes on a clean tree. A row whose failure nobody has observed is a row nobody knows works
 
 ---

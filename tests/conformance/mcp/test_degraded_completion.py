@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from core.dependencies.gate import DEPENDENCY_UNAVAILABLE, denial_class_for
 from core.dependencies.types import DenialClass, HealthState
+from core.run import GovernedRun
 from core.tools.invoke import invoke_tool
 from tests.component.conftest import CountingHandler, make_run
 
@@ -23,14 +24,14 @@ class Down:
         return HealthState.UNHEALTHY
 
 
-def _mixed_run() -> tuple[object, CountingHandler, CountingHandler]:
+def _mixed_run() -> tuple[GovernedRun, CountingHandler, CountingHandler]:
     """A run with one reachable tool and one that needs a downed product."""
     plan = CountingHandler()
     apply_ = CountingHandler()
     run, _, _ = make_run(tool_name="plan", scope={"plan", "apply"}, handler=plan)
     run.registry.register("plan", plan)
     run.registry.register("apply", apply_, product="terraform-cloud")
-    run.dependency_health = Down()  # type: ignore[assignment]
+    run.dependency_health = Down()
     return run, plan, apply_
 
 
