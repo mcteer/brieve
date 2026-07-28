@@ -42,12 +42,13 @@ def _job_registered() -> bool:
         return False
 
 
-def _allocation_state(dispatched_job_id: str, *, timeout: float = 420.0) -> tuple[str, str]:
+def _allocation_state(dispatched_job_id: str, *, timeout: float = 720.0) -> tuple[str, str]:
     """Wait for the dispatched allocation to finish and return (client status, alloc id).
 
-    Seven minutes, because a cold allocation installs its dependencies before it runs
-    anything — measured at four to six minutes on this enclave. A shorter budget reports
-    `timeout` for a run that was working, which reads as a hang and is a stopwatch.
+    Twelve minutes, because every allocation installs its dependencies from scratch before
+    running anything — there is no shared cache, and a cold one has been measured past
+    seven. A shorter budget reports `timeout` for a run that was working, which reads as a
+    hang and is a stopwatch.
     """
     deadline = time.monotonic() + timeout
     alloc_id = ""
