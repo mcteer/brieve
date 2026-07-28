@@ -4,16 +4,25 @@
 **Status**: Planned
 **Depends on**: Constitution Quality Gates (v1.1.0, amended by this feature); ADR-0033; ADR-0047; ADR-0049
 
-## The row this feature finally claims
+## The row this feature amends, then satisfies
 
-**Four-transport surface parity.** Owed since ADR-0033, deferred through 008 for a good
-reason, and claimable now that two transports exist.
+**Surface parity.** Owed since ADR-0033 and deferred through 008 for a good reason.
+
+It is **not simply claimed here**, and the distinction survived an analyze pass rather than
+the first draft. The constitutional row reads *"surface parity across all four transports"*,
+and there are two — so claiming it would assert something untrue, which is the passing stub
+ADR-0047 forbids, in the feature whose spec makes a point of refusing stubs.
+
+The row is **amended to bind incrementally**: parity across every pair of implemented
+transports. Better than claiming and better than deferring again, because the gate then
+binds at two, at three, and at four, instead of catching nothing until the last transport
+lands — which is well after divergence would have started.
 
 ## Rows in force
 
 | Row | Asserts | Spec | Enclave |
 | --- | --- | --- | --- |
-| **Surface parity — verdicts** | Every operation in the recorded set yields the same verdict on both transports | FR-003, SC-001 | **yes** |
+| **Surface parity — verdicts** | Every operation in the recorded set yields the same verdict on both transports, satisfying the **amended** row for the API/MCP pair | FR-003, FR-004, SC-001 | **yes** |
 | **Surface parity — audit** | Same event types, order, subject, and decision fields; transport a field, not a structural difference | FR-003a, SC-002 | **yes** |
 | **Surface parity — coverage** | An operation on one transport and not the other is detected, in either direction | FR-005, SC-003 | no |
 | MCP acts as the caller | Every MCP-originated operation names the calling user as subject; zero name the service | FR-002a, SC-002a | **yes** |

@@ -81,7 +81,7 @@ merge is blocked without a human having run anything.
 - [ ] T009 [US6] (FR-018) Run **`make dev-up` then `make conformance`** — the same commands a human runs, not a bespoke sequence (Principle VII). Two ways to run the gate is two gates, and the one nobody runs locally is the one that rots
 - [ ] T010 [US6] [GATE:fail-closed] Assert in `.github/workflows/enclave.yml` that a failure to stand up the enclave reads as a **failure**, never a pass or a skip (FR-020). Verify by running the lane with the licence secret deliberately absent
 - [ ] T011 [US6] Assert the job conditions in `.github/workflows/ci.yml` and `.github/workflows/enclave.yml` keep the fast lane running for fork pull requests while the enclave lane does not (FR-019), and that a fork contributor's experience is unchanged
-- [ ] T012 [US6] [GATE:conformance] **Prove `.github/workflows/enclave.yml` fails on a broken row.** Push a branch with a deliberately broken enclave row and confirm the lane goes red. A lane that has only ever seen green is a lane nobody knows works — the same reason every conformance row here ships a break fixture
+- [ ] T012 [US6] [GATE:conformance] (SC-011, SC-012) **Prove `.github/workflows/enclave.yml` fails on a broken row.** Push a branch with a deliberately broken enclave row and confirm the lane goes red. A lane that has only ever seen green is a lane nobody knows works — the same reason every conformance row here ships a break fixture
 
 **Checkpoint**: from here, every subsequent change in this feature is covered by an automated gate.
 
@@ -96,7 +96,11 @@ removed from 005's durability path, and a constitutional gate row that changes w
 
 - [ ] T013 Remove `RunState.PARKED` and add `SUSPENDED` in `src/core/run.py`, splitting what it conflated: grant expiry becomes `STOPPED` with the reason recorded, and an unreachable dependency becomes `SUSPENDED` naming that dependency. **Not a rename** — keeping the name would carry the human-in-the-loop connotation into the state that most needs it gone
 - [ ] T014 Update `src/core/durability/checkpoint.py` and `resume.py` for the split, and the five test modules that reference parking, including `tests/conformance/durability/rows.py`
-- [ ] T015 [GATE:conformance] Amend `.specify/memory/constitution.md`: the Quality Gates row **"grant-expiry parking"** becomes grant-expiry **stop**. Include a Sync Impact Report citing ADR-0049. **MINOR** — a gate row is redefined and no principle is, so no ADR-0016 quorum. A test file renaming a state while the constitution still names the old behaviour would leave the governing document describing something that cannot happen
+- [ ] T015 [GATE:conformance] Amend `.specify/memory/constitution.md` in **three** places, with one Sync Impact Report citing ADR-0049 and ADR-0033 and naming each (FR-004a, SC-014):
+  1. Quality Gates durability rows: **"grant-expiry parking"** → grant-expiry **stop**.
+  2. Quality Gates: **"surface parity across all four transports"** → parity across **every pair of implemented transports**. Claiming the row as worded would assert something untrue with two transports — the stub ADR-0047 forbids. Amended, the gate binds at two, three, and four instead of sitting inert until the last lands.
+  3. **Principle VIII**: "or the run **parks**" → the run **stops**, reason recorded. Found by an analyze pass; the first draft of this task amended only the gate row, which would have left a *principle* describing a state that cannot exist.
+  **MINOR** — rows are redefined and a principle's wording follows an Accepted ADR; no principle is removed, so no ADR-0016 quorum
 - [ ] T015a [GATE:conformance] Assert in `tests/unit/test_parked_is_gone.py` that zero occurrences of `PARKED` remain anywhere in `src/` or `tests/` (FR-015, SC-009). Without it, a single missed reference leaves a state in the sealed core that nothing can enter and everything still compiles
 - [ ] T016 [P] Update `specs/005-durable-execution/contracts/conformance-durability.md` so its parking row matches what it now asserts
 
@@ -129,8 +133,8 @@ the same subject; assert identical verdicts and equivalent audit events.
 - [ ] T026 [US1] [GATE:fail-closed] Authenticate **as the calling user, never as the service** (FR-002a) in `src/surfaces/mcp/server.py`. A service account would collapse every caller into one subject and destroy the non-repudiation the delegation chain exists for — invisibly, because everything would still work
 - [ ] T027 [US1] Build the parity driver in `tests/harness/parity.py`: run an operation through both transports as one subject and return both verdicts and both audit projections
 - [ ] T028 [US1] [GATE:correlation] Implement the audit projection in `tests/harness/parity.py` — event types, order, subject, decision fields; **transport excluded** (FR-003a). Naming the projection is what makes the assertion falsifiable; "both produced some audit" is satisfied by two surfaces that agree about nothing
-- [ ] T029 [US1] [GATE:conformance] **Claim the parity row** (FR-003, FR-004) in `tests/conformance/mcp/test_surface_parity.py`, driven from `specs/008-northbound-api/contracts/operations.snapshot.json`. Deferring a second time with two transports would stop being rigour
-- [ ] T030 [P] [US1] [GATE:conformance] Coverage row in `tests/conformance/mcp/test_surface_parity.py` (FR-005): an operation on one transport and not the other is detected **in either direction**, including MCP exposing something the API does not — the direction a transport-specific convenience would grow
+- [ ] T029 [US1] [GATE:conformance] **Satisfy the amended parity row** (FR-003, FR-004, SC-001) — the API/MCP pair, per T015's incremental wording. Not the four-transport row as originally worded in `tests/conformance/mcp/test_surface_parity.py`, driven from `specs/008-northbound-api/contracts/operations.snapshot.json`. Deferring a second time with two transports would stop being rigour
+- [ ] T030 [P] [US1] [GATE:conformance] Coverage row in `tests/conformance/mcp/test_surface_parity.py` (FR-005, SC-003): an operation on one transport and not the other is detected **in either direction**, including MCP exposing something the API does not — the direction a transport-specific convenience would grow
 - [ ] T031 [P] [US1] Break fixture in `tests/conformance/mcp/test_surface_parity.py`: make one transport emit an extra audit event and assert the comparison catches it. A fixture that broke a verdict would be caught by the verdict row and prove nothing about the audit comparison
 - [ ] T032 [P] [US1] [GATE:conformance] Assert in `tests/conformance/mcp/test_mcp_acts_as_caller.py` that every MCP-originated operation names the calling user as subject; zero name the service (SC-002a)
 
@@ -147,11 +151,11 @@ execution, no intent record is written, and the denial is audited.
 reach — the knowing has to exist first.
 
 - [ ] T033 [US3] Implement the dependency gate as a **pre-execution hook** in `src/core/dependencies/gate.py`, registered in `builtin_governance_hooks()` in `src/core/hooks/governance.py` alongside authority and mirroring (FR-009)
-- [ ] T034 [US3] [GATE:fail-closed] Deny before execution and write **no intent record** in `src/core/dependencies/gate.py` (FR-007). Attempting a call against a dead dependency writes an intent that must later be resolved by re-observation — against the same dead dependency, so the bracket that makes interrupted steps resolvable becomes the thing that cannot be resolved
+- [ ] T034 [US3] [GATE:fail-closed] Deny before execution and write **no intent record** in `src/core/dependencies/gate.py` (FR-007, SC-004). Attempting a call against a dead dependency writes an intent that must later be resolved by re-observation — against the same dead dependency, so the bracket that makes interrupted steps resolvable becomes the thing that cannot be resolved
 - [ ] T035 [US3] Implement `DenialClass` in `src/core/dependencies/types.py`: `POLICY` and `AVAILABILITY`, both audited, **only availability model-visible** (FR-008). Getting this backwards would teach agents that scope refusals are obstacles to route around, which inverts Principles II and III — and nothing would break visibly
 - [ ] T036 [US3] [GATE:conformance] Row in `tests/conformance/mcp/test_dependency_refusal.py`: refusal precedes execution and no intent record exists
 - [ ] T037 [US3] [GATE:conformance] **Placement row** in `tests/conformance/mcp/test_refusal_placement.py` (FR-009): assert the gate runs inside the hook pipeline, in hook order, not as a pre-flight. Break fixture **moves it to a working pre-flight** and asserts detection — a fixture that merely removed the gate would test refusal, which T036 already covers. The failure being guarded is a working optimisation
-- [ ] T038 [P] [US3] [GATE:conformance] Assert in `tests/conformance/mcp/test_denial_classes.py` (FR-008) that the two denial classes are distinguishable in the trail, and that only availability reaches the model
+- [ ] T038 [P] [US3] [GATE:conformance] Assert in `tests/conformance/mcp/test_denial_classes.py` (FR-008, SC-005) that the two denial classes are distinguishable in the trail, and that only availability reaches the model
 - [ ] T039 [P] [US3] [GATE:fail-closed] Assert in `tests/component/test_unknown_health_refuses.py` that an unknown or stale health record refuses rather than being assumed reachable (FR-006)
 
 ---
@@ -167,9 +171,11 @@ allocation and it completes.
 - [ ] T040 [US2] Implement suspension in `src/core/durability/resume.py`: record the run as `SUSPENDED` naming the dependency, at its step index (FR-010)
 - [ ] T041 [US2] [GATE:conformance] **End the container on suspension** in `src/core/durability/resume.py` (FR-011). A suspended run is a record, not a process holding a slot — an idling container costs nothing until it costs one slot per suspended run
 - [ ] T042 [US2] Implement the health checker in `src/surfaces/mcp/health.py` as the **single owner** of reachability (FR-006a), with asymmetric transitions: one failure marks unhealthy, several consecutive successes mark healthy
+- [ ] T042a [US2] Extend `infra/jobs/agent-run.nomad.hcl` to carry `run_id` and `step_index` in `meta_required`, and `tests/harness/dispatched_run.py` to resume from them. 008's job declares neither, so **as it stands the sweeper can decide to resume and has nothing to resume with** — found by an analyze pass, and the same shape as 008 shipping `NomadDispatcher` with no job to dispatch to
+- [ ] T042b [US2] Wire the sweeper to `NomadDispatcher` (008) in `src/core/durability/sweeper.py` so resumption goes through the existing dispatch seam rather than a second path to the scheduler. A resume-specific dispatcher would be a second way to start a run, which is how two lifecycles diverge
 - [ ] T043 [US2] Implement the sweeper in `src/core/durability/sweeper.py`, hosted by the MCP service. **One sweep resumes every run waiting on that dependency** — recovery is a platform-level event, so the response is platform-level. No run polls
 - [ ] T044 [US2] [GATE:fail-closed] In `src/core/durability/sweeper.py` (FR-012), the sweeper runs under the service's own identity and **never holds or forwards a run's credentials**; each resumed run gets a new allocation that manufactures its own. A sweeper carrying a credential forward would reintroduce replay after 005 spent a feature making it structurally unavailable
-- [ ] T045 [US2] [GATE:conformance] Enclave row in `tests/conformance/mcp/test_suspend_and_sweep.py`: suspension names the dependency, no container remains, and recovery resumes the run
+- [ ] T045 [US2] [GATE:conformance] Enclave row in `tests/conformance/mcp/test_suspend_and_sweep.py` (SC-006, SC-007): suspension names the dependency, no container remains, and recovery resumes the run
 - [ ] T046 [US2] [GATE:conformance] Assert in `tests/conformance/mcp/test_suspend_and_sweep.py` that the resumed run runs in a **new allocation with a new identity** and re-authenticates. Break fixture resumes into the *same* allocation and asserts detection — resuming and completing looks identical from outside, and only the new-identity assertion distinguishes re-authentication from replay
 - [ ] T047 [P] [US2] [GATE:conformance] Assert in `tests/conformance/mcp/test_suspension_bounds.py` that suspension expires against the run's **existing** maximum duration (FR-013), stopping with the reason recorded. No new ceiling, no timeout that grants by default
 - [ ] T048 [P] [US2] Assert in `tests/component/test_sweep_respects_revocation.py` that a revoked grant cannot be resumed: the resumed run manufactures fresh authority and fails to obtain it
@@ -201,14 +207,15 @@ without operator action.
 
 - [ ] T054 [US5] Run `verify_stream_integrity` (008) periodically from the MCP service in `src/surfaces/mcp/server.py`, scoped so one pass does not walk an estate's whole history
 - [ ] T055 [US5] [GATE:correlation] Surface findings from `src/surfaces/mcp/server.py` (FR-017) where an operator will see them, not only recorded. A finding written to a table nobody reads is the same as no finding
-- [ ] T056 [US5] [GATE:conformance] Enclave row in `tests/conformance/mcp/test_continuous_verification.py`: tampering is reported with no operator action, **and a clean store reports clean**. The false-positive half matters as much — a check that always fires gets disabled
+- [ ] T056 [US5] [GATE:conformance] Enclave row in `tests/conformance/mcp/test_continuous_verification.py` (SC-010): tampering is reported with no operator action, **and a clean store reports clean**. The false-positive half matters as much — a check that always fires gets disabled
 - [ ] T057 [P] [US5] Update `ROADMAP.md`: continuous evidence-stream verification moves from deferred to shipped
 
 ---
 
 ## Phase 9: Polish and the record
 
-- [ ] T058 [GATE:conformance] Resolve **ADR-0049** in `docs/adr/0049-*.md` — Accepted, amended, or withdrawn on the evidence of having built it (FR-021). It was left Proposed deliberately, until something built it. Leaving it Proposed is a failure of this requirement, not a deferral
+- [ ] T058 [GATE:conformance] Resolve **ADR-0049** in `docs/adr/0049-*.md` — Accepted, amended, or withdrawn on the evidence of having built it (FR-021, SC-013). It was left Proposed deliberately, until something built it. Leaving it Proposed is a failure of this requirement, not a deferral
+- [ ] T058a Record the supersession in `docs/adr/0026-*.md`: its re-consent and human-resolution rules are superseded by ADR-0049, the rest stands. Principle X requires superseding be **recorded, never edited in place**, and an ADR silently outlived by another is exactly the failure that principle names
 - [ ] T059 Update `specs/008-northbound-api/contracts/conformance-api.md` and `specs/005-durable-execution/contracts/conformance-durability.md` to say which rows CI now covers and which remain named to a human — fork pull requests only (FR-022). A contract still claiming no automated runner exists is wrong in the direction that makes people trust the gate less than they should
 - [ ] T060 [P] Update `AGENTS.md`: the harness gate now applies to fork pull requests and to anything the lane cannot cover, rather than to everything
 - [ ] T061 [P] Update `ROADMAP.md`: 009 shipped; the **four-transport parity row moves from Deferred to In force**
@@ -226,7 +233,7 @@ T001, T002 (premise gates)
               └─> Phase 3 Foundational (T013–T024)
                     ├─> US1 parity (T025–T032)
                     ├─> US3 refusal (T033–T039)
-                    │     └─> US2 suspend + sweep (T040–T050)
+                    │     └─> US2 suspend + sweep (T040–T050, incl. T042a/T042b)
                     ├─> US4 degraded completion (T051–T053a)   [needs US3's classes]
                     └─> US5 continuous verification (T054–T057)
                           └─> Phase 9 (T058–T063)

@@ -17,7 +17,24 @@ each of which is exactly the kind of change those rows exist to catch. Building 
 before the changes it must catch is the only order where the control is ever tested by
 something it did not already pass.
 
-**One thing this feature must carry that the spec did not anticipate.** The constitution's
+**The constitution amendment is larger than one row, and finding that out took an analyze
+pass.** Three places in the governing document describe behaviour this feature changes:
+
+| Where | Says | Becomes |
+| --- | --- | --- |
+| Quality Gates, durability rows | "grant-expiry **parking**" | grant-expiry **stop** |
+| Quality Gates, parity row | "surface parity across **all four** transports" | parity across **every pair of implemented** transports |
+| **Principle VIII** | "or the run **parks**" | the run **stops**, reason recorded |
+
+The parity one is the finding I would least like to have missed. This feature's spec argued
+for *claiming* the four-transport row on the reasoning that refusing twice would be
+avoidance — which is persuasive and does not survive reading the row, since two is not four.
+Claiming it would have been the stub ADR-0047 forbids, in the feature whose spec makes a
+point of refusing stubs. Amending it to bind incrementally is better than either claiming or
+deferring: the gate then binds at two transports, at three, and at four, instead of sitting
+inert until the last one lands.
+
+**And the original one the spec did not anticipate.** The constitution's
 Quality Gates name seven durability rows, one of which is **"grant-expiry parking"**.
 ADR-0049 removes parking: grant expiry now *stops* the run with the reason recorded, the
 same disposition as any other execution bound. So a named constitutional gate row changes
@@ -69,14 +86,22 @@ checking is not itself load on a struggling product
 
 ### What this feature changes that is not its own
 
-Three, and each is a change to something a prior feature owns.
+Four, and each is a change to something a prior feature or the constitution owns.
 
 1. **`RunState.PARKED` is removed** (FR-015), which is a sealed-core change touching 005's
    `run.py`, `checkpoint.py`, and `resume.py`, plus five test modules.
-2. **A constitutional gate row changes what it asserts.** "Grant-expiry parking" becomes
-   grant-expiry *stop*. Amendment required, with a Sync Impact Report citing ADR-0049.
-3. **ADR-0049 stops being Proposed** (FR-021). It was left open until something built it;
-   this is that. Accepted, amended, or withdrawn on the evidence.
+2. **The resume path needs a dispatch route that does not exist.** The sweeper starts a new
+   allocation, and 008's `agent-run` parameterized job declares `meta_required` of
+   correlation, subject, tenant, and definition — **no `run_id`, no `step_index`**. A resume
+   needs both. Extending someone else's jobspec is a small change with a large failure mode:
+   without it the sweeper can decide to resume and has nothing to resume with.
+3. **Three constitutional passages change**, per the table above. One Sync Impact Report
+   citing ADR-0049 and ADR-0033, naming each. A partial amendment leaves the governing
+   document describing states that cannot occur, which is worse than not amending at all
+   because it reads as deliberate.
+4. **ADR-0049 stops being Proposed** (FR-021), and **ADR-0026 records being partially
+   superseded by it**. Principle X requires superseding be recorded, never edited in place —
+   an ADR silently outlived by another is the failure that principle names.
 
 ### The CI lane cannot be fork-safe, and that is not a compromise
 
@@ -111,7 +136,7 @@ the licence in repository secrets, and I cannot provision that.
 | VII — Anti-Fragmentation | **Pass, and the CI lane is where it could break** | The lane must run `make conformance` — the same command a human runs — not a bespoke CI sequence. Two ways to run the gate is two gates, and the one nobody runs locally is the one that rots |
 | VIII — Eval-Gated Promotion | N/A | No packs, prompts, models, or policies promoted |
 | IX — Evidence Over Claims | **Pass, and doubly exercised** | Parity is asserted on audit equivalence (FR-003a), and the evidence trail is now verified while running rather than at bring-up (FR-017) |
-| X — The Decision Record Governs | **Pass, and this feature is where a record resolves** | ADR-0049 stops being Proposed (FR-021). The constitution is amended in the same change as the ADR it follows, which is what Principle X requires |
+| X — The Decision Record Governs | **Pass, and this feature is where a record resolves** | ADR-0049 stops being Proposed and ADR-0026 records being superseded by it (FR-021) — Principle X requires superseding be recorded, never edited in place. The constitution is amended in the same change as the ADRs it follows |
 
 **Gate result**: PASS — proceed to Phase 0
 
@@ -204,5 +229,6 @@ reviewer should see stated rather than infer.
 | Addition | Why needed | Simpler alternative rejected because |
 |-----------|------------|-------------------------------------|
 | A persistent operated component | ADR-0049's health checks and sweeper need something that outlives a run, and every other component ends when its work ends | A cron-style periodic batch job would avoid the persistent service, but the health checker needs to answer *on demand* — a run about to call a product asks now, not at the next tick. Recovery detection alone could be periodic; the refusal path cannot |
+| Amending the parity row rather than claiming it | The row says "across all four transports" and there are two; claiming it would assert something untrue | Claiming it is the stub ADR-0047 forbids, in the feature whose spec refuses stubs. Deferring again leaves the gate inert until a fourth transport lands, so it never catches a two- or three-transport divergence — which is when divergence actually starts |
 | Removing `RunState.PARKED` | ADR-0049 supersedes the re-consent rule that created it, and a state nothing can enter is worse than none | Leaving it as a deprecated no-op would keep a state in the sealed core that means nothing, and the constitution would still name a gate row for behaviour that no longer exists |
 | A second CI workflow | Sixteen merge-blocking rows have no automated runner | Extending the fast lane would require exposing a licence secret to fork pull requests, which trades a coverage gap for a credential-disclosure one |

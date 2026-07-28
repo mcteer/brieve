@@ -49,3 +49,17 @@
 - It also settled that MCP authenticates **as the calling user**, never as itself. A
   service account would collapse every caller into one subject and destroy
   non-repudiation — invisibly, because everything would still appear to work.
+- Analyze (2026-07-27) caught a claim this spec made without checking its source. The
+  constitutional parity row reads "surface parity across **all four** transports", and this
+  feature has two — so claiming it would have been the passing stub ADR-0047 forbids, in the
+  feature whose spec makes a point of refusing stubs. The clarification session had recorded
+  "refusing a second time would be avoidance" as settled reasoning, which is how a decision
+  gets made without being verified. The row is now **amended to bind incrementally** instead,
+  which is better than either claiming or deferring.
+- It also found the amendment was incomplete — **Principle VIII** describes parking too, so
+  amending only the gate row would have left a principle describing an impossible state — and
+  that the sweeper had no dispatch route: 008's parameterized job carries neither `run_id`
+  nor `step_index`, so it could decide to resume with nothing to resume with. Same shape as
+  008 shipping `NomadDispatcher` with no job to dispatch to.
+- ADR-0026 now records being partially superseded (Principle X), and every SC carries a task
+  reference rather than only the FRs.

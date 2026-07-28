@@ -23,7 +23,8 @@
 ### Session 2026-07-27
 
 - Q: Why is MCP second rather than the CLI? → A: It is the surface with users already waiting — coding IDEs — and it is the one ADR-0049 needs to exist. The dependency health checks and the resume sweeper both require a long-lived home, and every other component in this platform is deliberately ephemeral. Doing MCP second gets the second transport *and* the service ADR-0049 assumes, in one pass.
-- Q: Does this feature claim the four-transport parity row? → A: **Yes, and it must.** 008 refused it because parity is a property between transports and there was one; refusing it a second time when there are two would stop being rigour and start being avoidance. `specs/008-northbound-api/contracts/operations.snapshot.json` exists precisely so this comparison is against something recorded.
+- Q: Does this feature claim the four-transport parity row? → A: **Not as the constitution currently words it, and the difference matters.** The row reads *"surface parity across all four transports"*, and there are two. Claiming it would be a row asserting something untrue — the passing stub ADR-0047 forbids, and what 008 correctly refused. What this feature does instead is **amend the row to bind incrementally**: parity across every pair of implemented transports. That is the property that is actually meaningful, it is checkable now, and it binds again at three and at four rather than sitting inert until the last one lands. `specs/008-northbound-api/contracts/operations.snapshot.json` exists so this comparison is against something recorded.
+  *(An earlier version of this clarification said the row should simply be claimed, on the reasoning that "refusing a second time would be avoidance". That reasoning was rhetorically satisfying and did not survive reading the row's actual wording — recorded because a decision reached without checking its source is worth marking as such.)*
 - Q: ADR-0049 is still Proposed. Is that a problem? → A: It is the point. The decision was left Proposed deliberately — "I'd hate to say it's accepted until we actually build it and see how testing goes." This feature builds it. It ends with ADR-0049 **Accepted, amended, or withdrawn on evidence**, and a feature that quietly leaves it Proposed has failed a requirement rather than merely deferred one.
 - Q: Is the resume sweeper a human in the loop? → A: No — it is the mechanism that makes humans *not* be in the loop. A suspended run names the dependency it could not reach; the sweeper resumes it when that dependency recovers. No run polls, and nobody is told to press anything.
 - Q: Why does the CI lane need its own feature rather than being a chore? → A: Because it is the only thing that closes a gap this repository has recorded twice and enlarged once. 005 recorded that no required check covers the durability rows; 008 added nine more enclave rows to the same uncovered set. The mechanism protecting them is an instruction in `AGENTS.md` that the agent harness follows — which is only as good as that instruction being obeyed.
@@ -226,8 +227,14 @@ and the merge is blocked without a human having run anything.
   rather than appearing as a structural difference. Without this the parity row is the
   easiest check in the feature to pass dishonestly, since "both produced some audit" is
   satisfied by two surfaces that agree about nothing.
-- **FR-004**: This feature MUST claim the four-transport surface parity row. Deferring it a
-  second time is not available: two transports exist, and the comparison is possible.
+- **FR-004**: The constitutional parity row MUST be **amended to bind incrementally** —
+  parity across every pair of implemented transports — and this feature MUST then satisfy it
+  for the API/MCP pair. Claiming the row as currently worded ("across all four transports")
+  would assert something untrue with two, which is the stub ADR-0047 forbids.
+- **FR-004a**: The constitution amendment this feature carries MUST cover **every** place the
+  governing document describes behaviour this feature removes or changes — the Quality Gates
+  parking row, the parity row, and Principle VIII's "or the run parks". A partial amendment
+  leaves the governing document describing states that cannot occur.
 - **FR-005**: An operation present on one transport and absent from the other MUST be
   detected by a check rather than by review.
 - **FR-006**: The harness MUST monitor the reachability of the products agents operate, at
@@ -309,7 +316,10 @@ and the merge is blocked without a human having run anything.
 - **SC-011**: 100% of enclave rows run in CI for non-fork pull requests; zero run for fork
   pull requests.
 - **SC-012**: A CI run whose enclave fails to come up reports failure in 100% of cases.
-- **SC-013**: ADR-0049's status is not "Proposed" when this feature lands.
+- **SC-013**: ADR-0049's status is not "Proposed" when this feature lands, and ADR-0026
+  records having been partially superseded by it.
+- **SC-014**: Zero places in the constitution describe parking or four-transport-only parity
+  after the amendment; the Sync Impact Report names each one changed.
 
 ## Assumptions
 

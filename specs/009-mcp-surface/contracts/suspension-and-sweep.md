@@ -15,10 +15,13 @@ the state that most needs it gone.
 | Grant expiry | `STOPPED`, reason recorded | No — an execution bound like any other |
 | Unreachable dependency | `SUSPENDED`, naming the dependency | Yes — by the sweeper, never by a person |
 
-**This changes a constitutionally-named gate row.** Quality Gates name *"grant-expiry
-parking"*; it becomes grant-expiry **stop**. A constitution amendment with a Sync Impact
-Report citing ADR-0049 ships in this feature. MINOR — a gate row is redefined, no principle
-is — so no ADR-0016 quorum.
+**This changes the constitution in more than one place**, which an analyze pass found after
+the first draft had spotted only the obvious one. Quality Gates name *"grant-expiry parking"*
+— it becomes grant-expiry **stop**. **Principle VIII** also says "or the run **parks**", and
+amending only the gate row would have left a principle describing a state that cannot exist.
+
+One Sync Impact Report, naming each passage. MINOR — rows are redefined and a principle's
+wording follows an Accepted ADR; no principle is removed, so no ADR-0016 quorum.
 
 ## A suspended run is a record, not a process
 
@@ -28,6 +31,11 @@ The container ends when its work ends, **including when that work ends in suspen
 Resumption starts a **new allocation**, which is also what makes resume re-attest: a new
 allocation has a new attested identity by construction (ADR-0048), so re-authentication falls
 out of the lifecycle rather than being enforced by a rule someone could forget.
+
+**It goes through 008's existing dispatch seam**, extended to carry `run_id` and `step_index`
+— 008's parameterized job requires neither, so as it stood the sweeper could decide to resume
+and have nothing to resume with. A resume-specific dispatcher would be a second way to start
+a run, which is how two lifecycles quietly diverge.
 
 ## The sweeper
 
