@@ -84,6 +84,17 @@ class ToolRegistry:
         """
         return sorted({reg.product for reg in self._tools.values() if reg.product})
 
+    def product_actions(self) -> list[str]:
+        """Distinct product actions the registered tools perform.
+
+        The other half of "what this platform can do", and the reason it exists is
+        FR-005a: a ceiling naming an action no tool performs is a configuration error that
+        must refuse rather than be silently dropped, and refusing requires knowing what is
+        real. `products()` answered the 009 question — what does this estate touch — and
+        could not answer this one.
+        """
+        return sorted({reg.product_action for reg in self._tools.values() if reg.product_action})
+
     def resolve(self, name: str) -> ToolRegistration:
         """Resolve a tool by name.
 
