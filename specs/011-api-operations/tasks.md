@@ -124,7 +124,7 @@ never the other jurisdiction.
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T037 [GATE:conformance] Extend the verdict half of parity in `tests/conformance/mcp/test_surface_parity.py` (or a driver over `tests/harness/parity.py`): every 011 operation yields the same verdict on both transports, not only the same catalogue entry. The coverage half grows by construction; the verdict half grows only if someone writes it
+- [X] T037 [GATE:conformance] Extend the verdict half of parity in `tests/conformance/mcp/test_surface_parity.py` (or a driver over `tests/harness/parity.py`): every 011 operation yields the same verdict on both transports, not only the same catalogue entry. The coverage half grows by construction; the verdict half grows only if someone writes it
 - [ ] T038 [GATE:conformance] The audited-everywhere row in `tests/conformance/identity/test_operations_audited.py` (FR-017, SC-011): each new operation appears in the trail attributed to the authenticated human, and the refusal shapes record `no_such_record` / `outside_tenant` / `not_permitted` distinctly while the caller-facing collapse holds (FR-020). **And the unauthenticated half of FR-016**: a call to each new operation with no credential refuses, on both transports — 008's structural argument (a route without a subject can do nothing) is strong, and it is an argument rather than a row
 - [ ] T039 [P] Update `ROADMAP.md`: 011 shipped — the API/MCP catalogue at ten operations; the portal's remaining precondition is the portal itself
 - [ ] T040 [P] Record the rows in `specs/011-api-operations/contracts/conformance-operations.md` as **In force**, and note in `specs/008-northbound-api/contracts/conformance-api.md` that the snapshot grew from four to ten under the same parity row
