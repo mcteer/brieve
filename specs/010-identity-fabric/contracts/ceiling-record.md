@@ -42,6 +42,22 @@ resolves identity. Not merged into `harness-database`: that policy exists so a r
 its own record, and merging would mean anything able to reach the database could also read
 every ceiling in the estate. The evidence path made the same separation for the same reason.
 
+## Who may write it
+
+**Terraform, from reviewed HCL — and nothing at runtime.** ADR-0015's division of labor is
+the governance story: definitions in HCL (design-time, version-controlled, reviewed),
+enforcement in Vault. A ceiling record change is therefore a pull request, with the same
+review a registration change gets — which matters because **writing a wider ceiling record
+is widening a scope**, and widening a scope is precisely the deliberate, reviewable act
+ADR-0016 exists to govern. The HCL review path is that governance for design-time records,
+the same way it already is for the registration's `ceiling_policies`.
+
+Stated because it was the one governance question this feature's artifacts left implicit:
+the read policy below is explicit about who may look, and a contract explicit about reads
+and silent about writes invites the assumption that writes are somebody's runtime API. They
+are not. No path in the harness, the MCP service, or any surface writes these records, and
+the conformance lane asserts the reader role holds read capability only.
+
 ## Who may NOT read it
 
 **No agent-governed tool** (FR-016). ADR-0015 puts the trust fabric structurally outside every

@@ -22,7 +22,7 @@
 
 ### Session 2026-07-28
 
-- Q: The registry's ceiling policy governs secret paths; `AuthorityScope` governs tool names and product actions. Where should the tool-authorization ceiling live? → A: **As its own first-class field on the agent definition**, alongside the credential-issuance policy rather than derived from it.
+- Q: The registry's ceiling policy governs secret paths; `AuthorityScope` governs tool names and product actions. Where should the tool-authorization ceiling live? → A: **As its own first-class field on the agent definition**, alongside the credential-issuance policy rather than derived from it. *(Amended by Phase 0 research: the registry engine's schema turned out to be closed, so "field on the definition" became "record beside the registration" — same trust fabric, written by the same apply. Everything the decision was about survives: authored in the core's vocabulary, read directly, disjoint from the credential policy. research.md Finding 3 records the change rather than silently applying it.)*
   *(This corrects the spec's original framing. It described a "shape mismatch" between a compiled policy and an authority scope, and asked how to translate between them. Checking what a registered ceiling actually contains — `allowed_paths = ["secret/data/demo/*"]` — showed the premise was wrong: that is a secret path, not a tool. The two do not describe one thing in two shapes; they describe **different jurisdictions**, which is what ADR-0044 requires when it says "policy jurisdictions are disjoint... no rule is duplicated across engines." There is no translation to get right, because there is nothing to translate. Recorded at length because the original framing was plausible enough to survive a spec draft, and the thing that dislodged it was reading one line of `variables.tf`.)*
 - Q: Is the product-entitlement seam in this feature, given that products stay faked? → A: **Build the seam; keep the products behind it faked.** The interface that asks a product what a user may do is ours and does not exist; the product's own authorization system is outside our boundary and correctly stays a fake.
   *(The line is between the two, and it is worth stating why it falls there. Deferring the whole thing to the credential-translation feature was tempting — that is where the coarse credential this compensates for actually appears — but it would leave one of the fabric's four resolutions on the test double while the feature claimed to have replaced the double. A success criterion that is true of three quarters of a seam is not true.)*
@@ -47,11 +47,11 @@ any of it running against the thing an operator actually configures.
 **What the registry holds today is not this ceiling.** Its `ceiling_policy` bounds which
 secrets a run's token may read — `allowed_paths = ["secret/data/demo/*"]` — which is the
 credential-issuance jurisdiction, and a different one from tool authorization. So this
-feature adds the tool-authorization ceiling to the agent definition as its own field rather
-than deriving it from the policy. The two stay disjoint, per ADR-0044.
+feature adds the tool-authorization ceiling as its own record in the trust fabric, beside
+the registration rather than derived from its policy. The two stay disjoint, per ADR-0044.
 
-The risk this carries, stated plainly because it is the cost of the decision: two fields on
-one definition can be edited independently, so an agent can be granted a tool whose secrets
+The risk this carries, stated plainly because it is the cost of the decision: two records
+for one definition can be edited independently, so an agent can be granted a tool whose secrets
 it cannot read, or secrets for a tool it cannot call. That is not a defect — the
 jurisdictions genuinely differ — but it is a coherence question an operator will hit, and
 nothing currently reports it.
@@ -106,8 +106,9 @@ Provable without touching ceilings, since the intersection narrows either way.
    **Then** the run refuses. An empty scope and an unresolvable one must not be
    indistinguishable — one is a person with no permissions, the other is a platform that
    does not know who is asking.
-3. **Given** a role-to-scope binding changed through the governed path, **When** a
-   subsequent run starts, **Then** it resolves the new binding without a restart.
+3. **Given** a role-to-scope binding changed through its governed path — the trust
+   fabric's version-controlled, reviewed configuration, per ADR-0015's division of labor —
+   **When** a subsequent run starts, **Then** it resolves the new binding without a restart.
 
 ---
 
@@ -220,9 +221,12 @@ test-only affordances.
   The health checker and sweeper hold fabric-issued credentials. Recovery terminates, but
   only in one order (FR-008b), and nothing else in this platform has this property.
 - **A definition is removed from the registry while a run under it is in flight.** The
-  ceiling that bounded the grant no longer exists.
+  ceiling that bounded the grant no longer exists. Reduces to a per-step resolution refusal:
+  the next policy read refuses `unknown_agent_definition`, under the same FR-008/FR-012
+  machinery as any other resolution failure — no separate mechanism.
 - **A user is deprovisioned mid-run.** 007 already governs revocation; what is new is that
-  the fabric is now the thing that notices.
+  the fabric is now the thing that notices, as `unknown_subject` or `no_role_for_subject`
+  on the next resolution rather than through a dedicated path.
 - **Two definitions sharing a ceiling policy name.** Legal in the registry, and it means one
   edit changes two definitions' ceilings.
 - **A resolved scope that is empty.** Distinguishable from unresolvable, per US2, and it
@@ -242,9 +246,12 @@ test-only affordances.
   in its configuration.
 - **FR-003**: An agent definition absent from the registry MUST refuse. It MUST NOT resolve
   to a default ceiling, an empty ceiling that later widens, or an open one.
-- **FR-004**: The agent registry MUST hold each definition's tool-authorization ceiling as a
-  **first-class field expressed in the core's own vocabulary** — tool names and product
-  actions. The fabric MUST read that field directly.
+- **FR-004**: The trust fabric MUST hold each definition's tool-authorization ceiling as a
+  **first-class record expressed in the core's own vocabulary** — tool names and product
+  actions. The fabric MUST read that record directly. *(Amended after Phase 0: the registry
+  engine's schema is closed — research Finding 3 — so the record lives beside the
+  registration rather than on it. Same fabric, same apply, same governance; what survived
+  the amendment is everything C1 decided, and what changed is only where the bytes sit.)*
 - **FR-005**: The fabric MUST NOT derive a tool-authorization ceiling from a
   credential-issuance policy, or vice versa. The two jurisdictions stay disjoint (ADR-0044),
   and a definition missing either one MUST refuse rather than having it inferred from the
@@ -303,19 +310,21 @@ test-only affordances.
 - **FR-019**: The feature MUST state, in a conformance contract, which rows previously
   asserted against the fake now assert against the real fabric — and which do not, with the
   reason.
-- **FR-020**: Adding a tool-authorization ceiling to the agent definition (FR-004) changes
-  what the agent registry is for, and MUST be recorded as an **architecture decision** rather
-  than made silently in a module. ADR-0015 describes the registry as holding identities,
+- **FR-020**: Adding the tool-authorization ceiling record to the trust fabric (FR-004)
+  changes what the trust fabric holds, and MUST be recorded as an **architecture decision**
+  rather than made silently in a module. ADR-0015 describes it as holding identities,
   registration, and compiled ceiling policies; after this feature it also holds the
-  harness-domain ceiling, and that is a change to what ADR-0015 describes.
+  harness-domain ceiling and the role-to-scope bindings, and that is a change to what
+  ADR-0015 describes.
 
 ### Key Entities
 
 - **Agent definition**: A registered agent with an owner, a description, and a ceiling.
   Already exists in the registry; this feature is the first thing that reads it at runtime.
-- **Ceiling**: The maximum authority any run under a definition may hold. Held by the
-  registry in one representation and consumed by the core in another — the gap between them
-  is this feature's central problem.
+- **Ceiling**: The maximum authority any run under a definition may hold. Two disjoint
+  jurisdictions, deliberately: the registration's policy bounds credential issuance, and the
+  harness ceiling record bounds tool authorization — authored directly in the core's
+  vocabulary, so there is nothing to translate and no translation to get wrong.
 - **Harness-domain scope**: Tool names and product actions a principal may exercise, for
   both users and agent definitions.
 - **Product-domain entitlement**: What a user may do *inside* a managed product. Owned by
@@ -382,7 +391,8 @@ All three forks this spec opened were resolved in the session recorded above. Ke
 pointer rather than deleted, because a spec that shows no sign of having had open questions
 reads as one where nobody looked.
 
-- **C1 — Ceiling representation.** Resolved: its own first-class registry field. The
+- **C1 — Ceiling representation.** Resolved: its own first-class record in the trust
+  fabric (amended from "registry field" by Phase 0 — the engine's schema is closed). The
   premise that a translation was needed turned out to be wrong.
 - **C2 — Product entitlement seam.** Resolved: build the seam, keep the products faked.
 - **C3 — Freshness and mid-run identity outage.** Resolved: read per step, suspend on

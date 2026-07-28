@@ -32,7 +32,7 @@ Gates bind rows as features land (ADR-0047). Test tasks are not optional here.
 ## Phase 2: Foundational — blocks every user story
 
 - [ ] T003 [GATE:fail-closed] Widen the 005 credential seam in `src/core/durability/credentials.py`: add an authenticated **read of an arbitrary Vault path** under the same workload identity, alongside the existing `database/creds/<role>` fetch. **A sealed-core change to a seam 005 owns.** The existing class logs in and reads exactly one path; the fabric reads several unrelated ones. The alternative — a second class authenticating its own way — would be a second path to the trust fabric, which is the shape Principle II forbids elsewhere for the same reason
-- [ ] T004 [GATE:fail-closed] Give the read in `src/core/durability/credentials.py` a **bounded timeout that fails closed** (FR-018). A resolution that hangs holds a step open, and a step held open indefinitely is a run that neither completes nor suspends — which is worse than a refusal because nothing notices it
+- [ ] T004 [GATE:fail-closed] Give the read in `src/core/durability/credentials.py` a **bounded timeout that fails closed** (FR-018): one named constant, default **5 seconds**, overridable per deployment — the value is deployment-shaped, but the default must exist and must be seconds-scale, because a 60-second default holds steps open in exactly the way FR-018 exists to prevent. A resolution that hangs holds a step open, and a step held open indefinitely is a run that neither completes nor suspends — which is worse than a refusal because nothing notices it
 - [ ] T005 [P] Add `harness-ceilings/` and `role-bindings/` KV v2 storage to `infra/modules/trust-fabric/ceilings.tf`, written by the same apply that writes the registration. Two applies would leave a window in which a registered agent has no ceiling; per FR-005 that refuses, so the window is fail-closed — but it would look like an outage, which is why it is one apply
 - [ ] T006 [P] [GATE:fail-closed] Add a **narrow read policy** for the two prefixes in `infra/modules/trust-fabric/policies.tf`, and a reader role in `auth.tf`. **Not merged into `harness-database`**: that policy exists so a run can write its own record, and merging would mean anything able to reach the database could read every ceiling in the estate. The evidence path drew the same separation for the same reason
 - [ ] T007 Extend `agent_definitions` in `infra/modules/trust-fabric/variables.tf` and `infra/environments/*/variables.tf` with a harness-domain ceiling — `tool_names` and `product_actions`. **The registry cannot hold this** (research Finding 3): `agent_registry` is a built-in engine with a closed schema, so the variable feeds the KV record rather than the registration
@@ -55,7 +55,7 @@ imports from `tests/`.
 - [ ] T011 [US5] Remove `issue_brokered_material` and `get_brokered_material` from the protocol in `src/core/authority/fabric.py` (FR-013), and delete the "fakes implement; core never calls a live IdP" module docstring, which stops being true in this feature
 - [ ] T012 [US5] [GATE:fail-closed] Make the **broker branch refuse** `broker_not_implemented` in `src/core/hooks/mirroring.py`. **This is the task research Finding 6 created and it is not a rename.** That branch is production code performing a *simulated* exchange — it writes the literal string `HARNESS_FIXTURE_BROKERED_GRAIN_MARKER_NOT_A_REAL_SECRET` and returns `allow`. Principle IV names the brokered path's management token as the platform's one permitted standing credential; the mechanism it exists for does not exist. Refusing makes the gap visible when someone configures a brokered product, which is when they need to know
 - [ ] T013 [US5] Keep both methods on `tests/harness/fake_identity_fabric.py` as ordinary methods. The fake needed them; it simply stops claiming they are part of the contract
-- [ ] T014 [P] [US5] [GATE:conformance] Assert in `tests/unit/test_protocol_has_no_test_affordances.py` that the protocol declares no method whose name or docstring marks it test-only, **stripping docstrings via AST with a positive control** proving the stripper did not swallow the body. Without this row the next test-only convenience arrives exactly as this one did — as the shortest path at the time
+- [ ] T014 [P] [US5] [GATE:conformance] Assert in `tests/unit/test_protocol_has_no_test_affordances.py` that the protocol declares no method whose name or docstring marks it test-only, **stripping docstrings via AST with a positive control** proving the stripper did not swallow the body — **and** that the production fabric structurally satisfies the protocol with no method raising "not supported" (SC-009, both halves: a clean protocol nobody implements is as vacuous as a dirty one everybody does). Without this row the next test-only convenience arrives exactly as this one did — as the shortest path at the time
 - [ ] T015 [P] [US5] [GATE:conformance] Assert in `tests/unit/test_src_does_not_import_tests.py` that **zero modules under `src/` import from `tests/`** (FR-015, SC-008), resolving imports by AST rather than by string match — a check that grepped for `tests` would match this task's own docstring
 - [ ] T016 [US5] Move the dispatched-run entrypoint from `tests/harness/dispatched_run.py` into `src/`, or record why it cannot (FR-015). It lives under `tests/` because a production entrypoint had no fabric to resolve through; that reason expires with this feature, and if it does not, the reason it survives is worth more than the move
 
@@ -74,6 +74,7 @@ authority in a live enclave, and neither exceeds its record.
 - [ ] T020 [US1] [GATE:fail-closed] Refuse `missing_ceiling_record` when a definition is registered but has no harness ceiling, and **never infer either jurisdiction from the other** (FR-005). That substitution is how a secrets grant quietly becomes a tool grant
 - [ ] T021 [US1] [GATE:fail-closed] Refuse `unknown_ceiling_entry`, **naming the entry**, when a ceiling names a tool or product action the platform does not know (FR-005a). Silently dropping it narrows a ceiling with no trace, which is a change to authority nobody can audit
 - [ ] T022 [US1] Record both **declared and effective** `ceiling_policies` when reading a registration (research Finding 2). Vault appends `default` and `default-ceiling` unless `no_default_ceiling_policy` is set, which this repository has never set. A reader seeing only its own declaration is reading something that does not exist
+- [ ] T022a [US1] [GATE:conformance] **Construct the production fabric in the run path**: the dispatched-run entrypoint (post-T016 location) and the surface assembly in `src/surfaces/api/app.py` build `VaultIdentityFabric` and pass it to `start_governed_run`, replacing the fake. **The task G2 named before it became a discovery.** Every task before this builds the mechanism; this is the thing it acts through, and 009 recorded eight features' worth of the difference. Without it, T023 fails as a mystery — the fabric exists, is correct, is tested, and nothing instantiates it
 - [ ] T023 [P] [US1] [GATE:conformance] Enclave row in `tests/conformance/identity/test_ceiling_from_registry.py` (SC-002): two definitions, two ceilings, different manufactured authority, neither exceeding its record. Depends on T009 — against the current fixture this passes whether enforcement works or not
 - [ ] T024 [P] [US1] [GATE:conformance] Enclave row in `tests/conformance/identity/test_jurisdictions_stay_disjoint.py`: a registration with a credential policy and no harness ceiling refuses. **Break fixture**: a reader that falls back to `ceiling_policies` — plausible as a "be resilient" change, and it converts a secrets grant into a tool grant
 - [ ] T025 [P] [US1] [GATE:conformance] Row in `tests/conformance/identity/test_declared_vs_effective.py` asserting the appended default policies are observed and accounted for rather than discovered later
@@ -122,7 +123,7 @@ for the same run request.
 - [ ] T040 [US4] [GATE:fail-closed] Refuse `entitlement_unavailable` when a product cannot be asked (FR-011). Unknown entitlement is not empty and is certainly not full
 - [ ] T041 [US4] [GATE:fail-closed] Keep both authorization domains independent in `src/core/hooks/mirroring.py` — either refusing refuses the call (FR-010, ADR-0044). Two checks that must agree are not one check consulted twice
 - [ ] T042 [P] [US4] [GATE:conformance] Row in `tests/conformance/identity/test_mirroring_bites.py` (SC-007): a user narrower than the credential cannot exceed themselves, with **zero side effects** on the attempt
-- [ ] T043 [P] [US4] [GATE:conformance] Row asserting the broker branch refuses `broker_not_implemented` rather than allowing on a placeholder (research Finding 6)
+- [ ] T043 [P] [US4] [GATE:conformance] Row in `tests/conformance/identity/test_broker_refuses.py` asserting the broker branch refuses `broker_not_implemented` rather than allowing on a placeholder (research Finding 6)
 
 ---
 
@@ -131,12 +132,14 @@ for the same run request.
 - [ ] T044 [GATE:fail-closed] Assert in `tests/conformance/identity/test_fabric_unreachable_from_a_tool.py` that with an **agent's own credential** the ceiling paths are denied **by Vault** (FR-016). A refusal produced by our code would satisfy the behaviour and miss the point — ADR-0015 puts the fabric structurally outside every agent ceiling, and "structurally" means the denial is not ours to make
 - [ ] T045 [GATE:fail-closed] Extend `tests/unit/test_no_static_credentials.py` to cover the fabric's configuration and environment (FR-002, SC-010), reusing the assertion the durability and evidence paths already carry
 - [ ] T046 [GATE:conformance] Break fixture in `tests/conformance/identity/test_break_empty_scope_on_error.py`: **a fabric returning an empty scope on error**. Every "denied" row still passes, because denial is what an empty scope produces — only the reason code fails. This is the most likely regression in the feature, since returning `AuthorityScope()` in an exception handler is the shortest path and reads as fail-closed
+- [ ] T046a [GATE:conformance] **Sweep every existing row that resolves authority through the fake** (FR-014, SC-001) — the task without which this feature's headline criterion is false on its own merge commit. For each conformance and component row importing `fake_identity_fabric`: migrate it to the production fabric where its subject allows, or mark it fault-injection with the explicit statement FR-014 requires. Record the resulting mapping — which rows moved, which stayed and why — in `contracts/conformance-identity.md`, which is FR-019's deliverable and falls out of this sweep rather than being written separately
+- [ ] T046b [P] [GATE:conformance] Gate check in `tests/unit/test_fake_fabric_is_fault_injection_only.py`: no conformance or component row imports the fake without the fault-injection marker (SC-001, mechanically). **Imports resolved by AST, not by string match**, with a positive control — this repository has had five checks match prose instead of code, and a grep for the fake's name would match the marker comments this check requires
 - [ ] T047 Write `docs/adr/00NN-harness-ceilings-live-in-the-trust-fabric.md` (FR-020): what the trust fabric now holds, why the ceiling is a separate record rather than a registration field, and why that is a truer expression of ADR-0044's disjoint jurisdictions than sharing a struct would have been
 - [ ] T048 [P] Record the **RFC 8693 + RAR divergence** (research Finding 5) in `ROADMAP.md` under known gaps: the constitution describes manufacture as "RFC 8693 + RAR against ceiling policies" and the implementation is a JWT role login. Not closed here — it is a second large feature — but this is the last honest moment to notice, since this is the feature that reads ceilings
 - [ ] T049 [P] Record the **brokered-path gap** (research Finding 6) in `ROADMAP.md`: Principle IV names the broker's management token as the platform's one permitted standing credential, and the mechanism it exists for is a stub that returns allow
 - [ ] T050 [P] Record `no_default_ceiling_policy` as a follow-up decision (research Finding 2). Setting it changes the security posture of every registration and belongs in a decision of its own, not a module edit
 - [ ] T051 [P] Update `ROADMAP.md`: the production `IdentityFabric` gap moves from **claimed by 010** to shipped; 010 joins the shipped table
-- [ ] T052 [P] Record the rows in `contracts/conformance-identity.md` as **In force**
+- [ ] T052 [P] Record the rows in `contracts/conformance-identity.md` as **In force**, over the fake-to-real mapping T046a produced there
 - [ ] T053 [GATE:conformance] Run `make check` and `make conformance` against a **live enclave**, and confirm every break fixture passes on a clean tree. A row whose failure nobody has observed is a row nobody knows works
 
 ---
@@ -152,6 +155,9 @@ Phase 1 Setup (T001–T002)
               ├─> Phase 6 US3 policy (T031–T038)
               └─> Phase 7 US4 entitlements (T039–T043)
                     └─> Phase 8 Polish (T044–T053)
+                          [T046a needs all four stories real — a row can only
+                           migrate off the fake once its resolution has somewhere
+                           real to go; T046b needs T046a's markers to exist]
 ```
 
 **Two orderings are not free**, and both are recorded in the plan:
@@ -173,7 +179,7 @@ fake — which is what makes each independently testable.
 - **Phase 5**: T029 and T030
 - **Phase 6**: T037 and T038
 - **Phase 7**: T042 and T043
-- **Phase 8**: T048–T052 are documentation in different files
+- **Phase 8**: T046b runs beside T046a's tail; T048–T052 are documentation in different files
 
 ## Implementation strategy
 
@@ -189,4 +195,9 @@ one.
 
 ## Task count
 
-**53 tasks** — 2 setup, 8 foundational, 6 US5, 9 US1, 5 US2, 8 US3, 5 US4, 10 polish.
+**56 tasks** — 2 setup, 8 foundational, 6 US5, 10 US1, 5 US2, 8 US3, 5 US4, 12 polish.
+
+Three were added by the analyze pass rather than the original generation, and each has a
+finding behind it: T022a (G2 — the wiring task, the ninth instance of the seam pattern
+caught before implementation instead of during), and T046a/T046b (G1 — the sweep and its
+enforcement, without which SC-001 is false on the feature's own merge commit).
