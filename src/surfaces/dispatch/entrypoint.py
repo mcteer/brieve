@@ -27,8 +27,11 @@ from core.audit.postgres_sink import PostgresAuditSink
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
+from core.durability.postgres import PostgresDurabilityProvider
+from core.durability.types import CheckpointBlob, RunOutcome
 from core.registry.memory import ToolRegistry
-from core.run import start_governed_run
+from core.run import RunState, start_governed_run
+from surfaces.api.runs import RESULT_KEY
 
 
 def main() -> int:
@@ -119,6 +122,26 @@ def main() -> int:
     # The audit trail is the evidence that this happened, and the row reads it back
     # through the evidence path rather than trusting this line.
     print(f"run {run.correlation_id} started, state={run.state}")
+
+    # A terminal checkpoint, so the run has an ending anyone can read.
+    #
+    # Before 011 this entrypoint started a run, printed, and exited — leaving no terminal
+    # record at all, so every API-started run read as *not finished* forever and only one
+    # arm of the three-way result disposition was reachable. The result goes under the
+    # reserved key in the same write, because the terminal checkpoint is the one place a
+    # run's ending is recorded and a second place would eventually disagree with it.
+    durability = PostgresDurabilityProvider(credentials=credentials)
+    durability.save(
+        CheckpointBlob(
+            blob_id=os.environ.get("RUN_ID", "").strip() or correlation_id,
+            payload={RESULT_KEY: {"started": True, "tools": sorted(tools)}},
+            correlation_id=correlation_id,
+            grant_id=getattr(run.authority, "credential_id", ""),
+            step_index=0,
+            written_by="entrypoint",
+            outcome=RunOutcome(state=RunState.COMPLETED.value, stop_reason=None),
+        )
+    )
     return 0
 
 
