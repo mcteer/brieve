@@ -38,7 +38,7 @@ Gates bind rows as features land (ADR-0047). Test tasks are not optional here.
 - [ ] T007 Extend `agent_definitions` in `infra/modules/trust-fabric/variables.tf` and `infra/environments/*/variables.tf` with a harness-domain ceiling — `tool_names` and `product_actions`. **The registry cannot hold this** (research Finding 3): `agent_registry` is a built-in engine with a closed schema, so the variable feeds the KV record rather than the registration
 - [ ] T008 [GATE:conformance] Assert in `tests/unit/test_ceiling_record_shape.py` that a ceiling record with an unknown `schema_version` refuses rather than being partially parsed. A record written by a newer platform must not be half-understood by an older one — and half-understanding a ceiling means enforcing a subset of it
 - [ ] T009 Register an agent definition in `infra/environments/dev/variables.tf` whose ceiling **resolves to something real**, and mount whatever it names. **Blocks every enclave row.** `demo-agent`'s ceiling grants `secret/data/demo/*` and `secret/` is not mounted (research Finding 4), so every assertion against it passes whether enforcement works or not
-- [ ] T010 Update `infra/bin/enclave-verify` to assert the ceiling records exist and are readable by the reader role and by nothing else. A missing ceiling store must fail at bring-up rather than appearing later as runs that refuse for reasons nobody can trace
+- [ ] T010 Update `infra/bin/enclave-verify` to assert **both** the `harness-ceilings/` and `role-bindings/` stores exist, are readable by the reader role, and are unreadable by everything else. T005 creates two prefixes and pass 4 caught this task verifying one — a missing role-binding store would surface not at bring-up but in a US2 row, as a resolution error naming the role rather than the store that is not there
 - [ ] T010a Build a **hybrid fabric** in `tests/harness/hybrid_fabric.py`: a delegating wrapper that routes named resolutions to the production fabric and the rest to the fake. **This is the mechanism behind the plan's claim that US1–US4 are independently provable, and pass 2 found that no task built it**: `manufacture_authority` resolves user scope, ceiling, and policy from one fabric object, so a per-story enclave row can only exercise its own term against the real fabric if something composes the terms — and the composition cannot live in `src/`, because production code importing the fake is FR-015's own violation. It lives here, in the harness, where importing both is legitimate. **Rows using it carry a transitional marker — `# HYBRID(<term>): migrated at T046a` — not an FR-014 marker**: an FR-014 marker claims fault injection, and a hybrid row is exercising a real term, so marking it per FR-014 would be a false statement in the file (pass 3 caught pass 2 instructing exactly that). The hybrid is scaffolding with a recorded expiry: T046a migrates its rows and deletes it
 
 ---
@@ -128,6 +128,7 @@ seam is fail-closed behaviour, not absence.
 - [ ] T038a Move the dispatched-run entrypoint from `tests/harness/dispatched_run.py` to `src/surfaces/dispatch/entrypoint.py` — beside the dispatcher whose jobs invoke it — completing what T016 recorded (FR-015). The reason it lived under `tests/` — no fabric to resolve through — expires at this task and not before. Update `infra/jobs/agent-run.nomad.hcl`'s command to the new module path, or the job dispatches an entrypoint that no longer exists
 - [ ] T038b [GATE:conformance] **Construct the production fabric in the run path**: the moved entrypoint and the surface assembly in `src/surfaces/api/app.py` build `VaultIdentityFabric` and pass it to `start_governed_run`, replacing the fake. The task pass 1 named G2 and placed where it could not work; every task before this builds the mechanism, and this is the thing it acts through
 - [ ] T038c [GATE:conformance] Dispatched end-to-end row in `tests/conformance/identity/test_dispatched_end_to_end.py` (SC-002): a run dispatched through the real entrypoint, resolving every term from the live trust fabric under an attested identity, bounded by the registered ceiling. **This is the row that proves the plumbing** — T023 proved the term through the hybrid; a feature that stopped there would have a correct fabric nothing instantiates
+- [ ] T038d [GATE:conformance] **Wire the identity rows into a lane that can run them** — pass 4 found they had none. Add `tests/conformance/identity` to the in-allocation pytest command in `infra/jobs/conformance.nomad.hcl`, and exclude the directory **by path** from the host lanes in `Makefile` (`conformance` line 1 and `conformance-hermetic`). The durability pattern, not the api one: these rows construct `NomadWorkloadIdentity`, which raises outside an allocation, so the host `-m enclave` lane fails them on identity and the hermetic lane fails them on the missing enclave — there is no host lane that works, and without this task `make conformance` at T053 either skips the feature's rows silently or fails all of them in a way that reads as a Vault regression. Include the negative control: assert the host lanes collect **zero** identity rows. *(Eleventh instance of the seam pattern — rows specified without the runner that executes them — and the first found by asking "who runs this file" instead of "what does this file assert")*
 
 ---
 
@@ -210,7 +211,7 @@ independent; it is Phase 6a, and it needs three stories done.
 - **Phase 4**: T023, T024, T025 are three separate row files
 - **Phase 5**: T029 and T030
 - **Phase 6**: T037 and T038 (T036a precedes T035's row)
-- **Phase 6a**: deliberately none — move, wire, prove, in that order
+- **Phase 6a**: T038a→b→c are deliberately sequential — move, wire, prove, in that order; T038d (lane wiring) is independent of the chain
 - **Phase 7**: T042 and T043
 - **Phase 8**: T046b runs beside T046a's tail; T048–T052 are documentation in different files
 
@@ -230,10 +231,10 @@ one.
 
 ## Task count
 
-**61 tasks** — 2 setup, 9 foundational, 6 US5, 9 US1, 5 US2, 9 US3, 3 integration, 5 US4,
+**62 tasks** — 2 setup, 9 foundational, 6 US5, 9 US1, 5 US2, 9 US3, 4 integration, 5 US4,
 13 polish.
 
-Eight exist because analyze looked, across two passes. Pass 1 added the SC-001 sweep and its
+Nine exist because analyze looked, across four passes. Pass 1 added the SC-001 sweep and its
 enforcement (T046a/T046b) and a wiring task; pass 2 found that wiring task could not work
 where it sat — the run path resolves three terms from one fabric object — and replaced it
 with the hybrid harness (T010a), the Integration phase (T038a–c), and the trust-fabric probe

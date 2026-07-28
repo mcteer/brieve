@@ -97,6 +97,13 @@ Recorded here because the constitution requires a blocking row with no automated
 name who runs it *in this contract*. 009 narrowed that to forks; this feature inherits the
 narrowed version and adds nothing to it.
 
+One mechanical precondition, because pass 4 found it missing: the in-allocation runner
+enumerates its directories explicitly, so `tests/conformance/identity` must be **added to
+the allocation jobspec and path-excluded from every host lane** (T038d). These rows
+construct a workload identity, which exists only inside an allocation — a host lane cannot
+run them, only fail them, and a lane that silently collects zero rows reports the same green
+as one that ran them all.
+
 ## What this lane still cannot prove
 
 Stated so nobody reads the green as broader than it is:
