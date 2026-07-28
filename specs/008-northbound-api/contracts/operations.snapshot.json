@@ -26,5 +26,9 @@
     "method": "GET",
     "name": "get_run",
     "path": "/runs/{run_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/runs/{run_id}/result"
   }
 ]

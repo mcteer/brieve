@@ -33,6 +33,7 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "request_mapping_change": ("POST", "/claim-mappings"),
     "collect_mapping_change": ("GET", "/claim-mappings/{accessor}"),
     "list_runs": ("GET", "/runs"),
+    "get_run_result": ("GET", "/runs/{run_id}/result"),
 }
 
 
@@ -135,6 +136,22 @@ def operations() -> list[McpOperation]:
                 },
                 # No subject and no tenant. Both come from the authenticated caller, and a
                 # parameter for either would be a request to list someone else's work.
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="get_run_result",
+            method="GET",
+            path="/runs/{run_id}/result",
+            description=(
+                "What a run produced. Distinguishes still-running, finished with a "
+                "result, and ended without one — three states an empty answer would "
+                "conflate."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"run_id": {"type": "string", "minLength": 1}},
+                "required": ["run_id"],
                 "additionalProperties": False,
             },
         ),

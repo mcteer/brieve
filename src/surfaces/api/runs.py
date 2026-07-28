@@ -26,6 +26,7 @@ from core.errors import CorrelationRequiredError
 from core.identity.types import AuthenticatedSubject
 from core.run import RunState
 from core.runs.index import DEFAULT_PAGE_SIZE, RunIndexError
+from core.runs.refusals import OperationRefused
 from surfaces.api.dependencies import DispatcherDep, DurabilityDep, RunIndexDep, SubjectDep
 from surfaces.dispatch.types import RunHandle
 
@@ -128,8 +129,118 @@ def _state_of(run_id: str, durability: Any) -> RunState | None:
         return None
 
 
+#: Where a run's output lives on its terminal checkpoint.
+#:
+#: A reserved key in the existing payload rather than a new column or a new table: the
+#: terminal checkpoint is the one place a run's ending is already recorded, and two records
+#: of one ending will eventually disagree about which is true.
+RESULT_KEY = "__run_result__"
+
+#: How much of a result the operation will return.
+#:
+#: Past this it refuses rather than truncating, because the spec is explicit that a partial
+#: result presented as complete is worse than a refusal — someone acts on it. The bound is
+#: generous enough that no ordinary result meets it and small enough that a runaway one
+#: cannot be handed to a browser.
+MAX_RESULT_BYTES = 256 * 1024
+
+
+class RunResultResponse(BaseModel):
+    """What a run produced, or why there is nothing to show.
+
+    Three dispositions, and a single empty response would conflate all of them (FR-007):
+    a run still working, a run that finished with something, and a run that ended without
+    one. Only the second has a `result`.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run_id: str
+    disposition: str
+    result: Any | None = None
+    stop_reason: str | None = None
+
+
+def run_result_for(
+    *,
+    run_id: str,
+    subject: AuthenticatedSubject,
+    index: Any,
+    durability: Any,
+) -> RunResultResponse:
+    """A run's output, without the caller reading a single audit entry.
+
+    The index supplies the tenant check — a run in another tenant is answered exactly as a
+    run that does not exist — and the checkpoint supplies the outcome. **Never the raw
+    payload**: checkpoint contents are resume state, and returning them wholesale would
+    make their shape a compatibility surface, which is the argument against reconstructing
+    results from the audit trail, one layer down.
+    """
+    entry = index.get(run_id=run_id, tenant_id=subject.tenant_id)
+    if entry is None:
+        raise OperationRefused("no such run", reason_code="no_such_record")
+    if entry.subject_user_id != subject.subject_user_id:
+        raise OperationRefused("this run belongs to someone else", reason_code="not_permitted")
+
+    blob = durability.load(run_id) if durability is not None else None
+    if blob is None or blob.outcome is None:
+        return RunResultResponse(run_id=run_id, disposition="running")
+
+    payload = blob.payload or {}
+    if RESULT_KEY not in payload:
+        # Terminal with nothing to show — stopped, refused, or simply produced nothing.
+        # The reason is what makes this actionable: a run that failed is not a run that
+        # returned nothing, and an empty response would say the second about the first.
+        return RunResultResponse(
+            run_id=run_id,
+            disposition="ended_without_result",
+            stop_reason=blob.outcome.stop_reason,
+        )
+
+    result = payload[RESULT_KEY]
+    if _too_large(result):
+        raise OperationRefused("result too large to return", reason_code="not_permitted")
+
+    return RunResultResponse(run_id=run_id, disposition="complete", result=result)
+
+
+def _too_large(result: Any) -> bool:
+    """Whether returning this would exceed the bound.
+
+    Measured on the serialised form, because that is what a caller receives — a structure
+    that is small in objects and enormous in bytes is exactly the case a naive length check
+    would wave through.
+    """
+    import json
+
+    try:
+        return len(json.dumps(result).encode()) > MAX_RESULT_BYTES
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        return True
+
+
 def build_router() -> APIRouter:
     router = APIRouter(tags=["runs"])
+
+    @router.get("/runs/{run_id}/result", response_model=RunResultResponse)
+    def get_run_result(
+        run_id: str,
+        subject: SubjectDep,
+        index: RunIndexDep,
+        durability: DurabilityDep,
+    ) -> RunResultResponse:
+        """What this run produced."""
+        try:
+            return run_result_for(
+                run_id=run_id, subject=subject, index=index, durability=durability
+            )
+        except OperationRefused as refused:
+            code = (
+                status.HTTP_403_FORBIDDEN
+                if refused.is_visible_to_caller
+                else status.HTTP_404_NOT_FOUND
+            )
+            raise HTTPException(code, str(refused)) from refused
 
     @router.get("/runs", response_model=RunListResponse)
     def list_runs(
