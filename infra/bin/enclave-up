@@ -319,8 +319,32 @@ say "Evidence store"
 # never exports it. enclave-verify does the same thing at its line 47 — worth matching
 # rather than assuming the environment carries it.
 export VAULT_TOKEN="${VAULT_TOKEN:-$(env_val VAULT_ROOT_TOKEN)}"
-ev_creds="$(vault read -format=json database/creds/harness 2>/dev/null || echo "")"
-[ -n "$ev_creds" ] || die "could not mint a harness credential to apply the evidence schema"
+
+# Unsealed is not the same as ready, and this is the first place that difference bites.
+# `vault operator unseal` returns as soon as the key is accepted; the store then becomes
+# active and remounts its backends, and a request for a dynamic credential arriving inside
+# that window fails against a database engine that is not serving yet. The TLS restart
+# above puts a fresh unseal directly in front of this call, so the window is not a rare
+# one — it is where this call always lands.
+#
+# It presented as an intermittent CI failure with a message naming the credential, which
+# sent debugging toward Vault's database configuration rather than at a restart four lines
+# earlier. Hence both halves of the fix: wait for ready, and **report what Vault actually
+# said** when the wait runs out.
+ev_creds=""
+mint_error=""
+for _ in $(seq 1 30); do
+  if ev_creds="$(vault read -format=json database/creds/harness 2>/tmp/enclave-mint-err)"; then
+    [ -n "$ev_creds" ] && break
+  fi
+  mint_error="$(tr -d '\r' < /tmp/enclave-mint-err | tail -3)"
+  ev_creds=""
+  sleep 1
+done
+if [ -z "$ev_creds" ]; then
+  [ -n "$mint_error" ] && printf '  %s\n' "$mint_error" >&2
+  die "could not mint a harness credential to apply the evidence schema (30s)"
+fi
 EV_USER="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["username"])')"
 EV_PASS="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["password"])')"
 # SET ROLE before the DDL. Every dynamic credential is a distinct role, so a table
