@@ -142,6 +142,31 @@ class PostgresAuditSink:
 
         def _run(conn: Any) -> AuditEntry:
             cur = conn.cursor()
+            # Seed the head before locking it, because **`FOR UPDATE` on a row that does
+            # not exist locks nothing.** The lock below serialises appends to a stream that
+            # already has one — but the FIRST append to a stream had no row to take, so two
+            # writers starting a stream together both read nothing, both computed seq 0,
+            # and one lost on the primary key.
+            #
+            # It is a narrow window and it stayed hidden accordingly: the row that drives
+            # concurrent writers passed locally many times and in CI, and only failed once
+            # a persistent service was sharing the machine. A race that reproduces under
+            # load and not otherwise is the kind that reaches production.
+            #
+            # `ON CONFLICT DO NOTHING` is what makes this safe rather than a second race.
+            # Postgres blocks the losing inserter until the winner commits or aborts, so by
+            # the time either reaches the `SELECT ... FOR UPDATE` there is exactly one row
+            # to lock and they take it in turn.
+            #
+            # The sentinel is `-1` with the genesis hash, so the read below needs no
+            # special case: seq becomes 0 and prev_hash the genesis, by the same
+            # arithmetic every later append uses. A branch here would be a second place for
+            # the first entry's shape to be decided.
+            cur.execute(
+                "INSERT INTO audit_stream_heads (correlation_id, highest_seq, head_hash) "
+                "VALUES (%s, -1, %s) ON CONFLICT (correlation_id) DO NOTHING",
+                (correlation_id, GENESIS_PREV_HASH),
+            )
             # The row lock is what makes this safe for a stream with many writers. Taking
             # the head row FOR UPDATE serialises concurrent appends to the same stream;
             # readers of other streams are unaffected.
@@ -151,12 +176,12 @@ class PostgresAuditSink:
                 (correlation_id,),
             )
             row = cur.fetchone()
-            if row is None:
-                seq = 0
-                prev_hash = GENESIS_PREV_HASH
-            else:
-                seq = int(row[0]) + 1
-                prev_hash = str(row[1])
+            # Never None now — the seed above guarantees a row — but a sink that crashed
+            # here would be reporting the wrong thing entirely.
+            if row is None:  # pragma: no cover — defensive; the seed makes it unreachable
+                raise RuntimeError(f"stream head vanished between seed and lock: {correlation_id}")
+            seq = int(row[0]) + 1
+            prev_hash = str(row[1])
 
             entry_hash = compute_entry_hash(
                 correlation_id=correlation_id,
