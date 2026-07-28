@@ -73,6 +73,13 @@ seal_status_ok() {
 # ---------------------------------------------------------------- prerequisites
 # Each failure NAMES what is missing. "Bring-up failed" withholds the diagnosis this
 # script has already performed.
+# How the trust store addresses the host is a substrate difference. Docker Desktop
+# provides `host.docker.internal`; Linux Docker does not, and its published ports bind one
+# interface, so a bridged trust store resolves the host and is refused by it. Set
+# ENCLAVE_VAULT_HOST_NETWORK=true there.
+NET_ARGS=()
+[ "${ENCLAVE_VAULT_HOST_NETWORK:-false}" = "true" ] && NET_ARGS=(-var vault_host_network=true)
+
 say "Prerequisites"
 for bin in docker nomad vault terraform python3; do
   command -v "$bin" >/dev/null || die "$bin is not on PATH — see CONTRIBUTING.md"
@@ -170,7 +177,8 @@ if docker container inspect brieve-dev-vault >/dev/null 2>&1; then
 fi
 
 terraform apply -input=false -auto-approve \
-  -target=module.substrate -var vault_token=placeholder >/dev/null
+  -target=module.substrate -var vault_token=placeholder \
+  ${NET_ARGS[@]+"${NET_ARGS[@]}"} >/dev/null
 for _ in $(seq 1 30); do seal_status_ok && break; sleep 1; done
 seal_status_ok \
   || die "trust store is not answering at $VAULT_ADDR — try: docker logs brieve-dev-vault"
@@ -221,12 +229,6 @@ say "Trust fabric"
 TLS_ARGS=()
 [ "${ENCLAVE_TLS:-true}" = "true" ] && TLS_ARGS=(-var enable_tls=true)
 
-# How the trust store addresses the host is a substrate difference. Docker Desktop
-# provides `host.docker.internal`; Linux Docker does not, and its published ports bind one
-# interface, so a bridged trust store resolves the host and is refused by it. Set
-# ENCLAVE_VAULT_HOST_NETWORK=true there.
-NET_ARGS=()
-[ "${ENCLAVE_VAULT_HOST_NETWORK:-false}" = "true" ] && NET_ARGS=(-var vault_host_network=true)
 terraform apply -input=false -auto-approve -var vault_token="$(env_val VAULT_ROOT_TOKEN)" ${TLS_ARGS[@]+"${TLS_ARGS[@]}"} ${NET_ARGS[@]+"${NET_ARGS[@]}"} >/dev/null
 ok "workload identity auth, ceiling policies, agent registry, database engine, dynamic role"
 
@@ -276,7 +278,7 @@ TFVARS
 
   terraform apply -input=false -auto-approve \
     -var vault_token="$(env_val VAULT_ROOT_TOKEN)" \
-    -target=module.substrate >/dev/null
+    -target=module.substrate ${NET_ARGS[@]+"${NET_ARGS[@]}"} >/dev/null
   ok "listener switched to TLS, issued by the control plane's own CA"
 
   export VAULT_ADDR="https://127.0.0.1:8200"
