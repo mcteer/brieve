@@ -34,6 +34,7 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "collect_mapping_change": ("GET", "/claim-mappings/{accessor}"),
     "list_runs": ("GET", "/runs"),
     "get_run_result": ("GET", "/runs/{run_id}/result"),
+    "stop_run": ("POST", "/runs/{run_id}/stop"),
 }
 
 
@@ -147,6 +148,22 @@ def operations() -> list[McpOperation]:
                 "What a run produced. Distinguishes still-running, finished with a "
                 "result, and ended without one — three states an empty answer would "
                 "conflate."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"run_id": {"type": "string", "minLength": 1}},
+                "required": ["run_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="stop_run",
+            method="POST",
+            path="/runs/{run_id}/stop",
+            description=(
+                "End a run you started. Terminal and unilateral — not a pause, and "
+                "nothing resumes it. The step in flight finishes first, so a stop is not "
+                "instant."
             ),
             input_schema={
                 "type": "object",

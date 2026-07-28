@@ -22,6 +22,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.correlation import validate_correlation_id
+from core.durability.types import CheckpointBlob, RunOutcome
 from core.errors import CorrelationRequiredError
 from core.identity.types import AuthenticatedSubject
 from core.run import RunState
@@ -219,8 +220,93 @@ def _too_large(result: Any) -> bool:
         return True
 
 
+class StopRunResponse(BaseModel):
+    """The run's state after a stop. Terminal, and never a promise to stop later."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run_id: str
+    state: RunState
+    stop_reason: str | None = None
+    already_terminal: bool = False
+
+
+def stop_run_for(
+    *,
+    run_id: str,
+    subject: AuthenticatedSubject,
+    index: Any,
+    durability: Any,
+) -> StopRunResponse:
+    """Withdraw a run this subject started.
+
+    **Withdrawal, not pausing**, and the distinction is what keeps this compatible with
+    ADR-0049. That decision forbids a run *waiting* on a human; it says nothing about a
+    person ending their own request. The state written here is terminal — unresumable by
+    `is_terminal()`, invisible to the sweeper by `_is_suspended` — so nothing waits, and
+    no recovering dependency can bring it back. A stop a dependency could undo would be a
+    pause wearing another name.
+
+    The caller returns immediately. The running allocation notices at its next step
+    boundary and ends after bracketing the step in flight, which is why a stop is not
+    instant: buying promptness by killing the allocation would leave an open intent on a
+    run that is terminal and will therefore never resume to re-observe it — permanent,
+    which is the one outcome 005's bracketing exists to prevent.
+    """
+    entry = index.get(run_id=run_id, tenant_id=subject.tenant_id)
+    if entry is None:
+        raise OperationRefused("no such run", reason_code="no_such_record")
+    if entry.subject_user_id != subject.subject_user_id:
+        # Only the person who gave consent may withdraw it.
+        raise OperationRefused("this run belongs to someone else", reason_code="not_permitted")
+
+    blob = durability.load(run_id)
+    if blob is not None and blob.outcome is not None:
+        # Asking twice is not an error (FR-011). The terminal-once guard means a second
+        # stop could not change this even if it tried, so reporting the existing state is
+        # both the honest answer and the only possible one.
+        return StopRunResponse(
+            run_id=run_id,
+            state=RunState(blob.outcome.state),
+            stop_reason=blob.outcome.stop_reason,
+            already_terminal=True,
+        )
+
+    reason = f"stopped_by:{subject.subject_user_id}"
+    durability.save(
+        CheckpointBlob(
+            blob_id=run_id,
+            payload=(blob.payload if blob is not None else {}),
+            correlation_id=(blob.correlation_id if blob is not None else entry.correlation_id),
+            grant_id=(blob.grant_id if blob is not None else ""),
+            step_index=(blob.step_index if blob is not None else 0),
+            written_by=f"stop:{subject.subject_user_id}",
+            outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
+        )
+    )
+    return StopRunResponse(run_id=run_id, state=RunState.STOPPED, stop_reason=reason)
+
+
 def build_router() -> APIRouter:
     router = APIRouter(tags=["runs"])
+
+    @router.post("/runs/{run_id}/stop", response_model=StopRunResponse)
+    def stop_run(
+        run_id: str,
+        subject: SubjectDep,
+        index: RunIndexDep,
+        durability: DurabilityDep,
+    ) -> StopRunResponse:
+        """End a run you started."""
+        try:
+            return stop_run_for(run_id=run_id, subject=subject, index=index, durability=durability)
+        except OperationRefused as refused:
+            code = (
+                status.HTTP_403_FORBIDDEN
+                if refused.is_visible_to_caller
+                else status.HTTP_404_NOT_FOUND
+            )
+            raise HTTPException(code, str(refused)) from refused
 
     @router.get("/runs/{run_id}/result", response_model=RunResultResponse)
     def get_run_result(

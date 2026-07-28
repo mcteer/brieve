@@ -127,8 +127,25 @@ class PostgresDurabilityProvider:
                     grant_id = EXCLUDED.grant_id,
                     step_index = EXCLUDED.step_index,
                     written_by = EXCLUDED.written_by,
-                    run_state = EXCLUDED.run_state,
-                    stop_reason = EXCLUDED.stop_reason,
+                    -- TERMINAL-ONCE. A terminal state, once written, is never cleared and
+                    -- never replaced; the FIRST terminal write wins.
+                    --
+                    -- This used to be `run_state = EXCLUDED.run_state`, unconditional,
+                    -- which reads as obviously correct and passed every durability row
+                    -- for three features. It is not: a mid-flight checkpoint carries no
+                    -- outcome, so the running allocation's next ROUTINE save wrote NULL
+                    -- over a terminal state — silently resurrecting a stopped run, whose
+                    -- stop then held only until the run next checkpointed.
+                    --
+                    -- Nothing legitimate overwrites a terminal state: resume refuses
+                    -- terminal runs, and suspension carries a non-terminal state. So the
+                    -- guard forbids exactly the write that was always a defect.
+                    --
+                    -- It assumes blob ids are not reused across runs, which dispatch
+                    -- guarantees by minting fresh ones — a fresh run under a stopped
+                    -- blob id could never record its own completion.
+                    run_state = COALESCE(checkpoints.run_state, EXCLUDED.run_state),
+                    stop_reason = COALESCE(checkpoints.stop_reason, EXCLUDED.stop_reason),
                     written_at = now()
                 """,
                 (

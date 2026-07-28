@@ -93,6 +93,7 @@ class McpTransport:
             "collect_mapping_change": self._collect_mapping_change,
             "list_runs": self._list_runs,
             "get_run_result": self._get_run_result,
+            "stop_run": self._stop_run,
         }.get(tool_name)
 
         if handler is None:
@@ -149,6 +150,26 @@ class McpTransport:
                 "disposition": str(disposition),
             },
         )
+
+    def _stop_run(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from core.runs.refusals import OperationRefused
+        from surfaces.api.runs import stop_run_for
+
+        try:
+            stopped = stop_run_for(
+                run_id=str(args["run_id"]),
+                subject=subject,
+                index=self._index,
+                durability=self._durability,
+            )
+        except OperationRefused as refused:
+            return McpResult(
+                ok=False,
+                status=403 if refused.is_visible_to_caller else 404,
+                payload={"reason": str(refused)},
+            )
+
+        return McpResult(ok=True, status=200, payload=stopped.model_dump(mode="json"))
 
     def _get_run_result(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         from core.runs.refusals import OperationRefused
