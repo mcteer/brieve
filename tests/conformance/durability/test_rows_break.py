@@ -60,14 +60,14 @@ def test_fencing_row_fails_when_a_superseded_holder_still_holds() -> None:
 
 
 def test_parking_row_fails_when_an_expired_grant_resumes() -> None:
-    with pytest.raises(AssertionError, match="expected PARKED"):
-        rows.assert_parked(RunState.ACTIVE, None, expected_prefix="grant_expired")
+    with pytest.raises(AssertionError, match="expected STOPPED"):
+        rows.assert_stopped(RunState.ACTIVE, None, expected_prefix="grant_expired")
 
 
 def test_parking_row_fails_on_the_wrong_reason() -> None:
     """Parking for the wrong reason is not the guarantee — the cause must be right."""
     with pytest.raises(AssertionError, match="does not start with"):
-        rows.assert_parked(RunState.PARKED, "checkpoint_missing", expected_prefix="grant_expired")
+        rows.assert_stopped(RunState.STOPPED, "checkpoint_missing", expected_prefix="grant_expired")
 
 
 def test_reobservation_row_fails_when_an_observed_effect_is_repeated() -> None:

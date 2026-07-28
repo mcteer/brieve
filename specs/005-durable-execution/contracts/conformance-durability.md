@@ -26,9 +26,26 @@ Postgres; `make dev-up` is a prerequisite for them, not an alternative to them.
 | Re-authenticate, never replay | Resume manufactures fresh authority; no checkpoint contains credential material; a pre-disruption credential is not honoured | FR-003/004, SC-002/003 |
 | Re-observe, never re-execute | An interrupted non-repeatable step is resolved against observed external state, in both directions | FR-006/007, SC-005 |
 | Fencing against double resume | A superseded holder's tool calls and checkpoint writes are rejected; zero side effects, zero state mutation | FR-009, SC-006 |
-| Parking on grant expiry | Resume under expired consent parks with zero subsequent steps; renewed consent permits resume | FR-005, SC-004 |
+| **Stop** on grant expiry | Resume under expired consent **stops** with the reason recorded and zero subsequent steps. Terminal — renewed consent does **not** revive it | FR-005, SC-004 |
 | Duplicate side-effect rejection | A repeated step carrying the same stable key is recognised as the same step | FR-010, SC-001 |
 | Drain across upgrade | A controlled in-process handover preserves the run and its evidence | FR-015, SC-008 |
+
+## What this row asserted before, and why it changed
+
+It read *"Parking on grant expiry — resume under expired consent parks with zero
+subsequent steps; **renewed consent permits resume**"*. That last clause was the
+re-consent loop ADR-0049 supersedes: it assumed a human being asked to extend consent
+mid-run, and there is no such human. A run reaching its grant's end has hit an execution
+bound, and bounds are not renegotiated while the run waits.
+
+The constitution named this row *"grant-expiry parking"* in its Quality Gates. It now says
+*"grant-expiry stop"* — amended in 009 (v1.2.0) with a Sync Impact Report, in the same
+change that removed `PARKED` from the sealed core. A gate row describing a state nothing
+can enter is worse than a missing row: it reads as covered.
+
+`PARKED` conflated two things. The other half — waiting on a machine condition that clears
+itself — became `SUSPENDED`, which 009 introduces along with the sweeper that resumes it.
+That is not this row, and deliberately so: one is a bound, the other is a wait.
 
 ## Break fixtures (FR-014)
 

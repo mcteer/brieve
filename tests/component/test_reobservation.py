@@ -165,9 +165,11 @@ def test_unobservable_step_parks() -> None:
         {"provision": ScriptedObserver()},  # defaults to cannot-determine
     )
 
-    assert decision.state is RunState.PARKED
-    assert decision.park_reason is not None
-    assert decision.park_reason.startswith("unobservable_step:provision")
+    assert decision.state is RunState.SUSPENDED
+    assert not decision.state.is_terminal(), "an unobservable step must stay resumable"
+    assert decision.awaiting == "provision", "a suspension must name what it waits on"
+    assert decision.stop_reason is not None
+    assert decision.stop_reason.startswith("unobservable_step:provision")
 
 
 def test_unreachable_external_system_is_not_evidence() -> None:
@@ -180,7 +182,7 @@ def test_unreachable_external_system_is_not_evidence() -> None:
 
     decision = _resume(provider, grant, clock, {"provision": ScriptedObserver(raises=True)})
 
-    assert decision.state is RunState.PARKED, "an unreachable system means we do not know"
+    assert decision.state is RunState.SUSPENDED, "an unreachable system means we do not know"
 
 
 def test_missing_observer_parks_rather_than_guessing() -> None:
@@ -194,8 +196,8 @@ def test_missing_observer_parks_rather_than_guessing() -> None:
 
     decision = _resume(provider, grant, clock, {})
 
-    assert decision.state is RunState.PARKED
-    assert "no observer registered" in (decision.park_reason or "")
+    assert decision.state is RunState.SUSPENDED
+    assert "no observer registered" in (decision.stop_reason or "")
 
 
 def test_idempotency_key_is_stable_per_step_and_distinct_across_steps() -> None:

@@ -36,8 +36,14 @@ class RunState(StrEnum):
 
     002 shipped ACTIVE and REFUSED, which sufficed while nothing had to survive a
     restart. Durable execution needs all three distinctions: without COMPLETED a resume
-    attempt against a finished run re-enters the loop, and calling a bounded stop PARKED
-    would invite resuming past the bound.
+    attempt against a finished run re-enters the loop, and calling a bounded stop
+    SUSPENDED would invite resuming past the bound.
+
+    ``PARKED`` used to live here and meant "stopped for a human to resolve". ADR-0049
+    removed that category — consent to start a run is consent to finish it — so the state
+    went with it rather than being renamed. Keeping the name would have carried the
+    human-in-the-loop connotation into ``SUSPENDED``, which is the one state that most
+    needs it gone: a suspended run waits on a *machine condition* that clears itself.
     """
 
     ACTIVE = "active"
@@ -46,11 +52,18 @@ class RunState(StrEnum):
     COMPLETED = "completed"
     #: Halted by an execution bound; ``stop_reason`` records which one.
     STOPPED = "stopped"
-    #: Waiting for something only a human can supply. Resumable; not failed.
-    PARKED = "parked"
+    #: Waiting on a named dependency to become reachable again. Resumable by the
+    #: sweeper, never by a person, and never by a timeout that grants by default.
+    SUSPENDED = "suspended"
 
     def is_terminal(self) -> bool:
-        """True when there is nothing left to resume."""
+        """True when there is nothing left to resume.
+
+        ``SUSPENDED`` is deliberately absent: it is the one non-terminal stop, and the
+        sweeper's whole job is to resume it. Adding it here would make the sweeper able to
+        resume nothing while every test still passed — and omitting ``STOPPED`` would let a
+        run resume past a bound it already hit.
+        """
         return self in {RunState.REFUSED, RunState.COMPLETED, RunState.STOPPED}
 
 

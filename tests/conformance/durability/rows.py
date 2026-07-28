@@ -40,11 +40,33 @@ def assert_superseded_is_rejected(provider: DurabilityProvider, run_id: str, sta
     assert not provider.check_lease(run_id, stale), "a superseded holder still holds the lease"
 
 
-def assert_parked(state: RunState, reason: str | None, *, expected_prefix: str) -> None:
-    assert state is RunState.PARKED, f"expected PARKED, got {state}"
+def assert_stopped(state: RunState, reason: str | None, *, expected_prefix: str) -> None:
+    """The grant-expiry row, as ADR-0049 redefines it.
+
+    It asserted PARKED — "stopped for a human to resolve" — and now asserts STOPPED,
+    because there is no human to resolve it. The constitution's Quality Gates named this
+    row "grant-expiry parking"; the amendment in this change renames it to grant-expiry
+    stop, so the governing document and this assertion say the same thing.
+
+    STOPPED is terminal, which is the substantive difference: nothing resumes it, and a
+    row that still accepted a resumable state would let a run continue past a bound.
+    """
+    assert state is RunState.STOPPED, f"expected STOPPED, got {state}"
+    assert state.is_terminal(), "grant expiry must be terminal — nothing resumes a bound"
     assert reason is not None and reason.startswith(expected_prefix), (
-        f"park reason {reason!r} does not start with {expected_prefix!r}"
+        f"stop reason {reason!r} does not start with {expected_prefix!r}"
     )
+
+
+def assert_suspended(state: RunState, awaiting: str | None, *, expected: str) -> None:
+    """The other half of what PARKED conflated: waiting on a machine condition.
+
+    Resumable by construction — asserted, because a suspension that reported terminal
+    would be a run the sweeper can never pick up, and it would look like a hang.
+    """
+    assert state is RunState.SUSPENDED, f"expected SUSPENDED, got {state}"
+    assert not state.is_terminal(), "a suspended run must stay resumable"
+    assert awaiting == expected, f"suspended awaiting {awaiting!r}, expected {expected!r}"
 
 
 def assert_observation_decides(outcome: ObservationOutcome, *, repeated: bool) -> None:
