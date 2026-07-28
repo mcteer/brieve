@@ -247,6 +247,41 @@ def _report_integrity(report: IntegrityReport) -> None:
         )
 
 
+def supervisory_pass(
+    *,
+    checker: HealthChecker,
+    sweeper: Sweeper,
+    store: PostgresDependencyStore,
+    credentials: VaultDatabaseCredentials,
+) -> list[str]:
+    """One pass of everything this service exists to do. Returns the passes it ran.
+
+    A named function rather than the loop's body, because the loop's body is unreachable
+    from a test: it blocks. This service was shipped constructing a health checker and a
+    sweeper that the loop then never called, and every conformance row still passed —
+    each exercises its component directly, and nothing asserted that the loop calls them.
+    The hosting claim rested on the jobspec existing.
+
+    **Health before sweep, in that order and not the reverse.** The sweeper resumes runs
+    whose dependency `state_of` reports healthy, so sweeping first would decide on the
+    previous pass's health — a full interval of resuming into an outage this pass already
+    knows about.
+
+    Each pass is independent and a failure in one is reported rather than propagated. A
+    supervisory loop that died on a transient database error would take the health checker
+    and the sweeper with it, and the platform would then trust whatever was last recorded
+    until staleness caught up.
+    """
+    ran: list[str] = []
+    _pass("health", lambda: _report_health(checker))
+    ran.append("health")
+    _pass("sweep", lambda: _report_sweep(sweeper, store))
+    ran.append("sweep")
+    _pass("integrity", lambda: _report_integrity(check_integrity(credentials)))
+    ran.append("integrity")
+    return ran
+
+
 def main() -> int:
     """Start the service.
 
@@ -279,19 +314,7 @@ def main() -> int:
 
     supervisor = _Supervisor(interval)
     while supervisor.running:
-        # Three passes, each independent, and a failure in one reported rather than fatal.
-        # A supervisory loop that died on a transient database error would take the health
-        # checker and the sweeper with it — and the platform would then trust whatever was
-        # last recorded until staleness caught up.
-        #
-        # Health before sweep, in that order and not the reverse. The sweeper resumes runs
-        # whose dependency `state_of` reports healthy, so sweeping first would decide on
-        # the previous pass's health — one full interval of resuming into an outage that
-        # this pass already knows about.
-        _pass("health", lambda: _report_health(checker))
-        _pass("sweep", lambda: _report_sweep(sweeper, store))
-        _pass("integrity", lambda: _report_integrity(check_integrity(credentials)))
-
+        supervisory_pass(checker=checker, sweeper=sweeper, store=store, credentials=credentials)
         supervisor.sleep()
 
     print("mcp service stopping on signal", flush=True)
