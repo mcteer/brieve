@@ -43,6 +43,7 @@ from core.dependencies.store import PostgresDependencyStore
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
 from core.durability.sweeper import Sweeper
+from core.hooks.suspension import TRUST_FABRIC_DEPENDENCY
 from core.registry.memory import ToolRegistry
 from surfaces.dispatch.nomad import NomadDispatcher
 from surfaces.dispatch.types import RunDispatcher
@@ -213,6 +214,35 @@ def _pass(name: str, work: Callable[[], None]) -> None:
         print(f"{name} pass failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
 
 
+def record_trust_fabric_health(store: PostgresDependencyStore) -> None:
+    """Record that the trust fabric is reachable — by having just reached it.
+
+    **The probe is not a separate check, and that is the whole design.** Reaching this
+    store at all required a database credential, and that credential came from the trust
+    fabric moments ago. So a pass that gets here has already proved the thing it is about
+    to record, and one that could not would have failed before arriving — leaving the
+    record untouched, which staleness turns into UNKNOWN, which refuses.
+
+    That is what makes FR-008b's recovery ordering self-asserting rather than a sequence
+    someone has to maintain:
+
+        fabric returns → login succeeds → credentials obtained → health recorded → sweep
+
+    Every arrow is a precondition of the next, so the order cannot be got wrong by writing
+    the steps in a different sequence. It is the only order that terminates, and it is also
+    the only order that runs.
+
+    **Nothing that failed to reach the fabric can mark it healthy** (FR-008c), because
+    marking it requires a credential only the fabric issues. The guarantee is structural
+    rather than a rule about who may call this.
+    """
+    store.record_probe(
+        product=TRUST_FABRIC_DEPENDENCY,
+        reachable=True,
+        detail="credential acquisition succeeded",
+    )
+
+
 def _report_health(checker: HealthChecker) -> None:
     for health in checker.sweep():
         if not health.state.permits_calls():
@@ -273,6 +303,10 @@ def supervisory_pass(
     until staleness caught up.
     """
     ran: list[str] = []
+    # Before the product sweep, because the fabric is what the sweep's own store
+    # credentials come from — see `record_trust_fabric_health`.
+    _pass("trust-fabric", lambda: record_trust_fabric_health(store))
+    ran.append("trust-fabric")
     _pass("health", lambda: _report_health(checker))
     ran.append("health")
     _pass("sweep", lambda: _report_sweep(sweeper, store))

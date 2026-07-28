@@ -51,6 +51,9 @@ class RecordingStore:
     def awaited_products(self) -> list[str]:
         return ["terraform-cloud"]
 
+    def record_probe(self, *, product: str, reachable: bool, detail: str) -> None:
+        self.calls.append("trust-fabric")
+
 
 class ExplodingChecker:
     """A pass that raises. The others must still run."""
@@ -75,8 +78,8 @@ def test_every_pass_runs(monkeypatch: Any) -> None:
 
     ran = supervisory_pass(**parts)
 
-    assert set(ran) == {"health", "sweep", "integrity"}
-    assert calls == ["health", "sweep", "integrity"]
+    assert set(ran) == {"trust-fabric", "health", "sweep", "integrity"}
+    assert calls == ["trust-fabric", "health", "sweep", "integrity"]
 
 
 def test_health_runs_before_sweep(monkeypatch: Any) -> None:
@@ -102,8 +105,8 @@ def test_one_failing_pass_does_not_stop_the_others(monkeypatch: Any) -> None:
 
     ran = supervisory_pass(**parts)
 
-    assert set(ran) == {"health", "sweep", "integrity"}
-    assert calls == ["sweep", "integrity"], "a raising health pass stopped the rest"
+    assert set(ran) == {"trust-fabric", "health", "sweep", "integrity"}
+    assert calls == ["trust-fabric", "sweep", "integrity"], "a raising health pass stopped the rest"
 
 
 def test_break_fixture_a_pass_that_is_constructed_but_not_called_is_detected() -> None:
