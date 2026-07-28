@@ -33,8 +33,16 @@ being re-derived at the start of every spec.
 
 ## In progress
 
-Nothing. 009 shipped; the next feature has no number until `/speckit-specify` creates its
-directory.
+**010 — Production identity fabric.** The gap recorded below since 008 and unclaimed since:
+every feature from 002 to 009 resolves user scope, agent ceilings, policy, and product
+entitlements through a **fake**. This is the feature that reads them from the control-plane
+trust fabric instead.
+
+**Why now, ahead of the CLI.** The remaining transports are human-facing, and a CLI is the
+first thing a real person authenticates to expecting real scope. Shipping it over a fake
+authority source would put the gap in front of users before it was closed — and northbound's
+next honest step is arguably widening the API's four operations anyway, which the CLI would
+otherwise have to be specified around twice.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -96,7 +104,11 @@ no approval path is hard to evaluate end to end.
 **Owed gate rows:** all Eval gates (must-deny safety, must-decline scope, citation accuracy,
 estate-state fixtures, report fidelity).
 
-### 010 — Deferred disclosure and code mode (ADR-0040, ADR-0041)
+### Deferred disclosure and code mode (ADR-0040, ADR-0041)
+
+> Previously headed "010", which guessed a number this file's own rule says not to guess —
+> and it was wrong the moment the identity fabric was specified first. Unnumbered until its
+> directory exists.
 
 Productizes deferred tool/capability disclosure, and ships code mode — but only with verified
 per-call hook parity, which ADR-0041 makes an unconditional gate rather than a default.
@@ -124,7 +136,7 @@ the decision, not an omission.
 | Dedicated workflow-engine durability provider | ADR-0024, ADR-0028 | A named trigger: scale, an existing deployment, or a requirement the library provider cannot meet |
 | Wire-level guardrail (second protection layer) | ADR-0014 | Optional by design; in-process hooks are the primary layer |
 | Retrieval | ADR-0029 | Runs in the Postgres a deployment already has — needs that Postgres to exist first |
-| A production `IdentityFabric` | **Unassigned** | Every feature from 002 to 008 resolves user scope, ceilings, policy, and entitlements through a **fake**. `IdentityFabric` is a protocol and `fabric.py` says so in its first line; ADR-0048 anticipates a Vault-backed implementation and notes the fake was "a consequence of the gap, not a deliberate deferral". 008 made it concrete: a dispatched run's entrypoint had to live under `tests/harness/` because a production one has no fabric to resolve scope through, and putting a production-looking entrypoint in `src/` that imported the test fake would have hidden that. **No feature currently claims this.** Nothing downstream of it is proven against a real identity source |
+| A production `IdentityFabric` | **010** | Every feature from 002 to 009 resolves user scope, ceilings, policy, and entitlements through a **fake**. `IdentityFabric` is a protocol and `fabric.py` says so in its first line; ADR-0048 anticipates a Vault-backed implementation and notes the fake was "a consequence of the gap, not a deliberate deferral". 008 made it concrete: a dispatched run's entrypoint had to live under `tests/harness/` because a production one has no fabric to resolve scope through, and putting a production-looking entrypoint in `src/` that imported the test fake would have hidden that. **Claimed by 010** — the row stays here until it ships, because a gap moved to the plan is not a gap closed |
 | Row-level security on the evidence store | 008 | The tenant boundary on evidence reads is enforced by the application, not the database. `exists_outside_tenant` shows why that matters: the SQL role can see that rows exist under another tenant even though no content crosses. Postgres RLS moves the enforcement a layer down and is the right eventual home |
 | Vertical policy/content profiles | ADR-0003 | Horizontal first. Profiles ship as policy and content, not as forks |
 
