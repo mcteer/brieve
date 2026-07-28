@@ -77,10 +77,23 @@ class VaultReadFailed(CoreError):
     """
 
     def __init__(
-        self, message: str, *, timed_out: bool = False, correlation_id: str | None = None
+        self,
+        message: str,
+        *,
+        timed_out: bool = False,
+        status: int | None = None,
+        detail: str = "",
+        correlation_id: str | None = None,
     ) -> None:
         super().__init__(message, correlation_id=correlation_id)
         self.timed_out = timed_out
+        #: HTTP status and body, carried because **absence is engine-specific**. KV v2
+        #: answers a missing key with 404; the `agent_registry` engine answers a missing
+        #: registration with 400 and a message. A caller that knows which engine it is
+        #: talking to can recognise its absence signature; this class deliberately does
+        #: not guess, because guessing wrong turns "no such record" into "outage".
+        self.status = status
+        self.detail = detail
         self.reason_code = "fabric_timeout" if timed_out else "fabric_unreachable"
 
 
@@ -226,7 +239,9 @@ class VaultDatabaseCredentials:
                 detail = ""
             raise VaultReadFailed(
                 f"trust fabric refused {path!r} at {self._addr} "
-                f"as role {self._role!r}: HTTP {exc.code} {detail}"
+                f"as role {self._role!r}: HTTP {exc.code} {detail}",
+                status=exc.code,
+                detail=detail,
             ) from exc
         except TimeoutError as exc:
             raise VaultReadFailed(

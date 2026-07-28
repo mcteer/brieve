@@ -45,6 +45,28 @@ CEILING_PATH = "harness-authority/data/harness-ceilings"
 ROLE_BINDING_PATH = "harness-authority/data/role-bindings"
 POLICY_PATH = "harness-authority/data/policies"
 
+#: Policies the `agent_registry` engine appends to every registration on its own.
+#:
+#: Terraform registers one policy; Vault stores three. The engine adds these unless the
+#: registration sets ``no_default_ceiling_policy``, which this repository has never set —
+#: **so the effective ceiling has never been the declared one, and nothing had looked.**
+#:
+#: Their contents are benign (self-inspection, and reading two well-known policies), and
+#: that is exactly why this is worth naming rather than shrugging at: the finding is not
+#: that Vault granted something dangerous, it is that a difference existed where the whole
+#: point of the mechanism is that no difference exists. The next default the engine adds
+#: may not be benign, and without this there would still be nothing watching.
+ENGINE_APPENDED_POLICIES = frozenset({"default", "default-ceiling"})
+
+#: How the `agent_registry` engine says a registration is not there.
+#:
+#: **It answers 400, not 404**, with this in the body. Found against the live enclave and
+#: not derivable from anywhere else: KV v2 404s a missing key, so a reader that generalised
+#: from KV — which is every other read in this module — reports an unregistered definition
+#: as an unreachable fabric. That is the one confusion `read_path` exists to prevent, and it
+#: would have looked like an outage to anyone reading the trail.
+REGISTRY_ABSENT_SIGNATURE = "does not exist"
+
 
 class VaultIdentityFabric:
     """Resolves authority from the control-plane trust fabric, as an attested workload."""
@@ -63,6 +85,29 @@ class VaultIdentityFabric:
         self._entitlements = entitlement_source
 
     # ------------------------------------------------------------------ reads
+
+    def _read_registration(self, agent_definition_id: str) -> dict[str, Any] | None:
+        """Read a registration, treating the engine's own "not there" as absence.
+
+        Separate from :meth:`_read` because the absence signature belongs to the registry
+        engine, and the generic reader must not learn one backend's dialect — the next
+        engine will have a different one, and a generic reader that accumulated them would
+        eventually match a real error as absence.
+        """
+        try:
+            return self._credentials.read_path(f"{REGISTRATION_PATH}/{agent_definition_id}")
+        except VaultReadFailed as exc:
+            if exc.status == 400 and REGISTRY_ABSENT_SIGNATURE in exc.detail:
+                return None
+            raise ResolutionRefused(
+                str(exc),
+                reason_code="fabric_timeout" if exc.timed_out else "fabric_unreachable",
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 — an unresolvable read must never permit
+            raise ResolutionRefused(
+                f"registration read failed for {agent_definition_id!r}: {type(exc).__name__}",
+                reason_code="fabric_unreachable",
+            ) from exc
 
     def _read(self, path: str) -> dict[str, Any] | None:
         """One trust-fabric read, with failures mapped to reason codes.
@@ -107,7 +152,7 @@ class VaultIdentityFabric:
         anything, including an empty ceiling that a later widening would fill. The ceiling
         record carries what it may **do**.
         """
-        registration = self._read(f"{REGISTRATION_PATH}/{agent_definition_id}")
+        registration = self._read_registration(agent_definition_id)
         if registration is None:
             raise ResolutionRefused(
                 f"no registration for agent definition {agent_definition_id!r}",
@@ -129,6 +174,28 @@ class VaultIdentityFabric:
         return parse_ceiling_record(
             record, known_tools=self._known_tools, known_actions=self._known_actions
         )
+
+    def observed_policies(self, agent_definition_id: str) -> dict[str, list[str]]:
+        """What the registry actually holds, split into configured and engine-appended.
+
+        The fabric cannot see what Terraform *declared* — that lives in HCL, not in Vault.
+        What it can see is the effective set and which members of it the engine adds on its
+        own, and separating those is what turns research Finding 2 from a surprise into a
+        record. A resolution that reported only the effective list would be accurate and
+        would still leave a reader believing an operator had asked for all three.
+        """
+        registration = self._read_registration(agent_definition_id)
+        if registration is None:
+            raise ResolutionRefused(
+                f"no registration for agent definition {agent_definition_id!r}",
+                reason_code="unknown_agent_definition",
+            )
+        effective = [str(p) for p in (registration.get("data") or {}).get("ceiling_policies") or ()]
+        return {
+            "effective": sorted(effective),
+            "engine_appended": sorted(set(effective) & ENGINE_APPENDED_POLICIES),
+            "configured": sorted(set(effective) - ENGINE_APPENDED_POLICIES),
+        }
 
     def resolve_user_scope(self, subject_user_id: str) -> AuthorityScope:
         """What this person may delegate, from the roles their claims resolved to."""
