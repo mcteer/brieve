@@ -29,8 +29,9 @@ provider "vault" {
 }
 
 module "substrate" {
-  source        = "../../modules/substrate-docker"
-  vault_license = var.vault_license
+  source             = "../../modules/substrate-docker"
+  vault_host_network = var.vault_host_network
+  vault_license      = var.vault_license
 
   tls_certificate = var.tls_certificate
   tls_private_key = var.tls_private_key

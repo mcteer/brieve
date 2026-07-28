@@ -120,7 +120,12 @@ jobs:
 
       # The same command a human runs. Principle VII: two ways to run the gate is two
       # gates, and the one nobody runs locally is the one that rots.
+      # Linux Docker: the trust store joins the host namespace rather than being bridged.
+      # See infra/modules/substrate-docker/variables.tf for why this is a substrate
+      # difference — Principle VII's only permitted kind — and not a fix applied everywhere.
       - name: Stand up the enclave
+        env:
+          ENCLAVE_VAULT_HOST_NETWORK: "true"
         run: make dev-up
 
       - name: Conformance (all rows)

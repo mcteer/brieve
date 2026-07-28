@@ -56,3 +56,13 @@ variable "ca_cert_file" {
   type        = string
   default     = ""
 }
+
+variable "vault_host_network" {
+  description = <<-DESC
+    Run the trust store in the host network namespace (Linux Docker) rather than
+    publishing a port (Docker Desktop). See the substrate module for why this is a
+    substrate difference and not a change.
+  DESC
+  type        = bool
+  default     = false
+}

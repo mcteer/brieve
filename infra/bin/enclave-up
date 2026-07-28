@@ -220,7 +220,14 @@ say "Trust fabric"
 # "is TLS the problem", not "should we have TLS".
 TLS_ARGS=()
 [ "${ENCLAVE_TLS:-true}" = "true" ] && TLS_ARGS=(-var enable_tls=true)
-terraform apply -input=false -auto-approve -var vault_token="$(env_val VAULT_ROOT_TOKEN)" "${TLS_ARGS[@]}" >/dev/null
+
+# How the trust store addresses the host is a substrate difference. Docker Desktop
+# provides `host.docker.internal`; Linux Docker does not, and its published ports bind one
+# interface, so a bridged trust store resolves the host and is refused by it. Set
+# ENCLAVE_VAULT_HOST_NETWORK=true there.
+NET_ARGS=()
+[ "${ENCLAVE_VAULT_HOST_NETWORK:-false}" = "true" ] && NET_ARGS=(-var vault_host_network=true)
+terraform apply -input=false -auto-approve -var vault_token="$(env_val VAULT_ROOT_TOKEN)" ${TLS_ARGS[@]+"${TLS_ARGS[@]}"} ${NET_ARGS[@]+"${NET_ARGS[@]}"} >/dev/null
 ok "workload identity auth, ceiling policies, agent registry, database engine, dynamic role"
 
 # ---------------------------------------------------------------- 4b. transport

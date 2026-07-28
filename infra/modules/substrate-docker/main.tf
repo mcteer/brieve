@@ -89,10 +89,17 @@ resource "docker_container" "vault" {
   # race and is not one.
   capabilities { add = ["CAP_IPC_LOCK"] }
 
-  ports {
-    internal = 8200
-    external = var.vault_port
+  # Published only when the trust store is bridged. Under host networking the port is
+  # already the host's, and publishing it as well is an error rather than a no-op.
+  dynamic "ports" {
+    for_each = var.vault_host_network ? [] : [1]
+    content {
+      internal = 8200
+      external = var.vault_port
+    }
   }
+
+  network_mode = var.vault_host_network ? "host" : null
 
   # `host.docker.internal` is a Docker DESKTOP convenience. On Linux Docker it does not
   # exist, and the trust store then cannot reach the state store at all — Terraform fails
@@ -106,9 +113,14 @@ resource "docker_container" "vault" {
   #
   # Found by 009's T002, which existed to ask whether the enclave comes up on a Linux CI
   # runner before a lane was built assuming it does. It does not, unmodified.
-  host {
-    host = "host.docker.internal"
-    ip   = "host-gateway"
+  # Only meaningful when bridged. Under host networking the container has the host's
+  # resolver already, and the name is not needed to reach anything.
+  dynamic "host" {
+    for_each = var.vault_host_network ? [] : [1]
+    content {
+      host = "host.docker.internal"
+      ip   = "host-gateway"
+    }
   }
 
   # Certificate material, uploaded only when TLS is on. Uploading empty files would make
