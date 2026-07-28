@@ -79,9 +79,5 @@ def test_row_the_denial_is_audited() -> None:
     invoke_tool(run, "provision", {})
 
     entries = run.audit_sink.list_by_correlation_id(run.correlation_id)
-    denials = [
-        e
-        for e in entries
-        if (e.payload or {}).get("reason_code") == DEPENDENCY_UNAVAILABLE
-    ]
+    denials = [e for e in entries if (e.payload or {}).get("reason_code") == DEPENDENCY_UNAVAILABLE]
     assert denials, "an availability refusal left no trace in the trail"
