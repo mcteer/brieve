@@ -110,6 +110,13 @@ written; a task that writes rows first would produce green that means nothing.
 
 ## Who runs these
 
+**Two lanes, and 010 had to be added to both.** The in-allocation runner enumerates its
+directories (`infra/jobs/conformance.nomad.hcl`) and so does the host lane
+(`Makefile`'s `host_enclave` line). A marker alone does not run a row that no lane
+collects — `tests/conformance/identity` was invisible to the host lane while passing
+everywhere it was asked to run, which is the same shape as the in-allocation gap and was
+found the same way: by reading which directories the runner names, not by trusting green.
+
 | Where the change comes from | What covers these rows |
 | --- | --- |
 | Same-repo branch or pull request | The enclave lane (`.github/workflows/enclave.yml`). A required check |

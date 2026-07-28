@@ -160,7 +160,7 @@ seam is fail-closed behaviour, not absence.
 - [X] T050 [P] Record `no_default_ceiling_policy` as a follow-up decision (research Finding 2). Setting it changes the security posture of every registration and belongs in a decision of its own, not a module edit
 - [X] T051 [P] Update `ROADMAP.md`: the production `IdentityFabric` gap moves from **claimed by 010** to shipped; 010 joins the shipped table
 - [X] T052 [P] Record the rows in `contracts/conformance-identity.md` as **In force**, over the fake-to-real mapping T046a produced there
-- [ ] T053 [GATE:conformance] Run `make check` and `make conformance` against a **live enclave**, and confirm every break fixture passes on a clean tree. A row whose failure nobody has observed is a row nobody knows works
+- [X] T053 [GATE:conformance] Run `make check` and `make conformance` against a **live enclave**, and confirm every break fixture passes on a clean tree. A row whose failure nobody has observed is a row nobody knows works
 
 ---
 
