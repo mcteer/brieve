@@ -197,6 +197,32 @@ class VaultIdentityFabric:
             "configured": sorted(set(effective) - ENGINE_APPENDED_POLICIES),
         }
 
+    def list_definitions(self) -> list[str]:
+        """Every registered agent definition id, tenant-wide.
+
+        The registry is one per deployment and carries no tenant of its own, so "tenant-
+        wide" is structural here rather than filtered — a limit recorded in the conformance
+        contract rather than hidden, because a multi-tenant deployment sharing one registry
+        would disclose definitions across tenants and the gap would look closed until
+        someone deployed that topology.
+        """
+        try:
+            keys = self._credentials.list_path(REGISTRATION_PATH)
+        except VaultReadFailed as exc:
+            raise ResolutionRefused(
+                str(exc),
+                reason_code="fabric_timeout" if exc.timed_out else "fabric_unreachable",
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 — an unlistable registry must not read as empty
+            raise ResolutionRefused(
+                f"registry could not be listed: {type(exc).__name__}",
+                reason_code="fabric_unreachable",
+            ) from exc
+        # An empty registry is a legitimate answer; an unreachable one raised above. The
+        # difference matters because "no agents exist" and "we could not look" produce the
+        # same screen otherwise, and only one of them is worth waiting out.
+        return sorted(keys or ())
+
     def resolve_user_scope(self, subject_user_id: str) -> AuthorityScope:
         """What this person may delegate, from the roles their claims resolved to."""
         roles = self._roles_for(subject_user_id)

@@ -1,5 +1,13 @@
 [
   {
+    "method": "GET",
+    "path": "/agent-definitions"
+  },
+  {
+    "method": "GET",
+    "path": "/agent-definitions/{agent_definition_id}"
+  },
+  {
     "method": "POST",
     "name": "request_mapping_change",
     "path": "/claim-mappings"

@@ -258,6 +258,22 @@ class VaultDatabaseCredentials:
                 timed_out=timed_out,
             ) from exc
 
+    def list_path(self, path: str, *, token: str | None = None) -> list[str] | None:
+        """List the keys under a Vault path. ``None`` means the folder is not there.
+
+        Vault's LIST is a GET with ``?list=true`` rather than a distinct verb, which is the
+        kind of detail that costs an afternoon exactly once — a plain GET on a folder
+        returns 404 and reads as "nothing is registered" rather than "you asked wrongly".
+
+        Same absence-versus-failure contract as :meth:`read_path`: a missing folder is data
+        and returns ``None``; anything else raises.
+        """
+        response = self.read_path(f"{path}?list=true", token=token)
+        if response is None:
+            return None
+        keys = (response.get("data") or {}).get("keys") or []
+        return [str(k) for k in keys]
+
     def fetch(self) -> DatabaseCredential:
         """Authenticate as this workload and mint a credential."""
         try:

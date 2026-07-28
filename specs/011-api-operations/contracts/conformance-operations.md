@@ -73,6 +73,23 @@ enumerate directories by name. This feature's in-allocation rows extend
 `tests/conformance/api/` — both already named in both runners. The cheap lesson from the
 expensive one.
 
+## A limit worth naming before someone assumes it closed (FR-013a)
+
+**The registry is one per deployment and carries no tenant of its own.** So "definitions
+are never disclosed across tenants" holds *structurally* today — there is one registry, and
+every subject of that deployment sees the same set. Nothing filters, because nothing needs
+to.
+
+A multi-tenant deployment sharing one registry would disclose definitions across tenants,
+and the enumeration code would look correct while doing it. Recorded here rather than left
+implicit, because this is exactly the kind of gap that reads as closed until someone
+deploys the topology that opens it — and the row asserting cross-tenant absence would keep
+passing, since it tests the deployment it runs in.
+
+The fix, when a deployment needs it, is a tenant on the registration rather than a filter
+in this surface: a filter would be the platform deciding what a registry means, which is
+the coupling ADR-0050 kept disjoint.
+
 ## What this lane still cannot prove
 
 - **That anything renders these operations well.** The portal is the consumer and its own

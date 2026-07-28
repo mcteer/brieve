@@ -35,6 +35,8 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "list_runs": ("GET", "/runs"),
     "get_run_result": ("GET", "/runs/{run_id}/result"),
     "stop_run": ("POST", "/runs/{run_id}/stop"),
+    "list_agent_definitions": ("GET", "/agent-definitions"),
+    "get_agent_definition": ("GET", "/agent-definitions/{agent_definition_id}"),
 }
 
 
@@ -169,6 +171,28 @@ def operations() -> list[McpOperation]:
                 "type": "object",
                 "properties": {"run_id": {"type": "string", "minLength": 1}},
                 "required": ["run_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="list_agent_definitions",
+            method="GET",
+            path="/agent-definitions",
+            description=(
+                "Agent definitions you can see, each marked with whether you may start "
+                "it. Ones you cannot start still appear — so you know what to ask for."
+            ),
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        ),
+        McpOperation(
+            tool_name="get_agent_definition",
+            method="GET",
+            path="/agent-definitions/{agent_definition_id}",
+            description="One agent definition's public view.",
+            input_schema={
+                "type": "object",
+                "properties": {"agent_definition_id": {"type": "string", "minLength": 1}},
+                "required": ["agent_definition_id"],
                 "additionalProperties": False,
             },
         ),

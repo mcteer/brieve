@@ -94,6 +94,8 @@ class McpTransport:
             "list_runs": self._list_runs,
             "get_run_result": self._get_run_result,
             "stop_run": self._stop_run,
+            "list_agent_definitions": self._list_agent_definitions,
+            "get_agent_definition": self._get_agent_definition,
         }.get(tool_name)
 
         if handler is None:
@@ -150,6 +152,47 @@ class McpTransport:
                 "disposition": str(disposition),
             },
         )
+
+    def _definition_views(self, subject: AuthenticatedSubject) -> Any:
+        from surfaces.api.definitions import definition_views
+
+        return definition_views(subject=subject, fabric=self._definitions)
+
+    def _list_agent_definitions(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        from core.authority.errors import ResolutionRefused
+
+        if self._definitions is None:
+            return McpResult(ok=False, status=503, payload={"reason": "definitions unavailable"})
+        try:
+            views = self._definition_views(subject)
+        except ResolutionRefused:
+            return McpResult(ok=False, status=503, payload={"reason": "definitions unavailable"})
+
+        return McpResult(
+            ok=True,
+            status=200,
+            payload={"definitions": [v.model_dump(mode="json") for v in views]},
+        )
+
+    def _get_agent_definition(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        from core.authority.errors import ResolutionRefused
+
+        if self._definitions is None:
+            return McpResult(ok=False, status=503, payload={"reason": "definitions unavailable"})
+        wanted = str(args["agent_definition_id"])
+        try:
+            views = self._definition_views(subject)
+        except ResolutionRefused:
+            return McpResult(ok=False, status=503, payload={"reason": "definitions unavailable"})
+
+        for view in views:
+            if view.agent_definition_id == wanted:
+                return McpResult(ok=True, status=200, payload=view.model_dump(mode="json"))
+        return McpResult(ok=False, status=404, payload={"reason": "no such agent definition"})
 
     def _stop_run(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         from core.runs.refusals import OperationRefused
