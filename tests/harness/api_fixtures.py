@@ -174,9 +174,7 @@ class ScriptedChangeStatus:
     def status_of(self, accessor: str) -> Any:
         from core.runs.changes import CollectedDisposition
 
-        return CollectedDisposition(
-            accessor=accessor, disposition=self.disposition, approvals=0, required=2
-        )
+        return CollectedDisposition(accessor=accessor, disposition=self.disposition, approvals=0)
 
 
 def fake_definitions_fabric(subject: str) -> Any:

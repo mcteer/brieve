@@ -56,8 +56,18 @@ class CollectedDisposition:
 
     accessor: str
     disposition: str
+    #: How many approvals the fabric has recorded so far.
     approvals: int = 0
-    required: int = 0
+    #: What the pending change would write, as the fabric reports it. Useful to a person
+    #: deciding whether the thing they asked for is the thing that is queued.
+    request_path: str = ""
+
+    # **There is deliberately no `required` field.** The status endpoint reports who has
+    # approved (`authorizations`) and does not report how many approvals are needed — a
+    # first version of this model carried `required` and it was always 0, which a caller
+    # would read as "no approvals needed", i.e. approved. A field that is always the most
+    # dangerous possible value is worse than an absent one, and the enclave row is what
+    # surfaced it: the hermetic double had happily returned a plausible number.
 
 
 class ChangeRequestStore(Protocol):
@@ -266,11 +276,14 @@ class VaultChangeStatus:
         # including states this platform has not seen — because guessing that an unknown
         # state means approved is the one direction that grants something.
         approved = bool(data.get("approved"))
+        # `authorizations` is a LIST of who has approved, or null before anyone has —
+        # not a count, which is what a first reading of the field name suggests.
+        authorizations = data.get("authorizations") or []
         return CollectedDisposition(
             accessor=accessor,
             disposition="approved" if approved else "pending",
-            approvals=int(data.get("authorizations") or 0),
-            required=int(data.get("required") or 0),
+            approvals=len(authorizations) if isinstance(authorizations, list) else 0,
+            request_path=str(data.get("request_path") or ""),
         )
 
 

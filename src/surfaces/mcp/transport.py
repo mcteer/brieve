@@ -287,7 +287,7 @@ class McpTransport:
                 "accessor": disposition.accessor,
                 "disposition": disposition.disposition,
                 "approvals": disposition.approvals,
-                "required": disposition.required,
+                "request_path": disposition.request_path,
             },
         )
 

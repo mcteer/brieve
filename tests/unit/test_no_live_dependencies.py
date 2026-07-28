@@ -98,6 +98,11 @@ ENCLAVE_PATHS = frozenset(
         # A fake cannot express this: the assertion is that VAULT denies, and a double
         # denying proves only that we wrote a double that denies.
         "conformance/identity/test_fabric_unreachable_from_a_tool.py",
+        # Watches an allocation reach a terminal state before comparing the run index
+        # against the audit trail (011). The wait is the row's substance: the two writes
+        # are minutes apart on a cold dispatch, and comparing inside that window would
+        # flake at exactly the cadence cold allocations occur.
+        "conformance/identity/test_run_index_and_trail_agree.py",
     }
 )
 

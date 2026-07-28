@@ -54,7 +54,6 @@ class StatusSource:
             accessor=accessor,
             disposition=self.disposition,
             approvals=self.approvals,
-            required=2,
         )
 
 
@@ -90,7 +89,6 @@ def test_the_requester_learns_it_is_pending() -> None:
     result = _collect(_store(), StatusSource("pending"), _subject())
 
     assert result.disposition == "pending"
-    assert result.required == 2
 
 
 def test_the_requester_learns_it_was_approved_without_being_told() -> None:
@@ -175,7 +173,6 @@ def test_break_fixture_a_collect_that_authorizes_is_detectable() -> None:
                 accessor=accessor,
                 disposition=self.disposition,
                 approvals=self.approvals,
-                required=2,
             )
 
     source = AuthorizingSource()
