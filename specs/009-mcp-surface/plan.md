@@ -103,6 +103,27 @@ Four, and each is a change to something a prior feature or the constitution owns
    superseded by it**. Principle X requires superseding be recorded, never edited in place —
    an ADR silently outlived by another is the failure that principle names.
 
+### The seams this feature extends, enumerated
+
+Three analyze passes each found the same shape — a mechanism specified without the thing it
+acts through — at a different layer. The generalisable cause is worth stating rather than
+fixing case by case: **009 is the first feature to consume seams that 002, 005, and 008 built
+for a single caller each.** None was designed to be extended later, so each accepts exactly
+what its original caller passed and nothing more.
+
+Enumerated here so implementation confirms rather than discovers:
+
+| Seam | Owner | Accepts today | 009 needs | Task |
+| --- | --- | --- | --- | --- |
+| `GovernedRun` / `builtin_governance_hooks()` | 002 | No health reader; the factory takes no arguments | A path from a hook to dependency health | T032a |
+| `RunDispatcher.dispatch()` | 008 | Five keyword arguments | Optional `run_id`, `step_index` for resume | T042a1 |
+| `agent-run` jobspec `meta_required` | 008 | correlation, subject, tenant, definition | `run_id`, `step_index` | T042a |
+| Vault JWT auth roles | 006 | `harness`, `conformance`, `agent-run`, per-agent | An `mcp` role | T022a |
+
+Each extension is **optional-by-default where a prior caller exists**, which is the rule that
+would have prevented two of the three findings on its own: a required parameter added to a
+seam breaks the caller that was already using it.
+
 ### The CI lane cannot be fork-safe, and that is not a compromise
 
 It needs a Vault Enterprise licence, which is a secret. GitHub does not expose secrets to
@@ -131,7 +152,7 @@ the licence in repository secrets, and I cannot provision that.
 | II — Total Interception; One Governed Tool Layer | **Pass, and the load-bearing row** | MCP reaches the same core as the API (FR-001), and the dependency refusal runs *inside* the pipeline (FR-009). A health pre-check beside the pipeline would be a second refusal path, which is a second authorization path wearing a practical-sounding name |
 | III — Fail-Closed, In-Process Enforcement | Pass | Unknown health is unhealthy (FR-006). Denial precedes execution and writes no intent record (FR-007) |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass, with the honest caveat** | MCP acts as the calling user, never as itself (FR-002a). But a *persistent* service holds an identity for as long as it runs, which is closer to standing than anything shipped so far. It is mitigated rather than absent: the identity carries a TTL and is re-issued, and the service holds no product credential — it starts runs and reads health |
-| V — Sealed Core, Versioned Seams | **Pass, with a non-additive change and an amendment** | `RunState.PARKED` is removed. Not additive, touches 005's durability path, and changes what a constitutionally-named gate row asserts. Security-maintainer review required |
+| V — Sealed Core, Versioned Seams | **Pass, and the heaviest review burden here** | `RunState.PARKED` is removed — not additive, touches 005's durability path, and changes what a constitutionally-named gate row asserts. Plus **four seams extended** (see the table above), including a new field on `GovernedRun`, which is 002-era sealed core. Every extension is optional-by-default so prior callers keep compiling. Security-maintainer review required |
 | VI — Lean by Default | Pass, with triggers named | A persistent operated component needs a named trigger in an ADR. Two exist: ADR-0033 names MCP as a transport, ADR-0049 requires a long-lived home for the sweeper. Without ADR-0049 this would be a Principle VI failure |
 | VII — Anti-Fragmentation | **Pass, and the CI lane is where it could break** | The lane must run `make conformance` — the same command a human runs — not a bespoke CI sequence. Two ways to run the gate is two gates, and the one nobody runs locally is the one that rots |
 | VIII — Eval-Gated Promotion | N/A | No packs, prompts, models, or policies promoted |

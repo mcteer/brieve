@@ -76,3 +76,17 @@
   saying why. That "parks" has a different trigger — no eval-qualified model cell — where
   `SUSPENDED` looks like the right answer and would restore human-waiting through the
   model-fallback path, since qualifying a cell is eval-gated human work.
+- Analyze pass 3 (2026-07-27) applied the check recorded in pass 2 — *when a task says
+  "wire A to B", verify A's interface accepts what B requires* — and immediately found three
+  more instances, one of which made a core mechanism unbuildable: the dependency gate is
+  registered through `builtin_governance_hooks()`, which takes no arguments, and reads a
+  `GovernedRun` that has no health field. There was no path from the hook to the health it
+  must consult.
+- The other two: extending `RunDispatcher.dispatch()` with required parameters would have
+  stopped 008's `POST /runs` compiling, and the MCP service had no Vault JWT role at all —
+  the same failure 008 hit at T030, not carried forward.
+- **The cause is now recorded in plan.md as a table rather than fixed case by case.** 009 is
+  the first feature to consume seams that 002, 005, and 008 each built for one caller, so
+  each accepts exactly what its original caller passed. Four extensions are enumerated, and
+  the rule that prevents two of the three findings on its own is: **optional-by-default
+  wherever a prior caller exists.**
