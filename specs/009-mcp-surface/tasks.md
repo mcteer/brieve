@@ -199,10 +199,10 @@ allocation and it completes.
 **Independent test**: with a dependency down, run a task whose plan-producing half needs
 nothing from it; assert the output is returned and names what was not attempted.
 
-- [ ] T051 [US4] Surface the availability refusal to the agent as an invitation to adapt in `src/core/dependencies/gate.py`, carrying which dependency and that the refusal is availability rather than policy
-- [ ] T052 [US4] [GATE:conformance] Row in `tests/conformance/mcp/test_degraded_completion.py`: the reachable half completes and is returned, naming the unavailable dependency
-- [ ] T053a [P] [US4] [GATE:conformance] Assert in `tests/unit/test_nothing_waits_on_a_human.py` that no path in `src/surfaces/mcp/` or `src/core/dependencies/` notifies, prompts, or blocks on a person (FR-014, SC-008). **Strip comments and docstrings before matching** — these modules discuss waiting on humans at length precisely because they must not do it, and this repository has had four checks match prose instead of code
-- [ ] T053 [P] [US4] Assert in `tests/conformance/mcp/test_degraded_completion.py` that the result is **not presented as a completed action** (FR-016). Returning plan output that reads as applied is worse than returning nothing
+- [X] T051 [US4] Surface the availability refusal to the agent as an invitation to adapt in `src/core/dependencies/gate.py`, carrying which dependency and that the refusal is availability rather than policy
+- [X] T052 [US4] [GATE:conformance] Row in `tests/conformance/mcp/test_degraded_completion.py`: the reachable half completes and is returned, naming the unavailable dependency
+- [X] T053a [P] [US4] [GATE:conformance] Assert in `tests/unit/test_nothing_waits_on_a_human.py` that no path in `src/surfaces/mcp/` or `src/core/dependencies/` notifies, prompts, or blocks on a person (FR-014, SC-008). **Strip comments and docstrings before matching** — these modules discuss waiting on humans at length precisely because they must not do it, and this repository has had four checks match prose instead of code
+- [X] T053 [P] [US4] Assert in `tests/conformance/mcp/test_degraded_completion.py` that the result is **not presented as a completed action** (FR-016). Returning plan output that reads as applied is worse than returning nothing
 
 ---
 
@@ -214,9 +214,9 @@ nothing from it; assert the output is returned and names what was not attempted.
 without operator action.
 
 - [X] T053b [US5] Build a **run-role connection factory** in `src/surfaces/mcp/server.py`, drawing credentials through the `mcp` Vault role (T022a). `verify_stream_integrity(conn_factory, ...)` takes one, and without it T054 has nothing to pass — the fifth instance of this feature's recurring shape, and one the seam table did not list
-- [ ] T054 [US5] Run `verify_stream_integrity` (008) periodically from the MCP service in `src/surfaces/mcp/server.py` using T053b's factory, scoped so one pass does not walk an estate's whole history
-- [ ] T055 [US5] [GATE:correlation] Surface findings from `src/surfaces/mcp/server.py` (FR-017) where an operator will see them, not only recorded. A finding written to a table nobody reads is the same as no finding
-- [ ] T056 [US5] [GATE:conformance] Enclave row in `tests/conformance/mcp/test_continuous_verification.py` (SC-010): tampering is reported with no operator action, **and a clean store reports clean**. The false-positive half matters as much — a check that always fires gets disabled
+- [X] T054 [US5] Run `verify_stream_integrity` (008) periodically from the MCP service in `src/surfaces/mcp/server.py` using T053b's factory, scoped so one pass does not walk an estate's whole history
+- [X] T055 [US5] [GATE:correlation] Surface findings from `src/surfaces/mcp/server.py` (FR-017) where an operator will see them, not only recorded. A finding written to a table nobody reads is the same as no finding
+- [X] T056 [US5] [GATE:conformance] Enclave row in `tests/conformance/mcp/test_continuous_verification.py` (SC-010): tampering is reported with no operator action, **and a clean store reports clean**. The false-positive half matters as much — a check that always fires gets disabled
 - [ ] T057 [P] [US5] Update `ROADMAP.md`: continuous evidence-stream verification moves from deferred to shipped
 
 ---
