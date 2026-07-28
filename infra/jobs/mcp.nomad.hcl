@@ -24,9 +24,16 @@ variable "vault_addr" {
 }
 
 variable "vault_cacert" {
-  type        = string
-  default     = "/repo/.enclave/ca.pem"
-  description = "Control-plane CA, as seen INSIDE the container — the repo is mounted at /repo."
+  type    = string
+  default = "/src/.enclave/ca.pem"
+  description = <<-DESC
+    Control-plane CA, as seen INSIDE the container.
+
+    `/src`, not `/repo`, unlike the batch jobs: this task mounts the tree read-only at
+    `/src` and runs from a copy at `/repo`. The CA is read from the mount rather than the
+    copy deliberately — it is the one file that can change under a running service, and
+    reading it live means a reissued CA is picked up without the copy going stale.
+  DESC
 }
 
 variable "repo" {
@@ -76,15 +83,35 @@ job "mcp" {
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "host"
 
+        # Read-only, unlike every batch job here, and the difference is not caution.
+        #
+        # This is the first workload that starts at BRING-UP rather than when a developer
+        # runs something. Everything before it built the project on the host first, so the
+        # editable-install artefacts under `src/` already existed and were owned by
+        # whoever was working. This job gets there first, as root, and on Linux root in a
+        # container is root on the host — so `src/harness.egg-info` becomes root-owned and
+        # the next host build fails with "Cannot update time stamp of directory", which
+        # names a directory and not the container that created it.
+        #
+        # Read-only makes that structurally impossible rather than ordering-dependent. The
+        # service reads code; it has no business writing to a developer's tree.
         mount {
           type     = "bind"
           source   = var.repo
-          target   = "/repo"
-          readonly = false
+          target   = "/src"
+          readonly = true
         }
 
+        # Copied out of the read-only mount, because the build needs somewhere to write.
+        # A service is a fine place for a snapshot: it runs the code it started with, and
+        # `change_mode = restart` above is what makes it pick up anything new.
+        #
+        # Four paths rather than the whole tree: the manifests, the sources, and the README
+        # the build backend resolves `readme = "README.md"` against. Copying everything
+        # would drag a 164 MB host virtualenv and the git history into a container that
+        # uses neither.
         args = [
-          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra adapters --extra surfaces python -m surfaces.mcp.server"
+          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra adapters --extra surfaces python -m surfaces.mcp.server"
         ]
       }
 
