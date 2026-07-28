@@ -53,3 +53,18 @@ variable "role_bindings" {
   }))
   default = {}
 }
+
+variable "definition_policies" {
+  description = <<-DESC
+    Policy narrowing a definition below its ceiling, keyed by agent definition id.
+
+    Empty is the normal state. A policy is how an operator tightens a definition without
+    editing its ceiling — for an incident or a migration — and it is read on every step so
+    the narrowing takes effect on the next one rather than at the next run.
+  DESC
+  type = map(object({
+    tool_names      = list(string)
+    product_actions = list(string)
+  }))
+  default = {}
+}

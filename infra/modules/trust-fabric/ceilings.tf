@@ -80,3 +80,22 @@ resource "vault_mount" "agent_secrets" {
   options     = { version = "2" }
   description = "Per-agent secret space the ceiling policies bound access to"
 }
+
+# Per-definition policy, which narrows a ceiling without changing it.
+#
+# Empty by default and that is the expected state: policy exists to tighten a definition
+# temporarily — an incident, a migration, a product being drained — and most definitions
+# most of the time have none. The absence of a record means unrestricted, which the fabric
+# reads as `None` rather than as a failure.
+resource "vault_kv_secret_v2" "definition_policy" {
+  for_each = var.definition_policies
+
+  mount = vault_mount.harness_authority.path
+  name  = "policies/${each.key}"
+
+  data_json = jsonencode({
+    schema_version  = 1
+    tool_names      = each.value.tool_names
+    product_actions = each.value.product_actions
+  })
+}

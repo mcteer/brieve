@@ -64,6 +64,14 @@ resource "vault_policy" "harness_authority_read" {
     path "${vault_mount.harness_authority.path}/data/role-bindings/*" {
       capabilities = ["read"]
     }
+    # Policy narrows a definition mid-run, and is read on EVERY step (FR-008). Granted
+    # even though no deployment writes one yet: without the capability Vault answers 403
+    # rather than 404, so "no policy record" is indistinguishable from "not allowed to
+    # look" — and the fabric would report an unreachable trust fabric for a definition
+    # that simply has no policy, suspending runs that should have proceeded unrestricted.
+    path "${vault_mount.harness_authority.path}/data/policies/*" {
+      capabilities = ["read"]
+    }
     path "agent-registry/registration/display-name/*" {
       capabilities = ["read"]
     }
