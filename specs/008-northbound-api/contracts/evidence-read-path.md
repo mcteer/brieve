@@ -1,7 +1,7 @@
 # Contract: The evidence read path
 
 **Feature**: `specs/008-northbound-api`
-**Status**: Planned
+**Status**: In force (008 landed)
 **Depends on**: ADR-0035; Principle IX; Principle V
 
 ## Why this is a new class of access

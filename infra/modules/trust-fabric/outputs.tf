@@ -73,3 +73,8 @@ output "listener_ca_chain" {
   value       = var.enable_tls ? vault_pki_secret_backend_cert.listener[0].issuing_ca : ""
   description = "Issuing CA, for clients that must trust this listener."
 }
+
+output "evidence_credentials_path" {
+  description = "Vault path issuing the SELECT-only evidence credentials (008, FR-009)."
+  value       = "${vault_mount.database.path}/creds/${local.evidence_role_name}"
+}

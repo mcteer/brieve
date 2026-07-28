@@ -80,7 +80,7 @@ job "conformance" {
         # No VAULT_TOKEN is set, deliberately. The suite authenticates as this workload
         # or it does not run.
         args = [
-          "set -e; cd /repo; pip install --quiet --disable-pip-version-check uv; uv run --extra adapters pytest tests/conformance/durability -q"
+          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra adapters --extra surfaces pytest tests/conformance/durability tests/conformance/api -m \"not host_enclave\" -q"
         ]
       }
 

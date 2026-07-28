@@ -2,9 +2,10 @@
 
 .PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries
 
-# Every recipe names the adapters extra so the gates cannot run in an environment
-# that silently lacks the primary adapter (specs/004-primary-adapter/research.md).
-UV_RUN := uv run --extra adapters
+# Every recipe names the adapters and surfaces extras so the gates cannot run in an
+# environment that silently lacks the primary adapter or the northbound surface
+# (specs/004-primary-adapter/research.md; specs/008-northbound-api T003).
+UV_RUN := uv run --extra adapters --extra surfaces
 
 # Inner-loop: lint, typecheck, unit tests
 # Hermetic inner loop. Enclave-dependent tests are excluded by marker rather than by
@@ -25,17 +26,34 @@ check:
 # not on the host with a token. That is what makes them exercise the attestation chain
 # rather than sit beside it. The honest cost is that failure output arrives through
 # allocation logs; enclave-conformance streams them and surfaces the exit status.
+# Step 1 runs only what a host process legitimately can. The durability rows and the
+# enclave-marked API rows both hold their OWN workload identity, so running them here
+# would fail for the right reason and the wrong purpose — a host process has no attested
+# identity and should not be able to reach the state store. They run in the allocation.
 conformance:
-	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -q
+	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
 	@bash infra/bin/enclave-conformance
 	$(UV_RUN) pytest -m enclave -q
+	# The rows that must run HERE rather than in the allocation: one drives the
+	# scheduler, the other holds an admin token the allocation deliberately lacks.
+	$(UV_RUN) pytest tests/conformance/api -m host_enclave -q
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
 # Enterprise license and cannot stand one up. This is a real coverage gap and is
 # recorded as one in specs/005-durable-execution/contracts/conformance-durability.md —
 # the durability rows are merge-blocking for a human running them, not for CI.
+# Two exclusions, and both are load-bearing for different reasons.
+#
+# The path ignore stays because the durability rows are parameterized memory/postgres and
+# are NOT marker-excluded — their memory half is genuinely hermetic, so a marker would
+# either drop coverage or force the postgres half into this lane.
+#
+# The marker is new, for tests/conformance/api, which holds hermetic AND enclave rows in
+# one directory. Ignoring that path would drop the hermetic ones; collecting the enclave
+# ones fails the lane, since they fail loudly rather than skipping when the enclave is
+# absent. Neither exclusion alone is sufficient (specs/008-northbound-api T057a).
 conformance-hermetic:
-	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -q
+	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
 
 test-full:
 	@echo "make test-full: stub — PR-tier suites not implemented yet" >&2

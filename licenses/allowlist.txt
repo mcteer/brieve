@@ -5,6 +5,12 @@ Apache Software License
 Apache License 2.0
 Apache-2.0
 Apache-2.0 OR BSD-2-Clause
+# Added for `cryptography` (PyJWT's signature backend, specs/008-northbound-api T001).
+# Not a relaxation: BOTH branches of this disjunction already clear the allowlist
+# independently — Apache-2.0 and BSD-3-Clause are each listed above. Only the composite
+# string was missing, and pip-licenses matches the string rather than the disjunction.
+# Contrast psycopg, refused for 005: LGPL-3.0-only offered no allowed branch at all.
+Apache-2.0 OR BSD-3-Clause
 MIT
 MIT License
 # MIT-0 is MIT without the attribution clause — strictly more permissive, so it clears

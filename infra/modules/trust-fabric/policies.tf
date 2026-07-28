@@ -25,3 +25,20 @@ resource "vault_policy" "harness_database" {
     }
   HCL
 }
+
+# The evidence read path's credential, deliberately a SEPARATE policy from the one above
+# rather than another path added to it.
+#
+# Separate because the two are held by different things for different reasons: the harness
+# policy lets a run write its own record, and this one lets a reader read records back.
+# Merging them would mean anything able to read evidence could also write it, which is the
+# distinction the whole read path exists to draw — and it would be a one-line merge that
+# looked like tidying.
+resource "vault_policy" "evidence_database" {
+  name   = "evidence-database"
+  policy = <<-HCL
+    path "${vault_mount.database.path}/creds/${local.evidence_role_name}" {
+      capabilities = ["read"]
+    }
+  HCL
+}

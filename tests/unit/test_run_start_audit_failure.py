@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from tests.harness import DEFAULT_AGENT_DEFINITION_ID, fake_identity_fabric, frozen_clock
 
@@ -21,11 +23,11 @@ class FailAfterAuditSink(InMemoryAuditSink):
         self._fail_on = fail_on_append_index
         self._appends = 0
 
-    def append(self, entry: AuditEntry) -> None:
+    def append_event(self, **kwargs: Any) -> AuditEntry:
         if self._appends >= self._fail_on:
             raise RuntimeError("audit append failed")
         self._appends += 1
-        super().append(entry)
+        return super().append_event(**kwargs)
 
 
 def _start(audit: InMemoryAuditSink) -> None:

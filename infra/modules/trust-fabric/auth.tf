@@ -71,7 +71,42 @@ resource "vault_jwt_auth_backend_role" "conformance" {
     nomad_job_id = var.conformance_job_id
   }
 
+  # Both, because the conformance rows exercise the write path and the read path: the
+  # evidence rows have to draw a real SELECT-only credential to prove Postgres refuses a
+  # write through it. Proving that against a fake connection would prove nothing.
+  token_policies = [
+    vault_policy.harness_database.name,
+    vault_policy.evidence_database.name,
+  ]
+  token_ttl  = 1800
+  token_type = "service"
+}
+
+# Dispatched agent runs.
+#
+# Separate from the conformance role because they are separate things that happen to want
+# the same database access today: one is a merge gate, the other is the product. Merging
+# them would mean widening the gate's authority to widen a run's, or the reverse, which is
+# exactly the coupling per-task authority exists to avoid.
+#
+# `bound_claims_type = "glob"` so both the parent id and any derived dispatch id are
+# admissible. The identity presents the PARENT id, which is not what `nomad job status`
+# shows — binding only the derived form fails every login with "claim nomad_job_id does not
+# match any associated bound claim values" while the role looks correctly configured.
+resource "vault_jwt_auth_backend_role" "agent_run" {
+  backend                 = vault_jwt_auth_backend.workload.path
+  role_name               = "agent-run"
+  role_type               = "jwt"
+  bound_audiences         = ["vault.io"]
+  user_claim              = "/nomad_job_id"
+  user_claim_json_pointer = true
+
+  bound_claims_type = "glob"
+  bound_claims = {
+    nomad_job_id = join(",", var.agent_run_job_id_patterns)
+  }
+
   token_policies = [vault_policy.harness_database.name]
-  token_ttl      = 1800
+  token_ttl      = 3600
   token_type     = "service"
 }

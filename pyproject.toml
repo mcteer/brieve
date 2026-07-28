@@ -37,6 +37,26 @@ adapters = [
     "pydantic-ai-slim==2.18.0",
 ]
 
+# Northbound API surface (ADR-0033), optional so the core install stays free of a web
+# framework. Deliberately an EXTRA and not a base dependency, which is the opposite call
+# from pg8000 above: pg8000 is imported by `core` itself, so making it optional would make
+# core optional. FastAPI and PyJWT are imported only by `src/surfaces`, which is exactly
+# what an extra is for — Principle I's "the core never imports an agent framework"
+# generalises to not acquiring a web framework in the core install either.
+# Every recipe in the Makefile names `--extra surfaces` so no gate can run without it.
+#
+# FastAPI rather than Starlette alone or stdlib http.server: FR-012 requires the operation
+# description be generated from the implementation rather than maintained beside it, and
+# FastAPI derives its OpenAPI document from the same signatures and Pydantic models that
+# validate requests. There is one thing to maintain, not two.
+# PyJWT rather than a hand-rolled verifier: a JWT check that accepts `alg: none` or fails to
+# pin the algorithm fails OPEN and passes every test anyone thinks to write.
+surfaces = [
+    "fastapi==0.140.7",
+    "pyjwt[crypto]==2.13.0",
+    "uvicorn==0.51.0",
+]
+
 
 [dependency-groups]
 dev = [
@@ -82,7 +102,18 @@ markers = [
     # fork-safe CI lane stays hermetic; included in `make conformance`, which is the
     # gate a human runs against the real stack.
     "enclave: needs a running Vault and Postgres",
+    # Needs the enclave AND must run on the HOST rather than inside an allocation.
+    # Two reasons, both structural rather than incidental: a row that drives the scheduler
+    # cannot run inside something the scheduler placed, and a row that sets up a Control
+    # Group needs an admin token the allocation deliberately does not have — no token in
+    # that jobspec is the property it exists to demonstrate.
+    "host_enclave: needs the enclave, and cannot run inside an allocation",
 ]
+
+# No mypy override is needed for the `surfaces` extra: fastapi, uvicorn, pyjwt, and
+# starlette all ship a py.typed marker (checked, specs/008-northbound-api T004). An
+# override for a typed package would silently weaken `strict` for that module, so the
+# absence of one here is deliberate rather than an oversight.
 
 [[tool.mypy.overrides]]
 # pg8000 ships no py.typed marker. The provider wraps it behind typed methods, so the

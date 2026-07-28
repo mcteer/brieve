@@ -1,7 +1,7 @@
 # Contract: Northbound API conformance lane
 
 **Feature**: `specs/008-northbound-api`
-**Status**: Planned
+**Status**: In force (008 landed)
 **Depends on**: Constitution Quality Gates (v1.1.0); ADR-0033; ADR-0035; ADR-0047
 
 ## Purpose
@@ -16,7 +16,15 @@ check executes**.
 make conformance
 ```
 
-Gains `tests/conformance/api`. Rows marked *enclave* below need `make dev-up`: they run
+Gains `tests/conformance/api`, which runs in **two places** and the split is structural:
+
+- Most rows run **inside a Nomad allocation**, holding their own attested workload
+  identity. That is what makes them exercise the attestation chain rather than sit beside
+  it.
+- Two run on the **host**, marked `host_enclave`. One drives the scheduler, so it cannot
+  run inside something the scheduler placed; the other sets up a Control Group with an
+  admin token, which the allocation deliberately does not have — no token in that jobspec
+  is the property it exists to demonstrate. Rows marked *enclave* below need `make dev-up`: they run
 against the real Vault, the real Postgres, and a real allocation, and **fail loudly when
 the enclave is absent rather than skipping**. A test that skips itself reports the same
 green as one that ran.
@@ -30,7 +38,7 @@ green as one that ran.
 | Unmapped claim refuses | A valid token whose claims map to no role refuses; zero resolve to a default | FR-006, SC-004 | no |
 | No static credential | No authentication path accepts or issues a platform-issued long-lived credential, and no supported configuration creates one | FR-003, SC-002 | no |
 | No tool route | No registered route reaches a tool body; the API exposes no direct tool invocation | FR-007, SC-005 | no |
-| Run start does not block | Starting a run returns a handle; zero requests hold a connection for a run's duration | FR-007a, SC-005a | **yes** |
+| Run start does not block | Dispatch returns a handle in under a second while the allocation is still being placed; Nomad places it; the allocation obtains its own credentials by presenting its own attested identity and starts the run | FR-007a, SC-005a | **yes** |
 | Evidence is scope-bounded | Two identities with differing entitlements each see only their own scope; neither can widen it | FR-008, SC-006 | **yes** |
 | Read path cannot mutate | A write attempted on the evidence connection is refused **by Postgres**, not by application code | FR-009, SC-007 | **yes** |
 | Evidence access is audited | Every read produces exactly one meta-audit record naming who and when | FR-010, SC-008 | **yes** |
@@ -39,7 +47,7 @@ green as one that ran.
 | Concurrent reads are all recorded | Concurrent readers in one tenant each produce a record; zero lost, zero collided, and zero reads succeed whose record failed | FR-010b / FR-010c, SC-009b | **yes** |
 | Zero rows are distinguishable | A cross-tenant *attempt* — narrowing by another tenant's correlation or run ID, since no tenant parameter exists — and a legitimately empty query both return zero rows and are distinguishable in the trail | FR-011, SC-009 | **yes** |
 | Description is complete | Every exposed operation appears in the generated description; an operation added without updating the snapshot is detected | FR-012, SC-010 | no |
-| Mapping change is gated | A claim-to-role mapping change returns **pending**, not denied, and takes effect only on approval | FR-013 | **yes** |
+| Mapping change is gated | Against a **real** Control Group under a non-root token: the change is queued, the value is absent until quorum, and an ungated path applies instead of queueing — the control proving the submitter is not simply reporting pending for everything | FR-013 | **yes** |
 | Nothing pauses a run | No path in this feature pauses, interrupts, or blocks a run | FR-015, SC-011 | no |
 | IdP unreachable fails closed | With a cold key cache and an unreachable provider, authentications succeed in zero cases | FR-016, SC-012 | no |
 

@@ -6,7 +6,6 @@ from __future__ import annotations
 from typing import Any
 
 from core.audit.schema import AuditEventType
-from core.audit.sink import build_next_entry
 from core.authority.errors import AuditAppendFailed
 from core.authority.intersection import live_effective
 from core.hooks.types import HookContext, HookDecision
@@ -17,9 +16,13 @@ AUTHORITY_HOOK_NAME = "authority"
 def _append(run: Any, event_type: AuditEventType, payload: dict[str, Any]) -> None:
     sink = run.audit_sink
     cid = run.correlation_id
-    entry = build_next_entry(sink, correlation_id=cid, event_type=event_type, payload=payload)
     try:
-        sink.append(entry)
+        sink.append_event(
+            correlation_id=cid,
+            tenant_id=run.tenant_id,
+            event_type=event_type,
+            payload=payload,
+        )
     except Exception as exc:
         raise AuditAppendFailed(
             f"authority audit append failed: {type(exc).__name__}",

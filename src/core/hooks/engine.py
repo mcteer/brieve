@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from typing import Any
 
 from core.audit.schema import AuditEventType
-from core.audit.sink import build_next_entry
 from core.authority.errors import AuditAppendFailed
 from core.errors import RegistryError, ToolNotRegisteredError
 from core.hooks.governance import has_required_governance_hooks
@@ -37,13 +36,12 @@ def _audit(
     event_type: AuditEventType,
     payload: dict[str, Any],
 ) -> None:
-    entry = build_next_entry(
-        run.audit_sink,
+    run.audit_sink.append_event(
         correlation_id=run.correlation_id,
+        tenant_id=run.tenant_id,
         event_type=event_type,
         payload=payload,
     )
-    run.audit_sink.append(entry)
 
 
 def _decision(

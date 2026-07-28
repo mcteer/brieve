@@ -73,6 +73,46 @@ fi
 # 5 — state store reachable and migrated
 nc -z 127.0.0.1 5432 2>/dev/null && ok "state store listening" || bad "state store not listening on 5432"
 
+# 5b — evidence store present, and readable by exactly the role that should read it
+#
+# Both halves matter. That the evidence role CAN read audit_entries is the feature; that
+# it CANNOT read audit_stream_heads is what keeps truncation detectable, since a read path
+# able to see the heads could learn what it would need to forge.
+ev="$(vault read -format=json database/creds/evidence 2>/dev/null || echo "")"
+if [ -n "$ev" ]; then
+  EVU="$(printf '%s' "$ev" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["username"])')"
+  EVP="$(printf '%s' "$ev" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["password"])')"
+  if docker run --rm -e PGPASSWORD="$EVP" --network host postgres:17-alpine \
+       psql -h 127.0.0.1 -p 5432 -U "$EVU" -d brieve -tAc 'select count(*) from audit_entries' >/dev/null 2>&1; then
+    ok "evidence role can read audit_entries"
+  else
+    bad "evidence role cannot read audit_entries — schema missing, or the grant did not apply"
+  fi
+  if docker run --rm -e PGPASSWORD="$EVP" --network host postgres:17-alpine \
+       psql -h 127.0.0.1 -p 5432 -U "$EVU" -d brieve -tAc 'select count(*) from audit_stream_heads' >/dev/null 2>&1; then
+    bad "evidence role CAN read audit_stream_heads — truncation detection is forgeable"
+  else
+    ok "evidence role cannot reach audit_stream_heads"
+  fi
+  if docker run --rm -e PGPASSWORD="$EVP" --network host postgres:17-alpine \
+       psql -h 127.0.0.1 -p 5432 -U "$EVU" -d brieve -tAc \
+       "insert into audit_entries values ('t','c',0,'run_start',now(),'{}','x','y')" >/dev/null 2>&1; then
+    bad "evidence role CAN write audit_entries — the read path is not read-only"
+  else
+    ok "evidence role cannot write audit_entries (refused by Postgres, not by Python)"
+  fi
+else
+  bad "no evidence credential could be minted — the SELECT-only role is missing"
+fi
+
+# 5c — the job a dispatched run becomes
+if curl -sf "http://127.0.0.1:4646/v1/job/agent-run" 2>/dev/null \
+   | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ParameterizedJob") else 1)' 2>/dev/null; then
+  ok "agent-run registered and parameterized"
+else
+  bad "agent-run is missing or not parameterized — the API would dispatch to nothing"
+fi
+
 # 6 — persistent state intact
 for vol in brieve-dev-vault-data brieve-dev-pgdata; do
   docker volume inspect "$vol" >/dev/null 2>&1 && ok "volume $vol intact" || bad "volume $vol missing — persisted state is gone"

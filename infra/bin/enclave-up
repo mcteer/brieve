@@ -261,6 +261,64 @@ TFVARS
   ok "VAULT_ADDR and VAULT_CACERT written to .env — every client moves with the listener"
 fi
 
+# ---------------------------------------------------------------- 4a. evidence schema
+#
+# Applied after the transport settles and before anything draws evidence credentials,
+# because the evidence role's creation_statements name `audit_entries` explicitly. Vault
+# evaluates those statements when it issues a credential, not when Terraform creates the
+# role — so if the table does not exist yet, credential issuance FAILS OUTRIGHT rather
+# than degrading. An ordering requirement nothing owns is a comment; this owns it.
+#
+# Applied under the harness (run) role, which is the only one holding CREATE ON SCHEMA
+# public. The evidence role could not create this schema even if asked to, which is the
+# point of it.
+#
+# Placed after the TLS switch rather than before it because that restart replaces the
+# container and reseals the store: a step that talked to Vault beforehand would be talking
+# to a listener about to be torn down. Nothing draws an evidence credential during
+# bring-up, so the ordering requirement is still satisfied.
+say "Evidence store"
+# The CLI needs a token; the trust-fabric apply above passes one to Terraform as a var and
+# never exports it. enclave-verify does the same thing at its line 47 — worth matching
+# rather than assuming the environment carries it.
+export VAULT_TOKEN="${VAULT_TOKEN:-$(env_val VAULT_ROOT_TOKEN)}"
+ev_creds="$(vault read -format=json database/creds/harness 2>/dev/null || echo "")"
+[ -n "$ev_creds" ] || die "could not mint a harness credential to apply the evidence schema"
+EV_USER="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["username"])')"
+EV_PASS="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["password"])')"
+# SET ROLE before the DDL. Every dynamic credential is a distinct role, so a table
+# created under one is owned by an ephemeral user that will not exist next week — and the
+# next credential then fails DDL with "must be owner of table", including on
+# `CREATE INDEX IF NOT EXISTS`, which checks ownership before existence. 005 paid for this
+# once already in the durability schema; the same trap is reachable from every new store.
+if { echo "SET ROLE brieve;"; cat "$REPO/src/core/audit/evidence_schema.sql"; } \
+   | docker run --rm -i -e PGPASSWORD="$EV_PASS" --network host postgres:17-alpine \
+     psql -h 127.0.0.1 -p 5432 -U "$EV_USER" -d brieve -v ON_ERROR_STOP=1 -q >/dev/null 2>&1; then
+  ok "audit_entries and audit_stream_heads applied"
+else
+  die "evidence schema failed to apply — the evidence role cannot issue credentials without it"
+fi
+
+# The tenant every audit entry carries. Runs started without a surface — the adapter, the
+# older suites — have no identity provider to draw a claim from, and core refuses rather
+# than inventing a value, so the deployment names one.
+# Written only if absent, so a deployment that has chosen its own tenant keeps it across
+# re-runs. Everything else in this script is idempotent for the same reason.
+if [ -z "$(env_val HARNESS_DEFAULT_TENANT)" ]; then
+  env_set HARNESS_DEFAULT_TENANT "tenant-local"
+fi
+ok "HARNESS_DEFAULT_TENANT=$(env_val HARNESS_DEFAULT_TENANT)"
+
+# ---------------------------------------------------------------- 4c. run job
+# The parameterized job a dispatched run becomes. Registered here rather than left to
+# whoever runs the tests, because `NomadDispatcher` submitting to a job that does not
+# exist fails at the moment a customer starts their first run — not at bring-up, where it
+# would be noticed.
+say "Run job"
+nomad job run -var="repo=$REPO" "$REPO/infra/jobs/agent-run.nomad.hcl" >/dev/null 2>&1 \
+  && ok "agent-run registered (parameterized; one allocation and one identity per run)" \
+  || die "could not register the agent-run job — dispatched runs would have nothing to run"
+
 # ---------------------------------------------------------------- 5. the contract
 # Verification runs BEFORE success is reported. Otherwise the contract describes intent
 # rather than state.

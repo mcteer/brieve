@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import os
 import ssl
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -161,10 +162,24 @@ class VaultDatabaseCredentials:
             creds = self._get(self._creds_path, token)
         except CredentialUnavailableError:
             raise
+        except urllib.error.HTTPError as exc:
+            # Vault says WHY in the body, and without it every failure here reads as
+            # "HTTPError" — which names the credential path rather than the cause and
+            # sends whoever is debugging to the wrong component. A role whose bound claims
+            # do not match the presenting workload and an expired identity look identical
+            # otherwise.
+            try:
+                detail = exc.read().decode(errors="replace")[:500]
+            except Exception:  # noqa: BLE001 - the original failure is what matters
+                detail = ""
+            raise CredentialUnavailableError(
+                f"could not obtain a database credential from Vault at {self._addr} "
+                f"as role {self._role!r}: HTTP {exc.code} {detail}"
+            ) from exc
         except Exception as exc:
             raise CredentialUnavailableError(
-                f"could not obtain a database credential from Vault at {self._addr}: "
-                f"{type(exc).__name__}"
+                f"could not obtain a database credential from Vault at {self._addr} "
+                f"as role {self._role!r}: {type(exc).__name__}"
             ) from exc
 
         data = creds.get("data") or {}

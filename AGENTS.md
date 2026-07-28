@@ -133,16 +133,19 @@ have not verified.
 
 ### You are the conformance gate
 
-**CI does not run the durability rows.** The fast lane is fork-safe and cannot hold a
-Vault Enterprise licence, so it runs `make conformance-hermetic`, which skips them. No
-required check covers them. Nothing in GitHub will stop a merge that breaks them.
+**CI does not run the durability rows, nor the enclave half of the API rows.** The fast
+lane is fork-safe and cannot hold a Vault Enterprise licence, so it runs
+`make conformance-hermetic`, which excludes them — durability by path, and the
+enclave-marked API rows by marker, since `tests/conformance/api/` holds both kinds. No
+required check covers either set. Nothing in GitHub will stop a merge that breaks them.
 
 So before merging anything that touches durability, sealed core, an adapter, a provider,
-or `infra/`:
+`src/surfaces/`, `src/core/audit/`, or `infra/`:
 
 1. `make dev-up` — the enclave must be **running**, not assumed
-2. `make conformance` — all rows, including the durability lane, which executes as a
-   scheduled workload under an attested identity
+2. `make conformance` — all rows. Most execute under an attested workload identity inside
+   an allocation rather than a supplied token; two run on the host because one drives the
+   scheduler and the other holds an admin token the allocation deliberately lacks
 3. Merge only if it passed. If the enclave cannot be brought up, **say so and do not
    merge** — report the gap rather than merging past it
 

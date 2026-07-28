@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from core.audit.schema import AuditEntry
@@ -43,11 +45,11 @@ class FailAfterAuditSink(InMemoryAuditSink):
         self._fail_on = fail_on_append_index
         self._appends = 0
 
-    def append(self, entry: AuditEntry) -> None:
+    def append_event(self, **kwargs: Any) -> AuditEntry:
         if self._appends >= self._fail_on:
             raise RuntimeError("audit append failed")
         self._appends += 1
-        super().append(entry)
+        return super().append_event(**kwargs)
 
 
 def _raising_pre(_ctx: HookContext) -> HookDecision:
@@ -190,10 +192,10 @@ def test_post_path_audit_append_failure_not_clean_success(
     registry.register("echo", handler)
 
     class FailAfterTool(InMemoryAuditSink):
-        def append(self, entry: AuditEntry) -> None:
-            if entry.event_type.value == "post_decision":
+        def append_event(self, **kwargs: Any) -> AuditEntry:
+            if str(kwargs["event_type"]) == "post_decision":
                 raise RuntimeError("post audit fail")
-            super().append(entry)
+            return super().append_event(**kwargs)
 
     audit = FailAfterTool()
     run = _start(
