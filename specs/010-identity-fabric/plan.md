@@ -185,6 +185,9 @@ src/core/
 ├── run.py                    # CHANGED — the fabric a run resolves through
 └── durability/resume.py      # CHANGED — suspend naming the trust fabric
 
+src/surfaces/dispatch/
+└── entrypoint.py             # MOVED from tests/harness/dispatched_run.py at integration
+
 infra/modules/trust-fabric/
 ├── ceilings.tf               # NEW — harness-domain ceiling records + role bindings
 ├── policies.tf               # CHANGED — a narrow read policy for the fabric

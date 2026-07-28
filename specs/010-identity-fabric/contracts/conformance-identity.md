@@ -20,7 +20,8 @@ provenance rather than on outcomes.
 
 | Row | Asserts | Spec | Enclave |
 | --- | --- | --- | --- |
-| Ceiling comes from the registry | Two definitions with different ceilings produce different manufactured authority; neither exceeds its record | FR-001, FR-004, SC-002 | **yes** |
+| Ceiling comes from the registry | Two definitions with different ceilings produce different manufactured authority; neither exceeds its record — the *term*, proven via the hybrid harness | FR-001, FR-004 | **yes** |
+| Dispatched end-to-end | A run dispatched through the real entrypoint resolves **every** term from the live trust fabric under an attested identity, bounded by the registered ceiling — the *plumbing*, provable only after integration | SC-002, FR-017 | **yes** |
 | Unknown definition refuses | An unregistered id never resolves to a default, empty-then-widened, or open ceiling | FR-003, SC-005 | **yes** |
 | Jurisdictions never substitute | A registration with a credential policy and no harness ceiling refuses; neither is inferred from the other | FR-005, SC-003 | **yes** |
 | Unknown ceiling entry refuses | A ceiling naming an unknown tool refuses and names it, rather than dropping it | FR-005a, SC-003 | no |
@@ -36,6 +37,31 @@ provenance rather than on outcomes.
 | The fabric is unreachable from a tool | With an agent's own credential, ceiling paths are denied **by Vault**, not by our code | FR-016 | **yes** |
 | Protocol declares no test-only method | And no module under `src/` imports from `tests/` | FR-013, FR-015, SC-008, SC-009 | no |
 | No static credential | The same assertion the durability and evidence paths already carry | FR-002, SC-010 | **yes** |
+
+## The hybrid harness, and when it stops existing
+
+The per-term rows above run through a **test-harness hybrid fabric** during implementation:
+the term under test resolves through the production fabric, the rest through the fake. This
+is what makes the four stories independently provable — `manufacture_authority` resolves
+three terms from one object, so without composition no story could be proven until all of
+them were done — and it is scaffolding with a recorded expiry, not a pattern.
+
+Three properties keep it honest:
+
+- Hybrid rows carry a **transitional marker**, not an FR-014 marker. An FR-014 marker claims
+  fault injection; a hybrid row exercises a real term, and marking it fault-injection would
+  be a false statement in the file.
+- At the migration sweep, every hybrid row moves to the full production fabric and **the
+  hybrid module is deleted**. Scaffolding that survives its purpose becomes the next
+  feature's precedent.
+- The gate check asserts **zero rows import the hybrid** at feature end — because a row
+  reaching the fake *through* the hybrid passes a direct-import check unmarked, and closing
+  that loophole by asserting the importer count is cheaper and stricter than resolving
+  transitive imports.
+
+So the table above describes the feature's **end state**. During implementation the per-term
+rows are hybrid and say so in their own files; a reader of this contract at any commit can
+tell which state they are looking at by whether `tests/harness/hybrid_fabric.py` exists.
 
 ## Break fixtures worth naming
 
