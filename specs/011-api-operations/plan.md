@@ -111,7 +111,7 @@ Stop must not become the pause ADR-0049 removed. The plan's mechanism *is* the a
 | I — Build Glue Only | **Pass** | Operations over existing mechanisms; the only "new" storage is two index tables over facts the platform already produces |
 | II — Total Interception; One Governed Tool Layer | **Pass** | No operation reaches a tool; all are reads plus one durable-state write. No second authorization path — MCP tools call the same functions the routes call, per 009's pattern |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | FR-018; a scope-resolution failure refuses the read rather than shrinking it |
-| IV — Zero Standing Credentials; Authority Per Task | **Pass** | No credential surface changes. Collect polls Vault with the caller's flow, never a stored token |
+| IV — Zero Standing Credentials; Authority Per Task | **Pass** | No credential surface changes. Collect polls Vault through the same controlled-path arrangement submission already uses — a surface-held token for the gated path is the shipped 008 mechanism, exercised host-side in rows for the same reason the gated-mapping row is `host_enclave`. The caller-flow version arrives with RFC 8693, which is 010's recorded gap, not this feature's |
 | V — Sealed Core, Versioned Seams | **Pass** | One additive change at the step boundary; reviewed as sealed core |
 | VI — Lean by Default | **Pass** | No new dependencies; keyset pagination instead of stateful cursors |
 | VII — Anti-Fragmentation | **Pass** | Schema and policy changes in the substrate-independent tree |
