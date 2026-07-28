@@ -20,6 +20,8 @@ from typing import Any
 from core.audit.query import EvidenceQuery
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
+from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
+from core.runs.index import InMemoryRunIndex, RunIndex
 from surfaces.dispatch.types import RunDispatcher, RunHandle
 from surfaces.mcp.operations import operations
 
@@ -50,11 +52,26 @@ class McpTransport:
         audit_sink: AuditSink,
         evidence_query: EvidenceQuery | None = None,
         authority_submitter: Any | None = None,
+        run_index: RunIndex | None = None,
+        durability: Any | None = None,
+        change_requests: ChangeRequestStore | None = None,
+        change_status: Any | None = None,
+        definitions: Any | None = None,
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
         self._evidence = evidence_query
         self._submitter = authority_submitter
+        # Mirrors `create_app`'s collaborators exactly, and the mirroring is the point: the
+        # parity row compares what the two surfaces DO, and two surfaces holding different
+        # collaborators would diverge in ways no catalogue comparison could see.
+        self._index: RunIndex = run_index if run_index is not None else InMemoryRunIndex()
+        self._durability = durability
+        self._changes: ChangeRequestStore = (
+            change_requests if change_requests is not None else InMemoryChangeRequestStore()
+        )
+        self._change_status = change_status
+        self._definitions = definitions
 
     def tool_names(self) -> list[str]:
         return [op.tool_name for op in operations()]
