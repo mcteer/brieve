@@ -204,6 +204,59 @@ the document to match and the target is lost.
 
 ---
 
+## Finding 6 — The "fake only" methods have a production caller, and it writes a placeholder.
+
+**Decision**: The broker branch of entitlement mirroring **refuses** (`broker_not_implemented`)
+until ADR-0044's credential translation ships. The two methods leave the protocol as FR-013
+requires, and nothing inherits them.
+
+**What was assumed**: That `issue_brokered_material` / `get_brokered_material` were declared
+for tests and called only by tests — which is what "(fake only)" in their docstrings says.
+
+**What the source says** (`src/core/hooks/mirroring.py`, production code on the invoke path):
+
+```python
+if mode == "broker":
+    # Entitlement membership already checked before any shared-grain wield.
+    material = fabric.get_brokered_material(authority.credential_id)
+    if material is None:
+        fabric.issue_brokered_material(
+            authority.credential_id,
+            "HARNESS_FIXTURE_BROKERED_GRAIN_MARKER_NOT_A_REAL_SECRET",
+        )
+```
+
+Production code performing a **simulated** brokered exchange, storing a hard-coded fixture
+string. The method is not test-only; the *branch* is a stub, and it is a stub that returns
+`allow`.
+
+**Why this matters more than the protocol change it complicates.** Principle IV names the
+brokered path explicitly — "the rotated, Control-Group-governed management token behind the
+TFE broker" is the one permitted standing credential in the entire platform. The mechanism
+that credential exists for does not exist. What exists is a branch that looks like it works:
+it checks entitlements first (correctly), then "brokers" by writing a placeholder, then
+allows the call.
+
+The entitlement check in front of it is real and does its job, so the compensating control
+is present. But a reader of `mirroring.py` would reasonably conclude that brokering is
+implemented, and it is not.
+
+**Why refusing is the right resolution rather than preserving the simulation.** Keeping it
+behind the fake would mean production and test behaviour differ on the exact path where they
+must not — a call that is allowed under test and refused in production, or worse, allowed in
+both for different reasons. Refusing with a named reason code makes the gap visible at the
+moment someone configures a brokered product, which is the moment they need to know.
+
+**Consequence for this feature's scope**: US5 grows a decision it did not have. Removing two
+methods from a protocol is trivial; deciding what the branch that called them now does is not.
+Recorded so the task list reflects the second thing rather than only the first.
+
+**Alternatives considered**: Implementing federation/brokering here — that is ADR-0044's
+feature and explicitly out of scope. Leaving the simulation in place with a comment — a
+comment does not stop the branch returning `allow`.
+
+---
+
 ## Consolidated decisions
 
 | # | Decision | Rationale |
@@ -216,6 +269,7 @@ the document to match and the target is lost.
 | D6 | Fabric authenticates by workload identity, new narrow read policy | The `harness` role carries only `harness-database` today |
 | D7 | Policy read per step, no cache; suspend on mid-run outage | Spec C3 |
 | D8 | Entitlement seam real, products faked | Spec C2 |
+| D9 | Broker branch refuses `broker_not_implemented` | Its "exchange" writes a placeholder and returns allow (Finding 6) |
 
 ## Remaining unknowns
 
