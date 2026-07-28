@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     # Type-only: importing the durability package at runtime would cycle back here
     # through resume.py, which needs RunState.
     from core.bounds import BoundsTracker
+    from core.dependencies.types import DependencyHealthReader
     from core.durability.lease import RunLease
     from core.durability.types import DurabilityProvider
 
@@ -36,8 +37,14 @@ class RunState(StrEnum):
 
     002 shipped ACTIVE and REFUSED, which sufficed while nothing had to survive a
     restart. Durable execution needs all three distinctions: without COMPLETED a resume
-    attempt against a finished run re-enters the loop, and calling a bounded stop PARKED
-    would invite resuming past the bound.
+    attempt against a finished run re-enters the loop, and calling a bounded stop
+    SUSPENDED would invite resuming past the bound.
+
+    ``PARKED`` used to live here and meant "stopped for a human to resolve". ADR-0049
+    removed that category — consent to start a run is consent to finish it — so the state
+    went with it rather than being renamed. Keeping the name would have carried the
+    human-in-the-loop connotation into ``SUSPENDED``, which is the one state that most
+    needs it gone: a suspended run waits on a *machine condition* that clears itself.
     """
 
     ACTIVE = "active"
@@ -46,11 +53,18 @@ class RunState(StrEnum):
     COMPLETED = "completed"
     #: Halted by an execution bound; ``stop_reason`` records which one.
     STOPPED = "stopped"
-    #: Waiting for something only a human can supply. Resumable; not failed.
-    PARKED = "parked"
+    #: Waiting on a named dependency to become reachable again. Resumable by the
+    #: sweeper, never by a person, and never by a timeout that grants by default.
+    SUSPENDED = "suspended"
 
     def is_terminal(self) -> bool:
-        """True when there is nothing left to resume."""
+        """True when there is nothing left to resume.
+
+        ``SUSPENDED`` is deliberately absent: it is the one non-terminal stop, and the
+        sweeper's whole job is to resume it. Adding it here would make the sweeper able to
+        resume nothing while every test still passed — and omitting ``STOPPED`` would let a
+        run resume past a bound it already hit.
+        """
         return self in {RunState.REFUSED, RunState.COMPLETED, RunState.STOPPED}
 
 
@@ -88,6 +102,18 @@ class GovernedRun:
     probe_log: list[str] = field(default_factory=list)
     # Recomputed by the authority hook on every invoke; issue-time authority never widens it.
     live_effective: AuthorityScope | None = None
+    #: What the platform believes about the products this run's tools reach (009).
+    #:
+    #: On the run rather than closed over by the hook, because `builtin_governance_hooks()`
+    #: takes no arguments and a handler receives only a `HookContext` — so without a field
+    #: here there is no path from the dependency gate to the health it must consult.
+    #:
+    #: Optional and defaulting to None so every 002-era caller keeps working. **None means
+    #: the gate is inert, not that everything is unhealthy**: "unknown health for a
+    #: monitored product is unhealthy" and "a run with no dependency mechanism denies
+    #: everything" are different claims, and collapsing them would make every existing run
+    #: refuse every tool call while looking like the gate working.
+    dependency_health: DependencyHealthReader | None = None
 
 
 def start_governed_run(
@@ -103,6 +129,7 @@ def start_governed_run(
     audit_sink: AuditSink | None = None,
     hooks: list[HookRegistration] | None = None,
     include_governance: bool = True,
+    dependency_health: DependencyHealthReader | None = None,
 ) -> GovernedRun:
     """Start an active governed run with bound task authority, or refuse.
 
@@ -154,6 +181,7 @@ def start_governed_run(
         clock=clk,
         hooks=registered,
         state=RunState.ACTIVE,
+        dependency_health=dependency_health,
     )
 
     issued_payload = {

@@ -75,12 +75,19 @@ def stop_run(run: GovernedRun, *, reason: str, payload: dict[str, Any] | None = 
     )
 
 
-def park_run(run: GovernedRun, *, reason: str, payload: dict[str, Any] | None = None) -> None:
-    """Suspend the run awaiting a human.
+def suspend_run(run: GovernedRun, *, awaiting: str, payload: dict[str, Any] | None = None) -> None:
+    """Suspend the run pending a named dependency.
 
-    Parked is *not* written as a terminal outcome: the run must stay resumable once the
-    blocking condition clears, and marking it terminal would make resume refuse it.
+    Not written as a terminal outcome: the run must stay resumable once the dependency
+    recovers, and marking it terminal would make resume refuse it.
+
+    ``awaiting`` is required and is the whole difference from the ``park_run`` this
+    replaced. A run that suspends without naming what it waits on is a run the sweeper
+    cannot find work for — it would sit suspended forever, which is exactly the hang
+    ADR-0049 exists to prevent, produced by the mechanism meant to prevent it.
     """
-    run.state = RunState.PARKED
-    run.stop_reason = reason
+    if not awaiting.strip():
+        raise ValueError("a suspended run must name the dependency it awaits")
+    run.state = RunState.SUSPENDED
+    run.stop_reason = f"awaiting:{awaiting}"
     checkpoint_run(run, payload=payload, outcome=None)

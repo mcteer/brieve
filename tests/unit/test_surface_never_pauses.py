@@ -43,6 +43,19 @@ FORBIDDEN = (
 #: no check because the gate still appears to exist.
 FORBIDDEN_CALLS = ("sleep", "wait", "acquire")
 
+#: A module may declare itself a supervisory loop, and then blocking is its job.
+#:
+#: This exists because the rule is "no RUN waits on a human", and the blocking-primitive
+#: check approximates that. The approximation is right for a request path — any sleep
+#: there is a held request — and wrong for the persistent service, whose whole shape is a
+#: loop with an interval.
+#:
+#: Declared rather than carved out by filename, for the reason 009's own task list gives:
+#: narrowing a check to remove a false positive is where coverage gets lost silently. An
+#: explicit marker is greppable, is a claim the author makes on the record, and leaves the
+#: check covering every module that has not made it.
+SERVICE_LOOP_MARKER = "__service_loop__"
+
 #: Importing these into a surface module is itself the signal. Blocking a request path
 #: requires one of them, and none has a legitimate use here.
 FORBIDDEN_IMPORTS = ("threading", "multiprocessing", "concurrent.futures")
@@ -87,7 +100,10 @@ def test_no_surface_module_calls_a_blocking_primitive() -> None:
     """
     offenders: list[str] = []
     for path in _sources():
-        for node in ast.walk(_code_without_prose(path)):
+        tree = _code_without_prose(path)
+        if SERVICE_LOOP_MARKER in ast.unparse(tree):
+            continue
+        for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
             target = node.func
@@ -123,6 +139,23 @@ def test_no_surface_module_imports_a_concurrency_primitive() -> None:
                 if any(n == f or n.startswith(f + ".") for f in FORBIDDEN_IMPORTS)
             ]
     assert offenders == [], f"surface imports a concurrency primitive: {offenders}"
+
+
+def test_only_declared_service_loops_are_exempt() -> None:
+    """The exemption is narrow and visible, and nothing else claims it.
+
+    If this list grows, the check is being worked around rather than satisfied — which is
+    the failure mode of every exemption, and the reason this asserts the membership rather
+    than merely allowing it.
+    """
+    declared = [
+        str(p.relative_to(SURFACES))
+        for p in _sources()
+        if SERVICE_LOOP_MARKER in ast.unparse(_code_without_prose(p))
+    ]
+    assert declared == ["mcp/server.py"], (
+        f"unexpected modules claim the service-loop exemption: {declared}"
+    )
 
 
 def test_the_precision_fix_did_not_gut_the_check() -> None:

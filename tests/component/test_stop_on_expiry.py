@@ -1,5 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""US3 — a run whose consent has expired parks instead of resuming (T035-T040)."""
+"""A run whose consent has expired STOPS instead of resuming.
+
+Was "parks instead of resuming", and the change is ADR-0049 superseding ADR-0026's
+re-consent rule. Grant expiry is an execution bound like any other: recorded, terminal,
+and resolved by nobody. The test that used to assert a parked run resumed "under fresh
+consent" asserted precisely the mechanism that was removed — there is no human being asked
+to re-consent, so there is nothing for fresh consent to be.
+
+The other half of what PARKED conflated lives in the suspension tests below: waiting on a
+machine condition, which does clear itself.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +20,7 @@ import pytest
 
 from core.authority.grant import DelegationGrant, GrantExpiredError, issue_grant
 from core.authority.types import AuthorityScope
-from core.durability.checkpoint import checkpoint_run, park_run
+from core.durability.checkpoint import checkpoint_run, suspend_run
 from core.durability.lease import RunLease
 from core.durability.memory import InMemoryDurabilityProvider
 from core.durability.resume import resume_run
@@ -42,7 +52,7 @@ def _run_with(
     return run, h, audit
 
 
-def test_resume_under_expired_consent_parks_with_zero_further_steps() -> None:
+def test_resume_under_expired_consent_stops_with_zero_further_steps() -> None:
     clock = frozen_clock()
     provider = InMemoryDurabilityProvider()
     grant = issue_grant(
@@ -69,13 +79,21 @@ def test_resume_under_expired_consent_parks_with_zero_further_steps() -> None:
         clock=clock,
     )
 
-    assert decision.state is RunState.PARKED
-    assert decision.park_reason == "grant_expired"
-    assert decision.authority is None, "parked runs hold no live authority"
-    assert handler.call_count == executions_before, "zero steps after parking"
+    assert decision.state is RunState.STOPPED
+    assert decision.state.is_terminal(), "a bound is terminal — nothing resumes it"
+    assert decision.stop_reason == "grant_expired"
+    assert decision.authority is None, "stopped runs hold no live authority"
+    assert handler.call_count == executions_before, "zero steps after stopping"
 
 
-def test_parked_run_is_durable_and_resumable_under_fresh_consent() -> None:
+def test_fresh_consent_does_not_revive_a_run_that_hit_its_bound() -> None:
+    """The inverse of what this asserted before, and the substance of ADR-0049.
+
+    It used to prove that a parked run resumed once consent was renewed. That was the
+    re-consent loop the ADR removes: a run reaching its grant's end has hit a bound, and
+    bounds are not renegotiated mid-run. Consent to start a run was consent to finish it,
+    and the run finished.
+    """
     clock = frozen_clock()
     provider = InMemoryDurabilityProvider()
     expired = issue_grant(
@@ -89,23 +107,24 @@ def test_parked_run_is_durable_and_resumable_under_fresh_consent() -> None:
     checkpoint_run(run, payload={"progress": "step-1"})
     clock.advance(timedelta(minutes=6))
 
-    park_run(run, reason="grant_expired")
-    assert run.state is RunState.PARKED
-
-    # Parked is NOT terminal: fresh consent lets the same checkpoint resume.
-    renewed = durability_grant(clock, tool_names={"echo"})
-    decision = resume_run(
+    # Resuming under the EXPIRED grant stops, and records why.
+    stopped = resume_run(
         provider,
         blob_id="run-1",
         run_id="run-1",
-        grant=renewed,
+        grant=expired,
         holder_identity="alloc-2",
         identity_fabric=fake_identity_fabric(tool_names={"echo"}, ceiling_tools={"echo"}),
         clock=clock,
     )
-    assert decision.resumable
-    assert decision.checkpoint is not None
-    assert decision.checkpoint.payload["progress"] == "step-1", "the work survived"
+    assert stopped.state is RunState.STOPPED
+    assert stopped.stop_reason == "grant_expired"
+
+    # And the work is still on disk. Stopping is not losing — an operator can read what
+    # the run had done. What they cannot do is hand it a new grant and continue it.
+    blob = provider.load("run-1")
+    assert blob is not None
+    assert blob.payload["progress"] == "step-1", "the record survived the bound"
 
 
 def test_consent_expiring_mid_run_stops_at_the_same_boundary() -> None:
@@ -133,16 +152,38 @@ def test_consent_expiring_mid_run_stops_at_the_same_boundary() -> None:
         )
 
 
-def test_parking_does_not_mark_the_run_terminal() -> None:
-    """Marking it terminal would make resume refuse a run that is merely waiting."""
+def test_suspension_does_not_mark_the_run_terminal() -> None:
+    """The half of PARKED that survives: waiting on a machine condition.
+
+    Marking it terminal would make resume refuse a run that is merely waiting — and the
+    sweeper would then have nothing it could ever pick up, which presents as a hang rather
+    than as an error.
+    """
     clock = frozen_clock()
     provider = InMemoryDurabilityProvider()
     grant = durability_grant(clock, tool_names={"echo"})
     run, _, _ = _run_with(provider, clock, grant)
 
-    park_run(run, reason="grant_expired")
+    suspend_run(run, awaiting="terraform-cloud")
 
     blob = provider.load("run-1")
     assert blob is not None
-    assert blob.outcome is None, "PARKED is not written as a terminal outcome"
-    assert not RunState.PARKED.is_terminal()
+    assert blob.outcome is None, "SUSPENDED is not written as a terminal outcome"
+    assert not RunState.SUSPENDED.is_terminal()
+    assert run.stop_reason == "awaiting:terraform-cloud", "a suspension names its dependency"
+
+
+def test_a_suspension_must_name_what_it_waits_on() -> None:
+    """A suspension with no named dependency is a run the sweeper can never find.
+
+    It would sit suspended forever — the exact hang ADR-0049 exists to prevent, produced
+    by the mechanism meant to prevent it. So it is refused at the point of suspending
+    rather than discovered later by its absence.
+    """
+    clock = frozen_clock()
+    provider = InMemoryDurabilityProvider()
+    grant = durability_grant(clock, tool_names={"echo"})
+    run, _, _ = _run_with(provider, clock, grant)
+
+    with pytest.raises(ValueError, match="must name the dependency"):
+        suspend_run(run, awaiting="   ")

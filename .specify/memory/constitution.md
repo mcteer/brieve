@@ -1,5 +1,34 @@
 <!--
 Sync Impact Report
+- This revision (1.1.0 → 1.2.0, MINOR — three passages follow Accepted ADRs; no principle
+  removed or redefined). Motivated by ADR-0049 (Accepted in the same change) and by a
+  long-standing mis-statement of ADR-0033.
+
+  1. Quality Gates, durability rows: "grant-expiry **parking**" → "grant-expiry **stop**".
+     ADR-0049 supersedes ADR-0026's re-consent rule: a run reaching its grant's end has hit
+     an execution bound, recorded and terminal, not a pause awaiting a human. `PARKED` is
+     removed from the sealed core in the same change, so a row naming parking would have
+     described behaviour that can no longer occur.
+
+  2. Quality Gates: "surface parity across **all four** transports" → "across **every pair
+     of implemented** transports". **A correction, not a policy change.** ADR-0033 says
+     "the same operation attempted through *any* transport"; it never said all four. The
+     row's wording mis-stated the ADR it exists to gate, and Principle X is explicit that
+     where a document conflicts with an Accepted ADR, the ADR wins and the document is
+     amended. As worded the gate would have bound only once a fourth transport existed —
+     catching nothing at two or three, which is when divergence starts.
+
+  3. Principle VIII: "or the run **parks**" → "or the run **stops** with the reason
+     recorded". Same removal as (1), different trigger: no eval-qualified model cell is
+     available. `SUSPENDED` is the tempting substitute here and is wrong — a cell becomes
+     qualified through eval-gated promotion, which is human work, so suspending would
+     reintroduce exactly the waiting-on-a-person ADR-0049 removes.
+
+  Propagation: `src/core/run.py` (`PARKED` removed, `SUSPENDED` added),
+  `src/core/durability/{checkpoint,resume}.py`, `tests/conformance/durability/rows.py`
+  (the named gate row), `specs/005-durable-execution/contracts/conformance-durability.md`.
+
+Prior Sync Impact Report
 - Version: 1.0.1 — sourced from architecture v1.14; decision records ADR-0001–0047 plus
   GR-1 in docs/adr/
 - This revision (1.0.1 → 1.1.0, MINOR — expands an existing gate; no principle removed
@@ -137,7 +166,8 @@ and conformance suite MUST be identical; the substrate is the only permitted del
 Packs, prompts/skills, models, and policies promote only through eval gates — never
 auto-tracked; model use only via a definition's binding map (ask / plan / write /
 judge / summarize) over eval-qualified Qualified Model Matrix cells (pack × model ×
-role), with fallback only to another qualified cell — recorded — or the run parks;
+role), with fallback only to another qualified cell — recorded — or the run stops with
+the reason recorded;
 upstream skill bumps require provenance checks, injection-lens review, and an eval
 pass. Eval-time judge models are themselves pinned, eval-promoted artifacts. What the
 agent *executes* is pinned; what it *consults* is fetched fresh with
@@ -194,9 +224,10 @@ change.
   "the check is not automated" is not a defence.** A gate whose only enforcement is
   everyone remembering is not a gate. Rows: governance-ordering and
   fail-closed assertions; tool-call parity under deferred disclosure (ADR-0040); registry isolation (agent-credential control-plane writes
-  observed denied); surface parity across all four transports; durability scenarios per
+  observed denied); surface parity across every pair of implemented transports; durability
+  scenarios per
   ADR-0024/026 — kill/resume, re-observe-never-re-execute, re-auth-never-replay,
-  double-resume fencing, grant-expiry parking, duplicate-side-effect rejection,
+  double-resume fencing, grant-expiry stop, duplicate-side-effect rejection,
   drain-across-upgrade.
 - **Eval gates** (blocking for packs, prompts, models, policies): must-deny safety
   suites; must-decline scope suites (ADR-0034/036); citation accuracy and
@@ -213,4 +244,4 @@ change.
   train for drift against newly Accepted decisions; `/speckit.analyze` findings that
   implicate a principle block `/speckit.implement`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-26
+**Version**: 1.2.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-28

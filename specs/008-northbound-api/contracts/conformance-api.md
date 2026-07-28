@@ -92,33 +92,37 @@ than to check:
   A sequential test passes against that arrangement every time, which is why the row has to
   drive concurrent readers rather than assert on one.
 
-## CI does not run the enclave rows, and that is the same gap 005 recorded
+## CI runs the enclave rows on same-repo pull requests (as of 009)
 
-Nine of the seventeen rows need the enclave. The CI fast lane runs `make conformance-hermetic`
-and cannot stand up a licensed Vault Enterprise, so **no required GitHub check covers those
-six.** Stated plainly rather than papered over.
+Nine of the seventeen rows need the enclave. **009 closed this gap for same-repo pull
+requests**: `.github/workflows/enclave.yml` stands up the full enclave and runs
+`make conformance`, with the Vault Enterprise licence supplied as a repository secret.
 
-**That lane must exclude by marker, not by path.** It currently passes
+**Fork pull requests remain uncovered, and always will be.** The lane is conditioned on
+`github.event.pull_request.head.repo.full_name == github.repository` because a
+fork-originating run cannot read repository secrets — that is GitHub's design, not a
+configuration choice, and it is the right one. A lane that tried anyway would fail on every
+external contribution in a way indistinguishable from a real regression.
+
+So the responsible-party record narrows rather than disappears:
+
+| Where the change comes from | What covers these nine rows |
+| --- | --- |
+| Same-repo branch or pull request | The enclave lane. A required check, and it fails the merge |
+| Fork pull request | **The agent harness in the IDE**, per `AGENTS.md` — unchanged |
+
+**That lane must exclude by marker, not by path.** The fast lane currently passes
 `--ignore=tests/conformance/durability`, which worked while every enclave-dependent row
 lived in one directory. `tests/conformance/api/` holds both kinds, so the path exclusion
 would collect the nine enclave rows and **fail the fork-safe lane on the merge commit** —
-they fail loudly when the enclave is absent, by design. T057a changes it to `-m "not
-enclave"`.
+they fail loudly when the enclave is absent, by design. 008's T057a changed it to
+`-m "not enclave"`.
 
-**Responsible party (constitution v1.1.0): the agent harness in the IDE.** Named here
-because the constitution requires a blocking row with no automated runner to record who runs
-it *in this contract*, rather than leaving it to whoever remembers. `AGENTS.md` instructs
-the harness to bring the enclave up and run `make conformance` before merging anything
-touching a surface, sealed core, an adapter, a provider, or `infra/` — and to refuse the
-merge and report the gap if the enclave cannot come up.
-
-The mechanism is an instruction the harness follows, which is only as good as that
-instruction being kept current and obeyed. One property holds regardless: the lane **fails
-loudly when the enclave is absent** rather than skipping, so a false green is not obtainable
-by running it in the wrong place — only by not running it at all.
-
-Closing this needs a second CI lane with the licence available as a secret, which remains a
-deployment-tree concern rather than this feature's.
+One property holds across both lanes and is worth keeping stated: the rows **fail loudly
+when the enclave is absent** rather than skipping, so a false green is not obtainable by
+running them in the wrong place — only by not running them at all. That was the whole
+safety margin when a human was the runner; it is now the thing that makes the automated
+lane's green mean something.
 
 ## Sealed-core review
 

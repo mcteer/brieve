@@ -75,7 +75,12 @@ jobs:
             curl -fsSL -o "/tmp/${name}.sums" "${base}/${name}_${encoded}_SHA256SUMS"
             ( cd /tmp && grep " ${zip}\$" "${name}.sums" | sed "s| ${zip}| ${name}.zip|" | sha256sum -c - )
             sudo unzip -o -q "/tmp/${name}.zip" -d /usr/local/bin
-            "${name}" version | head -1
+            # Not `| head -1`. Terraform prints more than one line, `head` closes the pipe
+            # after the first, and the writer takes SIGPIPE — which under `set -e` fails
+            # the step with exit 141 and a log showing three successful installs. It went
+            # green for several runs first, because whether the writer has flushed before
+            # `head` exits is a race.
+            printf '%s\n' "$("${name}" version 2>/dev/null | sed -n 1p)"
           }
           install_hashicorp nomad "${NOMAD_VERSION}"
           install_hashicorp vault "${VAULT_VERSION}"

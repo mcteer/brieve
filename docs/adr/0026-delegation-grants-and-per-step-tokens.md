@@ -1,6 +1,6 @@
 # ADR-0026: Long-running execution — delegation grants, per-step tokens, resume as re-observation
 
-- **Status**: Accepted
+- **Status**: Accepted; partially superseded by [ADR-0049](0049-consent-to-start-is-consent-to-finish.md) (2026-07-28)
 - **Date**: 2026-05-13
 - **Relates to**: [ADR-0016](0016-control-groups-gate-authority-changes.md), [ADR-0018](0018-grounded-reporting.md), [ADR-0024](0024-durability-provider-seam.md)
 - **Requirements**: R2, R3
@@ -61,6 +61,13 @@ Parking on grant expiry rather than resuming is the behavior that will surprise 
 most, and it is deliberate. A run that resumes days later under a consent the user has
 forgotten giving is not a feature.
 
+> **Superseded by [ADR-0049](0049-consent-to-start-is-consent-to-finish.md).** A run
+> reaching its ceiling now **stops with the reason recorded**; there is no re-consent, and
+> `PARKED` no longer exists. The paragraph above is kept rather than rewritten because
+> Principle X requires supersession be recorded, not edited in place — and because the
+> reasoning it contains is the reasoning ADR-0049 had to answer. Editing it away would
+> leave that ADR arguing against nothing.
+
 Re-observation is what makes resumption safe with irreversible side effects, and it is
 also the expensive part: every resumption pays the cost of re-reading external state, and
 every tool must expose enough for that reading to be conclusive.
@@ -74,3 +81,22 @@ partition-plus-double-resume as a mandatory scenario.
 None of these properties are optional for a durability provider: they are defined above
 the interface ([ADR-0024](0024-durability-provider-seam.md)) and asserted identically
 against every implementation.
+
+## Superseded parts
+
+[ADR-0049](0049-consent-to-start-is-consent-to-finish.md) supersedes exactly two rules from
+this ADR, and **nothing else here is affected**:
+
+1. **Grant expiry parks for re-consent.** Now: the run stops, reason recorded.
+2. **A step whose outcome cannot be determined parks for a human to resolve.** Now: the run
+   suspends naming the dependency it could not reach, and a sweeper resumes it on recovery.
+
+**What stands, and it is most of this ADR:** the two-level split of a longer-lived
+delegation grant and short-lived per-step credentials; resume as re-observation rather than
+replay; intent-and-result bracketing; single-writer fencing. ADR-0049 changes what happens
+when a run *cannot proceed* — not how authority is structured or how resumption is made
+safe.
+
+The distinction matters because "superseded" read loosely would suggest the credential
+model was revisited. It was not. ADR-0049 removes the human from the loop; it leaves the
+mechanism that makes removing them safe entirely intact.

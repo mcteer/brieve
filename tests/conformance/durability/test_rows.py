@@ -166,7 +166,7 @@ def test_park_on_grant_expiry(provider: DurabilityProvider, run_id: str) -> None
 
     decision = _resume(provider, run_id, grant, clock)
 
-    rows.assert_parked(decision.state, decision.park_reason, expected_prefix="grant_expired")
+    rows.assert_stopped(decision.state, decision.stop_reason, expected_prefix="grant_expired")
     assert decision.authority is None
 
 

@@ -1,15 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Resume a disrupted run — re-attest, re-acquire, re-observe, continue or park.
+"""Resume a disrupted run — re-attest, re-acquire, re-observe, continue, stop, or suspend.
 
 The order below is not stylistic. Each step is a gate on the next:
 
 1. **Is there anything to resume?** A terminal run is not re-entered.
 2. **Is consent still live?** An expired grant is withdrawn permission, so the run
-   parks rather than resuming (FR-005).
+   STOPS rather than resuming — an execution bound like any other (ADR-0049).
 3. **Do we own the run?** Acquire the lease *before* acting, so a zombie is superseded
    before it can write anything more (FR-009).
 4. **What actually happened?** Resolve open intents by observation, never by
-   assumption. ``cannot_determine`` parks (FR-008).
+   assumption. ``cannot_determine`` SUSPENDS, naming the dependency it could not
+   observe, so the sweeper can resume it when that dependency recovers (ADR-0049).
 
 On re-authentication: this module does **not** try to prevent credential replay,
 because the substrate already does. A resumed run is a new Nomad allocation with a new
@@ -21,6 +22,7 @@ recovered credential, and none should be added.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from core.authority.clock import Clock
@@ -45,7 +47,11 @@ class ResumeDecision:
     state: RunState
     checkpoint: CheckpointBlob | None = None
     authority: ManufacturedAuthority | None = None
-    park_reason: str | None = None
+    #: Why the run stopped, when it stopped. An execution bound, not a suspension.
+    stop_reason: str | None = None
+    #: The dependency a SUSPENDED run waits on. Required for the sweeper to find it —
+    #: a suspension nobody can match to a recovery is a run that never resumes.
+    awaiting: str | None = None
     #: Steps observed to have already taken effect — skip these.
     completed_steps: list[IntentRecord] = field(default_factory=list)
     #: Steps observed *not* to have taken effect — these may proceed.
@@ -67,15 +73,26 @@ def resume_run(
     clock: Clock,
     observers: dict[str, Observer] | None = None,
     correlation_id: str | None = None,
+    depends_on: Mapping[str, str] | None = None,
 ) -> ResumeDecision:
-    """Decide whether and how a run continues."""
+    """Decide whether and how a run continues.
+
+    ``depends_on`` maps a tool name to the **product** it reaches, so a suspension names
+    something the health checker also names. Optional, and absent it falls back to the
+    tool name — which is honest rather than convenient: the sweeper watches products, so
+    a suspension carrying only a tool name will not be matched by a product recovering.
+    Resume has no registry of its own, and inventing one here would be a second place that
+    decides what a tool depends on.
+    """
     checkpoint = provider.load(blob_id)
     if checkpoint is None:
         # Not "start over": a missing checkpoint means we cannot know what already
         # happened, and guessing is the failure re-observation exists to prevent.
+        # STOPPED, not suspended: a missing checkpoint does not come back. Suspending
+        # would leave the sweeper waiting on a dependency that was never the problem.
         return ResumeDecision(
-            state=RunState.PARKED,
-            park_reason="checkpoint_missing",
+            state=RunState.STOPPED,
+            stop_reason="checkpoint_missing",
         )
 
     if checkpoint.outcome is not None:
@@ -86,10 +103,12 @@ def resume_run(
     try:
         grant.assert_live(clock, correlation_id=correlation_id)
     except GrantExpiredError:
+        # ADR-0049 supersedes ADR-0026 here: grant expiry is a BOUND, recorded and
+        # final, not a pause awaiting re-consent. There is no human to re-consent to.
         return ResumeDecision(
-            state=RunState.PARKED,
+            state=RunState.STOPPED,
             checkpoint=checkpoint,
-            park_reason="grant_expired",
+            stop_reason="grant_expired",
         )
 
     # Acquire before observing or acting: a zombie that writes between our observation
@@ -118,10 +137,14 @@ def resume_run(
             case ObservationOutcome.DID_NOT_HAPPEN:
                 pending.append(intent)
             case ObservationOutcome.CANNOT_DETERMINE:
+                # The only suspension: the outcome cannot be determined because
+                # something is unreachable. Names what it waits on so the sweeper can
+                # resume it on recovery.
                 return ResumeDecision(
-                    state=RunState.PARKED,
+                    state=RunState.SUSPENDED,
                     checkpoint=checkpoint,
-                    park_reason=_unobservable_reason(intent, observation),
+                    awaiting=(depends_on or {}).get(intent.tool_name, intent.tool_name),
+                    stop_reason=_unobservable_reason(intent, observation),
                 )
 
     return ResumeDecision(

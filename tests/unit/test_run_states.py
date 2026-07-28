@@ -108,12 +108,14 @@ def test_missing_checkpoint_parks_rather_than_starting_over() -> None:
 
     decision = _resume(provider, grant, clock, fake_identity_fabric(tool_names={"read_tool"}))
 
-    assert decision.state is RunState.PARKED
-    assert decision.park_reason == "checkpoint_missing"
+    assert decision.state is RunState.STOPPED
+    assert decision.stop_reason == "checkpoint_missing"
 
 
 def test_parked_is_not_terminal() -> None:
     """Parked is waiting, not failed — it must stay resumable."""
-    assert not RunState.PARKED.is_terminal()
+    assert not RunState.SUSPENDED.is_terminal(), (
+        "SUSPENDED must stay resumable — terminal here means the sweeper resumes nothing"
+    )
     assert RunState.COMPLETED.is_terminal()
     assert RunState.STOPPED.is_terminal()

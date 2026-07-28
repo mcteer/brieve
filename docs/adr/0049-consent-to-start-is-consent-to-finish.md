@@ -1,6 +1,6 @@
 # ADR-0049: Consent to start a run is consent to finish it; dependencies are monitored, not escalated
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-07-28, on the evidence of `specs/009-mcp-surface`)
 - **Date**: 2026-07-26
 - **Supersedes**: the re-consent and human-resolution rules of [ADR-0026](0026-delegation-grants-and-per-step-tokens.md) (the rest of that ADR stands)
 - **Relates to**: [ADR-0016](0016-control-groups-gate-authority-changes.md), [ADR-0015](0015-control-plane-vault-as-trust-fabric.md), [ADR-0024](0024-durability-provider-seam.md)
@@ -147,9 +147,11 @@ unreachable is a poor shape for the component whose job is knowing what is unrea
 Postgres already holds durable run state, is already reachable from every agent container
 under the same credential path, and does not care whether the MCP service is up.
 
-Until that machinery exists, the honest description is that this ADR is a decision rather
-than a shipped capability, and a run that cannot observe has no automatic path back. That
-gap belongs on the roadmap — not assumed closed by accepting this.
+That gap is now closed, which is why this ADR is Accepted rather than still Proposed —
+see **Resolution** below. It was left Proposed deliberately: a decision whose machinery
+does not exist is a decision, and accepting it on the strength of the argument alone would
+have made the status field mean "we found this convincing" rather than "we built it and it
+held".
 
 It also sharpens what evidence is for. A stopped run's audit trail is no longer a prompt
 for someone to act on mid-flight; it is the record an investigator reads afterwards to
@@ -176,6 +178,41 @@ field that does not exist. Fix the language, not the number.
 *resumable*; it is not a reservation. An allocation exists to do work and ends when that
 work ends — including when it ends in suspension. A five-minute job is a five-minute
 container.
+
+## Resolution
+
+Accepted 2026-07-28. `specs/009-mcp-surface` built every mechanism this ADR assumed, and
+the assumptions survived contact with the build in every case but one, recorded here
+because a decision that was silently adjusted during implementation is a decision nobody
+reviewed:
+
+| Decided here | Where it lives | Conformance row |
+| --- | --- | --- |
+| `PARKED` removed | `src/core/run.py` — `SUSPENDED` replaces it, and is non-terminal | `tests/unit/test_parked_is_gone.py` |
+| Grant expiry stops rather than parks | `src/core/durability/resume.py` | `test_stop_on_expiry.py` (semantics inverted from 005's row, not deleted) |
+| Unresolvable step suspends naming a dependency | `suspend_run(run, *, awaiting=...)` — blank `awaiting` raises | `test_suspension_bounds.py` |
+| Health read from Postgres on the invoke path, never from the MCP service | `src/core/dependencies/store.py` | `test_dependency_refusal.py` |
+| Availability denials model-visible, policy denials not | `DenialClass.is_model_visible()` | `test_denial_classes.py` |
+| Refusal inside the hook pipeline, not beside it | registered first in `builtin_governance_hooks()` | `test_refusal_placement.py`, whose break fixture is a *working* pre-flight guard |
+| Sweeper resumes on recovery; nothing polls, nobody presses anything | `src/core/durability/sweeper.py` | `test_suspend_and_sweep.py`, `test_nothing_waits_on_a_human.py` |
+| Suspension bounded by the existing run ceiling, not a new one | `resume.py` | `test_suspension_bounds.py` |
+| Checks and sweeper hosted on the MCP service | `src/surfaces/mcp/server.py` | `infra/jobs/mcp.nomad.hcl` (`type = "service"`) |
+
+**The one adjustment.** This ADR says a suspended run is resumed "when that dependency
+recovers", which reads as a single event. Implementation found that a health signal
+flapping — a product recovering and failing repeatedly — would resume the same runs into
+the same outage each time. Recovery is therefore reported with hysteresis: consecutive
+healthy observations before the state changes, in `PostgresDependencyStore`. That is a
+refinement of "recovers", not a departure from it, and `test_health_hysteresis.py` holds
+it.
+
+**One consequence sharpened by building it.** This ADR argues the platform gets simpler,
+and it did — but not uniformly. Removing the human made the *sweeper* load-bearing in a
+way a queue with an owner never was: nothing else notices a suspended run. The properties
+that matter are therefore the ones nobody would see fail — a run absent from the index is
+invisible forever, and a stale index row resumes a finished run. Both are held by making
+the checkpoint authoritative and the index a candidate list re-read before every resume.
+The simplicity is real; it moved the difficulty rather than removing it.
 
 ## Notes
 

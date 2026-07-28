@@ -20,18 +20,22 @@ operator concludes the request was refused when it was in fact granted.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.audit.schema import AuditEventType
+from core.audit.sink import AuditSink
 from core.authority.changes import (
+    AuthorityChangeEvent,
     BlockedPendingApprovalError,
     ChangeDisposition,
     observe_change,
 )
 from core.identity.claims import ClaimMapping
+from core.identity.types import AuthenticatedSubject
 from surfaces.api.authority_submit import AuthorityChangeRefused, AuthoritySubmitUnavailable
 from surfaces.api.dependencies import AuditDep, AuthoritySubmitterDep, SubjectDep
 
@@ -55,6 +59,50 @@ class ClaimMappingChangeResponse(BaseModel):
     controlled_path: str = CONTROLLED_PATH
 
 
+def submit_mapping_change(
+    *,
+    submitter: Any,
+    audit: AuditSink,
+    subject: AuthenticatedSubject,
+    mapping: ClaimMapping,
+    reason: str,
+) -> AuthorityChangeEvent:
+    """Submit the change and record what the trust fabric decided.
+
+    Transport-independent, so MCP reaches this rather than reimplementing it — the same
+    reason the evidence read was extracted. Raises `AuthoritySubmitUnavailable` when the
+    fabric is unreachable, which each transport turns into its own shape of 503: failing
+    closed on the CHANGE, and only on the change. Runs already holding authority are
+    untouched, because failing closed on the wrong thing here would halt the platform
+    during a Vault blip.
+    """
+    correlation_id = f"authority-change:{subject.tenant_id}"
+    accessor: str | None = None
+    try:
+        disposition = submitter.submit(requester=subject.subject_user_id, mapping=mapping)
+    except BlockedPendingApprovalError as pending:
+        disposition = ChangeDisposition.REQUESTED
+        accessor = pending.accessor
+    except AuthorityChangeRefused:
+        disposition = ChangeDisposition.DENIED
+
+    event = observe_change(
+        correlation_id=correlation_id,
+        controlled_path=CONTROLLED_PATH,
+        disposition=disposition,
+        identities=[subject.subject_user_id],
+        occurred_at=datetime.now(UTC),
+        accessor=accessor,
+    )
+    audit.append_event(
+        correlation_id=correlation_id,
+        tenant_id=subject.tenant_id,
+        event_type=AuditEventType.AUTHORITY_CHANGE_OBSERVED,
+        payload=event.public_dict() | {"reason": reason},
+    )
+    return event
+
+
 def build_router() -> APIRouter:
     router = APIRouter(tags=["authority"])
 
@@ -75,39 +123,19 @@ def build_router() -> APIRouter:
         design, and holding an HTTP connection open for it would fail on every proxy in
         the path even if it were otherwise acceptable — which FR-015 says it is not.
         """
-        correlation_id = f"authority-change:{subject.tenant_id}"
-        accessor: str | None = None
         try:
-            disposition = submitter.submit(requester=subject.subject_user_id, mapping=body.mapping)
-        except BlockedPendingApprovalError as pending:
-            disposition = ChangeDisposition.REQUESTED
-            accessor = pending.accessor
-        except AuthorityChangeRefused:
-            disposition = ChangeDisposition.DENIED
+            event = submit_mapping_change(
+                submitter=submitter,
+                audit=audit,
+                subject=subject,
+                mapping=body.mapping,
+                reason=body.reason,
+            )
         except AuthoritySubmitUnavailable as exc:
-            # Fail closed on the CHANGE, and only on the change. Runs already holding
-            # authority are untouched — failing closed on the wrong thing here would halt
-            # the platform during a Vault blip.
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 "the trust fabric is unreachable; the change was not submitted",
             ) from exc
-
-        event = observe_change(
-            correlation_id=correlation_id,
-            controlled_path=CONTROLLED_PATH,
-            disposition=disposition,
-            identities=[subject.subject_user_id],
-            occurred_at=datetime.now(UTC),
-            accessor=accessor,
-        )
-
-        audit.append_event(
-            correlation_id=correlation_id,
-            tenant_id=subject.tenant_id,
-            event_type=AuditEventType.AUTHORITY_CHANGE_OBSERVED,
-            payload=event.public_dict() | {"reason": body.reason},
-        )
 
         # 202 for requested AND approved; 403 only for an outright denial. A pending
         # change must never read as a refusal — a client that sees 403 stops asking, so a

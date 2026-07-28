@@ -43,6 +43,8 @@ class InProcessDispatcher:
         tenant_id: str,
         agent_definition_id: str,
         requested_tools: frozenset[str],
+        run_id: str | None = None,
+        step_index: int | None = None,
     ) -> RunHandle:
         run = start_governed_run(
             correlation_id=correlation_id,
@@ -55,7 +57,7 @@ class InProcessDispatcher:
             audit_sink=self._audit,
         )
         handle = RunHandle(
-            run_id=run.run_id or run.correlation_id,
+            run_id=run_id or run.run_id or run.correlation_id,
             correlation_id=run.correlation_id,
             state=run.state,
         )

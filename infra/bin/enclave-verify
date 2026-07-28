@@ -105,6 +105,14 @@ else
   bad "no evidence credential could be minted — the SELECT-only role is missing"
 fi
 
+# 5b2 — the persistent service
+if curl -sf "http://127.0.0.1:4646/v1/job/mcp" 2>/dev/null \
+   | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("Type")=="service" else 1)' 2>/dev/null; then
+  ok "mcp registered as a service"
+else
+  bad "mcp is missing or not a service — nothing sweeps suspended runs or checks dependency health"
+fi
+
 # 5c — the job a dispatched run becomes
 if curl -sf "http://127.0.0.1:4646/v1/job/agent-run" 2>/dev/null \
    | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ParameterizedJob") else 1)' 2>/dev/null; then

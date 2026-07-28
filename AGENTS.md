@@ -133,14 +133,23 @@ have not verified.
 
 ### You are the conformance gate
 
-**CI does not run the durability rows, nor the enclave half of the API rows.** The fast
-lane is fork-safe and cannot hold a Vault Enterprise licence, so it runs
-`make conformance-hermetic`, which excludes them — durability by path, and the
-enclave-marked API rows by marker, since `tests/conformance/api/` holds both kinds. No
-required check covers either set. Nothing in GitHub will stop a merge that breaks them.
+**CI now runs the durability rows, the enclave half of the API rows, and the MCP rows — but
+only on same-repo pull requests.** 009 added `.github/workflows/enclave.yml`, which holds
+the Vault Enterprise licence as a repository secret and runs `make conformance` against a
+real enclave.
 
-So before merging anything that touches durability, sealed core, an adapter, a provider,
-`src/surfaces/`, `src/core/audit/`, or `infra/`:
+**A fork pull request cannot read that secret**, so the lane does not run there. That is
+GitHub's design and the correct one — but it means the gate is not universal, and where it
+does not reach, you are still it:
+
+| Situation | Who runs the enclave rows |
+| --- | --- |
+| Same-repo branch or pull request | The enclave lane. Trust its result; do not duplicate it |
+| **Fork pull request** | **You.** No required check covers these rows |
+| **Anything the lane cannot cover** — a change to the lane itself, or an enclave that fails to come up in CI for an environmental reason | **You.** A lane that did not run is not a lane that passed |
+
+So before merging in either of the latter two cases, for anything touching durability,
+sealed core, an adapter, a provider, `src/surfaces/`, `src/core/audit/`, or `infra/`:
 
 1. `make dev-up` — the enclave must be **running**, not assumed
 2. `make conformance` — all rows. Most execute under an attested workload identity inside
@@ -150,8 +159,13 @@ So before merging anything that touches durability, sealed core, an adapter, a p
    merge** — report the gap rather than merging past it
 
 This is not ceremony. ADR-0047 says a gate row is blocking from the moment its feature
-exists, and for these rows the only thing standing between a regression and `main` is
-this step. A conformance suite nobody runs is a conformance suite that does not exist.
+exists, and where the lane does not reach, the only thing standing between a regression and
+`main` is this step. A conformance suite nobody runs is a conformance suite that does not
+exist.
+
+**Do not read the lane's existence as coverage.** Check that it ran, on this pull request,
+and passed. A skipped job and a passing job are both green in the checks list, and the
+skipped one means nothing was tested.
 
 The one property you get for free: the durability lane **fails loudly when the enclave is
 absent** rather than skipping. You cannot obtain a false green by running it in the wrong

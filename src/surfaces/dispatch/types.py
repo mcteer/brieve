@@ -45,8 +45,19 @@ class RunDispatcher(Protocol):
         tenant_id: str,
         agent_definition_id: str,
         requested_tools: frozenset[str],
+        run_id: str | None = None,
+        step_index: int | None = None,
     ) -> RunHandle:
-        """Start a run and return immediately with a handle."""
+        """Start a run and return immediately with a handle.
+
+        ``run_id`` and ``step_index`` are **resume state, and optional**. A resumed run
+        keeps its identity and picks up where it stopped; a fresh one supplies neither.
+
+        Optional is not a style choice. 008's ``POST /runs`` calls this with exactly five
+        keyword arguments, so required parameters would stop the API route compiling —
+        which is the rule this feature adopted after finding the same shape three times:
+        **optional-by-default wherever a prior caller exists.**
+        """
         ...
 
     def state_of(self, run_id: str) -> RunHandle | None:
