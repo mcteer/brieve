@@ -19,6 +19,13 @@ Nomad places an allocation, and that allocation obtains its own credentials by p
 its own attested identity.** Nothing is handed to it — the metadata says who the run is
 for and what it may touch, and the authority comes from the attestation or not at all.
 That is the part 008 owed. What a run then *does* waits on a real identity fabric.
+
+**010 update — this module moves to `src/surfaces/dispatch/entrypoint.py` at T038a, and
+not before.** The production fabric it will construct does not exist until the ceiling,
+user-scope, and policy resolutions all land, because `manufacture_authority` resolves all
+three from one object. Moving it earlier would force a module under `src/` to import the
+fake — FR-015's violation, committed by the task meant to satisfy FR-015. The reason this
+file sits here expires at integration and not at the first opportunity.
 """
 
 from __future__ import annotations

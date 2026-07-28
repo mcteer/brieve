@@ -22,6 +22,7 @@ from adapters.pydantic_ai.tools import GovernedToolError
 from core.approvals import ApprovalHook, DenyAllApprovalHook
 from core.audit.sink import AuditSink
 from core.authority.clock import Clock
+from core.authority.entitlements import BrokeredMaterialSource
 from core.authority.fabric import IdentityFabric
 from core.authority.types import AuthorityScope
 from core.durability import DurabilityProvider, InMemoryDurabilityProvider
@@ -41,6 +42,7 @@ def start_adapter_run(
     audit_sink: AuditSink | None = None,
     approval_hook: ApprovalHook | None = None,
     durability: DurabilityProvider | None = None,
+    brokered_material_source: BrokeredMaterialSource | None = None,
 ) -> AdapterRunContext:
     """Start a governed run and return the deps object bound to it.
 
@@ -56,6 +58,7 @@ def start_adapter_run(
         registry=registry,
         clock=clock,
         audit_sink=audit_sink,
+        brokered_material_source=brokered_material_source,
     )
     return AdapterRunContext(
         governed_run=run,

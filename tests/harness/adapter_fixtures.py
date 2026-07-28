@@ -30,6 +30,7 @@ from core.registry.memory import ToolRegistry
 from tests.harness.capture_audit import capture_audit
 from tests.harness.fake_identity_fabric import (
     DEFAULT_AGENT_DEFINITION_ID,
+    FakeBrokeredMaterialSource,
     FakeIdentityFabric,
     fake_identity_fabric,
 )
@@ -144,6 +145,10 @@ def governed_agent_fixture(
         audit_sink=audit,
         approval_hook=approval_hook,
         durability=durability,
+        # Brokering is unimplemented (ADR-0044); rows whose subject is the check in FRONT
+        # of it need something here, or they refuse `broker_not_implemented` and stop
+        # testing what they were written to test.
+        brokered_material_source=FakeBrokeredMaterialSource(),
     )
 
     exposed = list(framework_tools) if framework_tools is not None else list(handlers)
