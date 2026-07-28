@@ -108,10 +108,16 @@ resource "vault_database_secret_backend_role" "evidence" {
     "GRANT CONNECT ON DATABASE \"${var.database_name}\" TO \"{{name}}\";",
     "GRANT USAGE ON SCHEMA public TO \"{{name}}\";",
     "GRANT SELECT ON audit_entries TO \"{{name}}\";",
+    # Not dependency_health, and not suspended_runs. Neither is evidence — both are
+    # operational state that happens to share a database — and widening a SELECT-only
+    # credential to cover "things in the same database" is exactly how it stops being a
+    # narrow credential and becomes a general reader.
     # Belt and braces. The role was never granted this and inherits nothing, but the
     # table is the one thing whose exposure would defeat truncation detection, so the
     # withholding is stated rather than left implied.
     "REVOKE ALL PRIVILEGES ON audit_stream_heads FROM \"{{name}}\";",
+    "REVOKE ALL PRIVILEGES ON dependency_health FROM \"{{name}}\";",
+    "REVOKE ALL PRIVILEGES ON suspended_runs FROM \"{{name}}\";",
   ]
 
   revocation_statements = [
