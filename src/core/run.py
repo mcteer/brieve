@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     # Type-only: importing the durability package at runtime would cycle back here
     # through resume.py, which needs RunState.
     from core.bounds import BoundsTracker
+    from core.dependencies.types import DependencyHealthReader
     from core.durability.lease import RunLease
     from core.durability.types import DurabilityProvider
 
@@ -101,6 +102,18 @@ class GovernedRun:
     probe_log: list[str] = field(default_factory=list)
     # Recomputed by the authority hook on every invoke; issue-time authority never widens it.
     live_effective: AuthorityScope | None = None
+    #: What the platform believes about the products this run's tools reach (009).
+    #:
+    #: On the run rather than closed over by the hook, because `builtin_governance_hooks()`
+    #: takes no arguments and a handler receives only a `HookContext` — so without a field
+    #: here there is no path from the dependency gate to the health it must consult.
+    #:
+    #: Optional and defaulting to None so every 002-era caller keeps working. **None means
+    #: the gate is inert, not that everything is unhealthy**: "unknown health for a
+    #: monitored product is unhealthy" and "a run with no dependency mechanism denies
+    #: everything" are different claims, and collapsing them would make every existing run
+    #: refuse every tool call while looking like the gate working.
+    dependency_health: DependencyHealthReader | None = None
 
 
 def start_governed_run(
@@ -116,6 +129,7 @@ def start_governed_run(
     audit_sink: AuditSink | None = None,
     hooks: list[HookRegistration] | None = None,
     include_governance: bool = True,
+    dependency_health: DependencyHealthReader | None = None,
 ) -> GovernedRun:
     """Start an active governed run with bound task authority, or refuse.
 
@@ -167,6 +181,7 @@ def start_governed_run(
         clock=clk,
         hooks=registered,
         state=RunState.ACTIVE,
+        dependency_health=dependency_health,
     )
 
     issued_payload = {

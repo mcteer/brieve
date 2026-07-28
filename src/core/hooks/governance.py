@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from core.dependencies.gate import DEPENDENCY_HOOK_NAME, dependency_pre_hook
 from core.hooks.authority import AUTHORITY_HOOK_NAME, authority_pre_hook
 from core.hooks.mirroring import MIRRORING_HOOK_NAME, mirroring_pre_hook
 from core.hooks.types import (
@@ -25,8 +26,27 @@ def _allow(_ctx: HookContext) -> HookDecision:
 
 
 def builtin_governance_hooks() -> list[HookRegistration]:
-    """Return required governance hooks: authority → mirroring → governance shell."""
+    """Return required governance hooks: dependency → authority → mirroring → shell.
+
+    The dependency gate runs FIRST among these, and the order is a decision rather than an
+    accident. A call against an unreachable product cannot succeed whatever its authority
+    says, so refusing it before manufacturing and checking authority avoids doing work
+    that is certain to be wasted — and, more importantly, keeps the *reason* the caller
+    sees accurate. Checking authority first would refuse a perfectly authorized call with
+    a scope error when the actual problem is that a product is down, which sends whoever
+    is debugging it to the wrong place entirely.
+
+    It is inside this list rather than before the pipeline because a check placed before
+    the pipeline is a second refusal path (Principle II), and gets none of the ordering or
+    audit guarantees the pipeline provides.
+    """
     return [
+        HookRegistration(
+            name=DEPENDENCY_HOOK_NAME,
+            phase=HookPhase.PRE,
+            capability_kind=CapabilityKind.GOVERNANCE,
+            handler=dependency_pre_hook,
+        ),
         HookRegistration(
             name=AUTHORITY_HOOK_NAME,
             phase=HookPhase.PRE,
