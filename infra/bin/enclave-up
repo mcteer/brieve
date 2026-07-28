@@ -328,10 +328,17 @@ EV_PASS="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.loa
 # next credential then fails DDL with "must be owner of table", including on
 # `CREATE INDEX IF NOT EXISTS`, which checks ownership before existence. 005 paid for this
 # once already in the durability schema; the same trap is reachable from every new store.
-if { echo "SET ROLE brieve;"; cat "$REPO/src/core/audit/evidence_schema.sql"; } \
+# Both schemas, in one pass. The dependency tables are here for the same reason the
+# evidence ones are: the evidence role's statements NAME them, and a statement naming a
+# table that does not exist fails outright rather than degrading. That has now bitten
+# three times — 008's audit_entries, and both dependency tables here — so schemas that any
+# role statement references get applied at bring-up, not on first use by whatever happens
+# to start first.
+if { echo "SET ROLE brieve;"; cat "$REPO/src/core/audit/evidence_schema.sql"; \
+     cat "$REPO/src/core/dependencies/schema.sql"; } \
    | docker run --rm -i -e PGPASSWORD="$EV_PASS" --network host postgres:17-alpine \
      psql -h 127.0.0.1 -p 5432 -U "$EV_USER" -d brieve -v ON_ERROR_STOP=1 -q >/dev/null 2>&1; then
-  ok "audit_entries and audit_stream_heads applied"
+  ok "audit_entries, audit_stream_heads, dependency_health, suspended_runs applied"
 else
   die "evidence schema failed to apply — the evidence role cannot issue credentials without it"
 fi
@@ -351,6 +358,14 @@ ok "HARNESS_DEFAULT_TENANT=$(env_val HARNESS_DEFAULT_TENANT)"
 # whoever runs the tests, because `NomadDispatcher` submitting to a job that does not
 # exist fails at the moment a customer starts their first run — not at bring-up, where it
 # would be noticed.
+say "MCP service"
+# The persistent component. Registered at bring-up rather than left to whoever remembers,
+# because a missing MCP service is invisible until suspended runs stop resuming — which
+# looks like a hang and is not one.
+nomad job run -var="repo=$REPO" "$REPO/infra/jobs/mcp.nomad.hcl" >/dev/null 2>&1 \
+  && ok "mcp registered (persistent; hosts the health checker and the sweeper)" \
+  || die "could not register the mcp service — health checks and the sweeper would not run"
+
 say "Run job"
 nomad job run -var="repo=$REPO" "$REPO/infra/jobs/agent-run.nomad.hcl" >/dev/null 2>&1 \
   && ok "agent-run registered (parameterized; one allocation and one identity per run)" \

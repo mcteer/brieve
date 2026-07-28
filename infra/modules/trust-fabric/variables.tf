@@ -85,6 +85,17 @@ variable "conformance_job_id" {
   default     = "conformance"
 }
 
+variable "mcp_job_id" {
+  description = <<-DESC
+    Scheduler job id of the persistent MCP service.
+
+    A plain id rather than a glob: the service is a `service` job with one name, unlike
+    dispatched runs whose ids derive from a parameterized parent.
+  DESC
+  type        = string
+  default     = "mcp"
+}
+
 variable "agent_run_job_id_patterns" {
   description = <<-DESC
     Scheduler job ids a dispatched agent run may present.

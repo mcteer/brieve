@@ -65,6 +65,25 @@ class ToolRegistry:
         """Observers by tool name, for resolving open intents on resume."""
         return {name: reg.observer for name, reg in self._tools.items() if reg.observer is not None}
 
+    def tool_names(self) -> list[str]:
+        """Every registered tool name.
+
+        Read-only, and added by 009 because the health checker needs to know which
+        products the estate's tools reach. The registry could resolve a name and could not
+        be enumerated — built for one caller that always knew what it was asking for,
+        which is the shape of most of this feature's findings.
+        """
+        return sorted(self._tools)
+
+    def products(self) -> list[str]:
+        """Distinct products the registered tools reach.
+
+        Here rather than in the checker so there is one answer to "what does this estate
+        touch". A second implementation would drift, and the drift would show up as a
+        product nobody was monitoring.
+        """
+        return sorted({reg.product for reg in self._tools.values() if reg.product})
+
     def resolve(self, name: str) -> ToolRegistration:
         """Resolve a tool by name.
 

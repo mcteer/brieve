@@ -110,3 +110,35 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
   token_ttl      = 3600
   token_type     = "service"
 }
+
+# The persistent MCP service.
+#
+# Separate from `harness` and `agent-run` because it is a separate thing that happens to
+# want the same database access: it reads dependency health, writes what its checker
+# observed, and verifies evidence-stream integrity. Merging the roles would mean widening
+# one workload's authority to widen another's, which is the coupling per-task authority
+# exists to avoid.
+#
+# It carries `harness_database` and NOT `evidence_database`: integrity verification runs
+# under the run role, because `audit_stream_heads` deliberately carries no grant for the
+# evidence role — a read path able to see the heads could learn what it would need to
+# forge.
+resource "vault_jwt_auth_backend_role" "mcp" {
+  backend                 = vault_jwt_auth_backend.workload.path
+  role_name               = "mcp"
+  role_type               = "jwt"
+  bound_audiences         = ["vault.io"]
+  user_claim              = "/nomad_job_id"
+  user_claim_json_pointer = true
+
+  bound_claims = {
+    nomad_job_id = var.mcp_job_id
+  }
+
+  token_policies = [vault_policy.harness_database.name]
+  # Longer than a batch job's, because this one is long-lived by design — and still a TTL
+  # rather than none, which is the difference between a re-issued identity and a standing
+  # credential.
+  token_ttl  = 3600
+  token_type = "service"
+}
