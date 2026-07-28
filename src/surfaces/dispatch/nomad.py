@@ -94,6 +94,7 @@ class NomadDispatcher:
         requested_tools: frozenset[str],
         run_id: str | None = None,
         step_index: int | None = None,
+        subject_roles: frozenset[str] = frozenset(),
     ) -> RunHandle:
         """Schedule the run and return immediately.
 
@@ -113,6 +114,10 @@ class NomadDispatcher:
                 "tenant_id": tenant_id,
                 "agent_definition_id": agent_definition_id,
                 "requested_tools": ",".join(sorted(requested_tools)),
+                # What the surface established about who is asking. Still metadata: the
+                # run resolves what these roles MEAN from the trust fabric, so a
+                # dispatcher cannot grant authority by writing a scope into a jobspec.
+                "subject_roles": ",".join(sorted(subject_roles)),
                 "run_id": run_id or correlation_id,
                 "step_index": str(step_index if step_index is not None else 0),
             },

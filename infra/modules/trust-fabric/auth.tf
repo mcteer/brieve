@@ -114,9 +114,16 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
     nomad_job_id = join(",", var.agent_run_job_id_patterns)
   }
 
-  token_policies = [vault_policy.harness_database.name]
-  token_ttl      = 3600
-  token_type     = "service"
+  # The harness-domain jurisdiction too, as of 010: a dispatched run resolves its own
+  # ceiling, user scope, and policy from the trust fabric. Read-only — a run that could
+  # write its own ceiling would be the escalation Principle IV makes structurally
+  # unavailable, and it would be one line away.
+  token_policies = [
+    vault_policy.harness_database.name,
+    vault_policy.harness_authority_read.name,
+  ]
+  token_ttl  = 3600
+  token_type = "service"
 }
 
 # The persistent MCP service.

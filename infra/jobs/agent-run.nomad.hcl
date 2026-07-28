@@ -17,7 +17,8 @@
 # The allocation presents its identity to Vault and receives a ceiling-scoped token, or it
 # does nothing at all.
 #
-# The task body is `tests/harness/dispatched_run.py`, and that is deliberate rather than
+# The task body is `src/surfaces/dispatch/entrypoint.py`. It lived under `tests/harness/`
+# until 010 built an identity fabric for it to resolve through — deliberate rather than
 # provisional sloppiness: a production entrypoint needs a real IdentityFabric, and no
 # implementation of that protocol exists in this repository yet. What this job proves is
 # the dispatch and attestation path, which is what 008 owed.
@@ -57,7 +58,18 @@ job "agent-run" {
       "run_id",
       "step_index",
     ]
-    meta_optional = ["requested_tools"]
+
+    # OPTIONAL rather than required, and the distinction is the same one that made the
+    # resume fields required. Omitting `run_id` silently starts a fresh run under a
+    # resumed correlation id — wrong, plausible, and invisible. Omitting the roles
+    # produces a run that refuses `no_role_for_subject` before doing anything, which is
+    # loud and traceable. Nomad rejects any metadata key declared in neither list, so a
+    # key added to the dispatcher and not here fails the dispatch with
+    # "unpermitted metadata keys" rather than being silently dropped.
+    meta_optional = [
+      "requested_tools",
+      "subject_roles",
+    ]
   }
 
   group "run" {
@@ -104,7 +116,7 @@ job "agent-run" {
         # it, so a default like ${VAR:-x} fails to parse with an error about
         # interpolation rather than about the script.
         args = [
-          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra adapters --extra surfaces python -m tests.harness.dispatched_run"
+          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra adapters --extra surfaces python -m surfaces.dispatch.entrypoint"
         ]
       }
 
@@ -132,6 +144,13 @@ job "agent-run" {
         RUN_TENANT_ID       = "${NOMAD_META_tenant_id}"
         RUN_DEFINITION_ID   = "${NOMAD_META_agent_definition_id}"
         RUN_REQUESTED_TOOLS = "${NOMAD_META_requested_tools}"
+
+        # The roles the dispatching surface resolved from this subject's verified claims.
+        # Metadata, like everything above it — it says what the surface established, and
+        # the run still resolves what those roles MEAN from the trust fabric. Carrying the
+        # resolved scope here instead would let a dispatcher grant authority by writing it
+        # into a jobspec, which is the shape ADR-0048 exists to close.
+        RUN_SUBJECT_ROLES = "${NOMAD_META_subject_roles}"
         RUN_ID              = "${NOMAD_META_run_id}"
         RUN_STEP_INDEX      = "${NOMAD_META_step_index}"
       }

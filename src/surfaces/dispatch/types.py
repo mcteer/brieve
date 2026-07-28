@@ -47,6 +47,7 @@ class RunDispatcher(Protocol):
         requested_tools: frozenset[str],
         run_id: str | None = None,
         step_index: int | None = None,
+        subject_roles: frozenset[str] = frozenset(),
     ) -> RunHandle:
         """Start a run and return immediately with a handle.
 
