@@ -230,6 +230,7 @@ without operator action.
 - [X] T061 [P] Update `ROADMAP.md`: 009 shipped; the **four-transport parity row moves from Deferred to In force**
 - [X] T062 [P] Record the fifteen rows in `contracts/conformance-mcp.md` as **In force**
 - [X] T063 [GATE:conformance] Run `make check` and `make conformance` against a live enclave, and confirm every break fixture passes on a clean tree. A row whose failure nobody has observed is a row nobody knows works
+- [X] T064 [GATE:conformance] Run the health checker and the sweeper **from the service loop** in `src/surfaces/mcp/server.py`, with `tests/unit/test_service_loop_runs_every_pass.py` asserting it. **Found by T063**, not by a row: the service constructed both and called neither, and every conformance row still passed because each exercises its component directly with fakes — so nothing could see whether anything calls them at all, and the hosting claim rested on the jobspec existing. **Health before sweep**, since the sweeper acts on what the health pass just recorded; the reverse order decides on the previous pass's health and resumes runs into an outage this pass already knows about
 
 ---
 
