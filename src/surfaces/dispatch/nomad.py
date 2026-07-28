@@ -101,6 +101,7 @@ class NomadDispatcher:
         run_id: str | None = None,
         step_index: int | None = None,
         subject_roles: frozenset[str] = frozenset(),
+        steps: int | None = None,
     ) -> RunHandle:
         """Schedule the run and return immediately.
 
@@ -124,6 +125,8 @@ class NomadDispatcher:
                 # run resolves what these roles MEAN from the trust fabric, so a
                 # dispatcher cannot grant authority by writing a scope into a jobspec.
                 "subject_roles": ",".join(sorted(subject_roles)),
+                # Absent unless asked for. A run given neither behaves exactly as before.
+                "steps": str(steps) if steps is not None else "",
                 "run_id": run_id or correlation_id,
                 "step_index": str(step_index if step_index is not None else 0),
             },

@@ -69,6 +69,12 @@ job "agent-run" {
     meta_optional = [
       "requested_tools",
       "subject_roles",
+      # Multi-step mode, for rows that need a run still running when something happens to
+      # it. Optional because a run that ignores them behaves exactly as before — and Nomad
+      # rejects any metadata key declared in neither list, so a key added to the dispatcher
+      # and not here fails the dispatch with "unpermitted metadata keys" rather than being
+      # silently dropped. Found the hard way in 010.
+      "steps",
     ]
   }
 
@@ -151,6 +157,9 @@ job "agent-run" {
         # resolved scope here instead would let a dispatcher grant authority by writing it
         # into a jobspec, which is the shape ADR-0048 exists to close.
         RUN_SUBJECT_ROLES = "${NOMAD_META_subject_roles}"
+
+        # Empty unless a row asks for them, in which case the run brackets that many steps.
+        RUN_STEPS = "${NOMAD_META_steps}"
         RUN_ID              = "${NOMAD_META_run_id}"
         RUN_STEP_INDEX      = "${NOMAD_META_step_index}"
       }
