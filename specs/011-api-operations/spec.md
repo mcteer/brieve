@@ -18,6 +18,18 @@
 | **ADRs touched** | **ADR-0033** (the parity row grows with the catalogue rather than being satisfied by a smaller comparison), **ADR-0034** (the portal is the consumer these operations exist for; threads are its state), ADR-0035 (evidence stays a read path that cannot mutate or mask), ADR-0016 (collecting an authority decision is a read and must not become a way to make one), ADR-0049 (stopping a run must not reintroduce the human-in-the-loop pause it removed), ADR-0050 (agent definitions are real records now, which is what makes enumerating them meaningful). |
 | **Evidence class** | **Audit-critical, and newly so in one direction.** Most of this feature adds *reads*, and 008 established that reading evidence is itself audited. Listing runs and enumerating definitions are new read classes over data that has never been enumerable — a tenant boundary that held for a single-record lookup has to hold for a list, which is a different question. |
 
+## Clarifications
+
+### Session 2026-07-28
+
+- Q: Does the thread model belong in this feature? → A: **No — it goes with the portal.** 011 ships five operation classes; threads ship with the thing that uses them.
+  *(ADR-0034's "threads are tenant-scoped run state" is a claim nobody has tested against a real conversation, and a persistence model built without a consumer is a shape guessed rather than derived. The cost is real and worth naming: the portal feature now carries both its own surface and a new operation class, and the parity row grows twice instead of once. It binds both times, which is what makes paying that cost safe.)*
+- Q: When a subject enumerates definitions, what happens to one they cannot start? → A: **Show it, flagged as unavailable.** They see what exists and that they may not use it.
+  *(Omitting it presents a world in which the agent does not exist, so nobody thinks to ask for access — and "request access to the thing you cannot see" is not a workflow. The cost is real and is deliberately accepted: the definition's name and description are disclosed to someone with no authority over it, which is a wider disclosure than this platform makes anywhere else. It is bounded by FR-014 — no credential-issuance detail, ever — and by the tenant boundary, which still hides other tenants entirely. **Within a tenant, existence is discoverable; across tenants it is not.**)*
+- Q: Does stopping cancel in-flight work, or only prevent further steps? → A: **The current step finishes; no further step begins.**
+  *(Killing the allocation is faster and manufactures precisely the open intent 005's re-observation exists to resolve — a tool call whose outcome nobody knows — on a run that is now terminal and will therefore never resume to re-observe it. The open intent would be permanent. Letting the step complete reuses the bracketing that already exists rather than adding a second way for a step to end, and leaves nothing unresolved. The cost is that a stop is not instant: a long apply runs to completion, and a person who stops a run may wait. That is the right trade — the alternative buys promptness with a permanently unresolvable record.)*
+
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — A requester learns what happened to their authority change (Priority: P1)
@@ -118,8 +130,9 @@ The distinction that resolves it: ADR-0049 forbids a run *waiting* on a human. I
 forbid a human **withdrawing** their own request. Stopping is terminal and unilateral; it
 is not a hold, it does not await anything, and nothing resumes afterwards.
 
-**Independent Test**: Start a long run, stop it, and assert it reaches a terminal state with
-the reason recorded and nothing waiting on anyone.
+**Independent Test**: Start a long run, stop it mid-step, and assert the in-flight step
+completes and is bracketed, no further step begins, and the run is terminal with the reason
+recorded and nothing waiting on anyone.
 
 **Acceptance Scenarios**:
 
@@ -134,6 +147,10 @@ the reason recorded and nothing waiting on anyone.
    reports the existing state rather than failing — asking twice is not an error.
 5. **Given** a stop, **When** the audit trail is read, **Then** the stop is attributable to
    the person who requested it and distinguishable from a stop caused by a bound.
+6. **Given** a stop arriving mid-step, **When** the run ends, **Then** the in-flight step
+   **completed and was bracketed normally**, and zero intents are left open. A terminal run
+   never resumes, so an intent left open by a stop could never be re-observed — it would be
+   permanent, which is the one outcome 005's bracketing exists to prevent.
 
 ---
 
@@ -157,38 +174,26 @@ the results differ according to what each may actually start.
 
 1. **Given** registered definitions, **When** a subject enumerates, **Then** they see the
    ones they could start.
-2. **Given** a definition whose ceiling excludes everything this subject's scope permits,
-   **When** they enumerate, **Then** the platform is clear about whether they may start it —
-   an entry a person cannot use, presented without qualification, is worse than its absence.
+2. **Given** a definition this subject cannot start, **When** they enumerate, **Then** it
+   appears **flagged as unavailable to them** rather than omitted. A person who cannot see
+   that something exists cannot ask for it, and "request access to the thing you cannot
+   see" is not a workflow.
 3. **Given** enumeration, **When** the response is examined, **Then** it exposes **no
    credential-issuance detail** — no policy names, no secret paths. Those are the other
    jurisdiction (ADR-0044/ADR-0050) and are nobody's business on this surface.
 
 ---
 
-### User Story 6 — A conversation survives (Priority: P6)
+### Threads: deferred to the portal (was User Story 6)
 
-Someone has a conversation with the platform, closes the tab, comes back, and the
-conversation is still there.
+Kept as a heading rather than deleted, because a story that vanishes between drafts looks
+like it was never considered. ADR-0034 makes threads tenant-scoped run state, auditable by
+correlation ID — and the portal is the only thing that will ever create one. Building the
+model first means guessing its shape; the portal feature carries it.
 
-**Why this priority**: ADR-0034 makes threads tenant-scoped run state, persisted like any
-other run state and auditable by correlation ID. It is last because it is the only story
-whose consumer does not exist yet — the portal is its own feature — and building a thread
-model before the thing that uses it is how a shape gets guessed wrong.
-
-**It may belong in the portal's feature rather than here**, and that is a live question this
-spec does not settle on its own; see the clarification below.
-
-**Independent Test**: Create a thread, add to it, retrieve it in a separate session, and
-assert its correlation ID ties it to the audit trail.
-
-**Acceptance Scenarios**:
-
-1. **Given** a thread, **When** it is retrieved later, **Then** its contents are intact.
-2. **Given** a thread, **When** the audit trail is read by its correlation ID, **Then** the
-   thread's activity is there — it is run state, not a separate log.
-3. **Given** a thread in another tenant, **When** someone retrieves it, **Then** the platform
-   answers as it would for one that does not exist.
+**What that costs**: the portal feature is now larger than "a client of the API", and the
+operations snapshot grows in two features rather than one. The parity row binds on both
+occasions, which is what makes the split safe rather than merely tidy.
 
 ---
 
@@ -229,6 +234,9 @@ assert its correlation ID ties it to the audit trail.
   *ended without one* — three states that a single empty response would conflate.
 - **FR-008**: A subject MUST be able to stop a run they started, and the run MUST reach a
   **terminal** state.
+- **FR-008a**: A stop MUST allow the in-flight step to complete and be bracketed, and MUST
+  prevent any subsequent step. It MUST NOT leave an open intent: a terminal run never
+  resumes, so an intent open at stop time could never be re-observed and would be permanent.
 - **FR-009**: A stopped run MUST NOT be resumable, and MUST NOT be resumed by the dependency
   sweeper. A stop that a recovering dependency could undo is a pause, which ADR-0049 removed.
 - **FR-010**: Only the subject who started a run may stop it. Withdrawing consent is
@@ -237,8 +245,12 @@ assert its correlation ID ties it to the audit trail.
   failing. Asking twice is not an error.
 - **FR-012**: A stop MUST be attributable in the audit trail to the person who requested it,
   and distinguishable from a stop caused by an execution bound.
-- **FR-013**: A subject MUST be able to enumerate agent definitions, with the result shaped
-  by what that subject may actually start.
+- **FR-013**: A subject MUST be able to enumerate agent definitions within their tenant.
+  Definitions they cannot start MUST appear, **marked unavailable to them**, rather than
+  being omitted — so a person can discover what to request access to.
+- **FR-013a**: The tenant boundary is **not** softened by FR-013. Definitions in another
+  tenant remain absent and undisclosed. Within a tenant existence is discoverable; across
+  tenants it is not, and that asymmetry is the decision rather than an inconsistency.
 - **FR-014**: Enumeration MUST NOT expose credential-issuance detail — policy names, secret
   paths, or anything from the other jurisdiction (ADR-0050).
 - **FR-015**: **Every operation added by this feature MUST exist on both implemented
@@ -266,8 +278,8 @@ assert its correlation ID ties it to the audit trail.
 - **Run result**: What a run produced, with its disposition. New; today only reconstructible
   from evidence.
 - **Agent definition (public view)**: Display name, description, owner, and whether this
-  subject may start it. **Not** its ceiling policies or paths.
-- **Thread**: Tenant-scoped conversational run state, auditable by correlation ID (ADR-0034).
+  subject may start it. **Not** its ceiling policies or paths — those are the other
+  jurisdiction (ADR-0050) and are nobody's business on this surface.
 
 ## Success Criteria *(mandatory)*
 
@@ -282,11 +294,12 @@ assert its correlation ID ties it to the audit trail.
 - **SC-004**: A run's result is obtainable without the caller reading a single audit entry.
 - **SC-005**: The three completion states — unfinished, finished with a result, ended without
   one — are distinguishable in 100% of cases.
-- **SC-006**: A stopped run reaches a terminal state, and zero stopped runs are resumed by
-  the sweeper.
+- **SC-006**: A stopped run reaches a terminal state, zero stopped runs are resumed by the
+  sweeper, and zero stopped runs leave an open intent behind.
 - **SC-007**: Zero runs can be stopped by a subject other than the one who started them.
-- **SC-008**: Two subjects with different authority enumerating definitions receive
-  measurably different results.
+- **SC-008**: Two subjects with different authority enumerating definitions receive results
+  that differ in their **availability marking** while containing the same definitions —
+  and zero definitions from another tenant appear for either.
 - **SC-009**: Zero enumeration responses contain credential-issuance detail.
 - **SC-010**: The operations snapshot grows by every operation this feature adds, and the
   parity row asserts over the grown set — verified by the row failing when an operation is
@@ -300,8 +313,6 @@ assert its correlation ID ties it to the audit trail.
   widens the catalogue; nothing here renders anything.
 - **The CLI is tabled** (2026-07-28), so "both transports" means API and MCP, and the parity
   row binds across that pair.
-- **Threads are run state**, per ADR-0034 — not a new persistence concept. If they need one,
-  that is a finding for the plan rather than an assumption here.
 - **Stopping is withdrawal, not pausing.** ADR-0049 forbids a run *waiting* on a human; it
   does not forbid a person ending their own request. This spec treats that as settled and
   states it plainly enough to be argued with.
@@ -310,25 +321,22 @@ assert its correlation ID ties it to the audit trail.
 - **Existing operations do not change.** Nothing here alters the four that exist; if one has
   to change, that is a sealed-core-adjacent decision the plan should surface.
 
-## Needs Clarification
+## Resolved clarifications
 
-- **C1 — Do threads belong in this feature?** [NEEDS CLARIFICATION: User Story 6 is the only
-  story whose consumer does not exist yet. Building a thread model before the portal that
-  uses it risks guessing the shape wrong; deferring it means the portal feature carries both
-  its own surface and a new operation class. Which?]
-- **C2 — What does "may start it" mean for enumeration?** [NEEDS CLARIFICATION: A definition
-  a subject cannot start could be omitted, or returned with a flag. Omitting is simpler and
-  leaks less; flagging tells a person what exists so they can request access, which is the
-  difference between a platform that helps them ask and one that pretends nothing is there.]
-- **C3 — Does stopping cancel in-flight work, or only prevent further steps?**
-  [NEEDS CLARIFICATION: ADR-0049 makes a run's container end when its work ends. A stop that only
-  prevents the *next* step is simpler and leaves the current one to finish; one that ends the
-  allocation is faster and interacts with the intent-and-result bracketing 005 built for
-  exactly this ambiguity.]
+All three forks were resolved in the session recorded above. Kept as a pointer rather than
+deleted, because a spec showing no sign of open questions reads as one where nobody looked.
+
+- **C1 — Threads.** Deferred to the portal feature, which is the only thing that will create
+  one.
+- **C2 — Enumeration.** Definitions a subject cannot start appear, marked unavailable.
+  Within a tenant existence is discoverable; across tenants it is not.
+- **C3 — Stop semantics.** The current step finishes and is bracketed; no further step
+  begins. Killing the allocation would leave a permanently unresolvable open intent.
 
 ## Out of scope
 
-- The conversational portal itself (ADR-0034 — its own feature).
+- The conversational portal itself (ADR-0034 — its own feature), **and the thread model
+  with it** (C1).
 - The CLI transport (tabled 2026-07-28).
 - Capability packs and eval gates.
 - Brokered credential translation, and RFC 8693 + RAR authority manufacture — both recorded

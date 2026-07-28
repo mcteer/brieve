@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,23 +31,25 @@
 
 ## Notes
 
-**Three clarification markers, and each is a fork where the readings produce different
-features:**
+**All 16 items pass.** The three forks were resolved in the 2026-07-28 session:
 
-- **C1 (threads)** is a *scope* question — the highest-priority kind. User Story 6 is the
-  only story whose consumer does not exist, and building a thread model before the portal
-  risks guessing its shape.
-- **C2 (enumeration visibility)** decides whether the platform helps a person discover what
-  they cannot yet use, or presents a world without it.
-- **C3 (stop semantics)** touches 005's intent-and-result bracketing, which exists precisely
-  for the ambiguity a mid-step stop creates.
+- **C1 (threads)** → deferred to the portal, the only thing that will ever create one. The
+  cost is named rather than glossed: the portal feature grows, and the operations snapshot
+  grows in two features instead of one. The parity row binds on both occasions, which is
+  what makes the split safe rather than merely tidy.
+- **C2 (enumeration)** → show unavailable definitions, marked. This is a **wider disclosure
+  than this platform makes anywhere else**, accepted deliberately because "request access to
+  the thing you cannot see" is not a workflow. It is bounded twice: never any
+  credential-issuance detail, and never across tenants. FR-013a states that asymmetry as a
+  decision so it is not later read as an inconsistency.
+- **C3 (stop)** → the current step finishes and is bracketed. Killing the allocation would
+  manufacture the exact open intent 005's re-observation exists to resolve, on a run that is
+  terminal and will therefore never resume to resolve it. Permanent, and the one outcome
+  that bracketing exists to prevent. The cost — a stop is not instant — is stated.
 
-**One thing deliberately settled rather than asked.** Stopping looks like it conflicts with
-ADR-0049, and the spec resolves it in the assumptions rather than deferring: ADR-0049 forbids
-a run *waiting* on a human, not a person *withdrawing* their own request. That is stated
-plainly enough to be argued with, which is the point — a resolution nobody can find is not a
-resolution.
+**One thing settled in the spec rather than asked.** Stopping appears to conflict with
+ADR-0049, and the assumptions resolve it: ADR-0049 forbids a run *waiting* on a human, not a
+person *withdrawing* their own request. Stated plainly enough to be argued with, because a
+resolution nobody can find is not one.
 
-**On the shape of this feature.** Six stories is more than usual, and they are genuinely
-independent: each closes a different gap for a different consumer. The MVP is US1 alone,
-which is the only one that fixes a defect rather than filling an absence.
+**MVP is US1 alone** — the only story that fixes a defect rather than filling an absence.
