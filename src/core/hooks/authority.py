@@ -8,6 +8,7 @@ from typing import Any
 from core.audit.schema import AuditEventType
 from core.authority.errors import AuditAppendFailed
 from core.authority.intersection import live_effective
+from core.hooks.suspension import TRUST_FABRIC_DEPENDENCY, suspend_for_dependency
 from core.hooks.types import HookContext, HookDecision
 
 AUTHORITY_HOOK_NAME = "authority"
@@ -66,7 +67,24 @@ def authority_pre_hook(ctx: HookContext) -> HookDecision:
 
         try:
             policy = fabric.resolve_policy(run.agent_definition_id)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 — an unresolvable policy must never permit
+            code = getattr(exc, "reason_code", "identity_unavailable")
+            if code in {"fabric_unreachable", "fabric_timeout"}:
+                # The trust fabric is unreachable and this run already holds a grant, so
+                # there is something to come back to. **Suspend naming it** rather than
+                # denying the step (FR-008a): a denial would end the run's work on a
+                # transient outage that a product outage would have survived, and ADR-0049
+                # is explicit that a run may wait on a machine condition.
+                #
+                # The asymmetry with run START is not a special case — a run that cannot
+                # resolve identity before it begins has no grant and no checkpoint, so
+                # there is nothing to suspend. It falls out of the run existing or not.
+                suspend_for_dependency(run, awaiting=TRUST_FABRIC_DEPENDENCY)
+                return HookDecision(
+                    outcome="deny",
+                    reason_code=code,
+                    message="trust fabric unreachable; run suspended awaiting it",
+                )
             return HookDecision(
                 outcome="deny",
                 reason_code="identity_unavailable",

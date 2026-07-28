@@ -63,6 +63,10 @@ def build_router() -> APIRouter:
             tenant_id=subject.tenant_id,
             agent_definition_id=body.agent_definition_id,
             requested_tools=body.requested_tools,
+            # The roles this surface already resolved from the caller's verified claims.
+            # The run resolves what they mean; passing them saves it from deriving identity
+            # a second time, and two derivations would disagree exactly when it mattered.
+            subject_roles=frozenset(subject.roles),
         )
 
     @router.get("/runs/{run_id}", response_model=RunHandle)

@@ -45,6 +45,7 @@ class InProcessDispatcher:
         requested_tools: frozenset[str],
         run_id: str | None = None,
         step_index: int | None = None,
+        subject_roles: frozenset[str] = frozenset(),
     ) -> RunHandle:
         run = start_governed_run(
             correlation_id=correlation_id,

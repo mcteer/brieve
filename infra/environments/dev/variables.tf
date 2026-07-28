@@ -22,13 +22,45 @@ variable "agent_definitions" {
     owner          = string
     ceiling_policy = string
     allowed_paths  = list(string)
+    # The HARNESS-DOMAIN ceiling — a different jurisdiction from the two fields above
+    # (ADR-0044). Those bound which secrets a run's token may read; these bound which
+    # tools an agent may call. Neither is derivable from the other, which is why both
+    # are authored rather than one being generated from the other.
+    tool_names      = list(string)
+    product_actions = list(string)
   }))
   default = {
+    # The 006 registration proof. Its ceiling grants a path under a mount that DOES exist
+    # as of 010 — before that it named `secret/data/demo/*` with no `secret/` mounted, so
+    # every assertion against it passed whether enforcement worked or not.
     "demo-agent" = {
-      description    = "Reference registration proving the ADR-0015 registry flow"
-      owner          = "platform"
-      ceiling_policy = "agent-ceiling-demo"
-      allowed_paths  = ["secret/data/demo/*"]
+      description     = "Reference registration proving the ADR-0015 registry flow"
+      owner           = "platform"
+      ceiling_policy  = "agent-ceiling-demo"
+      allowed_paths   = ["secret/data/demo/*"]
+      tool_names      = ["echo"]
+      product_actions = []
+    }
+
+    # THE FIXTURE THAT CAN FAIL. Two definitions with deliberately different ceilings,
+    # because "the ceiling bounds authority" is only demonstrable against a ceiling that
+    # excludes something a run would otherwise get. One definition cannot show that: every
+    # assertion would hold under a fabric that ignored ceilings entirely.
+    "planner-agent" = {
+      description     = "Plans but never applies — the narrow half of the ceiling pair"
+      owner           = "platform"
+      ceiling_policy  = "agent-ceiling-planner"
+      allowed_paths   = ["secret/data/planner/*"]
+      tool_names      = ["echo", "plan"]
+      product_actions = ["product.workspace.read"]
+    }
+    "applier-agent" = {
+      description     = "Plans and applies — the wide half"
+      owner           = "platform"
+      ceiling_policy  = "agent-ceiling-applier"
+      allowed_paths   = ["secret/data/applier/*"]
+      tool_names      = ["echo", "plan", "apply"]
+      product_actions = ["product.workspace.read", "product.workspace.write"]
     }
   }
 }
@@ -65,4 +97,42 @@ variable "vault_host_network" {
   DESC
   type        = bool
   default     = false
+}
+
+variable "role_bindings" {
+  type = map(object({
+    tool_names      = list(string)
+    product_actions = list(string)
+  }))
+  default = {
+    # The operator role: everything the reference agent can do, so an intersection with a
+    # ceiling is bounded by the CEILING rather than by the person — which is the case the
+    # ceiling rows need in order to be about ceilings at all.
+    "operator" = {
+      tool_names      = ["echo", "plan", "apply"]
+      product_actions = ["product.workspace.read", "product.workspace.write"]
+    }
+    # Deliberately narrower, and the reason it exists: with only one role, "two users get
+    # different authority" (SC-004) is untestable. A fixture that cannot fail is not a
+    # fixture.
+    "reader" = {
+      tool_names      = ["echo", "plan"]
+      product_actions = ["product.workspace.read"]
+    }
+  }
+}
+
+variable "definition_policies" {
+  description = <<-DESC
+    Policy narrowing a definition below its ceiling, keyed by agent definition id.
+
+    Empty is the normal state. A policy is how an operator tightens a definition without
+    editing its ceiling — for an incident or a migration — and it is read on every step so
+    the narrowing takes effect on the next one rather than at the next run.
+  DESC
+  type = map(object({
+    tool_names      = list(string)
+    product_actions = list(string)
+  }))
+  default = {}
 }

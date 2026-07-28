@@ -53,6 +53,30 @@ mounts="$(vault auth list -format=json 2>/dev/null | python3 -c 'import json,sys
 engines="$(vault secrets list -format=json 2>/dev/null | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)))' 2>/dev/null || echo "")"
 [[ "$engines" == *"database/"* ]] && ok "database engine mounted" || bad "database engine missing"
 [[ "$engines" == *"agent-registry/"* ]] && ok "agent registry present" || bad "agent registry missing"
+[[ "$engines" == *"harness-authority/"* ]] \
+  && ok "harness-authority mounted (tool-authorization jurisdiction)" \
+  || bad "harness-authority missing"
+
+# 3a — BOTH harness-domain stores, because T005 creates two prefixes and verifying one
+# leaves the other to fail inside a run: a missing role-binding store surfaces as a
+# resolution error naming the ROLE, which sends whoever reads it looking at claim mappings
+# rather than at the store that is not there.
+for prefix in harness-ceilings role-bindings; do
+  if vault kv list -format=json "harness-authority/${prefix}" >/dev/null 2>&1; then
+    ok "${prefix} readable"
+  else
+    bad "${prefix} missing or unreadable — identity resolution will refuse every run"
+  fi
+done
+
+# 3b — the ceiling records the fixture pair depends on. A ceiling row asserts that two
+# definitions get DIFFERENT authority; if either record is absent the row refuses rather
+# than failing, and a refusal reads as the mechanism working.
+for agent in planner-agent applier-agent; do
+  vault kv get -format=json "harness-authority/harness-ceilings/${agent}" >/dev/null 2>&1 \
+    && ok "ceiling record for ${agent}" \
+    || bad "no ceiling record for ${agent} — the ceiling rows have nothing to compare"
+done
 
 # 4 — a dynamic credential can be minted AND it authenticates
 creds="$(vault read -format=json database/creds/harness 2>/dev/null || echo "")"

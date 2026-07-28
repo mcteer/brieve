@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.audit.schema import AuditEventType
+from core.authority.entitlements import require_brokered_material
 from core.authority.errors import AuditAppendFailed
 from core.hooks.types import HookContext, HookDecision
 
@@ -103,29 +104,38 @@ def mirroring_pre_hook(ctx: HookContext) -> HookDecision:
         )
 
     if mode == "broker":
-        # Entitlement membership already checked before any shared-grain wield.
-        material = fabric.get_brokered_material(authority.credential_id)
-        if material is None:
-            try:
-                fabric.issue_brokered_material(
-                    authority.credential_id,
-                    "HARNESS_FIXTURE_BROKERED_GRAIN_MARKER_NOT_A_REAL_SECRET",
-                )
-            except Exception as exc:
-                code = getattr(exc, "reason_code", "exchange_failed")
-                _append(
-                    run,
-                    {
-                        "outcome": "deny",
-                        "reason_code": "exchange_failed",
-                        "tool_name": ctx.tool_name,
-                    },
-                )
-                return HookDecision(
-                    outcome="deny",
-                    reason_code="exchange_failed",
-                    message="brokered exchange failed",
-                )
+        # Entitlement membership is already checked above, and the order is load-bearing:
+        # a call the user is not entitled to make was denied for THAT reason, which is a
+        # decision about their permissions. Only a call that passed reaches this point, so
+        # anything refused here is a platform gap rather than a policy answer — and the
+        # trail must say which, or whoever reads it investigates the wrong system.
+        #
+        # This used to call two identity-fabric methods documented "(fake only)" and pass
+        # a hard-coded fixture string, then allow. A deployment configuring a brokered
+        # product had its calls permitted against material that was never obtained.
+        try:
+            require_brokered_material(
+                getattr(run, "brokered_material_source", None),
+                authority.credential_id,
+            )
+        except Exception as exc:
+            code = getattr(exc, "reason_code", "exchange_failed")
+            if code not in {"broker_not_implemented", "exchange_failed"}:
+                code = "exchange_failed"
+            _append(
+                run,
+                {
+                    "outcome": "deny",
+                    "reason_code": code,
+                    "tool_name": ctx.tool_name,
+                    "product": product,
+                },
+            )
+            return HookDecision(
+                outcome="deny",
+                reason_code=code,
+                message=str(exc),
+            )
 
     _append(
         run,

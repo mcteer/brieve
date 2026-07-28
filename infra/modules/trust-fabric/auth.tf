@@ -52,9 +52,16 @@ resource "vault_jwt_auth_backend_role" "harness" {
     nomad_job_id = var.harness_job_id
   }
 
-  token_policies = [vault_policy.harness_database.name]
-  token_ttl      = 300
-  token_type     = "service"
+  # Both jurisdictions: the state store to write its own record, and the harness-domain
+  # ceiling to know what it may call. Read-only on the second — a run that could write its
+  # own ceiling would be the escalation Principle IV exists to make structurally
+  # unavailable.
+  token_policies = [
+    vault_policy.harness_database.name,
+    vault_policy.harness_authority_read.name,
+  ]
+  token_ttl  = 300
+  token_type = "service"
 }
 
 # The conformance suite runs as its own workload with its own identity. That is what
@@ -77,6 +84,7 @@ resource "vault_jwt_auth_backend_role" "conformance" {
   token_policies = [
     vault_policy.harness_database.name,
     vault_policy.evidence_database.name,
+    vault_policy.harness_authority_read.name,
   ]
   token_ttl  = 1800
   token_type = "service"
@@ -106,9 +114,16 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
     nomad_job_id = join(",", var.agent_run_job_id_patterns)
   }
 
-  token_policies = [vault_policy.harness_database.name]
-  token_ttl      = 3600
-  token_type     = "service"
+  # The harness-domain jurisdiction too, as of 010: a dispatched run resolves its own
+  # ceiling, user scope, and policy from the trust fabric. Read-only — a run that could
+  # write its own ceiling would be the escalation Principle IV makes structurally
+  # unavailable, and it would be one line away.
+  token_policies = [
+    vault_policy.harness_database.name,
+    vault_policy.harness_authority_read.name,
+  ]
+  token_ttl  = 3600
+  token_type = "service"
 }
 
 # The persistent MCP service.
@@ -135,7 +150,10 @@ resource "vault_jwt_auth_backend_role" "mcp" {
     nomad_job_id = var.mcp_job_id
   }
 
-  token_policies = [vault_policy.harness_database.name]
+  token_policies = [
+    vault_policy.harness_database.name,
+    vault_policy.harness_authority_read.name,
+  ]
   # Longer than a batch job's, because this one is long-lived by design — and still a TTL
   # rather than none, which is the difference between a re-issued identity and a standing
   # credential.

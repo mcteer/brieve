@@ -23,7 +23,7 @@ from tests.harness import (
     fake_product_api,
     frozen_clock,
 )
-from tests.harness.fake_identity_fabric import FakeIdentityFabric
+from tests.harness.fake_identity_fabric import FakeBrokeredMaterialSource, FakeIdentityFabric
 from tests.harness.fake_product_api import FakeProductApi
 
 PRODUCT = "workspace"
@@ -83,6 +83,12 @@ def _product_run(
         clock=frozen_clock(),
         registry=registry,
         audit_sink=audit,
+        # A stub for a mechanism that does not exist. These rows' subject is the
+        # governance AROUND brokering — that entitlements are checked before any wield,
+        # that a mid-run shrink bites — and those properties are real and worth asserting.
+        # Production supplies nothing here and a brokered call refuses
+        # `broker_not_implemented`, which `test_broker_refuses.py` is what asserts.
+        brokered_material_source=FakeBrokeredMaterialSource(),
     )
     return run, handler, api, audit, fabric
 

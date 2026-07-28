@@ -85,8 +85,9 @@ def test_row_dispatch_returns_a_handle_without_blocking(dispatcher: NomadDispatc
         correlation_id=correlation_id,
         subject_user_id="alice",
         tenant_id=TENANT,
-        agent_definition_id="agent-def-1",
+        agent_definition_id="planner-agent",
         requested_tools=frozenset({"echo"}),
+        subject_roles=frozenset({"operator"}),
     )
     elapsed = time.monotonic() - started
 
@@ -106,8 +107,17 @@ def test_row_the_handle_refers_to_a_real_allocation(dispatcher: NomadDispatcher)
         correlation_id=correlation_id,
         subject_user_id="alice",
         tenant_id=TENANT,
-        agent_definition_id="agent-def-1",
+        # A REGISTERED definition, and a role that binds to something — as of 010 the
+        # entrypoint resolves both from the trust fabric, so "agent-def-1" (which this row
+        # used, and which exists nowhere) now refuses `unknown_agent_definition` and fails
+        # the allocation.
+        #
+        # That is 010 working rather than 010 breaking this row: the id was arbitrary
+        # because the fabric was a dictionary that answered for any key. This row's subject
+        # is the attestation path, not the definition id, so it takes a real one.
+        agent_definition_id="planner-agent",
         requested_tools=frozenset({"echo"}),
+        subject_roles=frozenset({"operator"}),
     )
 
     for _ in range(30):
@@ -133,11 +143,20 @@ def test_row_the_allocation_holds_its_own_attested_identity(dispatcher: NomadDis
         correlation_id=correlation_id,
         subject_user_id="alice",
         tenant_id=TENANT,
-        agent_definition_id="agent-def-1",
+        agent_definition_id="planner-agent",
         requested_tools=frozenset({"echo"}),
+        subject_roles=frozenset({"operator"}),
     )
 
-    deadline = time.monotonic() + 300
+    # Twelve minutes, raised from five in 010 after cold allocations were still
+    # DOWNLOADING dependencies when the clock ran out at five and again at seven. Every
+    # allocation installs from scratch — there is no shared cache — so the budget has to
+    # cover a cold one or the row reports "the allocation did not start the run", which is
+    # a stopwatch describing itself as a defect and sends whoever reads it to dispatch.
+    #
+    # The slowness is the enclave's, not this row's. Worth its own look: a uv cache shared
+    # across allocations would take minutes off every dispatched run.
+    deadline = time.monotonic() + 720
     alloc_id = ""
     while time.monotonic() < deadline:
         allocations = _allocations_for(dispatcher, correlation_id)

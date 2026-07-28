@@ -111,3 +111,23 @@ def fake_identity_fabric(
 
 def issue_default_brokered(fabric: FakeIdentityFabric, credential_id: str) -> None:
     fabric.issue_brokered_material(credential_id, BROKERED_GRAIN_MARKER)
+
+
+class FakeBrokeredMaterialSource:
+    """A stand-in for a brokering mechanism that does not exist yet.
+
+    Supplied only by rows whose subject is the governance *around* brokering — that the
+    entitlement check bites before any wield, that a mid-run shrink takes effect. Those
+    properties are real and worth asserting; the credential acquisition beneath them is
+    not implemented, and without something here every such row would refuse
+    `broker_not_implemented` and stop testing what it was written to test.
+
+    **Production supplies nothing**, which is how a deployment configuring a brokered
+    product learns the mechanism is missing (ADR-0044).
+    """
+
+    def __init__(self, marker: str = BROKERED_GRAIN_MARKER) -> None:
+        self._marker = marker
+
+    def material_for(self, credential_id: str) -> str:
+        return self._marker

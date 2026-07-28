@@ -18,6 +18,16 @@ from core.durability.resume import resume_run
 from core.run import RunState
 from tests.harness import DEFAULT_AGENT_DEFINITION_ID, fake_identity_fabric, frozen_clock
 
+#: FR-014 — this row supplies a FAKE identity fabric, deliberately.
+#:
+#: Its subject is suspension expiring against the run's existing bound, not authority
+#: resolution. It needs *a* fabric the way it needs a clock: to construct a run at all.
+#: Substituting the production fabric would make the
+#: row depend on registry contents that have nothing to do with what it asserts, and would
+#: not strengthen it — authority resolution against the live trust fabric is proven by
+#: `tests/conformance/identity/`, which is where SC-001 points.
+FAKE_FABRIC_IS_FAULT_INJECTION = "suspension expiring against the run's existing bound"
+
 
 def test_row_a_dependency_down_past_the_bound_stops_the_run() -> None:
     """The grant runs out while the run waits, and the run stops rather than waiting on."""

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from core.authority.clock import Clock
-from core.authority.errors import AuthorityRefuseError
+from core.authority.errors import RESOLUTION_REASONS, AuthorityRefuseError
 from core.authority.fabric import IdentityFabric
 from core.authority.grant import DelegationGrant
 from core.authority.intersection import intersect_scopes
@@ -68,10 +68,17 @@ def manufacture_authority(
         raise
     except Exception as exc:
         code = getattr(exc, "reason_code", None)
-        if code in {"identity_unavailable", "exchange_failed"}:
+        # Every reason the resolution layer can give, carried through rather than
+        # flattened. Before 010 there were two, and anything else became "identity fabric
+        # unavailable" — which was accurate when the fabric was a dictionary and could
+        # only be present or absent. Against a real fabric the reasons are the diagnosis:
+        # a ceiling naming an unknown tool, a record from a newer platform, and a fabric
+        # that did not answer are three different problems with three different fixes, and
+        # collapsing them sends whoever reads the trail to the network every time.
+        if code in {"identity_unavailable", "exchange_failed"} or code in RESOLUTION_REASONS:
             raise AuthorityRefuseError(
                 str(exc) or code,
-                reason_code=code,
+                reason_code=str(code),
                 correlation_id=correlation_id,
             ) from exc
         raise AuthorityRefuseError(

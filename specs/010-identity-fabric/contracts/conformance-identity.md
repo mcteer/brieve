@@ -1,7 +1,7 @@
 # Contract: identity conformance lane
 
 **Feature**: `specs/010-identity-fabric`
-**Status**: Planned
+**Status**: **In force** (as of 010's merge)
 **Depends on**: Constitution Quality Gates (v1.2.0); ADR-0015; ADR-0044; ADR-0047; ADR-0049
 
 ## The row this feature finally makes meaningful
@@ -38,9 +38,32 @@ provenance rather than on outcomes.
 | Protocol declares no test-only method | And no module under `src/` imports from `tests/` | FR-013, FR-015, SC-008, SC-009 | no |
 | No static credential | The same assertion the durability and evidence paths already carry | FR-002, SC-010 | **yes** |
 
-## The hybrid harness, and when it stops existing
+## The fake-to-real migration (FR-019)
 
-The per-term rows above run through a **test-harness hybrid fabric** during implementation:
+Which rows moved off the test double, and which kept it and why. SC-001's scope is
+**conformance rows** — a component row supplying a fake fabric to test hook ordering is not
+resolving authority as its subject; it needs a fabric the way it needs a clock, and marking
+forty such rows "fault injection" would put a false statement in each.
+
+| Row | Before | After |
+| --- | --- | --- |
+| `identity/test_ceiling_from_registry.py` | hybrid (ceiling real) | **fully real** — every term from the live fabric |
+| `identity/test_scope_from_claims.py` | — (new) | fully real |
+| `identity/test_jurisdictions_stay_disjoint.py` | — (new) | fully real |
+| `identity/test_dispatched_end_to_end.py` | — (new) | fully real, through a dispatched allocation |
+| `identity/test_fabric_unreachable_from_a_tool.py` | — (new) | real Vault, agent credential |
+| `identity/test_broker_refuses.py` | fake | **fake, declared** — subject is the absent broker mechanism |
+| `durability/test_rows.py` | fake | **fake, declared** — subject is checkpointing, resume, fencing |
+| `mcp/test_suspension_bounds.py` | fake | **fake, declared** — subject is the run's existing bound |
+
+Declared means the module assigns `FAKE_FABRIC_IS_FAULT_INJECTION` naming its subject, and
+`tests/unit/test_fake_fabric_is_fault_injection_only.py` fails the build on any conformance
+row that imports the fake without it.
+
+## The hybrid harness, and when it stopped existing
+
+**It is gone.** During implementation the per-term rows ran through a test-harness hybrid
+fabric:
 the term under test resolves through the production fabric, the rest through the fake. This
 is what makes the four stories independently provable — `manufacture_authority` resolves
 three terms from one object, so without composition no story could be proven until all of
@@ -59,9 +82,9 @@ Three properties keep it honest:
   that loophole by asserting the importer count is cheaper and stricter than resolving
   transitive imports.
 
-So the table above describes the feature's **end state**. During implementation the per-term
-rows are hybrid and say so in their own files; a reader of this contract at any commit can
-tell which state they are looking at by whether `tests/harness/hybrid_fabric.py` exists.
+All three held. The rows migrated at T046a, `tests/harness/hybrid_fabric.py` was deleted,
+and a check asserts nothing imports it — which is stricter than following transitive imports
+and needs no maintaining, because there is nothing left to follow.
 
 ## Break fixtures worth naming
 
@@ -86,6 +109,13 @@ enclave gains a definition whose ceiling resolves to something real before any e
 written; a task that writes rows first would produce green that means nothing.
 
 ## Who runs these
+
+**Two lanes, and 010 had to be added to both.** The in-allocation runner enumerates its
+directories (`infra/jobs/conformance.nomad.hcl`) and so does the host lane
+(`Makefile`'s `host_enclave` line). A marker alone does not run a row that no lane
+collects — `tests/conformance/identity` was invisible to the host lane while passing
+everywhere it was asked to run, which is the same shape as the in-allocation gap and was
+found the same way: by reading which directories the runner names, not by trusting green.
 
 | Where the change comes from | What covers these rows |
 | --- | --- |

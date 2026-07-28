@@ -43,5 +43,7 @@ module "trust_fabric" {
   # off is a deployment where someone will.
   enable_tls = true
 
-  agent_definitions = var.agent_definitions
+  agent_definitions   = var.agent_definitions
+  role_bindings       = var.role_bindings
+  definition_policies = var.definition_policies
 }

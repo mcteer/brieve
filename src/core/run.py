@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from core.audit.schema import AuditEventType
 from core.audit.sink import AuditSink, InMemoryAuditSink
 from core.authority.clock import Clock, SystemClock
+from core.authority.entitlements import BrokeredMaterialSource
 from core.authority.errors import AuthorityRefuseError
 from core.authority.fabric import IdentityFabric
 from core.authority.grant import DelegationGrant
@@ -115,6 +116,16 @@ class GovernedRun:
     #: refuse every tool call while looking like the gate working.
     dependency_health: DependencyHealthReader | None = None
 
+    #: Where a shared-grain credential comes from, for products that cannot federate.
+    #:
+    #: ``None`` in production and that is not an oversight — ADR-0044's credential
+    #: translation is its own feature, so nothing can supply this yet, and a brokered call
+    #: refuses `broker_not_implemented` rather than proceeding against material that was
+    #: never obtained. Optional and defaulting to ``None`` so every existing caller keeps
+    #: compiling; the harness supplies a stub where a row's subject is the governance
+    #: AROUND brokering rather than brokering itself.
+    brokered_material_source: BrokeredMaterialSource | None = None
+
 
 def start_governed_run(
     *,
@@ -130,6 +141,7 @@ def start_governed_run(
     hooks: list[HookRegistration] | None = None,
     include_governance: bool = True,
     dependency_health: DependencyHealthReader | None = None,
+    brokered_material_source: BrokeredMaterialSource | None = None,
 ) -> GovernedRun:
     """Start an active governed run with bound task authority, or refuse.
 
@@ -182,6 +194,7 @@ def start_governed_run(
         hooks=registered,
         state=RunState.ACTIVE,
         dependency_health=dependency_health,
+        brokered_material_source=brokered_material_source,
     )
 
     issued_payload = {
