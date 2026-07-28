@@ -40,7 +40,9 @@ from typing import Any
 from core.audit.integrity import IntegrityReport, verify_stream_integrity
 from core.dependencies.store import PostgresDependencyStore
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
+from core.durability.sweeper import Sweeper
 from core.registry.memory import ToolRegistry
+from surfaces.dispatch.types import RunDispatcher
 from surfaces.mcp.health import HealthChecker, Probe
 
 #: The Vault JWT auth role this service assumes. Selected by the job id in its workload
@@ -104,6 +106,48 @@ def check_integrity(credentials: VaultDatabaseCredentials) -> IntegrityReport:
     an operator restarts something detects tampering on a schedule the tamperer chooses.
     """
     return verify_stream_integrity(run_connection_factory(credentials))
+
+
+def build_sweeper(
+    store: PostgresDependencyStore,
+    dispatcher: RunDispatcher,
+    load_checkpoint: Any,
+) -> Sweeper:
+    """The sweeper, over the store's index and the existing dispatch seam.
+
+    Through `RunDispatcher` rather than a resume-specific path to the scheduler: a second
+    way to start a run is how two lifecycles quietly diverge, and one of them would stop
+    getting the attention the other receives.
+    """
+    return Sweeper(
+        index=store,
+        health=store.state_of,
+        load_checkpoint=load_checkpoint,
+        dispatch_resume=_resume_dispatcher(dispatcher),
+    )
+
+
+def _resume_dispatcher(dispatcher: RunDispatcher) -> Any:
+    """Dispatch a resume as the run's own subject, in a new allocation.
+
+    Every field comes from the index rather than from the sweeper, because the sweeper has
+    no subject of its own to lend. It carries no credential either way: the allocation
+    manufactures its own from its own attested identity, which is what makes
+    re-authentication structural rather than a rule someone remembers.
+    """
+
+    def _dispatch(record: Any) -> None:
+        dispatcher.dispatch(
+            correlation_id=record.correlation_id,
+            subject_user_id=record.subject_user_id,
+            tenant_id=record.tenant_id,
+            agent_definition_id=record.agent_definition_id,
+            requested_tools=frozenset(),
+            run_id=record.run_id,
+            step_index=record.step_index,
+        )
+
+    return _dispatch
 
 
 def build_health_checker(

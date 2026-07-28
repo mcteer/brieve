@@ -57,11 +57,22 @@ class SuspendedRunIndex(Protocol):
 
 @dataclass(frozen=True)
 class SuspendedRunRecord:
+    """Everything a resume dispatch needs, and nothing that grants anything.
+
+    The subject, tenant, and definition are here because the sweeper dispatches *as* the
+    run — a record that only said "run-7 waits on terraform-cloud" would let the sweeper
+    know a run should resume and not say as whom. It carries no credential and no
+    authority: the resumed allocation manufactures its own from its own attested identity.
+    """
+
     run_id: str
     correlation_id: str
     awaiting: str
     suspended_at: datetime
     step_index: int
+    subject_user_id: str = ""
+    tenant_id: str = ""
+    agent_definition_id: str = ""
 
 
 @dataclass

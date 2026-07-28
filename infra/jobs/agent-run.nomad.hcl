@@ -50,6 +50,12 @@ job "agent-run" {
       "subject_user_id",
       "tenant_id",
       "agent_definition_id",
+      # Resume state. Required rather than optional because a dispatch that omitted them
+      # would start a fresh run under a resumed run's correlation id — which looks like a
+      # successful resume and re-executes everything the run had already done. A fresh
+      # dispatch passes its own correlation id and step 0.
+      "run_id",
+      "step_index",
     ]
     meta_optional = ["requested_tools"]
   }
@@ -126,6 +132,8 @@ job "agent-run" {
         RUN_TENANT_ID       = "${NOMAD_META_tenant_id}"
         RUN_DEFINITION_ID   = "${NOMAD_META_agent_definition_id}"
         RUN_REQUESTED_TOOLS = "${NOMAD_META_requested_tools}"
+        RUN_ID              = "${NOMAD_META_run_id}"
+        RUN_STEP_INDEX      = "${NOMAD_META_step_index}"
       }
     }
   }

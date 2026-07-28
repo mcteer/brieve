@@ -30,6 +30,14 @@ CREATE TABLE IF NOT EXISTS dependency_health (
 CREATE TABLE IF NOT EXISTS suspended_runs (
     run_id         TEXT PRIMARY KEY,
     correlation_id TEXT        NOT NULL,
+    -- Denormalized deliberately: the sweeper dispatches a resume, and a dispatch needs a
+    -- subject, a tenant, and a definition. Without them here the sweeper knows a run
+    -- should resume and cannot say as whom — and passing blanks would start a fresh run
+    -- under a resumed run's identity, which looks like a successful resume and re-executes
+    -- everything the run had already done.
+    subject_user_id     TEXT   NOT NULL DEFAULT '',
+    tenant_id           TEXT   NOT NULL DEFAULT '',
+    agent_definition_id TEXT   NOT NULL DEFAULT '',
     -- Named, so the sweeper knows what to watch. Required at the point of suspending:
     -- a suspension nobody can match to a recovery never resumes.
     awaiting       TEXT        NOT NULL,

@@ -23,6 +23,7 @@ import pg8000.dbapi
 
 from core.dependencies.types import DependencyHealth, HealthState
 from core.durability.credentials import DatabaseCredential, VaultDatabaseCredentials
+from core.durability.sweeper import SuspendedRunRecord
 from core.errors import CoreError
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
@@ -229,6 +230,96 @@ class PostgresDependencyStore:
         result = self._run(_write)
         assert isinstance(result, DependencyHealth)
         return result
+
+    # ------------------------------------------------------------- suspension index
+
+    def record_suspension(
+        self,
+        *,
+        run_id: str,
+        correlation_id: str,
+        awaiting: str,
+        step_index: int,
+        subject_user_id: str = "",
+        tenant_id: str = "",
+        agent_definition_id: str = "",
+        now: datetime | None = None,
+    ) -> None:
+        """Index a suspended run so the sweeper can find it.
+
+        **An index over the checkpoint, not a second record of state.** The checkpoint's
+        `run_state` is authoritative and says SUSPENDED too; this exists so the sweeper's
+        question — "what is waiting on this product" — is an indexed lookup rather than a
+        scan of every run. The sweeper re-reads the checkpoint before acting on anything
+        it finds here.
+        """
+        moment = now or datetime.now(UTC)
+
+        def _write(conn: Any) -> None:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO suspended_runs "
+                "(run_id, correlation_id, awaiting, suspended_at, step_index, "
+                " subject_user_id, tenant_id, agent_definition_id) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT (run_id) DO UPDATE SET "
+                "  correlation_id = EXCLUDED.correlation_id, awaiting = EXCLUDED.awaiting, "
+                "  suspended_at = EXCLUDED.suspended_at, step_index = EXCLUDED.step_index, "
+                "  subject_user_id = EXCLUDED.subject_user_id, "
+                "  tenant_id = EXCLUDED.tenant_id, "
+                "  agent_definition_id = EXCLUDED.agent_definition_id",
+                (
+                    run_id,
+                    correlation_id,
+                    awaiting,
+                    moment,
+                    step_index,
+                    subject_user_id,
+                    tenant_id,
+                    agent_definition_id,
+                ),
+            )
+            conn.commit()
+
+        self._run(_write)
+
+    def awaiting(self, product: str) -> list[SuspendedRunRecord]:
+        def _read(conn: Any) -> list[SuspendedRunRecord]:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT run_id, correlation_id, awaiting, suspended_at, step_index, "
+                "       subject_user_id, tenant_id, agent_definition_id "
+                "FROM suspended_runs WHERE awaiting = %s ORDER BY suspended_at",
+                (product,),
+            )
+            rows = cur.fetchall()
+            return [
+                SuspendedRunRecord(
+                    run_id=str(r[0]),
+                    correlation_id=str(r[1]),
+                    awaiting=str(r[2]),
+                    suspended_at=r[3] if r[3].tzinfo else r[3].replace(tzinfo=UTC),
+                    step_index=int(r[4]),
+                    subject_user_id=str(r[5]),
+                    tenant_id=str(r[6]),
+                    agent_definition_id=str(r[7]),
+                )
+                for r in rows
+            ]
+
+        result = self._run(_read)
+        assert isinstance(result, list)
+        return result
+
+    def forget(self, run_id: str) -> None:
+        """Drop a run from the index — resumed, or found terminal."""
+
+        def _write(conn: Any) -> None:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM suspended_runs WHERE run_id = %s", (run_id,))
+            conn.commit()
+
+        self._run(_write)
 
     def known_products(self) -> list[str]:
         def _read(conn: Any) -> list[str]:

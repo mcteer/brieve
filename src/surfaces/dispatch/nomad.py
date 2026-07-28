@@ -92,6 +92,8 @@ class NomadDispatcher:
         tenant_id: str,
         agent_definition_id: str,
         requested_tools: frozenset[str],
+        run_id: str | None = None,
+        step_index: int | None = None,
     ) -> RunHandle:
         """Schedule the run and return immediately.
 
@@ -101,6 +103,9 @@ class NomadDispatcher:
         the job a token would put a static credential in a jobspec — the single thing this
         architecture is built to avoid.
         """
+        # Resume state travels as metadata, like everything else the job is told. A
+        # resumed allocation still manufactures its own credentials — knowing WHICH run it
+        # is resuming grants it nothing.
         payload = {
             "Meta": {
                 "correlation_id": correlation_id,
@@ -108,6 +113,8 @@ class NomadDispatcher:
                 "tenant_id": tenant_id,
                 "agent_definition_id": agent_definition_id,
                 "requested_tools": ",".join(sorted(requested_tools)),
+                "run_id": run_id or correlation_id,
+                "step_index": str(step_index if step_index is not None else 0),
             },
         }
         result = self._request(f"job/{self._job_id}/dispatch", payload)
@@ -115,9 +122,9 @@ class NomadDispatcher:
         if not dispatched_id:
             raise DispatchError("scheduler accepted the dispatch but named no job")
 
-        self._dispatched[correlation_id] = dispatched_id
+        self._dispatched[run_id or correlation_id] = dispatched_id
         return RunHandle(
-            run_id=correlation_id,
+            run_id=run_id or correlation_id,
             correlation_id=correlation_id,
             state=RunState.ACTIVE,
         )
