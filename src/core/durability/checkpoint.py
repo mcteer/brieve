@@ -14,6 +14,38 @@ from core.durability.types import CheckpointBlob, DurabilityProvider, RunOutcome
 from core.run import GovernedRun, RunState
 
 
+def stop_requested(run: GovernedRun) -> str | None:
+    """Whether someone has ended this run, read from the durable record.
+
+    **Called at the step boundary** — after the in-flight step's result is bracketed and
+    before the next intent is written — which is where C3's semantics come from. The
+    placement *is* the guarantee: a step already begun completes and records its result, no
+    further step starts, and no intent is left open. Nothing here enforces that by timeout,
+    because a timeout would produce exactly the open intent this ordering avoids.
+
+    A terminal run never resumes, so an intent open at stop time could never be
+    re-observed — it would be permanent, which is the single outcome 005's bracketing
+    exists to prevent. That is why the stop waits for the bracket rather than the reverse.
+
+    Returns the stop reason, or ``None`` when the run should continue. A read that fails
+    returns ``None`` too: the run carries on, which is right, because a database blip must
+    not end work nobody asked to end. The stop is durable and will be seen at the next
+    boundary.
+    """
+    provider: DurabilityProvider | None = run.durability
+    if provider is None:
+        return None
+    try:
+        blob = provider.load(run.run_id or run.correlation_id)
+    except Exception:  # noqa: BLE001 — an unreadable record must not end a healthy run
+        return None
+    if blob is None or blob.outcome is None:
+        return None
+    if blob.outcome.state != RunState.STOPPED.value:
+        return None
+    return blob.outcome.stop_reason or "stopped"
+
+
 def checkpoint_run(
     run: GovernedRun,
     *,
