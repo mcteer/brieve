@@ -97,6 +97,23 @@ fi
 # 5 — state store reachable and migrated
 nc -z 127.0.0.1 5432 2>/dev/null && ok "state store listening" || bad "state store not listening on 5432"
 
+# 5a — the operational tables 011 added, and the boundary around them.
+#
+# BOTH tables, because the schema creates two and verifying one leaves the other to fail
+# inside an operation — surfacing as a list error that names the subject rather than the
+# table that is not there. 010's pass 4 caught exactly this omission one feature earlier.
+if [ -n "${PGUSER:-}" ]; then
+  for table in run_index authority_change_requests; do
+    if docker run --rm -e PGPASSWORD -e PGUSER --network host postgres:17-alpine \
+         psql -h 127.0.0.1 -p 5432 -d brieve -tAc "SELECT 1 FROM ${table} LIMIT 1" \
+         >/dev/null 2>&1; then
+      ok "${table} present, readable by the run role"
+    else
+      bad "${table} missing — every operation over it refuses for reasons nobody can trace"
+    fi
+  done
+fi
+
 # 5b — evidence store present, and readable by exactly the role that should read it
 #
 # Both halves matter. That the evidence role CAN read audit_entries is the feature; that

@@ -73,7 +73,14 @@ resource "vault_policy" "harness_authority_read" {
       capabilities = ["read"]
     }
     path "agent-registry/registration/display-name/*" {
-      capabilities = ["read"]
+      capabilities = ["read", "list"]
+    }
+    # LIST on the folder itself, because enumeration asks "what definitions exist" and the
+    # glob above answers only "what is at this name". 010 granted exactly what resolution
+    # needed — resolution knows the id it wants — and enumeration is the second caller,
+    # which is the seam pattern in policy form.
+    path "agent-registry/registration/display-name" {
+      capabilities = ["list"]
     }
   HCL
 }
