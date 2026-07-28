@@ -42,3 +42,30 @@ resource "vault_policy" "evidence_database" {
     }
   HCL
 }
+
+# Reading the harness-domain jurisdiction. READ ONLY, and deliberately its own policy.
+#
+# Not merged into `harness_database`: that policy exists so a run can write its own
+# record, and merging would mean anything able to reach the state store could also read
+# every ceiling in the estate. The evidence read path drew exactly this separation for
+# exactly this reason, and the argument has not changed.
+#
+# No write capability appears here at all. These records are written by Terraform from
+# reviewed HCL (ADR-0015's division of labor: definitions in HCL, enforcement in Vault),
+# because writing a wider ceiling record IS widening a scope — the deliberate, reviewable
+# act ADR-0016 governs. Nothing at runtime writes them, and nothing at runtime should be
+# able to.
+resource "vault_policy" "harness_authority_read" {
+  name   = "harness-authority-read"
+  policy = <<-HCL
+    path "${vault_mount.harness_authority.path}/data/harness-ceilings/*" {
+      capabilities = ["read"]
+    }
+    path "${vault_mount.harness_authority.path}/data/role-bindings/*" {
+      capabilities = ["read"]
+    }
+    path "agent-registry/registration/display-name/*" {
+      capabilities = ["read"]
+    }
+  HCL
+}

@@ -42,6 +42,18 @@ DEFAULT_JWT_AUTH_PATH = "nomad"
 DEFAULT_VAULT_ROLE = "harness"
 DEFAULT_CREDS_PATH = "database/creds/harness"
 
+#: How long a trust-fabric read may take before it fails closed (FR-018).
+#:
+#: **Seconds-scale by requirement, not by taste.** Identity resolution sits on the invoke
+#: path, so a generous timeout does not degrade gracefully — it holds a step open, and a
+#: step held open indefinitely is a run that neither completes nor suspends. That is worse
+#: than a refusal, because nothing notices it.
+#:
+#: Overridable per deployment, because what is generous depends on where the trust fabric
+#: sits relative to the workload. The default exists so the value is never implicitly
+#: whatever the HTTP library chose.
+DEFAULT_RESOLUTION_TIMEOUT_SECONDS = 5.0
+
 
 class CredentialUnavailableError(CoreError):
     """No credential could be obtained. Fail closed — never fall back to a static one."""
@@ -49,6 +61,27 @@ class CredentialUnavailableError(CoreError):
     def __init__(self, message: str, *, correlation_id: str | None = None) -> None:
         super().__init__(message, correlation_id=correlation_id)
         self.reason_code = "credential_unavailable"
+
+
+class VaultReadFailed(CoreError):
+    """A trust-fabric read did not answer.
+
+    Distinct from "the path is not there", which :meth:`VaultDatabaseCredentials.read_path`
+    reports by returning ``None``. **Absence is data; unreachability is an error**, and
+    collapsing them would let a deleted ceiling record look exactly like a network
+    partition — one of which is a configuration mistake and the other an outage, with
+    opposite responses.
+
+    ``timed_out`` distinguishes the two failure modes the fabric maps to different reason
+    codes: a fabric that refused to answer and one that took too long.
+    """
+
+    def __init__(
+        self, message: str, *, timed_out: bool = False, correlation_id: str | None = None
+    ) -> None:
+        super().__init__(message, correlation_id=correlation_id)
+        self.timed_out = timed_out
+        self.reason_code = "fabric_timeout" if timed_out else "fabric_unreachable"
 
 
 @dataclass(frozen=True)
@@ -110,7 +143,7 @@ class VaultDatabaseCredentials:
         auth_path: str = DEFAULT_JWT_AUTH_PATH,
         role: str = DEFAULT_VAULT_ROLE,
         creds_path: str = DEFAULT_CREDS_PATH,
-        timeout: float = 10.0,
+        timeout: float = DEFAULT_RESOLUTION_TIMEOUT_SECONDS,
     ) -> None:
         self._identity = identity
         self._addr = (vault_addr or os.environ.get("VAULT_ADDR") or DEFAULT_VAULT_ADDR).rstrip("/")
@@ -151,14 +184,69 @@ class VaultDatabaseCredentials:
             parsed: dict[str, Any] = json.loads(response.read())
             return parsed
 
+    def login(self) -> str:
+        """Exchange this workload's attested identity for a Vault token.
+
+        Extracted from :meth:`fetch` so the same identity can reach more than one path.
+        The identity fabric reads several unrelated ones — a registration, a ceiling
+        record, a role binding — and a second class that authenticated its own way would
+        be a second authentication path to the trust fabric, which is the shape Principle
+        II forbids for tools and is no more attractive here.
+        """
+        login = self._post(
+            f"auth/{self._auth_path}/login",
+            {"role": self._role, "jwt": self._identity.jwt()},
+        )
+        token: str = login["auth"]["client_token"]
+        return token
+
+    def read_path(self, path: str, *, token: str | None = None) -> dict[str, Any] | None:
+        """Read one Vault path as this workload. ``None`` means the path is not there.
+
+        **The return type carries the distinction that matters.** A missing ceiling record
+        and an unreachable trust fabric are a configuration mistake and an outage
+        respectively, with opposite responses — so absence returns ``None`` and everything
+        else raises :class:`VaultReadFailed`. A reader that collapsed them would refuse
+        identically for both and send whoever investigates to the wrong system.
+
+        Pass ``token`` to reuse a login across reads. Logging in per read would multiply
+        the timeout budget by the number of paths, which is how a bounded wait stops being
+        bounded in the only case that matters — the slow one.
+        """
+        try:
+            tok = token if token is not None else self.login()
+            return self._get(path, tok)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                # Vault's "no value at path". Data, not failure.
+                return None
+            try:
+                detail = exc.read().decode(errors="replace")[:500]
+            except Exception:  # noqa: BLE001 - the original failure is what matters
+                detail = ""
+            raise VaultReadFailed(
+                f"trust fabric refused {path!r} at {self._addr} "
+                f"as role {self._role!r}: HTTP {exc.code} {detail}"
+            ) from exc
+        except TimeoutError as exc:
+            raise VaultReadFailed(
+                f"trust fabric did not answer {path!r} at {self._addr} within {self._timeout}s",
+                timed_out=True,
+            ) from exc
+        except OSError as exc:
+            # urllib wraps socket timeouts in URLError, so the timeout arrives here rather
+            # than as TimeoutError — checking the cause is what keeps a slow fabric
+            # distinguishable from an absent one.
+            timed_out = isinstance(getattr(exc, "reason", None), TimeoutError)
+            raise VaultReadFailed(
+                f"trust fabric unreachable for {path!r} at {self._addr}: {type(exc).__name__}",
+                timed_out=timed_out,
+            ) from exc
+
     def fetch(self) -> DatabaseCredential:
         """Authenticate as this workload and mint a credential."""
         try:
-            login = self._post(
-                f"auth/{self._auth_path}/login",
-                {"role": self._role, "jwt": self._identity.jwt()},
-            )
-            token = login["auth"]["client_token"]
+            token = self.login()
             creds = self._get(self._creds_path, token)
         except CredentialUnavailableError:
             raise

@@ -44,4 +44,5 @@ module "trust_fabric" {
   enable_tls = true
 
   agent_definitions = var.agent_definitions
+  role_bindings     = var.role_bindings
 }
