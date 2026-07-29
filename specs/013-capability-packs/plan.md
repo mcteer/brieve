@@ -67,7 +67,7 @@ approval; report fidelity recorded as owed rather than stubbed.
 | II — Total Interception; One Governed Tool Layer | **Pass** | Pack tools are `ToolRegistry` registrations like any other, so they inherit the hook pipeline **by construction rather than by discipline**. **Risk class becomes real** — it is in the glossary and nowhere in code today — and registry review may require process isolation for `secret-touching` and `destructive`. Transport stays a tool property; no MCP server is authored for uniformity. |
 | III — Fail-Closed, In-Process Enforcement | **Pass, with a new enforcement surface bounded** | **Pack hooks ARE a new enforcement point**, authored outside this repository — the earlier "no new enforcement point" was wrong, and analyze pass 10 caught it. Bounded two ways: a pack may not register a `governance` capability kind (refused at load), so it cannot enter the set `has_required_governance_hooks` validates; and `GovernanceCapability` still runs first, asserted with pack hooks present. Every new refusal — unqualified cell, tier violation, unpinned skill, unverified digest — fails closed, and each is asserted as the *absence of any permissive path* rather than as one branch behaving. |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass** | A pack carries no credential. Pack tools resolve authority through the same manufacture path, and **a pack cannot widen a ceiling** (FR-005) — asserted, because a pack declaring tools its definition's ceiling omits is the obvious shortcut and would read as a feature. The live lane's provider key is a dev-lane secret: never in a jobspec, never read by a run. |
-| V — Sealed Core, Versioned Seams | **Pass, five recorded additions — none of them a signature break** | `ToolRegistration` gains `risk_class`. `AuditEventType` gains `MODEL_GATE` and `MATRIX_FALLBACK`. Two new core modules — `core/authority/matrix.py` and `core/packs/workflows.py`. One infrastructure grant: `data/model-matrix/*` in `policies.tf`. **`start_governed_run` is deliberately NOT changed** — see the binding-resolution note below. All additive; this approved spec is the required spec, security-maintainer review is Dan. |
+| V — Sealed Core, Versioned Seams | **Pass, seven recorded additions — none of them a signature break** | `ToolRegistration` gains `risk_class`. `AuditEventType` gains `MODEL_GATE` and `MATRIX_FALLBACK`. Two new core modules — `core/authority/matrix.py` and `core/packs/workflows.py`. One infrastructure grant: `data/model-matrix/*` in `policies.tf`. **Two more, found at analyze pass 11 and recorded here rather than absorbed**: `ManufacturedAuthority` and `ResumeDecision` each gain an optional `matrix_fallback`, because `MATRIX_FALLBACK` was otherwise an event with no writer — the module that resolves a fallback holds no sink and no tenant. Both additive with defaults. **`start_governed_run`'s signature is still deliberately NOT changed** — its *body* emits the new event, which is not a seam move. This approved spec is the required spec, security-maintainer review is Dan. |
 | VI — Lean by Default | **Pass** | No new operated component. The eval harness is a library and a dev extra, not a service. Pack content is files. |
 | VII — Anti-Fragmentation | **Pass** | Packs are identical across substrates; the matrix is a control-plane record every deployment already has. |
 | VIII — Eval-Gated Promotion | **Pass — and this is the feature** | Brought online for the first time: the matrix, binding maps, fallback-only-to-qualified-or-stop, no auto-tracking, pinned judges, and provenance + injection-lens + eval on every skill bump. **Report fidelity is recorded as owed against ADR-0018**, per ADR-0047 — absent or an explicit skip citing its deferring record, never a stub. |
@@ -85,6 +85,16 @@ validated), so the resolution belongs there and the seam does not move.
 This follows the precedent that function's own docstring records: the `grant` parameter was
 made *optional* rather than breaking the seam, because "a break bought nothing" — the same
 reasoning, one feature later.
+
+**What that placement costs, found at pass 11**: `manufacture_authority` holds no audit sink
+and no `tenant_id`, so a fallback resolved there cannot be *written* there — and
+`MATRIX_FALLBACK` was specified with no writer at all. The fix keeps the placement and
+returns the fallback on `ManufacturedAuthority`, leaving the emit to `start_governed_run`,
+which already holds both. That is the discipline the module already keeps in the other
+direction: it raises `AuthorityRefuseError` and `start_governed_run` records
+`AUTHORITY_REFUSED`. The same applies to `resume_run`, which calls the same function and
+returns a `ResumeDecision` — a resumed run's fallback going unrecorded is the identical
+defect in a later phase.
 
 **Named-runner obligation** (constitution v1.1.0): the **live-model lane** has no automated
 runner — it needs a provider credential and costs money per run, so it cannot sit in CI.
@@ -144,7 +154,19 @@ src/core/evals/
 
 src/core/registry/memory.py   # + risk_class on ToolRegistration (additive)
 src/core/authority/manufacture.py  # binding-map resolution lands HERE, so
-                                   # start_governed_run's signature does not move
+                                   # start_governed_run's signature does not move.
+                                   # + matrix_fallback on ManufacturedAuthority: this
+                                   # module RAISES and lets its caller record; the
+                                   # fallback follows the same rule outbound, because
+                                   # there is no sink and no tenant here to write with.
+src/core/run.py               # start_governed_run's BODY emits MATRIX_FALLBACK and names
+                              # the loaded packs and digests in RUN_START. Signature
+                              # unchanged; it already holds both sink and tenant.
+src/core/durability/resume.py # catches AuthorityRefuseError -> STOPPED with the reason,
+                              # like every other failure in that function already does.
+                              # A withdrawn cell is an ordinary mid-flight state (D6),
+                              # and it was landing on the one path that recorded nothing
+                              # WITH THE LEASE HELD. + matrix_fallback on ResumeDecision.
 src/core/audit/schema.py      # + MODEL_GATE (a verdict is not an approval — FR-015)
 
 infra/modules/trust-fabric/policies.tf  # + read on data/model-matrix/*. Without it the

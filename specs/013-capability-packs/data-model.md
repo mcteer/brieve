@@ -250,6 +250,60 @@ Separate from `MODEL_GATE` because they answer different questions — "a model 
 something" versus "the model that ran was not the model that was pinned" — and an
 investigator looking for the second should not have to filter the first.
 
+**Who writes it, because nothing said and it turns out nothing could** (analyze pass 11).
+The fallback is *resolved* inside `manufacture_authority`, which takes no audit sink and no
+`tenant_id`, and returns a frozen `ManufacturedAuthority` with no channel for "cell A was
+unavailable, cell B was used". `AuditEntry` requires a `tenant_id` that function never sees.
+So the event was specified with no writer — and adding a sink parameter there would break
+the discipline that module already keeps: **it raises `AuthorityRefuseError` and lets the
+caller record `AUTHORITY_REFUSED`.** The fallback follows the same rule in the other
+direction — it is **returned, not written** — and the caller that owns the sink emits it.
+
+## Fallback carrier *(existing records, one additive field each)*
+
+| Record | Field | Emitted by |
+| --- | --- | --- |
+| `ManufacturedAuthority` (`core/authority/manufacture.py`) | `matrix_fallback: MatrixFallback \| None = None` | `start_governed_run`, which already holds `sink` and `tenant` |
+| `ResumeDecision` (`core/durability/resume.py`) | `matrix_fallback: MatrixFallback \| None = None` | the resume caller, on the same rule |
+
+`MatrixFallback` is a frozen record carrying `role`, `pinned_cell`, `used_cell`, and
+`reason` — the payload of the event, one layer before it becomes one.
+
+**Both, not just the first.** `resume_run` calls `manufacture_authority` too, so a resumed
+run can fall back, and a resumed run's fallback going unrecorded is the same defect wearing
+a different phase. Neither field changes a signature; both are additive with defaults.
+
+## Durability touchpoints *(existing: `core/durability/`)*
+
+Three things this feature requires of the layer that survives an interruption, none of which
+were stated and all of which the code decides.
+
+**A withdrawn cell on resume must stop with a reason.** `resume_run` acquires the lease and
+*then* calls `manufacture_authority`, with no `except AuthorityRefuseError`. Every other
+failure in that function returns a `ResumeDecision` carrying `stop_reason` — a missing
+checkpoint, an expired grant. This one throws past the contract with the lease held. That was
+tolerable while the only refusals were fabric-level errors; D6's rationale is that **a cell
+can be withdrawn**, which makes it an ordinary mid-flight state landing on the one path that
+records nothing. `cell_withdrawn` and `pack_not_loaded` both resolve to `STOPPED` with the
+reason recorded (FR-010, SC-004).
+
+**A suspended pack-tool step must name the product, not the tool.** `resume_run`'s
+`depends_on` maps tool → product so a suspension names something the sweeper also names —
+and it is **constructed nowhere in the tree**, so today every suspension falls back to the
+tool name. `SuspendedRunIndex.awaiting()` matches on *product*. The docstring already states
+the consequence: a suspension carrying only a tool name is never matched by a product
+recovering. Pack tools reach real products and `ToolDeclaration` carries `product`, so the
+map is derivable from loaded manifests — and without it a suspended Vault step **never
+resumes and nobody is told**.
+
+**The run record must name which pack content executed.** `CheckpointBlob` carries
+`correlation_id`, `grant_id`, `step_index`, `written_by`, and `outcome` — nothing about
+content. A resumed run in a new allocation reloads `packs/` from disk and verifies digests
+*against the manifest sitting beside them*, so edited content verifies clean and the run
+continues at a different skill version. FR-020's pinning holds per-load, not per-run. The
+loaded pack digests go in the `RUN_START` payload — no seam change, and it is what lets an
+attestation name the pack version the way FR-021 already names consulted guidance.
+
 ---
 
 ## Refusal vocabulary *(extending 011's frozen mapping)*
