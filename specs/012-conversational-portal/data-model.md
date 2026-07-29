@@ -41,6 +41,8 @@ One exchange. Insert-only; rows die only with their thread.
 | --- | --- | --- |
 | `turn_id` | TEXT, primary key | Minted at acceptance |
 | `thread_id` | TEXT, FK → threads | Cascade-deleted with the thread |
+| `tenant_id` | TEXT | **Denormalized from the thread, deliberately.** The rate window is per-*person across threads* — a join through one thread answers the wrong question — and the index that serves it needs these columns on this table |
+| `subject_user_id` | TEXT | With `tenant_id`: the `(tenant_id, subject_user_id, created_at)` index is the rate window's whole cost |
 | `seq` | INTEGER | Dense per-thread ordering, assigned under the thread's row lock — two tabs cannot interleave into ambiguity (edge case: two tabs, one thread) |
 | `message` | TEXT | What the person typed, ≤ 8 KiB, verbatim |
 | `disposition` | TEXT | `dispatched` / `declined` / `refused` |
@@ -127,9 +129,12 @@ sessions).
 
 ## Rate window *(a query, not a table)*
 
-`COUNT(*) FROM thread_turns WHERE subject + tenant + created_at > now() - 5min` ≥ 30 →
-refuse `rate_limited`. Stateless, restart-safe, one indexed query (index on
-`(tenant_id, subject_user_id, created_at)`).
+`COUNT(*) FROM thread_turns WHERE tenant_id = ? AND subject_user_id = ? AND created_at >
+now() - 5min` ≥ 30 → refuse `rate_limited`. Stateless, restart-safe, one indexed query —
+served by `thread_turns`'s own `(tenant_id, subject_user_id, created_at)` index, which is
+why those two columns are denormalized onto the turns table: the window counts a
+*person's* turns across every thread they have, and a query that joined through a single
+thread would bound each thread separately, which is thirty threads times thirty turns.
 
 ---
 
@@ -142,6 +147,7 @@ refuse `rate_limited`. Stateless, restart-safe, one indexed query (index on
 | No agent selected / none available | **declined** | `nothing_to_dispatch` |
 | Agent selected, not startable by this person | refused | `not_permitted` |
 | Turn limit exceeded | refused | `rate_limited` *(new reason, same frozen-mapping discipline as 011's `OPERATION_REASONS`)* |
+| Message over `MAX_MESSAGE_BYTES` | refused | `message_too_large` — refused whole, **never truncated** (011's `result_too_large` rule, pointing the other direction) |
 
 The decline/refusal distinction is FR-017's: the first says the platform does not do
 this, the second says this person may not — conflated, they tell someone their access is

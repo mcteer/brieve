@@ -249,7 +249,9 @@ reads as a boundary rather than a malfunction, and that is distinguishable from 
   requiring a model binding this feature deliberately does not acquire.
 - **FR-009a**: What carries forward MUST be bounded by a stated count or size, not by
   whatever a downstream limit happens to permit. A bound that emerges from a limit changes
-  silently when the limit does.
+  silently when the limit does. A message over its own bound is refused whole
+  (`message_too_large`) — **never truncated**, because a truncated consent record is a
+  consent record for something the person did not say.
 - **FR-009b**: When an earlier result falls outside the bound, the person MUST be able to
   see that it did. Someone unaware the platform forgot something reads a worse answer as a
   worse platform.
@@ -286,10 +288,16 @@ reads as a boundary rather than a malfunction, and that is distinguishable from 
   not do this, the second says this person may not.
 - **FR-017a**: A decline or refusal MUST start no run. A surface that dispatches on
   ambiguity is worse than one that declines on clarity.
-- **FR-018**: An authority change requested in conversation MUST remain Control-Group gated
-  (ADR-0016), and collecting its disposition MUST remain a read.
-- **FR-019**: Evidence reached through the portal MUST remain a read path that cannot
-  mutate or mask (ADR-0035).
+- **FR-018**: The portal offers **no authority-change path** — no page submits or collects
+  a claim-mapping change. The API operations stay Control-Group gated (ADR-0016) exactly as
+  011 left them, and the containment row is what holds this: a portal that grew a mapping
+  page without an API operation behind it would fail containment before it failed review.
+  *(Scoped by analyze pass 1: the original wording — "requested in conversation" — was
+  residue of the answering classes, describing a path this feature does not build.)*
+- **FR-019**: The portal offers **no evidence page**. Evidence remains reachable only
+  through the API's governed read path (ADR-0035), whose properties are already
+  conformance-held there; the portal adds no reader and therefore no new place for the
+  read path to be wrong. *(Same scoping, same reason, same pass.)*
 
 **The client**
 
