@@ -38,6 +38,10 @@ fi
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
 ok()  { printf '    \033[32mok\033[0m %s\n' "$*"; }
 die() { printf '\033[31mmissing prerequisite:\033[0m %s\n' "$*" >&2; exit 1; }
+# For the things a person may want but no gate needs. `die` stops the platform; this says
+# something is missing and lets the rest come up — the distinction 012 had to learn when a
+# dev-only identity provider blocked the enclave CI lane.
+warn() { printf '    \033[33mwarn\033[0m %s\n' "$*" >&2; }
 
 # .env values are quoted. Passing the quotes through made the trust store reject its
 # licence with "error decoding version: expected integer", which names neither quoting
@@ -407,6 +411,17 @@ nomad job run -var="repo=$REPO" "$REPO/infra/jobs/agent-run.nomad.hcl" >/dev/nul
 # The API's FIRST deployment (012). 008 built it and nothing ever served it — every
 # operation row since has been true about an app object rather than a running service.
 # The portal is a thin client over the API, and a client cannot be over what is not there.
+#
+# **These three WARN rather than die, and that is deliberate.** No conformance row needs
+# any of them: the gates reach Vault, Nomad, Postgres, the MCP service, and the agent-run
+# job, all of which are `die`-guarded above. What the API and portal serve is the
+# quickstart walkthrough — a person in a browser — and the dev IdP exists only to make that
+# login possible.
+#
+# The first version used `die`, and the CI enclave lane failed on it: a dev-only fake
+# identity provider taking longer than ten seconds to start blocked a lane whose actual
+# job is the durability and identity rows. A bring-up step that can stop the platform must
+# be something the platform needs.
 say "Development identity provider"
 # DEV ONLY, and quarantined in tests/ so the packaging boundary says so too. The portal's
 # login is a browser redirect, and a browser cannot redirect to a Python object. It
@@ -418,13 +433,16 @@ if curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1; then
 else
   (cd "$REPO" && nohup uv run --extra adapters --extra surfaces --extra portal \
      python -m tests.harness.dev_idp >/tmp/brieve-dev-idp.log 2>&1 &) 
-  for _ in $(seq 1 20); do
+  # 60s, not 10: the first `uv run` with a new extra set resolves and installs packages,
+  # which is exactly what CI does on a cold cache.
+  for _ in $(seq 1 120); do
     curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 && break
     sleep 0.5
   done
   curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 \
     && ok "dev idp listening on ${DEV_IDP_PORT} (authenticates nobody; never deploy)" \
-    || die "the development identity provider did not come up — see /tmp/brieve-dev-idp.log"
+    || warn "the development identity provider did not come up (see /tmp/brieve-dev-idp.log). \
+The portal login will not work; nothing else is affected."
 fi
 
 say "API service"
@@ -433,7 +451,7 @@ nomad job run -var="repo=$REPO" \
   -var="oidc_jwks_uri=http://127.0.0.1:${DEV_IDP_PORT}/jwks" \
   "$REPO/infra/jobs/api.nomad.hcl" >/dev/null 2>&1 \
   && ok "api registered (the northbound surface, served for the first time)" \
-  || die "could not register the api service — the portal would have nothing to be over"
+  || warn "could not register the api service; the portal will have nothing to be over"
 
 say "Portal"
 nomad job run -var="repo=$REPO" \
@@ -444,7 +462,7 @@ nomad job run -var="repo=$REPO" \
   -var="portal_redirect_uri=http://127.0.0.1:8082/callback" \
   "$REPO/infra/jobs/portal.nomad.hcl" >/dev/null 2>&1 \
   && ok "portal registered (thin client; holds no credential of any kind)" \
-  || die "could not register the portal"
+  || warn "could not register the portal"
 
 # ---------------------------------------------------------------- 5. the contract
 # Verification runs BEFORE success is reported. Otherwise the contract describes intent

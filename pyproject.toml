@@ -114,6 +114,15 @@ files = ["src", "tests"]
 mypy_path = "src"
 explicit_package_bases = true
 
+# The accessibility lane's driver is not installed in the inner loop, deliberately: it
+# pulls a browser toolchain that only `make a11y` and its CI job need, and making every
+# `make check` carry it would be a heavy dependency for one lane's benefit. mypy still
+# typechecks tests/a11y — the fixtures are `Any` at the boundary anyway, so what is lost is
+# stub-level checking of playwright's own API, not of this repository's code.
+[[tool.mypy.overrides]]
+module = "playwright.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/component"]
 pythonpath = ["src", "."]
