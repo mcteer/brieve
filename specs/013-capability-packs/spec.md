@@ -343,8 +343,14 @@ lower one is confined to golden paths and that the bound is a property of the de
   and the refusal names the cell.
 - **SC-004**: Zero paths exist by which a run reaches an unqualified model — including
   fallback, including when the pinned model is unavailable.
-- **SC-005**: Every eval gate named by the constitution runs and blocks. A gate that cannot
-  run reports failure rather than absence.
+- **SC-005**: The four eval gates this feature builds — must-deny, must-decline, citation
+  accuracy, estate-state — run and block. Report fidelity is absent by decision and points
+  at FR-013a; it is the one the constitution names that this feature does not ship, and
+  SC-011 states that outcome.
+- **SC-005a**: **A gate that cannot run reports failure rather than absence.** A suite whose
+  fixtures are missing, whose provider key is absent in the live lane, or whose pack cannot
+  be read must raise — never skip, never return an empty result set, never pass. This is
+  FR-014 and it is the property that stops a broken gate from reading green.
 - **SC-006**: A skill bump missing any one of provenance, injection-lens review, or a
   passing eval cannot promote.
 - **SC-007**: A skill containing an injection attempt is refused, and the refusal is in the
