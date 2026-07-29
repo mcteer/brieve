@@ -25,7 +25,11 @@ from surfaces.probes import vault_probe
 from surfaces.toolset import build_registry, known_actions, known_tools
 from tests.conformance.identity.conftest import production_fabric
 
-pytestmark = pytest.mark.host_enclave
+# BOTH markers, not `host_enclave` alone. The hermetic lane filters on `-m "not
+# enclave"`, which does not deselect `host_enclave` — so a row marked only host_enclave
+# RUNS IN THE FAST LANE with no enclave and fails for want of a stack. `host_enclave`
+# says *where* among enclave rows this must run; `enclave` says it needs one at all.
+pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
 
 def test_vault_is_reachable_from_the_probe_the_pack_names() -> None:

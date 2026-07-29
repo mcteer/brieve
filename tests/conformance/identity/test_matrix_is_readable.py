@@ -25,7 +25,11 @@ from core.authority.vault_fabric import (
     VaultIdentityFabric,
 )
 
-pytestmark = pytest.mark.host_enclave
+# BOTH markers, not `host_enclave` alone. The hermetic lane filters on `-m "not
+# enclave"`, which does not deselect `host_enclave` — so a row marked only host_enclave
+# RUNS IN THE FAST LANE with no enclave and fails for want of a stack. `host_enclave`
+# says *where* among enclave rows this must run; `enclave` says it needs one at all.
+pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
 
 def _reason(exc: ResolutionRefused) -> str:
