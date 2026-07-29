@@ -39,6 +39,8 @@ reads as four-of-five rather than as complete.
 | The tool vocabulary comes from packs | No hardcoded tool-name set survives outside pack manifests. `parse_ceiling_record` refuses any ceiling naming a tool outside the known set, so a stale constant makes a correct ceiling record look broken and points at the wrong artifact |
 | The matrix is readable | The run role can read `data/model-matrix/*` against the live fabric. A row rather than a Terraform review, because a grant present in HCL and a grant that is *effective* are different claims — 010 learned that when the registry engine appended policies nobody had declared |
 | The run path does not import the gate harness | No module reachable from `core.run` imports `core.evals`. A cell is read on the run path; the scoring harness must never be |
+| A pinned pack that is gone refuses | A definition naming an unloaded pack refuses `pack_not_loaded` at run start, not mid-run |
+| Cells are per role | The same pack and model qualified for one role and refused for another — the dimension ADR-0039 adds, and the one a `(pack, model)` lookup would silently ignore |
 | Digests are verified at load | A skill whose bytes changed without its pin changing refuses `digest_mismatch` |
 | Promotion needs all three | Provenance, injection lens, and a passing eval — any one absent blocks (FR-017, SC-006) |
 
@@ -63,6 +65,11 @@ column exists so it cannot be read as more than it is.
 - **Provenance-at-read works against a real corpus.** The validated-design corpus left with
   US6, so US4's mechanism is proven against a controlled fixture. The mechanism is built;
   the corpus is not, and the first real one arrives with the answering feature.
+- **That a passing skill bump is an unchanged one.** A bump can pass every suite and still
+  change behaviour the suites do not cover — *passing is not the same as unchanged*. This is
+  the honest limit of eval-gating and it is not fixable by another row: a suite can only
+  assert what someone thought to encode. It is recorded here because a gate whose limits are
+  unwritten gets read as a guarantee, and ADR-0004's human review is what covers the rest.
 - **The injection lens catches novel phrasing.** Pattern-based by necessity — a
   model-scored lens would need a qualified cell, which needs the gates, a second regress
   with no seed set to terminate it. A row asserts a phrasing it misses, so the floor is
