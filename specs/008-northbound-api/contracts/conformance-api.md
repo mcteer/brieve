@@ -139,6 +139,17 @@ One thing the coverage half still cannot do is compare *verdicts*, which is a se
 of rows in `tests/conformance/mcp/test_surface_parity.py`. Two surfaces can expose the same
 ten operations and disagree about what each returns.
 
+## The snapshot grew again (012): ten to fifteen
+
+Five thread operations, landed snapshot-first one at a time — grow the snapshot, watch
+parity go red, land both surfaces, watch it go green. The parity row's implementation did
+not change, which is the property that makes it worth having.
+
+**The portal did not grow it.** It is a *consumer* of this catalogue, not a third
+implementation, so parity still binds exactly one pair (API↔MCP) while the portal's own
+rows assert containment — that it exposes nothing this catalogue does not. Those live in
+`specs/012-conversational-portal/contracts/conformance-portal.md`.
+
 ## Sealed-core review
 
 This feature changes sealed core in five places, and **two of them are not additive**:

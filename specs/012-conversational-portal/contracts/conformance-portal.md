@@ -1,6 +1,6 @@
 # Conformance: The Portal Surface
 
-**Feature**: `specs/012-conversational-portal` | **Date**: 2026-07-29 | **Status**: Planned
+**Feature**: `specs/012-conversational-portal` | **Date**: 2026-07-29 | **Status**: **In force** (as of 012's merge)
 
 The portal's obligation is **containment, not equivalence** (spec clarification,
 2026-07-29): the parity row keeps binding API↔MCP, and the portal's rows assert it adds
@@ -28,6 +28,34 @@ nothing. These rows are blocking from the moment this feature lands (ADR-0047).
 | Deletion masks nothing | `THREAD_DELETED` is in the chain; every run the thread started remains explainable — rationale, subject, order — from the trail |
 | Verbatim context | The second run's received context is byte-identical to the first run's recorded result (SC-002); the bound's drops appear on the turn and in its event |
 | No inherited authority | A turn dispatched after the subject's roles narrowed is authorized against the narrowed roles (FR-008); the earlier turn's authority is nowhere consulted |
+
+## Break fixtures — run, not described
+
+All six were applied to the tree, the row watched to fail, and the change reverted.
+**Every one was detected**, which is worth recording because 011's equivalent exercise
+found one fixture in four survivable — and that one guarded the defect the feature was
+most likely to reintroduce. The list below is what was run.
+
+| Fixture | Caught by |
+| --- | --- |
+| Dispatch before record (decline branch) | `test_every_accepted_disposition_is_recorded_with_the_message` |
+| Carried context truncated by one byte | `test_carried_context_is_byte_identical_to_what_was_recorded` |
+| A page handler reaching past the relay | `test_row_only_declared_modules_can_reach_the_network` |
+| The token written into the cookie | `test_the_cookie_carries_an_opaque_id_and_never_the_token` |
+| A refusal record carrying the message | `test_an_oversized_message_is_refused_and_its_content_is_not_recorded` |
+| An unconditional client reload | `test_row_the_client_does_not_reload_unconditionally` |
+
+**Two defects were found by running the gates rather than by these fixtures**, and both
+were in code no hermetic row executes:
+
+- **The session cookie was unusable in a browser.** `__Host-` requires `Secure`; a
+  `secure_cookies=False` development flag made a real browser reject the cookie outright.
+  The flag is gone — `Secure` is no longer configurable.
+- **The client reloaded on every stream close**, which on a settled thread is an infinite
+  loop. The accessibility gate ran in 117 seconds while looping and 1.9 after the fix.
+
+Both are the argument for a lane that drives a real browser, stated as evidence rather
+than as a preference.
 
 ## Break fixtures worth naming
 

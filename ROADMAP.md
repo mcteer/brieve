@@ -32,10 +32,11 @@ being re-derived at the start of every spec.
 | 009 | MCP surface | ADR-0033 (second transport), ADR-0049 (**resolved by building it**), ADR-0035, ADR-0048 | Fifteen MCP rows. **Surface parity claimed** — the row 008 could not assert, now that there are two transports to compare |
 | 010 | Production identity fabric | ADR-0015 (**first feature that reads the registry at runtime**), ADR-0050 (new), ADR-0044 (mirroring seam; credential translation still deferred), ADR-0048 | Identity rows against the live trust fabric, in-allocation. **The gap every prior feature rested on** |
 | 011 | Northbound API operations | ADR-0033 (the parity row grows with the catalogue), ADR-0034 (the portal's precondition), ADR-0035, ADR-0016, ADR-0049 (stop as withdrawal, not the pause it removed) | Sixteen operation rows, plus verdict parity over the grown catalogue |
+| 012 | The conversational portal | ADR-0034 (**built**), ADR-0051 (new — a turn is evidence, a thread is a view), ADR-0033 (the portal is a consumer, so parity still binds one pair), ADR-0032 (the ungoverned loop, made structurally impossible), ADR-0049 (no pause, asserted as an absence) | Eight containment rows, eight accessibility rows, and the API's first deployment |
 
 ## In progress
 
-Nothing. 011 shipped; the next feature has no number until `/speckit-specify` creates its
+Nothing. 012 shipped; the next feature has no number until `/speckit-specify` creates its
 directory.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
@@ -69,7 +70,7 @@ wearing a different name.
 | 008 | **API** | ✅ Shipped. The surface the others consume. Carries the audit plane as a governed read path |
 | 009 | **MCP** | ✅ Shipped. The persistent service coding IDEs talk to. Carries the dependency health checks and the resume sweeper decided in ADR-0049 — both needed a long-lived home, and this is it — plus the continuous evidence-stream verification 008 deferred here, and the second CI lane |
 | — | CLI | **Tabled** (2026-07-28) — see below |
-| — | Portal | Over the API. ADR-0034. **Its API preconditions are met as of 011** — the catalogue carries the operations a portal needs; what remains is the portal, and the thread model that ships with it |
+| 012 | **Portal** | ✅ Shipped. Threads, the client, and the API's first actual deployment — 008 built `create_app` and nothing had ever served it. **Answering is not here**: estate-state and grounded guidance need an eval-gated model binding, and follow capability packs |
 
 **Gate row, no longer owed:** surface parity. It stayed owed through 008 because parity
 cannot be asserted against a single surface. **009 amended the row and satisfied the amended
@@ -97,6 +98,19 @@ change wearing the clothes of a scheduling one.
 **Why here:** the first features that ship something a user touches directly. They need the
 authorization core (002/003) and the approval gate (007) settled behind them; attempting them
 earlier means building transports over guarantees still in motion.
+
+### Portal answering — estate-state and grounded guidance (ADR-0034, ADR-0039)
+
+**Unnumbered, and after capability packs**, which is not a preference but a dependency:
+ADR-0039 makes an `ask` binding inexpressible without a green Qualified Model Matrix cell,
+and the eval gates that green a cell are that feature's. 012 split these out on exactly
+that evidence — the platform installs zero model providers on purpose, so these would be
+its first model call.
+
+What it inherits, so it does not rediscover it: the corpus is settled (HashiCorp Validated
+Patterns — 33 documents, stable per-section anchors, **no version metadata anywhere**, so
+change detection must be content-based), and ADR-0039 has already decided the rule it will
+be tempted to bend — *ask answers, it never acts*.
 
 ### Capability packs and eval gates (ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045)
 
@@ -170,6 +184,7 @@ ADR — never a passing stub.**
 | Tool-call parity under deferred disclosure | Deferred-disclosure feature | Deferred — ADR-0040 |
 | Eval gates (packs, models, policies) | Capability packs | Deferred — Principle VIII |
 | Registry isolation (control-plane write denials) | — | **Unassigned** — see gaps below |
+| Accessibility (WCAG 2.2 AA, rendered interface) | 012 | ✅ **In force.** A gate class no prior lane could run: every other gate asserts something about a process, this one about a rendered page. Automated over every page state with a vendored, pinned axe ruleset; the criteria automation cannot assert are enumerated with **Dan** as the named runner (constitution v1.1.0). A green run is deliberately not a conformance claim |
 
 ## Open records
 
