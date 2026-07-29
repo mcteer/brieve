@@ -26,6 +26,27 @@ resource "vault_policy" "harness_database" {
   HCL
 }
 
+# What a dispatched run's PACK TOOLS may read in the agent secret space (013).
+#
+# Role-level, and the limitation is the point of the comment: every dispatched run shares
+# this grant, because narrowing the VAULT-TOKEN layer per definition is credential
+# translation (ADR-0044) — its own feature, explicitly out of 013's scope. What IS
+# per-definition today is the harness-domain ceiling: which TOOLS a definition may call is
+# bounded by its ceiling record, and a definition whose ceiling omits `vault_read` never
+# reaches this path at all. The two jurisdictions stay disjoint (ADR-0044), and this grant
+# is the fixture space the conformance probe reads — not a production posture.
+resource "vault_policy" "agent_pack_secrets" {
+  name   = "agent-pack-secrets"
+  policy = <<-HCL
+    path "${vault_mount.agent_secrets.path}/data/conformance/*" {
+      capabilities = ["read"]
+    }
+    path "${vault_mount.agent_secrets.path}/metadata/*" {
+      capabilities = ["read"]
+    }
+  HCL
+}
+
 # The evidence read path's credential, deliberately a SEPARATE policy from the one above
 # rather than another path added to it.
 #

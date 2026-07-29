@@ -9,6 +9,16 @@
 # whose tools were never called must not read as one whose tools were. Its eval status and
 # its tool reachability are separate facts, and a row asserts they stay that way.
 
+# PRODUCT_MODE IS "none", AND THE FIRST DISPATCH TAUGHT WHY. These tools run on the
+# ALLOCATION'S platform identity — the workload logs into Vault as itself and reads the
+# agent secret space. `federate` means the USER'S identity is carried into the product,
+# which is ADR-0044's credential translation and RFC 8693 territory: explicitly out of
+# 013's scope. Declaring federate anyway made the entitlement mirror refuse the first
+# real invoke — the governance layer correctly catching a manifest that claimed
+# user-identity semantics for a platform-identity tool. `product` stays declared, because
+# reachability monitoring and the dependency gate key on it, and neither is about whose
+# identity a call carries.
+
 [pack]
 name       = "terraform"
 product    = "terraform"
@@ -35,8 +45,6 @@ risk_class     = "read"
 transport      = "mcp"
 handler        = "terraform_plan"
 product        = "terraform"
-product_mode   = "federate"
-product_action = "terraform.plan"
 repeatable     = true
 
 [[tools]]
@@ -49,8 +57,6 @@ handler    = "terraform_apply"
 # parks the run unless something can go and find out what actually happened.
 observer       = "terraform_apply_observer"
 product        = "terraform"
-product_mode   = "federate"
-product_action = "terraform.apply"
 repeatable     = false
 
 [[skills]]

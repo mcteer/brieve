@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import sys
 from datetime import UTC, datetime
+from typing import Any
 
 from core.audit.postgres_sink import PostgresAuditSink
 from core.authority.types import AuthorityScope
@@ -35,6 +36,14 @@ from core.run import RunState, start_governed_run
 from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
 from surfaces.toolset import build_registry, content_pins
+
+
+def _product_action_of(registry: Any, tool_name: str) -> str:
+    """The action a tool performs, or empty for unregistered/actionless tools."""
+    try:
+        return str(registry.resolve(tool_name).product_action or "")
+    except Exception:  # noqa: BLE001 — manufacture refuses unknown tools; not our job here
+        return ""
 
 
 def main() -> int:
@@ -93,7 +102,23 @@ def main() -> int:
         subject_user_id=subject_user_id,
         tenant_id=tenant_id,
         agent_definition_id=definition_id,
-        requested_scope=AuthorityScope(tool_names=tools),
+        # Tools AND the product actions those tools perform, both derived from the
+        # registry. The intersection algebra is strict — an empty requested action set
+        # yields an empty effective action set — so a request naming only tools
+        # manufactures authority that can hold a product tool and never invoke it:
+        # the authority hook refuses `authority_insufficient` at the first call. Nothing
+        # dispatched ever invoked a product tool before 013's opt-in step, which is why
+        # five features' worth of dispatched rows never met this. Unknown names skip —
+        # manufacture refuses them on the tool set, which is the right refusal.
+        requested_scope=AuthorityScope(
+            tool_names=tools,
+            product_actions=frozenset(
+                action
+                for name in tools
+                for action in [_product_action_of(registry, name)]
+                if action
+            ),
+        ),
         # The production fabric, resolving every term from the control-plane trust fabric
         # under this allocation's own identity. What this line used to say is the whole
         # reason the module lived under `tests/`.

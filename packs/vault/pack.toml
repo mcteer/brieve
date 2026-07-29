@@ -12,6 +12,16 @@
 # upstream uses (FR-027d), so contributing them back is a pull request rather than a
 # rewrite — which makes authoring here a temporary state by design rather than a fork.
 
+# PRODUCT_MODE IS "none", AND THE FIRST DISPATCH TAUGHT WHY. These tools run on the
+# ALLOCATION'S platform identity — the workload logs into Vault as itself and reads the
+# agent secret space. `federate` means the USER'S identity is carried into the product,
+# which is ADR-0044's credential translation and RFC 8693 territory: explicitly out of
+# 013's scope. Declaring federate anyway made the entitlement mirror refuse the first
+# real invoke — the governance layer correctly catching a manifest that claimed
+# user-identity semantics for a platform-identity tool. `product` stays declared, because
+# reachability monitoring and the dependency gate key on it, and neither is about whose
+# identity a call carries.
+
 [pack]
 name       = "vault"
 product    = "vault"
@@ -33,8 +43,6 @@ handler    = "vault_read"
 # (Principle II) — a provision that has never been actionable because nothing in this
 # platform could tell a secret-touching tool from any other until 013 added the field.
 product        = "vault"
-product_mode   = "federate"
-product_action = "vault.read"
 repeatable     = true
 
 [[tools]]
@@ -47,8 +55,6 @@ handler    = "vault_write"
 # rather than by assumption, and the loader refuses without one.
 observer       = "vault_write_observer"
 product        = "vault"
-product_mode   = "federate"
-product_action = "vault.write"
 repeatable     = false
 
 [[skills]]

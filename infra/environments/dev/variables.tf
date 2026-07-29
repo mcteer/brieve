@@ -85,7 +85,10 @@ variable "agent_definitions" {
       ceiling_policy  = "agent-ceiling-vault"
       allowed_paths   = ["secret/data/conformance/*"]
       tool_names      = ["vault_read"]
-      product_actions = ["vault.read"]
+      # Empty, with the manifest's reasoning: the pack's tools are platform-identity
+      # reads (product_mode none), so there is no product action to authorize until
+      # credential translation (ADR-0044) federates the user into the product.
+      product_actions = []
       packs           = ["vault"]
       tier            = 1
     }
@@ -150,7 +153,7 @@ variable "role_bindings" {
     # that role's exact contents are what the ceiling-pair rows intersect against.
     "vault-operator" = {
       tool_names      = ["vault_read"]
-      product_actions = ["vault.read"]
+      product_actions = []
     }
   }
 }
