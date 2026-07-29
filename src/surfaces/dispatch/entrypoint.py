@@ -33,7 +33,8 @@ from core.durability.postgres import PostgresDurabilityProvider
 from core.durability.types import CheckpointBlob, IntentRecord, ResultRecord, RunOutcome
 from core.registry.memory import ToolRegistry
 from core.run import RunState, start_governed_run
-from surfaces.api.runs import RESULT_KEY
+from core.threads.context import RESULT_KEY, resolve_run_input
+from core.threads.postgres import PostgresThreadStore
 
 
 def main() -> int:
@@ -185,6 +186,24 @@ def main() -> int:
                 )
             )
 
+    # What this run was asked to do, and what it was given to work from.
+    #
+    # Read from durable state rather than from the environment, and that is the point: a
+    # person's free text must not enter a jobspec, where it would be visible to anyone with
+    # scheduler access and outside the tenant-scoped read path. `resolve_run_input` reads
+    # the message and turns each carried run id into the bytes that run's result was
+    # recorded as — reading the record rather than a copy that travelled, which is what
+    # makes "byte-identical" true by construction.
+    #
+    # None means this run was started outside a thread. Not an error: those runs behave
+    # exactly as they did before this feature existed.
+    thread_store = PostgresThreadStore(credentials=credentials)
+    resolved = resolve_run_input(
+        run_id=os.environ.get("RUN_ID", "").strip() or correlation_id,
+        store=thread_store,
+        durability=PostgresDurabilityProvider(credentials=credentials),
+    )
+
     # A terminal checkpoint, so the run has an ending anyone can read.
     #
     # Before 011 this entrypoint started a run, printed, and exited — leaving no terminal
@@ -196,7 +215,21 @@ def main() -> int:
     durability.save(
         CheckpointBlob(
             blob_id=os.environ.get("RUN_ID", "").strip() or correlation_id,
-            payload={RESULT_KEY: {"started": True, "tools": sorted(tools)}},
+            payload={
+                RESULT_KEY: {
+                    "started": True,
+                    "tools": sorted(tools),
+                    # Echoed so a row can assert what the run actually received, rather
+                    # than asserting that the resolver returned something and hoping the
+                    # run read it.
+                    "message": resolved.message if resolved else None,
+                    "received_context": (
+                        [{"run_id": rid, "result": body} for rid, body in resolved.context]
+                        if resolved
+                        else []
+                    ),
+                }
+            },
             correlation_id=correlation_id,
             grant_id=getattr(run.authority, "credential_id", ""),
             step_index=0,
