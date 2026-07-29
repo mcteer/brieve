@@ -62,7 +62,7 @@ scale.
 | II — Total Interception; One Governed Tool Layer | **Pass** | The principle itself names this surface: "the portal is a thin client: no logic, orchestration, or model calls client-side" — built here structurally (the browser receives rendered state, not machinery). No tool route is added to any surface. Thread operations land on both transports; verdicts conformance-asserted. |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | No new enforcement point. Declines and refusals fail closed at the turn operation (FR-017a: no run on ambiguity); the portal adds no authorization logic to fail open *with*. |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass** | The portal holds no static credential: public OIDC client (PKCE, no secret), person's token held server-side in a memory session, relayed per-request. Every turn re-authorizes (FR-008); context carries **results**, never authority (ADR-0042's cached-results rule respected). |
-| V — Sealed Core, Versioned Seams | **Pass, one recorded seam change** | `AuditEventType` gains `TURN_RECORDED` / `THREAD_DELETED` — additive schema growth, this approved spec is the required spec, security-maintainer review is Dan, recorded in the conformance contract. The obvious second change — `input=` on the dispatch seam — was **avoided** by research D6: run input is durable state read by the run, not metadata passed through the scheduler, so the seam does not move and a person's text never enters a jobspec. |
+| V — Sealed Core, Versioned Seams | **Pass, one recorded seam change** | `AuditEventType` gains `TURN_RECORDED` / `TURN_REFUSED` / `THREAD_DELETED` — additive schema growth, this approved spec is the required spec, security-maintainer review is Dan, recorded in the conformance contract. The obvious second change — `input=` on the dispatch seam — was **avoided** by research D6: run input is durable state read by the run, not metadata passed through the scheduler, so the seam does not move and a person's text never enters a jobspec. |
 | VI — Lean by Default | **Pass** | No node toolchain, no build step, no SPA, no new operated component beyond the portal service — whose named trigger **is ADR-0034**. Playwright is a dev-lane dependency, not an operated one. |
 | VII — Anti-Fragmentation | **Pass** | Same core, same control-plane posture; the portal is identical across substrates; only the substrate differs. |
 | VIII — Eval-Gated Promotion | **Pass (by construction)** | Zero model use — the clarification split removed it. The portal's decline is deterministic, so no must-decline eval suite binds yet; recorded in the conformance contract so its absence reads as scoped, not forgotten. |
@@ -100,9 +100,10 @@ src/core/threads/
 ├── store.py             # ThreadStore protocol + InMemoryThreadStore
 ├── postgres.py          # PostgresThreadStore (011's store pattern, verbatim discipline)
 ├── turns.py             # The turn decision: decline / refuse / dispatch, rate limit, context bound
+├── context.py           # resolve_run_input(): the one function that turns context refs into verbatim results
 └── schema.sql           # threads, thread_turns (idempotent, applied at bring-up)
 
-src/core/audit/schema.py # + TURN_RECORDED, THREAD_DELETED (additive)
+src/core/audit/schema.py # + TURN_RECORDED, TURN_REFUSED, THREAD_DELETED (additive)
 
 src/surfaces/api/
 ├── threads.py           # Five routes; evidence-first turn handling

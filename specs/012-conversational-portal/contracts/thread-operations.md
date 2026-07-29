@@ -26,15 +26,27 @@ needs an id to subscribe to before the first turn resolves.
 The consequential one. Request: `message` (≤ 8 KiB), `agent_definition_id` (optional —
 absent means nothing was selected), `requested_tools` (optional, as `start_run` takes).
 
-Ordered semantics, and the order is the contract:
+Ordered semantics, and the order is the contract. The load-bearing distinction is
+**pre-acceptance versus accepted** (analyze pass 2, I4): a message the platform never
+accepted gets a small fixed-size refusal record; a message it accepted gets a
+`TURN_RECORDED` event carrying the message itself. Without that split, either rate-limited
+messages vanish from the record, or the append-only trail is floodable at whatever HTTP
+rate a subject can achieve — the rate limit would protect dispatch while leaving evidence
+unbounded.
 
 1. **Resolve the thread** — absent or another tenant's → not found; another subject's in
-   the same tenant → refused `not_permitted`.
-2. **Rate window** — over the limit → refused `rate_limited`.
+   the same tenant → refused `not_permitted`. Response reason codes, per the platform's
+   existing refusal posture — there is no thread to chain an event under.
+2. **Pre-acceptance checks** — over the rate window → refused `rate_limited`; message
+   over `MAX_MESSAGE_BYTES` → refused `message_too_large`. Each writes a **`TURN_REFUSED` event — small, fixed-size, without the message** under the thread's correlation ID, so
+   the attempt is visible in the trail while per-attempt trail growth stays bounded.
 3. **Compute context** — the 5 most recent dispatched turns with results; record what
    fell outside the bound.
-4. **Write the `TURN_RECORDED` trail event.** Before dispatch, before the turn row —
-   evidence first. A turn that reaches step 5 without a trail event cannot exist.
+4. **Write the `TURN_RECORDED` trail event** — the message verbatim, before dispatch,
+   before the turn row. Evidence first: a turn that reaches step 5 without a trail event
+   cannot exist. This covers all three **accepted** dispositions — `dispatched`,
+   `declined`, and scope-`refused` — and the scope refusals are deliberate: the asks a
+   person made *beyond their authority* are the ones an investigator most wants.
 5. **Decide**: no agent selected / none available → `declined: nothing_to_dispatch`;
    agent not startable by this subject (011's `may_start` intersection) → `refused:
    not_permitted`; otherwise write `run_inputs`, dispatch through the **same core path

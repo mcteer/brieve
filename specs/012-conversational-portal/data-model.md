@@ -85,12 +85,15 @@ the scheduler (research D6: a person's text must not enter a jobspec).
   through `get_run_result`; the tenant boundary was enforced when the turn was accepted
   (context may only reference runs from the same thread).
 
-## Trail events *(two new `AuditEventType` members — the sealed-core change)*
+## Trail events *(three new `AuditEventType` members — the sealed-core change)*
 
 ### `TURN_RECORDED`
 
-Written under the thread's `correlation_id` for **every** submitted message, before the
-turn does anything else.
+Written under the thread's `correlation_id` for every **accepted** message — dispatched,
+declined, or scope-refused — before the turn does anything else. **Pre-acceptance
+refusals (`rate_limited`, `message_too_large`) get a small fixed-size refusal record
+without the message instead**: the attempt is in the trail, but a subject cannot grow the
+append-only evidence store at HTTP rate by being refused (analyze pass 2, I4).
 
 Payload: `thread_id`, `turn_id`, `seq`, `subject_user_id`, `tenant_id`, `message`
 (verbatim), `disposition`, `reason` (when not dispatched), `agent_definition_id` (when
@@ -102,6 +105,15 @@ that lets an investigator walk from the thread's chain into the run's), `context
 - A **declined or refused** turn's event is the only durable copy of that message once
   its thread is deleted, and that is the point (D4): the asks that started nothing are
   the ones an investigator most wants.
+
+### `TURN_REFUSED`
+
+The pre-acceptance record. Fixed-size payload: `thread_id`, `subject_user_id`,
+`tenant_id`, `reason` (`rate_limited` / `message_too_large`), `message_bytes` (the size,
+never the content). Exists because a refusal that leaves no record makes flooding
+invisible, and a refusal that records the message makes flooding effective — the size
+field lets an investigator see the shape of an abuse attempt without the trail carrying
+its payload.
 
 ### `THREAD_DELETED`
 
@@ -138,16 +150,23 @@ thread would bound each thread separately, which is thirty threads times thirty 
 
 ---
 
-## Refusal shapes (unchanged vocabulary, one addition)
+## Refusal shapes (unchanged vocabulary, two additions)
 
-| Situation | Caller sees | Trail records |
+**A wording honesty note (analyze pass 2, C2)**: for not-found and pre-acceptance rows,
+the "trail" column names the *reason code the response carries and a refusal record where
+stated* — run-operation refusals today are response codes, not audited events (only
+evidence reads have a refusal event), and this feature follows that posture rather than
+quietly inventing a new mechanism. The turn operation's own events (`TURN_RECORDED`,
+`THREAD_DELETED`) are where this feature's trail writing lives.
+
+| Situation | Caller sees | Reason / record |
 | --- | --- | --- |
 | No such thread / other tenant's | not found — identically | `no_such_record` / `outside_tenant` |
 | Someone else's thread, same tenant | refused | `not_permitted` |
 | No agent selected / none available | **declined** | `nothing_to_dispatch` |
 | Agent selected, not startable by this person | refused | `not_permitted` |
-| Turn limit exceeded | refused | `rate_limited` *(new reason, same frozen-mapping discipline as 011's `OPERATION_REASONS`)* |
-| Message over `MAX_MESSAGE_BYTES` | refused | `message_too_large` — refused whole, **never truncated** (011's `result_too_large` rule, pointing the other direction) |
+| Turn limit exceeded | refused | `rate_limited` — fixed-size refusal record, no message *(new reason, same frozen-mapping discipline as 011's `OPERATION_REASONS`)* |
+| Message over `MAX_MESSAGE_BYTES` | refused | `message_too_large` — refused whole, **never truncated**; fixed-size refusal record, no message |
 
 The decline/refusal distinction is FR-017's: the first says the platform does not do
 this, the second says this person may not — conflated, they tell someone their access is

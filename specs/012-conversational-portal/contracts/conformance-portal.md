@@ -73,5 +73,5 @@ its starting obligation.
 
 ## Sealed-core review
 
-One sealed-core change: two additive `AuditEventType` members (`TURN_RECORDED`,
-`THREAD_DELETED`). Approved spec: this feature's. Security-maintainer review: Dan.
+One sealed-core change: three additive `AuditEventType` members (`TURN_RECORDED`,
+`TURN_REFUSED`, `THREAD_DELETED`). Approved spec: this feature's. Security-maintainer review: Dan.
