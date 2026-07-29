@@ -114,7 +114,7 @@ run id in any rendered page; every request in the relay log is a catalogued oper
 - [X] T035 [US1] Create `src/surfaces/portal/events.py` + SSE wiring in `portal.js`: server-side bounded polling (2s) of `get_run`/`get_run_result` with the person's token; stream ends on 403 (fail-closed) and on terminal state; per-subject concurrent-stream cap
 - [X] T036 [P] [US1] Component rows in `tests/component/test_portal_start_and_watch.py`: scripted session (fake IdP, in-memory assembly) — start → disposition renders; no run id string appears in any rendered page (SC-001); the SSE source emits state transitions and closes on terminal
 - [X] T037 [US1] [GATE:correlation] Component row in `tests/component/test_portal_run_attribution.py`: a run started from the portal carries the person as subject and is indistinguishable in the trail from the same run started directly through the API — same events, same subject, same authorization path (SC-007)
-- [ ] T038 [US1] [GATE:conformance] Enclave row in `tests/conformance/api/test_thread_dispatch_enclave.py` (`host_enclave`): a turn accepted through the served API dispatches a real allocation whose entrypoint reads its `run_inputs` row; the run completes and its result is reachable through `get_run_result`
+- [X] T038 [US1] [GATE:conformance] Enclave row in `tests/conformance/api/test_thread_dispatch_enclave.py` (`host_enclave`): a turn accepted through the served API dispatches a real allocation whose entrypoint reads its `run_inputs` row; the run completes and its result is reachable through `get_run_result`
 
 **Checkpoint**: US1 demonstrable end-to-end against the enclave.
 
@@ -128,10 +128,10 @@ never carries forward.
 **Independent test**: two-turn thread — the second run receives the first's result
 byte-identical; a six-result thread shows exactly which result fell out of the bound.
 
-- [ ] T039 [P] [US2] Component rows in `tests/component/test_thread_context.py`: second turn's `context_run_ids` names the first turn's run; the run receives the recorded bytes (SC-002); with six dispatched-with-result turns, the oldest is in `context_dropped` and the newest five carry (SC-002a); declined/refused turns never enter context
-- [ ] T040 [US2] Render context visibility in `templates/thread.html`: what this turn carried forward, and what fell out of the bound (FR-009b — a person who does not know the platform forgot something reads a worse answer as a worse platform)
-- [ ] T041 [US2] [GATE:fail-closed] Component row in `tests/component/test_turn_authority_fresh.py`: narrow the subject's roles between turn one and turn two — turn two is authorized against the narrowed roles and refused where they no longer suffice; nothing consults turn one's authority (FR-008, US2 scenario 3)
-- [ ] T042 [US2] [GATE:no-secret-leak] Component row in `tests/component/test_context_carries_results_not_authority.py`: context resolution reads results only — no grant id, no token, no credential material appears in what a later run receives (ADR-0042's cached-results rule)
+- [X] T039 [P] [US2] Component rows in `tests/component/test_thread_context.py`: second turn's `context_run_ids` names the first turn's run; the run receives the recorded bytes (SC-002); with six dispatched-with-result turns, the oldest is in `context_dropped` and the newest five carry (SC-002a); declined/refused turns never enter context
+- [X] T040 [US2] Render context visibility in `templates/thread.html`: what this turn carried forward, and what fell out of the bound (FR-009b — a person who does not know the platform forgot something reads a worse answer as a worse platform)
+- [X] T041 [US2] [GATE:fail-closed] Component row in `tests/component/test_turn_authority_fresh.py`: narrow the subject's roles between turn one and turn two — turn two is authorized against the narrowed roles and refused where they no longer suffice; nothing consults turn one's authority (FR-008, US2 scenario 3)
+- [X] T042 [US2] [GATE:no-secret-leak] Component row in `tests/component/test_context_carries_results_not_authority.py`: context resolution reads results only — no grant id, no token, no credential material appears in what a later run receives (ADR-0042's cached-results rule)
 
 **Checkpoint**: US1+US2 together are the MVP — a portal that converses.
 
