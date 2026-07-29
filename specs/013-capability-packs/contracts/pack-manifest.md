@@ -12,7 +12,7 @@ A pack **declares**; the platform **decides**. Nothing in a manifest grants anyt
 2. **Verify every content digest.** A mismatch refuses with `digest_mismatch` and names the
    file. Verification happens at load rather than at review, because review is when someone
    looked and load is when it matters.
-3. **Validate every tool declaration.** A non-repeatable tool with no observer refuses
+3. **Validate every tool and hook declaration.** A pack hook declaring `capability_kind = governance` refuses `governance_hook_from_pack` — enforcement is the platform's. A non-repeatable tool with no observer refuses
    `observer_required`; a `product_mode` other than `none` without `product` and
    `product_action` refuses `incomplete_product_binding`. Both in the pack's own vocabulary
    rather than as a registry `ValueError` one layer down.
@@ -36,6 +36,7 @@ a reader knows where to look for every way a pack can be rejected.
   `apply`. The ceiling still decides, and a declaration outside it refuses
   `pack_exceeds_ceiling` (FR-005) — asserted, because "the pack said so" is the obvious
   shortcut and would read as a feature rather than a hole.
+- **It does not let a pack author enforcement.** Pack hooks register at non-governance kinds only, so a pack cannot satisfy the platform's enforcement-is-whole check with its own hook, and `GovernanceCapability` still runs first.
 - **It does not bypass hooks.** Pack tools are `ToolRegistry` registrations, so they inherit
   the pipeline **by construction**. There is no pack-tool code path; that is the whole
   design (FR-003).

@@ -24,6 +24,7 @@ authority by shipping a file.
 | `upstream` | table? | For `adopted`: repository, commit, licence. Absent for `authored` |
 | `tools[]` | array | Tool declarations — see below |
 | `skills[]` | array | Skill pins — see below |
+| `hooks[]` | array | Pack hook declarations — see below. **Never `capability_kind = GOVERNANCE`** |
 | `workflows[]` | array | Workflow declarations, each with a minimum tier |
 | `evals` | table | Which suites this pack ships cases for |
 
@@ -62,6 +63,33 @@ anything is interrupted. **Loading refuses `observer_required`**, which is where
 code; nothing in this platform has ever known how dangerous a tool is. Harmless while every
 tool was `echo`, and not harmless the moment a pack declares something that deletes
 infrastructure — which is the first thing a real pack does.
+
+## Pack hook declaration *(inside the manifest)*
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `name` | string | Qualified by its pack |
+| `phase` | enum | `pre` \| `post` |
+| `capability_kind` | enum | **Never `governance`.** Refused at load: `governance_hook_from_pack` |
+| `handler` | string | Resolved from what the platform provides, like a tool's |
+
+**This is the one manifest component that is not inert content, and it went nine passes
+without a record.** FR-001 and the glossary have both listed pack hooks since specify time;
+the manifest had `tools`, `skills`, `workflows`, and `evals`.
+
+**Why the governance restriction is the whole point**: `has_required_governance_hooks`
+asserts the built-in governance pre-hooks are all present, and it identifies them by
+`capability_kind == GOVERNANCE`. A pack registering a hook of that kind would enter the set
+that check validates — so a pack could satisfy the platform's enforcement-is-whole check
+with its own hook, which is enforcement authored by whoever ships a pack. Principle III
+requires `GovernanceCapability` to run first and fail closed; a pack that could register at
+that kind can reorder enforcement.
+
+**Pack hooks receive the narrowed context and must not read `HookContext.run`.** That field
+carries its own warning — *"populated for built-in governance hooks only; third-party hooks
+must not depend on this attribute; the hook context narrows further before the Hook SDK seam
+ships"* — and pack hooks are third-party by definition, arriving *before* that seam. A pack
+depending on `run` today is a pack the Hook SDK breaks tomorrow.
 
 ## Skill pin *(inside the manifest)*
 
@@ -236,6 +264,7 @@ investigator looking for the second should not have to filter the first.
 | Skill content fails digest verification | `digest_mismatch` |
 | Skill bump missing provenance, review, or a passing eval | `promotion_incomplete` |
 | Injection-lens refusal | `injection_suspected` |
+| Pack hook declares `capability_kind = governance` | `governance_hook_from_pack` — refused at load. Enforcement is the platform's, and a pack that could register at that kind could satisfy the enforcement-is-whole check with its own hook |
 | Non-repeatable tool declared with no observer | `observer_required` — refused at load. The registry calls an observer "required in practice"; this is where that becomes checkable |
 | `product_mode` set without `product` or `product_action` | `incomplete_product_binding` — refused at load, in the pack's own vocabulary, rather than as a registry `ValueError` |
 | Definition names a pack that is not loaded | `pack_not_loaded` — refused **at run start**, so the person is told before anything executes rather than after a step has run |
