@@ -1,0 +1,116 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The conversational portal (ADR-0034) — a thin client of the API above.
+#
+# It holds NO credential of any kind: no client secret (it is a public OIDC client using
+# PKCE), no Vault identity, no database access. It relays a person's own token to the API,
+# which is why a run started here is indistinguishable from one started through the API —
+# it is one.
+#
+# Note what this job does not have that every other service here does: an `identity`
+# block. The portal has nothing to authenticate AS. That absence is the design.
+
+variable "api_base_url" {
+  type        = string
+  description = "Where the northbound API answers. Loopback inside the enclave for dev."
+}
+
+variable "oidc_authorize_endpoint" {
+  type        = string
+  description = "Where a person is sent to sign in. Must be reachable from their BROWSER."
+}
+
+variable "oidc_token_endpoint" {
+  type        = string
+  description = "Where the portal redeems an authorization code. Server-side only."
+}
+
+variable "oidc_issuer" {
+  type = string
+}
+
+variable "portal_client_id" {
+  type    = string
+  default = "harness-portal"
+  description = <<-DESC
+    The public client identifier. Public: there is no secret to go with it.
+
+    A confidential client would need one in this jobspec, which is the static credential
+    Principle IV prohibits without exception. PKCE exists precisely so a client with no
+    secret can still prove it is the party that requested the code it is redeeming.
+  DESC
+}
+
+variable "portal_redirect_uri" {
+  type        = string
+  description = "Where the IdP returns the person. Must match what the IdP has registered."
+}
+
+variable "repo" {
+  type = string
+}
+
+job "portal" {
+  type = "service"
+
+  group "portal" {
+    count = 1
+
+    network {
+      port "http" {
+        static = 8082
+      }
+    }
+
+    restart {
+      attempts = 3
+      interval = "5m"
+      delay    = "15s"
+      mode     = "delay"
+    }
+
+    task "server" {
+      driver = "docker"
+
+      config {
+        image        = "python:3.12-slim"
+        entrypoint   = ["/bin/sh", "-c"]
+        network_mode = "host"
+
+        mount {
+          type     = "bind"
+          source   = var.repo
+          target   = "/src"
+          readonly = true
+        }
+
+        args = [
+          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra surfaces --extra portal python -m surfaces.portal.service"
+        ]
+      }
+
+      env {
+        API_BASE_URL            = var.api_base_url
+        OIDC_ISSUER             = var.oidc_issuer
+        OIDC_AUTHORIZE_ENDPOINT = var.oidc_authorize_endpoint
+        OIDC_TOKEN_ENDPOINT     = var.oidc_token_endpoint
+        PORTAL_CLIENT_ID        = var.portal_client_id
+        PORTAL_REDIRECT_URI     = var.portal_redirect_uri
+        PORTAL_BIND             = "0.0.0.0:8082"
+
+        # Dev serves the portal over plain HTTP on loopback, where browsers treat
+        # `localhost` as a trustworthy origin so `Secure` cookies still work. A real
+        # deployment terminates TLS in front of this and sets PORTAL_SECURE_COOKIES=1;
+        # that posture is a deployment concern and is deliberately not solved here.
+        PORTAL_SECURE_COOKIES = "0"
+
+        UV_PROJECT_ENVIRONMENT = "/tmp/venv"
+      }
+
+      resources {
+        cores  = 1
+        memory = 384
+      }
+    }
+  }
+}

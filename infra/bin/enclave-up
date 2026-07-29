@@ -396,6 +396,49 @@ nomad job run -var="repo=$REPO" "$REPO/infra/jobs/agent-run.nomad.hcl" >/dev/nul
   && ok "agent-run registered (parameterized; one allocation and one identity per run)" \
   || die "could not register the agent-run job — dispatched runs would have nothing to run"
 
+# ---------------------------------------------------------------- 4d. the surfaces
+# The API's FIRST deployment (012). 008 built it and nothing ever served it — every
+# operation row since has been true about an app object rather than a running service.
+# The portal is a thin client over the API, and a client cannot be over what is not there.
+say "Development identity provider"
+# DEV ONLY, and quarantined in tests/ so the packaging boundary says so too. The portal's
+# login is a browser redirect, and a browser cannot redirect to a Python object. It
+# authenticates NOBODY: /authorize mints a code for whoever asks. A real deployment points
+# OIDC_ISSUER at the organization's own provider and nothing else changes.
+DEV_IDP_PORT="${DEV_IDP_PORT:-8090}"
+if curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1; then
+  ok "dev idp already listening on ${DEV_IDP_PORT}"
+else
+  (cd "$REPO" && nohup uv run --extra adapters --extra surfaces --extra portal \
+     python -m tests.harness.dev_idp >/tmp/brieve-dev-idp.log 2>&1 &) 
+  for _ in $(seq 1 20); do
+    curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 && break
+    sleep 0.5
+  done
+  curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 \
+    && ok "dev idp listening on ${DEV_IDP_PORT} (authenticates nobody; never deploy)" \
+    || die "the development identity provider did not come up — see /tmp/brieve-dev-idp.log"
+fi
+
+say "API service"
+nomad job run -var="repo=$REPO" \
+  -var="oidc_issuer=http://127.0.0.1:${DEV_IDP_PORT}" \
+  -var="oidc_jwks_uri=http://127.0.0.1:${DEV_IDP_PORT}/jwks" \
+  "$REPO/infra/jobs/api.nomad.hcl" >/dev/null 2>&1 \
+  && ok "api registered (the northbound surface, served for the first time)" \
+  || die "could not register the api service — the portal would have nothing to be over"
+
+say "Portal"
+nomad job run -var="repo=$REPO" \
+  -var="api_base_url=http://127.0.0.1:8081" \
+  -var="oidc_issuer=http://127.0.0.1:${DEV_IDP_PORT}" \
+  -var="oidc_authorize_endpoint=http://127.0.0.1:${DEV_IDP_PORT}/authorize" \
+  -var="oidc_token_endpoint=http://127.0.0.1:${DEV_IDP_PORT}/token" \
+  -var="portal_redirect_uri=http://127.0.0.1:8082/callback" \
+  "$REPO/infra/jobs/portal.nomad.hcl" >/dev/null 2>&1 \
+  && ok "portal registered (thin client; holds no credential of any kind)" \
+  || die "could not register the portal"
+
 # ---------------------------------------------------------------- 5. the contract
 # Verification runs BEFORE success is reported. Otherwise the contract describes intent
 # rather than state.
