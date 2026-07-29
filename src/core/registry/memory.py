@@ -13,11 +13,29 @@ from core.observation.types import Observer
 ToolHandler = Callable[[Mapping[str, Any]], Any]
 ProductMode = Literal["none", "federate", "broker"]
 
+#: How dangerous a tool is. In the glossary since the beginning and in no code until 013
+#: (research.md F2), which was harmless while every registered tool was `echo` and stops
+#: being harmless the moment a pack declares a tool that deletes infrastructure — the first
+#: thing a Terraform or Vault pack does.
+#:
+#: **Nothing here enforces anything.** Principle II provides that registry review MAY
+#: require process isolation for `secret_touching` and `destructive` tools; that provision
+#: has never been actionable because the platform could not tell those tools from any
+#: other. This makes the classification *knowable*. What is done with it is a separate
+#: decision and deliberately not made here — a field that silently changed execution would
+#: be an enforcement point nobody declared.
+RiskClass = Literal["read", "write", "destructive", "secret_touching"]
+
 
 @dataclass(frozen=True)
 class ToolRegistration:
     name: str
     handler: ToolHandler
+    #: Additive and defaulted to the safest value, so every pre-013 caller is unchanged.
+    #: `read` rather than a nullable "unclassified": a tool nobody classified is not a tool
+    #: with no risk, and defaulting to the narrowest claim means an unclassified
+    #: `destructive` tool reads as under-declared rather than as unknown.
+    risk_class: RiskClass = "read"
     product_mode: ProductMode = "none"
     product: str | None = None
     product_action: str | None = None
@@ -41,6 +59,7 @@ class ToolRegistry:
         name: str,
         handler: ToolHandler,
         *,
+        risk_class: RiskClass = "read",
         product_mode: ProductMode = "none",
         product: str | None = None,
         product_action: str | None = None,
@@ -54,6 +73,7 @@ class ToolRegistry:
         self._tools[name] = ToolRegistration(
             name=name,
             handler=handler,
+            risk_class=risk_class,
             product_mode=product_mode,
             product=product,
             product_action=product_action,

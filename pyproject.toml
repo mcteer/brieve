@@ -77,6 +77,25 @@ a11y = [
     "playwright==1.58.0",
 ]
 
+# The eval gates (013, Principle VIII). An extra, and the reason is stronger here than for
+# any other extra in this file: the description at the top of this project says the platform
+# is a governed runtime, and until this feature it CALLED NO MODEL AT ALL — the `adapters`
+# comment above records refusing the pydantic-ai meta package precisely because it would
+# have installed three provider SDKs "for a feature that calls no model". That posture is
+# worth keeping for everyone who is not running the live lane, so the SDK arrives only with
+# this extra and the base install still calls nothing.
+#
+# The scoring harness itself is in-repo (`core/evals/scoring.py`) and needs no dependency —
+# `FixtureScorer` replays a recording and imports nothing. Only `LiveModelScorer` needs the
+# SDK, which is why one marked, non-blocking lane carries the whole of this cost.
+#
+# anthropic, MIT, and the only provider SDK here: `make evals` (fixtures) is the blocking
+# lane and never imports it. A second provider would be a second thing to keep qualified
+# without a second thing to qualify it for.
+evals = [
+    "anthropic==0.120.2",
+]
+
 
 [dependency-groups]
 dev = [
@@ -137,6 +156,13 @@ markers = [
     # Group needs an admin token the allocation deliberately does not have — no token in
     # that jobspec is the property it exists to demonstrate.
     "host_enclave: needs the enclave, and cannot run inside an allocation",
+    # Scores a REAL model through a provider SDK. Never in a blocking lane, and the two
+    # reasons are different from every other marker here: it needs a paid credential, and
+    # it is non-deterministic. A merge gate carrying either fails for reasons unrelated to
+    # the change under review, and a gate that fails for unrelated reasons is one people
+    # learn to re-run rather than read. `make evals` scores fixtures and blocks; this lane
+    # is `make evals-live` and has a named runner (plan.md, SC-013).
+    "live_model: scores a live model; needs a provider credential and costs money",
 ]
 
 # No mypy override is needed for the `surfaces` extra: fastapi, uvicorn, pyjwt, and
