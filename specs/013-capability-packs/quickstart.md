@@ -31,9 +31,14 @@ grep -rl "workflow" src/core/ | wc -l                # -> 0 before the fix
 ## 2 — The core stays product-blind *(after packs land)*
 
 ```bash
-grep -ril "terraform\|vault" src/core/ | grep -v "vault_fabric\|credentials"
-# -> nothing. `vault_fabric` is the TRUST FABRIC, not the product — a distinction
-#    the row makes explicitly rather than by pattern.
+# The row (T020) uses an explicit module allowlist, not a grep filter — `vault_fabric.py`
+# and `credentials.py` mention Vault throughout because they are the TRUST FABRIC, and a
+# pattern that excluded them by filename would still match their contents. Run the row
+# rather than approximating it:
+uv run --extra adapters --extra surfaces pytest \
+  tests/conformance/packs/test_core_is_product_blind.py -q
+
+# SC-002's second clause, shown rather than argued:
 git diff --stat main -- src/core/    # adding the second pack: zero files
 ```
 
@@ -57,6 +62,18 @@ uv run --extra adapters --extra surfaces pytest tests/component -k matrix -q
 refused at run start; fallback only to a qualified cell, recorded; no qualified cell means
 the run stops with its reason.
 
+## 4b — The structural rows *(after packs land)*
+
+```bash
+uv run --extra adapters --extra surfaces pytest tests/conformance/packs -q
+```
+
+**Expect**: containment, tool vocabulary, no-bypass, no-widening, no-auto-tracking, and the
+run-path layering row. **These do not run under `pytest tests/component`** — `testpaths`
+covers `tests/unit` and `tests/component` only, so a reader who runs the sections above and
+stops has exercised none of them. `make conformance` includes this directory (wired at
+T012b).
+
 ## 5 — The gates *(fixtures)*
 
 ```bash
@@ -69,7 +86,9 @@ skip visible in the output rather than silent.
 ## 6 — The gates *(live model — named runner)*
 
 ```bash
-export EVAL_PROVIDER_KEY=...     # dev-lane secret; never in a jobspec, never read by a run
+export EVAL_PROVIDER_KEY=...     # the name is defined in src/core/evals/scoring.py and
+                                 # asserted by T045 against that constant, not a literal.
+                                 # Dev-lane only: never in a jobspec, never read by a run.
 make evals-live
 ```
 
@@ -92,6 +111,9 @@ already qualified; a judge pointed at itself refused rather than closing the loo
   fixture-backed, and the tool half is what Principle II governs.
 - **A fixture-qualified cell is a qualified model.** It is a qualified *recording*.
 - **Report fidelity.** Owed against ADR-0018, which is unbuilt.
+- **That the gates would catch anything if their fixtures vanished.** A green run proves
+  the suites passed, not that an unrunnable suite fails — that is its own row (T040a), with
+  its own positive control, and it is the property that stops a broken gate reading green.
 - **The injection lens catches novel phrasing.** It is pattern-based by necessity — a
   model-scored lens would need a qualified cell, which needs the gates, which is a second
   regress with no seed set to terminate it. The lens is a floor; ADR-0004's human review

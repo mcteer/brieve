@@ -12,8 +12,11 @@ A pack **declares**; the platform **decides**. Nothing in a manifest grants anyt
 2. **Verify every content digest.** A mismatch refuses with `digest_mismatch` and names the
    file. Verification happens at load rather than at review, because review is when someone
    looked and load is when it matters.
-3. **Register the tools** into the one governed registry, `risk_class` preserved.
-4. **Record the pack as available**, not as *granted* — availability is not access.
+3. **Check the eval-coverage floor.** A pack shipping fewer than five cases per suite is
+   refused `insufficient_eval_coverage` — **at load, not at gate time**. The failure belongs
+   where the pack is added rather than where a gate later reports a number nobody reads.
+4. **Register the tools** into the one governed registry, `risk_class` preserved.
+5. **Record the pack as available**, not as *granted* — availability is not access.
 
 ## What loading does NOT do
 
