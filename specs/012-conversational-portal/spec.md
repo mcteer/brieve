@@ -14,8 +14,8 @@
 
 | Field | Value |
 | --- | --- |
-| **Requirements (R1–R17)** | **R15** (four transports, one authorization core — and this is the transport that makes "one core" hardest to hold, because it is the one a human looks at). R2 / R3 (per-task authority — the authenticated human is the subject of every turn, and a thread must not become a way for turn two to inherit turn one's authority). R7 (fail-closed — a turn that cannot establish scope declines rather than answering with less). R4 / R10 / R13 (evidence — a thread is auditable by correlation ID, which is a claim ADR-0034 makes and nothing has yet tested). |
-| **ADRs touched** | **ADR-0034** (this feature *is* that record, built), **ADR-0033** (the parity row and the no-static-keys rule), **ADR-0032** (the ungoverned local loop this surface is most likely to manufacture by accident), ADR-0035 (evidence stays a read path that cannot mutate or mask), ADR-0049 (a thread must not reintroduce the human-in-the-loop pause it removed), ADR-0039 (per-role model bindings, if the portal answers rather than only dispatches), ADR-0016 (an authority change requested in conversation is still Control-Group gated). |
+| **Requirements (R1–R17)** | **R15** (four transports, one authorization core — and this is the transport that makes "one core" hardest to hold, because it is the one a human looks at). R2 / R3 (per-task authority — the authenticated human is the subject of every turn, and a thread must not become a way for turn two to inherit turn one's authority). R7 (fail-closed — a turn that cannot establish scope declines rather than acting with less). R4 / R10 / R13 (evidence — a thread is auditable by correlation ID, which is a claim ADR-0034 makes and nothing has yet tested). |
+| **ADRs touched** | **ADR-0034** (this feature *is* that record, built), **ADR-0033** (the parity row and the no-static-keys rule), **ADR-0032** (the ungoverned local loop this surface is most likely to manufacture by accident), ADR-0035 (evidence stays a read path that cannot mutate or mask), ADR-0049 (a thread must not reintroduce the human-in-the-loop pause it removed), ADR-0039 (**why this feature does not answer** — an `ask` binding is only expressible against a green Qualified Model Matrix cell, and nothing produces one yet), ADR-0016 (an authority change requested in conversation is still Control-Group gated). |
 | **Evidence class** | **Audit-critical, and it introduces a new shape.** Every prior surface audits discrete operations. A thread is a *sequence* whose meaning is partly in the ordering — "what did this person ask before they started that run" is a question the trail has never had to answer. If threads are run state (ADR-0034), they are as auditable as a run; if they are anything else, they are a side channel, which is the failure that record exists to prevent. |
 
 ## Clarifications
@@ -24,10 +24,22 @@
 
 - Q: Does this feature ship the browser client, or the thread substrate with the client as its own feature? → A: **Substrate and the full product UI.**
   *(The largest of the three options, chosen deliberately. It is what makes ADR-0034's security-critical rule testable rather than asserted — SC-006 compares against a delivered client, and there is nothing to compare against otherwise. The cost is exactly what ADR-0034 named: a second technology stack with its own build, test, dependency, and accessibility obligations, none of which this repo has carried before. The gates that come with it are new, not inherited.)*
-- Q: Which of ADR-0034's three conversation classes does this feature serve? → A: **All three** — governed actions, estate-state questions, and grounded guidance with visible citations.
+- Q: Which of ADR-0034's three conversation classes does this feature serve? → A: ~~**All three**~~ — **superseded by the fourth question below**, which found the dependency this answer did not have. Left standing rather than edited, per Principle X. Original answer: **All three** — governed actions, estate-state questions, and grounded guidance with visible citations.
   *(Also the largest option. Guidance requires a corpus, an ingestion path, and citation machinery that do not exist in this repository; estate-state requires answering over ADR-0035's read path, which exists, with a model interpreting it, which does not. The prioritisation below reflects this: governed actions are P1, and the two answering classes are P3 and P4 — not because they matter less, but because they are separable and each is large enough to land on its own.)*
 - Q: Is the portal a third implementation of the operation catalogue, or a consumer of the API? → A: **A consumer.** Parity stays API/MCP; a new row asserts the portal exposes no capability the API does not.
   *(ADR-0034's thin-client rule forbids business logic, and implementing the catalogue is business logic by definition — a third copy of the authorization path is what ADR-0033 exists to prevent. Thread operations still land on API and MCP, so the parity row still grows, exactly as 011 recorded it would. What changes is the shape of the portal's own conformance obligation: not "does it agree with the others" but "does it add anything at all", which is a containment claim rather than an equivalence one.)*
+
+- Q: The two answering classes (estate-state and grounded guidance) need ask-role model bindings, which ADR-0039 only allows against a green Qualified Model Matrix cell — and the eval gates that green a cell are deferred to the unscheduled capability-packs feature. How should 012 handle that chain? → A: **Split.** 012 is governed actions; the two answering classes become their own feature, after capability packs.
+  *(This reverses the earlier "all three conversation classes" answer, on information that answer did not have: `pyproject.toml` installs zero model providers on purpose — "three live model-provider SDKs for a feature that calls no model" — so the answering classes would have been the platform's first model call, and ADR-0039 makes a binding inexpressible without an eval-gated matrix cell that nothing produces yet. The alternative was shipping a binding with no green cell behind it, which is the passing stub ADR-0047 forbids. The cost is real and visible: the portal lands unable to answer questions, which is a gap for four of the five personas ADR-0034 names — only the person taking governed actions is fully served. The corpus stays sourced and the finding stays recorded, so the follow-on feature starts from a settled source rather than rediscovering it.)*
+
+- Q: Which accessibility standard must the client meet, and how hard should the gate be? → A: **WCAG 2.2 AA**, asserted by an automated gate, with the criteria that gate *cannot* assert recorded explicitly.
+  *(2.2 rather than 2.1 because its additions — focus appearance, dragging alternatives, target size — land squarely on a conversational interface rather than being incidental to it. The recorded-gaps half is the load-bearing part: automated tooling catches a real but partial fraction of AA, and focus order, screen-reader flow, and meaningful alternative text need a person. A green gate that silently implies full conformance is the passing stub ADR-0047 forbids, in a new discipline. So the gate binds what it can prove and names what it cannot, which is the same shape as the surface-parity row being amended rather than claimed.)*
+
+- Q: Can a person delete a thread, and is the message they typed evidence or view state? → A: **The prompt is evidence and lives in the trail; the thread is a deletable view over it.** Deletion is itself audited.
+  *(This is what lets both records stay true at once. A message that starts a run is the consent record for that run — "why did this happen" is answerable only from it — so it belongs in the trail, where ADR-0035 already forbids mutation and masking. Once it is there, the thread is a reading of it rather than the original, and removing a reading masks nothing. The alternative that erases prompts outright would be a masking primitive by construction, handed to exactly the person with a motive to use it. **The open edge, named rather than assumed: a message that starts no run has no trail entry**, so deleting its thread does remove the only copy. Planning settles whether such a message is written to the trail anyway or is genuinely ephemeral — the second is defensible, but only if it is chosen.)*
+
+- Q: What actually carries forward from earlier turns into a later one? → A: **Verbatim prior run results**, under an explicit bound, with a drop made visible to the person.
+  *(Verbatim because the alternative is summarizing, which is an ADR-0039 role and therefore needs a model binding against a green matrix cell — the same chain that moved the answering classes out. Choosing summary here would have taken US2 with them and left a portal that neither answers nor remembers, which is a form. The bound being a stated count or size, rather than whatever a context window happens to allow, is FR-009's "explicit rather than emergent": a bound you can state is a bound you can test, and one that emerges from a limit changes silently when the limit does. Visible dropping is the third piece — a person who does not know the platform forgot something will read a worse answer as a worse platform. The honest cost: a long thread carries less forward than a summary would, and this feature accepts that rather than acquiring a model to avoid it.)*
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -77,8 +89,8 @@ refers to that result without repeating it — and the second run receives it.
 1. **Given** a thread whose first run produced a result, **When** the person sends a second
    message, **Then** the second turn has access to that result.
 2. **Given** a thread with several completed turns, **When** the person sends another,
-   **Then** what carries forward is bounded — a thread does not grow without limit and does
-   not silently drop the earliest thing it needs.
+   **Then** what carries forward is bounded by a stated count or size, and any earlier
+   result that falls outside it is visibly dropped rather than silently omitted.
 3. **Given** a turn whose authority differs from the previous turn's, **When** it runs,
    **Then** it is authorized on its own terms. **A thread must not let turn two inherit
    turn one's authority**, which is the specific way a conversational surface becomes a
@@ -145,77 +157,32 @@ confirm no mechanism exists by which a run can solicit input mid-flight.
 
 ### User Story 5 - The surface declines what it is not for (Priority: P3)
 
-Someone asks the portal something outside its domain. It declines gracefully rather than
-attempting an answer.
+Someone types something the portal cannot turn into a run. It declines gracefully and says
+what it is for.
 
 **Why this priority**: ADR-0034 makes this the thing that keeps quality measurable — a
-bounded assistant can be evaluated against its domain, an unbounded one only against
+bounded surface can be evaluated against its domain, an unbounded one only against
 everything. P3 because it is meaningless until there is something to be off-topic
 *relative to*.
 
-**Independent Test**: Ask something plainly outside the estate and the products; receive a
-decline that reads as a boundary rather than a malfunction.
+**With answering split out, this story changed shape rather than leaving.** The portal
+never answers, so "off-topic" no longer means "a question outside the corpus" — it means a
+message that maps to no agent the person may start. That makes the decline *more* load
+bearing, not less: a surface that only dispatches must be unmistakably clear when it has
+not dispatched, because there is no answer arriving to signal that something happened.
+
+**Independent Test**: Type something that maps to no available agent; receive a decline that
+reads as a boundary rather than a malfunction, and that is distinguishable from a refusal.
 
 **Acceptance Scenarios**:
 
-1. **Given** an off-topic request, **When** the portal responds, **Then** it declines and
-   says what it is for, without appearing broken.
-2. **Given** a request that is in-domain but exceeds the asker's scope, **When** the portal
-   responds, **Then** it refuses on scope — a *different* answer from off-topic, because
-   conflating them tells someone their access is fine when it is not.
-
----
-
-### User Story 6 - Ask what the estate actually looks like (Priority: P3)
-
-A person asks a question about their own estate — what ran, what changed, what a control
-looks like in practice — and gets an answer drawn from evidence they are entitled to see.
-
-**Why this priority**: It is the second of ADR-0034's three conversation classes, and the
-cheaper of the two answering classes: the governed read path already exists (ADR-0035), so
-what is new is interpretation rather than access. P3 because it is separable from US1–US4 and
-lands on its own.
-
-**Independent Test**: Two people in the same tenant with different scopes ask the same
-estate question and receive answers that differ by exactly what each may see.
-
-**Acceptance Scenarios**:
-
-1. **Given** a person asking about their estate, **When** the portal answers, **Then** the
-   answer is drawn only from evidence within that person's scope.
-2. **Given** two subjects with different scopes, **When** both ask the same question,
-   **Then** neither answer contains anything the asker could not have read directly.
-3. **Given** a question whose answer would require evidence outside the asker's scope,
-   **When** the portal responds, **Then** it says the scope is insufficient rather than
-   answering from the part it can see. **A partial answer presented as complete is the
-   fail-open of an answering surface.**
-4. **Given** any estate answer, **When** the trail is read, **Then** the underlying evidence
-   read is recorded as an evidence read, indistinguishable from one made through the API.
-
----
-
-### User Story 7 - Guidance, with visible citations (Priority: P4)
-
-A person asks how something is meant to work — from vendor documentation and validated
-designs — and gets an answer that shows where each claim came from.
-
-**Why this priority**: The third conversation class, and the largest. It requires a corpus,
-an ingestion path, and citation machinery, none of which exist in this repository. P4
-because everything above it is deliverable without it, and it is the part most likely to
-warrant its own feature if the sequencing proves it.
-
-**Independent Test**: Ask a documented question, receive an answer in which every
-substantive claim carries a citation a person can follow to its source.
-
-**Acceptance Scenarios**:
-
-1. **Given** a question answerable from the corpus, **When** the portal answers, **Then**
-   every substantive claim carries a visible citation resolving to its source.
-2. **Given** a question the corpus does not cover, **When** the portal responds, **Then** it
-   says so rather than answering without grounding. **An uncited answer is worse than no
-   answer here, because the surface's whole claim is that its answers are checkable.**
-3. **Given** a corpus document that changes, **When** the same question is asked again,
-   **Then** the answer reflects the current document and cites it.
+1. **Given** a message that maps to no agent, **When** the portal responds, **Then** it
+   declines, says what it is for, and does not appear broken.
+2. **Given** a message that maps to an agent the person may **not** start, **When** the
+   portal responds, **Then** it refuses on scope — a *different* response from "I cannot do
+   that at all", because conflating them tells someone their access is fine when it is not.
+3. **Given** any decline or refusal, **When** the person looks, **Then** no run was started.
+   A surface that dispatches on ambiguity is worse than one that declines on clarity.
 
 ---
 
@@ -233,6 +200,12 @@ substantive claim carries a citation a person can follow to its source.
   understand why the same request now answers differently.
 - **The API is unreachable.** The portal is a thin client with nothing to fall back on. Does
   it say so, or does it look like the platform is empty?
+- **A message that starts nothing.** Someone types, changes their mind, and deletes the
+  thread. That message has no run and therefore no trail entry, so deletion removes the only
+  copy — the one case where the view/evidence split does not hold. Deliberately open; see the
+  clarification.
+- **Deleting a thread with a run still in flight.** The view goes; the run does not (FR-010d).
+  Where does its result land, and does the person who deleted the thread still see it?
 - **A thread referencing a run the person may no longer read.** Roles narrowed after the
   fact. The thread holds a reference; the operation refuses. Which wins, and does the
   refusal leak what the run was?
@@ -271,10 +244,25 @@ substantive claim carries a citation a person can follow to its source.
   thread outside the asker's tenant MUST be answered as absent rather than refused.
 - **FR-008**: A turn in a thread MUST be authorized on its own terms. Authority MUST NOT
   carry forward from an earlier turn.
-- **FR-009**: What a thread carries forward into a later turn MUST be bounded, and the
-  bound MUST be explicit rather than emergent from a context limit.
+- **FR-009**: A later turn MUST receive earlier run results **verbatim**, as recorded. The
+  platform MUST NOT summarize or otherwise compress them — summarizing is an ADR-0039 role
+  requiring a model binding this feature deliberately does not acquire.
+- **FR-009a**: What carries forward MUST be bounded by a stated count or size, not by
+  whatever a downstream limit happens to permit. A bound that emerges from a limit changes
+  silently when the limit does.
+- **FR-009b**: When an earlier result falls outside the bound, the person MUST be able to
+  see that it did. Someone unaware the platform forgot something reads a worse answer as a
+  worse platform.
 - **FR-010**: A run started in a thread MUST complete and record its result regardless of
   whether anyone is still watching the thread.
+- **FR-010a**: A message that starts a run MUST be written to the audit trail as that run's
+  rationale. It is the consent record — the only thing that answers "why did this happen" —
+  and it is therefore evidence, subject to ADR-0035's prohibition on mutation and masking.
+- **FR-010b**: A person MUST be able to delete a thread. Deletion removes the readable view
+  and MUST NOT remove anything the trail holds, so it is not a masking primitive.
+- **FR-010c**: Deleting a thread MUST itself be an audited event.
+- **FR-010d**: Deleting a thread MUST NOT affect runs it started. A run in flight continues;
+  a completed run's result stays reachable through the operations that already expose it.
 
 **Runs, in conversation**
 
@@ -293,8 +281,11 @@ substantive claim carries a citation a person can follow to its source.
 
 - **FR-016**: Per-user rate limits and loop bounds MUST apply. ADR-0034 names this the
   easiest surface on which to consume resources accidentally.
-- **FR-017**: The portal MUST decline out-of-domain requests gracefully, and MUST
-  distinguish an out-of-domain decline from an out-of-scope refusal.
+- **FR-017**: The portal MUST decline a message that maps to no agent gracefully, and MUST
+  distinguish that decline from an out-of-scope refusal — the first says the platform does
+  not do this, the second says this person may not.
+- **FR-017a**: A decline or refusal MUST start no run. A surface that dispatches on
+  ambiguity is worse than one that declines on clarity.
 - **FR-018**: An authority change requested in conversation MUST remain Control-Group gated
   (ADR-0016), and collecting its disposition MUST remain a read.
 - **FR-019**: Evidence reached through the portal MUST remain a read path that cannot
@@ -305,35 +296,15 @@ substantive claim carries a citation a person can follow to its source.
 - **FR-020**: This feature MUST deliver the browser client, not only the substrate behind
   it. The client is what makes FR-002 and SC-006 verifiable — a thin-client rule with no
   client is an assertion nobody can test.
-- **FR-020a**: The client MUST meet a stated accessibility standard, and that standard MUST
-  be asserted by a gate rather than reviewed by eye. ADR-0034 names accessibility as one of
-  the obligations this second technology stack carries; an obligation with no gate is a
-  preference.
+- **FR-020a**: The client MUST meet **WCAG 2.2 AA**, asserted by an automated gate that
+  fails the build rather than by review. ADR-0034 names accessibility as an obligation this
+  second technology stack carries, and an obligation with no gate is a preference.
+- **FR-020a-i**: The gate MUST record which WCAG 2.2 AA success criteria it **cannot**
+  assert automatically — focus order, screen-reader flow, and meaningful alternative text
+  among them. A green run that implies full conformance while testing a subset is the
+  passing stub ADR-0047 forbids, in a discipline where it would be hardest to notice.
 - **FR-020b**: The client MUST hold no capability that survives the loss of the person's
   session, and MUST NOT persist anything that would let it act on their behalf later.
-
-**Answering — estate-state and guidance**
-
-- **FR-021**: The portal MUST serve all three of ADR-0034's conversation classes: governed
-  actions, estate-state questions, and grounded guidance.
-- **FR-022**: An estate-state answer MUST be drawn only from evidence within the asker's
-  scope, and the underlying read MUST be recorded as an evidence read — indistinguishable in
-  the trail from the same read made through the API.
-- **FR-023**: When a question cannot be fully answered within the asker's scope, the portal
-  MUST say the scope is insufficient rather than answering from the visible part. A partial
-  answer presented as complete is this surface's fail-open.
-- **FR-024**: Every substantive claim in a guidance answer MUST carry a visible citation
-  that resolves to its source.
-- **FR-025**: When the corpus does not cover a question, the portal MUST say so rather than
-  answering without grounding.
-- **FR-025a**: The corpus is **HashiCorp Validated Patterns**. Because those documents carry
-  no version or revision metadata, the platform MUST detect a changed source by its content
-  rather than by anything the source asserts about itself, and a citation MUST resolve to the
-  section it supports rather than to the document containing it.
-- **FR-026**: Model selection for answering MUST follow the per-role bindings ADR-0039
-  establishes, not a portal-local choice.
-- **FR-027**: Answering MUST NOT become a path to any capability the operation catalogue
-  does not expose. A model that can read and summarise must not thereby be able to act.
 
 ### Key Entities
 
@@ -353,7 +324,10 @@ substantive claim carries a citation a person can follow to its source.
 - **SC-001**: A person who has never used the platform can start an agent and see its
   result without being given, or having to record, any identifier.
 - **SC-002**: A follow-up turn that refers to a previous result succeeds without the person
-  restating that result.
+  restating that result, and what it received is byte-identical to what the earlier run
+  recorded.
+- **SC-002a**: A thread longer than the bound carries forward exactly the stated amount, and
+  the person can tell what was left out.
 - **SC-003**: A thread and its runs survive a restart of every serving process, with zero
   turns lost and zero run states changed.
 - **SC-004**: An investigator can reconstruct a complete thread — subject, order, and
@@ -367,18 +341,13 @@ substantive claim carries a citation a person can follow to its source.
 - **SC-008**: No sequence of turns produces a run that waits for human input mid-flight.
 - **SC-009**: A thread belonging to another tenant is indistinguishable from one that does
   not exist, across every operation that can name a thread.
+- **SC-009a**: After a thread is deleted, every run it started remains reconstructable from
+  the trail — including the message that started it — and the deletion itself appears there.
+  **Zero runs become unexplainable by deleting a conversation.**
 - **SC-010**: Per-user rate limits bound a runaway conversation without operator
   intervention.
-- **SC-011**: The delivered client meets its stated accessibility standard, verified by a
-  gate that fails the build rather than by review.
-- **SC-012**: Two subjects with different scopes asking the same estate question receive
-  answers differing by exactly what each may see, with neither containing anything its asker
-  could not have read directly.
-- **SC-013**: Every substantive claim in a guidance answer resolves to a source a person can
-  open, and a question outside the corpus produces a stated gap rather than an uncited
-  answer.
-- **SC-014**: No answering capability reaches an action. A model that can read cannot start,
-  stop, or change anything except through the same operations a person uses.
+- **SC-011**: The delivered client passes an automated WCAG 2.2 AA gate that fails the
+  build, and the criteria that gate cannot assert are enumerated rather than implied.
 
 ## Assumptions
 
@@ -399,42 +368,46 @@ substantive claim carries a citation a person can follow to its source.
 - **No new authorization concepts.** Every refusal in this surface is one the core already
   makes. If the portal needs a decision the core cannot express, that is a finding about the
   core, not a portal feature.
-- **This feature is large enough to warrant splitting, and that call belongs to planning.**
-  The clarifications chose the largest option twice: a full product UI and all three
-  conversation classes. By this repository's own precedent that is roughly three features —
-  ADR-0033 split four transports into four features precisely because building several
-  surfaces in one pass means getting parity right across things that are all still moving.
-  The story priorities encode the seam: **P1–P2 (US1–US4) is a portal that governs actions
-  and is deliverable alone; P3 (US6) adds estate-state answering; P4 (US7) adds grounded
-  guidance and the corpus it needs.** Planning should sequence these as increments rather
-  than one landing, and if it concludes P4 should be its own numbered feature, that is a
-  finding worth acting on rather than absorbing.
-- **The corpus is sourced: HashiCorp Validated Patterns.** Named 2026-07-29, and it closes
-  what this section previously recorded as US7's *unsourced* dependency —
-  [developer.hashicorp.com/validated-patterns](https://developer.hashicorp.com/validated-patterns),
+- **The split already happened, and this is what is left.** The clarifications chose the
+  largest option twice, then the fourth reversed one of them on evidence the first did not
+  have. What remains is a portal that governs actions: threads, the full client, start,
+  watch, stop, and the scope declines. It is deliverable alone, which was the argument for
+  the seam.
+- **The answering classes are a follow-on feature, and it is unnumbered.** ADR-0034's other
+  two conversation classes — estate-state and grounded guidance — leave with a dependency
+  chain already traced: the platform's first model integration, ADR-0039 `ask` bindings, and
+  a green Qualified Model Matrix cell, which needs the eval gates deferred to capability
+  packs. **That feature follows capability packs, not this one.** It has no number until
+  `/speckit-specify` creates its directory.
+- **What the follow-on inherits, so it does not rediscover it.** The corpus is settled:
+  **HashiCorp Validated Patterns**
+  ([developer.hashicorp.com/validated-patterns](https://developer.hashicorp.com/validated-patterns)),
   33 field-tested documents (Vault 15, Terraform 12, Packer 4, Nomad 1, Boundary 1) over
-  exactly the estate this platform governs. It is still unbuilt: no ingestion path exists.
-  Four properties, checked against the documents rather than assumed, because each shapes
-  the work:
+  exactly the estate this platform governs. Four properties, checked against the documents
+  rather than assumed:
 
-  1. **Stable per-section anchors**, so FR-024's citation can resolve to a section rather
-     than a page — which is the difference between a citation a person can check and one
-     they have to search.
-  2. **No publication date, no revision date, no version, anywhere.** US7's third scenario —
-     "a corpus document changes, the answer reflects the current one" — therefore cannot be
-     satisfied from metadata. Change detection has to be content-based. This is the single
-     most consequential fact about the source and it is invisible until you look.
-  3. **Section counts vary from 8 to 29**, so chunking cannot assume a uniform document
-     shape.
+  1. **Stable per-section anchors**, so a citation can resolve to a section rather than a
+     page — the difference between a citation a person can check and one they must search.
+  2. **No publication date, no revision date, no version, anywhere.** "The corpus document
+     changed, so the answer changed" therefore cannot be satisfied from metadata. Change
+     detection has to be content-based. The most consequential fact about the source, and
+     invisible until you open one.
+  3. **Section counts vary from 8 to 29**, so chunking cannot assume a uniform shape.
   4. **Named authors, no editorial version.** Attribution is available; provenance over time
      is not.
 
-- **Terms of use for ingesting the corpus are unresolved.** Serving answers derived from a
-  vendor's documentation is a different act from linking to it, and this feature does the
-  former. Flagged for planning rather than assumed either way.
-- **Accessibility is a new gate class.** Every quality gate this platform has is about
-  governance, authority, or durability. An accessibility gate asserts something about a
-  rendered interface, which no existing lane can run.
+  Terms of use for serving answers derived from that documentation are **unresolved** —
+  a different act from linking to it, and the follow-on feature's question to settle.
+- **ADR-0039 already decided the rule the follow-on will be tempted to bend.** "Ask answers,
+  it never acts", and actions raised in conversation hand off to plan and write runs with
+  their own approvals. That is not a new constraint for the answering feature to invent; it
+  is an existing one to implement.
+- **Accessibility is a new gate class, and no existing lane can run it.** Every quality
+  gate this platform has is about governance, authority, or durability, and all of them
+  assert something about a process. A WCAG gate asserts something about a *rendered
+  interface* — it needs a browser in the lane, which nothing here has ever needed. Whether
+  that lives beside `make check` or in its own recipe is a planning question; that it is new
+  work rather than a marker on existing work is not.
 
 ## Out of Scope
 
@@ -445,3 +418,10 @@ substantive claim carries a citation a person can follow to its source.
 - The CLI, tabled 2026-07-28.
 - Any general-purpose assistant capability. ADR-0034 is explicit that scope is enforced,
   and an unbounded assistant is the failure mode it names.
+- **Answering of any kind** — estate-state questions and grounded guidance both. The portal
+  this feature ships dispatches, watches, and declines; it does not answer. Split out on
+  2026-07-29 to a feature that follows capability packs, because ADR-0039 makes an `ask`
+  binding inexpressible without an eval-gated matrix cell that nothing yet produces.
+- **Any model call.** This platform makes none today — deliberately, per the dependency
+  comment in `pyproject.toml` — and this feature does not change that. The portal is the
+  first surface a person converses with and the last one that would call a model.

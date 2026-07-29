@@ -2,6 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-29
+**Last validated**: 2026-07-29, after the clarification session
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,25 +32,31 @@
 
 ## Notes
 
-All items pass. Three markers were resolved by the 2026-07-29 clarification session, and
-the two that failed before are the same two, now passing for the same reason: the inner
-boundary is settled.
+**16/16 → 16/16.** No item changed state. The clarification session did not fix a failing
+checklist; it changed what the passing spec describes, which is the more useful outcome and
+the one this checklist cannot see.
 
-**One thing this checklist cannot check, recorded because it is the most important fact
-about this spec.** Every item above asks whether the specification is *sound*. None asks
-whether the feature is the right *size*, and this one is large — the clarifications chose
-the largest available option twice. The spec says so directly in Assumptions and encodes
-the seam in its story priorities (P1–P2 governs actions, P3 adds estate-state answering,
-P4 adds grounded guidance and a corpus that does not yet exist).
+**The previous note said the largest open question was one this checklist could not check —
+whether the feature was the right *size*.** That question is now answered, and by evidence
+rather than preference: the platform installs zero model providers on purpose, and ADR-0039
+makes an `ask` binding inexpressible without a green Qualified Model Matrix cell that
+nothing yet produces. The answering classes left. What remains is a portal that dispatches,
+watches, stops, and declines.
 
-That is a planning question, and it is deliberately left to planning rather than resolved
-here. A spec that quietly narrowed itself to a comfortable size would be answering a
-question nobody asked it.
+**Three requirements are deliberately negative**, and all three are testable by construction
+rather than by observation — the assertion is that no path exists, which is stronger than
+asserting no path was taken:
 
-Two requirements are deliberately negative — FR-002 (no orchestration or model calls in the
-browser) and FR-014 (no mid-flight solicitation of the person) — and both are testable by
-construction rather than by observation: the assertion is that no path exists, which is
-stronger than asserting no path was taken. FR-027 is a third of the same kind, and is the
-one most likely to be weakened during implementation, because an answering capability that
-cannot act is less useful and more safe in exactly the proportion that makes the trade
-tempting.
+- FR-002 — no orchestration or model calls in the browser
+- FR-014 — no mid-flight solicitation of the person
+- FR-017a — a decline or refusal starts no run
+
+FR-009's prohibition on summarizing is a fourth of the same kind, and the one most likely to
+be argued with during implementation, because a long thread carrying less forward than it
+could looks like a defect rather than a decision.
+
+**One question is deliberately left open**, recorded rather than guessed: a message that
+starts no run has no trail entry, so deleting its thread removes the only copy. That is the
+single case where the evidence/view split does not hold. Planning decides whether such a
+message is written to the trail anyway or is genuinely ephemeral — the second is defensible,
+but only if it is chosen rather than defaulted into.
