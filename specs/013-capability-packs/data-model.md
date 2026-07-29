@@ -68,10 +68,17 @@ not at review time, because review is when someone looked and load is when it ma
 
 ## Qualified cell *(new control-plane record: `harness-authority/data/model-matrix`)*
 
+> **The read policy must grant this path.** `harness-authority-read` covers
+> `data/harness-ceilings/*` and `data/role-bindings/*` and nothing else. Without a grant on
+> `data/model-matrix/*`, Vault answers **403 rather than 404** — so "no matrix" is
+> indistinguishable from "not allowed to look", and every run-start validation reports an
+> unreachable trust fabric for a matrix that is merely unreadable. The `data/policies/*`
+> grant in `policies.tf` documents this exact trap from 010; this is the same one.
+
 | Field | Type | Notes |
 | --- | --- | --- |
 | `pack` | string | |
-| `model` | string | Provider-qualified identifier, pinned to a version |
+| `model` | string | **`provider/model@version`**, all three parts required. A bare name, an alias, or a `@latest` is refused at parse — FR-011's no-auto-tracking rule enforced at the identifier rather than only at the lookup, because an alias that resolves at read time is exactly the moving target it forbids |
 | `role` | enum | `ask` \| `plan` \| `write` \| `judge` \| `summarize` — the closed vocabulary |
 | `qualified_at` | timestamp | |
 | `qualified_by` | enum | **`fixture` \| `live`** — which scorer, per cell (SC-013) |
@@ -88,6 +95,20 @@ auto-tracking gets reinvented.
 **`qualified_by` is the honesty field.** A cell scored by `FixtureScorer` is qualified
 against a recording. The distinction is per cell rather than per matrix because the two
 lanes will not stay in step — the live lane runs when someone runs it.
+
+## Workflow record *(new: `src/core/packs/workflows.py`)*
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `name` | string | Qualified by its pack, like a tool |
+| `minimum_tier` | int | The tier a definition must hold to run it |
+| `paved` | bool | A fully-verified golden path; lower tiers may run only these |
+
+**Added by analyze pass 1 (G1).** The manifest already declared `workflows[]` and nothing in
+the platform had a runtime shape for one — so tiers had nothing to bound, and US5's rows
+would have asserted a refusal against a concept that did not exist. Deliberately minimal: a
+workflow here is a *named, tiered thing a definition may or may not run*, which is all
+ADR-0045 needs. What a workflow *does* is pack content.
 
 ## Binding map *(inside an agent definition)*
 

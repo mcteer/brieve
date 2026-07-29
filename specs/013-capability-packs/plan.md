@@ -105,16 +105,32 @@ src/core/packs/
 ├── registration.py      # Manifest → ToolRegistry registrations, risk class preserved
 └── isolation.py         # Which packs a definition reaches; the no-widening check
 
+src/core/authority/matrix.py  # QualifiedCell, the reader, binding-map validation
+                              # HERE, not in core/evals — a cell is an AUTHORIZATION FACT
+                              # (D5's own reasoning), it is read on the run path, and a
+                              # matrix module inside a package named `evals` invites
+                              # someone to import the scoring harness into a run.
+
+src/core/packs/workflows.py   # WorkflowRecord + tier comparison. The manifest already
+                              # declares `workflows[]`; nothing in the platform had a
+                              # runtime shape for one, so tiers had nothing to bound.
+
 src/core/evals/
 ├── __init__.py          # Package intent: gates are records, not claims
 ├── suites.py            # must-deny, must-decline, citation accuracy, estate-state
 ├── scoring.py           # Scorer protocol; FixtureScorer and LiveModelScorer
-├── matrix.py            # QualifiedCell, matrix reader, binding-map validation
 ├── promotion.py         # Skill bumps: provenance + injection lens + eval, all three
 └── judge.py             # The seed set, and what qualified the first judge
 
 src/core/registry/memory.py   # + risk_class on ToolRegistration (additive)
 src/core/audit/schema.py      # + MODEL_GATE (a verdict is not an approval — FR-015)
+
+infra/modules/trust-fabric/policies.tf  # + read on data/model-matrix/*. Without it the
+                                        # matrix is unreadable at run time AND Vault
+                                        # answers 403 rather than 404, so the failure
+                                        # lies about which system is broken — the exact
+                                        # trap the `data/policies/*` grant beside it
+                                        # already documents (010).
 
 packs/
 ├── terraform/           # ADOPTED from hashicorp/agent-skills @ pinned commit
@@ -132,7 +148,11 @@ docs/adr/0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md
 ```
 
 **Structure Decision**: `core/packs` and `core/evals` are new packages in the existing
-layout. **`packs/` sits at the repository root rather than under `src/`**, deliberately: it
+layout. **The matrix reader lives in `core/authority`, not `core/evals`** — analyze pass 1
+(I3): a cell is an authorization fact by D5's own argument, it is read on the run path at
+every run start, and putting it in a package named `evals` invites someone to import the
+scoring harness into a run. Evals *write* cells through it; nothing on the run path imports
+`core.evals` at all. **`packs/` sits at the repository root rather than under `src/`**, deliberately: it
 is content, not code, and putting product knowledge inside the Python package tree would
 ship it in the distribution that Principle I says stays product-blind. `evals/seed/` is
 likewise data — and it is the one directory in this repository whose *authority comes from

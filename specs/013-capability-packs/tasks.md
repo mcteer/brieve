@@ -18,7 +18,7 @@ behaviour they guard.
 | **Fail-closed** | Unqualified cell, withdrawn cell, no-fallback stop, tier violation, digest mismatch, incomplete promotion |
 | **Conformance** | Four eval suites; the structural rows (product-blind core, no bypass, no widening, no auto-tracking); the live-model lane |
 | **Correlation / evidence** | `MODEL_GATE`, `MATRIX_FALLBACK`, provenance-at-read into the run record |
-| **Eval** | The whole of Phase 7 — this is the feature that brings them online |
+| **Eval** | The whole of Phase 8 — this is the feature that brings them online |
 | **No-secret-leak** | The provider key is a dev-lane secret: never in a jobspec, never read by a run, never in a pack |
 
 ## Path Conventions
@@ -58,14 +58,18 @@ audit events. No story is demonstrable until this phase completes.
 - [ ] T009 [P] Create `src/core/packs/loader.py`: `PackLoader` protocol, `FilesystemPackLoader`, `InMemoryPackLoader`. Loading verifies **every content digest** and refuses `digest_mismatch` naming the file — verification at load rather than at review, because review is when someone looked and load is when it matters
 - [ ] T010 Create `src/core/packs/registration.py`: manifest → `ToolRegistry` registrations with risk class preserved. **Loading executes nothing from the pack** — a declaration names a handler, and the handler is resolved from what the platform already provides
 - [ ] T011 Create `src/core/packs/isolation.py`: which packs a definition reaches, the no-widening check against its ceiling, and ambiguous-tool-name refusal. A tool name is qualified by its pack; an unqualified name reachable from two packs refuses rather than resolving by load order, because load order changes without anyone deciding it did
+- [ ] T011a Create `src/core/packs/workflows.py`: `WorkflowRecord` (`name`, `minimum_tier`, `paved`) and tier comparison. **The manifest already declared `workflows[]` and nothing in the platform had a runtime shape for one**, so tiers had nothing to bound and US5's rows would have asserted a refusal against a concept that did not exist. Deliberately minimal — a workflow here is a named, tiered thing a definition may or may not run, which is all ADR-0045 needs; what a workflow *does* is pack content
 - [ ] T012 [P] Component rows in `tests/component/test_pack_loading.py`: manifest parsing, digest verification and its refusal, two packs side by side, ambiguous name refused, and that a malformed manifest refuses the whole load rather than partially loading
 
 ### The matrix
 
 - [ ] T013 Create `src/core/evals/__init__.py` with the package intent: gates are records, not claims
-- [ ] T014 Create `src/core/evals/matrix.py`: `QualifiedCell`, the Vault-backed matrix reader (010's ceiling pattern — operator-authored, read-only to runs, refused loudly when absent), and `validate_binding_map`. Each cell carries `qualified_by` (`fixture | live`) and the judge that scored it
+- [ ] T013a [GATE:fail-closed] Grant `read` on `${vault_mount.harness_authority.path}/data/model-matrix/*` in `infra/modules/trust-fabric/policies.tf`, beside the ceiling and role-binding grants. **Before T014, not in Polish** — the policy covers exactly two prefixes today, so without this the matrix is unreadable at run time AND Vault answers **403 rather than 404**, which makes "no matrix" indistinguishable from "not allowed to look" and reports an unreachable trust fabric for a matrix that merely lacks a grant. The `data/policies/*` block directly below documents this exact trap from 010; copy its reasoning rather than rediscovering it
+- [ ] T013b [P] Row in `tests/conformance/identity/test_matrix_is_readable.py` (`host_enclave`): the run role can read the matrix path against the live fabric. A row rather than a Terraform review, because the grant being present in HCL and the grant being effective are different claims — 010 learned that when the registry engine appended policies nobody had declared
+- [ ] T014 Create `src/core/authority/matrix.py`: `QualifiedCell`, the Vault-backed matrix reader (010's ceiling pattern — operator-authored, read-only to runs, refused loudly when absent), and `validate_binding_map`. Each cell carries `qualified_by` (`fixture | live`) and the judge that scored it. **In `core/authority`, not `core/evals`** — a cell is an authorization fact, it is read on the run path at every run start, and a matrix module inside a package named `evals` invites someone to import the scoring harness into a run. `core.evals` writes cells through this module; nothing on the run path imports `core.evals` at all
 - [ ] T015 [P] Extend `OPERATION_REASONS` in `src/core/runs/refusals.py` with this feature's vocabulary: `unqualified_cell`, `cell_withdrawn`, `no_qualified_fallback`, `pack_exceeds_ceiling`, `above_tier`, `digest_mismatch`, `promotion_incomplete`, `injection_suspected`. Added to the frozen mapping rather than invented at call sites — the 010 rule
-- [ ] T016 [P] Component rows in `tests/component/test_matrix_reader.py`: a green cell resolves; an absent matrix refuses loudly rather than resolving to empty; `qualified_by` round-trips
+- [ ] T016 [P] Component rows in `tests/component/test_matrix_reader.py`: a green cell resolves; an absent matrix refuses loudly rather than resolving to empty; `qualified_by` round-trips; **a model identifier that is not `provider/model@version` is refused at parse** — an alias or a bare name is the moving target FR-011 forbids, caught at the identifier rather than only at the lookup
+- [ ] T016a [P] [GATE:conformance] Row in `tests/conformance/packs/test_run_path_does_not_import_evals.py`: no module reachable from `core.run` imports `core.evals`. The layering I3 names, asserted rather than trusted to naming
 
 **Checkpoint**: `make check` green; a pack loads and registers tools; the matrix reads.
 
@@ -80,7 +84,7 @@ core module names a product.
 watch them reach the same hooks every other tool does — then grep `src/core` for a product
 name and find nothing.
 
-- [ ] T017 [US1] Create `packs/vault/pack.toml` and `packs/vault/skills/` — **authored**, in the same open Agent Skills format `hashicorp/agent-skills` uses (FR-027d), so contributing upstream is a pull request rather than a rewrite. Vault runs in the enclave, so this is the pack whose tools are exercised against a live product
+- [ ] T017 [US1] Create `packs/vault/pack.toml` and `packs/vault/skills/` — **authored**, in the same open Agent Skills format `hashicorp/agent-skills` uses (FR-027d), so contributing upstream is a pull request rather than a rewrite. Vault runs in the enclave, so this is the pack whose tools are exercised against a live product. Declare at least one `paved` workflow, so US5 has something a lower tier may run
 - [ ] T018 [US1] Vendor the Terraform pack: `packs/terraform/pack.toml`, `skills/` copied unmodified from [`hashicorp/agent-skills`](https://github.com/hashicorp/agent-skills) at a pinned commit, and `packs/terraform/skills/PROVENANCE.md` recording repository, commit, licence (MPL-2.0), and retrieval date. **Adopted**, which is what gives ADR-0004's supply chain a genuine subject
 - [ ] T019 [US1] Replace the hand-built registry in `src/surfaces/dispatch/entrypoint.py` with pack loading — **the line a previous feature signposted** ("when they land, this is the line they replace"). Keep the fixture tools available for definitions that name no pack, so 008–012's rows are unchanged
 - [ ] T020 [P] [US1] [GATE:conformance] Structural row in `tests/conformance/packs/test_core_is_product_blind.py`: no module under `src/core` contains a product name, with `vault_fabric` and `credentials` excluded **by name and with a comment** — those are the trust fabric, not the product, and a pattern-only check would either miss the distinction or forbid the wrong thing
@@ -136,8 +140,8 @@ moment.
 **Independent test**: consult guidance, change it upstream, confirm the run record still
 names what was actually read.
 
-- [ ] T034 [US4] Create `src/core/packs/consulted.py`: record URL, timestamp, and content hash into the run record at read time
-- [ ] T035 [P] [US4] [GATE:correlation] Rows in `tests/component/test_provenance_at_read.py`: the triple is archived; changing the source afterwards does not change the record; an executed artifact is always pinned, so the executed/consulted distinction holds in both directions
+- [ ] T034 [US4] Create `src/core/packs/consulted.py`: record URL, timestamp, and content hash into the run record at read time. **The source is a fixture, and the record says so** — the validated-design corpus left with US6, so nothing in 013 gives an agent real guidance to read. This builds and proves the mechanism against a controlled document; the first real corpus arrives with the answering feature, and `contracts/conformance-packs.md` records that the mechanism is proven and the corpus is not
+- [ ] T035 [P] [US4] [GATE:correlation] Rows in `tests/component/test_provenance_at_read.py`: the triple is archived; changing the fixture afterwards does not change the record; an executed artifact is always pinned, so the executed/consulted distinction holds in both directions. One row asserts the honest limit — **the mechanism is proven against a fixture, not against a corpus**, so a green run here is not evidence that consulting real guidance works
 
 **Checkpoint**: attestation can name its inputs.
 
@@ -150,6 +154,7 @@ names what was actually read.
 **Independent test**: two definitions, different tiers, same pack — the lower one confined
 to paved workflows regardless of what the request asks for.
 
+- [ ] T035a [P] [US4] Emit aggregate retrieval targets as OTel counters in `src/core/packs/consulted.py` — what was looked up and how often (FR-026, ADR-0031). **A counter, not a table**: Principle VI, and the ranking is read at a lifecycle review rather than by a run, so nothing needs it queryable in-process. This is the skill-authoring backlog, and a section's retrieval rate falling after a pack release is the evidence that distillation worked
 - [ ] T036 [US5] Add tier resolution to `src/core/packs/isolation.py`: a workflow above the definition's tier refuses `above_tier`. **Tiers bound workflows, never tools** — the ceiling answers about tools, and two mechanisms answering one question is the duplication ADR-0044 forbids
 - [ ] T037 [P] [US5] [GATE:fail-closed] Rows in `tests/component/test_competency_tiers.py`: lower tier confined to paved workflows; higher tier composes; a request asking for behaviour above the tier is refused — **the tier wins, because it belongs to the definition and not the request**
 - [ ] T038 [P] [US5] Row in `tests/component/test_tiers_do_not_duplicate_the_ceiling.py`: a tier change never alters which tools are reachable — the disjointness ADR-0044 requires, asserted rather than assumed
@@ -164,7 +169,7 @@ to paved workflows regardless of what the request asks for.
 
 - [ ] T039 [GATE:eval] Create `src/core/evals/suites.py`: the four suites as sets of cases with expected outcomes — `must_deny`, `must_decline`, `citation_accuracy`, `estate_state`. **Report fidelity is deliberately absent**, with an explicit skip citing ADR-0018 in the output rather than silence (FR-013a)
 - [ ] T040 [GATE:eval] Create `src/core/evals/scoring.py`: `Scorer` protocol, `FixtureScorer` (replays a recorded response), `LiveModelScorer` (calls a provider). The suites, thresholds, and refusals are **identical across both** — only the scorer differs, which is what makes "the machinery is real even when the substrate is a recording" true rather than aspirational
-- [ ] T041 [GATE:eval] Create `evals/seed/` with human-labelled verdict cases, and `src/core/evals/judge.py` implementing the chain: the first judge is qualified against the seed, every later judge by a judge already qualified. A judge pointed at itself refuses rather than closing the loop
+- [ ] T041 [GATE:eval] Create `evals/seed/` with **at least 20 human-labelled verdict cases spanning all four suites, including at least three the judge should REJECT** — a floor, so "representative" is checkable rather than aspirational and a seed set of two happy paths cannot qualify a judge. ADR-0052 records the floor and the obligation to grow it with the suites. Then and `src/core/evals/judge.py` implementing the chain: the first judge is qualified against the seed, every later judge by a judge already qualified. A judge pointed at itself refuses rather than closing the loop
 - [ ] T042 [P] Write `packs/vault/evals/` and `packs/terraform/evals/` cases for each suite
 - [ ] T043 [GATE:eval] Add `make evals` (fixtures, blocking) and `make evals-live` (`live_model` marker, named runner) to the `Makefile`, and wire `tests/conformance/packs` into the conformance recipe — **in the same commit that creates the directory**, because 010 lost a feature's rows to a directory no lane enumerated
 - [ ] T044 [P] [GATE:eval] Rows in `tests/component/test_judge_chain.py`: the first judge qualified against the seed; a later judge qualified by a qualified judge; a judge pointed at itself refused; **and a cell recorded without a judge is refused unless it is the seed-qualified first**

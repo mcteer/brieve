@@ -20,6 +20,12 @@ grep -c "Risk class" docs/glossary.md                # -> 1
 
 # F3: there is no approval audit event to be confused with
 grep -ci "approval" src/core/audit/schema.py         # -> 0
+
+# The read policy covers two prefixes and not the matrix (analyze pass 1, I1)
+grep -c "model-matrix" infra/modules/trust-fabric/policies.tf   # -> 0 before the fix
+
+# Tiers had nothing to bound: no workflow concept anywhere (G1)
+grep -rl "workflow" src/core/ | wc -l                # -> 0 before the fix
 ```
 
 ## 2 — The core stays product-blind *(after packs land)*
