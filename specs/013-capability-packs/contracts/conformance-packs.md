@@ -45,6 +45,21 @@ reads as four-of-five rather than as complete.
 | Digests are verified at load | A skill whose bytes changed without its pin changing refuses `digest_mismatch` |
 | Promotion needs all three | Provenance, injection lens, and a passing eval — any one absent blocks (FR-017, SC-006) |
 
+## The dispatched invocation (T023, FR-027b) — **demonstrated 2026-07-29**
+
+A dispatched allocation loaded the Vault pack under its own attested identity, resolved
+`vault-agent`'s ceiling and bindings from the trust fabric, and invoked `vault_read`
+against the live Vault through `invoke_tool` — the one pipeline there is. The negative
+dispatched alongside: `planner-agent`, naming no pack and requesting `vault_read`, failed
+its allocation on the scope refusal. Three rows, all green, in
+`tests/conformance/identity/test_pack_tools_dispatch.py`.
+
+Two governance refusals preceded the green run, and both were the platform being right:
+the entrypoint requested no product actions (strict intersection made the tool holdable
+and never invocable), and the manifests declared `federate` for tools that run on the
+platform's identity — the entitlement mirror refused the over-claim. Both corrections are
+recorded where they were made.
+
 ## The per-cell qualification record (SC-013)
 
 **Every qualified cell records which scorer qualified it.** This table is the record, and a
