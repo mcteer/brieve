@@ -111,6 +111,24 @@ def main() -> int:
     # through the evidence path rather than trusting this line.
     print(f"run {run.correlation_id} started, state={run.state}")
 
+    # 013, opt-in: invoke each requested tool once through the real pipeline. This is what
+    # makes "a pack tool reaches a live product through the same hooks as any other tool"
+    # a demonstrated fact rather than a structural argument — the allocation holds the
+    # attested identity the tool's handler manufactures credentials from, which no host
+    # process has. Opt-in because every pre-013 dispatched row asserts a trail this
+    # appends TOOL_OUTCOME events to.
+    if os.environ.get("RUN_INVOKE_TOOLS", "").strip() == "1":
+        from core.tools.invoke import invoke_tool
+
+        for tool_name in sorted(tools):
+            outcome = invoke_tool(run, tool_name, {"path": "conformance/probe"})
+            print(f"tool {tool_name}: allowed={outcome.allowed}", flush=True)
+            if not outcome.allowed:
+                # A refused invoke fails the allocation, so the dispatch row's
+                # "complete" assertion means every requested tool actually ran.
+                print(f"tool {tool_name} refused: {outcome.reason_code}", file=sys.stderr)
+                return 1
+
     # Optional multi-step mode, for rows that need a run still running when something
     # happens to it. Every existing fixture completes immediately, so a stop row against
     # one passes whether the stop works or not — 010's T009 lesson in this feature's

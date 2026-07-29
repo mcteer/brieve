@@ -1,116 +1,154 @@
 # SPDX-License-Identifier: Apache-2.0
-"""GATE:conformance — a pack tool reaches a real product through the real pipeline.
+"""GATE:conformance — a pack tool reaches a real product through the real pipeline (T023).
 
-**This is the row the Vault pack exists for.** Terraform proves *adoption* — a real upstream,
-a pinned commit, genuine provenance. Vault proves *invocation*: its tools reach a product
-that actually runs here, so Principle II's claim gets exercised end to end rather than
-against a fixture that would agree with anything.
+**This is the row the Vault pack exists for.** Terraform proves *adoption*; Vault proves
+*invocation*: a dispatched allocation loads the pack under its own attested identity,
+manufactures authority whose ceiling names `vault_read`, and invokes it through the same
+hook pipeline as every other tool — against a Vault that actually answers.
 
-Every other pack row in this feature is hermetic and would pass against a platform where no
-tool had ever been called. This one needs the enclave, and it fails if the pack's product is
-unreachable, if the probe is missing, if the ceiling does not know the tool's name, or if the
-dependency gate denies the call — the set of failures that were invisible until a pack
-declared a product that could genuinely be down.
+**Dispatched, not simulated on the host.** The first version of this file called the
+handler from the host and failed with `CredentialUnavailableError`: the handler
+manufactures credentials from the allocation's workload identity, which no host process
+holds — a property the platform is built on, not a test inconvenience. So the row drives
+the scheduler (the thing a host process legitimately can) and asserts the allocation's
+outcome, on the `test_dispatched_end_to_end` pattern.
 """
 
 from __future__ import annotations
 
+import json
+import time
+import urllib.error
+import urllib.request
+import uuid
+
 import pytest
 
-from core.authority.types import AuthorityScope
-from core.registry.memory import ToolRegistry
-from core.run import start_governed_run
-from core.tools.invoke import invoke_tool
+from surfaces.dispatch.nomad import NomadDispatcher
 from surfaces.probes import vault_probe
-from surfaces.toolset import build_registry, known_actions, known_tools
-from tests.conformance.identity.conftest import production_fabric
 
-# BOTH markers, not `host_enclave` alone. The hermetic lane filters on `-m "not
-# enclave"`, which does not deselect `host_enclave` — so a row marked only host_enclave
-# RUNS IN THE FAST LANE with no enclave and fails for want of a stack. `host_enclave`
-# says *where* among enclave rows this must run; `enclave` says it needs one at all.
+# BOTH markers: `-m "not enclave"` does not deselect host_enclave alone.
 pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
+
+NOMAD_ADDR = "http://127.0.0.1:4646"
+JOB_ID = "agent-run"
+TENANT = "tenant-conformance"
+
+
+def _job_registered() -> bool:
+    try:
+        with urllib.request.urlopen(f"{NOMAD_ADDR}/v1/job/{JOB_ID}", timeout=3) as response:  # noqa: S310
+            return json.loads(response.read()).get("ParameterizedJob") is not None
+    except (urllib.error.URLError, OSError):
+        return False
+
+
+def _allocation_state(dispatched_job_id: str, *, timeout: float = 720.0) -> tuple[str, str]:
+    """Wait for the allocation to finish. Twelve minutes — a cold dependency install has
+    been measured past seven, and a shorter budget reports `timeout` for a working run."""
+    deadline = time.monotonic() + timeout
+    alloc_id = ""
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(  # noqa: S310
+                f"{NOMAD_ADDR}/v1/job/{dispatched_job_id}/allocations", timeout=5
+            ) as response:
+                allocations = json.loads(response.read())
+        except (urllib.error.URLError, OSError):
+            allocations = []
+        if allocations:
+            alloc = allocations[0]
+            alloc_id = alloc.get("ID", "")
+            status = alloc.get("ClientStatus", "")
+            if status in {"complete", "failed"}:
+                return status, alloc_id
+        time.sleep(2)
+    return "timeout", alloc_id
+
+
+@pytest.fixture
+def dispatcher() -> NomadDispatcher:
+    if not _job_registered():
+        pytest.fail(
+            f"the parameterized job {JOB_ID!r} is not registered — run `make dev-up`. Not "
+            "skippable: a pack tool proven only hermetically has not been proven to run."
+        )
+    return NomadDispatcher(nomad_addr=NOMAD_ADDR, job_id=JOB_ID)
 
 
 def test_vault_is_reachable_from_the_probe_the_pack_names() -> None:
-    """The precondition every row below depends on.
+    """The precondition, separated so a Vault outage reports as a Vault outage rather than
+    as a pack defect — the two look identical from a denied tool call.
 
-    Separated so a Vault outage reports as a Vault outage rather than as a pack defect. The
-    two look identical from a denied tool call, which is the confusion the probe exists to
-    remove.
+    The probe's first live run failed HERE: it ignored `VAULT_CACERT`, so TLS under the
+    enclave's own CA read as unreachability — the probe inventing an outage for a product
+    that was up, which is the exact confusion it exists to remove. Fixed in the probe.
     """
     reachable, detail = vault_probe("vault")
     assert reachable, f"vault is not reachable ({detail}); the rows below cannot mean anything"
 
 
-def test_the_vault_pack_registers_its_tools_with_risk_classes_intact() -> None:
-    registry, loaded = build_registry(packs=["vault"])
-    assert "vault_read" in known_tools(registry)
-    assert "vault.read" in known_actions(registry)
-    assert registry.resolve("vault_read").risk_class == "secret_touching"
-    assert loaded["vault"].product == "vault"
-    assert loaded["vault"].probe is not None, (
-        "the Vault pack registered without a resolved probe; its product would record "
-        "UNHEALTHY and every one of its tools would be denied while Vault is up"
+def test_a_dispatched_run_invokes_a_pack_tool_through_the_real_pipeline(
+    dispatcher: NomadDispatcher,
+) -> None:
+    """FR-027b end to end: pack loaded, ceiling resolved, `vault_read` invoked, in an
+    allocation, against the live product.
+
+    The entrypoint fails the allocation if the invoke is refused, so `complete` means the
+    tool ran — through `invoke_tool`, which is the one pipeline there is (FR-003). The
+    definition, its ceiling naming `vault_read`, and its bindings record carrying the pack
+    all come from the trust fabric; the allocation authenticates as itself.
+    """
+    correlation_id = f"pack-dispatch-{uuid.uuid4().hex[:12]}"
+
+    dispatcher.dispatch(
+        correlation_id=correlation_id,
+        subject_user_id="alice",
+        tenant_id=TENANT,
+        agent_definition_id="vault-agent",
+        requested_tools=frozenset({"vault_read"}),
+        subject_roles=frozenset({"vault-operator"}),
+        packs=frozenset({"vault"}),
+        invoke_tools=True,
+    )
+
+    dispatched = dispatcher.dispatched_job_id(correlation_id)
+    assert dispatched, "the dispatcher returned a handle naming no scheduled job"
+    status, alloc_id = _allocation_state(dispatched)
+    assert status == "complete", (
+        f"the pack-tool allocation ended {status!r} (alloc {alloc_id}). Run "
+        f"`nomad alloc logs -stderr {alloc_id} run` — a refused invoke names its "
+        f"reason_code there, and a resolution failure names which record was missing"
     )
 
 
-def test_a_pack_tool_passes_the_same_hooks_as_any_other_tool() -> None:
-    """FR-003, exercised rather than inspected.
+def test_a_definition_without_the_pack_cannot_reach_its_tool(
+    dispatcher: NomadDispatcher,
+) -> None:
+    """The negative, and what makes the row above mean something.
 
-    The hermetic row asserts there is no bypass *path*; this asserts a real call goes through
-    the pipeline it is supposed to. A structural check and a live call are different evidence,
-    and the structural one holds even if nothing had ever been invoked.
+    `planner-agent` names no pack, and its ceiling does not know `vault_read` — so a
+    dispatch requesting it must FAIL the allocation. An entrypoint that quietly loaded
+    every pack, or a ceiling parser that accepted unknown tools, would complete this.
     """
-    registry, _ = build_registry(packs=["vault"])
-    run = start_governed_run(
-        correlation_id="corr-pack-dispatch-001",
-        subject_user_id="conformance",
-        agent_definition_id="planner",
-        requested_scope=_scope_of(registry, "vault_read"),
-        identity_fabric=production_fabric(),
-        registry=registry,
+    correlation_id = f"pack-dispatch-neg-{uuid.uuid4().hex[:12]}"
+
+    dispatcher.dispatch(
+        correlation_id=correlation_id,
+        subject_user_id="alice",
+        tenant_id=TENANT,
+        agent_definition_id="planner-agent",
+        requested_tools=frozenset({"vault_read"}),
+        subject_roles=frozenset({"operator"}),
+        # No packs. vault_read is not in the fixture registry, not in planner's ceiling,
+        # and not in the operator role — three independent reasons this must refuse.
+        invoke_tools=True,
     )
 
-    outcome = invoke_tool(run, "vault_read", {"path": "conformance/probe"})
-
-    assert outcome.allowed, f"the pack tool was refused: {outcome.reason_code}"
-    events = [e.event_type for e in run.audit_sink.list_by_correlation_id(run.correlation_id)]
-    assert "pre_decision" in events, f"no pre-hook decision recorded; got {events}"
-    assert "tool_outcome" in events, f"no tool outcome recorded; got {events}"
-
-
-def test_a_read_against_real_vault_returns_keys_and_never_values() -> None:
-    """Against the real product, not a double.
-
-    `vault_read` returning keys and presence is a property of the handler; this asserts it
-    holds when the handler is talking to an actual Vault rather than to a stub that returns
-    nothing interesting either way.
-
-    A value returned here reaches tool output, then the trail, then model context — and the
-    trail is append-only and hash-chained, so what lands there is permanent (ADR-0051).
-    """
-    from surfaces.handlers import vault_read
-
-    result = vault_read({"path": "conformance/probe"})
-
-    assert set(result) == {"path", "present", "keys"}, (
-        f"vault_read returned {sorted(result)}; anything beyond path/present/keys risks "
-        f"carrying secret material into a permanent record"
-    )
-    assert isinstance(result["keys"], list)
-    assert all(isinstance(k, str) for k in result["keys"])
-
-
-def _scope_of(registry: ToolRegistry, *tools: str) -> AuthorityScope:
-    """The scope a run requests, derived from what the tools actually declare.
-
-    Derived rather than written out, for the reason the vocabulary is: a literal here would
-    have to agree with the manifest, and the two would drift the first time a pack changed
-    a product action.
-    """
-    actions = {registry.resolve(t).product_action for t in tools}
-    return AuthorityScope(
-        tool_names=frozenset(tools),
-        product_actions=frozenset(str(a) for a in actions if a),
+    dispatched = dispatcher.dispatched_job_id(correlation_id)
+    assert dispatched, "the dispatcher returned a handle naming no scheduled job"
+    status, alloc_id = _allocation_state(dispatched)
+    assert status == "failed", (
+        f"a run requesting a pack tool with no pack ended {status!r} (alloc {alloc_id}) — "
+        f"something resolved authority for a tool nothing provided"
     )

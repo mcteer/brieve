@@ -75,6 +75,13 @@ job "agent-run" {
       # and not here fails the dispatch with "unpermitted metadata keys" rather than being
       # silently dropped. Found the hard way in 010.
       "steps",
+      # 013: which capability packs the entrypoint loads, comma-separated. Optional — a
+      # dispatch naming none behaves exactly as before, and the fixture tools stay.
+      "packs",
+      # 013: when "1", the entrypoint invokes each requested tool once through the real
+      # pipeline. Opt-in, because every pre-013 dispatched row asserts a trail this would
+      # append TOOL_OUTCOME events to.
+      "invoke_tools",
     ]
   }
 
@@ -160,6 +167,8 @@ job "agent-run" {
 
         # Empty unless a row asks for them, in which case the run brackets that many steps.
         RUN_STEPS = "${NOMAD_META_steps}"
+        RUN_PACKS = "${NOMAD_META_packs}"
+        RUN_INVOKE_TOOLS = "${NOMAD_META_invoke_tools}"
         RUN_ID              = "${NOMAD_META_run_id}"
         RUN_STEP_INDEX      = "${NOMAD_META_step_index}"
       }

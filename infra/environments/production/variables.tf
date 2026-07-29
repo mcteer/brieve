@@ -30,6 +30,13 @@ variable "agent_definitions" {
     # are authored rather than one being generated from the other.
     tool_names      = list(string)
     product_actions = list(string)
+    # 013. Declared here as well as in the module: Terraform's object-type conversion
+    # silently DROPS attributes the type does not name, and the first apply of vault-agent
+    # wrote packs = [] for exactly that reason — the values were in the tfvars map and the
+    # root variable's type threw them away without a warning.
+    packs       = optional(list(string), [])
+    binding_map = optional(map(string), {})
+    tier        = optional(number, 1)
   }))
 }
 

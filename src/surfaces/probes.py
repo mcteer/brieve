@@ -31,6 +31,7 @@ declaring its own product healthy is a pack marking its own homework.
 from __future__ import annotations
 
 import os
+import ssl
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -55,9 +56,17 @@ def vault_probe(product: str) -> tuple[bool, str]:
     address = os.environ.get("VAULT_ADDR", "").strip()
     if not address:
         return False, "VAULT_ADDR is not set"
+    # The enclave's Vault serves TLS under its own CA (VAULT_CACERT), and a probe that
+    # ignored it would report "certificate verify failed" as unreachability — the probe
+    # inventing an outage for a product that is up, which is the exact failure this module
+    # exists to prevent. The first live conformance run failed on precisely this line.
+    cacert = os.environ.get("VAULT_CACERT", "").strip()
+    context = ssl.create_default_context(cafile=cacert) if cacert else None
     try:
         with urllib.request.urlopen(  # noqa: S310 — operator-supplied address, not user input
-            f"{address.rstrip('/')}/v1/sys/health", timeout=PROBE_TIMEOUT_SECONDS
+            f"{address.rstrip('/')}/v1/sys/health",
+            timeout=PROBE_TIMEOUT_SECONDS,
+            context=context,
         ) as response:
             # 200 initialized+unsealed+active, 429 standby, 473 performance standby. All
             # three answer, which is what reachability asks. Sealed (503) is not reachable:

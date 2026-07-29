@@ -78,6 +78,12 @@ ENCLAVE_PATHS = frozenset(
         # The list shrank because the reason for an entry went away. An allowlist that
         # only ever grows is not an allowlist.
         "component/test_resume_cross_process.py",
+        # 013's host rows, same posture as 011's divergence rows below: a host process
+        # holds no attested identity — a property the platform is built on — so the
+        # matrix-grant rows read Vault as the OPERATOR, and the pack-dispatch rows drive
+        # the scheduler, which only a host process legitimately can.
+        "conformance/identity/test_matrix_is_readable.py",
+        "conformance/identity/test_pack_tools_dispatch.py",
         # 011's divergence rows read the audit trail as an OPERATOR, with a token.
         #
         # **This is not the entry that was removed above, arriving back.** That one used a

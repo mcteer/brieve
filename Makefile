@@ -94,9 +94,16 @@ a11y:
 evals:
 	$(UV_RUN) pytest tests/component/test_eval_gates.py tests/component/test_judge_chain.py -q
 
+# The credential comes from .env's ANTHROPIC_API_KEY, passed on the command line as the
+# name the lane reads — scoped to this one invocation, never exported, on the same pattern
+# as the conformance recipe's Vault coordinates. The directory is NAMED because it sits
+# outside `testpaths` (like tests/a11y): a bare `pytest -m live_model` collects nothing,
+# which is a gate that cannot run reporting an empty pass.
 evals-live:
-	uv run --extra adapters --extra surfaces --extra portal --extra evals \
-	  pytest -m live_model -q
+	@K=$$(grep '^ANTHROPIC_API_KEY=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	[ -n "$$K" ] || { echo "no ANTHROPIC_API_KEY in .env; the live lane cannot run" >&2; exit 1; } ; \
+	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra portal --extra evals \
+	  pytest tests/evals_live -m live_model -q
 
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
