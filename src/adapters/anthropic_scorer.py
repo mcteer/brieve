@@ -62,7 +62,12 @@ class LiveModelScorer:
         client = anthropic.Anthropic(api_key=key)
         response = client.messages.create(
             model=api_model,
-            max_tokens=1024,
+            # 4096, because 1024 was the live lane's quietest defect: Opus 5 reasons
+            # before it answers, the reasoning spends from the same budget, and a case
+            # whose thinking ran long returned ZERO text — which the predicate failed as
+            # a wrong answer. Diagnosed from failing cases whose sample responses were
+            # empty strings after five runs of chasing what looked like model variance.
+            max_tokens=4096,
             # No temperature parameter: the API answers "`temperature` is deprecated
             # for this model" — Opus 5 rejects it outright, discovered when pinning it
             # to 0 failed all nine tests in six seconds. Variance is controlled one
