@@ -36,6 +36,14 @@ OPERATION_REASONS: Final[dict[str, str]] = {
     "nothing_to_dispatch": "no agent was selected, and none is available to dispatch",
 }
 
+# 013's vocabulary is deliberately NOT here. Every matrix, pack, and tier refusal is raised
+# as `ResolutionRefused`, which validates against `RESOLUTION_REASONS` in
+# `core.authority.errors` — a different frozen mapping, and the one the code actually
+# checks. The task list said to extend this one; the code says otherwise, and the code is
+# what refuses at construction. Load-time refusals (digest, coverage, governance hook)
+# carry `ManifestError` and belong to neither mapping: they refuse a pack before any
+# operation or resolution has begun.
+
 #: The reasons a caller must not be able to tell apart.
 #:
 #: Both answer "not found" on the wire. Keeping the set explicit means the collapse is a

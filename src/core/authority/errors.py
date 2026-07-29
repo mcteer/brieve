@@ -36,6 +36,26 @@ RESOLUTION_REASONS: Final[dict[str, str]] = {
     "broker_not_implemented": "the brokered credential path does not exist yet",
     # --- what they may do does not include this
     "outside_scope": "resolution succeeded; the action is not permitted",
+    # --- 013: the record could not be read as written
+    "malformed_record": "a control-plane record is present but not well-formed",
+    # --- 013: the model bound for a role is not one evaluation qualified
+    #
+    # Resolution reasons rather than operation reasons: these refuse while establishing what
+    # a definition may do, alongside `unknown_ceiling_entry`, and they refuse before a run
+    # exists. A binding is checked twice — at definition registration and again at run start
+    # — because a cell can be WITHDRAWN while the definition that pinned it sits unchanged.
+    "unqualified_cell": "the definition pins a cell evaluation has not qualified",
+    "cell_withdrawn": "the pinned cell was qualified once and has since been withdrawn",
+    "no_qualified_fallback": "the pinned cell is unavailable and no other qualified cell "
+    "exists for that role; the run stops rather than proceeding unqualified",
+    # --- 013: the pack a definition names cannot supply what it is being asked for
+    "pack_exceeds_ceiling": "a named pack declares a tool the ceiling does not permit; a "
+    "pack narrows what a definition may do and never widens it",
+    "pack_not_loaded": "the definition names a pack that is not loaded",
+    "pack_not_reachable": "the definition does not name the pack this tool was qualified by",
+    "ambiguous_tool_name": "two reachable packs declare this tool name; qualify it, because "
+    "resolving by load order makes the answer change when the directory listing does",
+    "above_tier": "the composition is above the definition's competency tier",
 }
 
 #: The one reason code above that reports a **decision** rather than a failure to decide.
