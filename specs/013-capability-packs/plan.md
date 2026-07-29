@@ -1,0 +1,208 @@
+# Implementation Plan: Capability Packs and Eval Gates
+
+**Branch**: `feat/013-capability-packs` | **Date**: 2026-07-29 | **Spec**: [spec.md](spec.md)
+
+**Input**: Feature specification from `specs/013-capability-packs/spec.md`
+
+## Summary
+
+Two packs, five qualified roles, four of the five eval gates (report fidelity is owed
+against ADR-0018, which is unbuilt), and the judge regress resolved by a
+**human-labeled seed set** — the only one of the spec's three bounded options that
+terminates without importing trust from somewhere this platform cannot inspect.
+
+A pack is a **declared manifest plus content**, loaded through a seam that registers its
+tools into the registry 002 already built. Nothing in `core` learns a product name. The
+Terraform pack *adopts* real upstream skills from `hashicorp/agent-skills`; the Vault pack
+*authors* its own in the same format — so ADR-0004's supply chain has a genuine subject and
+the authored half is a pull request away from becoming adopted.
+
+The Qualified Model Matrix lands as a **record in the control-plane trust fabric**, beside
+the ceilings 010 put there, because it is the same kind of thing: an operator-authored
+authorization fact a definition may reference and never widen.
+
+## Technical Context
+
+**Language/Version**: Python 3.12 (existing toolchain; `uv`)
+
+**Primary Dependencies**: no new *runtime* dependency. A new `evals` dev extra carries the
+scoring harness and, for the live lane only, one model-provider SDK. **Deliberately absent
+from base and `surfaces`**: any provider SDK — the platform's default posture stays "calls
+no model", which `pyproject.toml` currently states in as many words.
+
+**Storage**: the control-plane Vault for the matrix and pack pins (operator-authored,
+read-only to runs — the 010 pattern). Pack content on disk under `packs/`, verified by
+digest. Eval results in Postgres beside the audit trail, **written by `core/evals` and read
+by `core/authority/matrix.py`** when it resolves a cell's `suite_results` — the schema lives
+under `core/evals`, and the run path reaches results only through the matrix module, which
+is what keeps the I3 layering row true of this design rather than only of its naming.
+
+**Testing**: pytest. Rows for pack loading and isolation, matrix refusals, supply-chain
+promotion, and the gates themselves. Live-model scoring behind `@pytest.mark.live_model`,
+never in the blocking lane.
+
+**Target Platform**: the dev enclave. **No new operated component** — Vault, Nomad, and
+Postgres already run, which is why Vault was the right second pack. *"Operated" means
+operated by us*: the live-model lane calls an external provider, which is a runtime
+dependency of one dev lane rather than a component this platform stands up, monitors, or
+is responsible for. The distinction matters because Principle VI's trigger is the
+operational burden, and a provider we call carries none of it.
+
+**Project Type**: a core seam (pack loading) + content (two packs) + a gate discipline
+(four suites in force, report fidelity owed) + one trust-fabric record type (the matrix).
+
+**Performance Goals**: none newly binding. An eval run is a gate, not a hot path.
+
+**Constraints**: no core module names a product; no pack widens a ceiling; no path reaches
+an unqualified model; no auto-tracking anywhere; a model verdict never satisfies a human
+approval; report fidelity recorded as owed rather than stubbed.
+
+**Scale/Scope**: two packs, five roles, one provider in the live lane.
+
+## Constitution Check
+
+| Principle | Verdict | Notes |
+| --- | --- | --- |
+| I — Build Glue Only | **Pass** | Terraform's skills are *adopted* from `hashicorp/agent-skills`, which is ADR-0004's instruction honoured rather than paraphrased. No registry product: packs register into the registry 002 built. Vault's authored skills use the upstream format (FR-027d) so they migrate onto upstream as it matures — the "migrate onto and delete anything they absorb" half of this principle, made operational. |
+| II — Total Interception; One Governed Tool Layer | **Pass** | Pack tools are `ToolRegistry` registrations like any other, so they inherit the hook pipeline **by construction rather than by discipline**. **Risk class becomes real** — it is in the glossary and nowhere in code today — and registry review may require process isolation for `secret-touching` and `destructive`. Transport stays a tool property; no MCP server is authored for uniformity. |
+| III — Fail-Closed, In-Process Enforcement | **Pass, with a new enforcement surface bounded** | **Pack hooks ARE a new enforcement point**, authored outside this repository — the earlier "no new enforcement point" was wrong, and analyze pass 10 caught it. Bounded two ways: a pack may not register a `governance` capability kind (refused at load), so it cannot enter the set `has_required_governance_hooks` validates; and `GovernanceCapability` still runs first, asserted with pack hooks present. Every new refusal — unqualified cell, tier violation, unpinned skill, unverified digest — fails closed, and each is asserted as the *absence of any permissive path* rather than as one branch behaving. |
+| IV — Zero Standing Credentials; Authority Per Task | **Pass** | A pack carries no credential. Pack tools resolve authority through the same manufacture path, and **a pack cannot widen a ceiling** (FR-005) — asserted, because a pack declaring tools its definition's ceiling omits is the obvious shortcut and would read as a feature. The live lane's provider key is a dev-lane secret: never in a jobspec, never read by a run. |
+| V — Sealed Core, Versioned Seams | **Pass, seven recorded additions — none of them a signature break** | `ToolRegistration` gains `risk_class`. `AuditEventType` gains `MODEL_GATE` and `MATRIX_FALLBACK`. Two new core modules — `core/authority/matrix.py` and `core/packs/workflows.py`. One infrastructure grant: `data/model-matrix/*` in `policies.tf`. **Two more, found at analyze pass 11 and recorded here rather than absorbed**: `ManufacturedAuthority` and `ResumeDecision` each gain an optional `matrix_fallback`, because `MATRIX_FALLBACK` was otherwise an event with no writer — the module that resolves a fallback holds no sink and no tenant. Both additive with defaults. **`start_governed_run`'s signature is still deliberately NOT changed** — its *body* emits the new event, which is not a seam move. This approved spec is the required spec, security-maintainer review is Dan. |
+| VI — Lean by Default | **Pass** | No new operated component. The eval harness is a library and a dev extra, not a service. Pack content is files. |
+| VII — Anti-Fragmentation | **Pass** | Packs are identical across substrates; the matrix is a control-plane record every deployment already has. |
+| VIII — Eval-Gated Promotion | **Pass — and this is the feature** | Brought online for the first time: the matrix, binding maps, fallback-only-to-qualified-or-stop, no auto-tracking, pinned judges, and provenance + injection-lens + eval on every skill bump. **Report fidelity is recorded as owed against ADR-0018**, per ADR-0047 — absent or an explicit skip citing its deferring record, never a stub. |
+| IX — Evidence Over Claims | **Pass** | Provenance-at-read for consulted artifacts into the run record. Eval results are records rather than claims. `MODEL_GATE` keeps a verdict and an approval distinguishable in the trail. |
+| X — The Decision Record Governs | **Pass** | ADR-0004, 0022, 0030, 0039, 0045 built as written. **ADR-0052 (new)** records the judge-regress resolution, because "what qualified the first judge" must outlive this spec. ADR-0023 stays unbuilt and is recorded as owed rather than quietly dropped. |
+
+**Where the binding map is resolved** (analyze pass 2, N2): **inside
+`manufacture_authority`, not `start_governed_run`.** The run-start signature takes
+`identity_fabric` and `registry` and nothing model-shaped, so threading a matrix through it
+would be a sealed-core signature change touching all three callers — the adapter, the
+entrypoint, and the in-process dispatcher. `manufacture_authority` already receives both the
+fabric (which reads the matrix) and `agent_definition_id` (whose binding map is being
+validated), so the resolution belongs there and the seam does not move.
+
+This follows the precedent that function's own docstring records: the `grant` parameter was
+made *optional* rather than breaking the seam, because "a break bought nothing" — the same
+reasoning, one feature later.
+
+**What that placement costs, found at pass 11**: `manufacture_authority` holds no audit sink
+and no `tenant_id`, so a fallback resolved there cannot be *written* there — and
+`MATRIX_FALLBACK` was specified with no writer at all. The fix keeps the placement and
+returns the fallback on `ManufacturedAuthority`, leaving the emit to `start_governed_run`,
+which already holds both. That is the discipline the module already keeps in the other
+direction: it raises `AuthorityRefuseError` and `start_governed_run` records
+`AUTHORITY_REFUSED`. The same applies to `resume_run`, which calls the same function and
+returns a `ResumeDecision` — a resumed run's fallback going unrecorded is the identical
+defect in a later phase.
+
+**Named-runner obligation** (constitution v1.1.0): the **live-model lane** has no automated
+runner — it needs a provider credential and costs money per run, so it cannot sit in CI.
+Named runner: **Dan**, before merge, with the per-cell outcome recorded in
+`contracts/conformance-packs.md` (SC-013).
+
+*This is a genuine named-runner case rather than the shape 012 got wrong. There, "needs a
+human" was deferral disguised as rigour and a browser could do the work. Here the obstacle is
+a paid credential and non-determinism, not missing tooling — and the blocking lane still runs
+every gate, against fixtures.*
+
+**Gate result**: **PASS — proceed to Phase 0.**
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/013-capability-packs/
+├── plan.md              # This file
+├── research.md          # Phase 0 — findings F1–F3, decisions D1–D12
+├── data-model.md        # Phase 1 — manifests, cells, pins, eval records
+├── quickstart.md        # Phase 1 — end-to-end validation
+├── contracts/
+│   ├── pack-manifest.md          # What a pack declares; what loading it does
+│   ├── qualified-matrix.md       # Cells, binding maps, refusals, fallback
+│   └── conformance-packs.md      # Four gates in force, the fifth owed, per-cell record
+└── tasks.md             # /speckit-tasks output (not created here)
+```
+
+### Source Code (repository root)
+
+```text
+src/core/packs/
+├── __init__.py          # Package intent: packs are content; the core stays product-blind
+├── manifest.py          # PackManifest, ToolDeclaration, RiskClass, SkillPin
+├── loader.py            # PackLoader protocol + FilesystemPackLoader; digest verification
+├── registration.py      # Manifest → ToolRegistry registrations, risk class preserved
+└── isolation.py         # Which packs a definition reaches; the no-widening check
+
+src/core/authority/matrix.py  # QualifiedCell, the reader, binding-map validation
+                              # HERE, not in core/evals — a cell is an AUTHORIZATION FACT
+                              # (D5's own reasoning), it is read on the run path, and a
+                              # matrix module inside a package named `evals` invites
+                              # someone to import the scoring harness into a run.
+
+src/core/packs/workflows.py   # WorkflowRecord + tier comparison. The manifest already
+                              # declares `workflows[]`; nothing in the platform had a
+                              # runtime shape for one, so tiers had nothing to bound.
+
+src/core/evals/
+├── __init__.py          # Package intent: gates are records, not claims
+├── suites.py            # must-deny, must-decline, citation accuracy, estate-state
+├── scoring.py           # Scorer protocol; FixtureScorer and LiveModelScorer
+├── promotion.py         # Skill bumps: provenance + injection lens + eval, all three
+└── judge.py             # The seed set, and what qualified the first judge
+
+src/core/registry/memory.py   # + risk_class on ToolRegistration (additive)
+src/core/authority/manufacture.py  # binding-map resolution lands HERE, so
+                                   # start_governed_run's signature does not move.
+                                   # + matrix_fallback on ManufacturedAuthority: this
+                                   # module RAISES and lets its caller record; the
+                                   # fallback follows the same rule outbound, because
+                                   # there is no sink and no tenant here to write with.
+src/core/run.py               # start_governed_run's BODY emits MATRIX_FALLBACK and names
+                              # the loaded packs and digests in RUN_START. Signature
+                              # unchanged; it already holds both sink and tenant.
+src/core/durability/resume.py # catches AuthorityRefuseError -> STOPPED with the reason,
+                              # like every other failure in that function already does.
+                              # A withdrawn cell is an ordinary mid-flight state (D6),
+                              # and it was landing on the one path that recorded nothing
+                              # WITH THE LEASE HELD. + matrix_fallback on ResumeDecision.
+src/core/audit/schema.py      # + MODEL_GATE (a verdict is not an approval — FR-015)
+
+infra/modules/trust-fabric/policies.tf  # + read on data/model-matrix/*. Without it the
+                                        # matrix is unreadable at run time AND Vault
+                                        # answers 403 rather than 404, so the failure
+                                        # lies about which system is broken — the exact
+                                        # trap the `data/policies/*` grant beside it
+                                        # already documents (010).
+
+packs/
+├── terraform/           # ADOPTED from hashicorp/agent-skills @ pinned commit
+│   ├── pack.toml
+│   ├── skills/          # upstream content, unmodified, with PROVENANCE.md
+│   └── evals/
+└── vault/               # AUTHORED here, in the upstream format (FR-027d)
+    ├── pack.toml
+    ├── skills/
+    └── evals/
+
+evals/seed/              # Human-labeled verdicts. The root of the judge chain (ADR-0052).
+
+docs/adr/0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md
+```
+
+**Structure Decision**: `core/packs` and `core/evals` are new packages in the existing
+layout. **The matrix reader lives in `core/authority`, not `core/evals`** — analyze pass 1
+(I3): a cell is an authorization fact by D5's own argument, it is read on the run path at
+every run start, and putting it in a package named `evals` invites someone to import the
+scoring harness into a run. Evals *write* cells through it; nothing on the run path imports
+`core.evals` at all. **`packs/` sits at the repository root rather than under `src/`**, deliberately: it
+is content, not code, and putting product knowledge inside the Python package tree would
+ship it in the distribution that Principle I says stays product-blind. `evals/seed/` is
+likewise data — and it is the one directory in this repository whose *authority comes from
+a human having labelled it*, which is worth keeping visible rather than buried in a package.
+
+## Complexity Tracking
+
+No violations to justify. The two seam additions and the new ADR are recorded in the
+Constitution Check above.
