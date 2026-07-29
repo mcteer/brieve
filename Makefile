@@ -3,7 +3,7 @@
 # `evals` is .PHONY twice over: it is a recipe, and a DIRECTORY named evals/ exists at
 # the repository root — without the declaration, make reports the seed set 'up to date'
 # and the gate never runs, which is a skip wearing a build system's clothes.
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live
+.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
@@ -99,7 +99,19 @@ evals:
 # as the conformance recipe's Vault coordinates. The directory is NAMED because it sits
 # outside `testpaths` (like tests/a11y): a bare `pytest -m live_model` collects nothing,
 # which is a gate that cannot run reporting an empty pass.
-evals-live:
+# TWO CALLS BEFORE ONE HUNDRED AND EIGHTY. Building the live lane took six full runs and
+# four of them existed only to surface a HARNESS defect — a truncating token budget, a
+# rejected temperature, a subject that did not know its own scope, a judge starved of
+# context. Every one was visible in a single call with the response printed. Run this
+# first; `evals-live` is for qualifying cells, not for finding out whether the harness
+# works. See tests/evals_live/smoke.py for the full accounting.
+evals-smoke:
+	@K=$$(grep '^ANTHROPIC_API_KEY=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	[ -n "$$K" ] || { echo "no ANTHROPIC_API_KEY in .env" >&2; exit 1; } ; \
+	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra portal --extra evals \
+	  python tests/evals_live/smoke.py
+
+evals-live: evals-smoke
 	@K=$$(grep '^ANTHROPIC_API_KEY=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	[ -n "$$K" ] || { echo "no ANTHROPIC_API_KEY in .env; the live lane cannot run" >&2; exit 1; } ; \
 	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra portal --extra evals \
