@@ -75,6 +75,20 @@ column exists so it cannot be read as more than it is.
   model-scored lens would need a qualified cell, which needs the gates, a second regress
   with no seed set to terminate it. A row asserts a phrasing it misses, so the floor is
   documented by a test rather than only by a docstring.
+- **That a withdrawn cell stops a RESUMED run.** **OWED, and larger than pass 11 stated.**
+  That pass found `resume_run` did not catch `AuthorityRefuseError` after acquiring the
+  lease. Implementing T019a surfaced the deeper fact: **`resume_run` has no production
+  caller at all** — it is called from tests and from nowhere in `src/`. The sweeper
+  dispatches a *new allocation*, and the entrypoint that allocation runs calls
+  `start_governed_run`, not `resume_run`. So the whole re-observation path is a tested
+  library nothing invokes.
+  That makes two things true at once, and both belong in the record. **T026b's fix is still
+  correct** — the moment resume is wired, a withdrawn cell must stop with a reason rather
+  than throw past a contract holding a lease. And **`depends_on` was never constructed
+  because nothing constructs a resume call**; `surfaces.toolset.dependency_products` ships
+  the mapping ready for that wiring, asserted by a row, and wired to nothing. Wiring resume
+  into the entrypoint is 005's integration and its own change; 013 does not do it, and must
+  not read as though it had.
 - **That availability gating covers every transport.** **OWED, and inherited rather than
   introduced here** (analyze pass 12). `dependency_health` is passed only by the MCP server;
   the API, the portal, and the in-process dispatcher leave it `None`, and `dependency_pre_hook`

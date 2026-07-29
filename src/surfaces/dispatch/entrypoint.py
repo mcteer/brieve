@@ -31,10 +31,10 @@ from core.durability.checkpoint import stop_requested
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
 from core.durability.types import CheckpointBlob, IntentRecord, ResultRecord, RunOutcome
-from core.registry.memory import ToolRegistry
 from core.run import RunState, start_governed_run
 from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
+from surfaces.toolset import build_registry
 
 
 def main() -> int:
@@ -71,32 +71,16 @@ def main() -> int:
     audit = PostgresAuditSink(credentials=credentials)
     audit.migrate()
 
-    # The reference toolset. An empty registry knows no tools, so a ceiling naming any of
-    # them would refuse `unknown_ceiling_entry` — correct behaviour, and useless as an
-    # entrypoint. 008 could leave this empty because it only proved a run STARTS; a run
-    # that resolves a real ceiling has to know what the ceiling is talking about.
+    # The toolset. **This is the line capability packs were signposted to replace**, and
+    # 013 is the feature that replaced it — the comment that stood here said "when they
+    # land, this is the line they replace", and it was right about where and about why.
     #
-    # Hardcoded here because the real toolset arrives with capability packs, which are a
-    # later feature. When they land, this is the line they replace.
-    registry = ToolRegistry()
-    registry.register("echo", lambda _arguments: {"ok": "ran"})
-    # Product-tagged, because the ceiling records name product actions and a ceiling may
-    # only name things the platform can do. The registry is the source of that truth, so
-    # a toolset declaring no product actions makes every product-shaped ceiling refuse
-    # `unknown_ceiling_entry` — which is correct, precise, and impossible to satisfy.
-    registry.register(
-        "plan",
-        lambda _arguments: {"ok": "planned"},
-        product_mode="federate",
-        product="workspace",
-        product_action="product.workspace.read",
-    )
-    registry.register(
-        "apply",
-        lambda _arguments: {"ok": "applied"},
-        product_mode="federate",
-        product="workspace",
-        product_action="product.workspace.write",
+    # The fixture tools stay, for definitions that name no pack: 008-012's rows are built
+    # on them, and removing them would break a dozen lanes to prove a point about packs.
+    # Packs named by RUN_PACKS are loaded alongside, and a definition reaches only what it
+    # names.
+    registry, _loaded_packs = build_registry(
+        packs=[p for p in os.environ.get("RUN_PACKS", "").split(",") if p]
     )
 
     # The roles the dispatching surface already resolved from this subject's verified
