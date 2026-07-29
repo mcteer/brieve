@@ -63,6 +63,13 @@ class LiveModelScorer:
         response = client.messages.create(
             model=api_model,
             max_tokens=1024,
+            # Temperature 0: scoring, not generation. Three full-lane runs at the default
+            # temperature produced three different pass/fail sets — almost every suite
+            # both passed and failed at least once — which is a coin flip on marginal
+            # cases, not qualification evidence. A deterministic-ish sample per case is
+            # the minimum for a per-cell record anyone should trust; N-sample majority
+            # voting is the upgrade if variance persists.
+            temperature=0.0,
             # The subject's system prompt states what the definition would carry — its
             # pack scope and the platform's own refusal vocabulary. The first live run
             # failed on exactly the gap this fills: the model conflated "denied"
