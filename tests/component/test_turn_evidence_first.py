@@ -243,3 +243,41 @@ def test_the_context_bound_is_recorded_on_the_event() -> None:
     recorded = [e for e in _events(sink, thread) if e.event_type == AuditEventType.TURN_RECORDED]
     assert recorded[0].payload["context_run_ids"] == []
     assert recorded[0].payload["context_dropped"] == []
+
+
+def test_an_oversized_message_through_the_api_still_leaves_a_record() -> None:
+    """The defect the parity row surfaced, pinned so it cannot come back.
+
+    A `max_length` on the request model rejects inside request validation — before
+    `accept_turn` runs, so no `TURN_REFUSED` is written and the one kind of message someone
+    might send maliciously becomes the one kind that leaves no trace. The bound lives in
+    core alone, and this row is why.
+    """
+    from fastapi.testclient import TestClient
+
+    from core.threads.records import ThreadRecord as _ThreadRecord
+    from tests.harness.api_fixtures import surface_under_test
+
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+    created = client.post("/threads", headers=surface.bearer())
+    thread_id = created.json()["thread_id"]
+    correlation_id = created.json()["correlation_id"]
+
+    response = client.post(
+        f"/threads/{thread_id}/turns",
+        json={"message": "x" * 9000},
+        headers=surface.bearer(),
+    )
+
+    assert response.status_code >= 400
+    refusals = [
+        e
+        for e in surface.audit.list_by_correlation_id(correlation_id)
+        if e.event_type == AuditEventType.TURN_REFUSED
+    ]
+    assert len(refusals) == 1, "an oversized message was refused without leaving a record"
+    assert refusals[0].payload["reason"] == "message_too_large"
+    assert refusals[0].payload["message_bytes"] == 9000
+    assert "message" not in refusals[0].payload
+    assert isinstance(_ThreadRecord, type)  # import guard: the record type still exists

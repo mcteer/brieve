@@ -18,8 +18,9 @@ from core.audit.query import EvidenceQuery
 from core.audit.sink import AuditSink
 from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
+from core.threads.store import InMemoryThreadStore, ThreadStore
 from surfaces.api import definitions as definitions_routes
-from surfaces.api import evidence, mappings, runs
+from surfaces.api import evidence, mappings, runs, threads
 from surfaces.api.verification import TokenVerifier
 from surfaces.dispatch.types import RunDispatcher
 
@@ -38,6 +39,7 @@ def create_app(
     change_requests: ChangeRequestStore | None = None,
     change_status: Any | None = None,
     definitions: Any | None = None,
+    thread_store: ThreadStore | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -66,8 +68,16 @@ def create_app(
     )
     app.state.change_status = change_status
     app.state.definitions = definitions
+    # 012's collaborator, defaulted like `run_index` above and deliberately NOT like
+    # `definitions` below. The thread router registers unconditionally, because a router
+    # whose presence depends on assembly makes the operation snapshot assembly-dependent —
+    # and a snapshot that says fifteen in one wiring and ten in another is the shape 011's
+    # snapshot defect had. What varies by assembly is what the operations can *do*, never
+    # whether they exist.
+    app.state.thread_store = thread_store if thread_store is not None else InMemoryThreadStore()
 
     app.include_router(runs.build_router())
+    app.include_router(threads.build_router())
     if authority_submitter is not None:
         app.include_router(mappings.build_router())
     if evidence_query is not None:

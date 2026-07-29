@@ -73,12 +73,12 @@ def test_row_start_run_yields_the_same_verdict() -> None:
 
     api = client.post(
         "/runs",
-        json={"agent_definition_id": "definition-a", "requested_tools": ["echo"]},
+        json={"agent_definition_id": "planner", "requested_tools": ["echo"]},
         headers=surface.bearer(),
     )
     mcp = surface.mcp.call(
         "start_run",
-        {"agent_definition_id": "definition-a", "requested_tools": ["echo"]},
+        {"agent_definition_id": "planner", "requested_tools": ["echo"]},
         subject=surface.subject(),
     )
 
@@ -137,7 +137,7 @@ def test_row_audit_events_are_equivalent() -> None:
     api_surface = surface_under_test()
     mcp_surface = surface_under_test()
 
-    api_body = {"agent_definition_id": "definition-a", "requested_tools": ["echo"]}
+    api_body = {"agent_definition_id": "planner", "requested_tools": ["echo"]}
     api_response = TestClient(api_surface.app).post(
         "/runs", json=api_body, headers=api_surface.bearer()
     )
@@ -164,7 +164,7 @@ def test_row_the_subject_is_the_caller_on_both() -> None:
     surface = surface_under_test()
     result = surface.mcp.call(
         "start_run",
-        {"agent_definition_id": "definition-a", "requested_tools": ["echo"]},
+        {"agent_definition_id": "planner", "requested_tools": ["echo"]},
         subject=surface.subject(),
     )
 
@@ -184,7 +184,7 @@ def test_break_fixture_an_extra_audit_event_is_detected() -> None:
     surface = surface_under_test()
     result = surface.mcp.call(
         "start_run",
-        {"agent_definition_id": "definition-a", "requested_tools": ["echo"]},
+        {"agent_definition_id": "planner", "requested_tools": ["echo"]},
         subject=surface.subject(),
     )
     correlation_id = result.payload["correlation_id"]
@@ -275,3 +275,145 @@ def test_row_enumerating_definitions_yields_the_same_verdict_and_marking() -> No
     assert api.status_code == mcp.status == 200
     assert api.json()["definitions"] == mcp.payload["definitions"]
     assert api.json()["definitions"], "an empty comparison would make this row vacuous"
+
+
+# --------------------------------------------------------- 012: thread verdicts
+#
+# The catalogue half of parity now compares fifteen operations instead of ten, and it
+# passed the moment both surfaces listed them. These rows are the other half: two surfaces
+# can expose the same operation and disagree about what it *answers*, and a conversational
+# surface that declined on one transport while dispatching on the other would be two
+# authorization paths wearing one name.
+
+
+def _thread_on_both(surface: object) -> str:
+    """A thread both transports can see, created through the API.
+
+    Created once and used from both sides deliberately — the surfaces share a store, so a
+    thread made here is a thread MCP must be able to reach. If they held separate stores
+    this would fail, which is the divergence worth catching.
+    """
+    client = TestClient(surface.app)  # type: ignore[attr-defined]
+    created = client.post("/threads", headers=surface.bearer())  # type: ignore[attr-defined]
+    assert created.status_code == 201
+    return str(created.json()["thread_id"])
+
+
+def test_row_thread_creation_yields_the_same_verdict() -> None:
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+
+    api = client.post("/threads", headers=surface.bearer())
+    mcp = surface.mcp.call("create_thread", {}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 201
+
+
+def test_row_an_unknown_thread_yields_the_same_verdict() -> None:
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+
+    api = client.get("/threads/th-nonexistent", headers=surface.bearer())
+    mcp = surface.mcp.call("get_thread", {"thread_id": "th-nonexistent"}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 404
+
+
+def test_row_a_declined_turn_yields_the_same_verdict_and_disposition() -> None:
+    """A decline is a 200 with a disposition on both, not an error on one of them."""
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+    thread_id = _thread_on_both(surface)
+
+    api = client.post(
+        f"/threads/{thread_id}/turns",
+        json={"message": "what can you do?"},
+        headers=surface.bearer(),
+    )
+    mcp = surface.mcp.call(
+        "send_turn",
+        {"thread_id": thread_id, "message": "what can you do?"},
+        subject=surface.subject(),
+    )
+
+    assert api.status_code == mcp.status == 200
+    assert api.json()["disposition"] == mcp.payload["disposition"] == "declined"
+    assert api.json()["reason"] == mcp.payload["reason"] == "nothing_to_dispatch"
+
+
+def test_row_a_dispatched_turn_yields_the_same_verdict_on_both() -> None:
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+    thread_id = _thread_on_both(surface)
+
+    api = client.post(
+        f"/threads/{thread_id}/turns",
+        json={"message": "plan it", "agent_definition_id": "planner"},
+        headers=surface.bearer(),
+    )
+    mcp = surface.mcp.call(
+        "send_turn",
+        {"thread_id": thread_id, "message": "plan it", "agent_definition_id": "planner"},
+        subject=surface.subject(),
+    )
+
+    assert api.status_code == mcp.status == 200
+    assert api.json()["disposition"] == mcp.payload["disposition"] == "dispatched"
+    assert api.json()["run_id"] and mcp.payload["run_id"]
+
+
+def test_row_an_oversized_message_is_refused_identically() -> None:
+    """The pre-acceptance refusal, which is the one most likely to live on one surface.
+
+    The API bounds it in its request model; MCP bounds it in core. Both must answer the
+    same way, or the size limit is a suggestion on whichever surface forgot.
+    """
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+    thread_id = _thread_on_both(surface)
+    oversized = "x" * 9000
+
+    api = client.post(
+        f"/threads/{thread_id}/turns",
+        json={"message": oversized},
+        headers=surface.bearer(),
+    )
+    mcp = surface.mcp.call(
+        "send_turn",
+        {"thread_id": thread_id, "message": oversized},
+        subject=surface.subject(),
+    )
+
+    assert api.status_code == mcp.status, (
+        f"transports disagree on an oversized message: API {api.status_code}, MCP {mcp.status}"
+    )
+    assert api.status_code >= 400, "an oversized message was accepted"
+
+
+def test_row_deleting_a_thread_yields_the_same_verdict() -> None:
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+
+    api_thread = _thread_on_both(surface)
+    api = client.delete(f"/threads/{api_thread}", headers=surface.bearer())
+
+    mcp_thread = _thread_on_both(surface)
+    mcp = surface.mcp.call("delete_thread", {"thread_id": mcp_thread}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 204
+
+
+def test_row_listing_threads_agrees_across_transports() -> None:
+    """Same store, same subject: the two listings must name the same threads."""
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+    for _ in range(3):
+        _thread_on_both(surface)
+
+    api = client.get("/threads", headers=surface.bearer())
+    mcp = surface.mcp.call("list_threads", {}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 200
+    assert [t["thread_id"] for t in api.json()["threads"]] == [
+        t["thread_id"] for t in mcp.payload["threads"]
+    ]

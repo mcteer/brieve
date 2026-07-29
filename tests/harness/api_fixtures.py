@@ -20,6 +20,7 @@ from core.identity.claims import ClaimMapping
 from core.registry.memory import ToolRegistry
 from core.runs.changes import InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex
+from core.threads.store import InMemoryThreadStore
 from surfaces.api.app import create_app
 from surfaces.api.authority_submit import AuthorityChangeRefused, AuthoritySubmitUnavailable
 from surfaces.api.verification import TokenVerifier
@@ -75,6 +76,7 @@ class SurfaceUnderTest:
     audit: InMemoryAuditSink
     dispatcher: InProcessDispatcher
     submitter: ScriptedSubmitter
+    thread_store: InMemoryThreadStore
 
     #: The subject the identity fabric knows about. Tests naming anyone else are testing
     #: refusal, which is a different assertion.
@@ -117,6 +119,9 @@ def surface_under_test(
     index = InMemoryRunIndex()
     durability = InMemoryDurabilityProvider()
     changes = InMemoryChangeRequestStore()
+    # 012's collaborator, shared for the same reason as the four above: two surfaces
+    # reading different thread stores would diverge in ways no catalogue comparison sees.
+    thread_store = InMemoryThreadStore()
     definitions_fabric = fake_definitions_fabric(subject)
     dispatcher = InProcessDispatcher(
         identity_fabric=fake_identity_fabric(subject_user_id=subject),
@@ -142,6 +147,7 @@ def surface_under_test(
         change_requests=changes,
         change_status=ScriptedChangeStatus(),
         definitions=definitions_fabric,
+        thread_store=thread_store,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
@@ -153,6 +159,7 @@ def surface_under_test(
         change_requests=changes,
         change_status=ScriptedChangeStatus(),
         definitions=definitions_fabric,
+        thread_store=thread_store,
     )
     return SurfaceUnderTest(
         app=app,
@@ -162,6 +169,7 @@ def surface_under_test(
         dispatcher=dispatcher,
         subject_name=subject,
         submitter=submitter,
+        thread_store=thread_store,
     )
 
 
