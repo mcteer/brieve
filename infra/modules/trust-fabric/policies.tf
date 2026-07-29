@@ -72,6 +72,26 @@ resource "vault_policy" "harness_authority_read" {
     path "${vault_mount.harness_authority.path}/data/policies/*" {
       capabilities = ["read"]
     }
+    # The Qualified Model Matrix (013, ADR-0022/0039). Read at every run start when a
+    # binding map is resolved, and read-only to runs for the same reason ceilings are:
+    # a run that could write a cell could qualify a model for itself.
+    #
+    # The 403-not-404 trap above applies exactly, and worse. Without this grant the matrix
+    # is unreadable AND the failure presents as an unreachable trust fabric, so whoever
+    # debugs it goes to Vault's health rather than to a missing policy line — for a matrix
+    # that merely lacks a grant. Analyze pass 1 found this as the feature's first CRITICAL;
+    # the block above is where the same trap was already written down.
+    path "${vault_mount.harness_authority.path}/data/model-matrix/*" {
+      capabilities = ["read"]
+    }
+    # Which packs a definition reaches, its binding map, and its tier (013). The record the
+    # whole feature reads: isolation, binding-map validation, and tier resolution all
+    # consume these three fields. Beside the ceiling and granted in the same policy,
+    # because a definition holding one and not the other is a definition nothing can
+    # resolve.
+    path "${vault_mount.harness_authority.path}/data/definition-bindings/*" {
+      capabilities = ["read"]
+    }
     path "agent-registry/registration/display-name/*" {
       capabilities = ["read", "list"]
     }

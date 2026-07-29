@@ -13,8 +13,7 @@ order changes without anybody deciding it did. A name is qualified by its pack.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
+from core.authority.bindings import DefinitionBindings
 from core.authority.types import AuthorityScope
 from core.packs.registration import LoadedPack
 from core.packs.workflows import WorkflowRecord
@@ -26,26 +25,6 @@ class IsolationRefused(Exception):
     def __init__(self, message: str, *, reason_code: str) -> None:
         super().__init__(message)
         self.reason_code = reason_code
-
-
-@dataclass(frozen=True)
-class DefinitionBindings:
-    """The three fields the whole feature reads, from one control-plane record.
-
-    ``packs`` decides isolation, ``binding_map`` is validated against the matrix, and
-    ``tier`` bounds composition. They live together in
-    ``harness-authority/data/definition-bindings/<id>`` — beside the ceiling and written by
-    the same apply, so no window exists where a definition has one and not the other.
-
-    Until analyze pass 8 these lived in the glossary, in four tasks' logic, and in no record
-    at all.
-    """
-
-    agent_definition_id: str
-    packs: frozenset[str]
-    #: role → qualified cell reference. Validated against the matrix, not here.
-    binding_map: dict[str, str]
-    tier: int
 
 
 def reachable_tools(
@@ -154,7 +133,6 @@ def reachable_workflows(
 
 
 __all__ = [
-    "DefinitionBindings",
     "IsolationRefused",
     "assert_pack_does_not_widen",
     "reachable_tools",
