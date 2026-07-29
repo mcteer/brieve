@@ -5,6 +5,7 @@
 {% endblock %}
 {% block content %}
 <h1>{{ thread.title or "Untitled conversation" }}</h1>
+<p><a href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a></p>
 
 <ol class="turns" id="turns">
   {% for turn in turns %}

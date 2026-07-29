@@ -205,6 +205,21 @@ def create_portal(
             )
         return RedirectResponse(f"/threads/{thread_id}", status_code=303)
 
+    @app.get("/threads/{thread_id}/delete", response_class=HTMLResponse)
+    def confirm_delete(request: Request, thread_id: str) -> Response:
+        """Ask first, and say what deletion does and does not do.
+
+        A person deleting a conversation is entitled to know that the record survives —
+        stating it here rather than in a footnote is what makes ADR-0051's cost informed
+        at the moment it matters.
+        """
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, f"/threads/{thread_id}")
+        return templates.TemplateResponse(
+            request=request, name="delete_confirm.html", context={"thread_id": thread_id}
+        )
+
     @app.post("/threads/{thread_id}/delete")
     def delete(request: Request, thread_id: str) -> Response:
         session = _session(request)
