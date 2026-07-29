@@ -34,6 +34,8 @@ from typing import Any
 from core.packs.loader import FilesystemPackLoader
 from core.packs.registration import LoadedPack, PlatformBindings, load_packs
 from core.registry.memory import ToolRegistry
+from surfaces.handlers import PLATFORM_HANDLERS, PLATFORM_OBSERVERS
+from surfaces.probes import PLATFORM_PROBES
 
 #: Where packs live: the repository root, deliberately outside the Python package tree.
 PACKS_ROOT = Path(__file__).resolve().parents[2] / "packs"
@@ -95,9 +97,15 @@ def build_registry(
     if not packs:
         return registry, {}
     loader = FilesystemPackLoader(packs_root or PACKS_ROOT)
-    loaded = load_packs(
-        packs, loader=loader, registry=registry, bindings=bindings or PlatformBindings()
+    # The platform's probes are supplied by default. Without them a pack loads, its
+    # product starts being monitored, `unconfigured_probe` reports it unreachable, and
+    # every one of that pack's tools is denied while the product is up.
+    resolved = bindings or PlatformBindings(
+        handlers=dict(PLATFORM_HANDLERS),
+        observers=dict(PLATFORM_OBSERVERS),
+        probes=dict(PLATFORM_PROBES),
     )
+    loaded = load_packs(packs, loader=loader, registry=registry, bindings=resolved)
     return registry, loaded
 
 
