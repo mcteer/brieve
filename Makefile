@@ -5,7 +5,7 @@
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
 # (specs/004-primary-adapter/research.md; specs/008-northbound-api T003).
-UV_RUN := uv run --extra adapters --extra surfaces
+UV_RUN := uv run --extra adapters --extra surfaces --extra portal
 
 # Inner-loop: lint, typecheck, unit tests
 # Hermetic inner loop. Enclave-dependent tests are excluded by marker rather than by

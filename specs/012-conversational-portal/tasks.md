@@ -80,11 +80,11 @@ demonstrable until this phase completes.
 
 ### The portal skeleton
 
-- [ ] T024 Create `src/surfaces/portal/oidc.py`: authorization-code + PKCE public client (S256, no client secret anywhere), state + verifier held server-side pending the callback
-- [ ] T025 Create `src/surfaces/portal/session.py`: in-memory store, opaque id → (subject, token, expiry); cookie `HttpOnly; Secure; SameSite=Lax`; sessions die with process or token expiry. **Deliberately not Postgres** — FR-020b's reasoning in the docstring, plus one sentence noting `Secure` works on dev loopback because browsers treat localhost as a trustworthy origin (known, not lucky)
-- [ ] T026 Create `src/surfaces/portal/relay.py`: the **only** portal module with an HTTP client (urllib, matching the enclave readers); attaches the session's token; surfaces API refusals as typed results, never retries mutations
-- [ ] T027 Create `src/surfaces/portal/app.py` + `templates/base.html` + `static/portal.css` + `static/portal.js`: login flow, authenticated shell, session middleware. `portal.js` stays small, readable, and fetches nothing beyond the portal origin — it will be read by a conformance row, write it knowing that
-- [ ] T028 [P] [GATE:no-secret-leak] Component rows in `tests/component/test_portal_session.py`: cookie contains only an opaque id (entropy-checked, no token substring); token never appears in logs, rendered HTML, or error pages; expired session → clean re-auth redirect, not an error; callback with wrong `state` refused
+- [X] T024 Create `src/surfaces/portal/oidc.py`: authorization-code + PKCE public client (S256, no client secret anywhere), state + verifier held server-side pending the callback
+- [X] T025 Create `src/surfaces/portal/session.py`: in-memory store, opaque id → (subject, token, expiry); cookie `HttpOnly; Secure; SameSite=Lax`; sessions die with process or token expiry. **Deliberately not Postgres** — FR-020b's reasoning in the docstring, plus one sentence noting `Secure` works on dev loopback because browsers treat localhost as a trustworthy origin (known, not lucky)
+- [X] T026 Create `src/surfaces/portal/relay.py`: the **only** portal module with an HTTP client (urllib, matching the enclave readers); attaches the session's token; surfaces API refusals as typed results, never retries mutations
+- [X] T027 Create `src/surfaces/portal/app.py` + `templates/base.html` + `static/portal.css` + `static/portal.js`: login flow, authenticated shell, session middleware. `portal.js` stays small, readable, and fetches nothing beyond the portal origin — it will be read by a conformance row, write it knowing that
+- [X] T028 [P] [GATE:no-secret-leak] Component rows in `tests/component/test_portal_session.py`: cookie contains only an opaque id (entropy-checked, no token substring); token never appears in logs, rendered HTML, or error pages; expired session → clean re-auth redirect, not an error; callback with wrong `state` refused
 
 ### The enclave grows two jobs
 

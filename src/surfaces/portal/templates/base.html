@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Harness Portal{% endblock %}</title>
+  <link rel="stylesheet" href="/static/portal.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to main content</a>
+  <header>
+    <a href="/" class="brand">Harness</a>
+    {% block header_actions %}{% endblock %}
+  </header>
+  <main id="main">
+    {% block content %}{% endblock %}
+  </main>
+  <footer>
+    <p>Messages you send here are recorded as evidence and can be read by your
+       organization&rsquo;s auditors. Deleting a conversation removes it from this list;
+       it does not remove the record.</p>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -147,13 +147,21 @@ def test_only_declared_service_loops_are_exempt() -> None:
     If this list grows, the check is being worked around rather than satisfied — which is
     the failure mode of every exemption, and the reason this asserts the membership rather
     than merely allowing it.
+
+    **Two members, and the second was added deliberately in 012.** `portal/events.py` holds
+    an SSE connection open for a bounded time so a person does not refresh a page. It
+    `await`s rather than blocks, so it holds no worker while it waits — but the check
+    matches `sleep` by name and cannot see that difference, and teaching it to would be
+    narrowing the rule, which this file's own note calls the place coverage gets lost
+    silently. Declaring the exemption is the more honest of the two, because it is
+    greppable and because this row makes it a decision somebody had to make.
     """
     declared = [
         str(p.relative_to(SURFACES))
         for p in _sources()
         if SERVICE_LOOP_MARKER in ast.unparse(_code_without_prose(p))
     ]
-    assert declared == ["mcp/server.py"], (
+    assert declared == ["mcp/server.py", "portal/events.py"], (
         f"unexpected modules claim the service-loop exemption: {declared}"
     )
 
