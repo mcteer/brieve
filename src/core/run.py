@@ -175,6 +175,33 @@ def start_governed_run(
             pass
         raise
 
+    # The fallback travels back on the return value; the emit belongs here, where the sink
+    # and the tenant already are. `MATRIX_FALLBACK` had no writer at all until this line:
+    # the module that RESOLVES a fallback holds neither, and `AuditEntry` requires both.
+    #
+    # Before AUTHORITY_ISSUED, deliberately. "The model that ran was not the model that was
+    # pinned" is a fact about the authority being issued, so it must not appear after the
+    # record saying authority was issued — an investigator reading in order would otherwise
+    # see the run start under a cell nothing had yet said was substituted.
+    if manufactured.matrix_fallback is not None:
+        try:
+            sink.append_event(
+                correlation_id=cid,
+                tenant_id=tenant,
+                event_type=AuditEventType.MATRIX_FALLBACK,
+                payload=manufactured.matrix_fallback.as_payload(run_id=cid),
+            )
+        except Exception as exc:
+            # A fallback that could not be recorded is a fallback nobody can see, which
+            # FR-010 forbids as squarely as falling back to an unqualified cell. Refusing
+            # here rather than proceeding: the run would otherwise be running a model its
+            # definition does not name, with no record saying so.
+            raise AuthorityRefuseError(
+                f"matrix fallback could not be audited: {type(exc).__name__}",
+                reason_code="internal_error",
+                correlation_id=cid,
+            ) from exc
+
     registered: list[HookRegistration] = list(hooks) if hooks is not None else []
     if include_governance:
         registered = [*builtin_governance_hooks(), *registered]

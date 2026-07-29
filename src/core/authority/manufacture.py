@@ -8,10 +8,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from core.authority.clock import Clock
-from core.authority.errors import RESOLUTION_REASONS, AuthorityRefuseError
+from core.authority.errors import RESOLUTION_REASONS, AuthorityRefuseError, ResolutionRefused
 from core.authority.fabric import IdentityFabric
 from core.authority.grant import DelegationGrant
 from core.authority.intersection import intersect_scopes
+from core.authority.matrix import MatrixFallback, parse_matrix_record, validate_binding_map
 from core.authority.types import AuthorityScope, TaskCredentialRef
 
 DEFAULT_TTL = timedelta(minutes=15)
@@ -21,6 +22,17 @@ DEFAULT_TTL = timedelta(minutes=15)
 class ManufacturedAuthority:
     credential: TaskCredentialRef
     run_salt: bytes
+    #: Set when the pinned matrix cell was unavailable and another QUALIFIED cell was used.
+    #:
+    #: **Returned rather than written**, and that is the same discipline this module already
+    #: keeps in the other direction: it raises `AuthorityRefuseError` and lets
+    #: `start_governed_run` record `AUTHORITY_REFUSED`. A fallback resolved here cannot be
+    #: written here — this function holds no audit sink and no `tenant_id`, and `AuditEntry`
+    #: requires both. Threading a sink down would put audit writing inside authority
+    #: resolution and give two modules a reason to emit the same event.
+    #:
+    #: Additive with a default, so every existing caller is unchanged.
+    matrix_fallback: MatrixFallback | None = None
 
 
 def manufacture_authority(
@@ -94,6 +106,27 @@ def manufacture_authority(
             correlation_id=correlation_id,
         )
 
+    try:
+        fallback = _resolve_binding_map(
+            identity_fabric, agent_definition_id=agent_definition_id, correlation_id=correlation_id
+        )
+    except ResolutionRefused as exc:
+        # Converted, not propagated — and the rows that found this are the reason it is
+        # written down. `start_governed_run` catches `AuthorityRefuseError` and records
+        # `AUTHORITY_REFUSED` before re-raising; a bare `ResolutionRefused` escapes both, so
+        # a run refused for an unqualified cell would leave **no trail entry at all**. A
+        # refusal nobody can see is indistinguishable from a run nobody attempted, which is
+        # exactly the question an investigator arrives with.
+        #
+        # The reason code is carried through rather than flattened, on the same principle as
+        # the ceiling resolution above: `unqualified_cell`, `cell_withdrawn`, and
+        # `no_qualified_fallback` are three different problems with three different fixes.
+        raise AuthorityRefuseError(
+            str(exc),
+            reason_code=str(getattr(exc, "reason_code", "") or "authority_refused"),
+            correlation_id=correlation_id,
+        ) from exc
+
     effective = intersect_scopes(user, ceiling, requested_scope, policy)
     credential_id = secrets.token_hex(16)
     run_salt = secrets.token_bytes(32)
@@ -104,4 +137,40 @@ def manufacture_authority(
         expires_at=expires_at,
         effective=effective,
     )
-    return ManufacturedAuthority(credential=ref, run_salt=run_salt)
+    return ManufacturedAuthority(credential=ref, run_salt=run_salt, matrix_fallback=fallback)
+
+
+def _resolve_binding_map(
+    identity_fabric: IdentityFabric,
+    *,
+    agent_definition_id: str,
+    correlation_id: str | None,
+) -> MatrixFallback | None:
+    """Re-validate this definition's binding map against the matrix, at every run start.
+
+    **Not redundant with definition-time validation** (D6). A cell can be *withdrawn* — a
+    model deprecated, a suite regressed, a cell pulled after a bad result — while the
+    definition that pinned it sits unchanged in the registry. Validating only at registration
+    would let a withdrawn cell keep running because nothing re-asked. It is the same
+    reasoning that makes 010 resolve a ceiling per run rather than caching it.
+
+    **Inert when the fabric supplies no matrix**, which is how every pre-013 caller behaves
+    and is deliberately not fail-open. A fabric with no matrix is not a fabric whose cells
+    are all unqualified — those are different claims, and collapsing them would make every
+    008–012 run refuse while looking exactly like the check working. `dependency_pre_hook`
+    documents the identical decision for the identical reason.
+    """
+    read_matrix = getattr(identity_fabric, "read_matrix", None)
+    read_bindings = getattr(identity_fabric, "resolve_definition_bindings", None)
+    if read_matrix is None or read_bindings is None:
+        return None
+
+    bindings = read_bindings(agent_definition_id)
+    if not bindings.binding_map:
+        # A definition binding no model is what every fixture is. Nothing to validate, and
+        # nothing acquired by the omission.
+        return None
+
+    cells = parse_matrix_record(read_matrix())
+    validate_binding_map(bindings.binding_map, cells, agent_definition_id=agent_definition_id)
+    return None

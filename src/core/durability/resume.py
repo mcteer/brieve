@@ -26,9 +26,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from core.authority.clock import Clock
+from core.authority.errors import AuthorityRefuseError
 from core.authority.fabric import IdentityFabric
 from core.authority.grant import DelegationGrant, GrantExpiredError
 from core.authority.manufacture import ManufacturedAuthority, manufacture_authority
+from core.authority.matrix import MatrixFallback
 from core.durability.lease import RunLease
 from core.durability.types import CheckpointBlob, DurabilityProvider, IntentRecord
 from core.observation.bracket import resolve_open_intents
@@ -56,6 +58,12 @@ class ResumeDecision:
     completed_steps: list[IntentRecord] = field(default_factory=list)
     #: Steps observed *not* to have taken effect — these may proceed.
     pending_steps: list[IntentRecord] = field(default_factory=list)
+    #: Set when this resume fell back to a different qualified cell than the run pinned.
+    #:
+    #: Carried for the same reason `ManufacturedAuthority` carries it: this function holds
+    #: no sink and no tenant, so the caller that has both emits `MATRIX_FALLBACK`. A resumed
+    #: run's fallback going unrecorded is the identical defect one phase later.
+    matrix_fallback: MatrixFallback | None = None
 
     @property
     def resumable(self) -> bool:
@@ -118,14 +126,32 @@ def resume_run(
 
     # Fresh authority under the surviving grant, from THIS allocation's identity.
     # Nothing is read from the checkpoint here, and nothing should be.
-    authority = manufacture_authority(
-        subject_user_id=grant.subject_user_id,
-        requested_scope=grant.requested_scope,
-        identity_fabric=identity_fabric,
-        clock=clock,
-        agent_definition_id=grant.agent_definition_id,
-        correlation_id=correlation_id,
-    )
+    try:
+        authority = manufacture_authority(
+            subject_user_id=grant.subject_user_id,
+            requested_scope=grant.requested_scope,
+            identity_fabric=identity_fabric,
+            clock=clock,
+            agent_definition_id=grant.agent_definition_id,
+            correlation_id=correlation_id,
+        )
+    except AuthorityRefuseError as exc:
+        # STOPPED with the reason, like every other failure in this function.
+        #
+        # Without this the exception escapes past the ResumeDecision contract **with the
+        # lease already acquired** four lines above — so the run holds the lease, records no
+        # reason, and nothing downstream can tell a refused resume from a crashed one.
+        #
+        # This was tolerable while the only refusals here were fabric-level errors. 013's
+        # matrix makes it an ordinary mid-flight state: a cell can be WITHDRAWN between the
+        # run starting and the run resuming (D6), and a pack a definition names can stop
+        # being loaded. Both are expected, both must stop with the reason recorded
+        # (FR-010, SC-004).
+        return ResumeDecision(
+            state=RunState.STOPPED,
+            checkpoint=checkpoint,
+            stop_reason=str(getattr(exc, "reason_code", "") or "authority_refused"),
+        )
 
     resolved = resolve_open_intents(provider, run_id=run_id, observers=observers or {}, clock=clock)
     completed: list[IntentRecord] = []
@@ -153,6 +179,7 @@ def resume_run(
         authority=authority,
         completed_steps=completed,
         pending_steps=pending,
+        matrix_fallback=authority.matrix_fallback,
     )
 
 
