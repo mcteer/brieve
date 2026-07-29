@@ -1,0 +1,92 @@
+# Quickstart: validating packs and the eval gates
+
+**Feature**: `specs/013-capability-packs` | **Date**: 2026-07-29
+
+## Prerequisites
+
+```bash
+make dev-up && make dev-status
+```
+
+## 1 — The findings are real *(runs today)*
+
+```bash
+# F1: the entrypoint names the line packs replace
+grep -A3 "capability packs, which are a" src/surfaces/dispatch/entrypoint.py
+
+# F2: risk_class is in the glossary and nowhere in the code
+grep -c "risk_class" src/core/registry/memory.py     # -> 0
+grep -c "Risk class" docs/glossary.md                # -> 1
+
+# F3: there is no approval audit event to be confused with
+grep -ci "approval" src/core/audit/schema.py         # -> 0
+```
+
+## 2 — The core stays product-blind *(after packs land)*
+
+```bash
+grep -ril "terraform\|vault" src/core/ | grep -v "vault_fabric\|credentials"
+# -> nothing. `vault_fabric` is the TRUST FABRIC, not the product — a distinction
+#    the row makes explicitly rather than by pattern.
+git diff --stat main -- src/core/    # adding the second pack: zero files
+```
+
+## 3 — A pack cannot grant *(the most plausible defect)*
+
+```bash
+uv run --extra adapters --extra surfaces pytest tests/component -k "pack and ceiling" -q
+```
+
+**Expect**: a pack declaring a tool outside its definition's ceiling refuses
+`pack_exceeds_ceiling`. This is the row that matters most — a pack that grants reads as the
+pack system working.
+
+## 4 — The matrix refuses *(the blocking half of Principle VIII)*
+
+```bash
+uv run --extra adapters --extra surfaces pytest tests/component -k matrix -q
+```
+
+**Expect**: an unqualified cell refused at definition time naming the cell; a withdrawn cell
+refused at run start; fallback only to a qualified cell, recorded; no qualified cell means
+the run stops with its reason.
+
+## 5 — The gates *(fixtures)*
+
+```bash
+make evals
+```
+
+**Expect**: four suites green against fixtures. Report fidelity absent, with its ADR-0018
+skip visible in the output rather than silent.
+
+## 6 — The gates *(live model — named runner)*
+
+```bash
+export EVAL_PROVIDER_KEY=...     # dev-lane secret; never in a jobspec, never read by a run
+make evals-live
+```
+
+**Expect**: the same suites, scored against a real model. Record each cell's outcome in
+`contracts/conformance-packs.md`. **A cell qualified only by the fixture lane is qualified
+against a recording**, and the table is where that stops being invisible.
+
+## 7 — The judge chain terminates
+
+```bash
+uv run --extra adapters --extra surfaces pytest tests/component -k judge -q
+```
+
+**Expect**: the first judge qualified against `evals/seed/`; every later judge by a judge
+already qualified; a judge pointed at itself refused rather than closing the loop.
+
+## What a passing run does NOT prove
+
+- **Terraform's tools work.** Terraform is not in the enclave; that pack's tool layer is
+  fixture-backed, and the tool half is what Principle II governs.
+- **A fixture-qualified cell is a qualified model.** It is a qualified *recording*.
+- **Report fidelity.** Owed against ADR-0018, which is unbuilt.
+- **The injection lens catches novel phrasing.** It is pattern-based by necessity — a
+  model-scored lens would need a qualified cell, which needs the gates, which is a second
+  regress with no seed set to terminate it. The lens is a floor; ADR-0004's human review
+  covers the rest.
