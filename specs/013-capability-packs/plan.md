@@ -32,7 +32,10 @@ no model", which `pyproject.toml` currently states in as many words.
 
 **Storage**: the control-plane Vault for the matrix and pack pins (operator-authored,
 read-only to runs — the 010 pattern). Pack content on disk under `packs/`, verified by
-digest. Eval results in Postgres beside the audit trail.
+digest. Eval results in Postgres beside the audit trail, **written by `core/evals` and read
+by `core/authority/matrix.py`** when it resolves a cell's `suite_results` — the schema lives
+under `core/evals`, and the run path reaches results only through the matrix module, which
+is what keeps the I3 layering row true of this design rather than only of its naming.
 
 **Testing**: pytest. Rows for pack loading and isolation, matrix refusals, supply-chain
 promotion, and the gates themselves. Live-model scoring behind `@pytest.mark.live_model`,

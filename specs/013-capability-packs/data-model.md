@@ -82,7 +82,7 @@ not at review time, because review is when someone looked and load is when it ma
 | `role` | enum | `ask` \| `plan` \| `write` \| `judge` \| `summarize` — the closed vocabulary |
 | `qualified_at` | timestamp | |
 | `qualified_by` | enum | **`fixture` \| `live`** — which scorer, per cell (SC-013) |
-| `suite_results` | table | Per-suite scores and thresholds |
+| `suite_results` | table | Per-suite scores **and the thresholds they were judged against**. The thresholds live *here*, in the operator-authored matrix — never in the pack. A pack that set its own passing grade would be a pack that grades itself, and the whole point of a gate is that the thing being gated does not hold the bar |
 | `judge` | string? | Which judge scored this cell; absent only for the seed-qualified first judge |
 
 **Where it lives, and why that matters**: in the control-plane trust fabric beside the
@@ -125,6 +125,8 @@ reasoning makes 010 resolve a ceiling per run rather than caching it.
 A **case** is an input, an expected outcome, and the suite it belongs to — content, shipped
 in the pack. A **result** is a case, a cell, a scorer, a verdict, and a timestamp — a record,
 stored in `eval_results`.
+
+Results are **written by `core/evals`** and **read by `core/authority/matrix.py`** when it resolves a cell — so the run path reaches them only through the matrix module, and nothing on that path imports the scoring harness.
 
 **The schema is applied at bring-up** (`src/core/evals/schema.sql`, in `enclave-up`'s
 existing statement block), not on first use. 012 left `run_inputs` to the API service's
