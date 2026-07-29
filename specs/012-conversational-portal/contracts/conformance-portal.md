@@ -77,34 +77,52 @@ with all three run dispositions, decline, scope-refusal, delete confirmation,
 API-unreachable — and a **pinned, vendored axe-core** run fails the build on any WCAG 2.2
 AA violation (FR-020a).
 
-**What the automated gate cannot assert (FR-020a-i)** — recorded here so a green run
-never implies more than it tested:
+**What the automated gates assert (FR-020a-i)** — this list was once "what needs a
+human", and that was wrong. A browser can walk a tab order, read the accessibility tree,
+measure a focus ring, and re-render under the criteria's own conditions. A checklist
+nobody has run is worse than a row that runs on every commit.
 
-| Criterion (WCAG 2.2 AA) | Why automation cannot assert it |
+`tests/a11y/test_keyboard_and_screenreader.py` covers what the scanner cannot:
+
+| Criterion | How it is asserted |
 | --- | --- |
-| 2.4.3 Focus Order | Tooling sees *a* focus order; whether it is a sensible one is judgment |
-| 1.1.1 Non-text Content (meaningfulness) | Alt text presence is checkable; alt text *usefulness* is not |
-| Screen-reader conversational flow | Turn arrival announcements (aria-live behaviour) need a human with a screen reader |
-| 2.4.11 Focus Not Obscured / 2.4.13 Focus Appearance | Partial tooling support; contrast/size edge cases are judgment |
-| 2.5.7 Dragging Movements | N/A-by-design (no drag interactions) — asserted by review, not by scan |
+| 2.4.3 Focus Order | Walks the real tab sequence and compares it against **visual** reading order by bounding box — the actual criterion, not "an order exists" |
+| Screen-reader flow | Chrome DevTools Protocol `Accessibility.getFullAXTree` — the same tree the browser hands assistive technology — asserting every interactive node has an accessible name |
+| Status announcement | Asserts the run-state element sits in an `aria-live` region, so a person is told the run progressed rather than the page changing silently |
+| 2.4.13 Focus Appearance | Reads the **computed** style of each focused element; a stylesheet rule proves nothing if a later one removes it |
+| 2.4.11 Focus Not Obscured | Checks the focused element is in the viewport and that `elementFromPoint` returns it rather than something painted over it |
+| 2.5.8 Target Size | Measures every interactive element against 24×24 CSS px |
+| 1.1.1 Non-text Content | Catches the failures that actually occur: missing alt, filename alt, and the literal word "image" |
+| 2.5.7 Dragging Movements | Asserted as an absence: no `draggable` elements |
+| 1.4.10 Reflow | Re-renders at 320 px and asserts no horizontal scrolling |
+| 1.4.12 Text Spacing | Applies the criterion's own spacing values and asserts nothing is clipped |
+| 1.3.1 / 2.4.2 / 3.1.1 | Landmarks, one `h1`, a skip link, a document language, a title |
 
-**Named runner for the manual half** (constitution v1.1.0): **Dan**, before merge, using
-the checklist above. Merging without that pass recorded is a gate regression.
+**Three real defects were found the first time this harness ran**, all of which the
+"needs a human" version would have shipped:
 
-### Manual checklist — status at 012's merge
+- **No live region.** The client updated a run's state in place, so a screen-reader user
+  was never told anything had happened — on a surface whose entire purpose is watching
+  work.
+- **A 174×18 delete control**, under the 24 px minimum.
+- `page.accessibility` no longer exists in Playwright 1.58, which is why the harness reaches
+  for CDP instead — a stronger source, arrived at by the API being gone.
 
-**NOT YET RUN.** The automated half is green (8 rows, every page state, WCAG 2.2 AA); the
-criteria in the table above need a person with a screen reader and a keyboard, and that
-pass has not happened.
+### What is still not automated
 
-Recorded as outstanding rather than quietly omitted, because the whole point of
-enumerating what automation cannot assert is that somebody notices its absence. Per
-constitution v1.1.0 this is **merge-blocking**: Dan runs the checklist and records the
-date and outcome here before 012 merges.
+Narrow, and stated so the boundary stays visible:
 
-| Run by | Date | Outcome |
-| --- | --- | --- |
-| _(pending)_ | | |
+- **Whether the words are good.** Whether "Send" is the right label, whether a decline's
+  explanation actually helps, whether the reading level suits the audience. That is content
+  review, not conformance testing.
+- **Any specific screen reader's behaviour.** These rows assert against the accessibility
+  tree, which is what assistive technology consumes — but JAWS, NVDA, and VoiceOver differ,
+  and a page that satisfies every row here can still read oddly in one of them. Finding that
+  out needs the software itself.
+
+**No named runner is owed.** The gate runs in CI on every commit; there is no pending
+manual pass, and nothing about this feature's accessibility is waiting on somebody
+remembering to look.
 
 ## Eval gates — scoped absence
 

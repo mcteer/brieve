@@ -80,3 +80,23 @@ form.inline { display: inline; }
   width: 100%;
 }
 .composer .button { justify-self: start; margin-top: 0.5rem; }
+
+/* Available to a screen reader, absent from the page. Used for status prefixes that a
+ * sighted person reads from context and an assistive-technology user does not get. */
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* WCAG 2.5.8 AA: 24x24 CSS pixels. An inline link is text-height by default, which is
+ * under it — so anything acting as a CONTROL rather than as prose gets a hit area. The
+ * accessibility harness measures every interactive element, which is how this was found. */
+.target, button.link {
+  display: inline-block;
+  min-height: 24px;
+  line-height: 24px;
+}
