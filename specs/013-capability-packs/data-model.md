@@ -27,11 +27,28 @@ authority by shipping a file.
 | `hooks[]` | array | Pack hook declarations — see below. **Never `capability_kind = GOVERNANCE`** |
 | `workflows[]` | array | Workflow declarations, each with a minimum tier |
 | `evals` | table | Which suites this pack ships cases for |
+| `probe` | string | **Names how this pack's product is checked for reachability.** Resolved from what the platform provides, exactly as a tool handler is — never pack code. Required whenever any tool declares a `product` |
 
 **Properties**:
 
 - **A manifest is data, never code.** Loading executes nothing from the pack; the handler a
-  tool declaration names is resolved from what the platform already provides.
+  tool declaration names is resolved from what the platform already provides. **The probe
+  follows the same rule**, which is why it is a name rather than an implementation: a pack
+  supplying its own reachability check would be pack code running inside the health checker,
+  and the checker is the single owner of "reachable" (009, FR-006a).
+- **`probe` is required, and its absence is the sharpest trap in this feature** (analyze
+  pass 12). `HealthChecker.products()` derives its subject set from `registry.products()` —
+  so a loaded pack's product is monitored automatically, which is the good half. The probe
+  is *supplied*, and the only one wired is `unconfigured_probe`, which returns
+  `(False, "no probe configured for this product")`. Unreachable, therefore `UNHEALTHY`,
+  therefore `dependency_pre_hook` denies **every call to that pack's tools** with
+  `dependency_unavailable` — *"vault is not reachable"* — while Vault is running perfectly.
+  009's own docstring records the assumption 013 breaks: *"this platform fakes product APIs
+  by constitutional decision, so there is nothing here to reach yet."* FR-027b makes Vault
+  the pack whose tools reach a product that genuinely runs, so 013 is where that stops being
+  true. Refused at load (`probe_required`) rather than discovered at the first denied call,
+  because the denial names the product and the product is not the problem — the same
+  blames-the-wrong-system shape as the missing Vault grant found at pass 1.
 - **`provenance` is not decorative.** `adopted` requires `upstream`, and promotion checks
   the pinned commit; `authored` skips the upstream check and gains an obligation instead —
   FR-027d's format requirement, so it can become `adopted` later without a rewrite.
@@ -323,6 +340,7 @@ attestation name the pack version the way FR-021 already names consulted guidanc
 | `product_mode` set without `product` or `product_action` | `incomplete_product_binding` — refused at load, in the pack's own vocabulary, rather than as a registry `ValueError` |
 | Definition names a pack that is not loaded | `pack_not_loaded` — refused **at run start**, so the person is told before anything executes rather than after a step has run |
 | Pack ships fewer eval cases than the floor | `insufficient_eval_coverage` — refused **at load**, not warned about, because a floor nothing enforces is a suggestion and the failure belongs where the pack is added |
+| Pack declares a product with no `probe` | `probe_required` — refused **at load**. Without it the product records `UNHEALTHY` on the default probe and the dependency gate denies every one of that pack's tools, naming a product that is running fine |
 
 Each is added to `OPERATION_REASONS` rather than invented at a call site — the 010 rule,
 and the reason a conformance row can assert on any of them.

@@ -75,6 +75,17 @@ column exists so it cannot be read as more than it is.
   model-scored lens would need a qualified cell, which needs the gates, a second regress
   with no seed set to terminate it. A row asserts a phrasing it misses, so the floor is
   documented by a test rather than only by a docstring.
+- **That availability gating covers every transport.** **OWED, and inherited rather than
+  introduced here** (analyze pass 12). `dependency_health` is passed only by the MCP server;
+  the API, the portal, and the in-process dispatcher leave it `None`, and `dependency_pre_hook`
+  then returns `allow` — deliberately inert, because a run with no dependency mechanism
+  configured is not a run whose dependencies are all unknown. So after this feature a pack
+  tool is availability-gated on MCP and ungated on the other three. That was harmless while
+  every tool was `echo` and reached no product; **013 is the feature that makes it matter**,
+  because FR-027b's Vault tools reach something that can genuinely be down. It is recorded
+  here rather than fixed because widening the reader to the other dispatch paths is a change
+  to how those transports construct a run, which is 009's territory and its own decision —
+  and ADR-0033's parity claim is what it is owed against.
 
 ## Break fixtures worth naming
 
