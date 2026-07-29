@@ -223,6 +223,22 @@ executed server-side, fully governed, full attestation weight. Path B: local IDE
 calling governed meta-tools — every security property holds, but reasoning is
 ungoverned, so it evidences tool calls, not agent behavior.
 
+**Thread** — a conversation in the portal: tenant-scoped, subject-owned, persisted run
+state (ADR-0034), joined to everything it starts by one correlation ID. **A view, not the
+record** (ADR-0051) — it is hard-deletable by its owner precisely because the audit trail
+holds what it held, so deleting it masks nothing.
+
+**Turn** — one exchange within a thread. An **accepted** turn (dispatched, declined, or
+scope-refused) is written to the trail as `TURN_RECORDED` carrying the message verbatim,
+*before* anything acts on it — a declined ask is still an ask. A **pre-acceptance** refusal
+(rate-limited, oversized) is written as `TURN_REFUSED` carrying the message's size and
+never its content, so a refusal cannot grow the append-only trail by whatever a caller
+sends.
+
+**Declined vs refused** — declined means *the platform cannot do this*; refused means
+*this person may not*. Kept distinct because conflating them tells someone their access is
+fine when it is not, and tells another that it is broken when they simply have none.
+
 **Must-deny / must-decline** — release-gating eval classes: prompts the agent must
 refuse for safety, and requests outside the product's declared scope it must decline
 with a pointer elsewhere (e.g., audit-grade cost reporting) (ADR-0034/036).

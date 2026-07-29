@@ -25,6 +25,15 @@ OPERATION_REASONS: Final[dict[str, str]] = {
     "no_such_record": "no record with that identifier exists",
     "outside_tenant": "the record exists in another tenant",
     "not_permitted": "the record is visible to this caller, and this action is not theirs",
+    # 012's additions. Both are *pre-acceptance* — the platform never considered the
+    # message, so neither produces a turn, and both are recorded as TURN_REFUSED rather
+    # than TURN_RECORDED.
+    "rate_limited": "this subject has taken too many acts in the rate window",
+    "message_too_large": "the message exceeds the stated size bound and is refused whole",
+    # Not a refusal of the caller at all: the platform cannot do this for anyone.
+    # Distinct from `not_permitted` because conflating them tells someone their access is
+    # fine when it is not, and tells another that it is not when it is.
+    "nothing_to_dispatch": "no agent was selected, and none is available to dispatch",
 }
 
 #: The reasons a caller must not be able to tell apart.

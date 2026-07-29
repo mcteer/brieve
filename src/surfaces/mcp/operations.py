@@ -37,6 +37,15 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "stop_run": ("POST", "/runs/{run_id}/stop"),
     "list_agent_definitions": ("GET", "/agent-definitions"),
     "get_agent_definition": ("GET", "/agent-definitions/{agent_definition_id}"),
+    # 012. Threads are what make this a conversation rather than a queue, and they are on
+    # BOTH transports because an operation on one surface and not the other is a second
+    # authorization path wearing a friendlier name — which is exactly what MCP would be
+    # tempted to skip, being the surface where "just this one helper" is cheapest.
+    "create_thread": ("POST", "/threads"),
+    "list_threads": ("GET", "/threads"),
+    "get_thread": ("GET", "/threads/{thread_id}"),
+    "delete_thread": ("DELETE", "/threads/{thread_id}"),
+    "send_turn": ("POST", "/threads/{thread_id}/turns"),
 }
 
 
@@ -213,6 +222,81 @@ def operations() -> list[McpOperation]:
                 "required": ["accessor"],
                 # No requester. Who is asking comes from the authenticated subject, and a
                 # requester parameter would be a request to read someone else's change.
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="create_thread",
+            method="POST",
+            path="/threads",
+            description="Start a conversation. Returns its identifier.",
+            input_schema={
+                "type": "object",
+                # No subject and no tenant. Both come from the authenticated caller, and a
+                # parameter for either would be a request to start someone else's thread.
+                "properties": {},
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="list_threads",
+            method="GET",
+            path="/threads",
+            description="The conversations you have started, newest first.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                    "cursor": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="get_thread",
+            method="GET",
+            path="/threads/{thread_id}",
+            description="One conversation, with its turns in order.",
+            input_schema={
+                "type": "object",
+                "properties": {"thread_id": {"type": "string", "minLength": 1}},
+                "required": ["thread_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="delete_thread",
+            method="DELETE",
+            path="/threads/{thread_id}",
+            description=(
+                "Remove a conversation's view. The audit trail keeps every message it held."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"thread_id": {"type": "string", "minLength": 1}},
+                "required": ["thread_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="send_turn",
+            method="POST",
+            path="/threads/{thread_id}/turns",
+            description=(
+                "Say something in a conversation. The message is recorded as evidence "
+                "before anything acts on it; selecting an agent dispatches a run."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "thread_id": {"type": "string", "minLength": 1},
+                    "message": {"type": "string", "minLength": 1, "maxLength": 8192},
+                    # Optional: its absence is what a decline means. There is no intent
+                    # routing here — that needs a model, which this feature does not have.
+                    "agent_definition_id": {"type": "string"},
+                    "requested_tools": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["thread_id", "message"],
                 "additionalProperties": False,
             },
         ),

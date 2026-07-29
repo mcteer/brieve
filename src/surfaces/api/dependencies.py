@@ -112,11 +112,16 @@ def definitions(request: Request) -> Any:
     return _component(request, "definitions")
 
 
+def thread_store(request: Request) -> Any:
+    return _component(request, "thread_store")
+
+
 RunIndexDep = Annotated[Any, Depends(run_index)]
 DurabilityDep = Annotated[Any, Depends(durability)]
 ChangeRequestsDep = Annotated[Any, Depends(change_requests)]
 ChangeStatusDep = Annotated[Any, Depends(change_status)]
 DefinitionsDep = Annotated[Any, Depends(definitions)]
+ThreadStoreDep = Annotated[Any, Depends(thread_store)]
 
 __all__ = [
     "AuditDep",
@@ -129,9 +134,11 @@ __all__ = [
     "DispatcherDep",
     "EvidenceDep",
     "SubjectDep",
+    "ThreadStoreDep",
     "audit_sink",
     "authority_submitter",
     "current_subject",
     "evidence_query",
+    "thread_store",
     "run_dispatcher",
 ]

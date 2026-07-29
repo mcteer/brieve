@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Not permitted — Harness Portal{% endblock %}
+{% block content %}
+<h1>The platform did not {{ what }}</h1>
+{% if not response.reachable %}
+  <p>The platform could not be reached. This is not a permissions problem &mdash; nothing
+     about your access has changed, and your conversations are still there.</p>
+{% elif response.status == 404 %}
+  <p>There is nothing here to act on.</p>
+{% elif response.status == 403 %}
+  <p>You do not have access to do this. Someone who administers your access can grant it.</p>
+{% else %}
+  <p>The platform refused this request.</p>
+{% endif %}
+<p><a class="button" href="/">Back to your conversations</a></p>
+{% endblock %}

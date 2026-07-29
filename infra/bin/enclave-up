@@ -38,6 +38,10 @@ fi
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
 ok()  { printf '    \033[32mok\033[0m %s\n' "$*"; }
 die() { printf '\033[31mmissing prerequisite:\033[0m %s\n' "$*" >&2; exit 1; }
+# For the things a person may want but no gate needs. `die` stops the platform; this says
+# something is missing and lets the rest come up — the distinction 012 had to learn when a
+# dev-only identity provider blocked the enclave CI lane.
+warn() { printf '    \033[33mwarn\033[0m %s\n' "$*" >&2; }
 
 # .env values are quoted. Passing the quotes through made the trust store reject its
 # licence with "error decoding version: expected integer", which names neither quoting
@@ -358,12 +362,19 @@ EV_PASS="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.loa
 # three times — 008's audit_entries, and both dependency tables here — so schemas that any
 # role statement references get applied at bring-up, not on first use by whatever happens
 # to start first.
+#
+# **Four times now.** 012 added `run_inputs`, which the agent-run entrypoint reads at every
+# run start, and left it to the API service's migrate-on-boot. The API had never been
+# deployed before 012, so on an enclave brought up beforehand the table did not exist and
+# every dispatched run died with `relation "run_inputs" does not exist`. The rule this
+# comment already stated is the fix, applied one schema wider.
 if { echo "SET ROLE brieve;"; cat "$REPO/src/core/audit/evidence_schema.sql"; \
      cat "$REPO/src/core/dependencies/schema.sql"; \
-     cat "$REPO/src/core/runs/schema.sql"; } \
+     cat "$REPO/src/core/runs/schema.sql"; \
+     cat "$REPO/src/core/threads/schema.sql"; } \
    | docker run --rm -i -e PGPASSWORD="$EV_PASS" --network host postgres:17-alpine \
      psql -h 127.0.0.1 -p 5432 -U "$EV_USER" -d brieve -v ON_ERROR_STOP=1 -q >/dev/null 2>&1; then
-  ok "evidence, dependency, and run-index schemas applied"
+  ok "evidence, dependency, run-index, and thread schemas applied"
 else
   die "evidence schema failed to apply — the evidence role cannot issue credentials without it"
 fi
@@ -395,6 +406,22 @@ say "Run job"
 nomad job run -var="repo=$REPO" "$REPO/infra/jobs/agent-run.nomad.hcl" >/dev/null 2>&1 \
   && ok "agent-run registered (parameterized; one allocation and one identity per run)" \
   || die "could not register the agent-run job — dispatched runs would have nothing to run"
+
+# ---------------------------------------------------------------- 4d. the surfaces
+# The API and the portal are NOT registered here. `make portal-up` does it.
+#
+# They were, briefly, and the CI enclave lane taught the lesson twice in one run. First
+# `nomad job run` on a service job BLOCKS until its deployment settles, so a portal that
+# could not start held bring-up for ten minutes. Then the two extra `cores = 1`
+# reservations left the conformance job unplaceable, and the durability rows — the actual
+# merge-blocking work of that lane — never ran.
+#
+# The distinction that fixes it: bring-up stands up the PLATFORM, and the gates need Vault,
+# Nomad, Postgres, the MCP service, and agent-run. The API and portal serve a PERSON
+# walking through the quickstart in a browser, which is a deliberate act with its own
+# target and its own resource cost. Making it explicit is also more honest — the portal
+# needs a development identity provider that authenticates nobody, and that should be
+# something someone chooses to run.
 
 # ---------------------------------------------------------------- 5. the contract
 # Verification runs BEFORE success is reported. Otherwise the contract describes intent

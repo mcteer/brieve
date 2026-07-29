@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Your conversations — Harness Portal{% endblock %}
+{% block header_actions %}
+<form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+{% endblock %}
+{% block content %}
+<h1>Your conversations</h1>
+<form method="post" action="/threads">
+  <button type="submit" class="button">Start a conversation</button>
+</form>
+
+{% if not reachable %}
+  <p class="notice">The platform could not be reached, so this list is not showing your
+     conversations. They have not been lost.</p>
+{% elif refused %}
+  <p class="notice">The platform refused to list your conversations.</p>
+{% elif threads %}
+  <ul class="threads">
+    {% for thread in threads %}
+      <li>
+        <a href="/threads/{{ thread.thread_id }}">{{ thread.title or "Untitled conversation" }}</a>
+        <span class="meta">started {{ thread.created_at }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="empty">You have not started any conversations yet. This list is empty because
+     there is nothing in it &mdash; not because anything went wrong.</p>
+{% endif %}
+{% endblock %}

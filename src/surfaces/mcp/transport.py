@@ -22,6 +22,8 @@ from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
 from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
+from core.runs.refusals import OperationRefused
+from core.threads.store import DEFAULT_PAGE_SIZE, InMemoryThreadStore, ThreadStore
 from surfaces.dispatch.types import RunDispatcher, RunHandle
 from surfaces.mcp.operations import operations
 
@@ -57,6 +59,7 @@ class McpTransport:
         change_requests: ChangeRequestStore | None = None,
         change_status: Any | None = None,
         definitions: Any | None = None,
+        thread_store: ThreadStore | None = None,
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
@@ -72,6 +75,9 @@ class McpTransport:
         )
         self._change_status = change_status
         self._definitions = definitions
+        self._threads: ThreadStore = (
+            thread_store if thread_store is not None else InMemoryThreadStore()
+        )
 
     def tool_names(self) -> list[str]:
         return [op.tool_name for op in operations()]
@@ -96,6 +102,11 @@ class McpTransport:
             "stop_run": self._stop_run,
             "list_agent_definitions": self._list_agent_definitions,
             "get_agent_definition": self._get_agent_definition,
+            "create_thread": self._create_thread,
+            "list_threads": self._list_threads,
+            "get_thread": self._get_thread,
+            "delete_thread": self._delete_thread,
+            "send_turn": self._send_turn,
         }.get(tool_name)
 
         if handler is None:
@@ -193,6 +204,93 @@ class McpTransport:
             if view.agent_definition_id == wanted:
                 return McpResult(ok=True, status=200, payload=view.model_dump(mode="json"))
         return McpResult(ok=False, status=404, payload={"reason": "no such agent definition"})
+
+    # ------------------------------------------------------------------ threads
+    #
+    # Each of these delegates to the SAME function the API route calls. That is what makes
+    # verdict parity structural: a divergence would require someone to write a second
+    # implementation on purpose, rather than merely to update one surface and forget the
+    # other.
+
+    def _create_thread(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from surfaces.api.threads import _thread_view, create_thread_for
+
+        try:
+            record = create_thread_for(subject=subject, store=self._threads)
+        except OperationRefused as refused:
+            return self._refused(refused)
+        return McpResult(ok=True, status=201, payload=_thread_view(record).model_dump(mode="json"))
+
+    def _list_threads(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from surfaces.api.threads import list_threads_for
+
+        response = list_threads_for(
+            subject=subject,
+            store=self._threads,
+            limit=int(args.get("limit", DEFAULT_PAGE_SIZE)),
+            cursor=args.get("cursor"),
+        )
+        return McpResult(ok=True, status=200, payload=response.model_dump(mode="json"))
+
+    def _get_thread(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from surfaces.api.threads import thread_detail_for
+
+        try:
+            response = thread_detail_for(
+                subject=subject, store=self._threads, thread_id=str(args["thread_id"])
+            )
+        except OperationRefused as refused:
+            return self._refused(refused)
+        return McpResult(ok=True, status=200, payload=response.model_dump(mode="json"))
+
+    def _delete_thread(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from surfaces.api.threads import delete_thread_for
+
+        try:
+            delete_thread_for(
+                subject=subject,
+                store=self._threads,
+                audit_sink=self._audit,
+                thread_id=str(args["thread_id"]),
+            )
+        except OperationRefused as refused:
+            return self._refused(refused)
+        return McpResult(ok=True, status=204, payload={})
+
+    def _send_turn(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from surfaces.api.threads import SendTurnRequest, send_turn_for
+
+        body = SendTurnRequest(
+            message=str(args["message"]),
+            agent_definition_id=args.get("agent_definition_id"),
+            requested_tools=frozenset(args.get("requested_tools") or ()),
+        )
+        try:
+            view = send_turn_for(
+                subject=subject,
+                store=self._threads,
+                audit_sink=self._audit,
+                dispatcher=self._dispatcher,
+                fabric=self._definitions,
+                durability=self._durability,
+                thread_id=str(args["thread_id"]),
+                body=body,
+            )
+        except OperationRefused as refused:
+            return self._refused(refused)
+        return McpResult(ok=True, status=200, payload=view.model_dump(mode="json"))
+
+    def _refused(self, refused: OperationRefused) -> McpResult:
+        """The same 403/404 split the API makes, from the same property.
+
+        Written once so the two transports cannot drift on which refusals are visible —
+        which is the half of parity a catalogue comparison cannot see.
+        """
+        return McpResult(
+            ok=False,
+            status=403 if refused.is_visible_to_caller else 404,
+            payload={"reason": refused.reason_code},
+        )
 
     def _stop_run(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         from core.runs.refusals import OperationRefused

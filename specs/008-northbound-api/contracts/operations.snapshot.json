@@ -48,5 +48,30 @@
     "method": "POST",
     "name": "stop_run",
     "path": "/runs/{run_id}/stop"
+  },
+  {
+    "method": "GET",
+    "name": "list_threads",
+    "path": "/threads"
+  },
+  {
+    "method": "POST",
+    "name": "create_thread",
+    "path": "/threads"
+  },
+  {
+    "method": "DELETE",
+    "name": "delete_thread",
+    "path": "/threads/{thread_id}"
+  },
+  {
+    "method": "GET",
+    "name": "get_thread",
+    "path": "/threads/{thread_id}"
+  },
+  {
+    "method": "POST",
+    "name": "send_turn",
+    "path": "/threads/{thread_id}/turns"
   }
 ]

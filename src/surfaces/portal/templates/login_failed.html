@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Sign-in did not complete — Harness Portal{% endblock %}
+{% block content %}
+<h1>Sign-in did not complete</h1>
+<p>This usually means the sign-in link was already used, or was left open too long.
+   Neither is a problem with your account.</p>
+<p class="reason">Reason: <code>{{ reason }}</code></p>
+<p><a class="button" href="/login">Try again</a></p>
+{% endblock %}

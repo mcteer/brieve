@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Stand up the surfaces a PERSON uses: a development identity provider, the northbound
+# API, and the portal. Deliberately separate from `make dev-up`.
+#
+# Bring-up stands up the platform, and every gate reaches Vault, Nomad, Postgres, the MCP
+# service, and agent-run. These three serve a browser. Keeping them apart is not tidiness:
+# registering them at bring-up blocked the enclave CI lane for ten minutes on a service
+# deployment, and their resource reservations left the conformance job unplaceable, so the
+# merge-blocking durability rows never ran.
+#
+# It is also more honest. The portal login needs an identity provider that AUTHENTICATES
+# NOBODY, and running one should be something a person chooses rather than something that
+# happens to them.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO"
+
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+ok()  { printf '    \033[32mok\033[0m %s\n' "$*"; }
+die() { printf '\033[31mcould not start the surfaces:\033[0m %s\n' "$*" >&2; exit 1; }
+
+command -v nomad >/dev/null 2>&1 || die "nomad is not on PATH — run \`make dev-up\` first"
+nomad node status >/dev/null 2>&1 || die "the enclave is not up — run \`make dev-up\` first"
+
+DEV_IDP_PORT="${DEV_IDP_PORT:-8090}"
+
+say "Development identity provider (DEV ONLY — authenticates nobody)"
+if curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1; then
+  ok "already listening on ${DEV_IDP_PORT}"
+else
+  nohup uv run --extra adapters --extra surfaces --extra portal \
+    python -m tests.harness.dev_idp >/tmp/brieve-dev-idp.log 2>&1 &
+  for _ in $(seq 1 120); do
+    curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 && break
+    sleep 0.5
+  done
+  curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 \
+    || die "the development identity provider did not come up — see /tmp/brieve-dev-idp.log"
+  ok "listening on ${DEV_IDP_PORT}"
+fi
+
+# `-detach`, because `nomad job run` on a SERVICE job blocks until its deployment settles.
+# Without it a service that cannot start holds this script for as long as Nomad keeps
+# trying, and the failure reads as a hang rather than as a failure.
+say "API service"
+nomad job run -detach -var="repo=$REPO" \
+  -var="oidc_issuer=http://127.0.0.1:${DEV_IDP_PORT}" \
+  -var="oidc_jwks_uri=http://127.0.0.1:${DEV_IDP_PORT}/jwks" \
+  "$REPO/infra/jobs/api.nomad.hcl" >/dev/null \
+  && ok "api submitted (the northbound surface, served for the first time in 012)" \
+  || die "could not submit the api service"
+
+say "Portal"
+nomad job run -detach -var="repo=$REPO" \
+  -var="api_base_url=http://127.0.0.1:8081" \
+  -var="oidc_issuer=http://127.0.0.1:${DEV_IDP_PORT}" \
+  -var="oidc_authorize_endpoint=http://127.0.0.1:${DEV_IDP_PORT}/authorize" \
+  -var="oidc_token_endpoint=http://127.0.0.1:${DEV_IDP_PORT}/token" \
+  -var="portal_redirect_uri=http://127.0.0.1:8082/callback" \
+  "$REPO/infra/jobs/portal.nomad.hcl" >/dev/null \
+  && ok "portal submitted (thin client; holds no credential of any kind)" \
+  || die "could not submit the portal"
+
+cat <<MSG
+
+    Deployments are settling in the background. Watch them with:
+
+        nomad job status api
+        nomad job status portal
+
+    Then open http://127.0.0.1:8082/ and sign in. The identity provider will accept
+    whoever you say you are, because it is a development double and authenticates nobody.
+
+MSG

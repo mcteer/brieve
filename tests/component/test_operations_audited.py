@@ -21,7 +21,12 @@ from core.runs.refusals import (
 )
 from tests.harness.api_fixtures import surface_under_test
 
-#: Every operation 011 added, as (method, path, mcp tool).
+#: Every operation added after 008, as (method, path, mcp tool, args).
+#:
+#: Grown by 012 with the five thread operations. The guard at the bottom of this file is
+#: what forced that — and it is worth noticing that it worked: without it, five new
+#: operations would have shipped uncovered by the authentication rows above, which is
+#: precisely how a coverage check becomes decorative.
 NEW_OPERATIONS = [
     ("GET", "/runs", "list_runs", {}),
     ("GET", "/runs/r/result", "get_run_result", {"run_id": "r"}),
@@ -33,6 +38,17 @@ NEW_OPERATIONS = [
         "/agent-definitions/planner",
         "get_agent_definition",
         {"agent_definition_id": "planner"},
+    ),
+    # 012's five.
+    ("POST", "/threads", "create_thread", {}),
+    ("GET", "/threads", "list_threads", {}),
+    ("GET", "/threads/t", "get_thread", {"thread_id": "t"}),
+    ("DELETE", "/threads/t", "delete_thread", {"thread_id": "t"}),
+    (
+        "POST",
+        "/threads/t/turns",
+        "send_turn",
+        {"thread_id": "t", "message": "hello"},
     ),
 ]
 
@@ -93,9 +109,11 @@ def test_every_reason_code_says_what_it_means() -> None:
 def test_the_operation_list_here_matches_what_shipped() -> None:
     """Guards this file against the feature growing past it.
 
-    Six operations were added. If a seventh lands and is not listed here, the
-    authentication rows above silently stop covering it — which is how a coverage check
-    becomes decorative.
+    Eleven operations have been added since 008. If a twelfth lands and is not listed
+    here, the authentication rows above silently stop covering it — which is how a
+    coverage check becomes decorative. It has already caught this once: 012's five thread
+    operations were added to the catalogue before they were added here, and this row is
+    what noticed.
     """
     from surfaces.mcp.operations import operations
 

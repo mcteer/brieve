@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Delete this conversation? — Harness Portal{% endblock %}
+{% block content %}
+<h1>Delete this conversation?</h1>
+<p>This removes the conversation from your list. It does <strong>not</strong> remove the
+   record: every message you sent stays in the audit trail, and any run it started keeps
+   running and keeps its result.</p>
+<form method="post" action="/threads/{{ thread_id }}/delete">
+  <button type="submit" class="button button--danger">Delete conversation</button>
+</form>
+<p><a href="/threads/{{ thread_id }}">Keep it</a></p>
+{% endblock %}

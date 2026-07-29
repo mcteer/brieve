@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ thread.title or "Conversation" }} — Harness Portal{% endblock %}
+{% block header_actions %}
+<form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+{% endblock %}
+{% block content %}
+<h1>{{ thread.title or "Untitled conversation" }}</h1>
+<p><a href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a></p>
+
+<ol class="turns" id="turns">
+  {% for turn in turns %}
+  <li class="turn turn--{{ turn.disposition }}">
+    <p class="message">{{ turn.message }}</p>
+
+    {% if turn.disposition == "declined" %}
+      <p class="disposition disposition--declined">
+        This platform starts agents. It could not turn that into one &mdash; choose an
+        agent below and send it again.
+      </p>
+    {% elif turn.disposition == "refused" %}
+      <p class="disposition disposition--refused">
+        You do not have access to start that agent. It exists, and someone who administers
+        your access can grant it.
+      </p>
+    {% else %}
+      <p class="disposition" data-run-id="{{ turn.run_id }}">
+        <span class="state">{% if turn.run %}{{ turn.run.state }}{% else %}starting{% endif %}</span>
+        {% if turn.run and turn.run.state not in ["completed", "failed", "stopped"] %}
+          <form method="post" action="/runs/{{ turn.run_id }}/stop" class="inline">
+            <input type="hidden" name="thread_id" value="{{ thread.thread_id }}">
+            <button type="submit" class="link">Stop this run</button>
+          </form>
+        {% endif %}
+      </p>
+
+      {% if turn.result_status == 200 and turn.result %}
+        <pre class="result">{{ turn.result.result }}</pre>
+      {% elif turn.result_status == 409 %}
+        <p class="pending">Still working. This updates on its own.</p>
+      {% elif turn.result_status == 204 or (turn.run and turn.run.state == "stopped") %}
+        <p class="ended">Ended without a result{% if turn.run and turn.run.stop_reason %}
+          &mdash; {{ turn.run.stop_reason }}{% endif %}.</p>
+      {% endif %}
+    {% endif %}
+
+    {% if turn.context_run_ids %}
+      <p class="context">Carried forward from {{ turn.context_run_ids | length }} earlier
+        result{{ "s" if turn.context_run_ids | length != 1 }}.</p>
+    {% endif %}
+    {% if turn.context_dropped %}
+      <p class="context context--dropped">{{ turn.context_dropped | length }} earlier
+        result{{ "s" if turn.context_dropped | length != 1 }} fell outside what this
+        conversation carries forward, and {{ "were" if turn.context_dropped | length != 1
+        else "was" }} not included.</p>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ol>
+
+<form method="post" action="/threads/{{ thread.thread_id }}/turns" class="composer">
+  <label for="agent">Agent</label>
+  {% if not definitions_reachable %}
+    <p class="notice">The list of agents could not be reached.</p>
+  {% endif %}
+  <select name="agent_definition_id" id="agent">
+    <option value="">None &mdash; just leave a note</option>
+    {% for d in definitions %}
+      <option value="{{ d.agent_definition_id }}" {% if not d.may_start %}disabled{% endif %}>
+        {{ d.agent_definition_id }}{% if not d.may_start %} (you do not have access){% endif %}
+      </option>
+    {% endfor %}
+  </select>
+
+  <label for="message">Message</label>
+  <textarea name="message" id="message" rows="4" required
+            aria-describedby="recorded-note"></textarea>
+  <p id="recorded-note" class="note">This message is recorded as evidence before anything
+     acts on it.</p>
+
+  <button type="submit" class="button">Send</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/portal.js" data-thread-id="{{ thread.thread_id }}"></script>
+{% endblock %}
