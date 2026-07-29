@@ -63,13 +63,12 @@ class LiveModelScorer:
         response = client.messages.create(
             model=api_model,
             max_tokens=1024,
-            # Temperature 0: scoring, not generation. Three full-lane runs at the default
-            # temperature produced three different pass/fail sets — almost every suite
-            # both passed and failed at least once — which is a coin flip on marginal
-            # cases, not qualification evidence. A deterministic-ish sample per case is
-            # the minimum for a per-cell record anyone should trust; N-sample majority
-            # voting is the upgrade if variance persists.
-            temperature=0.0,
+            # No temperature parameter: the API answers "`temperature` is deprecated
+            # for this model" — Opus 5 rejects it outright, discovered when pinning it
+            # to 0 failed all nine tests in six seconds. Variance is controlled one
+            # layer up instead: the live lane scores each case by MAJORITY OF THREE
+            # samples, which is where the control belongs anyway — a deterministic
+            # sample would still be one draw from the distribution being qualified.
             # The subject's system prompt states what the definition would carry — its
             # pack scope and the platform's own refusal vocabulary. The first live run
             # failed on exactly the gap this fills: the model conflated "denied"

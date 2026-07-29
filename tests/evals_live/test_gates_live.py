@@ -65,12 +65,24 @@ def test_live_suite(pack: str, suite: str) -> None:
     here or not at all."""
     cases = load_pack_cases(PACKS / pack, suite)
     scorer = LiveModelScorer(grounding=_grounding_for(pack, suite))
-    result = run_suite(suite, cases, subject=_subject(pack, "ask"), scorer=scorer)
 
-    failed = [(v.case_id, v.observed) for v in result.verdicts if not v.passed]
-    assert result.passed, (
-        f"{pack}/{suite} against the live model: {failed}. A live failure is information "
-        f"the fixture lane cannot produce — record it in the per-cell table either way"
+    # Majority of three, per case. Three full-lane single-sample runs produced three
+    # different pass/fail sets — a coin flip on marginal cases — and the model rejects
+    # a pinned temperature, so the variance control lives here: a case passes when at
+    # least two of three samples do. The threshold function is untouched; what changed
+    # is how many draws from the distribution a verdict summarises.
+    tallies: dict[str, int] = {}
+    for _ in range(3):
+        result = run_suite(suite, cases, subject=_subject(pack, "ask"), scorer=scorer)
+        for verdict in result.verdicts:
+            tallies[verdict.case_id] = tallies.get(verdict.case_id, 0) + (
+                1 if verdict.passed else 0
+            )
+
+    failed = sorted(case_id for case_id, wins in tallies.items() if wins < 2)
+    assert not failed, (
+        f"{pack}/{suite} against the live model (majority of 3): {failed}. A live failure "
+        f"is information the fixture lane cannot produce — record it either way"
     )
 
 
