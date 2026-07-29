@@ -31,8 +31,9 @@
 
 ## Notes
 
-**16/16.** The three markers were resolved by the 2026-07-29 clarification session, and the
-two items that failed before now pass for the same reason: the inner boundary is settled.
+**16/16 → 16/16.** No item changed state in the clarification session. It did not fix a
+failing spec; it changed what the passing spec describes, which is the more useful outcome
+and the one this checklist cannot see.
 
 **The clarifications shrank the feature in one place and grew it in another**, which is
 worth noting because the net is not obviously smaller. Deferring US6 removes the largest
@@ -46,9 +47,14 @@ one pack has nothing to be independent of. That trade is the session's main deci
   scores fixtures so a merge gate does not fail for reasons unrelated to the change; a
   marked lane scores a live model. SC-013 exists so the contract cannot record a cell as
   qualified without saying which of the two it means.
-- **The judge regress.** FR-012 requires eval-time judges to be eval-promoted artifacts, so
-  something qualified the first one. Planning must resolve it; pretending it away in the
-  spec would be worse than naming it.
+- **The judge regress is no longer carried forward — it is a precondition.** Qualifying all
+  five roles made it binding, and FR-012a requires it resolved and recorded *before any cell
+  is qualified*, with the acceptable options bounded and the implicit answer forbidden. The
+  spec still does not choose among them, because that is architecture and belongs to
+  planning.
+- **`write` qualified against a fixture** is the sharpest edge here: a model permitted to
+  make changes, qualified against a recording. SC-013 keeps the distinction visible per
+  cell; the marked live lane is what makes it mean something.
 
 **Six requirements are deliberately negative** — FR-003 (no bypass path), FR-004 (no core
 module names a product), FR-010 (no path reaches an unqualified model), FR-011 (no
@@ -56,3 +62,21 @@ auto-tracking anywhere), FR-014 (a gate that cannot run reports failure), FR-015
 verdict never satisfies a human approval). All are testable by construction rather than by
 observation. FR-004 in particular reads as a slogan until asserted structurally over the
 real tree, and SC-012 makes it a diff rather than an argument.
+
+### What the clarification session changed
+
+Four questions, and two of them reversed earlier answers on evidence those answers did not
+have — which is the pattern worth noticing rather than the exception:
+
+1. **Packs became Terraform + Vault**, not Vault + Nomad. ADR-0004 says skills are *adopted*;
+   the upstream source turned out to exist (`hashicorp/agent-skills`, MPL-2.0) and to cover
+   Terraform and Packer only. Two authored packs would have left the supply chain with no
+   subject — no real provenance, no real version to pin, nothing genuine to review for
+   injection. The pair now proves adoption *and* invocation.
+2. **Report fidelity is recorded as owed**, because `RunReport` does not exist in `src/`.
+   ADR-0047's rule applied literally: absent or an explicit skip citing its deferring
+   record, never a stub, and never a weaker property asserted under its name.
+3. **All five roles are qualified**, which made the judge regress a precondition.
+4. **The authored Vault skills use the upstream format**, because they are intended for
+   contribution back — making this repository's authoring a temporary state by design
+   rather than a permanent fork.

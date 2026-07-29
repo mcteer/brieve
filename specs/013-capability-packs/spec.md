@@ -22,12 +22,22 @@
 
 ### Session 2026-07-29
 
-- Q: How many packs does this feature ship, and for which product? → A: **Two — Vault and Nomad.**
+- Q: How many packs does this feature ship, and for which product? → A: ~~**Two — Vault and Nomad**~~ — **superseded by the question below**, which found the upstream skills source. Left standing rather than edited, per Principle X. Original answer: **Two — Vault and Nomad.**
   *(Both already run in the enclave, so neither needs a new operated component. Two rather than one because FR-004's real claim is that packs are independent of each other and of the core, and with a single pack there is nothing to be independent OF — the property would be argued rather than demonstrated. Two also surfaces the collision the edge cases name: what happens when two packs declare the same tool name. The cost is real and is content work, which is the slow part of this feature.)*
+- Q: Upstream skills exist for Terraform and Packer, not Vault or Nomad. Which two packs? → A: **Terraform and Vault** — one adopted, one authored.
+  *(Supersedes the Vault-and-Nomad answer above, on evidence that answer did not have: ADR-0004 says skills are ADOPTED from upstream with original content only for genuine gaps, and the upstream source turns out to exist — [`hashicorp/agent-skills`](https://github.com/hashicorp/agent-skills), MPL-2.0, in Anthropic's open Agent Skills format — covering Terraform and Packer, with Vault and Nomad listed as future products. Two packs of authored-only content would have left ADR-0004's supply chain with no subject: no real provenance to check, no real upstream version to pin, nothing genuine to run an injection-lens review over. **The pair now proves both halves.** Terraform exercises adoption against a real upstream; Vault runs in the enclave, so its tools are callable end to end and its skills are the "genuine gap" ADR-0004 permits authoring for. The cost is stated rather than hidden: Terraform is not in the enclave, so that pack's TOOL layer stays fixture-backed, and the tool half is the one Principle II cares about.)*
 - Q: Do the eval gates run against a real model, or against recorded fixtures? → A: **Fixtures in the merge-blocking lane; real models behind a marker.**
   *(The gate machinery, the matrix, the promotion rules, and the refusals are all real and all blocking. What they score in the fast lane is a recorded fixture, and a separate marked lane scores a live model — the same shape as the enclave lane today. A merge-blocking gate carrying a provider dependency and non-determinism fails for reasons unrelated to the change under review, and a gate that fails for unrelated reasons is one people learn to re-run rather than read. **The honest cost, stated because it is the thing to watch: a cell qualified only against a fixture is qualified against a recording.** The marked lane is what makes a cell mean something, and the contract must record which cells have actually been through it.)*
 - Q: Are validated-design corpora and the deviation register (US6) in this feature? → A: **Deferred to a follow-on.**
   *(US1–US5 are coherent without it. US6 needs a corpus, a retrieval path, and precedence resolution — the largest single dependency here, in a feature that already brings Principle VIII online for the first time. What it leaves unbuilt is ADR-0023: "silent deviation is prohibited" stays a rule nothing enforces, and that is recorded as an owed gate rather than quietly dropped. The corpus question is already settled from 012's research (HashiCorp Validated Patterns), so the follow-on starts from a known source.)*
+
+- Q: Report fidelity is a named blocking eval gate, but `RunReport` (ADR-0018) is unbuilt. What should 013 do with it? → A: **Record it owed; build the other four.**
+  *(Must-deny, must-decline, citation accuracy, and estate-state fixtures all have subjects and all ship blocking. Report fidelity does not: nothing in `src/` is a typed report compiled from run records, so a gate over it would be asserting something about a thing that does not exist. ADR-0047's rule applies exactly — absent or an explicit skip citing its deferring record, never a passing stub — so it is recorded as owed against ADR-0018 rather than satisfied by asserting something weaker under its name. The cost is stated: the constitution's eval-gate row is still partially owed after the feature whose job was to close it, and the record must say so rather than reading as complete.)*
+- Q: The Vault skills are authored here because upstream has none. Where do they end up? → A: **Authored in the upstream format, and intended for contribution back to `hashicorp/agent-skills`.**
+  *(Dan's intent, recorded during this session. It is a constraint on authoring rather than a deliverable of this feature: the Vault skills are written in the same open Agent Skills format the upstream repository uses, so contributing them is a pull request rather than a rewrite. Cheap to honour now, expensive to retrofit — and it means this platform's "genuine gap" authoring under ADR-0004 is a temporary state by design, closing the loop that ADR says it wants: adopt what upstream ships, and migrate onto it as it matures.)*
+
+- Q: Which roles does 013 qualify cells for? → A: **All five** — ask, plan, write, judge, summarize.
+  *(The complete matrix, so any definition can be fully bound and nothing downstream waits on a second qualification pass. Two consequences, both stated rather than absorbed. **`write` means qualifying a model to make changes**, and in the blocking lane that qualification is against a fixture — so the marked live lane matters more for `write` than for any other role, and SC-013's per-cell record is what keeps the difference visible. **`judge` makes the regress binding**: FR-012 requires eval-time judges to be eval-promoted artifacts, so something must qualify the first one, and that is no longer a question this feature can carry forward unresolved. It is architecture, so it is planning's to decide rather than this session's — but it is now a blocker rather than a note, and FR-012a says so.)*
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -210,6 +220,12 @@ lower one is confined to golden paths and that the bound is a property of the de
 
 - **FR-008**: The platform MUST maintain a matrix of eval-qualified (pack × model × role)
   cells, where role is the closed vocabulary `ask | plan | write | judge | summarize`.
+- **FR-008a**: This feature MUST qualify cells for **all five roles**, so a definition can
+  be fully bound without a second qualification pass. Each role's suite MUST match what the
+  constitution names for it: `ask` reuses the guidance and estate-query classes; `plan`
+  scores decomposition, tool selection, and risk identification; `write` runs golden-task
+  correctness; `judge` measures agreement with human-labeled verdicts, calibration, and
+  deny-rate stability.
 - **FR-009**: A definition's binding map MUST reference only qualified cells. Pinning an
   unqualified cell MUST be refused **at definition time**, naming the cell.
 - **FR-010**: At run time, fallback MUST occur only to another qualified cell and MUST be
@@ -219,12 +235,26 @@ lower one is confined to golden paths and that the bound is a property of the de
   "latest" MUST NOT exist anywhere.
 - **FR-012**: Eval-time judge models MUST themselves be pinned, eval-promoted artifacts. A
   judge that auto-tracked would be an ungated input to every gate.
+- **FR-012a**: **The regress in FR-012 MUST be resolved before any cell is qualified**, and
+  the resolution MUST be recorded. Qualifying `judge` means a judge scored the judge suite;
+  what qualified *that* judge is the question, and it does not answer itself. The spec does
+  not choose — this is architecture and belongs to planning — but the options are bounded
+  and worth naming so planning starts informed: a **human-labeled seed set** that qualifies
+  the first judge without a model in the loop; an **externally attested** judge accepted as
+  a root of trust and recorded as such; or a **declared floor** where one judge is qualified
+  by fiat, named in the record, and everything else chains from it. What is NOT acceptable
+  is the regress being resolved implicitly by whichever judge happened to run first.
 
 **Eval gates**
 
 - **FR-013**: The following MUST be blocking for packs, prompts, models, and policies:
   must-deny safety suites; must-decline scope suites; citation accuracy and
-  refusal-to-confabulate; estate-state fixtures; report fidelity.
+  refusal-to-confabulate; estate-state fixtures.
+- **FR-013a**: **Report fidelity is NOT built here and MUST be recorded as owed**, citing
+  ADR-0018. `RunReport` does not exist, so a gate over it would assert something about a
+  thing that is not there. Per ADR-0047 it is absent or an explicit skip naming its
+  deferring record — never a passing stub, and never satisfied by asserting a weaker
+  property under its name.
 - **FR-014**: A gate that cannot run MUST report failure. It MUST NOT skip, and MUST NOT
   report a pass.
 - **FR-015**: A model verdict MAY gate a step but MUST NEVER satisfy an approval requirement
@@ -258,10 +288,24 @@ lower one is confined to golden paths and that the bound is a property of the de
 
 **Scope of this feature**
 
-- **FR-027**: This feature MUST ship **two** capability packs — Vault and Nomad — both of
-  which already run in the enclave and therefore need no new operated component. Two rather
-  than one because FR-004's claim is about independence, and one pack has nothing to be
-  independent of.
+- **FR-027**: This feature MUST ship **two** capability packs — **Terraform and Vault** —
+  chosen so that each proves a different half of ADR-0004.
+- **FR-027a**: The **Terraform** pack's skills MUST be *adopted* from
+  [`hashicorp/agent-skills`](https://github.com/hashicorp/agent-skills) (MPL-2.0), pinned to
+  a commit, with provenance recorded and an injection-lens review performed. This is the
+  pack that gives the supply chain a real subject.
+- **FR-027b**: The **Vault** pack's skills MUST be *authored here*, as the "genuine gap"
+  ADR-0004 permits — upstream covers Terraform and Packer, and lists Vault as a future
+  product. Vault runs in the enclave, so this is the pack whose **tools** are exercised
+  against a live product.
+- **FR-027d**: The authored Vault skills MUST use the same open Agent Skills format the
+  upstream repository uses, so they can be contributed back to `hashicorp/agent-skills` as
+  a pull request rather than a rewrite. ADR-0004's own instruction is to adopt what upstream
+  ships and migrate onto it as it matures; authoring in a divergent shape would make that
+  migration a rewrite and the gap permanent.
+- **FR-027c**: The record MUST state that Terraform's tool layer is fixture-backed, because
+  Terraform is not deployed in the enclave. The tool half is what Principle II governs, and
+  a pack whose tools were never called must not read as one whose tools were.
 - **FR-028**: The eval gates MUST be real and merge-blocking, scoring **recorded fixtures**
   in the hermetic lane. A separately marked lane MUST score a **live model**, and the
   conformance contract MUST record which cells have been through it. A cell qualified only
@@ -311,13 +355,21 @@ lower one is confined to golden paths and that the bound is a property of the de
   the request says.
 - **SC-010**: The audit trail distinguishes a model gate from a human approval in every case
   where both occur.
-- **SC-011**: The roadmap's eval-gate rows move from Deferred to In force.
+- **SC-011**: Four of the five eval-gate rows move from Deferred to In force. The fifth —
+  report fidelity — is recorded as owed against ADR-0018, and **zero rows are recorded as
+  in force without a subject**.
 - **SC-012**: Two packs load side by side, and neither is reachable from a definition that
   does not name it. **Adding the second pack changed no core file** — demonstrated by the
   diff, not argued.
+- **SC-012a**: The Terraform pack's skills carry a recorded upstream commit, a provenance
+  record, and a completed injection-lens review. Zero adopted skills are unpinned.
 - **SC-013**: The conformance contract states, per cell, whether it was qualified against a
   fixture or against a live model. Zero cells are recorded as qualified without saying
   which.
+- **SC-014**: All five roles have at least one qualified cell, and a definition can be bound
+  end to end without an unqualified reference.
+- **SC-015**: The record names what qualified the **first** judge, and that answer does not
+  itself depend on an unqualified judge. Zero cells are qualified before it is recorded.
 
 ## Assumptions
 
@@ -330,9 +382,11 @@ lower one is confined to golden paths and that the bound is a property of the de
 - **"No core change" is testable, and will be tested.** FR-004 reads as a slogan. It is
   asserted the way this repository asserts other absences — structurally, over the actual
   tree.
-- **The first pack should be a product this platform already depends on.** Vault, Nomad, or
-  Terraform are all already in the enclave, which means a pack for one of them can be
-  exercised end to end without standing up something new (Principle VI).
+- **The two packs prove different things, deliberately.** Terraform proves *adoption* —
+  ADR-0004's supply chain against a real upstream repository. Vault proves *invocation* —
+  tools reaching a product that actually runs in the enclave. Neither pack alone would
+  exercise both halves, and a feature that shipped two authored packs would have built the
+  supply chain and never tested it.
 - **The clarifications shrank this feature in one place and grew it in another.** Two
   packs rather than one is more content work, taken deliberately because it is what makes
   FR-004 demonstrable. Deferring US6 removes the largest dependency. Fixtures in the
@@ -341,10 +395,15 @@ lower one is confined to golden paths and that the bound is a property of the de
   Everything shipped so far calls no model at all — `pyproject.toml` says so in as many
   words — so the provider seam, whatever it turns out to be, is new ground rather than an
   extension of something.
-- **The judge regress is real and is carried forward visibly.** FR-012 requires eval-time
-  judges to be eval-promoted artifacts, which means something qualified the first judge.
-  The spec does not resolve it; planning must, and pretending it away here would be worse
-  than naming it.
+- **The judge regress is now binding, not theoretical.** Qualifying all five roles means
+  qualifying `judge`, which means a judge scored the judge suite, which means something
+  qualified that one. FR-012a makes resolving it a precondition rather than a note. The
+  spec deliberately does not choose the resolution — that is architecture — but it bounds
+  the options and forbids the implicit answer, which is the one that happens by default.
+- **Qualifying `write` on fixtures is the sharpest edge in this feature.** A `write` cell is
+  a model permitted to make changes, and in the blocking lane its qualification is against a
+  recording. The marked live lane is not optional for `write` in the way it arguably is for
+  `summarize`, and SC-013's per-cell record is what stops the difference being invisible.
 
 ## Out of Scope
 
@@ -359,5 +418,7 @@ lower one is confined to golden paths and that the bound is a property of the de
   feature, "silent deviation is prohibited" is still a rule nothing enforces. The corpus is
   already sourced (HashiCorp Validated Patterns, from 012's research), so the follow-on
   starts from a settled source rather than rediscovering one.
+- **`RunReport` and report fidelity (ADR-0018)**, recorded as an owed gate row rather than
+  built. See the clarification.
 - Any registry *product*. Principle I: provider interfaces and conformance suites are the
   deliverable.
