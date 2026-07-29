@@ -281,3 +281,37 @@ def test_an_oversized_message_through_the_api_still_leaves_a_record() -> None:
     assert refusals[0].payload["message_bytes"] == 9000
     assert "message" not in refusals[0].payload
     assert isinstance(_ThreadRecord, type)  # import guard: the record type still exists
+
+
+def test_a_declined_turns_message_survives_deletion_as_its_only_copy() -> None:
+    """T054 — D4's point, proven end to end rather than argued.
+
+    A declined turn has no run, so nothing else in the platform holds what the person
+    said. Delete the thread and the trail is the only place it exists — which is exactly
+    the reconstruction an investigator needs and exactly what a thread-as-record design
+    would have lost first.
+    """
+    from surfaces.api.threads import delete_thread_for
+
+    store, sink = InMemoryThreadStore(), InMemoryAuditSink()
+    thread = _thread(store)
+    subject = _subject()
+
+    accept_turn(
+        subject=subject,
+        thread_id=thread.thread_id,
+        message="can you delete the production workspace",
+        store=store,
+        audit_sink=sink,
+        dispatcher=RecordingDispatcher(),
+        agent_definition_id=None,
+    )
+
+    delete_thread_for(subject=subject, store=store, audit_sink=sink, thread_id=thread.thread_id)
+
+    assert store.get_thread(thread_id=thread.thread_id, tenant_id=TENANT) is None
+    recorded = [e for e in _events(sink, thread) if e.event_type == AuditEventType.TURN_RECORDED]
+    assert len(recorded) == 1
+    assert recorded[0].payload["message"] == "can you delete the production workspace"
+    assert recorded[0].payload["disposition"] == "declined"
+    assert recorded[0].payload["run_id"] is None

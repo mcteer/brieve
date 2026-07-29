@@ -164,9 +164,9 @@ mechanism for mid-run solicitation exists.
 **Independent test**: stop a running turn from the portal — current step completes,
 nothing further, terminal; grep the tree for any input-wait path and find none.
 
-- [ ] T049 [US4] Stop control in `templates/thread.html` + handler relaying the existing `stop_run` operation (no thread-local stop — the contract's "two paths to one action" rule)
-- [ ] T050 [P] [US4] Component rows in `tests/component/test_portal_stop.py`: stop from the portal produces the identical terminal state, stop reason, and trail events as `POST /runs/{run_id}/stop` (FR-013); a subsequent turn in the same thread is a fresh run, not a resumption (US4 scenario 3); the stopped run's result disposition renders as "ended without a result" with the reason
-- [ ] T051 [US4] [GATE:fail-closed] Structural row in `tests/component/test_no_solicitation_path.py`: assert no operation on either transport, no portal route, and no entrypoint code path exists by which a run waits for portal input mid-flight — the mechanism's absence is the guarantee (FR-014, SC-008), asserted the way `test_no_live_dependencies` asserts absence
+- [X] T049 [US4] Stop control in `templates/thread.html` + handler relaying the existing `stop_run` operation (no thread-local stop — the contract's "two paths to one action" rule)
+- [X] T050 [P] [US4] Component rows in `tests/component/test_portal_stop.py`: stop from the portal produces the identical terminal state, stop reason, and trail events as `POST /runs/{run_id}/stop` (FR-013); a subsequent turn in the same thread is a fresh run, not a resumption (US4 scenario 3); the stopped run's result disposition renders as "ended without a result" with the reason
+- [X] T051 [US4] [GATE:fail-closed] Structural row in `tests/component/test_no_solicitation_path.py`: assert no operation on either transport, no portal route, and no entrypoint code path exists by which a run waits for portal input mid-flight — the mechanism's absence is the guarantee (FR-014, SC-008), asserted the way `test_no_live_dependencies` asserts absence
 
 **Checkpoint**: ADR-0049 holds on the surface most likely to erode it.
 
@@ -179,9 +179,9 @@ nothing further, terminal; grep the tree for any input-wait path and find none.
 **Independent test**: submit with no agent selected → decline naming what the portal is
 for; submit with a non-startable agent → scope refusal; neither starts a run.
 
-- [ ] T052 [P] [US5] Decline and refusal rendering in `templates/thread.html`: `nothing_to_dispatch` says what the portal is for without appearing broken; `not_permitted` says this person may not — visually and textually distinct (FR-017); `rate_limited` renders as a boundary with the window, not an error
-- [ ] T053 [US5] Component rows in `tests/component/test_portal_declines.py`: each decline/refusal renders its distinct shape; zero runs started across all of them (FR-017a); the API-unreachable state says so rather than rendering an empty platform (edge case)
-- [ ] T054 [US5] [GATE:correlation] Component row extension in `tests/component/test_turn_evidence_first.py`: the declined turn's `TURN_RECORDED` event survives thread deletion as the only copy of that message — delete the thread, reconstruct the decline from the trail (D4's point, proven)
+- [X] T052 [P] [US5] Decline and refusal rendering in `templates/thread.html`: `nothing_to_dispatch` says what the portal is for without appearing broken; `not_permitted` says this person may not — visually and textually distinct (FR-017); `rate_limited` renders as a boundary with the window, not an error
+- [X] T053 [US5] Component rows in `tests/component/test_portal_declines.py`: each decline/refusal renders its distinct shape; zero runs started across all of them (FR-017a); the API-unreachable state says so rather than rendering an empty platform (edge case)
+- [X] T054 [US5] [GATE:correlation] Component row extension in `tests/component/test_turn_evidence_first.py`: the declined turn's `TURN_RECORDED` event survives thread deletion as the only copy of that message — delete the thread, reconstruct the decline from the trail (D4's point, proven)
 
 **Checkpoint**: all five stories demonstrable.
 
