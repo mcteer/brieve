@@ -19,7 +19,7 @@ The view's spine. Created empty by `create_thread`, hard-deleted by `delete_thre
 | `correlation_id` | TEXT, unique | **The join to the trail.** One correlation ID per thread — every turn event, and every run the thread starts, chains under it or references it |
 | `subject_user_id` | TEXT | The owner. Only this subject sees or continues the thread |
 | `tenant_id` | TEXT | Filtered **first** in every query, as 011's tables do |
-| `title` | TEXT | Display only; first message's leading fragment unless renamed |
+| `title` | TEXT, nullable | Display only. Null at creation (the thread is empty); set **once** at the first accepted turn from the message's leading fragment; never updated after — the contract's no-rename rule, held by there being no operation that could |
 | `created_at` | TIMESTAMPTZ | Keyset cursor component for listing |
 
 **Properties**:

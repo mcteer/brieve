@@ -17,7 +17,12 @@ The portal is a **consumer** of these operations, never an implementation of the
 ### `POST /threads` / `create_thread`
 
 Creates an empty thread owned by the authenticated subject in their tenant. Returns
-`thread_id`, `correlation_id`, `created_at`. Explicit creation rather than
+`thread_id`, `correlation_id`, `created_at`. **Creation counts against the same
+per-subject rate window as turns** (analyze pass 3, I6) — a created thread is a
+turn-shaped act, and a window that bound only turns would leave the `threads` table
+growable at HTTP rate through an operation whose whole body is an insert. The thread is
+untitled until its first accepted turn, whose leading fragment becomes the title, once —
+there is no rename (see "What is deliberately absent"). Explicit creation rather than
 create-on-first-message: orthogonal operations hold parity more simply, and the client
 needs an id to subscribe to before the first turn resolves.
 

@@ -11,9 +11,11 @@ operations land on **both** existing transports, growing the catalogue from ten 
 and the parity row with it; and the portal lands as a thin server-rendered client of the
 API — the first thing that *serves* the API, which it turns out nothing does today. Two
 findings shape the plan more than anything chosen in it: a dispatched run currently
-receives no input of any kind, so the seam gains one; and the trail must carry every turn —
-including the declined ones — or SC-004's "reconstruct the complete thread from the trail
-alone" is unsatisfiable the day a thread is deleted. That second decision is large enough
+receives no input of any kind — closed by making input **durable state the run reads**,
+deliberately not a dispatch-seam change (research D6: a person's text must not enter a
+jobspec); and the trail must carry every accepted turn — including the declined ones — or
+SC-004's "reconstruct the complete thread from the trail alone" is unsatisfiable the day
+a thread is deleted. That second decision is large enough
 to be its own record: **ADR-0051, drafted in this feature.**
 
 ## Technical Context

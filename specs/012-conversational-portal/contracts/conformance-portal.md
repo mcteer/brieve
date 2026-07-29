@@ -23,7 +23,7 @@ nothing. These rows are blocking from the moment this feature lands (ADR-0047).
 
 | Row | Asserts |
 | --- | --- |
-| Evidence first | The `TURN_RECORDED` event exists for every turn, written before dispatch — including declined and refused turns |
+| Evidence first | The `TURN_RECORDED` event exists for every **accepted** turn — dispatched, declined, scope-refused — written before dispatch; pre-acceptance refusals produce `TURN_REFUSED` (size, never content) |
 | Reconstruction | A thread with dispatched, declined, and refused turns is reconstructed **completely** from the trail alone; then the thread is deleted and the reconstruction is unchanged (SC-004, SC-009a) |
 | Deletion masks nothing | `THREAD_DELETED` is in the chain; every run the thread started remains explainable — rationale, subject, order — from the trail |
 | Verbatim context | The second run's received context is byte-identical to the first run's recorded result (SC-002); the bound's drops appear on the turn and in its event |

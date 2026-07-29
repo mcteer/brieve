@@ -95,7 +95,14 @@ retaining a shadow copy is the worst of both.
 
 ### D4 — Every turn is evidence, written to the trail before anything else happens
 
-**Decision**: every submitted message becomes a `TURN_RECORDED` audit event — under the
+> **Refined by analyze pass 2 (I4), recorded here rather than rewritten** — this is a
+> phase-0 record and stays one. The rule below now applies to every **accepted** message;
+> pre-acceptance refusals (`rate_limited`, `message_too_large`) get a fixed-size
+> `TURN_REFUSED` event carrying the message's size and never its content, because a trail
+> growable at HTTP rate by being refused is the flood the rate limit exists to stop. The
+> authoritative ordering lives in `contracts/thread-operations.md`.
+
+**Decision (as originally reasoned)**: every submitted message becomes a `TURN_RECORDED` audit event — under the
 thread's correlation ID, carrying the message, the disposition (started run / declined /
 refused, with reason), and the context bound's effect — **before** the turn does anything
 else. Thread deletion writes `THREAD_DELETED`. Two new members on `AuditEventType`; the
