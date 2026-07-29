@@ -326,6 +326,10 @@ substantive claim carries a citation a person can follow to its source.
   that resolves to its source.
 - **FR-025**: When the corpus does not cover a question, the portal MUST say so rather than
   answering without grounding.
+- **FR-025a**: The corpus is **HashiCorp Validated Patterns**. Because those documents carry
+  no version or revision metadata, the platform MUST detect a changed source by its content
+  rather than by anything the source asserts about itself, and a citation MUST resolve to the
+  section it supports rather than to the document containing it.
 - **FR-026**: Model selection for answering MUST follow the per-role bindings ADR-0039
   establishes, not a portal-local choice.
 - **FR-027**: Answering MUST NOT become a path to any capability the operation catalogue
@@ -405,9 +409,29 @@ substantive claim carries a citation a person can follow to its source.
   guidance and the corpus it needs.** Planning should sequence these as increments rather
   than one landing, and if it concludes P4 should be its own numbered feature, that is a
   finding worth acting on rather than absorbing.
-- **The corpus does not exist yet.** Vendor documentation and validated designs are named by
-  ADR-0034 as sources; nothing in this repository holds them, and no ingestion path exists.
-  US7 therefore carries a dependency that is not merely unbuilt but unsourced.
+- **The corpus is sourced: HashiCorp Validated Patterns.** Named 2026-07-29, and it closes
+  what this section previously recorded as US7's *unsourced* dependency —
+  [developer.hashicorp.com/validated-patterns](https://developer.hashicorp.com/validated-patterns),
+  33 field-tested documents (Vault 15, Terraform 12, Packer 4, Nomad 1, Boundary 1) over
+  exactly the estate this platform governs. It is still unbuilt: no ingestion path exists.
+  Four properties, checked against the documents rather than assumed, because each shapes
+  the work:
+
+  1. **Stable per-section anchors**, so FR-024's citation can resolve to a section rather
+     than a page — which is the difference between a citation a person can check and one
+     they have to search.
+  2. **No publication date, no revision date, no version, anywhere.** US7's third scenario —
+     "a corpus document changes, the answer reflects the current one" — therefore cannot be
+     satisfied from metadata. Change detection has to be content-based. This is the single
+     most consequential fact about the source and it is invisible until you look.
+  3. **Section counts vary from 8 to 29**, so chunking cannot assume a uniform document
+     shape.
+  4. **Named authors, no editorial version.** Attribution is available; provenance over time
+     is not.
+
+- **Terms of use for ingesting the corpus are unresolved.** Serving answers derived from a
+  vendor's documentation is a different act from linking to it, and this feature does the
+  former. Flagged for planning rather than assumed either way.
 - **Accessibility is a new gate class.** Every quality gate this platform has is about
   governance, authority, or durability. An accessibility gate asserts something about a
   rendered interface, which no existing lane can run.
