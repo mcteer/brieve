@@ -27,6 +27,7 @@ in `packs/vault/pack.toml`; nothing under `src/core` has heard of it.
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 from pathlib import Path
 
@@ -95,7 +96,14 @@ def _named_in_code(path: Path, products: tuple[str, ...]) -> set[str]:
                 text = node.module or ""
             case _:
                 continue
-        found |= {p for p in products if p in text.lower()}
+        # Word-boundary tokens, not substrings: `consul` is a substring of `consulted`,
+        # and the first run of this row flagged provenance-at-READ for naming a product it
+        # has never heard of. Case transitions split too, or `VaultIdentityFabric`
+        # tokenizes as one word and the trust fabric vanishes from its own allowlist —
+        # which the allowlist-currency row caught on the second run.
+        snaked = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", text)
+        tokens = set(re.split(r"[^a-z0-9]+", snaked.lower()))
+        found |= {p for p in products if p in tokens}
     return found
 
 

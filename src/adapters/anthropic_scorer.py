@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: Apache-2.0
+"""The live-lane scorer — the one place the eval gates touch a provider SDK.
+
+In `adapters`, not `core/evals`, because 002's layering guard forbids a provider import
+anywhere else and is right to: the first draft of `core/evals/scoring.py` imported
+`anthropic` inside a function body, and `test_core_import.py` caught it — a deferred import
+still ships, and "core calls no model" that depends on which branch ran is not a property.
+
+The `Scorer` protocol in `core.evals.scoring` is the seam. This is one implementation of
+it; `FixtureScorer` is the other, and the suites cannot tell them apart — which is the whole
+design. `make evals` (blocking) never imports this module; `make evals-live` does, behind
+`@pytest.mark.live_model`, with a named runner.
+
+The credential is read from `core.evals.scoring.EVAL_PROVIDER_KEY` — the ONE name, defined
+beside the protocol so the no-secret-leak row asserts against an import rather than a
+literal. It is a dev-lane secret: never in a jobspec, never read by a run, never in a pack
+manifest. The base URL is the SDK's default (`ANTHROPIC_BASE_URL` overrides it, as the SDK
+documents), and the dev lane obtains a key from the operator's own Anthropic account.
+"""
+
+from __future__ import annotations
+
+import os
+
+from core.evals.scoring import EVAL_PROVIDER_KEY, LIVE_MODEL, GovernedSubject
+from core.evals.suites import EvalCase, UnrunnableSuite
+
+
+class LiveModelScorer:
+    """Asks a real model. Behind `@pytest.mark.live_model`, never in a blocking lane."""
+
+    def __init__(self, model: str = LIVE_MODEL) -> None:
+        self._model = model
+
+    def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
+        key = os.environ.get(EVAL_PROVIDER_KEY, "").strip()
+        if not key:
+            raise UnrunnableSuite(
+                f"the live lane has no provider credential ({EVAL_PROVIDER_KEY} is unset); "
+                f"an unrunnable suite raises rather than skipping (SC-005a)"
+            )
+        try:
+            import anthropic
+        except ImportError as exc:
+            raise UnrunnableSuite(
+                "the anthropic SDK is not installed; the live lane needs the `evals` extra "
+                "(uv sync --extra evals)"
+            ) from exc
+
+        _, model_at_version = self._model.split("/", 1)
+        model_name, _, _version = model_at_version.partition("@")
+        client = anthropic.Anthropic(api_key=key)
+        response = client.messages.create(
+            model=model_name,
+            max_tokens=1024,
+            system=(
+                f"You are a governed agent (definition {subject.agent_definition_id}, "
+                f"pack {subject.pack}, tier {subject.tier}, role {subject.role})."
+            ),
+            messages=[{"role": "user", "content": case.prompt}],
+        )
+        # `getattr` with a default rather than narrowing the SDK's union: the block types
+        # the SDK ships change between versions, and this lane wants text regardless of
+        # which release enumerated them.
+        return "".join(str(getattr(block, "text", "")) for block in response.content)
+
+
+__all__ = ["LiveModelScorer"]

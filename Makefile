@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up
+# `evals` is .PHONY twice over: it is a recipe, and a DIRECTORY named evals/ exists at
+# the repository root — without the declaration, make reports the seed set 'up to date'
+# and the gate never runs, which is a skip wearing a build system's clothes.
+.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
@@ -81,6 +84,20 @@ portal-up:
 a11y:
 	uv run --extra surfaces --extra portal --extra a11y playwright install chromium
 	uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y -q
+
+# The eval gates (013, Principle VIII). `evals` scores FIXTURES and blocks — it is part
+# of what a merge must pass, and it is hermetic so it never fails for reasons unrelated to
+# the change under review. `evals-live` scores a REAL model: it needs a paid credential
+# (EVAL_PROVIDER_API_KEY) and is non-deterministic, so it is never in a blocking lane and
+# has a named runner (plan.md: Dan, before merge, per-cell outcome recorded in
+# specs/013-capability-packs/contracts/conformance-packs.md).
+evals:
+	$(UV_RUN) pytest tests/component/test_eval_gates.py tests/component/test_judge_chain.py -q
+
+evals-live:
+	uv run --extra adapters --extra surfaces --extra portal --extra evals \
+	  pytest -m live_model -q
+
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
 # Enterprise license and cannot stand one up. This is a real coverage gap and is
