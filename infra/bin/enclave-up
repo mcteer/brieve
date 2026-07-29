@@ -359,10 +359,11 @@ EV_PASS="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.loa
 # role statement references get applied at bring-up, not on first use by whatever happens
 # to start first.
 if { echo "SET ROLE brieve;"; cat "$REPO/src/core/audit/evidence_schema.sql"; \
-     cat "$REPO/src/core/dependencies/schema.sql"; } \
+     cat "$REPO/src/core/dependencies/schema.sql"; \
+     cat "$REPO/src/core/runs/schema.sql"; } \
    | docker run --rm -i -e PGPASSWORD="$EV_PASS" --network host postgres:17-alpine \
      psql -h 127.0.0.1 -p 5432 -U "$EV_USER" -d brieve -v ON_ERROR_STOP=1 -q >/dev/null 2>&1; then
-  ok "audit_entries, audit_stream_heads, dependency_health, suspended_runs applied"
+  ok "evidence, dependency, and run-index schemas applied"
 else
   die "evidence schema failed to apply — the evidence role cannot issue credentials without it"
 fi

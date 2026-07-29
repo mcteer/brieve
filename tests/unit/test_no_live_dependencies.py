@@ -78,6 +78,17 @@ ENCLAVE_PATHS = frozenset(
         # The list shrank because the reason for an entry went away. An allowlist that
         # only ever grows is not an allowlist.
         "component/test_resume_cross_process.py",
+        # 011's divergence rows read the audit trail as an OPERATOR, with a token.
+        #
+        # **This is not the entry that was removed above, arriving back.** That one used a
+        # development token in a lane where an attested identity was available, and the
+        # fix was to use the identity. These rows run in the HOST lane, which has no
+        # workload identity at all — that is the property the lane exists to preserve —
+        # and they belong there because they drive the scheduler, which the allocation
+        # cannot. So the choice is an operator token or a row that cannot run where the
+        # thing it checks happens. `OperatorCredentials` in that conftest is test-only and
+        # deliberately not a `core` class, so the fallback stays out of production reach.
+        "conformance/identity/conftest.py",
         # Talks to the control-plane Vault to exercise Control Groups (007). There is no
         # fake: one that always approves proves the caller can proceed, one that never
         # approves proves it handles denial, and neither proves the gate holds.
@@ -98,6 +109,11 @@ ENCLAVE_PATHS = frozenset(
         # A fake cannot express this: the assertion is that VAULT denies, and a double
         # denying proves only that we wrote a double that denies.
         "conformance/identity/test_fabric_unreachable_from_a_tool.py",
+        # Watches an allocation reach a terminal state before comparing the run index
+        # against the audit trail (011). The wait is the row's substance: the two writes
+        # are minutes apart on a cold dispatch, and comparing inside that window would
+        # flake at exactly the cadence cold allocations occur.
+        "conformance/identity/test_run_index_and_trail_agree.py",
     }
 )
 

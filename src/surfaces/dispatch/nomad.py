@@ -23,10 +23,12 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
 from typing import Any
 
 from core.errors import CoreError
 from core.run import RunState
+from core.runs.index import InMemoryRunIndex, RunIndex, RunIndexEntry
 from surfaces.dispatch.types import RunHandle
 
 DEFAULT_NOMAD_ADDR = "http://127.0.0.1:4646"
@@ -60,10 +62,14 @@ class NomadDispatcher:
         nomad_addr: str = DEFAULT_NOMAD_ADDR,
         job_id: str = DEFAULT_JOB_ID,
         timeout: float = 10.0,
+        run_index: RunIndex | None = None,
     ) -> None:
         self._addr = nomad_addr.rstrip("/")
         self._job_id = job_id
         self._timeout = timeout
+        # A real deployment passes the Postgres index; the default keeps every existing
+        # caller — including the rows that only prove dispatch — compiling and hermetic.
+        self._index: RunIndex = run_index if run_index is not None else InMemoryRunIndex()
         self._dispatched: dict[str, str] = {}
 
     def _request(self, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -95,6 +101,7 @@ class NomadDispatcher:
         run_id: str | None = None,
         step_index: int | None = None,
         subject_roles: frozenset[str] = frozenset(),
+        steps: int | None = None,
     ) -> RunHandle:
         """Schedule the run and return immediately.
 
@@ -118,6 +125,8 @@ class NomadDispatcher:
                 # run resolves what these roles MEAN from the trust fabric, so a
                 # dispatcher cannot grant authority by writing a scope into a jobspec.
                 "subject_roles": ",".join(sorted(subject_roles)),
+                # Absent unless asked for. A run given neither behaves exactly as before.
+                "steps": str(steps) if steps is not None else "",
                 "run_id": run_id or correlation_id,
                 "step_index": str(step_index if step_index is not None else 0),
             },
@@ -128,6 +137,27 @@ class NomadDispatcher:
             raise DispatchError("scheduler accepted the dispatch but named no job")
 
         self._dispatched[run_id or correlation_id] = dispatched_id
+
+        # Indexed AFTER the scheduler accepted it, and the ordering is a choice between
+        # two imperfect failures. Recording first would leave a phantom entry for every
+        # REFUSED dispatch — systematic, and a list of runs that never existed. Recording
+        # after leaves a real run unlisted only if this process dies in the window between
+        # acceptance and insert — rare, self-limiting, and visible in the audit trail,
+        # which is what the divergence row watches for.
+        #
+        # 009 avoided the choice entirely by writing `suspended_runs` and the checkpoint in
+        # one transaction. That is unavailable here: the scheduler and the index are
+        # different stores, and no transaction spans them.
+        self._index.record(
+            RunIndexEntry(
+                run_id=run_id or correlation_id,
+                correlation_id=correlation_id,
+                subject_user_id=subject_user_id,
+                tenant_id=tenant_id,
+                agent_definition_id=agent_definition_id,
+                created_at=datetime.now(UTC),
+            )
+        )
         return RunHandle(
             run_id=run_id or correlation_id,
             correlation_id=correlation_id,

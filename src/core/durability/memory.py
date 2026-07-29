@@ -24,6 +24,21 @@ class InMemoryDurabilityProvider:
         self._results: set[tuple[str, str]] = set()
 
     def save(self, blob: CheckpointBlob) -> None:
+        # TERMINAL-ONCE, matching the Postgres provider's COALESCE guard. The two must
+        # agree here or a row proven against one says nothing about the other — and this is
+        # precisely the property a hermetic row would be used to prove.
+        #
+        # A terminal outcome, once recorded, survives every later write. Without this a
+        # routine checkpoint (which carries no outcome) erases a stop and resurrects the
+        # run, which is what shipped for three features before anyone read the SQL.
+        # Note the condition: an existing terminal outcome survives ANY later write, not
+        # only one that carries none. That is what `COALESCE(checkpoints.run_state, ...)`
+        # does, and writing the narrower version here made the two providers disagree on
+        # precisely the stop-versus-finish race the guard exists for — caught by the row
+        # that asserts the first terminal write wins.
+        existing = self._blobs.get(blob.blob_id)
+        if existing is not None and existing.outcome is not None:
+            blob = blob.model_copy(update={"outcome": existing.outcome})
         self._blobs[blob.blob_id] = blob
 
     def load(self, blob_id: str) -> CheckpointBlob | None:

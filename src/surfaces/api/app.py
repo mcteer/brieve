@@ -16,6 +16,9 @@ from fastapi import FastAPI
 
 from core.audit.query import EvidenceQuery
 from core.audit.sink import AuditSink
+from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
+from core.runs.index import InMemoryRunIndex, RunIndex
+from surfaces.api import definitions as definitions_routes
 from surfaces.api import evidence, mappings, runs
 from surfaces.api.verification import TokenVerifier
 from surfaces.dispatch.types import RunDispatcher
@@ -30,6 +33,11 @@ def create_app(
     evidence_query: EvidenceQuery | None = None,
     audit_sink: AuditSink | None = None,
     authority_submitter: Any | None = None,
+    run_index: RunIndex | None = None,
+    durability: Any | None = None,
+    change_requests: ChangeRequestStore | None = None,
+    change_status: Any | None = None,
+    definitions: Any | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -43,12 +51,29 @@ def create_app(
     app.state.evidence_query = evidence_query
     app.state.audit_sink = audit_sink
     app.state.authority_submitter = authority_submitter
+    # 011's collaborators. Constructed once here from what the environment supplies, for
+    # the same reason the five above are: an operation that reached for its own database
+    # handle could be stood up in a test with different security properties than it has in
+    # production. Five operations improvising five wirings of one concern is how an app
+    # builder rots, and each improvisation would be individually reasonable.
+    #
+    # In-memory defaults keep every existing caller — and every hermetic row — working
+    # without a database, which is the same reason the run index is a seam at all.
+    app.state.run_index = run_index if run_index is not None else InMemoryRunIndex()
+    app.state.durability = durability
+    app.state.change_requests = (
+        change_requests if change_requests is not None else InMemoryChangeRequestStore()
+    )
+    app.state.change_status = change_status
+    app.state.definitions = definitions
 
     app.include_router(runs.build_router())
     if authority_submitter is not None:
         app.include_router(mappings.build_router())
     if evidence_query is not None:
         app.include_router(evidence.build_router())
+    if definitions is not None:
+        app.include_router(definitions_routes.build_router())
     return app
 
 

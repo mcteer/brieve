@@ -1,7 +1,7 @@
 # Contract: operations conformance lane
 
 **Feature**: `specs/011-api-operations`
-**Status**: Planned
+**Status**: **In force** (as of 011's merge)
 **Depends on**: Constitution Quality Gates (v1.2.0); ADR-0033; ADR-0035; ADR-0047; ADR-0049
 
 ## The row that grows rather than the row that is added
@@ -48,9 +48,26 @@ helper" is cheapest to add.
   and erases a stop the next time the running allocation checkpoints. The fixture stops a
   run, forces a routine checkpoint, and asserts the terminal state survived — because the
   COALESCE guard is one simplification away from the defect at all times.
+
+  **Run, and it caught the guard's own blind spot.** Applied for real at T041, the break
+  was survived by every component row: they build the in-memory provider, and the guard is
+  implemented twice. It also erased the *whole* outcome rather than only the state — a
+  stopped run came back reading as one that never ended, which is worse than the described
+  defect. The row that catches it is
+  `tests/conformance/durability/test_rows.py::test_a_routine_checkpoint_cannot_un_terminal_a_stopped_run`,
+  in the provider-parameterised lane, which is the only thing here that runs a row twice.
+  A guard implemented once per provider needs a row that runs once per provider.
 - **A result endpoint that returns the checkpoint payload.** Passes every disposition row
   — the result *is* in there — and makes resume state a compatibility surface. The fixture
   asserts resume-internal keys are absent from the response.
+
+## These were run, not described (T041)
+
+Every fixture above was applied to the tree, the row watched to fail, and the change
+reverted. Three were caught by the lane that owns them. The fourth was not, and finding
+that out is the whole reason the gate says *run* rather than *record*: a row nobody has
+seen fail is a row nobody knows works, and the one that did not fail was the one guarding
+the defect this feature was most likely to reintroduce.
 
 ## The fixture prerequisite, again
 
@@ -72,6 +89,23 @@ enumerate directories by name. This feature's in-allocation rows extend
 `tests/conformance/identity/`'s existing wiring and its host rows live in
 `tests/conformance/api/` — both already named in both runners. The cheap lesson from the
 expensive one.
+
+## A limit worth naming before someone assumes it closed (FR-013a)
+
+**The registry is one per deployment and carries no tenant of its own.** So "definitions
+are never disclosed across tenants" holds *structurally* today — there is one registry, and
+every subject of that deployment sees the same set. Nothing filters, because nothing needs
+to.
+
+A multi-tenant deployment sharing one registry would disclose definitions across tenants,
+and the enumeration code would look correct while doing it. Recorded here rather than left
+implicit, because this is exactly the kind of gap that reads as closed until someone
+deploys the topology that opens it — and the row asserting cross-tenant absence would keep
+passing, since it tests the deployment it runs in.
+
+The fix, when a deployment needs it, is a tenant on the registration rather than a filter
+in this surface: a filter would be the platform deciding what a registry means, which is
+the coupling ADR-0050 kept disjoint.
 
 ## What this lane still cannot prove
 

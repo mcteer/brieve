@@ -36,8 +36,21 @@ from core.authority.changes import (
 )
 from core.identity.claims import ClaimMapping
 from core.identity.types import AuthenticatedSubject
+from core.runs.changes import (
+    ChangeRequestRecord,
+    ChangeRequestStore,
+    CollectedDisposition,
+    authorize_collect,
+)
+from core.runs.refusals import OperationRefused
 from surfaces.api.authority_submit import AuthorityChangeRefused, AuthoritySubmitUnavailable
-from surfaces.api.dependencies import AuditDep, AuthoritySubmitterDep, SubjectDep
+from surfaces.api.dependencies import (
+    AuditDep,
+    AuthoritySubmitterDep,
+    ChangeRequestsDep,
+    ChangeStatusDep,
+    SubjectDep,
+)
 
 CONTROLLED_PATH = "identity/claim-mappings"
 
@@ -66,6 +79,7 @@ def submit_mapping_change(
     subject: AuthenticatedSubject,
     mapping: ClaimMapping,
     reason: str,
+    change_requests: ChangeRequestStore | None = None,
 ) -> AuthorityChangeEvent:
     """Submit the change and record what the trust fabric decided.
 
@@ -86,6 +100,23 @@ def submit_mapping_change(
     except AuthorityChangeRefused:
         disposition = ChangeDisposition.DENIED
 
+    if accessor is not None and change_requests is not None:
+        # Recorded the moment it exists, before it is returned. 008 handed the accessor to
+        # the caller and stored nothing, which is why nothing could collect the outcome —
+        # and why anyone holding an accessor could have polled anything, since the fabric
+        # answers whoever presents one. This record is what makes collect tenant-scoped.
+        change_requests.record(
+            ChangeRequestRecord(
+                accessor=accessor,
+                requester=subject.subject_user_id,
+                tenant_id=subject.tenant_id,
+                claim_name=mapping.claim_name,
+                claim_value=mapping.claim_value,
+                role=mapping.role,
+                submitted_at=datetime.now(UTC),
+            )
+        )
+
     event = observe_change(
         correlation_id=correlation_id,
         controlled_path=CONTROLLED_PATH,
@@ -101,6 +132,48 @@ def submit_mapping_change(
         payload=event.public_dict() | {"reason": reason},
     )
     return event
+
+
+def collect_mapping_change(
+    *,
+    accessor: str,
+    subject: AuthenticatedSubject,
+    change_requests: ChangeRequestStore,
+    change_status: Any,
+    audit: AuditSink,
+) -> CollectedDisposition:
+    """What became of a change this subject submitted.
+
+    Transport-independent, so MCP reaches this rather than reimplementing it — and so the
+    tenant check happens in exactly one place. Two lookups, in this order and not the
+    reverse: **our record first**, because it decides whether this caller may ask at all,
+    and only then the fabric, which would answer anyone.
+
+    Reading a disposition never advances one. That holds because this function knows only
+    how to ask `sys/control-group/request`; authorizing is a different endpoint it cannot
+    call. FR-002 by absent capability rather than by discipline.
+    """
+    record = authorize_collect(
+        change_requests.get(accessor=accessor, tenant_id=subject.tenant_id),
+        subject_user_id=subject.subject_user_id,
+    )
+    disposition: CollectedDisposition = change_status.status_of(record.accessor)
+
+    # Audited like every other read of governed state (FR-017). Collecting is a governance
+    # decision being observed, and 008 established that observing evidence is itself
+    # evidence.
+    audit.append_event(
+        correlation_id=f"authority-change:{subject.tenant_id}",
+        tenant_id=subject.tenant_id,
+        event_type=AuditEventType.AUTHORITY_CHANGE_OBSERVED,
+        payload={
+            "accessor": record.accessor,
+            "disposition": disposition.disposition,
+            "collected_by": subject.subject_user_id,
+            "outcome": "collect",
+        },
+    )
+    return disposition
 
 
 def build_router() -> APIRouter:
@@ -151,6 +224,48 @@ def build_router() -> APIRouter:
                 disposition=event.disposition,
                 accessor=event.accessor,
             ).model_dump(),
+        )
+
+    @router.get("/claim-mappings/{accessor}")
+    def collect_change(
+        accessor: str,
+        subject: SubjectDep,
+        audit: AuditDep,
+        changes: ChangeRequestsDep,
+        status_source: ChangeStatusDep,
+    ) -> JSONResponse:
+        """Report what became of a change this subject submitted.
+
+        The operation 008's own reasoning called for and did not ship: it returned 202 so
+        clients would keep asking, and gave them nothing to ask.
+        """
+        try:
+            disposition = collect_mapping_change(
+                accessor=accessor,
+                subject=subject,
+                change_requests=changes,
+                change_status=status_source,
+                audit=audit,
+            )
+        except OperationRefused as refused:
+            # `not_permitted` says why; everything else answers 404 regardless of whether
+            # the record was absent or another tenant's. A response that distinguished
+            # them would let anyone confirm an accessor exists somewhere else.
+            code = (
+                status.HTTP_403_FORBIDDEN
+                if refused.is_visible_to_caller
+                else status.HTTP_404_NOT_FOUND
+            )
+            raise HTTPException(code, "no such change request") from refused
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "accessor": disposition.accessor,
+                "disposition": disposition.disposition,
+                "approvals": disposition.approvals,
+                "request_path": disposition.request_path,
+            },
         )
 
     return router

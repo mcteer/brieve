@@ -31,6 +31,12 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "get_run": ("GET", "/runs/{run_id}"),
     "read_evidence": ("GET", "/evidence"),
     "request_mapping_change": ("POST", "/claim-mappings"),
+    "collect_mapping_change": ("GET", "/claim-mappings/{accessor}"),
+    "list_runs": ("GET", "/runs"),
+    "get_run_result": ("GET", "/runs/{run_id}/result"),
+    "stop_run": ("POST", "/runs/{run_id}/stop"),
+    "list_agent_definitions": ("GET", "/agent-definitions"),
+    "get_agent_definition": ("GET", "/agent-definitions/{agent_definition_id}"),
 }
 
 
@@ -114,6 +120,99 @@ def operations() -> list[McpOperation]:
                     "reason": {"type": "string", "minLength": 1},
                 },
                 "required": ["mapping", "reason"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="list_runs",
+            method="GET",
+            path="/runs",
+            description=(
+                "The runs you have started, newest first. Bounded; pass the returned "
+                "cursor for the next page. Absent cursor means there is nothing further."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "minimum": 1},
+                    "cursor": {"type": ["string", "null"]},
+                },
+                # No subject and no tenant. Both come from the authenticated caller, and a
+                # parameter for either would be a request to list someone else's work.
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="get_run_result",
+            method="GET",
+            path="/runs/{run_id}/result",
+            description=(
+                "What a run produced. Distinguishes still-running, finished with a "
+                "result, and ended without one — three states an empty answer would "
+                "conflate."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"run_id": {"type": "string", "minLength": 1}},
+                "required": ["run_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="stop_run",
+            method="POST",
+            path="/runs/{run_id}/stop",
+            description=(
+                "End a run you started. Terminal and unilateral — not a pause, and "
+                "nothing resumes it. The step in flight finishes first, so a stop is not "
+                "instant."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"run_id": {"type": "string", "minLength": 1}},
+                "required": ["run_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="list_agent_definitions",
+            method="GET",
+            path="/agent-definitions",
+            description=(
+                "Agent definitions you can see, each marked with whether you may start "
+                "it. Ones you cannot start still appear — so you know what to ask for."
+            ),
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        ),
+        McpOperation(
+            tool_name="get_agent_definition",
+            method="GET",
+            path="/agent-definitions/{agent_definition_id}",
+            description="One agent definition's public view.",
+            input_schema={
+                "type": "object",
+                "properties": {"agent_definition_id": {"type": "string", "minLength": 1}},
+                "required": ["agent_definition_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="collect_mapping_change",
+            method="GET",
+            path="/claim-mappings/{accessor}",
+            description=(
+                "Report what became of a change you requested. Pending is a legitimate "
+                "answer for as long as approvers have not acted — it is not a failure, "
+                "and asking again never advances the request."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "accessor": {"type": "string", "minLength": 1},
+                },
+                "required": ["accessor"],
+                # No requester. Who is asking comes from the authenticated subject, and a
+                # requester parameter would be a request to read someone else's change.
                 "additionalProperties": False,
             },
         ),

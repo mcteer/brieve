@@ -201,3 +201,77 @@ def test_break_fixture_an_extra_audit_event_is_detected() -> None:
     divergent = project(surface.audit.list_by_correlation_id(correlation_id))
 
     assert divergent != baseline, "an extra event slipped past the projection"
+
+
+# ------------------------------------------------------- verdicts, 011's operations
+#
+# The coverage half of parity grows by construction — the snapshot IS the compared set, so
+# adding an operation to one transport fails immediately. The VERDICT half does not: two
+# surfaces can expose the same ten operations and disagree about what each returns, and
+# nothing would notice unless someone wrote these.
+
+
+def test_row_listing_runs_yields_the_same_verdict() -> None:
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+
+    api = client.get("/runs", headers=surface.bearer())
+    mcp = surface.mcp.call("list_runs", {}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 200
+    assert api.json()["runs"] == mcp.payload["runs"]
+
+
+def test_row_an_unknown_runs_result_yields_the_same_verdict() -> None:
+    """Both answer not-found, and both for the same reason — a run nobody started.
+
+    The tenant collapse means this is also the answer for another tenant's run, which is
+    why the two transports agreeing here is worth asserting rather than assuming.
+    """
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+
+    api = client.get("/runs/no-such-run/result", headers=surface.bearer())
+    mcp = surface.mcp.call("get_run_result", {"run_id": "no-such-run"}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 404
+
+
+def test_row_stopping_an_unknown_run_yields_the_same_verdict() -> None:
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+
+    api = client.post("/runs/no-such-run/stop", headers=surface.bearer())
+    mcp = surface.mcp.call("stop_run", {"run_id": "no-such-run"}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 404
+
+
+def test_row_collecting_an_unknown_change_yields_the_same_verdict() -> None:
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+
+    api = client.get("/claim-mappings/no-such-accessor", headers=surface.bearer())
+    mcp = surface.mcp.call(
+        "collect_mapping_change", {"accessor": "no-such-accessor"}, subject=surface.subject()
+    )
+
+    assert api.status_code == mcp.status == 404
+
+
+def test_row_enumerating_definitions_yields_the_same_verdict_and_marking() -> None:
+    """Same list, same `may_start` on every entry.
+
+    The marking is the part worth comparing: two surfaces could both return two
+    definitions and disagree about which the caller may start, which is a difference a
+    person would act on.
+    """
+    surface = surface_under_test()
+    client = TestClient(surface.app)
+
+    api = client.get("/agent-definitions", headers=surface.bearer())
+    mcp = surface.mcp.call("list_agent_definitions", {}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 200
+    assert api.json()["definitions"] == mcp.payload["definitions"]
+    assert api.json()["definitions"], "an empty comparison would make this row vacuous"

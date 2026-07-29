@@ -20,6 +20,8 @@ from typing import Any
 from core.audit.query import EvidenceQuery
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
+from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
+from core.runs.index import InMemoryRunIndex, RunIndex
 from surfaces.dispatch.types import RunDispatcher, RunHandle
 from surfaces.mcp.operations import operations
 
@@ -50,11 +52,26 @@ class McpTransport:
         audit_sink: AuditSink,
         evidence_query: EvidenceQuery | None = None,
         authority_submitter: Any | None = None,
+        run_index: RunIndex | None = None,
+        durability: Any | None = None,
+        change_requests: ChangeRequestStore | None = None,
+        change_status: Any | None = None,
+        definitions: Any | None = None,
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
         self._evidence = evidence_query
         self._submitter = authority_submitter
+        # Mirrors `create_app`'s collaborators exactly, and the mirroring is the point: the
+        # parity row compares what the two surfaces DO, and two surfaces holding different
+        # collaborators would diverge in ways no catalogue comparison could see.
+        self._index: RunIndex = run_index if run_index is not None else InMemoryRunIndex()
+        self._durability = durability
+        self._changes: ChangeRequestStore = (
+            change_requests if change_requests is not None else InMemoryChangeRequestStore()
+        )
+        self._change_status = change_status
+        self._definitions = definitions
 
     def tool_names(self) -> list[str]:
         return [op.tool_name for op in operations()]
@@ -73,6 +90,12 @@ class McpTransport:
             "get_run": self._get_run,
             "read_evidence": self._read_evidence,
             "request_mapping_change": self._request_mapping_change,
+            "collect_mapping_change": self._collect_mapping_change,
+            "list_runs": self._list_runs,
+            "get_run_result": self._get_run_result,
+            "stop_run": self._stop_run,
+            "list_agent_definitions": self._list_agent_definitions,
+            "get_agent_definition": self._get_agent_definition,
         }.get(tool_name)
 
         if handler is None:
@@ -127,6 +150,144 @@ class McpTransport:
                 "entries": [e.model_dump(mode="json") for e in entries],
                 "count": len(entries),
                 "disposition": str(disposition),
+            },
+        )
+
+    def _definition_views(self, subject: AuthenticatedSubject) -> Any:
+        from surfaces.api.definitions import definition_views
+
+        return definition_views(subject=subject, fabric=self._definitions)
+
+    def _list_agent_definitions(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        from core.authority.errors import ResolutionRefused
+
+        if self._definitions is None:
+            return McpResult(ok=False, status=503, payload={"reason": "definitions unavailable"})
+        try:
+            views = self._definition_views(subject)
+        except ResolutionRefused:
+            return McpResult(ok=False, status=503, payload={"reason": "definitions unavailable"})
+
+        return McpResult(
+            ok=True,
+            status=200,
+            payload={"definitions": [v.model_dump(mode="json") for v in views]},
+        )
+
+    def _get_agent_definition(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        from core.authority.errors import ResolutionRefused
+
+        if self._definitions is None:
+            return McpResult(ok=False, status=503, payload={"reason": "definitions unavailable"})
+        wanted = str(args["agent_definition_id"])
+        try:
+            views = self._definition_views(subject)
+        except ResolutionRefused:
+            return McpResult(ok=False, status=503, payload={"reason": "definitions unavailable"})
+
+        for view in views:
+            if view.agent_definition_id == wanted:
+                return McpResult(ok=True, status=200, payload=view.model_dump(mode="json"))
+        return McpResult(ok=False, status=404, payload={"reason": "no such agent definition"})
+
+    def _stop_run(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from core.runs.refusals import OperationRefused
+        from surfaces.api.runs import stop_run_for
+
+        try:
+            stopped = stop_run_for(
+                run_id=str(args["run_id"]),
+                subject=subject,
+                index=self._index,
+                durability=self._durability,
+            )
+        except OperationRefused as refused:
+            return McpResult(
+                ok=False,
+                status=403 if refused.is_visible_to_caller else 404,
+                payload={"reason": str(refused)},
+            )
+
+        return McpResult(ok=True, status=200, payload=stopped.model_dump(mode="json"))
+
+    def _get_run_result(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from core.runs.refusals import OperationRefused
+        from surfaces.api.runs import run_result_for
+
+        try:
+            result = run_result_for(
+                run_id=str(args["run_id"]),
+                subject=subject,
+                index=self._index,
+                durability=self._durability,
+            )
+        except OperationRefused as refused:
+            return McpResult(
+                ok=False,
+                status=403 if refused.is_visible_to_caller else 404,
+                payload={"reason": str(refused)},
+            )
+
+        return McpResult(ok=True, status=200, payload=result.model_dump(mode="json"))
+
+    def _list_runs(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from core.runs.index import DEFAULT_PAGE_SIZE, RunIndexError
+        from surfaces.api.runs import list_runs_for
+
+        try:
+            page = list_runs_for(
+                subject=subject,
+                index=self._index,
+                durability=self._durability,
+                limit=int(args.get("limit") or DEFAULT_PAGE_SIZE),
+                cursor=args.get("cursor"),
+            )
+        except RunIndexError:
+            # 503 on both transports, because parity compares verdicts and "we could not
+            # look" must never arrive as an empty list on either.
+            return McpResult(ok=False, status=503, payload={"reason": "run index unavailable"})
+
+        return McpResult(ok=True, status=200, payload=page.model_dump(mode="json"))
+
+    def _collect_mapping_change(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        if self._change_status is None:
+            return McpResult(ok=False, status=503, payload={"reason": "trust fabric unavailable"})
+
+        from core.runs.refusals import OperationRefused
+        from surfaces.api.mappings import collect_mapping_change
+
+        try:
+            disposition = collect_mapping_change(
+                accessor=str(args["accessor"]),
+                subject=subject,
+                change_requests=self._changes,
+                change_status=self._change_status,
+                audit=self._audit,
+            )
+        except OperationRefused as refused:
+            # The same two-way split the route makes, and it must stay the same: parity
+            # compares verdicts, so a transport that reported these differently would fail
+            # the row — which is the row working rather than an inconvenience.
+            return McpResult(
+                ok=False,
+                status=403 if refused.is_visible_to_caller else 404,
+                payload={"reason": "no such change request"},
+            )
+
+        return McpResult(
+            ok=True,
+            status=200,
+            payload={
+                "accessor": disposition.accessor,
+                "disposition": disposition.disposition,
+                "approvals": disposition.approvals,
+                "request_path": disposition.request_path,
             },
         )
 

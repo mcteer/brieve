@@ -22,13 +22,18 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import UTC, datetime
 
 from core.audit.postgres_sink import PostgresAuditSink
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
+from core.durability.checkpoint import stop_requested
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
+from core.durability.postgres import PostgresDurabilityProvider
+from core.durability.types import CheckpointBlob, IntentRecord, ResultRecord, RunOutcome
 from core.registry.memory import ToolRegistry
-from core.run import start_governed_run
+from core.run import RunState, start_governed_run
+from surfaces.api.runs import RESULT_KEY
 
 
 def main() -> int:
@@ -119,6 +124,86 @@ def main() -> int:
     # The audit trail is the evidence that this happened, and the row reads it back
     # through the evidence path rather than trusting this line.
     print(f"run {run.correlation_id} started, state={run.state}")
+
+    # Optional multi-step mode, for rows that need a run still running when something
+    # happens to it. Every existing fixture completes immediately, so a stop row against
+    # one passes whether the stop works or not — 010's T009 lesson in this feature's
+    # clothes.
+    #
+    # **Each step runs the full 005 bracket**: intent, work, result, checkpoint. A fixture
+    # that merely slept would have no step boundaries for a stop to be observed at and no
+    # intents for the zero-open-intents row to count, which would make the row that exists
+    # to prevent vacuous stop rows produce one.
+    # No artificial delay. Each step is three durable writes — intent, result, checkpoint
+    # — so a multi-step run takes real time doing real work, and the duration a stop row
+    # needs comes from the bracket rather than from a sleep.
+    #
+    # That is not only tidier. `time.sleep` here would be a test affordance living in
+    # production code, which is precisely what 010 spent a user story removing from the
+    # identity protocol — and `tests/unit/test_surface_never_pauses.py` caught it, which
+    # is the check doing its job rather than obstructing.
+    steps = int(os.environ.get("RUN_STEPS", "0") or 0)
+    if steps > 0:
+        durability = PostgresDurabilityProvider(credentials=credentials)
+        run.durability = durability
+        blob_id = os.environ.get("RUN_ID", "").strip() or correlation_id
+        for step in range(steps):
+            if (reason := stop_requested(run)) is not None:
+                # Noticed at the boundary — after the previous step's bracket closed and
+                # before this one opens an intent. Nothing is left open, which is the whole
+                # reason the check sits here rather than in a signal handler.
+                print(f"run {correlation_id} ending at step {step}: {reason}", flush=True)
+                return 0
+
+            key = f"{blob_id}:step-{step}"
+            durability.record_intent(
+                IntentRecord(
+                    run_id=blob_id,
+                    idempotency_key=key,
+                    step_index=step,
+                    tool_name="echo",
+                    recorded_at=datetime.now(UTC),
+                )
+            )
+            durability.record_result(
+                ResultRecord(
+                    run_id=blob_id,
+                    idempotency_key=key,
+                    step_index=step,
+                    recorded_at=datetime.now(UTC),
+                )
+            )
+            durability.save(
+                CheckpointBlob(
+                    blob_id=blob_id,
+                    payload={"step": step},
+                    correlation_id=correlation_id,
+                    grant_id=getattr(run.authority, "credential_id", ""),
+                    step_index=step,
+                    written_by="entrypoint",
+                    outcome=None,
+                )
+            )
+
+    # A terminal checkpoint, so the run has an ending anyone can read.
+    #
+    # Before 011 this entrypoint started a run, printed, and exited — leaving no terminal
+    # record at all, so every API-started run read as *not finished* forever and only one
+    # arm of the three-way result disposition was reachable. The result goes under the
+    # reserved key in the same write, because the terminal checkpoint is the one place a
+    # run's ending is recorded and a second place would eventually disagree with it.
+    durability = PostgresDurabilityProvider(credentials=credentials)
+    durability.save(
+        CheckpointBlob(
+            blob_id=os.environ.get("RUN_ID", "").strip() or correlation_id,
+            payload={RESULT_KEY: {"started": True, "tools": sorted(tools)}},
+            correlation_id=correlation_id,
+            grant_id=getattr(run.authority, "credential_id", ""),
+            step_index=0,
+            written_by="entrypoint",
+            outcome=RunOutcome(state=RunState.COMPLETED.value, stop_reason=None),
+        )
+    )
     return 0
 
 

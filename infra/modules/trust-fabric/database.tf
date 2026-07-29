@@ -118,6 +118,12 @@ resource "vault_database_secret_backend_role" "evidence" {
     "REVOKE ALL PRIVILEGES ON audit_stream_heads FROM \"{{name}}\";",
     "REVOKE ALL PRIVILEGES ON dependency_health FROM \"{{name}}\";",
     "REVOKE ALL PRIVILEGES ON suspended_runs FROM \"{{name}}\";",
+    # Same treatment, same reason (011). A run index says who started what and an
+    # authority-change record says who asked for which privilege — both are operational
+    # state that happens to share a database, and a SELECT-only credential able to read
+    # every run's starter across the estate has stopped being a narrow credential.
+    "REVOKE ALL PRIVILEGES ON run_index FROM \"{{name}}\";",
+    "REVOKE ALL PRIVILEGES ON authority_change_requests FROM \"{{name}}\";",
   ]
 
   revocation_statements = [

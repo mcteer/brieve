@@ -12,11 +12,14 @@ enclave lanes.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from core.audit.sink import AuditSink
 from core.authority.fabric import IdentityFabric
 from core.authority.types import AuthorityScope
 from core.registry.memory import ToolRegistry
 from core.run import start_governed_run
+from core.runs.index import InMemoryRunIndex, RunIndex, RunIndexEntry
 from surfaces.dispatch.types import RunHandle
 
 
@@ -29,10 +32,15 @@ class InProcessDispatcher:
         identity_fabric: IdentityFabric,
         registry: ToolRegistry,
         audit_sink: AuditSink,
+        run_index: RunIndex | None = None,
     ) -> None:
         self._fabric = identity_fabric
         self._registry = registry
         self._audit = audit_sink
+        # In-memory by default, and that default is load-bearing rather than convenient:
+        # this dispatcher is what every hermetic surface row builds, so an unconditional
+        # Postgres write here would put a database inside the fork-safe lane.
+        self._index: RunIndex = run_index if run_index is not None else InMemoryRunIndex()
         self._handles: dict[str, RunHandle] = {}
 
     def dispatch(
@@ -56,6 +64,19 @@ class InProcessDispatcher:
             identity_fabric=self._fabric,
             registry=self._registry,
             audit_sink=self._audit,
+        )
+        # The index write, in the same motion as the dispatch. Its arguments are the
+        # ones dispatch already receives — which is what makes this the closure of the
+        # recurring seam finding rather than another instance of it.
+        self._index.record(
+            RunIndexEntry(
+                run_id=run_id or correlation_id,
+                correlation_id=correlation_id,
+                subject_user_id=subject_user_id,
+                tenant_id=tenant_id,
+                agent_definition_id=agent_definition_id,
+                created_at=datetime.now(UTC),
+            )
         )
         handle = RunHandle(
             run_id=run_id or run.run_id or run.correlation_id,

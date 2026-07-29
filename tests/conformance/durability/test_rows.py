@@ -238,3 +238,43 @@ def test_terminal_run_is_not_resumed(provider: DurabilityProvider, run_id: str) 
 
     assert decision.state is RunState.COMPLETED
     assert not decision.resumable
+
+
+def test_a_routine_checkpoint_cannot_un_terminal_a_stopped_run(
+    provider: DurabilityProvider, run_id: str
+) -> None:
+    """011's terminal-once guard, against **both** providers (FR-009).
+
+    The break fixture this row exists for: `SET run_state = EXCLUDED.run_state`,
+    unconditional. It reads as obviously correct, passed every 005 row for three features,
+    and erases a stop the next time the running allocation checkpoints — because a stop
+    does not interrupt the step in flight, and that step's checkpoint lands *after* it.
+
+    **It lives here rather than beside the stop rows because that is where the break was
+    survivable.** The component rows cover the same guard, but they build the in-memory
+    provider; removing the COALESCE from the Postgres upsert left every one of them green.
+    A guard implemented twice needs a row that runs twice, and the provider fixture is the
+    only thing in this repo that does that.
+    """
+    _write(
+        provider,
+        run_id,
+        step=4,
+        outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason="stopped_by_starter"),
+    )
+
+    # The step that was already in flight when the stop landed, checkpointing normally.
+    _write(provider, run_id, step=5)
+
+    saved = provider.load(run_id)
+    assert saved is not None and saved.outcome is not None, (
+        "the routine checkpoint erased the run's outcome entirely — a stopped run now "
+        "reads as one that never ended"
+    )
+    assert saved.outcome.state == RunState.STOPPED.value, (
+        f"a routine checkpoint moved a terminal run to {saved.outcome.state!r}. The run "
+        "was stopped; it is now running again as far as every reader is concerned."
+    )
+    assert saved.outcome.stop_reason == "stopped_by_starter", (
+        "the state survived but the reason did not, which leaves a terminal run nobody can explain"
+    )

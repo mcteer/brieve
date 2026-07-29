@@ -124,6 +124,21 @@ running them in the wrong place — only by not running them at all. That was th
 safety margin when a human was the runner; it is now the thing that makes the automated
 lane's green mean something.
 
+## The snapshot grew, and the parity row grew with it (011)
+
+`operations.snapshot.json` went from four operations to ten. The parity row did not change:
+it compares `operation_pairs()` against the snapshot, so a larger snapshot is a larger
+comparison, and an operation added to one transport fails immediately in either direction.
+
+That property is why 011 could add six operations without touching this row's
+implementation — and why it added them **snapshot-first**, one at a time: grow the
+snapshot, watch the row go red, add both surfaces, watch it go green. The row became the
+development loop rather than a check run afterwards.
+
+One thing the coverage half still cannot do is compare *verdicts*, which is a separate set
+of rows in `tests/conformance/mcp/test_surface_parity.py`. Two surfaces can expose the same
+ten operations and disagree about what each returns.
+
 ## Sealed-core review
 
 This feature changes sealed core in five places, and **two of them are not additive**:

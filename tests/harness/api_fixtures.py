@@ -9,14 +9,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 
 from core.audit.sink import InMemoryAuditSink
 from core.authority.changes import BlockedPendingApprovalError, ChangeDisposition
+from core.durability.memory import InMemoryDurabilityProvider
 from core.identity.claims import ClaimMapping
 from core.registry.memory import ToolRegistry
+from core.runs.changes import InMemoryChangeRequestStore
+from core.runs.index import InMemoryRunIndex
 from surfaces.api.app import create_app
 from surfaces.api.authority_submit import AuthorityChangeRefused, AuthoritySubmitUnavailable
 from surfaces.api.verification import TokenVerifier
@@ -108,10 +111,18 @@ def surface_under_test(
 ) -> SurfaceUnderTest:
     idp = FakeOIDCProvider()
     audit = InMemoryAuditSink()
+    # 011's collaborators, shared by BOTH surfaces. Sharing is the point rather than a
+    # convenience: parity compares what the two surfaces do, and two surfaces reading
+    # different stores would diverge in ways no catalogue comparison could see.
+    index = InMemoryRunIndex()
+    durability = InMemoryDurabilityProvider()
+    changes = InMemoryChangeRequestStore()
+    definitions_fabric = fake_definitions_fabric(subject)
     dispatcher = InProcessDispatcher(
         identity_fabric=fake_identity_fabric(subject_user_id=subject),
         registry=registry or ToolRegistry(),
         audit_sink=audit,
+        run_index=index,
     )
     verifier = TokenVerifier(
         issuer=ISSUER,
@@ -126,12 +137,22 @@ def surface_under_test(
         evidence_query=InMemoryEvidenceQuery(audit),
         audit_sink=audit,
         authority_submitter=submitter,
+        run_index=index,
+        durability=durability,
+        change_requests=changes,
+        change_status=ScriptedChangeStatus(),
+        definitions=definitions_fabric,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
         audit_sink=audit,
         evidence_query=InMemoryEvidenceQuery(audit),
         authority_submitter=submitter,
+        run_index=index,
+        durability=durability,
+        change_requests=changes,
+        change_status=ScriptedChangeStatus(),
+        definitions=definitions_fabric,
     )
     return SurfaceUnderTest(
         app=app,
@@ -142,3 +163,38 @@ def surface_under_test(
         subject_name=subject,
         submitter=submitter,
     )
+
+
+class ScriptedChangeStatus:
+    """A change-status source that answers without a trust fabric."""
+
+    def __init__(self, disposition: str = "pending") -> None:
+        self.disposition = disposition
+
+    def status_of(self, accessor: str) -> Any:
+        from core.runs.changes import CollectedDisposition
+
+        return CollectedDisposition(accessor=accessor, disposition=self.disposition, approvals=0)
+
+
+def fake_definitions_fabric(subject: str) -> Any:
+    """A fabric that knows two definitions and one subject's scope.
+
+    Enough for the parity rows to compare verdicts on the enumeration operations, which is
+    what they are for — the disclosure RULES have their own rows in
+    `tests/component/test_list_definitions.py`.
+    """
+    from core.authority.types import AuthorityScope
+
+    class _Fabric:
+        def resolve_user_scope(self, subject_user_id: str) -> AuthorityScope:
+            return AuthorityScope(tool_names=frozenset({"echo"}))
+
+        def list_definitions(self) -> list[str]:
+            return ["planner", "applier"]
+
+        def resolve_ceiling(self, agent_definition_id: str) -> AuthorityScope:
+            allowed = {"planner": {"echo"}, "applier": {"apply"}}
+            return AuthorityScope(tool_names=frozenset(allowed.get(agent_definition_id, set())))
+
+    return _Fabric()

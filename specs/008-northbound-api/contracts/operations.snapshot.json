@@ -1,13 +1,33 @@
 [
   {
+    "method": "GET",
+    "name": "list_agent_definitions",
+    "path": "/agent-definitions"
+  },
+  {
+    "method": "GET",
+    "name": "get_agent_definition",
+    "path": "/agent-definitions/{agent_definition_id}"
+  },
+  {
     "method": "POST",
     "name": "request_mapping_change",
     "path": "/claim-mappings"
   },
   {
     "method": "GET",
+    "name": "collect_change",
+    "path": "/claim-mappings/{accessor}"
+  },
+  {
+    "method": "GET",
     "name": "read_evidence",
     "path": "/evidence"
+  },
+  {
+    "method": "GET",
+    "name": "list_runs",
+    "path": "/runs"
   },
   {
     "method": "POST",
@@ -18,5 +38,15 @@
     "method": "GET",
     "name": "get_run",
     "path": "/runs/{run_id}"
+  },
+  {
+    "method": "GET",
+    "name": "get_run_result",
+    "path": "/runs/{run_id}/result"
+  },
+  {
+    "method": "POST",
+    "name": "stop_run",
+    "path": "/runs/{run_id}/stop"
   }
 ]
