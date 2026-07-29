@@ -50,12 +50,18 @@ conformance:
 	C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
-	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity -m host_enclave -q
+	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs -m host_enclave -q
 	#
 	# 012's containment lane. Named here in the same change that created the directory —
 	# 010 lost a whole feature's rows to a directory no lane enumerated, and the fix is to
 	# wire it at birth rather than to remember later.
 	$(UV_RUN) pytest tests/conformance/portal -q
+	#
+	# 013's pack lane. Its HERMETIC rows need no wiring — the first line of this recipe
+	# collects `tests/conformance` wholesale — so only the host_enclave line above needed
+	# the directory added, and it was added in the change that created it. Recorded here
+	# because "already collected" is exactly the assumption 010 made and paid for: the
+	# distinction is that line 34 names a tree and the host line names directories.
 
 # The accessibility gate (012, FR-020a). Its own target because it is its own DISCIPLINE:
 # every other gate here asserts something about a process, and this one asserts something
