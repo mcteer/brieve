@@ -34,7 +34,7 @@ from core.durability.types import CheckpointBlob, IntentRecord, ResultRecord, Ru
 from core.run import RunState, start_governed_run
 from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
-from surfaces.toolset import build_registry
+from surfaces.toolset import build_registry, content_pins
 
 
 def main() -> int:
@@ -105,6 +105,7 @@ def main() -> int:
         ),
         registry=registry,
         audit_sink=audit,
+        content_pins=content_pins(_loaded_packs),
     )
     # The audit trail is the evidence that this happened, and the row reads it back
     # through the evidence path rather than trusting this line.

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -142,6 +143,7 @@ def start_governed_run(
     include_governance: bool = True,
     dependency_health: DependencyHealthReader | None = None,
     brokered_material_source: BrokeredMaterialSource | None = None,
+    content_pins: Mapping[str, str] | None = None,
 ) -> GovernedRun:
     """Start an active governed run with bound task authority, or refuse.
 
@@ -250,12 +252,23 @@ def start_governed_run(
             correlation_id=cid,
         ) from exc
 
+    # What content this run executes, pinned (FR-020, T019b). Opaque name→digest pairs:
+    # the core records them without knowing what a pack is, which is what keeps this
+    # product-blind. Without it, a run resumed in a new allocation reloads content from
+    # disk and verifies digests against the manifest SITTING BESIDE the content — so
+    # edited content verifies clean and the run continues at a different version,
+    # silently. This is what lets an attestation name the pack version the way FR-021
+    # already names consulted guidance.
+    start_payload: dict[str, object] = {"scope": sorted(run.scope)}
+    if content_pins:
+        start_payload["content_pins"] = dict(sorted(content_pins.items()))
+
     try:
         sink.append_event(
             correlation_id=cid,
             tenant_id=tenant,
             event_type=AuditEventType.RUN_START,
-            payload={"scope": sorted(run.scope)},
+            payload=start_payload,
         )
     except Exception as exc:
         run.state = RunState.REFUSED

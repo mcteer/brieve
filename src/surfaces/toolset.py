@@ -119,6 +119,22 @@ def known_actions(registry: ToolRegistry) -> frozenset[str]:
     return frozenset(registry.product_actions())
 
 
+def content_pins(loaded: Mapping[str, LoadedPack]) -> dict[str, str]:
+    """name → digest of every executed content artifact, for `RUN_START`.
+
+    Keyed `pack@version` and `pack/skill` so the record reads without a schema. The core
+    records these without interpreting them — it never learns what a pack is — and the
+    payload is what lets a resumed run's content be compared to what the original run
+    actually loaded, rather than to the manifest sitting beside whatever is on disk now.
+    """
+    pins: dict[str, str] = {}
+    for pack in loaded.values():
+        pins[f"{pack.name}@{pack.manifest.version}"] = pack.manifest.version
+        for skill in pack.manifest.skills:
+            pins[f"{pack.name}/{skill.name}"] = skill.digest
+    return pins
+
+
 def dependency_products(loaded: Mapping[str, LoadedPack]) -> dict[str, str]:
     """Tool name → the product it reaches, for `resume_run`'s `depends_on`.
 
@@ -137,6 +153,7 @@ def dependency_products(loaded: Mapping[str, LoadedPack]) -> dict[str, str]:
 __all__ = [
     "PACKS_ROOT",
     "build_registry",
+    "content_pins",
     "dependency_products",
     "known_actions",
     "known_tools",
