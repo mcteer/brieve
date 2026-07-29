@@ -5,7 +5,7 @@
 {% endblock %}
 {% block content %}
 <h1>{{ thread.title or "Untitled conversation" }}</h1>
-<p><a href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a></p>
+<p><a class="target" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a></p>
 
 <ol class="turns" id="turns">
   {% for turn in turns %}
@@ -23,7 +23,15 @@
         your access can grant it.
       </p>
     {% else %}
-      <p class="disposition" data-run-id="{{ turn.run_id }}">
+      <p class="disposition" data-run-id="{{ turn.run_id }}"
+         aria-live="polite" aria-atomic="true">
+        {# aria-live, because the client updates this text in place. Without it a
+           screen-reader user is never told the run progressed: the page changes silently
+           and they are left believing nothing happened, on a surface whose entire job is
+           watching work. `polite` rather than `assertive` so it waits for a pause instead
+           of interrupting; `atomic` so the whole status is read rather than the one word
+           that changed, which out of context is just "completed". #}
+        <span class="visually-hidden">Run status:</span>
         <span class="state">{% if turn.run %}{{ turn.run.state }}{% else %}starting{% endif %}</span>
         {% if turn.run and turn.run.state not in ["completed", "failed", "stopped"] %}
           <form method="post" action="/runs/{{ turn.run_id }}/stop" class="inline">

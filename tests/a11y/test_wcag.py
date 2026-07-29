@@ -117,12 +117,15 @@ def test_the_skip_link_is_the_first_focusable_element(
     assert "skip" in focused, f"the first tab stop was {focused!r}, not the skip link"
 
 
-def test_the_gate_records_what_it_cannot_assert() -> None:
-    """The honest half of FR-020a-i, as a row rather than as a footnote.
+def test_the_contract_records_what_these_gates_do_and_do_not_cover() -> None:
+    """The boundary, kept visible in the same place as the result.
 
-    A green run above covers the machine-checkable subset of WCAG 2.2 AA. The criteria
-    below need a person, and the contract names who. This row exists so that anyone
-    reading a passing gate sees the boundary in the same place they see the result.
+    This row used to assert the contract named a human runner for criteria automation
+    "could not" reach. It now asserts the opposite: that those criteria are covered by
+    `test_keyboard_and_screenreader.py`, and that the two things genuinely outside a
+    browser's reach — whether the words are good, and how a specific screen reader behaves
+    — are still written down. A gate that stopped saying what it does not cover would be
+    the more dangerous kind of green.
     """
     import pathlib
 
@@ -132,10 +135,18 @@ def test_the_gate_records_what_it_cannot_assert() -> None:
     )
     text = contract.read_text()
 
-    for criterion in ("2.4.3 Focus Order", "1.1.1 Non-text Content", "Screen-reader"):
-        assert criterion in text, (
-            f"the contract no longer records {criterion!r} as unassertable — either the "
-            "gate grew to cover it, or the record lost something it must keep"
-        )
-    assert "Named runner for the manual half" in text
+    for criterion in (
+        "2.4.3 Focus Order",
+        "1.1.1 Non-text Content",
+        "2.4.13 Focus Appearance",
+        "2.5.8 Target Size",
+        "1.4.10 Reflow",
+    ):
+        assert criterion in text, f"the contract no longer records how {criterion!r} is covered"
+
+    assert "What is still not automated" in text
+    assert "specific screen reader" in text
+    assert "No named runner is owed" in text, (
+        "the contract still claims a manual pass is outstanding; it is not"
+    )
     assert AXE_TAGS[-1] == "wcag22aa"

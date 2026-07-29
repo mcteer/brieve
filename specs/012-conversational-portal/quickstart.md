@@ -69,16 +69,20 @@ credential in the portal; nothing in browser storage but the cookie.
 make a11y
 ```
 
-**Expect**: green on the automated WCAG 2.2 AA ruleset over every page state — and the
-run's output names the criteria it did NOT assert, pointing at the manual checklist in
+**Expect**: 21 rows green — the axe ruleset over every page state, plus the
+keyboard-and-screen-reader harness (real tab order against visual position, the browser's
+accessibility tree over CDP, focus indicators, target sizes, reflow at 320 px, text
+spacing). **There is no manual checklist to run afterwards**; what stays outside a
+browser's reach is recorded in
 [contracts/conformance-portal.md](contracts/conformance-portal.md).
 
 ## What a passing run does NOT prove
 
 - Anything about answering — estate-state and guidance are the follow-on feature's, after
   capability packs.
-- Full WCAG 2.2 AA conformance — the automated gate asserts its subset; the manual
-  checklist (named runner: Dan) covers the rest, per FR-020a-i.
+- Full WCAG 2.2 AA conformance. The gates cover every criterion a browser can decide,
+  including the ones once deferred to a person — but not whether the *words* are good, and
+  not how JAWS, NVDA, or VoiceOver specifically behave.
 - Multi-tenant thread isolation beyond the single-registry reality 011 recorded (FR-013a
   inherited).
 - Production TLS posture between portal and API — dev is loopback inside the enclave;

@@ -184,7 +184,7 @@ ADR — never a passing stub.**
 | Tool-call parity under deferred disclosure | Deferred-disclosure feature | Deferred — ADR-0040 |
 | Eval gates (packs, models, policies) | Capability packs | Deferred — Principle VIII |
 | Registry isolation (control-plane write denials) | — | **Unassigned** — see gaps below |
-| Accessibility (WCAG 2.2 AA, rendered interface) | 012 | ✅ **In force.** A gate class no prior lane could run: every other gate asserts something about a process, this one about a rendered page. Automated over every page state with a vendored, pinned axe ruleset; the criteria automation cannot assert are enumerated with **Dan** as the named runner (constitution v1.1.0). A green run is deliberately not a conformance claim |
+| Accessibility (WCAG 2.2 AA, rendered interface) | 012 | ✅ **In force.** A gate class no prior lane could run: every other gate asserts something about a process, this one about a rendered page. Twenty-one rows: a vendored, pinned axe ruleset over every page state, **plus a keyboard-and-screen-reader harness** that walks the real tab order against visual position, reads the browser's own accessibility tree over CDP, measures focus indicators and target sizes, and re-renders under the reflow and text-spacing criteria. **No named runner is owed** — what was once a manual checklist runs in CI, and it found three defects on its first run. What stays outside a browser's reach (whether the words are good; any specific screen reader's behaviour) is recorded in the contract |
 
 ## Open records
 
