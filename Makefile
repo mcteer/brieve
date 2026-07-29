@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y
+.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
@@ -68,6 +68,10 @@ conformance:
 # The ruleset is VENDORED and pinned (tests/a11y/vendor). What this gate cannot assert is
 # recorded in specs/012-conversational-portal/contracts/conformance-portal.md with a named
 # human runner — a green run here is not a conformance claim.
+# The surfaces a person uses, separate from `dev-up` on purpose — see infra/bin/portal-up.
+portal-up:
+	@bash infra/bin/portal-up
+
 a11y:
 	uv run --extra surfaces --extra portal --extra a11y playwright install chromium
 	uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y -q

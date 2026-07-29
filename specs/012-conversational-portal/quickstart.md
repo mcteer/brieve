@@ -39,9 +39,15 @@ concurrent sends.
 
 ```bash
 make dev-up && make dev-status
+make portal-up                 # dev IdP + API + portal, deliberately separate from bring-up
 nomad job status api && nomad job status portal
-open https://<portal-addr>/   # log in via the IdP, PKCE flow
+open http://127.0.0.1:8082/    # log in via the dev IdP, PKCE flow
 ```
+
+**Why `portal-up` is its own target**: bring-up stands up the platform, and every gate
+reaches Vault, Nomad, Postgres, the MCP service, and agent-run. These three serve a
+browser — and one of them is an identity provider that authenticates nobody, which should
+be something a person chooses to run.
 
 Walk US1→US4: see definitions (startable and not, flagged); start a run in a thread;
 watch it move without refreshing; send a follow-up that references the first result;

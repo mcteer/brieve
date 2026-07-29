@@ -408,61 +408,20 @@ nomad job run -var="repo=$REPO" "$REPO/infra/jobs/agent-run.nomad.hcl" >/dev/nul
   || die "could not register the agent-run job — dispatched runs would have nothing to run"
 
 # ---------------------------------------------------------------- 4d. the surfaces
-# The API's FIRST deployment (012). 008 built it and nothing ever served it — every
-# operation row since has been true about an app object rather than a running service.
-# The portal is a thin client over the API, and a client cannot be over what is not there.
+# The API and the portal are NOT registered here. `make portal-up` does it.
 #
-# **These three WARN rather than die, and that is deliberate.** No conformance row needs
-# any of them: the gates reach Vault, Nomad, Postgres, the MCP service, and the agent-run
-# job, all of which are `die`-guarded above. What the API and portal serve is the
-# quickstart walkthrough — a person in a browser — and the dev IdP exists only to make that
-# login possible.
+# They were, briefly, and the CI enclave lane taught the lesson twice in one run. First
+# `nomad job run` on a service job BLOCKS until its deployment settles, so a portal that
+# could not start held bring-up for ten minutes. Then the two extra `cores = 1`
+# reservations left the conformance job unplaceable, and the durability rows — the actual
+# merge-blocking work of that lane — never ran.
 #
-# The first version used `die`, and the CI enclave lane failed on it: a dev-only fake
-# identity provider taking longer than ten seconds to start blocked a lane whose actual
-# job is the durability and identity rows. A bring-up step that can stop the platform must
-# be something the platform needs.
-say "Development identity provider"
-# DEV ONLY, and quarantined in tests/ so the packaging boundary says so too. The portal's
-# login is a browser redirect, and a browser cannot redirect to a Python object. It
-# authenticates NOBODY: /authorize mints a code for whoever asks. A real deployment points
-# OIDC_ISSUER at the organization's own provider and nothing else changes.
-DEV_IDP_PORT="${DEV_IDP_PORT:-8090}"
-if curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1; then
-  ok "dev idp already listening on ${DEV_IDP_PORT}"
-else
-  (cd "$REPO" && nohup uv run --extra adapters --extra surfaces --extra portal \
-     python -m tests.harness.dev_idp >/tmp/brieve-dev-idp.log 2>&1 &) 
-  # 60s, not 10: the first `uv run` with a new extra set resolves and installs packages,
-  # which is exactly what CI does on a cold cache.
-  for _ in $(seq 1 120); do
-    curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 && break
-    sleep 0.5
-  done
-  curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 \
-    && ok "dev idp listening on ${DEV_IDP_PORT} (authenticates nobody; never deploy)" \
-    || warn "the development identity provider did not come up (see /tmp/brieve-dev-idp.log). \
-The portal login will not work; nothing else is affected."
-fi
-
-say "API service"
-nomad job run -var="repo=$REPO" \
-  -var="oidc_issuer=http://127.0.0.1:${DEV_IDP_PORT}" \
-  -var="oidc_jwks_uri=http://127.0.0.1:${DEV_IDP_PORT}/jwks" \
-  "$REPO/infra/jobs/api.nomad.hcl" >/dev/null 2>&1 \
-  && ok "api registered (the northbound surface, served for the first time)" \
-  || warn "could not register the api service; the portal will have nothing to be over"
-
-say "Portal"
-nomad job run -var="repo=$REPO" \
-  -var="api_base_url=http://127.0.0.1:8081" \
-  -var="oidc_issuer=http://127.0.0.1:${DEV_IDP_PORT}" \
-  -var="oidc_authorize_endpoint=http://127.0.0.1:${DEV_IDP_PORT}/authorize" \
-  -var="oidc_token_endpoint=http://127.0.0.1:${DEV_IDP_PORT}/token" \
-  -var="portal_redirect_uri=http://127.0.0.1:8082/callback" \
-  "$REPO/infra/jobs/portal.nomad.hcl" >/dev/null 2>&1 \
-  && ok "portal registered (thin client; holds no credential of any kind)" \
-  || warn "could not register the portal"
+# The distinction that fixes it: bring-up stands up the PLATFORM, and the gates need Vault,
+# Nomad, Postgres, the MCP service, and agent-run. The API and portal serve a PERSON
+# walking through the quickstart in a browser, which is a deliberate act with its own
+# target and its own resource cost. Making it explicit is also more honest — the portal
+# needs a development identity provider that authenticates nobody, and that should be
+# something someone chooses to run.
 
 # ---------------------------------------------------------------- 5. the contract
 # Verification runs BEFORE success is reported. Otherwise the contract describes intent
