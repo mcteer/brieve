@@ -34,6 +34,7 @@ reads as four-of-five rather than as complete.
 | No auto-tracking | Asserted as an absence: no alias, no "latest", no configuration that would produce one (FR-011) |
 | No unqualified model is reachable | Including fallback, including when the pinned cell is withdrawn (FR-010, SC-004) |
 | A verdict is not an approval | `MODEL_GATE` and any human approval are distinguishable in the trail (FR-015) |
+| The tool vocabulary comes from packs | No hardcoded tool-name set survives outside pack manifests. `parse_ceiling_record` refuses any ceiling naming a tool outside the known set, so a stale constant makes a correct ceiling record look broken and points at the wrong artifact |
 | The matrix is readable | The run role can read `data/model-matrix/*` against the live fabric. A row rather than a Terraform review, because a grant present in HCL and a grant that is *effective* are different claims — 010 learned that when the registry engine appended policies nobody had declared |
 | The run path does not import the gate harness | No module reachable from `core.run` imports `core.evals`. A cell is read on the run path; the scoring harness must never be |
 | Digests are verified at load | A skill whose bytes changed without its pin changing refuses `digest_mismatch` |
@@ -77,6 +78,7 @@ column exists so it cannot be read as more than it is.
 - **A skill bumped without review.** Change content, update the digest, skip the lens.
   Promotion must block.
 - **An alias that resolves to latest.** Add one — as a bare model name, and again as `@latest`. The no-auto-tracking row must fail on both, because the identifier parse and the lookup are different defences and only one of them is obvious.
+- **A pack tool outside the known vocabulary.** Pin `KNOWN_TOOLS` back to a constant and load a pack declaring anything else. The vocabulary row must fail — and the failure must not read as a malformed ceiling record, which is what it looks like when the constant is stale.
 - **The matrix grant removed.** Delete the `data/model-matrix/*` policy block. The readability row must fail — and the failure must not read as an unreachable fabric.
 - **A model verdict filed as an approval.** Record a `judge` verdict under an approval-shaped
   event. The distinction row must fail.

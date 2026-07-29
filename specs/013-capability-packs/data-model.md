@@ -122,8 +122,14 @@ reasoning makes 010 resolve a ceiling per run rather than caching it.
 
 ## Eval case and result *(new: `packs/<name>/evals/`, results in Postgres)*
 
-A **case** is an input, an expected outcome, and the suite it belongs to. A **result** is a
-case, a cell, a scorer, a verdict, and a timestamp.
+A **case** is an input, an expected outcome, and the suite it belongs to — content, shipped
+in the pack. A **result** is a case, a cell, a scorer, a verdict, and a timestamp — a record,
+stored in `eval_results`.
+
+**The schema is applied at bring-up** (`src/core/evals/schema.sql`, in `enclave-up`'s
+existing statement block), not on first use. 012 left `run_inputs` to the API service's
+migrate-on-boot and every dispatched run died with `relation "run_inputs" does not exist`;
+that script's comment records the rule and says it has bitten four times.
 
 | Suite | Asserts |
 | --- | --- |

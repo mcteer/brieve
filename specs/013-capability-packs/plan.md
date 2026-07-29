@@ -6,7 +6,8 @@
 
 ## Summary
 
-Two packs, five qualified roles, four eval gates, and the judge regress resolved by a
+Two packs, five qualified roles, four of the five eval gates (report fidelity is owed
+against ADR-0018, which is unbuilt), and the judge regress resolved by a
 **human-labeled seed set** — the only one of the spec's three bounded options that
 terminates without importing trust from somewhere this platform cannot inspect.
 
@@ -59,12 +60,24 @@ approval; report fidelity recorded as owed rather than stubbed.
 | II — Total Interception; One Governed Tool Layer | **Pass** | Pack tools are `ToolRegistry` registrations like any other, so they inherit the hook pipeline **by construction rather than by discipline**. **Risk class becomes real** — it is in the glossary and nowhere in code today — and registry review may require process isolation for `secret-touching` and `destructive`. Transport stays a tool property; no MCP server is authored for uniformity. |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | No new enforcement point. Every new refusal — unqualified cell, tier violation, unpinned skill, unverified digest — fails closed, and each is asserted as the *absence of any permissive path* rather than as one branch behaving. |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass** | A pack carries no credential. Pack tools resolve authority through the same manufacture path, and **a pack cannot widen a ceiling** (FR-005) — asserted, because a pack declaring tools its definition's ceiling omits is the obvious shortcut and would read as a feature. The live lane's provider key is a dev-lane secret: never in a jobspec, never read by a run. |
-| V — Sealed Core, Versioned Seams | **Pass, two recorded additions** | `ToolRegistration` gains `risk_class` (additive, defaulted). `AuditEventType` gains `MODEL_GATE`, because FR-015 requires the trail to distinguish a model verdict from a human approval and reusing an approval event would erase exactly that distinction. Both are sealed-core edits; this approved spec is the required spec, security-maintainer review is Dan. |
+| V — Sealed Core, Versioned Seams | **Pass, five recorded additions — none of them a signature break** | `ToolRegistration` gains `risk_class`. `AuditEventType` gains `MODEL_GATE` and `MATRIX_FALLBACK`. Two new core modules — `core/authority/matrix.py` and `core/packs/workflows.py`. One infrastructure grant: `data/model-matrix/*` in `policies.tf`. **`start_governed_run` is deliberately NOT changed** — see the binding-resolution note below. All additive; this approved spec is the required spec, security-maintainer review is Dan. |
 | VI — Lean by Default | **Pass** | No new operated component. The eval harness is a library and a dev extra, not a service. Pack content is files. |
 | VII — Anti-Fragmentation | **Pass** | Packs are identical across substrates; the matrix is a control-plane record every deployment already has. |
 | VIII — Eval-Gated Promotion | **Pass — and this is the feature** | Brought online for the first time: the matrix, binding maps, fallback-only-to-qualified-or-stop, no auto-tracking, pinned judges, and provenance + injection-lens + eval on every skill bump. **Report fidelity is recorded as owed against ADR-0018**, per ADR-0047 — absent or an explicit skip citing its deferring record, never a stub. |
 | IX — Evidence Over Claims | **Pass** | Provenance-at-read for consulted artifacts into the run record. Eval results are records rather than claims. `MODEL_GATE` keeps a verdict and an approval distinguishable in the trail. |
 | X — The Decision Record Governs | **Pass** | ADR-0004, 0022, 0030, 0039, 0045 built as written. **ADR-0052 (new)** records the judge-regress resolution, because "what qualified the first judge" must outlive this spec. ADR-0023 stays unbuilt and is recorded as owed rather than quietly dropped. |
+
+**Where the binding map is resolved** (analyze pass 2, N2): **inside
+`manufacture_authority`, not `start_governed_run`.** The run-start signature takes
+`identity_fabric` and `registry` and nothing model-shaped, so threading a matrix through it
+would be a sealed-core signature change touching all three callers — the adapter, the
+entrypoint, and the in-process dispatcher. `manufacture_authority` already receives both the
+fabric (which reads the matrix) and `agent_definition_id` (whose binding map is being
+validated), so the resolution belongs there and the seam does not move.
+
+This follows the precedent that function's own docstring records: the `grant` parameter was
+made *optional* rather than breaking the seam, because "a break bought nothing" — the same
+reasoning, one feature later.
 
 **Named-runner obligation** (constitution v1.1.0): the **live-model lane** has no automated
 runner — it needs a provider credential and costs money per run, so it cannot sit in CI.
@@ -123,6 +136,8 @@ src/core/evals/
 └── judge.py             # The seed set, and what qualified the first judge
 
 src/core/registry/memory.py   # + risk_class on ToolRegistration (additive)
+src/core/authority/manufacture.py  # binding-map resolution lands HERE, so
+                                   # start_governed_run's signature does not move
 src/core/audit/schema.py      # + MODEL_GATE (a verdict is not an approval — FR-015)
 
 infra/modules/trust-fabric/policies.tf  # + read on data/model-matrix/*. Without it the
