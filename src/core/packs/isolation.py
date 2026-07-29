@@ -110,6 +110,41 @@ def resolve_tool_name(
     return f"{owners[0]}/{name}"
 
 
+def resolve_composition(
+    workflow_name: str,
+    bindings: DefinitionBindings,
+    loaded: dict[str, LoadedPack],
+) -> WorkflowRecord:
+    """The workflow this definition may run, or refuse `above_tier`.
+
+    **The tier belongs to the definition, never to the request.** Nothing in this signature
+    accepts what the person asked for, which is not an oversight — it is the mechanism. A
+    tier that could be raised by asking differently would be a suggestion, and ADR-0045's
+    whole claim is that what an agent may compose is bounded at *design* time and reviewable
+    like any other part of the definition.
+
+    **Tiers bound workflows, never tools.** The ceiling answers "may this agent call
+    `apply`?"; the tier answers "may this agent *compose*?". Two mechanisms answering one
+    question is the duplication ADR-0044 forbids, and they would eventually disagree.
+    """
+    available = reachable_workflows(bindings, loaded)
+    record = available.get(workflow_name)
+    if record is None:
+        raise IsolationRefused(
+            f"no reachable pack provides workflow {workflow_name!r}; definition "
+            f"{bindings.agent_definition_id!r} names packs {sorted(bindings.packs)}",
+            reason_code="pack_not_loaded",
+        )
+    if not record.permitted_for(bindings.tier):
+        raise IsolationRefused(
+            f"workflow {workflow_name!r} requires tier {record.minimum_tier} "
+            f"({'paved' if record.paved else 'unpaved'}); definition "
+            f"{bindings.agent_definition_id!r} is tier {bindings.tier}",
+            reason_code="above_tier",
+        )
+    return record
+
+
 def reachable_workflows(
     bindings: DefinitionBindings, loaded: dict[str, LoadedPack]
 ) -> dict[str, WorkflowRecord]:
@@ -134,6 +169,7 @@ def reachable_workflows(
 
 __all__ = [
     "IsolationRefused",
+    "resolve_composition",
     "assert_pack_does_not_widen",
     "reachable_tools",
     "reachable_workflows",
