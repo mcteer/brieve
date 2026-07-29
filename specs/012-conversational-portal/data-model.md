@@ -20,7 +20,7 @@ The view's spine. Created empty by `create_thread`, hard-deleted by `delete_thre
 | `subject_user_id` | TEXT | The owner. Only this subject sees or continues the thread |
 | `tenant_id` | TEXT | Filtered **first** in every query, as 011's tables do |
 | `title` | TEXT, nullable | Display only. Null at creation (the thread is empty); set **once** at the first accepted turn from the message's leading fragment; never updated after — the contract's no-rename rule, held by there being no operation that could |
-| `created_at` | TIMESTAMPTZ | Keyset cursor component for listing |
+| `created_at` | TIMESTAMPTZ | Keyset cursor component for listing — and one leg of the rate window, so `threads` carries its own `(tenant_id, subject_user_id, created_at)` index |
 
 **Properties**:
 
@@ -60,6 +60,11 @@ One exchange. Insert-only; rows die only with their thread.
   expected, and exactly what SC-004 reconstructs from.
 - `seq` is assigned under `SELECT ... FOR UPDATE` on the thread row — the same
   first-writer-wins discipline the audit stream heads use, for the same reason.
+- **A trail event with no matching row on a live thread is the crash window** between the
+  evidence write and the row append, and the trail's account wins — the same trail ⊇ view
+  direction deletion relies on, stated here for the case where the thread still exists.
+  The reverse (a row with no event) remains a bug, and the evidence-first row asserts it
+  cannot happen.
 
 ## Run input *(new table: `run_inputs`)*
 
@@ -141,12 +146,22 @@ sessions).
 
 ## Rate window *(a query, not a table)*
 
-`COUNT(*) FROM thread_turns WHERE tenant_id = ? AND subject_user_id = ? AND created_at >
-now() - 5min` ≥ 30 → refuse `rate_limited`. Stateless, restart-safe, one indexed query —
-served by `thread_turns`'s own `(tenant_id, subject_user_id, created_at)` index, which is
-why those two columns are denormalized onto the turns table: the window counts a
-*person's* turns across every thread they have, and a query that joined through a single
-thread would bound each thread separately, which is thirty threads times thirty turns.
+Two indexed counts, summed against one limit (analyze pass 4, N1 — a bound that is not
+in the query is not a bound):
+
+```
+  COUNT(thread_turns WHERE tenant_id = ? AND subject_user_id = ? AND created_at > now()-5min)
++ COUNT(threads      WHERE tenant_id = ? AND subject_user_id = ? AND created_at > now()-5min)
+  ≥ 30  →  refuse rate_limited
+```
+
+Creations are in the sum because `create_thread` writes no turn row — a window that
+counted only turns would read zero while a subject created ten thousand empty threads.
+Stateless, restart-safe, each leg served by its table's own
+`(tenant_id, subject_user_id, created_at)` index. The turn-side columns are denormalized
+onto `thread_turns` because the window counts a *person's* acts across every thread they
+have — a query that joined through a single thread would bound each thread separately,
+which is thirty threads times thirty turns.
 
 ---
 

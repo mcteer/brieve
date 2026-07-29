@@ -18,9 +18,14 @@ The portal is a **consumer** of these operations, never an implementation of the
 
 Creates an empty thread owned by the authenticated subject in their tenant. Returns
 `thread_id`, `correlation_id`, `created_at`. **Creation counts against the same
-per-subject rate window as turns** (analyze pass 3, I6) — a created thread is a
-turn-shaped act, and a window that bound only turns would leave the `threads` table
-growable at HTTP rate through an operation whose whole body is an insert. The thread is
+per-subject rate window as turns, and the count is two summed queries** (analyze passes
+3+4, I6/N1) — creations write no turn row, so the window is
+`COUNT(recent turns) + COUNT(recent creations)` against the one limit; a window that
+counted only `thread_turns` would read zero while a subject created ten thousand empty
+threads, bounding creation in prose and not in the query. A rate-refused creation has no
+thread and therefore no correlation to chain a record under: it is a **response reason
+code only**, the platform's existing refusal posture, and that absence is decided rather
+than overlooked. The thread is
 untitled until its first accepted turn, whose leading fragment becomes the title, once —
 there is no rename (see "What is deliberately absent"). Explicit creation rather than
 create-on-first-message: orthogonal operations hold parity more simply, and the client
@@ -42,7 +47,7 @@ unbounded.
 1. **Resolve the thread** — absent or another tenant's → not found; another subject's in
    the same tenant → refused `not_permitted`. Response reason codes, per the platform's
    existing refusal posture — there is no thread to chain an event under.
-2. **Pre-acceptance checks** — over the rate window → refused `rate_limited`; message
+2. **Pre-acceptance checks** — over the rate window (turns + creations summed — see `create_thread`) → refused `rate_limited`; message
    over `MAX_MESSAGE_BYTES` → refused `message_too_large`. Each writes a **`TURN_REFUSED` event — small, fixed-size, without the message** under the thread's correlation ID, so
    the attempt is visible in the trail while per-attempt trail growth stays bounded.
 3. **Compute context** — the 5 most recent dispatched turns with results; record what

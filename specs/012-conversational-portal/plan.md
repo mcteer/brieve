@@ -41,7 +41,7 @@ axe ruleset.
 `api.nomad.hcl` (the API's first actual deployment) and `portal.nomad.hcl`.
 
 **Project Type**: web service (portal) + surface extension (API/MCP thread operations) +
-core records (threads) + one seam extension (run input).
+core records (threads) + a run-input substrate (durable state — deliberately not a seam change).
 
 **Performance Goals**: none newly binding. SSE update latency is bounded by the portal's
 server-side poll interval (2s stated); nothing here is on a hot path.
