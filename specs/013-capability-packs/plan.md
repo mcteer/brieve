@@ -42,7 +42,11 @@ promotion, and the gates themselves. Live-model scoring behind `@pytest.mark.liv
 never in the blocking lane.
 
 **Target Platform**: the dev enclave. **No new operated component** — Vault, Nomad, and
-Postgres already run, which is why Vault was the right second pack.
+Postgres already run, which is why Vault was the right second pack. *"Operated" means
+operated by us*: the live-model lane calls an external provider, which is a runtime
+dependency of one dev lane rather than a component this platform stands up, monitors, or
+is responsible for. The distinction matters because Principle VI's trigger is the
+operational burden, and a provider we call carries none of it.
 
 **Project Type**: a core seam (pack loading) + content (two packs) + a gate discipline
 (four suites in force, report fidelity owed) + one trust-fabric record type (the matrix).

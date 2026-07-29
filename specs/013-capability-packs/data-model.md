@@ -66,6 +66,30 @@ infrastructure — which is the first thing a real pack does.
 VIII exists to stop**, and it is invisible without the hash. Verification happens at load,
 not at review time, because review is when someone looked and load is when it matters.
 
+## Definition bindings *(new control-plane record: `harness-authority/data/definition-bindings`)*
+
+**The record the whole feature reads, and which did not exist until analyze pass 8.** FR-005
+("a definition MUST reach only the packs it names"), the isolation check, the binding-map
+validation, and tier resolution all read fields that lived in the glossary, in the
+assumptions, and in four tasks' logic — and in no record.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `agent_definition_id` | TEXT | Keyed by the same display name the registration and ceiling use |
+| `packs` | list | Which packs this definition reaches. **Naming a pack does not grant its tools** — the ceiling still bounds those (FR-005) |
+| `binding_map` | table | `role → provider/model@version`, each resolving to a qualified cell |
+| `tier` | int | The competency tier bounding what it may compose (ADR-0045) |
+
+**Beside the ceiling, not on the registration** — the same reasoning `ceilings.tf` already
+records: the registry engine serves its own registration format, so the harness's own facts
+about a definition live in the harness-authority KV. Operator-authored, read-only to runs,
+written by the same Terraform apply as the ceiling so no window exists where a definition
+has one and not the other.
+
+**The read policy must grant this path too**, for the reason `data/policies/*` documents:
+without a grant, Vault answers 403 rather than 404 and a definition with no bindings is
+indistinguishable from one nobody may read.
+
 ## Qualified cell *(new control-plane record: `harness-authority/data/model-matrix`)*
 
 > **The read policy must grant this path.** `harness-authority-read` covers
@@ -110,7 +134,7 @@ would have asserted a refusal against a concept that did not exist. Deliberately
 workflow here is a *named, tiered thing a definition may or may not run*, which is all
 ADR-0045 needs. What a workflow *does* is pack content.
 
-## Binding map *(inside an agent definition)*
+## Binding map *(inside the definition-bindings record above)*
 
 `role → model`, five entries or fewer, **each of which must resolve to a qualified cell for
 that definition's pack**.
