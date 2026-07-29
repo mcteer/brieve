@@ -159,3 +159,10 @@ and its comment — which already said this rule had bitten three times — says
 
 One sealed-core change: three additive `AuditEventType` members (`TURN_RECORDED`,
 `TURN_REFUSED`, `THREAD_DELETED`). Approved spec: this feature's. Security-maintainer review: Dan.
+
+## Post-012 note (2026-07-29, from 013)
+
+**Answering's dependency is met.** ADR-0039 makes an `ask` binding inexpressible without a
+green Qualified Model Matrix cell; 013 shipped the matrix, and `vault:anthropic/claude-opus@5:ask`
+is qualified in the fixture lane (see `specs/013-capability-packs/contracts/conformance-packs.md`
+for the per-cell record and the live-lane state). Portal answering is unblocked.

@@ -1,6 +1,6 @@
 # Conformance: Capability Packs and Eval Gates
 
-**Feature**: `specs/013-capability-packs` | **Date**: 2026-07-29 | **Status**: Planned
+**Feature**: `specs/013-capability-packs` | **Date**: 2026-07-29 | **Status**: **In force** (fixture lane; live lane awaits the named runner)
 
 Four gates in force, one recorded as owed, and a per-cell record of which scorer qualified
 what. These rows are blocking from the moment this feature lands (ADR-0047).
@@ -52,13 +52,56 @@ cell absent from it is not qualified.
 
 | Pack | Model | Role | Scorer | Date | Judge |
 | --- | --- | --- | --- | --- | --- |
-| _(populated at implementation)_ | | | | | |
+| vault | anthropic/claude-opus@5 | judge | fixture | 2026-07-29 | — (seed-qualified first judge, ADR-0052) |
+| vault | anthropic/claude-opus@5 | ask | fixture | 2026-07-29 | vault:anthropic/claude-opus@5:judge |
+| vault | anthropic/claude-opus@5 | plan | fixture | 2026-07-29 | vault:anthropic/claude-opus@5:judge |
+| vault | anthropic/claude-opus@5 | write | fixture | 2026-07-29 | vault:anthropic/claude-opus@5:judge — **see the `write` rule below** |
+| vault | anthropic/claude-opus@5 | summarize | fixture | 2026-07-29 | vault:anthropic/claude-opus@5:judge |
+| terraform | anthropic/claude-opus@5 | ask | fixture | 2026-07-29 | vault:anthropic/claude-opus@5:judge |
+| terraform | anthropic/claude-opus@5 | plan | fixture | 2026-07-29 | vault:anthropic/claude-opus@5:judge |
+| terraform | anthropic/claude-opus@5 | write | fixture | 2026-07-29 | vault:anthropic/claude-opus@5:judge — **see the `write` rule below** |
+| terraform | anthropic/claude-opus@5 | summarize | fixture | 2026-07-29 | vault:anthropic/claude-opus@5:judge |
+
+**The live column is empty by honesty, not omission.** `make evals-live` needs a provider
+credential and has a named runner (Dan, per plan.md); each cell's `qualified_by` moves to
+`live` only when that run happens, and this table is where the outcome lands (T051).
+
+## Is a fixture-qualified `write` cell usable? (T050a)
+
+**No — not for a run that makes changes.** Stated here rather than left to whoever reads
+the table to infer.
+
+A `write` cell is a model permitted to make changes, and in the blocking lane its
+qualification is against a recording — a replay of an answer the model gave once, not
+evidence about what it does next. For `ask` or `summarize` that gap is tolerable: the blast
+radius of a wrong answer is a wrong answer. For `write` the blast radius is the estate.
+
+So the rule is: **a definition binding `write` runs only after that cell's `qualified_by`
+reads `live` in this table.** The fixture qualification is what lets the merge gate stay
+hermetic — the machinery is proven, the thresholds bind, the refusals fire — and the live
+run is what makes the cell mean something. Until the named runner records it, a
+fixture-only `write` cell is a qualified *recording*, and the definition that pins it is
+registered but must not be dispatched against a live product.
+
+This is a policy line, not yet an enforced one: nothing in `src/` today reads this table at
+dispatch. That enforcement belongs to the answering feature, which is the first to bind a
+model at all — recorded here so it arrives as a requirement rather than a surprise.
 
 A `fixture` cell is qualified against a recording. That is a real limit, per cell, and the
 column exists so it cannot be read as more than it is.
 
 ## What these rows do not prove
 
+- **That every role's suite matches FR-008a's full text.** The `judge` cells are backed by
+  exactly what that requirement names — agreement with human-labeled verdicts, via the seed.
+  The `ask` and `summarize` cells reuse the guidance and estate-query classes, as FR-008a
+  says `ask` should. But `plan`'s named content (decomposition, tool selection, risk
+  identification scored as such) and `write`'s (golden-task correctness) are **thinner than
+  the requirement describes**: those cells were qualified against the four constitution-named
+  blocking classes, which exercise refusal and grounding rather than decomposition or task
+  completion. The machinery accepts role-matched cases the day they are written — they are
+  content, not code — and until then this line is what stops the table reading as more.
+  The `write` cells are additionally gated by the live-run rule above.
 - **Terraform's tools work.** Not in the enclave; that pack's tool layer is fixture-backed,
   and the tool half is what Principle II governs.
 - **A fixture-qualified cell is a qualified model.** It is a qualified *recording*, and the
@@ -100,6 +143,24 @@ column exists so it cannot be read as more than it is.
   here rather than fixed because widening the reader to the other dispatch paths is a change
   to how those transports construct a run, which is 009's territory and its own decision —
   and ADR-0033's parity claim is what it is owed against.
+
+## Break fixtures — applied, watched failing, reverted (T048)
+
+Every fixture below was applied to the actual tree on 2026-07-29; the named row failed;
+the tree was restored. **A row nobody has seen fail is a row nobody knows works.**
+
+| Break | Row that caught it | Outcome |
+| --- | --- | --- |
+| Skill bytes drifted without the pin changing | pack loading (digest verification) | FAILED as required |
+| Seed set thinned below the floor | judge chain (floor row) | FAILED as required |
+| A suite's case file removed | eval gates (all-suites row) | FAILED as required |
+| A product name written into `src/core` | product-blindness | FAILED as required |
+| The tool vocabulary re-hardcoded as a literal | vocabulary derivation | FAILED as required |
+| The upstream pin replaced with a branch name | no-auto-tracking | FAILED as required |
+
+Fixtures that live inside rows as positive controls (a pack that grants, a judge pointed at
+itself, a withdrawn cell that keeps running, a model verdict filed as an approval, an
+alias in the matrix) fire on every run and are not repeated here.
 
 ## Break fixtures worth naming
 
