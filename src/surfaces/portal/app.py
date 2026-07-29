@@ -41,7 +41,6 @@ def create_portal(
     relay: ApiRelay,
     oidc: OidcClient,
     sessions: SessionStore | None = None,
-    secure_cookies: bool = True,
 ) -> FastAPI:
     """Build the portal with its collaborators supplied rather than imported.
 
@@ -53,7 +52,6 @@ def create_portal(
     app.state.relay = relay
     app.state.oidc = oidc
     app.state.sessions = sessions if sessions is not None else SessionStore()
-    app.state.secure_cookies = secure_cookies
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     templates = Jinja2Templates(directory=str(TEMPLATES))
     app.state.templates = templates
@@ -100,7 +98,7 @@ def create_portal(
         response.set_cookie(
             COOKIE_NAME,
             session.session_id,
-            **cookie_attributes(secure=app.state.secure_cookies),  # type: ignore[arg-type]
+            **cookie_attributes(),  # type: ignore[arg-type]
         )
         return response
 

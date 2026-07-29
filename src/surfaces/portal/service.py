@@ -30,9 +30,6 @@ def build() -> object:
             authorize_endpoint=_required("OIDC_AUTHORIZE_ENDPOINT"),
             token_endpoint=_required("OIDC_TOKEN_ENDPOINT"),
         ),
-        # Defaults to secure. A deployment that wants otherwise has to say so, which is the
-        # right direction for a flag whose wrong value is invisible until it matters.
-        secure_cookies=os.environ.get("PORTAL_SECURE_COOKIES", "1") != "0",
     )
 
 

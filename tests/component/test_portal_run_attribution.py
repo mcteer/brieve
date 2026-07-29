@@ -50,7 +50,6 @@ def _portal_and_api(subject: str = "alice") -> tuple[TestClient, TestClient, obj
         create_portal(
             relay=ApiRelay(base_url="http://api.test", transport=transport),
             oidc=oidc,
-            secure_cookies=False,
         ),
         base_url="http://testserver",
     )

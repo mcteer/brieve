@@ -46,7 +46,7 @@ def _portal_over_api() -> tuple[TestClient, TestClient, object]:
     )
     relay = ApiRelay(base_url="http://api.test", transport=transport)
     portal = TestClient(
-        create_portal(relay=relay, oidc=oidc, secure_cookies=False),
+        create_portal(relay=relay, oidc=oidc),
         base_url="http://testserver",
     )
     state, _ = oidc.begin()

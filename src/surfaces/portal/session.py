@@ -104,19 +104,26 @@ class SessionStore:
             del self.sessions[sid]
 
 
-def cookie_attributes(*, secure: bool = True) -> dict[str, object]:
-    """How the session cookie is set.
+def cookie_attributes() -> dict[str, object]:
+    """How the session cookie is set. **Always Secure — there is no way to turn it off.**
 
-    ``HttpOnly`` so no script can read it — the single most important attribute here, since
-    the whole design rests on the browser being unable to extract anything usable.
-    ``SameSite=Lax`` so a cross-site POST cannot ride the session, while an ordinary
-    top-level navigation back from the IdP still carries it.
+    ``HttpOnly`` so no script can read it: the whole design rests on the browser being
+    unable to extract anything usable. ``SameSite=Lax`` so a cross-site POST cannot ride
+    the session, while an ordinary top-level navigation back from the IdP still carries it.
 
-    ``secure`` is a parameter only so a test client can drive the flow over plain HTTP;
-    production always sets it, and on dev loopback browsers treat `http://localhost` as a
-    trustworthy origin, so `Secure` works there too. **Known, not lucky.**
+    **`Secure` is not configurable, and the `__Host-` prefix is why.** That prefix requires
+    Secure, forbids a Domain attribute, and requires Path=/ — so a browser *rejects the
+    cookie outright* if Secure is absent, and the portal silently cannot log anyone in.
+    An earlier version took a `secure=False` parameter for dev over plain HTTP; the
+    accessibility gate found it immediately, because a real browser did what the test
+    client had not.
+
+    Dev over loopback works anyway: browsers treat `http://localhost` and `http://127.0.0.1`
+    as trustworthy origins, so a Secure cookie is accepted there. That was already the
+    claim in this docstring — the flag contradicted it, and removing the flag is what makes
+    it true. A flag whose wrong value is invisible until it matters should not exist.
     """
-    return {"httponly": True, "secure": secure, "samesite": "lax", "path": "/"}
+    return {"httponly": True, "secure": True, "samesite": "lax", "path": "/"}
 
 
 __all__ = [

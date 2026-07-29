@@ -68,3 +68,36 @@ jobs:
             exit 0
           fi
           bash scripts/check-specs.sh "${changed[@]}"
+
+  # ------------------------------------------------------------------ 012
+  # The accessibility gate. **Its own job**, not a step in fast-lane, because it is its own
+  # discipline: every other gate here asserts something about a process, and this one
+  # asserts something about a rendered interface. It needs a browser, it takes longer, and
+  # its failures are read by different people.
+  #
+  # No enclave needed — the portal runs in-process against in-memory stores and the fake
+  # IdP. What this gate checks is the page, not the platform.
+  a11y:
+    name: accessibility (WCAG 2.2 AA)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --frozen --extra adapters --extra surfaces --extra portal --extra a11y
+
+      # The axe ruleset is vendored and pinned in the tree; only the browser is fetched.
+      - name: Install browser
+        run: uv run --extra a11y playwright install --with-deps chromium
+
+      # A green run here is NOT a conformance claim. The criteria automation cannot assert
+      # are enumerated in specs/012-conversational-portal/contracts/conformance-portal.md
+      # with a named human runner — and that record is itself asserted by a row in this lane.
+      - name: Accessibility gate
+        run: uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y -q

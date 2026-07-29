@@ -98,11 +98,10 @@ job "portal" {
         PORTAL_REDIRECT_URI     = var.portal_redirect_uri
         PORTAL_BIND             = "0.0.0.0:8082"
 
-        # Dev serves the portal over plain HTTP on loopback, where browsers treat
-        # `localhost` as a trustworthy origin so `Secure` cookies still work. A real
-        # deployment terminates TLS in front of this and sets PORTAL_SECURE_COOKIES=1;
-        # that posture is a deployment concern and is deliberately not solved here.
-        PORTAL_SECURE_COOKIES = "0"
+        # The session cookie is ALWAYS Secure and always `__Host-` prefixed; there is no
+        # setting for it. Dev works over plain HTTP because browsers treat loopback as a
+        # trustworthy origin. A real deployment terminates TLS in front of this — that
+        # posture is a deployment concern and is deliberately not solved here.
 
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
       }

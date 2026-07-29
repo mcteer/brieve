@@ -79,7 +79,6 @@ def _portal_over_api(subject: str = "alice") -> PortalOverApi:
     app = create_portal(
         relay=ApiRelay(base_url="http://api.test", transport=transport),
         oidc=oidc,
-        secure_cookies=False,
     )
     portal = TestClient(app, base_url="http://testserver")
 
@@ -208,7 +207,6 @@ def test_an_unreachable_api_says_so_rather_than_showing_an_empty_platform() -> N
     app = create_portal(
         relay=ApiRelay(base_url="http://api.test", transport=dead),
         oidc=oidc,
-        secure_cookies=False,
     )
     portal = TestClient(app, base_url="http://testserver")
     state, _ = oidc.begin()

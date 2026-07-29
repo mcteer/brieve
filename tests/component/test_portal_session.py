@@ -63,7 +63,6 @@ def _portal(idp: FakeOIDCProvider, *, sessions: SessionStore | None = None) -> P
         relay=ApiRelay(base_url="http://api.test", transport=transport),
         oidc=oidc,
         sessions=sessions,
-        secure_cookies=False,  # the test client speaks plain HTTP
     )
     return PortalUnderTest(
         client=TestClient(app, base_url="http://testserver"),

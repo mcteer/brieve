@@ -68,7 +68,6 @@ def _portal_over_api() -> tuple[TestClient, TestClient, object]:
         create_portal(
             relay=ApiRelay(base_url="http://api.test", transport=transport),
             oidc=oidc,
-            secure_cookies=False,
         ),
         base_url="http://testserver",
     )
@@ -164,7 +163,6 @@ def test_a_refusal_page_distinguishes_unreachable_from_forbidden() -> None:
         create_portal(
             relay=ApiRelay(base_url="http://api.test", transport=dead),
             oidc=oidc,
-            secure_cookies=False,
         ),
         base_url="http://testserver",
     )

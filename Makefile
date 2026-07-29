@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries
+.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
@@ -51,6 +51,26 @@ conformance:
 	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
 	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity -m host_enclave -q
+	#
+	# 012's containment lane. Named here in the same change that created the directory —
+	# 010 lost a whole feature's rows to a directory no lane enumerated, and the fix is to
+	# wire it at birth rather than to remember later.
+	$(UV_RUN) pytest tests/conformance/portal -q
+
+# The accessibility gate (012, FR-020a). Its own target because it is its own DISCIPLINE:
+# every other gate here asserts something about a process, and this one asserts something
+# about a rendered interface, which needs a browser no other lane has.
+#
+# `playwright install` is idempotent and quick once the browser is cached. It is in the
+# recipe rather than in a setup document because a gate that depends on someone having read
+# something is a gate that does not run.
+#
+# The ruleset is VENDORED and pinned (tests/a11y/vendor). What this gate cannot assert is
+# recorded in specs/012-conversational-portal/contracts/conformance-portal.md with a named
+# human runner — a green run here is not a conformance claim.
+a11y:
+	uv run --extra surfaces --extra portal --extra a11y playwright install chromium
+	uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y -q
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
 # Enterprise license and cannot stand one up. This is a real coverage gap and is
