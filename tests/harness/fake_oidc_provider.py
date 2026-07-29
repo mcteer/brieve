@@ -15,12 +15,22 @@ against it.
 It can also produce the tokens that must be **refused**, which is most of what it is for:
 expired, not-yet-valid, wrong issuer, wrong audience, signed by the wrong key, and
 ``alg: none``. A verifier is judged by what it rejects.
+
+**012 grew it an authorization-code + PKCE flow** (`authorize` / `exchange`), because the
+portal is a public OIDC client and a browser has to actually walk the flow. The same rule
+applies as to the tokens: the flow is judged by what it refuses — a wrong verifier, a
+replayed code, an expired code, and `plain` challenges are all reproducible here, and the
+portal's own rows assert each is rejected. **S256 only**: `plain` is accepted by the
+specification and by nothing here, because a `plain` challenge is the verifier travelling
+in the clear beside the code it is supposed to protect.
 """
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
+import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -30,6 +40,43 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 ISSUER = "https://idp.test.invalid/"
 AUDIENCE = "harness-api"
+
+#: How long an authorization code stays exchangeable. Short by design: a code is a
+#: single-use bearer of the right to obtain a token, and every second it lives is a second
+#: it can be stolen from a browser history, a proxy log, or a referrer header.
+CODE_LIFETIME = timedelta(minutes=1)
+
+
+class AuthorizationRefused(Exception):
+    """The flow refused. Carries a code, not a message, so rows assert on the reason."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def code_challenge_for(verifier: str) -> str:
+    """S256: BASE64URL(SHA256(verifier)), unpadded — RFC 7636 §4.2.
+
+    Here rather than only in the client so a row can construct a challenge without
+    importing the thing it is testing, which would make the test agree with the
+    implementation by construction rather than by correctness.
+    """
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+@dataclass
+class _PendingCode:
+    """An issued authorization code, and everything needed to refuse its misuse."""
+
+    subject: str
+    tenant: str | None
+    claims: dict[str, Any]
+    code_challenge: str
+    redirect_uri: str
+    issued_at: datetime
+    used: bool = False
 
 
 def _b64url_uint(value: int) -> str:
@@ -51,6 +98,7 @@ class FakeOIDCProvider:
     key_id: str = "test-key-1"
     _key: rsa.RSAPrivateKey = field(init=False)
     _other_key: rsa.RSAPrivateKey = field(init=False)
+    _codes: dict[str, _PendingCode] = field(init=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         self._key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -156,9 +204,97 @@ class FakeOIDCProvider:
         )
         return f"{header.rstrip(b'=').decode()}.{body.rstrip(b'=').decode()}."
 
+    # ------------------------------------------------------ authorization code + PKCE
+
+    def authorize(
+        self,
+        *,
+        code_challenge: str,
+        code_challenge_method: str = "S256",
+        redirect_uri: str = "http://localhost/callback",
+        subject: str = "user-1",
+        tenant: str | None = "tenant-test",
+        claims: dict[str, Any] | None = None,
+    ) -> str:
+        """The `/authorize` half: the person has authenticated; here is a code.
+
+        **`plain` is refused**, not merely discouraged. RFC 7636 permits it and its whole
+        effect is to send the verifier in the clear alongside the code it exists to bind —
+        which is the attack PKCE was written to stop, reintroduced by a parameter.
+        """
+        if code_challenge_method != "S256":
+            raise AuthorizationRefused("unsupported_code_challenge_method")
+        if not code_challenge:
+            raise AuthorizationRefused("missing_code_challenge")
+        code = secrets.token_urlsafe(24)
+        self._codes[code] = _PendingCode(
+            subject=subject,
+            tenant=tenant,
+            claims=dict(claims or {}),
+            code_challenge=code_challenge,
+            redirect_uri=redirect_uri,
+            issued_at=datetime.now(UTC),
+        )
+        return code
+
+    def exchange(
+        self,
+        *,
+        code: str,
+        code_verifier: str,
+        redirect_uri: str = "http://localhost/callback",
+        lifetime: timedelta = timedelta(minutes=5),
+    ) -> str:
+        """The `/token` half: a code plus its verifier becomes a signed access token.
+
+        Four refusals, each of which is a real attack rather than a hypothetical:
+
+        - **unknown code** — a guessed or fabricated code;
+        - **used code** — replay, which is why the code is marked before the verifier is
+          even checked: a replayed code is dead whether or not the attacker also has the
+          verifier;
+        - **expired code** — a code recovered later from a log or history;
+        - **verifier mismatch** — the interception PKCE exists for, where an attacker has
+          the code from a redirect but not the verifier that never left the client.
+        """
+        pending = self._codes.get(code)
+        if pending is None:
+            raise AuthorizationRefused("unknown_code")
+        if pending.used:
+            raise AuthorizationRefused("code_already_used")
+        # Burned before validation, deliberately. A code that survives a failed exchange
+        # is a code an attacker may keep guessing verifiers against.
+        pending.used = True
+        if datetime.now(UTC) - pending.issued_at > CODE_LIFETIME:
+            raise AuthorizationRefused("expired_code")
+        if redirect_uri != pending.redirect_uri:
+            raise AuthorizationRefused("redirect_uri_mismatch")
+        if not secrets.compare_digest(code_challenge_for(code_verifier), pending.code_challenge):
+            raise AuthorizationRefused("verifier_mismatch")
+        return self.token(
+            subject=pending.subject,
+            tenant=pending.tenant,
+            claims=pending.claims,
+            lifetime=lifetime,
+        )
+
+    def expire_code(self, code: str) -> None:
+        """Age a code past its lifetime, so a row need not sleep for a minute."""
+        pending = self._codes.get(code)
+        if pending is not None:
+            pending.issued_at = pending.issued_at - CODE_LIFETIME - timedelta(seconds=1)
+
 
 def fake_oidc_provider() -> FakeOIDCProvider:
     return FakeOIDCProvider()
 
 
-__all__ = ["AUDIENCE", "ISSUER", "FakeOIDCProvider", "fake_oidc_provider"]
+__all__ = [
+    "AUDIENCE",
+    "CODE_LIFETIME",
+    "ISSUER",
+    "AuthorizationRefused",
+    "FakeOIDCProvider",
+    "code_challenge_for",
+    "fake_oidc_provider",
+]

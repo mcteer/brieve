@@ -32,10 +32,10 @@ Single project: `src/`, `tests/` at repository root, per plan.md.
 
 **Purpose**: dependencies, fixtures, and the one growth every later phase leans on.
 
-- [ ] T001 Add `portal` extra (`jinja2`) and `a11y` dev extra (`playwright`) to `pyproject.toml`, with the comment discipline the existing extras use — say why each is an extra and not a base dependency
-- [ ] T002 [P] Vendor pinned `axe.min.js` into `tests/a11y/vendor/` with version and license noted in `tests/a11y/vendor/README.md` (MPL-2.0; unmodified single file)
-- [ ] T003 Grow `tests/harness/fake_oidc_provider.py` with an authorization-code + PKCE flow: `/authorize` (code issuance bound to `code_challenge`) and `/token` (code + `code_verifier` exchange, S256 only, single-use codes). It must also mint what must be **refused**: wrong verifier, replayed code, expired code — a flow is judged by what it rejects
-- [ ] T004 [P] Unit rows for the PKCE flow in `tests/unit/test_fake_oidc_pkce.py`: happy path verifies; wrong verifier, replayed code, and `plain` method are refused
+- [X] T001 Add `portal` extra (`jinja2`) and `a11y` dev extra (`playwright`) to `pyproject.toml`, with the comment discipline the existing extras use — say why each is an extra and not a base dependency
+- [X] T002 [P] Vendor pinned `axe.min.js` into `tests/a11y/vendor/` with version and license noted in `tests/a11y/vendor/README.md` (MPL-2.0; unmodified single file)
+- [X] T003 Grow `tests/harness/fake_oidc_provider.py` with an authorization-code + PKCE flow: `/authorize` (code issuance bound to `code_challenge`) and `/token` (code + `code_verifier` exchange, S256 only, single-use codes). It must also mint what must be **refused**: wrong verifier, replayed code, expired code — a flow is judged by what it rejects
+- [X] T004 [P] Unit rows for the PKCE flow in `tests/unit/test_fake_oidc_pkce.py`: happy path verifies; wrong verifier, replayed code, and `plain` method are refused
 
 **Checkpoint**: `make check` green with the new extras resolving.
 

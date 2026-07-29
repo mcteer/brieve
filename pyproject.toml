@@ -58,6 +58,25 @@ surfaces = [
     "uvicorn==0.51.0",
 ]
 
+# The portal surface (ADR-0034, 012). An extra for the same reason `surfaces` is one:
+# jinja2 is imported only by `src/surfaces/portal`, and the core install must not acquire
+# a template engine. Deliberately absent from this list: any JS build toolchain, any SPA
+# framework, and any HTTP client — the portal's relay uses urllib, as the enclave readers
+# already do, so the thin-client rule stays auditable by reading rather than by trusting.
+portal = [
+    "jinja2==3.1.6",
+]
+
+# The accessibility gate (012, FR-020a). Dev-lane only, never operated: playwright drives
+# a real browser over the rendered client because a WCAG assertion is about a rendered
+# interface, which no process-only lane can see. The axe-core ruleset is VENDORED at a
+# pinned version in tests/a11y/vendor rather than fetched — what the gate executes is
+# pinned (Principle VIII), and a gate whose ruleset drifts silently is a gate whose
+# meaning drifts silently.
+a11y = [
+    "playwright==1.58.0",
+]
+
 
 [dependency-groups]
 dev = [
