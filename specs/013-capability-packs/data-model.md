@@ -42,9 +42,21 @@ authority by shipping a file.
 | `name` | string | Registered under this name in the one governed registry |
 | `risk_class` | enum | `read` \| `write` \| `destructive` \| `secret_touching` |
 | `transport` | enum | `mcp` \| `native`. A tool property (Principle II), never a uniformity requirement |
+| `product_mode` | enum | `none` \| `federate` \| `broker`. **Declared, not inferred** — the registry raises a `ValueError` when this is not `none` and `product`/`product_action` are absent, and a manifest should refuse in its own vocabulary rather than surface a driver-level error |
+| `product` | string? | Required when `product_mode != none` |
 | `product_action` | string? | Joins to the ceiling vocabulary, as 010 established |
 | `repeatable` | bool | Existing registry semantics |
-| `isolation_required` | bool | Registry review may demand process isolation for `secret_touching` and `destructive` |
+| `observer` | string? | **Required when `repeatable = false`.** Names the observer that answers "what actually happened" for a call interrupted mid-flight |
+| `isolation_required` | bool | Registry review may demand process isolation for `secret_touching` and `destructive`. **Declared and not yet enforced in 013** — recorded so a boolean nobody reads is not mistaken for a control |
+
+**`observer` is the field whose absence would have broken every real pack.** The registry's
+own comment says it plainly: *required in practice for a non-repeatable tool — without one,
+an interrupted step resolves to `CANNOT_DETERMINE` and parks the run.* A pack's `write` and
+`destructive` tools are exactly the non-repeatable ones, so a manifest that declared
+`repeatable = false` and no observer would ship every dangerous tool with 005's
+re-observation machinery unreachable — green gates over runs that suspend the first time
+anything is interrupted. **Loading refuses `observer_required`**, which is where a
+"required in practice" becomes checkable rather than hoped for.
 
 **`risk_class` is the finding F2 made real.** It exists in the glossary and nowhere in the
 code; nothing in this platform has ever known how dangerous a tool is. Harmless while every
@@ -224,6 +236,8 @@ investigator looking for the second should not have to filter the first.
 | Skill content fails digest verification | `digest_mismatch` |
 | Skill bump missing provenance, review, or a passing eval | `promotion_incomplete` |
 | Injection-lens refusal | `injection_suspected` |
+| Non-repeatable tool declared with no observer | `observer_required` — refused at load. The registry calls an observer "required in practice"; this is where that becomes checkable |
+| `product_mode` set without `product` or `product_action` | `incomplete_product_binding` — refused at load, in the pack's own vocabulary, rather than as a registry `ValueError` |
 | Definition names a pack that is not loaded | `pack_not_loaded` — refused **at run start**, so the person is told before anything executes rather than after a step has run |
 | Pack ships fewer eval cases than the floor | `insufficient_eval_coverage` — refused **at load**, not warned about, because a floor nothing enforces is a suggestion and the failure belongs where the pack is added |
 

@@ -12,11 +12,19 @@ A pack **declares**; the platform **decides**. Nothing in a manifest grants anyt
 2. **Verify every content digest.** A mismatch refuses with `digest_mismatch` and names the
    file. Verification happens at load rather than at review, because review is when someone
    looked and load is when it matters.
-3. **Check the eval-coverage floor.** A pack shipping fewer than five cases per suite is
+3. **Validate every tool declaration.** A non-repeatable tool with no observer refuses
+   `observer_required`; a `product_mode` other than `none` without `product` and
+   `product_action` refuses `incomplete_product_binding`. Both in the pack's own vocabulary
+   rather than as a registry `ValueError` one layer down.
+4. **Check the eval-coverage floor.** A pack shipping fewer than five cases per suite is
    refused `insufficient_eval_coverage` — **at load, not at gate time**. The failure belongs
    where the pack is added rather than where a gate later reports a number nobody reads.
-4. **Register the tools** into the one governed registry, `risk_class` preserved.
-5. **Record the pack as available**, not as *granted* — availability is not access.
+5. **Register the tools** into the one governed registry, `risk_class` preserved.
+6. **Record the pack as available**, not as *granted* — availability is not access.
+
+**All manifest validation happens at load, and this list is closed.** A refusal added
+later belongs in this sequence rather than beside it — the point of one ordered list is that
+a reader knows where to look for every way a pack can be rejected.
 
 ## What loading does NOT do
 
