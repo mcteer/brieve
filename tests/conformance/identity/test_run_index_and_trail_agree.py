@@ -9,6 +9,11 @@ the same dispatch — but to different stores, with no transaction spanning them
 one.** So the divergence is asserted rather than assumed, and the row is loud when it
 happens.
 
+**Both accounts are read under the same operator credentials**, so a disagreement is
+about what was written rather than about who was allowed to see it. These rows run on the
+host because they drive the scheduler, and a host process holds no attested identity — the
+conftest's `OperatorCredentials` says what that means and why it is not a `core` class.
+
 **It waits for the allocation to reach a terminal state before comparing.** The index is
 written at dispatch; `run_start` is written inside the allocation, minutes later on a cold
 one. Comparing inside that window would flake at exactly the cadence cold allocations
@@ -27,7 +32,6 @@ from typing import Any
 
 import pytest
 
-from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.runs.index import PostgresRunIndex
 from surfaces.dispatch.nomad import NomadDispatcher
 
@@ -35,10 +39,6 @@ pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
 NOMAD_ADDR = "http://127.0.0.1:4646"
 TENANT = "tenant-conformance"
-
-
-def _credentials() -> VaultDatabaseCredentials:
-    return VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role="conformance")
 
 
 def _wait_terminal(dispatched_job_id: str, *, timeout: float = 720.0) -> str:
@@ -68,7 +68,9 @@ def _trail_has(connection: Any, correlation_id: str) -> bool:
     return cur.fetchone() is not None
 
 
-def test_row_a_dispatched_run_appears_in_both_accounts(run_connection: Any) -> None:
+def test_row_a_dispatched_run_appears_in_both_accounts(
+    trail_connection: Any, operator_credentials: Any
+) -> None:
     """The index a person reads and the trail an investigator reads agree.
 
     Dispatched with a real subject and tenant, waited to completion, then both stores are
@@ -76,7 +78,7 @@ def test_row_a_dispatched_run_appears_in_both_accounts(run_connection: Any) -> N
     row exists to make loud.
     """
     correlation_id = f"divergence-{uuid.uuid4().hex[:12]}"
-    index = PostgresRunIndex(credentials=_credentials())
+    index = PostgresRunIndex(credentials=operator_credentials)
     dispatcher = NomadDispatcher(nomad_addr=NOMAD_ADDR, job_id="agent-run", run_index=index)
 
     dispatcher.dispatch(
@@ -95,7 +97,7 @@ def test_row_a_dispatched_run_appears_in_both_accounts(run_connection: Any) -> N
 
     page = index.list_for(tenant_id=TENANT, subject_user_id="alice", limit=200)
     in_index = any(e.correlation_id == correlation_id for e in page.entries)
-    in_trail = _trail_has(run_connection, correlation_id)
+    in_trail = _trail_has(trail_connection, correlation_id)
 
     assert in_index and in_trail, (
         f"the two accounts of this run disagree — index={in_index}, trail={in_trail}. "
@@ -104,14 +106,16 @@ def test_row_a_dispatched_run_appears_in_both_accounts(run_connection: Any) -> N
     )
 
 
-def test_row_the_index_records_the_subject_the_trail_records(run_connection: Any) -> None:
+def test_row_the_index_records_the_subject_the_trail_records(
+    trail_connection: Any, operator_credentials: Any
+) -> None:
     """Not merely that both know of the run — that they agree about whose it was.
 
     A run present in both under different subjects would satisfy the row above and be a
     worse failure than absence: two confident, contradictory answers to "who did this".
     """
     correlation_id = f"divergence-subject-{uuid.uuid4().hex[:12]}"
-    index = PostgresRunIndex(credentials=_credentials())
+    index = PostgresRunIndex(credentials=operator_credentials)
     dispatcher = NomadDispatcher(nomad_addr=NOMAD_ADDR, job_id="agent-run", run_index=index)
 
     dispatcher.dispatch(
@@ -129,7 +133,7 @@ def test_row_the_index_records_the_subject_the_trail_records(run_connection: Any
     entry = index.get(run_id=correlation_id, tenant_id=TENANT)
     assert entry is not None and entry.subject_user_id == "alice"
 
-    cur = run_connection.cursor()
+    cur = trail_connection.cursor()
     cur.execute(
         "SELECT payload FROM audit_entries WHERE correlation_id = %s AND event_type = %s",
         (correlation_id, "authority_issued"),

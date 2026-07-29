@@ -1,7 +1,7 @@
 # Contract: operations conformance lane
 
 **Feature**: `specs/011-api-operations`
-**Status**: Planned
+**Status**: **In force** (as of 011's merge)
 **Depends on**: Constitution Quality Gates (v1.2.0); ADR-0033; ADR-0035; ADR-0047; ADR-0049
 
 ## The row that grows rather than the row that is added
@@ -48,9 +48,26 @@ helper" is cheapest to add.
   and erases a stop the next time the running allocation checkpoints. The fixture stops a
   run, forces a routine checkpoint, and asserts the terminal state survived — because the
   COALESCE guard is one simplification away from the defect at all times.
+
+  **Run, and it caught the guard's own blind spot.** Applied for real at T041, the break
+  was survived by every component row: they build the in-memory provider, and the guard is
+  implemented twice. It also erased the *whole* outcome rather than only the state — a
+  stopped run came back reading as one that never ended, which is worse than the described
+  defect. The row that catches it is
+  `tests/conformance/durability/test_rows.py::test_a_routine_checkpoint_cannot_un_terminal_a_stopped_run`,
+  in the provider-parameterised lane, which is the only thing here that runs a row twice.
+  A guard implemented once per provider needs a row that runs once per provider.
 - **A result endpoint that returns the checkpoint payload.** Passes every disposition row
   — the result *is* in there — and makes resume state a compatibility surface. The fixture
   asserts resume-internal keys are absent from the response.
+
+## These were run, not described (T041)
+
+Every fixture above was applied to the tree, the row watched to fail, and the change
+reverted. Three were caught by the lane that owns them. The fourth was not, and finding
+that out is the whole reason the gate says *run* rather than *record*: a row nobody has
+seen fail is a row nobody knows works, and the one that did not fail was the one guarding
+the defect this feature was most likely to reintroduce.
 
 ## The fixture prerequisite, again
 

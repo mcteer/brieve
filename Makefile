@@ -41,7 +41,16 @@ conformance:
 	# that no lane collects. `tests/conformance/identity` was invisible to this line while
 	# passing everywhere it was asked to run, which is the same shape as the rows the
 	# in-allocation lane could not see.
-	$(UV_RUN) pytest tests/conformance/api tests/conformance/identity -m host_enclave -q
+	#
+	# The enclave's coordinates come from .env because `uv run` does not read it, and
+	# 011's divergence rows read the trail as an OPERATOR — a host process holds no
+	# attested identity, so the alternative is a row that cannot run where it belongs.
+	# Passed on the command line rather than exported: it stays scoped to this one lane.
+	@A=$$(grep '^VAULT_ADDR=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
+	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity -m host_enclave -q
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
 # Enterprise license and cannot stand one up. This is a real coverage gap and is

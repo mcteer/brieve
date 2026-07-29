@@ -31,10 +31,11 @@ being re-derived at the start of every spec.
 | 008 | Northbound API | ADR-0033 (first transport), ADR-0035, ADR-0016 (consumes), ADR-0015 | Seventeen API rows, nine needing the enclave. **Parity deliberately not claimed** — one transport is nothing to compare |
 | 009 | MCP surface | ADR-0033 (second transport), ADR-0049 (**resolved by building it**), ADR-0035, ADR-0048 | Fifteen MCP rows. **Surface parity claimed** — the row 008 could not assert, now that there are two transports to compare |
 | 010 | Production identity fabric | ADR-0015 (**first feature that reads the registry at runtime**), ADR-0050 (new), ADR-0044 (mirroring seam; credential translation still deferred), ADR-0048 | Identity rows against the live trust fabric, in-allocation. **The gap every prior feature rested on** |
+| 011 | Northbound API operations | ADR-0033 (the parity row grows with the catalogue), ADR-0034 (the portal's precondition), ADR-0035, ADR-0016, ADR-0049 (stop as withdrawal, not the pause it removed) | Sixteen operation rows, plus verdict parity over the grown catalogue |
 
 ## In progress
 
-Nothing. 010 shipped; the next feature has no number until `/speckit-specify` creates its
+Nothing. 011 shipped; the next feature has no number until `/speckit-specify` creates its
 directory.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
@@ -68,7 +69,7 @@ wearing a different name.
 | 008 | **API** | ✅ Shipped. The surface the others consume. Carries the audit plane as a governed read path |
 | 009 | **MCP** | ✅ Shipped. The persistent service coding IDEs talk to. Carries the dependency health checks and the resume sweeper decided in ADR-0049 — both needed a long-lived home, and this is it — plus the continuous evidence-stream verification 008 deferred here, and the second CI lane |
 | — | CLI | **Tabled** (2026-07-28) — see below |
-| — | Portal | Over the API. ADR-0034 |
+| — | Portal | Over the API. ADR-0034. **Its API preconditions are met as of 011** — the catalogue carries the operations a portal needs; what remains is the portal, and the thread model that ships with it |
 
 **Gate row, no longer owed:** surface parity. It stayed owed through 008 because parity
 cannot be asserted against a single surface. **009 amended the row and satisfied the amended
