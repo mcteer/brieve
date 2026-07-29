@@ -194,7 +194,7 @@ for; submit with a non-startable agent → scope refusal; neither starts a run.
 - [X] T057 [P] Break fixtures from `contracts/conformance-portal.md`, each applied to the tree, watched to fail, reverted: dispatch-before-record (decline branch), one-byte-truncated context, relay-bypassing fetch, token-in-cookie. A row nobody has seen fail is a row nobody knows works
 - [X] T058 [P] Update `ROADMAP.md`: 012 shipped — catalogue at fifteen, portal live as a contained consumer, the answering classes' entry named as following capability packs; record F2's lesson (operation rows passed for a year against an unserved surface)
 - [X] T059 [P] Record rows **In force** in `specs/012-conversational-portal/contracts/conformance-portal.md`, including the manual-checklist run (named runner: Dan) with date; note in `specs/008-northbound-api/contracts/conformance-api.md` that the snapshot grew 10 → 15
-- [ ] T060 [GATE:conformance] Run `make check`, `make conformance`, and `make a11y` against a live enclave on a clean tree; walk quickstart.md sections 4–6 in a real browser; run the manual accessibility checklist and record it
+- [X] T060 [GATE:conformance] Run `make check`, `make conformance`, and `make a11y` against a live enclave on a clean tree; walk quickstart.md sections 4–6 in a real browser; run the manual accessibility checklist and record it
 
 ---
 

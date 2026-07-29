@@ -91,6 +91,21 @@ never implies more than it tested:
 **Named runner for the manual half** (constitution v1.1.0): **Dan**, before merge, using
 the checklist above. Merging without that pass recorded is a gate regression.
 
+### Manual checklist — status at 012's merge
+
+**NOT YET RUN.** The automated half is green (8 rows, every page state, WCAG 2.2 AA); the
+criteria in the table above need a person with a screen reader and a keyboard, and that
+pass has not happened.
+
+Recorded as outstanding rather than quietly omitted, because the whole point of
+enumerating what automation cannot assert is that somebody notices its absence. Per
+constitution v1.1.0 this is **merge-blocking**: Dan runs the checklist and records the
+date and outcome here before 012 merges.
+
+| Run by | Date | Outcome |
+| --- | --- | --- |
+| _(pending)_ | | |
+
 ## Eval gates — scoped absence
 
 Constitution eval gates (must-decline suites, citation accuracy) bind **packs, prompts,
@@ -98,6 +113,29 @@ models, and policies**. This feature ships none — the decline path is determin
 the answering classes are split out — so no eval gate binds here. Recorded so the absence
 reads as scoped rather than forgotten; the answering feature inherits this paragraph as
 its starting obligation.
+
+## Gate run at 012 (T060)
+
+Against a live enclave, on a clean tree:
+
+| Gate | Result |
+| --- | --- |
+| `make check` | 532 passed |
+| `make conformance` — hermetic | 92 passed |
+| `make conformance` — in-allocation durability | 81 passed, under an attested workload identity, no token anywhere |
+| `make conformance` — enclave-marked | 10 passed |
+| `make conformance` — host lane | 15 passed (12m30s; the divergence rows wait for real allocations) |
+| `make conformance` — portal containment | 8 passed |
+| `make a11y` | 8 passed |
+
+Exit status 0 for both `make conformance` and `make a11y`.
+
+**One defect was found by this run and nothing before it**: every dispatched allocation
+died with `relation "run_inputs" does not exist`. The entrypoint reads its input at run
+start, and the table had been left to the API service's migrate-on-boot — but the API had
+never been deployed before this feature, so on an enclave brought up beforehand it did not
+exist. `infra/bin/enclave-up` now applies the thread schema in the same pass as the others,
+and its comment — which already said this rule had bitten three times — says four.
 
 ## Sealed-core review
 
