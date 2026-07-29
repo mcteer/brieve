@@ -42,6 +42,29 @@ class AuditEventType(StrEnum):
     #: is awaiting quorum has not issued anything, and filing it as an issuance would make
     #: the trail claim authority was granted at the moment it was asked for.
     AUTHORITY_CHANGE_OBSERVED = "authority_change_observed"
+    #: A person's message, recorded as the rationale for what it caused (ADR-0051, 012).
+    #:
+    #: Written for every **accepted** turn — one that dispatched, one that was declined
+    #: because nothing could be dispatched, and one refused on scope — *before* the turn
+    #: does anything else. A declined ask is still an ask, and after a thread is deleted
+    #: this event is the only copy of it: threads are a deletable view, and this is the
+    #: record. It carries the message verbatim, which is a deliberate divergence from
+    #: `redact_arguments` and is argued in ADR-0051 rather than assumed here.
+    TURN_RECORDED = "turn_recorded"
+    #: A message the platform never accepted — rate-limited, or over its size bound.
+    #:
+    #: Separate from TURN_RECORDED because it carries the message's SIZE and never its
+    #: content. Recording the content here would make the append-only trail growable at
+    #: whatever rate a caller can be refused, so the bound protecting dispatch would leave
+    #: evidence unbounded; recording nothing would make flooding invisible. The size is
+    #: what lets an investigator see the shape of an abuse attempt without the trail
+    #: carrying its payload.
+    TURN_REFUSED = "turn_refused"
+    #: A thread's view was removed. The turns it held remain in this trail.
+    #:
+    #: In the chain, so "the deletion itself appears in the trail" is a row rather than a
+    #: claim — and so deletion is demonstrably not a masking primitive.
+    THREAD_DELETED = "thread_deleted"
 
 
 class AuditEntry(BaseModel):

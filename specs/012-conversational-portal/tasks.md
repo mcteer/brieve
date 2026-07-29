@@ -49,13 +49,13 @@ demonstrable until this phase completes.
 
 ### The records and the sealed-core change
 
-- [ ] T005 Add `TURN_RECORDED`, `TURN_REFUSED`, and `THREAD_DELETED` to `AuditEventType` in `src/core/audit/schema.py` with docstrings carrying the D4 reasoning (a declined ask is an ask; the trail is the record). This is the feature's one sealed-core change — note the spec approval + reviewer in the commit
-- [ ] T006 Create `src/core/threads/__init__.py` with the package intent docstring: threads are a view, the trail is the record, nothing here is on the resume path
-- [ ] T007 [P] Create `src/core/threads/records.py`: `ThreadRecord`, `TurnRecord`, `TurnDisposition` (`dispatched`/`declined`/`refused`), `RunInput`, and the stated bounds `MAX_MESSAGE_BYTES = 8192`, `CONTEXT_TURNS = 5` (FR-009a — named constants, not emergent limits)
-- [ ] T008 [P] Create `src/core/threads/schema.sql`: `threads`; `thread_turns` **carrying denormalized `tenant_id` + `subject_user_id`** (the rate window is per-person across threads — a per-thread join answers the wrong question) with the `(tenant_id, subject_user_id, created_at)` index **on both `threads` and `thread_turns`** (the rate window sums two counts, one per table); `run_inputs` — idempotent, every statement `IF NOT EXISTS`
-- [ ] T009 Create `src/core/threads/store.py`: `ThreadStore` protocol + `InMemoryThreadStore` — create/get/list (keyset, no totals)/delete for threads; append/list for turns with `seq` assignment; put/get for run inputs; tenant collapse in `get` exactly as `RunIndex.get` does it
-- [ ] T010 Create `src/core/threads/postgres.py`: `PostgresThreadStore` under the workload credentials, `seq` assigned under `SELECT ... FOR UPDATE` on the thread row (two tabs cannot interleave into ambiguity), `migrate()` applying schema.sql, hard delete cascading turns, `run_inputs` insert-only `ON CONFLICT DO NOTHING`
-- [ ] T011 [P] Component rows in `tests/component/test_thread_store.py`: both stores — create/list/get/delete parity of semantics, tenant collapse, seq density under concurrent appends (in-memory), keyset paging without totals
+- [X] T005 Add `TURN_RECORDED`, `TURN_REFUSED`, and `THREAD_DELETED` to `AuditEventType` in `src/core/audit/schema.py` with docstrings carrying the D4 reasoning (a declined ask is an ask; the trail is the record). This is the feature's one sealed-core change — note the spec approval + reviewer in the commit
+- [X] T006 Create `src/core/threads/__init__.py` with the package intent docstring: threads are a view, the trail is the record, nothing here is on the resume path
+- [X] T007 [P] Create `src/core/threads/records.py`: `ThreadRecord`, `TurnRecord`, `TurnDisposition` (`dispatched`/`declined`/`refused`), `RunInput`, and the stated bounds `MAX_MESSAGE_BYTES = 8192`, `CONTEXT_TURNS = 5` (FR-009a — named constants, not emergent limits)
+- [X] T008 [P] Create `src/core/threads/schema.sql`: `threads`; `thread_turns` **carrying denormalized `tenant_id` + `subject_user_id`** (the rate window is per-person across threads — a per-thread join answers the wrong question) with the `(tenant_id, subject_user_id, created_at)` index **on both `threads` and `thread_turns`** (the rate window sums two counts, one per table); `run_inputs` — idempotent, every statement `IF NOT EXISTS`
+- [X] T009 Create `src/core/threads/store.py`: `ThreadStore` protocol + `InMemoryThreadStore` — create/get/list (keyset, no totals)/delete for threads; append/list for turns with `seq` assignment; put/get for run inputs; tenant collapse in `get` exactly as `RunIndex.get` does it
+- [X] T010 Create `src/core/threads/postgres.py`: `PostgresThreadStore` under the workload credentials, `seq` assigned under `SELECT ... FOR UPDATE` on the thread row (two tabs cannot interleave into ambiguity), `migrate()` applying schema.sql, hard delete cascading turns, `run_inputs` insert-only `ON CONFLICT DO NOTHING`
+- [X] T011 [P] Component rows in `tests/component/test_thread_store.py`: both stores — create/list/get/delete parity of semantics, tenant collapse, seq density under concurrent appends (in-memory), keyset paging without totals
 
 ### The turn decision
 
