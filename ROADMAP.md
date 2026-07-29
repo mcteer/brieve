@@ -128,9 +128,11 @@ worth doing before there is enough tool surface for the efficiency to matter.
 
 **Owed gate row:** tool-call parity under deferred disclosure.
 
-### 011 — Multi-tenancy (ADR-0046)
+### Multi-tenancy (ADR-0046)
 
 One platform, isolated tenants, using the products' own isolation primitives.
+
+**Unnumbered, per this file's own rule** — it had been headed `011`, which 011 then went to. Guessing a number reads as a fact and is wrong the moment anything is specified out of order, which is exactly what happened.
 
 **Why last of the scheduled set:** it multiplies every guarantee above it. Isolating tenants
 before the things being isolated are stable means doing the work twice.
@@ -171,13 +173,12 @@ ADR — never a passing stub.**
 
 ## Open records
 
-Two ADRs remain **Proposed** and are expected to resolve rather than linger. Neither blocks the
+One ADR remains **Proposed** and is expected to resolve rather than linger. Neither blocks the
 sequence above, but a Proposed record that quietly becomes permanent is a failure of the process
 ([`docs/adr/README.md`](docs/adr/README.md)).
 
 - **ADR-0011** — harness-first SDKs at the perimeter; awaiting the evidence ADR-0012 produces.
-- **ADR-0012** — harness-as-runtime vs governance-attach; an experiment with a defined decision
-  point, partially amended by ADR-0027.
+- **ADR-0012** — ✅ **Accepted 2026-07-29.** Harness-as-runtime leads. Decided on the platform's own construction rather than the early-adopter cohort the ADR named, because there is no cohort yet — recorded that way in the ADR's Resolution, since a record claiming evidence that never arrived is worse than one admitting its basis.
 
 ## Known gaps in the record
 

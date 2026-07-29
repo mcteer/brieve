@@ -1,6 +1,6 @@
 # ADR-0012: Harness-as-runtime leads; governance-attach is the committed second posture
 
-- **Status**: Proposed — decided by early-adopter evidence
+- **Status**: Accepted (2026-07-29) — harness-as-runtime leads. See Resolution
 - **Date**: 2026-03-04
 - **Relates to**: [ADR-0011](0011-harness-first-sdks-at-perimeter.md), [ADR-0014](0014-two-layer-runtime-protection.md)
 
@@ -60,5 +60,33 @@ Until the decision point is reached, some design questions stay open longer than
 otherwise would, because they have different answers depending on which posture leads.
 That is the cost of not guessing, and it is worth paying.
 
-This ADR remains **Proposed** by design; it will be resolved to Accepted with a stated
-outcome once the evidence is in, rather than being quietly forgotten.
+This ADR remained **Proposed** by design; it is resolved below, with a stated outcome —
+which is what it asked for, rather than being quietly forgotten.
+
+## Resolution
+
+**Accepted 2026-07-29. Harness-as-runtime leads.** Governance-attach stays committed and
+second, exactly as decided; nothing above is withdrawn.
+
+**The basis is not the one this ADR named, and that is worth stating plainly.** The
+decision point was "the first cohort's actual usage." There is no cohort — the platform is
+pre-release with a sole maintainer, and waiting for one would leave this record Proposed
+for as long as it takes to acquire customers, which is the quiet forgetting it was written
+to prevent.
+
+What decided it instead is the platform's own construction. Eleven features have landed
+and every one of them deepens the runtime: the governed core, per-task authority, durable
+execution, the trust fabric, and a northbound catalogue whose operations all describe
+*runs the harness owns*. Nothing built so far enforces at the wire for an agent the
+platform does not run. The investment question this ADR posed has been answered by eleven
+consecutive answers, none of which was framed as answering it.
+
+**What this does not settle.** It is evidence about what was built, not about what buyers
+want, and those come apart. If the first cohort arrives carrying existing agents, this
+resolution was reached on the wrong basis and should be revisited — under Principle X, by
+a superseding record rather than by editing this one.
+
+**Consequence for [ADR-0011](0011-harness-first-sdks-at-perimeter.md).** It is Proposed
+"awaiting the evidence ADR-0012 produces". The evidence here is weaker than what it was
+waiting for, so this resolution does not automatically resolve it. It is now the only
+Proposed record in the repository.
