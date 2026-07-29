@@ -200,6 +200,7 @@ investigator looking for the second should not have to filter the first.
 | Skill content fails digest verification | `digest_mismatch` |
 | Skill bump missing provenance, review, or a passing eval | `promotion_incomplete` |
 | Injection-lens refusal | `injection_suspected` |
+| Pack ships fewer eval cases than the floor | `insufficient_eval_coverage` — refused **at load**, not warned about, because a floor nothing enforces is a suggestion and the failure belongs where the pack is added |
 
 Each is added to `OPERATION_REASONS` rather than invented at a call site — the 010 rule,
 and the reason a conformance row can assert on any of them.

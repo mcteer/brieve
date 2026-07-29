@@ -45,7 +45,7 @@ never in the blocking lane.
 Postgres already run, which is why Vault was the right second pack.
 
 **Project Type**: a core seam (pack loading) + content (two packs) + a gate discipline
-(evals) + one trust-fabric record type (the matrix).
+(four suites in force, report fidelity owed) + one trust-fabric record type (the matrix).
 
 **Performance Goals**: none newly binding. An eval run is a gate, not a hot path.
 
@@ -107,7 +107,7 @@ specs/013-capability-packs/
 ├── contracts/
 │   ├── pack-manifest.md          # What a pack declares; what loading it does
 │   ├── qualified-matrix.md       # Cells, binding maps, refusals, fallback
-│   └── conformance-packs.md      # Four gates, the owed fifth, per-cell fixture/live record
+│   └── conformance-packs.md      # Four gates in force, the fifth owed, per-cell record
 └── tasks.md             # /speckit-tasks output (not created here)
 ```
 

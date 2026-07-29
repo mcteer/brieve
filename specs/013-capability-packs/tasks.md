@@ -60,16 +60,16 @@ audit events. No story is demonstrable until this phase completes.
 - [ ] T011 Create `src/core/packs/isolation.py`: which packs a definition reaches, the no-widening check against its ceiling, and ambiguous-tool-name refusal. A tool name is qualified by its pack; an unqualified name reachable from two packs refuses rather than resolving by load order, because load order changes without anyone deciding it did
 - [ ] T011a Create `src/core/packs/workflows.py`: `WorkflowRecord` (`name`, `minimum_tier`, `paved`) and tier comparison. **The manifest already declared `workflows[]` and nothing in the platform had a runtime shape for one**, so tiers had nothing to bound and US5's rows would have asserted a refusal against a concept that did not exist. Deliberately minimal — a workflow here is a named, tiered thing a definition may or may not run, which is all ADR-0045 needs; what a workflow *does* is pack content
 - [ ] T012 [P] Component rows in `tests/component/test_pack_loading.py`: manifest parsing, digest verification and its refusal, two packs side by side, ambiguous name refused, and that a malformed manifest refuses the whole load rather than partially loading
+- [ ] T012a [GATE:fail-closed] Derive `KNOWN_TOOLS` / `KNOWN_ACTIONS` from loaded packs at the two sites that must agree with reality — `src/surfaces/api/service.py` and `tests/conformance/identity/conftest.py`. **`tests/unit/test_ceiling_record_shape.py` keeps its own literal vocabulary and gains a comment saying why**: it is a hermetic unit row about the *parser*, and pulling pack loading into it would put content on the fast lane to test something that has nothing to do with packs. **Without this the first real pack is unusable**: `parse_ceiling_record` refuses any ceiling naming a tool outside the known set (`unknown_ceiling_entry`), so a Vault pack declaring `vault_read` makes a correct ceiling record look like a broken one, and the error points at the wrong artifact. `entrypoint.py` already derives from `registry.tool_names()` — it is the only site that does
+- [ ] T012b [P] [GATE:conformance] Row in `tests/conformance/packs/test_tool_vocabulary_comes_from_packs.py`: no hardcoded tool-name set survives in `src/` or in any lane that resolves a real ceiling. **`tests/unit/test_ceiling_record_shape.py` is a declared exemption with its reason inline**, on the `ENCLAVE_PATHS` pattern — an allowlist whose membership is asserted, so adding a second is a decision somebody makes on the record. Asserted structurally, because three copies of a constant is how the fourth gets missed. **Wire `tests/conformance/packs` into the Makefile conformance recipe in this same task** — the directory is created here and T043 would not wire it until Phase 8, leaving these rows unrun for six phases. 010 lost a feature's rows to a directory no lane enumerated; wiring at birth is the fix, and doing it later is the same gap in slow motion
 
 ### The matrix
 
 - [ ] T013 Create `src/core/evals/__init__.py` with the package intent: gates are records, not claims
-- [ ] T012a [GATE:fail-closed] Derive `KNOWN_TOOLS` / `KNOWN_ACTIONS` from loaded packs at the two sites that must agree with reality — `src/surfaces/api/service.py` and `tests/conformance/identity/conftest.py`. **`tests/unit/test_ceiling_record_shape.py` keeps its own literal vocabulary and gains a comment saying why**: it is a hermetic unit row about the *parser*, and pulling pack loading into it would put content on the fast lane to test something that has nothing to do with packs. **Without this the first real pack is unusable**: `parse_ceiling_record` refuses any ceiling naming a tool outside the known set (`unknown_ceiling_entry`), so a Vault pack declaring `vault_read` makes a correct ceiling record look like a broken one, and the error points at the wrong artifact. `entrypoint.py` already derives from `registry.tool_names()` — it is the only site that does
-- [ ] T012b [P] [GATE:conformance] Row in `tests/conformance/packs/test_tool_vocabulary_comes_from_packs.py`: no hardcoded tool-name set survives in `src/` or in any lane that resolves a real ceiling. **`tests/unit/test_ceiling_record_shape.py` is a declared exemption with its reason inline**, on the `ENCLAVE_PATHS` pattern — an allowlist whose membership is asserted, so adding a second is a decision somebody makes on the record. Asserted structurally, because three copies of a constant is how the fourth gets missed
 - [ ] T013a [GATE:fail-closed] Grant `read` on `${vault_mount.harness_authority.path}/data/model-matrix/*` in `infra/modules/trust-fabric/policies.tf`, beside the ceiling and role-binding grants. **Before T014, not in Polish** — the policy covers exactly two prefixes today, so without this the matrix is unreadable at run time AND Vault answers **403 rather than 404**, which makes "no matrix" indistinguishable from "not allowed to look" and reports an unreachable trust fabric for a matrix that merely lacks a grant. The `data/policies/*` block directly below documents this exact trap from 010; copy its reasoning rather than rediscovering it
 - [ ] T013b [P] Row in `tests/conformance/identity/test_matrix_is_readable.py` (`host_enclave`): the run role can read the matrix path against the live fabric. A row rather than a Terraform review, because the grant being present in HCL and the grant being effective are different claims — 010 learned that when the registry engine appended policies nobody had declared
 - [ ] T014 Create `src/core/authority/matrix.py`: `QualifiedCell`, the Vault-backed matrix reader (010's ceiling pattern — operator-authored, read-only to runs, refused loudly when absent), and `validate_binding_map`. Each cell carries `qualified_by` (`fixture | live`) and the judge that scored it. **In `core/authority`, not `core/evals`** — a cell is an authorization fact, it is read on the run path at every run start, and a matrix module inside a package named `evals` invites someone to import the scoring harness into a run. `core.evals` writes cells through this module; nothing on the run path imports `core.evals` at all
-- [ ] T015 [P] Extend `OPERATION_REASONS` in `src/core/runs/refusals.py` with this feature's vocabulary: `unqualified_cell`, `cell_withdrawn`, `no_qualified_fallback`, `pack_exceeds_ceiling`, `above_tier`, `digest_mismatch`, `promotion_incomplete`, `injection_suspected`. Added to the frozen mapping rather than invented at call sites — the 010 rule
+- [ ] T015 [P] Extend `OPERATION_REASONS` in `src/core/runs/refusals.py` with this feature's vocabulary: `unqualified_cell`, `cell_withdrawn`, `no_qualified_fallback`, `pack_exceeds_ceiling`, `above_tier`, `digest_mismatch`, `promotion_incomplete`, `injection_suspected`, `insufficient_eval_coverage`. Added to the frozen mapping rather than invented at call sites — the 010 rule
 - [ ] T016 [P] Component rows in `tests/component/test_matrix_reader.py`: a green cell resolves; an absent matrix refuses loudly rather than resolving to empty; `qualified_by` round-trips; **a model identifier that is not `provider/model@version` is refused at parse** — an alias or a bare name is the moving target FR-011 forbids, caught at the identifier rather than only at the lookup
 - [ ] T016a [P] [GATE:conformance] Row in `tests/conformance/packs/test_run_path_does_not_import_evals.py`: no module reachable from `core.run` imports `core.evals`. The layering I3 names, asserted rather than trusted to naming
 
@@ -172,10 +172,10 @@ to paved workflows regardless of what the request asks for.
 - [ ] T039 [GATE:eval] Create `src/core/evals/suites.py`: the four suites as sets of cases with expected outcomes — `must_deny`, `must_decline`, `citation_accuracy`, `estate_state`. **Report fidelity is deliberately absent**, with an explicit skip citing ADR-0018 in the output rather than silence (FR-013a)
 - [ ] T040 [GATE:eval] Create `src/core/evals/scoring.py`: `Scorer` protocol, `FixtureScorer` (replays a recorded response), `LiveModelScorer` (calls a provider). The suites, thresholds, and refusals are **identical across both** — only the scorer differs, which is what makes "the machinery is real even when the substrate is a recording" true rather than aspirational.
   **State the subject explicitly, because nothing else does**: a suite scores a **governed agent constructed from a definition** — its pack, its tier, and the binding-map cell for the role under test — built through `build_governed_agent`. Both scorers take that same subject, which is what lets a fixture be a recording *of it* rather than of an unnamed shape. Without this, `FixtureScorer` and `LiveModelScorer` have no agreed input and a fixture recorded against one shape cannot be replayed against another
-- [ ] T041 [GATE:eval] Create `evals/seed/` with **at least 20 human-labelled verdict cases spanning all four suites, including at least three the judge should REJECT** — a floor, so "representative" is checkable rather than aspirational and a seed set of two happy paths cannot qualify a judge. ADR-0052 records the floor and the obligation to grow it with the suites. Then and `src/core/evals/judge.py` implementing the chain: the first judge is qualified against the seed, every later judge by a judge already qualified. A judge pointed at itself refuses rather than closing the loop
+- [ ] T041 [GATE:eval] Create `evals/seed/` with **at least 20 human-labelled verdict cases spanning all four suites, including at least three the judge should REJECT** — a floor, so "representative" is checkable rather than aspirational and a seed set of two happy paths cannot qualify a judge. ADR-0052 records the floor and the obligation to grow it with the suites. **A seed set below the floor fails the gate rather than warning** — a floor nothing enforces is a suggestion, and this one is the root of the judge chain. Then and `src/core/evals/judge.py` implementing the chain: the first judge is qualified against the seed, every later judge by a judge already qualified. A judge pointed at itself refuses rather than closing the loop
 - [ ] T041a Create `src/core/evals/schema.sql` for eval cases and results, and apply it **at bring-up** in `infra/bin/enclave-up`'s existing schema pass — the same statement block as the evidence, dependency, run-index, and thread schemas. 012 shipped exactly this defect by leaving `run_inputs` to migrate-on-boot, and every dispatched run died with `relation ... does not exist`; that script's comment now says the rule has bitten four times, and this is the chance not to make it five
-- [ ] T042 [P] Write `packs/vault/evals/` and `packs/terraform/evals/` cases for each suite — **at least five cases per suite per pack, including at least two the agent must refuse or decline**. A floor for the same reason the seed set has one (T041): a suite of one happy path greens a gate while asserting nothing, and content is where that is easiest to let slide
-- [ ] T043 [GATE:eval] Add `make evals` (fixtures, blocking) and `make evals-live` (`live_model` marker, named runner) to the `Makefile`, and wire `tests/conformance/packs` into the conformance recipe — **in the same commit that creates the directory**, because 010 lost a feature's rows to a directory no lane enumerated
+- [ ] T042 [P] Write `packs/vault/evals/` and `packs/terraform/evals/` cases for each suite — **at least five cases per suite per pack, including at least two the agent must refuse or decline**. A floor for the same reason the seed set has one (T041): a suite of one happy path greens a gate while asserting nothing, and content is where that is easiest to let slide. **A pack below the floor is refused at load** (`insufficient_eval_coverage`), not warned about — refusing at load puts the failure where the pack is added rather than where a gate later reports a number nobody reads
+- [ ] T043 [GATE:eval] Add `make evals` (fixtures, blocking) and `make evals-live` (`live_model` marker, named runner) to the `Makefile`. **`tests/conformance/packs` was wired at T012b**, where the directory is born — this task adds only the eval targets
 - [ ] T044 [P] [GATE:eval] Rows in `tests/component/test_judge_chain.py`: the first judge qualified against the seed; a later judge qualified by a qualified judge; a judge pointed at itself refused; **and a cell recorded without a judge is refused unless it is the seed-qualified first**
 - [ ] T045 [P] [GATE:no-secret-leak] Row in `tests/conformance/packs/test_provider_key_is_dev_lane_only.py`: the provider credential appears in no jobspec, is read by no run path, and is absent from every pack manifest
 
@@ -204,16 +204,36 @@ Phase 1 Setup ─→ Phase 2 Foundational ─→ Phase 3 US1 (MVP start)
                                                                 ─→ Phase 9 Polish
 ```
 
-- **US3, US4, US5 are mutually independent** and each depends only on Foundational + US1.
-- **Phase 8 depends on US2**, because a gate that qualifies cells needs a matrix to write to.
-- T018 (vendoring Terraform) can start any time after T008 — it is content, not code.
+**Orderings that are not obvious from the phases**, and which an implementer following the
+graph alone would otherwise hit backwards:
+
+- **T013a → T014.** The Vault grant must exist before anything reads the matrix. Without it
+  the reader gets a 403 that presents as an unreachable fabric, so the failure blames the
+  wrong system and the debugging goes to Vault's health rather than to a missing policy line.
+- **T011a → T017.** `WorkflowRecord` must exist before the Vault pack declares a `paved`
+  workflow, because the manifest field has nothing to parse into otherwise.
+- **T012a → T023.** The tool vocabulary must derive from packs before the enclave row starts
+  a run against a real pack tool; otherwise the ceiling reader refuses a correct record.
+- **T012b → everything in `tests/conformance/packs`.** That task creates the directory *and*
+  wires it into the conformance recipe, so later rows land in a lane that runs.
+- **T041a → T042.** The eval schema exists before cases are written against it.
+
+Otherwise: **US3, US4, and US5 are mutually independent**, each needing only Foundational
+plus US1. **Phase 8 depends on US2**, because a gate that qualifies cells needs a matrix to
+write them to. **T018** (vendoring Terraform) can start any time after T008 — it is content,
+not code.
 
 ## Parallel opportunities
 
-- T002 ∥ T003 ∥ T004 (setup); T008 ∥ T009 (records/loader); T015 ∥ T016 after T014.
-- After US1+US2: Phases 5, 6, and 7 in parallel.
-- T042 (eval cases) ∥ T041 (the chain) — cases are content.
-- Polish: T046 ∥ T047 ∥ T049 ∥ T050.
+- **Setup**: T002 ∥ T003 ∥ T004.
+- **Foundational**: T008 ∥ T009; T011a ∥ T012; T012b ∥ T013b (different lanes); T015 ∥ T016
+  ∥ T016a once T014 lands.
+- **After US1+US2**: Phases 5, 6, and 7 run in parallel.
+- **Phase 8**: T042 (cases, content) ∥ T041 (the chain, code); T045 ∥ both.
+- **Polish**: T046 ∥ T047 ∥ T049 ∥ T050.
+
+**Not parallel, despite looking it**: T013a and T014 (the grant gates the reader), and
+T012a and T012b (the row asserts what the task establishes).
 
 ## Implementation strategy
 
