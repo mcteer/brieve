@@ -10,23 +10,23 @@
 -- that part in dev, and the fact that one operator wears both hats locally is a limitation
 -- of the dev enclave rather than of the design.
 --
--- **Not minted by the PLATFORM's Vault**, because a credential the platform's secrets engine
--- issues is one the platform's administrators govern — the party being guarded against would
--- hold the keys to the guard.
+-- **Not minted by the PLATFORM's Vault's database engine seeded with the collector's root**,
+-- because seeding that root would hand the platform's administrators the destination's
+-- credential lifecycle — the party being guarded against holding the keys to the guard.
 --
--- **That is not an argument against dynamic credentials, only against dynamic credentials
--- minted here.** The right shape is a secrets store the COLLECTOR's administrators own,
--- registered against this database and federating on Nomad's JWKS — the same verifiable
--- issuer the platform's Vault already trusts. The mcp service would present the workload
--- identity it already carries and receive a leased credential, with lifecycle control
--- provably on this side of the line. The dev enclave runs a single Vault, so it cannot host
--- that separation: the platform's root token administers all of it. The standing credential
--- below is an artifact of that substrate and should not survive a real deployment.
+-- **That is not an argument for a hand-written password, which is what this is, and it
+-- should not stay one.** Vault Enterprise 1.18+ supports rootless static roles
+-- (`self_managed=true` on the connection, `self_managed_password` on the role): Vault
+-- connects AS this account and rotates its own password on a `rotation_period`, holding no
+-- privileged account here and gaining nothing beyond the two grants below. The enclave
+-- already runs vault-enterprise 2.0.3-ent. Onboarding this role that way removes the
+-- standing credential without giving the platform an inch more reach — see ADR-0055's
+-- Correction and ROADMAP gap 0b.
 --
--- Rotation, meanwhile, does not need a human even now. Whoever runs the collector can rotate
--- this password on a schedule and write the new value to the KV path the platform reads; the
--- platform stores the credential and does not own its lifecycle. Bring-up simply does not
--- automate it yet.
+-- Worth being precise about why that is safe: the boundary this file draws rests on the
+-- GRANT LIST, never on who knows the password. An administrator holding this password gains
+-- exactly what the platform already legitimately has, and `probe()` goes on demonstrating
+-- that UPDATE and DELETE are refused.
 --
 -- What bounds it is this grant list. The platform can append and read; it cannot UPDATE,
 -- DELETE, or TRUNCATE. `probe()` in `core/audit/destination_postgres.py` demonstrates the

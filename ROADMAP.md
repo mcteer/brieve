@@ -289,36 +289,46 @@ that would have exercised it was the caller that did not exist:
 4. `VaultWriteObserver` could not be called: it required an argument the `Observer` protocol
    does not pass, so every interrupted Vault write suspended its run rather than resolving.
 
-### 0b. The collector credential is standing because the dev enclave has one Vault
+### 0b. The collector credential is a hand-written password where Vault could rotate it
 
-**Raised by Dan on 2026-07-30, reviewing 015.** The platform holds `harness_shipper` — a
-fixed username and password on the collector database — where every other database credential
-it uses is minted per workload, leased, and expires. ADR-0044 called a second standing
-credential "a constitutional event"; this is it, and the reason given for it was overstated.
+**Raised by Dan on 2026-07-30, reviewing 015, twice — the first correction was also wrong.**
+The platform holds `harness_shipper` as a fixed username and password written into a Vault KV
+path by bring-up, where every other database credential it uses is Vault-minted and expires.
 
-**The reason is the substrate, not the design.** 015's first draft of ADR-0055's Notes claimed
-federation was unavailable across an administrative boundary. That is backwards — federation
-is the mechanism *for* crossing one. The correct shape is a secrets store the **collector's**
-administrators own, holding its own database engine against the collector Postgres and its own
-JWT auth backend trusting Nomad's JWKS, the same verifiable public issuer the platform's Vault
-already trusts. The mcp service presents the workload identity it already carries, to a store
-the platform does not administer, and gets a leased credential. Zero standing credentials, and
-revocation available to the collector's operator unilaterally.
+**The claims 015 made about why were not researched.** It first said federation was
+unavailable across an administrative boundary (backwards — federation is the mechanism *for*
+crossing one), then said removing the standing credential needed a second Vault and that
+rotation needed bespoke collector-side automation. All three are wrong.
 
-The dev enclave cannot demonstrate that, because it runs one Vault and the platform's root
-token administers all of it — a second mount inside it would be a boundary drawn on paper. A
-second trust store is a feature: its own container, unseal, PKI, and bring-up sequencing.
+**What is actually true.** Vault rotates database credentials natively: dynamic roles mint an
+ephemeral user per request, and *static roles* take over an existing named account and rotate
+its password on a `rotation_period` (default 24h) or schedule, with the application reading
+`database/static-creds/<role>`. This repository already runs the seed-once pattern for its own
+state store — bootstrap user, `rotate-root` so only Vault knows it, then dynamic roles. The
+collector is the only store built outside it.
 
-**Two separable pieces**, and the cheaper one is available now:
+The reason for building it outside was that registering the collector in the platform's Vault
+normally means seeding the collector's ROOT credential there, which is the capture ADR-0055
+forecloses. **Rootless static roles remove that requirement**: with `self_managed=true` on the
+connection and `self_managed_password` on the role, Vault connects *as* `harness_shipper` and
+rotates that account's own password. The platform's Vault holds no privileged account on the
+collector and gains nothing beyond the role's own `INSERT`/`SELECT`. Enterprise 1.18+,
+Postgres-only; the enclave runs `vault-enterprise:2.0.3-ent` already.
 
-- **Automatic rotation needs no second Vault.** Rotation belongs to whoever runs the collector,
-  and that party can rotate the password on a schedule and write the new value to the KV path
-  the platform reads. The platform stores the credential; it does not own its lifecycle.
-  Bring-up simply does not automate this yet, which makes the dev enclave look like it requires
-  manual intervention when the design does not.
-- **Removing the standing credential entirely needs the second trust store**, and with it the
-  amendment to ADR-0044 — which should read *two, one of them temporary*, rather than recording
-  an accident as a principle.
+The tamper-evidence property is unaffected, because it rests on the grant list and never on
+password secrecy — an administrator holding the password gains exactly what the platform
+already legitimately has, and `probe()` still demonstrates `UPDATE`/`DELETE` refused.
+Conflating those two is what made a second trust store look load-bearing.
+
+**The work**: onboard `harness_shipper` as a rootless static role, replace the KV read in
+`load_egress_credential` with `database/static-creds/`, and add a conformance row asserting
+the password in force differs after a forced rotation while shipping continues. Then ADR-0044's
+count returns to **one** and this gap closes.
+
+**What a second trust store would still add** is narrower than 015 claimed: it would move the
+*auth* decision to the collector's side as well as the grants. Worth wanting, not required by
+"the platform must not administer the destination" — the collector's operator can already
+revoke this access unilaterally by altering the grants or dropping the role.
 
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
 

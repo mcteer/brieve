@@ -158,6 +158,12 @@ still refuses the step. The seam is asserted from both sides in
 second one "would be a constitutional event rather than a configuration change" — so it is
 named here rather than left to be discovered by counting.
 
+**It should not have, and the argument below for why it had to is wrong.** Both drafts of
+this note were written without checking what Vault actually provides, and both overstated a
+limitation into a principle. What is true is recorded under "Correction" at the end of this
+section; the reasoning that follows it is kept because the record is append-only and because
+a wrong argument is worth being able to find.
+
 It is the append-only account the platform holds at the collector: `INSERT` and `SELECT` on
 two tables, no `UPDATE`, no `DELETE`, no `TRUNCATE`, and the separation probe demonstrates
 those refusals on every reconcile pass rather than asserting them. It is deliberately **not**
@@ -193,7 +199,55 @@ Two things follow, and they are separable:
   automate it.
 - **The standing-ness itself needs the second trust store**, and is worth its own record.
 
-The count in ADR-0044 ("the platform's single standing credential") is therefore now two,
-and amending that record is a separate act this one does not perform — but the amendment
-should say *two, one of them temporary and blocked on a second trust store*, rather than
-recording an accident as a principle.
+### Correction (2026-07-30, after actually reading the documentation)
+
+Raised by Dan: Vault has native mechanisms for exactly this, and needing a human to rotate a
+credential is not a design constraint anyone should accept. Both points are correct, and the
+second trust store the reasoning above leans on is **not required**.
+
+**Vault rotates database credentials two ways**, and neither needs a human past initial
+seeding. *Dynamic roles* mint an ephemeral user per request under a lease. *Static roles*
+take over an existing named account and rotate its password on a `rotation_period` (default
+24 hours) or a `rotation_schedule`; the application reads the current value from
+`database/static-creds/<role>`. This repository already runs the seed-once pattern for its
+own state store — a bootstrap user, `rotate-root` so that afterwards only Vault knows the
+password ([`database.tf`](../../infra/modules/trust-fabric/database.tf)), then dynamic roles
+for the harness and evidence personas. The collector is the only store built outside it.
+
+**The objection to registering the collector in the platform's Vault was that doing so means
+seeding the collector's root credential there** — handing the platform's administrators the
+destination's credential lifecycle, which is the capture this record forecloses. That
+objection is sound and the conclusion drawn from it was not, because it assumed root seeding
+is the only way in.
+
+**Rootless static roles are the way in.** Vault Enterprise 1.18+ supports `self_managed=true`
+on a Postgres connection with `self_managed_password` on the static role: Vault connects *as*
+`harness_shipper` itself and rotates that account's own password. The platform's Vault holds
+**no privileged account on the collector** and gains nothing beyond what `harness_shipper`
+already has — `INSERT` and `SELECT` on two tables. The enclave already runs
+`hashicorp/vault-enterprise:2.0.3-ent`, so this is available today rather than pending.
+
+**The tamper-evidence property is untouched by any of this, because it never rested on
+password secrecy.** It rests on the grant list. Even an administrator who obtained
+`harness_shipper`'s password gains exactly the capability the platform already legitimately
+has, and `probe()` goes on demonstrating that `UPDATE` and `DELETE` are refused. Confusing
+"who knows the password" with "what the account may do" is what made the second trust store
+look load-bearing.
+
+**So the credential should stop being standing at all**: a Vault-managed account whose
+password rotates on a period and which no human knows, read from `database/static-creds/`
+under the same attested identity as every other credential here, replacing the hand-written
+value at a KV path. On that footing ADR-0044's count returns to **one**, and this record
+should not have claimed otherwise.
+
+Two honest caveats for whoever implements it: a rootless connection does not support dynamic
+roles (documented limitation), and out-of-band password changes desynchronise Vault from the
+database. Neither bites here — one account, rotated only by Vault.
+
+What a second trust store would still add is narrower than the reasoning above suggests:
+it would put the *auth* decision on the collector's side too, rather than only the grants.
+That is worth wanting and is not what "the platform must not administer the destination"
+requires, since the collector's operator can already revoke this access unilaterally by
+altering the grants or dropping the role.
+
+Tracked as ROADMAP gap 0b, rewritten to say this rather than what it first said.
