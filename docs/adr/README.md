@@ -105,6 +105,12 @@ same change.
 | [0046](0046-multi-tenancy.md) | One platform, isolated tenants — using the products' own isolation primitives | Accepted |
 | [0047](0047-conformance-gate-rows-attach-as-features-land.md) | Conformance gate rows attach as their features land — deferred rows are absent or explicitly skipped, never stubbed green | Accepted |
 | [0048](0048-nomad-is-the-agent-execution-substrate.md) | Nomad is the agent execution substrate, and its workload identity is the attestation | Accepted |
+| [0049](0049-consent-to-start-is-consent-to-finish.md) | Consent to start a run is consent to finish it; dependencies are monitored, not escalated | Accepted |
+| [0050](0050-harness-ceilings-live-in-the-trust-fabric.md) | The harness-domain ceiling is its own record in the trust fabric | Accepted |
+| [0051](0051-a-turn-is-evidence-a-thread-is-a-view.md) | A turn is evidence; a thread is a view | Accepted |
+| [0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md) | The first judge is qualified by a human-labeled seed set | Accepted |
+| [0053](0053-automated-skill-intake-gauntlet.md) | An automated intake gauntlet for skill adoption; the human gate is unchanged | Proposed |
+| [0054](0054-model-written-orchestration-parity.md) | Model-written orchestration: per-call and per-delegation governance parity | Proposed |
 
 ## Reviews
 

@@ -173,10 +173,31 @@ parity under deferral is conformance-asserted.
 
 **Code mode** — executing tool calls from model-written code in a sandbox. Ships in
 the governed path only with verified per-call hook parity (ADR-0041): sandbox safety
-guarantees safe execution, not preserved governance.
+guarantees safe execution, not preserved governance. The candidate sandbox is **Monty**
+(Pydantic, experimental as of 2026-07-29), whose relevant property is the
+**external-function seam**: it has no ambient filesystem, network, or environment access, so
+every external effect is a host-provided function call and execution pauses *at* that seam —
+which is what would make parity structural rather than hoped-for (ADR-0054). Watched, not
+adopted.
+
+**Dynamic workflow** — model-written orchestration of *sub-agents* rather than tools: the
+orchestrator writes one sandboxed script in which each sub-agent is an async function, the
+tree runs inside a single tool call, and only the final value returns to its context. The
+**roster is pre-declared** — the model composes the call graph, never the agent set. Each
+sub-agent invocation is a **delegation**, so per-delegation governance parity is required, not
+only per-call: the sub-agent runs under its own registered ceiling, scoped at or below its
+parent, on the same correlation ID (ADR-0054). Proposed; upstream is experimental.
 
 **Skill** — pinned, provenance-checked instruction content the agent *executes by*;
 adopted from upstream skill repositories with overlays authored here (ADR-0004).
+
+**Supply-chain sentinel** — the proposed automated intake gauntlet for skill adoption
+(ADR-0053): a poller watches pinned upstream repositories, a narrow-ceilinged analysis agent
+reads the diff in the hardened isolation tier, an automated adversarial read runs before any
+detonation, and a clean static read proceeds to differential behaviour testing against the
+golden-task corpus in a canary-seeded range. Produces an evidence package for a human
+reviewer. **It raises the review's floor and never replaces its ceiling** — the analyzer's
+verdict may block a promotion and never satisfies the approval.
 
 **Pinned vs consulted** — the artifact-class rule (ADR-0030): what an agent *executes*
 (skills, prompts, policies, models) is version-pinned and eval-gated; what it
@@ -285,6 +306,12 @@ Pydantic AI capability objects by the adapter. When ambiguity is possible, write
 **"Harness" has a third sense inside this repository**, and it is the one most likely to
 mislead: `tests/harness/` is the test-double package. So the word can mean the product,
 their capability library, or our test fixtures.
+
+**And a fourth, newer sense: `pydantic-ai-harness` is now a PyPI package name** — their
+capability library shipped as a distribution, adjacent to the primary adapter this project
+binds through. It is where `DynamicWorkflow` lives
+(`pydantic_ai_harness.experimental.dynamic_workflow`). Write the package name in full and
+never shorten it to "harness"; the three senses above are unchanged.
 
 The distinction is not pedantic — it decides which layer holds a credential. One process
 runs inside the Nomad allocation and contains three layers:
