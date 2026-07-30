@@ -128,6 +128,31 @@ no approval path is hard to evaluate end to end.
 **Owed gate rows:** all Eval gates (must-deny safety, must-decline scope, citation accuracy,
 estate-state fixtures, report fidelity).
 
+### Automated skill intake — the supply-chain sentinel (ADR-0053)
+
+**Unnumbered, per this file's own rule** — no directory exists and nothing is specified.
+[ADR-0053](docs/adr/0053-automated-skill-intake-gauntlet.md) is **Proposed**.
+
+Automates the intake gauntlet ADR-0004 requires, so analysis starts when upstream publishes
+rather than when a person notices, and the reviewer reads evidence instead of raw upstream
+text. A poller dispatches a narrow-ceilinged analysis agent in the hardened isolation tier; a
+textual diff and an automated adversarial read run first; a clean static read proceeds to
+differential detonation against the golden-task corpus in a canary-seeded range, with the
+observer and the specimen as separate workload identities. The evidence package attaches to
+the version-bump pull request.
+
+**Why beside capability packs:** skill adoption ships there, so intake has nothing to gate
+until packs exist. 013 built the promotion path — provenance, injection lens, eval — with the
+lens pattern-based and the review human. This is what feeds it.
+
+**The human gate is unchanged.** The pipeline raises the review's floor and never replaces
+its ceiling; the analyzer's verdict may block promotion and never satisfies the approval.
+
+**Owed before it can be specified:** the analyzer is itself eval-gated executed content and
+needs its own eval class — seeded-hostile corpus, must-flag rate, false-positive budget,
+calibration for lenient drift. And the honest limit stays in the record: detonation catches
+only what the corpus provokes, so the runtime governance floor remains the backstop.
+
 ### Deferred disclosure and code mode (ADR-0040, ADR-0041)
 
 > Previously headed "010", which guessed a number this file's own rule says not to guess —
@@ -137,10 +162,32 @@ estate-state fixtures, report fidelity).
 Productizes deferred tool/capability disclosure, and ships code mode — but only with verified
 per-call hook parity, which ADR-0041 makes an unconditional gate rather than a default.
 
-**Why here:** both are efficiency features gated on proving governance survives them. Neither is
-worth doing before there is enough tool surface for the efficiency to matter.
+**Now covers model-written orchestration of both tools and sub-agents**
+([ADR-0054](docs/adr/0054-model-written-orchestration-parity.md), **Proposed**). Two upstream
+projects bear on this: Monty, whose external-function seam is the sandbox's only exit and whose
+`start()`/`resume()` pauses *at* that seam — which makes ADR-0041's parity condition
+structurally satisfiable rather than hoped-for — and DynamicWorkflow, where each sub-agent is
+an async function in a model-written script and the whole tree runs in one tool call.
 
-**Owed gate row:** tool-call parity under deferred disclosure.
+ADR-0054's addition is that **a sub-agent invocation is a delegation, not a tool call**, and
+binds host-side to the governed delegation path: act-chain narrowing under the sub-agent's own
+registered ceiling, the roster drawn from the registry so the model composes the call graph and
+never the agent set, `reveal()` as disclosure economics for agents, `max_agent_calls` as a
+host-enforced bound, and the model-written script itself as a first-class audit artifact.
+
+**Why here:** all of it is efficiency gated on proving governance survives it. Neither disclosure
+nor code mode is worth doing before there is enough tool surface for the efficiency to matter,
+and orchestration is worth less still before there are packs to orchestrate.
+
+**Track, do not build on.** Both upstream projects are outside their own stability commitments
+— Monty's banner says so and DynamicWorkflow's import path carries an `experimental` segment.
+Watch signals are in ADR-0054; the one that matters most here is DynamicWorkflow's
+**durable-workflows extension**, because workflow state entering checkpoints invokes the
+credential-free-checkpoint condition (ADR-0026).
+
+**Owed gate rows:** tool-call parity under deferred disclosure; and, if orchestration is
+adopted, per-delegation parity plus the two break fixtures ADR-0054 names — a host handler that
+bypasses `invoke_tool` must fail, and an unregistered roster entry must refuse at construction.
 
 ### Multi-tenancy (ADR-0046)
 
