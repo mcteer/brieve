@@ -105,11 +105,22 @@ def test_row_a_checkpoint_written_since_the_grant_store_existed_resolves(conn: A
         "no grants exist at all, so this row asserted nothing — run the dispatch rows first"
     )
 
+    # Scoped to checkpoints a real ALLOCATION wrote, identified by `written_by` being a Nomad
+    # allocation UUID. Two reasons, and the first one bit during the full gate run.
+    #
+    # `tests/conformance/durability/test_cross_process.py` writes `grant_id="grant-1"` by hand
+    # — a synthetic id for a row about surviving a process boundary, which has nothing to do
+    # with consent. It resolves to nothing by construction and always will. A gate that failed
+    # on it would be reporting a fixture's shorthand as a production defect.
+    #
+    # And the claim worth making is specifically about the production path: what the entrypoint
+    # writes must resolve, because that is the value a resume loads consent by.
     dangling = h.query(
         conn,
-        "SELECT c.blob_id, c.grant_id FROM checkpoints c "
+        "SELECT c.blob_id, c.grant_id, c.written_by FROM checkpoints c "
         "LEFT JOIN grants g ON g.grant_id = c.grant_id "
-        "WHERE c.grant_id <> '' AND g.grant_id IS NULL AND c.written_at >= %s",
+        "WHERE c.grant_id <> '' AND g.grant_id IS NULL AND c.written_at >= %s "
+        "AND length(c.written_by) = 36",
         (epoch,),
     )
     assert dangling == [], (

@@ -142,12 +142,19 @@ def exit_code(alloc: str) -> int | None:
     return int(events[-1].get("ExitCode", 1)) if events else None
 
 
-def wait_dead(alloc: str, *, timeout: float = 420.0) -> None:
+def wait_dead(alloc: str, *, timeout: float = 900.0) -> None:
     """Wait for the task to reach a terminal state.
 
     Generously bounded because a cold allocation builds a virtualenv and downloads packages
     inside the container — measured at over two minutes. A bound tight enough to be
     impatient turns a slow run into a red row, which sends someone to debug passing code.
+
+    **Raised from 420s after the first full `make conformance` run.** Every row here passed
+    when run on its own and one timed out inside the whole gate, which is the difference the
+    number has to absorb: the suite dispatches allocations back to back, so a run that starts
+    while three others are building their environments waits on the node rather than on
+    anything under test. A bound that only holds when the row runs alone is a bound that turns
+    a busy machine into a red gate.
     """
     deadline = time.time() + timeout
     while time.time() < deadline:

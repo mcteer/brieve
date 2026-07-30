@@ -56,12 +56,11 @@ def test_row_a_superseded_allocation_writes_nothing_further(conn: Any) -> None:
     second_alloc = h.allocation_of(h.job_of(dispatcher, run_id))
     assert second_alloc != first_alloc
 
-    # A longer wait than the other rows use, and the reason is this row's own construction:
-    # the successor picks up near the start of the step list, so it has almost the whole run
-    # to do — after a cold allocation start, and while the incumbent it superseded is still
-    # competing for the same database. The default bound is sized for a resume that finishes
-    # what a disruption left, which is a much smaller remainder.
-    h.wait_dead(second_alloc, timeout=900.0)
+    # This row's successor picks up near the START of the step list, so it has almost the
+    # whole run to do — after a cold allocation start, and while the incumbent it superseded is
+    # still competing for the same database. It relies on the harness default being sized for
+    # that rather than for a resume finishing a small remainder.
+    h.wait_dead(second_alloc)
 
     h.assert_entrypoint_ran(second_alloc)
     # The incumbent must also end — its next lease-checked write raises, which fails the
