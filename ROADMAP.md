@@ -250,7 +250,18 @@ from, and each is worth its own small change.
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects*
 
 **Raised by Dan, 2026-07-29, during 013's live gate run. The most consequential gap on this
-page.**
+page.** Now carried by [ADR-0055](docs/adr/0055-audit-egress-for-tamper-evidence.md)
+(**Proposed**).
+
+**One correction to how this entry was first written.** It framed off-host shipping as a
+straightforward mitigation without citing
+[ADR-0020](docs/adr/0020-otel-only-backends-at-the-collector.md), which already states that
+**the audit plane never egresses by default** and that SIEM export is an explicit, configured
+act. That is a deliberate posture for regulated estates, not an oversight — so the real
+decision is a *tension* rather than a gap, and ADR-0055 is where it is resolved: the trust
+boundary that matters is **administrative, not topological**, and a collector the organization
+operates under administrators who are not the platform's satisfies tamper-evidence without
+becoming the third-party egress ADR-0020's default guards against.
 
 Everything downstream of the audit plane rests on evidence being trustworthy, and today the
 whole of it lives in one Postgres this platform operates. The chain is honest about what it
