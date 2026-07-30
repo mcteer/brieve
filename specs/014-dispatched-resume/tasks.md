@@ -108,9 +108,10 @@ case skips, the not-landed case proceeds.
 **Independent test**: open `terraform_apply` intent → resume → suspended awaiting
 `terraform`; `record_probe` recovery → revived; flap to the cap → terminal stop.
 
-- [ ] T021 [US3] Wire the suspended-run index write into the entrypoint's SUSPENDED arm (T013 stubs it; this lands the record the sweeper reads): run_id, correlation, `awaiting` from the decision, step position, subject/tenant/definition for the re-dispatch — everything `SuspendedRunRecord` carries and nothing that grants
+- [ ] T020a [US3] [GATE:fail-closed] The mid-run suspension arm (analyze C3). In `src/surfaces/dispatch/entrypoint.py`'s invoke loop, distinguish a suspension from a refusal: after a denied invoke, if `run.state == SUSPENDED`, write the suspended-run index row via `record_suspension` (**which has zero callers today — in `src/` and in `tests/` — the index is a store with a reader and no writer, `resume_run`'s defect one layer earlier in the lifecycle**), save a checkpoint carrying the suspended state, and **exit 0** — a suspension is a wait, not a failure, and today's `return 1` on any refusal presents the spec's own US1 narrative (fabric blinks mid-run) as a failed allocation with no index row and nothing for the sweeper to find. While there, correct `src/core/hooks/suspension.py`'s docstring: it says "the state transition is what the sweeper reads", and the sweeper reads the **index**, verifying against the checkpoint — a docstring that misstates the contract is how the next feature repeats this one
+- [ ] T021 [US3] Wire the suspended-run index write into the entrypoint's **resume-time** SUSPENDED arm (the mid-run arm is T020a's; after this feature there are two writers, one per arm) — T013 stubs it: run_id, correlation, `awaiting` from the decision, step position, subject/tenant/definition for the re-dispatch — everything `SuspendedRunRecord` carries and nothing that grants
 - [ ] T022 [P] [US3] Hermetic row in `tests/component/test_suspension_vocabulary.py`: with `depends_on` wired, a CANNOT_DETERMINE on `terraform_apply` suspends awaiting **`terraform`** — the product, never the tool name (FR-008, SC-005); without a known product the tool-name fallback still stands, per `resume_run`'s own docstring
-- [ ] T023 [US3] [GATE:conformance] Dispatch row in `tests/conformance/durability/test_dispatched_suspension_cycle.py`: the D5 harness end to end — open `terraform_apply` intent, resume, suspended awaiting `terraform`; `record_probe("terraform", reachable=True)`; the sweeper's next pass re-dispatches; the run completes. **The 009 sweeper's first end-to-end demonstration** (SC-006)
+- [ ] T023 [US3] [GATE:conformance] Dispatch row in `tests/conformance/durability/test_dispatched_suspension_cycle.py`: the D5 harness end to end — open `terraform_apply` intent, resume, suspended awaiting `terraform`; `record_probe("terraform", reachable=True)`; the sweeper's next pass re-dispatches; the run completes. **The 009 sweeper's first end-to-end demonstration** (SC-006). **And the mid-run arm** (analyze C3): a second case in the same file suspends via the invoke path — a tool whose product the dependency store marks unreachable mid-run — and is swept and revived the same way, so both writers of the index are exercised, not only the resume-time one
 - [ ] T024 [US3] [GATE:fail-closed] Dispatch row in the same file: flap the harness in a loop — each recovery revives, each revival re-suspends — and assert the run is revived **exactly `RESUME_ATTEMPT_CAP` times**, then stops terminally with `resume_attempts_exhausted` and never suspends again (SC-006a). Slow by construction; the docstring quotes the spec's assumption that waiting is what this row tests
 
 **Checkpoint**: the cycle closes, and its bound is terminal.
@@ -168,6 +169,8 @@ Phase 1 Setup ─→ Phase 2 Foundational ─→ Phase 3 US1 (MVP)
 
 **Orderings that are not obvious from the phases:**
 
+- **T020a → T023's mid-run case.** The invoke loop must file suspensions before a row can
+  sweep them; without T020a the mid-run case fails as a failed allocation, which is analyze C3.
 - **T010a → T013, T023.** The record extension lands before the entrypoint reads the new env
   and before the sweep-revival row runs — without it that row fails on `no_role_for_subject` by
   design, which is analyze C1.
