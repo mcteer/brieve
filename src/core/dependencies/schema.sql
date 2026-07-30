@@ -64,10 +64,25 @@ CREATE TABLE IF NOT EXISTS suspended_runs (
     invoke_tools   BOOLEAN     NOT NULL DEFAULT FALSE
 );
 
--- The columns above, for databases that already have this table (see the durability
--- schema's note — `CREATE TABLE IF NOT EXISTS` does not reconcile columns, so on any
--- enclave brought up before 014 the definition above is never read and every one of these
--- would silently not exist).
+-- Every column this table has gained since it was created, for databases that already have
+-- it. `CREATE TABLE IF NOT EXISTS` does not reconcile columns — see the durability schema's
+-- note — so on any enclave brought up before a column was declared, the definition above is
+-- never read and the column silently does not exist.
+--
+-- **The first four of these are not 014's, and finding that out is the interesting part.**
+-- `subject_user_id`, `tenant_id`, and `agent_definition_id` were added to the CREATE TABLE
+-- above by the feature that taught the sweeper to dispatch *as* the run, with no ALTER — so
+-- every enclave older than that change has a `suspended_runs` without them. Nothing noticed
+-- for a simple reason: `record_suspension` had no callers anywhere, in `src/` or `tests/`, so
+-- no code ever tried to write those columns. An index with a reader and no writer cannot
+-- discover that its own schema never landed.
+--
+-- 014 became the first writer and hit it on the first dispatched suspension:
+-- `column "subject_user_id" of relation "suspended_runs" does not exist`. The 014 columns
+-- below would have hidden behind the same wall.
+ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS subject_user_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS agent_definition_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS subject_roles TEXT NOT NULL DEFAULT '';
 ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS packs TEXT NOT NULL DEFAULT '';
 ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS steps INTEGER;

@@ -256,6 +256,134 @@ def credential_ids(conn: Any, run_id: str) -> list[str]:
     return [str(p.get("credential_id") or "") for p in events(conn, run_id, "authority_issued")]
 
 
+def dependency_store() -> Any:
+    """The real dependency store, reached with an operator credential.
+
+    The concrete store rather than a double, because what these rows drive is the SWEEPER,
+    and the sweeper reads this store inside the mcp service. A double here would let the row
+    tell itself a product had recovered while the thing that decides read something else.
+    """
+    from core.dependencies.store import PostgresDependencyStore
+
+    # Typed as the workload credential class because that is what production passes. The
+    # operator credential satisfies the same `.fetch()` shape and is the only thing a host
+    # process can hold — there is no attested identity here, which is the property this lane
+    # exists to preserve. Cast rather than widen the production signature: a `core` class that
+    # advertised acceptance of a static-token credential would make the fallback available to
+    # production by import, which is how a test affordance becomes a deployment.
+    credentials: Any = OperatorCredentials()
+    return PostgresDependencyStore(credentials=credentials)
+
+
+def mark_reachable(product: str, *, reachable: bool) -> None:
+    """Make the platform believe a product is up, or down.
+
+    Recovery is HYSTERETIC — `DEFAULT_RECOVERY_THRESHOLD` consecutive successes — and failure
+    is not, which is why marking down is one call and marking up is several. Asymmetric by
+    design (009): marking unhealthy fast costs a suspension the sweeper resolves, while
+    marking healthy fast resumes every waiting run into a product that fails again.
+    """
+    store = dependency_store()
+    if not reachable:
+        store.record_probe(product=product, reachable=False, detail="arranged by a 014 row")
+        return
+    for _ in range(5):
+        health = store.record_probe(product=product, reachable=True, detail="arranged")
+        if health.state.permits_calls():
+            return
+    pytest.fail(f"{product} would not come back healthy after five successful probes")
+
+
+def arrange_disrupted(
+    conn: Any,
+    run_id: str,
+    *,
+    tool_name: str,
+    step_index: int = 1,
+    grant_ttl: str = "8 hours",
+    resume_count: int = 0,
+) -> str:
+    """Write the state a disrupted run would have left, and return the grant id.
+
+    **Arranged from the host rather than produced by killing an allocation, and that is a
+    deliberate trade this docstring owes the reader.** What a kill gives you is authenticity;
+    what it costs is control — the exactly-once row spends five minutes and a polling race to
+    catch a run mid-bracket, and it can only ever leave the ONE interrupted state that racing
+    produces. The rows below need a specific interrupted state: an open intent for a tool whose
+    observer answers a particular way, or a grant that has already lapsed.
+
+    So the disruption these rows study is arranged, and the disruption itself is proven
+    elsewhere — `test_dispatched_resume.py` kills a real allocation. Each row here says which
+    of the two it is relying on.
+
+    Everything written here is what the entrypoint itself writes on the fresh path: a grant
+    row, a checkpoint referencing it, and a bracket left open.
+    """
+    grant_id = f"grant-{uuid.uuid4().hex}"
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO grants (grant_id, subject_user_id, agent_definition_id, "
+            "requested_scope, issued_at, expires_at) "
+            "VALUES (%s, %s, %s, %s::jsonb, now(), now() + %s::interval)",
+            (
+                grant_id,
+                "alice",
+                "planner-agent",
+                json.dumps({"tool_names": ["echo"], "product_actions": []}),
+                grant_ttl,
+            ),
+        )
+        cursor.execute(
+            "INSERT INTO checkpoints (blob_id, payload, correlation_id, grant_id, step_index, "
+            "written_by, resume_count) VALUES (%s, %s::jsonb, %s, %s, %s, %s, %s) "
+            "ON CONFLICT (blob_id) DO UPDATE SET grant_id = EXCLUDED.grant_id, "
+            "step_index = EXCLUDED.step_index, resume_count = EXCLUDED.resume_count",
+            (
+                run_id,
+                json.dumps({"step": step_index}),
+                run_id,
+                grant_id,
+                step_index,
+                "alloc-1",
+                resume_count,
+            ),
+        )
+        # The open bracket: an intent with no result, which is the only thing re-observation
+        # has to resolve. The key matches what `core.hooks.engine` would have written.
+        cursor.execute(
+            "INSERT INTO intents (run_id, idempotency_key, step_index, tool_name, recorded_at) "
+            "VALUES (%s, %s, %s, %s, now()) ON CONFLICT DO NOTHING",
+            (run_id, f"{run_id}:{step_index}:{tool_name}", step_index, tool_name),
+        )
+    finally:
+        cursor.close()
+    return grant_id
+
+
+def suspended_rows(conn: Any, run_id: str) -> list[dict[str, Any]]:
+    """What the sweeper would find for this run."""
+    rows = query(
+        conn,
+        "SELECT awaiting, step_index, subject_user_id, tenant_id, agent_definition_id, "
+        "       subject_roles, packs, steps, invoke_tools "
+        "FROM suspended_runs WHERE run_id = %s",
+        (run_id,),
+    )
+    keys = (
+        "awaiting",
+        "step_index",
+        "subject_user_id",
+        "tenant_id",
+        "agent_definition_id",
+        "subject_roles",
+        "packs",
+        "steps",
+        "invoke_tools",
+    )
+    return [dict(zip(keys, row, strict=True)) for row in rows]
+
+
 def dispatch_args(run_id: str, **overrides: Any) -> dict[str, Any]:
     """A `vault-agent` dispatch, which is what the disruption rows need.
 
