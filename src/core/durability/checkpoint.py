@@ -80,6 +80,12 @@ def checkpoint_run(
         step_index=run.step_index,
         written_by=run.lease.holder_identity if run.lease else "",
         outcome=outcome,
+        # Threaded, because this is the ONE place checkpoints are built and therefore the one
+        # place the revival count can be lost. `save()` overwrites the whole row, so a blob
+        # built without it would report zero revivals — and the paths that come through here
+        # include `suspend_run`, which is precisely where a flapping run's count decides
+        # whether it ever stops.
+        resume_count=run.resume_count,
     )
     provider.save(blob)
     return blob

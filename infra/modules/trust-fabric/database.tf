@@ -124,6 +124,17 @@ resource "vault_database_secret_backend_role" "evidence" {
     # every run's starter across the estate has stopped being a narrow credential.
     "REVOKE ALL PRIVILEGES ON run_index FROM \"{{name}}\";",
     "REVOKE ALL PRIVILEGES ON authority_change_requests FROM \"{{name}}\";",
+    # And the grant store (014). Same treatment, same reason, and the sharpest case yet: a
+    # grant record says which human consented to which definition doing what, across every
+    # tenant. It is consent metadata rather than evidence — the trail records what a run DID,
+    # this table records what it was ALLOWED to do — and a SELECT-only credential able to read
+    # every subject's consent estate-wide has stopped being a narrow credential by exactly the
+    # argument that withheld `run_index`.
+    #
+    # Belt and braces like the others: the role is granted `audit_entries` and nothing else,
+    # and inherits nothing, so it never had this. Stated because a withholding nobody wrote
+    # down is a withholding the next `ON ALL TABLES` convenience undoes.
+    "REVOKE ALL PRIVILEGES ON grants FROM \"{{name}}\";",
   ]
 
   revocation_statements = [
