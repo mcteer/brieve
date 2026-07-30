@@ -27,6 +27,7 @@ recorded in `tasks.md` there).
 | Lag is not divergence | Reconcile concurrently with active writing: zero false findings; the tail reads as backlog (SC-008, FR-013) | Write while reconciling |
 | Nothing is lost to an outage | Take the destination down mid-run; runs complete; backlog rises and is observable; on return, every entry written during the outage arrives; none lost (SC-009/009a, FR-014a/015/016) | Stop the collector container; resume it |
 | **The running service ships, under its own identity** | The mcp allocation — not the row — moves entries to the destination, holding the workload identity the egress policy names (FR-005, ADR-0048) | Write to the first copy; ship nothing; wait for the service's own supervisory pass |
+| **The credential is Vault's, not anybody's** | The seeded password authenticates nothing after onboarding; a forced rotation changes the credential and kills the old one; shipping survives a rotation because the shipper reads the current value (ROADMAP 0b) | Rootless static role; force `database/rotate-role/` and ship across it |
 | Capture failure refuses the step | With the LOCAL append failing, the step is refused rather than proceeding unrecorded (SC-009b, FR-014) | Hermetic — the inherited `evidential_gap` path (research F2), asserted so the inheritance is a row rather than a belief |
 
 **The air-gapped shape is the suite's own shape** (spec US5, scenario 1). The dev collector
@@ -86,9 +87,14 @@ nothing passes everything except use.
 
 `make check` (784 rows) and `make conformance` green on a clean tree against a live enclave
 with the collector store up: 122 hermetic conformance, 81 in-allocation, 10 enclave-marked,
-50 host_enclave (this directory's thirteen among them), 8 portal. Quickstart sections 2–6
+53 host_enclave (this directory's seventeen among them), 8 portal. Quickstart sections 2–6
 walked; section 6's scheduled half is what exposed the credential defect above, because
 walking it means reading the service's log rather than a row's result.
+
+The gate run also surfaced two defects outside this feature: two 014 rows that depended on
+estate health another row left behind, and a kill-window gap where a step's effect is
+recorded and its audit entry is not (ROADMAP gap 0c). Both are fixed or recorded rather than
+absorbed.
 
 ## Who runs these
 
