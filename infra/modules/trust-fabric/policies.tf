@@ -35,6 +35,35 @@ resource "vault_policy" "harness_database" {
 # bounded by its ceiling record, and a definition whose ceiling omits `vault_read` never
 # reaches this path at all. The two jurisdictions stay disjoint (ADR-0044), and this grant
 # is the fixture space the conformance probe reads — not a production posture.
+# How the shipper reaches the SECOND copy (015, ADR-0055).
+#
+# One path, read-only, and every part of that is deliberate.
+#
+# **Why the platform's Vault holds it at all**, when the whole feature is about the platform
+# not administering the destination: storage is not lifecycle control. The collector
+# administrator issues this credential and can revoke or rotate it at the destination
+# unilaterally, whatever the platform's Vault has cached. What the platform gets is a place
+# to put a credential that only the mcp role can read.
+#
+# **Why not the jobspec's env block**, which is where the plan first put it: the credential
+# carries SELECT on `shipped_entries`, which is the entire evidence copy across every
+# tenant. Jobspec metadata is readable by anyone with scheduler access, so delivering it
+# there would create an ungoverned evidence read sitting beside ADR-0035's governed one —
+# the same exposure that keeps a person's free text out of `run_inputs`, arriving by a
+# different door. Through Vault it is readable only by a workload holding the mcp role's
+# attested identity.
+#
+# The credential itself is append+read at the destination and can alter nothing already
+# shipped; `probe()` demonstrates that on every reconcile pass rather than trusting it.
+resource "vault_policy" "audit_egress_credential" {
+  name   = "audit-egress-credential"
+  policy = <<-HCL
+    path "${vault_mount.agent_secrets.path}/data/audit-egress/shipper" {
+      capabilities = ["read"]
+    }
+  HCL
+}
+
 resource "vault_policy" "agent_pack_secrets" {
   name   = "agent-pack-secrets"
   policy = <<-HCL

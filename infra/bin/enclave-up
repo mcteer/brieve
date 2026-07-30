@@ -419,6 +419,59 @@ ok "HARNESS_DEFAULT_TENANT=$(env_val HARNESS_DEFAULT_TENANT)"
 # In a container, not on the host, and that is the whole reason this is a `docker run`
 # rather than a `uv sync`: wheels are platform-specific, and a cache populated by an
 # arm64 macOS host serves a linux/amd64 allocation nothing at all.
+# ------------------------------------------------------- 4b-ter. the second copy (015)
+# The destination the audit trail ships to, under credentials the platform cannot use to
+# alter what it has shipped (ADR-0055).
+#
+# **This block plays the COLLECTOR ADMINISTRATOR**, which is a role the platform does not
+# otherwise have and must not keep. In a real deployment these three steps belong to
+# whoever runs the collector: create the store, create the append-only role, apply the
+# destination schema. Here one operator wears both hats, and the honest name for that is a
+# simulation — `contracts/conformance-egress.md` records it under what the rows cannot
+# prove. What is NOT simulated is the credential separation the rows do assert: the
+# platform's shipping credential genuinely cannot UPDATE or DELETE at the destination.
+#
+# The schema applies at bring-up like every other, per the rule that has now bitten five
+# times. Non-fatal: an enclave without the second copy is one where tamper-evidence reports
+# ABSENT (FR-009), which is a posture rather than a failure — and reporting it honestly is
+# better than refusing to start.
+say "Second copy (audit egress)"
+# No `-var repo`: this job mounts no working tree. It is a plain store, which is the
+# point — the platform ships to it and administers nothing inside it.
+if nomad job run "$REPO/infra/jobs/collector-postgres.nomad.hcl" >/dev/null 2>&1; then
+  # Wait for it to accept connections before applying DDL; a fresh volume initialises.
+  collector_ready=false
+  for _ in $(seq 1 45); do
+    if docker run --rm --network host -e PGPASSWORD=dev-only-collector-admin postgres:17-alpine \
+         psql -h 127.0.0.1 -p 5433 -U collector -d collector -c 'SELECT 1' >/dev/null 2>&1; then
+      collector_ready=true; break
+    fi
+    sleep 1
+  done
+
+  if [ "$collector_ready" = true ]; then
+    # Schema FIRST, then the role — `roles.sql` grants against tables that must exist.
+    if { cat "$REPO/src/core/audit/destination_schema.sql"; cat "$REPO/infra/collector/roles.sql"; } \
+       | docker run --rm -i --network host -e PGPASSWORD=dev-only-collector-admin postgres:17-alpine \
+         psql -h 127.0.0.1 -p 5433 -U collector -d collector -v ON_ERROR_STOP=1 -q >/dev/null 2>&1; then
+      # The shipping credential goes to VAULT, never to the mcp jobspec's env block: it
+      # carries SELECT on the whole evidence copy, and jobspec metadata is readable by
+      # anyone with scheduler access. The mcp role holds read on this one path.
+      vault kv put secret/audit-egress/shipper \
+        host=127.0.0.1 port=5433 dbname=collector \
+        username=harness_shipper password=dev-only-shipper >/dev/null 2>&1 \
+        && ok "second copy up on :5433; shipper credential in Vault (append+read only)" \
+        || warn "collector store is up but its credential could not be stored — egress will report ABSENT"
+    else
+      warn "could not apply the destination schema — egress will report ABSENT"
+    fi
+  else
+    warn "collector store did not accept connections — egress will report ABSENT"
+  fi
+else
+  warn "could not register the collector store — egress will report ABSENT"
+fi
+
 say "Package cache"
 mkdir -p "$REPO/.enclave/uv-cache"
 # The tree is mounted READ-ONLY and copied inside the container before the sync, which is
