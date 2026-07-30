@@ -204,7 +204,7 @@ to paved workflows regardless of what the request asks for.
 - [X] T049 [P] Update `ROADMAP.md`: 013 shipped; four of five eval-gate rows move Deferred → In force; report fidelity recorded as still-owed against ADR-0018; portal answering unblocked
 - [X] T050 [P] Record rows **In force** in `specs/013-capability-packs/contracts/conformance-packs.md`, and note in `specs/012-conversational-portal/`'s record that answering's dependency is now met
 - [X] T050a Record in `contracts/conformance-packs.md` whether a **fixture-qualified `write` cell is usable**, and why. A `write` cell is a model permitted to make changes, and in the blocking lane its qualification is against a recording — the spec calls this the sharpest edge in the feature and carried it no further. Either require `live` qualification for `write` specifically, or state plainly that fixture qualification suffices and what that costs. **What is not acceptable is leaving it to whoever reads the per-cell table to infer**
-- [ ] T051 [GATE:conformance] Run `make check`, `make conformance`, and `make evals` against a live enclave on a clean tree, and walk `specs/013-capability-packs/quickstart.md` sections 2–7. Then run `make evals-live` as the named runner and **record each cell's `qualified_by` in the per-cell table** — a cell absent from that table is not qualified (SC-013)
+- [X] T051 [GATE:conformance] Run `make check`, `make conformance`, and `make evals` against a live enclave on a clean tree, and walk `specs/013-capability-packs/quickstart.md` sections 2–7. Then run `make evals-live` as the named runner and **record each cell's `qualified_by` in the per-cell table** — a cell absent from that table is not qualified (SC-013)
 
 ---
 
