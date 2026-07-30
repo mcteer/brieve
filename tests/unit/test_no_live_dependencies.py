@@ -105,6 +105,16 @@ ENCLAVE_PATHS = frozenset(
         # This entry REPLACES nothing — the conftest above still holds the fixtures — and it
         # is a move rather than a widening: no lane gained access it did not have.
         "harness/operator_credentials.py",
+        # 014's dispatch-level rows. They reach the enclave's Vault as an OPERATOR to arrange
+        # what a PRODUCT holds, which is the only way the live re-observation rows can mean
+        # anything: the shipped `VaultWriteObserver` reads Vault and believes what it finds, so
+        # "the write landed" has to be made true *there*. Arranging it with a scripted observer
+        # would test the row's own fixture rather than the observer — the substitution clarify
+        # Q3 rejected in as many words.
+        #
+        # Same posture as the entries above and no wider: a host process holds no attested
+        # identity, and these rows belong on the host because they drive the scheduler.
+        "conformance/durability/dispatch_harness.py",
         # Talks to the control-plane Vault to exercise Control Groups (007). There is no
         # fake: one that always approves proves the caller can proceed, one that never
         # approves proves it handles denial, and neither proves the gate holds.

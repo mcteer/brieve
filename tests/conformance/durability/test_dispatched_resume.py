@@ -53,6 +53,7 @@ def test_row_a_killed_dispatched_run_resumes_and_completes_exactly_once(conn: An
     first_alloc = h.allocation_of(first_job)
     h.stop_allocation(first_alloc)
     h.wait_dead(first_alloc)
+    h.assert_entrypoint_ran(first_alloc)
 
     disrupted = h.checkpoint(conn, run_id)
     # THE PRECONDITION, asserted rather than assumed. If the run finished before the stop
@@ -73,6 +74,7 @@ def test_row_a_killed_dispatched_run_resumes_and_completes_exactly_once(conn: An
     assert second_job and second_job != first_job, "the resume reused the first dispatch's job"
     second_alloc = h.allocation_of(second_job)
     h.wait_dead(second_alloc)
+    h.assert_entrypoint_ran(second_alloc)
 
     final = h.checkpoint(conn, run_id)
     assert final["run_state"] == "completed", (
@@ -139,6 +141,7 @@ def test_row_a_fresh_dispatch_reusing_a_finished_runs_identifiers_is_not_a_resum
     dispatcher.dispatch(**h.dispatch_args(run_id, **short))
     first = h.allocation_of(h.job_of(dispatcher, run_id))
     h.wait_dead(first)
+    h.assert_entrypoint_ran(first)
     assert h.checkpoint(conn, run_id)["run_state"] == "completed"
     after_first = h.tool_invocations(conn, run_id)
 
@@ -146,6 +149,7 @@ def test_row_a_fresh_dispatch_reusing_a_finished_runs_identifiers_is_not_a_resum
     dispatcher.dispatch(**h.dispatch_args(run_id, resume=True, **short))
     resumed_alloc = h.allocation_of(h.job_of(dispatcher, run_id))
     h.wait_dead(resumed_alloc)
+    h.assert_entrypoint_ran(resumed_alloc)
 
     assert h.tool_invocations(conn, run_id) == after_first, (
         "a resume of a terminally-finished run re-executed its steps"

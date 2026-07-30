@@ -15,6 +15,7 @@ messages name the command.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 import uuid
@@ -156,6 +157,31 @@ def wait_dead(alloc: str, *, timeout: float = 420.0) -> None:
     pytest.fail(
         f"allocation {alloc} was still {task_state(alloc)!r} after {timeout}s. The rows did "
         f"not fail; this run did not finish: nomad alloc logs {alloc} harness"
+    )
+
+
+def assert_entrypoint_ran(alloc: str) -> None:
+    """Fail distinctly when an allocation died before reaching our code.
+
+    Each allocation bootstraps itself — `pip install uv`, then a virtualenv, then the
+    package — and that fetches from the public index. When the network hiccups the task exits
+    non-zero having never run the entrypoint, and every assertion downstream then reports the
+    property under test as broken. One such run cost ten minutes and reported "exhausting the
+    revival budget failed the allocation", which is a sentence about the cap describing a
+    read timeout from `files.pythonhosted.org`.
+
+    The signature is an exit code the entrypoint never produces together with no stdout at
+    all: the entrypoint prints before it can fail, so silence means it never started.
+    """
+    if exit_code(alloc) in (0, 1):
+        return
+    stdout = _nomad(["alloc", "logs", alloc, "harness"]).strip()
+    if stdout:
+        return
+    pytest.fail(
+        f"allocation {alloc} exited {exit_code(alloc)} with no output from the entrypoint, so "
+        f"it never ran: this is a bootstrap or network failure, not a property failing. "
+        f"nomad alloc logs -stderr {alloc} harness"
     )
 
 
@@ -302,6 +328,8 @@ def arrange_disrupted(
     step_index: int = 1,
     grant_ttl: str = "8 hours",
     resume_count: int = 0,
+    scope_tools: tuple[str, ...] = ("echo",),
+    definition: str = "planner-agent",
 ) -> str:
     """Write the state a disrupted run would have left, and return the grant id.
 
@@ -329,8 +357,11 @@ def arrange_disrupted(
             (
                 grant_id,
                 "alice",
-                "planner-agent",
-                json.dumps({"tool_names": ["echo"], "product_actions": []}),
+                definition,
+                # Sorted, like the provider writes it — the resumed run manufactures its
+                # authority from this scope, so a row that stored it differently would be
+                # arranging a grant the platform would never have issued.
+                json.dumps({"tool_names": sorted(scope_tools), "product_actions": []}),
                 grant_ttl,
             ),
         )
@@ -359,6 +390,65 @@ def arrange_disrupted(
     finally:
         cursor.close()
     return grant_id
+
+
+def _vault(path: str, *, method: str, body: dict[str, Any] | None = None) -> int:
+    """Reach the enclave's Vault as an OPERATOR, to arrange what a product would hold.
+
+    The re-observation rows have to make "the write landed" true or false *in Vault*, because
+    the shipped `VaultWriteObserver` reads Vault and believes what it finds. Arranging it any
+    other way — a scripted observer, a flag in the database — would test the row's own fixture
+    rather than the observer, which is what clarify Q3 rejected.
+    """
+    import ssl
+    import urllib.request
+
+    addr = (os.environ.get("VAULT_ADDR") or "https://127.0.0.1:8200").rstrip("/")
+    token = os.environ.get("VAULT_TOKEN") or os.environ.get("VAULT_ROOT_TOKEN") or ""
+    cacert = os.environ.get("VAULT_CACERT")
+    context = ssl.create_default_context(cafile=cacert) if cacert else None
+    data = json.dumps(body).encode() if body is not None else None
+    request = urllib.request.Request(  # noqa: S310 — fixed scheme, operator-supplied addr
+        f"{addr}/v1/{path}",
+        data=data,
+        headers={"X-Vault-Token": token, "Content-Type": "application/json"},
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10, context=context) as response:  # noqa: S310
+            return int(response.status)
+    except urllib.error.HTTPError as exc:
+        return int(exc.code)
+
+
+def arrange_effect_landed(idempotency_key: str) -> None:
+    """Make the interrupted write look like it succeeded, to the shipped observer.
+
+    The observer reads `secret/metadata/{key}`, which exists exactly when something was
+    written at `secret/data/{key}`. So this writes there, and the observer's answer is
+    genuinely derived from the product's state rather than handed to it.
+    """
+    status = _vault(
+        f"secret/data/{idempotency_key}",
+        method="POST",
+        body={"data": {"arranged_by": "014 re-observation row"}},
+    )
+    assert status in (200, 204), f"could not arrange the landed effect in Vault: HTTP {status}"
+
+
+def clear_effect(idempotency_key: str) -> None:
+    """Remove the arranged state, so the next run of this row starts from the same place.
+
+    `metadata` rather than `data`: deleting the data leaves a tombstone whose METADATA still
+    exists, and the observer reads metadata — so a data-only delete would leave the next
+    "did not land" direction observing that it had.
+    """
+    _vault(f"secret/metadata/{idempotency_key}", method="DELETE")
+
+
+def step_key(run_id: str, step_index: int, tool_name: str) -> str:
+    """The bracket key `core.hooks.engine` writes: run, step, tool."""
+    return f"{run_id}:{step_index}:{tool_name}"
 
 
 def suspended_rows(conn: Any, run_id: str) -> list[dict[str, Any]]:

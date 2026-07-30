@@ -56,6 +56,7 @@ def test_row_a_resume_under_lapsed_consent_stops_with_zero_further_steps(conn: A
     )
     alloc = h.allocation_of(h.job_of(dispatcher, run_id))
     h.wait_dead(alloc)
+    h.assert_entrypoint_ran(alloc)
 
     # EXIT ZERO. A bound is an ending, not a failure — an allocation that failed here would
     # make every expired grant look like an outage to whoever reads allocation states.
@@ -114,6 +115,7 @@ def test_row_reissuing_consent_revives_nothing(conn: Any) -> None:
     dispatcher.dispatch(**resume_args)
     second = h.allocation_of(h.job_of(dispatcher, run_id))
     h.wait_dead(second)
+    h.assert_entrypoint_ran(second)
 
     final = h.checkpoint(conn, run_id)
     assert final["run_state"] == "stopped", (

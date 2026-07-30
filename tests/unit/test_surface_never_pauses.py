@@ -81,6 +81,21 @@ def _sources() -> list[pathlib.Path]:
     return sorted(SURFACES.rglob("*.py"))
 
 
+def name_of(node: ast.expr) -> str:
+    """A dotted name for an expression, or empty when it is not one.
+
+    Used to judge a call by its RECEIVER rather than by its method name alone, so the check
+    can tell `run.lease.acquire()` from `lock.acquire()` without dropping either from the
+    forbidden list.
+    """
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = name_of(node.value)
+        return f"{prefix}.{node.attr}" if prefix else node.attr
+    return ""
+
+
 def test_the_check_covers_something() -> None:
     assert len(_sources()) >= 5
 
@@ -110,6 +125,18 @@ def test_no_surface_module_calls_a_blocking_primitive() -> None:
             if isinstance(target, ast.Attribute):
                 # A method on a string literal is never a blocking primitive.
                 if isinstance(target.value, ast.Constant):
+                    continue
+                # NOR IS A RUN LEASE. `RunLease.acquire()` is a single conditional upsert
+                # that returns immediately and supersedes whoever held the run — it never
+                # waits for anything, which is the whole design (`core.durability.lease`: a
+                # comparison "whose answer does not depend on who got there first").
+                #
+                # Excluded by RECEIVER rather than by dropping `acquire` from the list,
+                # because this module's own comment argues the point: narrowing the check to
+                # remove a false positive is where coverage gets lost silently, and the right
+                # fix is to be exact about what blocking looks like. `threading.Lock.acquire`
+                # still trips this; `run.lease.acquire` does not.
+                if name_of(target.value).endswith("lease") and target.attr == "acquire":
                     continue
                 name = target.attr
             else:

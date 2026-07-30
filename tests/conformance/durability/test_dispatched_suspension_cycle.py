@@ -62,6 +62,7 @@ def test_row_a_resumed_run_suspends_naming_the_product_and_is_indexed(conn: Any)
     )
     alloc = h.allocation_of(h.job_of(dispatcher, run_id))
     h.wait_dead(alloc)
+    h.assert_entrypoint_ran(alloc)
 
     assert h.exit_code(alloc) == 0, (
         f"a suspended run failed its allocation (exit {h.exit_code(alloc)}) — a wait presented "
@@ -123,6 +124,7 @@ def test_row_the_sweeper_revives_a_suspended_run_when_its_product_recovers(conn:
     )
     first = h.allocation_of(h.job_of(dispatcher, run_id))
     h.wait_dead(first)
+    h.assert_entrypoint_ran(first)
     assert h.suspended_rows(conn, run_id), "nothing to sweep; the suspension was not indexed"
 
     # ---- the recovery. Nobody presses anything; a health record changes.

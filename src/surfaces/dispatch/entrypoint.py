@@ -205,22 +205,18 @@ def _run_steps(
                 )
             )
 
-        durability.save(
-            CheckpointBlob(
-                blob_id=blob_id,
-                payload={"step": step},
-                correlation_id=run.correlation_id,
-                # The GRANT's id, not the credential's (research F1). See `_issue_consent`.
-                grant_id=run.grant.grant_id if run.grant else "",
-                step_index=step,
-                written_by=getattr(run.lease, "holder_identity", "") or "entrypoint",
-                outcome=None,
-                # Threaded, or `save()`'s whole-row overwrite resets the bound to zero on the
-                # first step after a revival — making the cap clear itself whenever any work
-                # happens, and a flapping run immortal.
-                resume_count=run.resume_count,
-            )
-        )
+        # THROUGH `checkpoint_run`, not `provider.save`, and the difference is fencing.
+        #
+        # `checkpoint_run` asserts the lease before writing; a direct save does not. A
+        # superseded allocation calling `save` would overwrite the state of the instance that
+        # replaced it — which is exactly what FR-009 forbids, and it would be invisible,
+        # because the zombie's writes look identical to the winner's. The invoke path already
+        # asserts the lease on every tool call, so a direct save here would have left one of
+        # the two write paths fenced and the other open.
+        #
+        # It also builds the blob from the run, which is the single place a checkpoint's shape
+        # is decided — including the revival count, which a hand-built blob is free to forget.
+        checkpoint_run(run, payload={"step": step})
         executed.append(step)
 
     return 0, executed, skipped
@@ -738,6 +734,16 @@ def main() -> int:
     run.grant = grant
     run.run_id = blob_id
     run.durability = durability
+    # A FRESH run claims the run too, not only a resumed one.
+    #
+    # Fencing is a comparison between whoever holds the lease and whoever is writing, so it
+    # only protects a run that took the lease in the first place. Before 014 nothing on this
+    # path did — `run.lease` stayed None, `checkpoint_run` skipped its assertion, and the
+    # instance a resume supersedes could have gone on writing checkpoints and calling tools
+    # underneath its successor. The zombie in FR-009's scenario is a FRESH allocation that
+    # lost contact, so leaving this side unclaimed left the case the requirement is about.
+    run.lease = RunLease(durability, run_id=blob_id, holder_identity=holder_identity)
+    run.lease.acquire()
 
     # 013, opt-in: invoke each requested tool once through the real pipeline. This is what
     # makes "a pack tool reaches a live product through the same hooks as any other tool"
