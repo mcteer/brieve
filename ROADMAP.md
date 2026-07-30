@@ -289,6 +289,37 @@ that would have exercised it was the caller that did not exist:
 4. `VaultWriteObserver` could not be called: it required an argument the `Observer` protocol
    does not pass, so every interrupted Vault write suspended its run rather than resolving.
 
+### 0b. The collector credential is standing because the dev enclave has one Vault
+
+**Raised by Dan on 2026-07-30, reviewing 015.** The platform holds `harness_shipper` — a
+fixed username and password on the collector database — where every other database credential
+it uses is minted per workload, leased, and expires. ADR-0044 called a second standing
+credential "a constitutional event"; this is it, and the reason given for it was overstated.
+
+**The reason is the substrate, not the design.** 015's first draft of ADR-0055's Notes claimed
+federation was unavailable across an administrative boundary. That is backwards — federation
+is the mechanism *for* crossing one. The correct shape is a secrets store the **collector's**
+administrators own, holding its own database engine against the collector Postgres and its own
+JWT auth backend trusting Nomad's JWKS, the same verifiable public issuer the platform's Vault
+already trusts. The mcp service presents the workload identity it already carries, to a store
+the platform does not administer, and gets a leased credential. Zero standing credentials, and
+revocation available to the collector's operator unilaterally.
+
+The dev enclave cannot demonstrate that, because it runs one Vault and the platform's root
+token administers all of it — a second mount inside it would be a boundary drawn on paper. A
+second trust store is a feature: its own container, unseal, PKI, and bring-up sequencing.
+
+**Two separable pieces**, and the cheaper one is available now:
+
+- **Automatic rotation needs no second Vault.** Rotation belongs to whoever runs the collector,
+  and that party can rotate the password on a schedule and write the new value to the KV path
+  the platform reads. The platform stores the credential; it does not own its lifecycle.
+  Bring-up simply does not automate this yet, which makes the dev enclave look like it requires
+  manual intervention when the design does not.
+- **Removing the standing credential entirely needs the second trust store**, and with it the
+  amendment to ADR-0044 — which should read *two, one of them temporary*, rather than recording
+  an accident as a principle.
+
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
 
 **Closed by [`specs/015-audit-egress`](specs/015-audit-egress/), which implements ADR-0055.**

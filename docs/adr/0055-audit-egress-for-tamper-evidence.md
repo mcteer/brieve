@@ -163,8 +163,37 @@ two tables, no `UPDATE`, no `DELETE`, no `TRUNCATE`, and the separation probe de
 those refusals on every reconcile pass rather than asserting them. It is deliberately **not**
 minted by the platform's Vault, because a credential the platform's secrets engine issues is
 one the platform's administrators govern — which would re-capture the destination and defeat
-this entire record. Being unmintable by the platform is precisely what makes it standing:
-federation is not available across an administrative boundary the design requires be genuine.
+this entire record.
 
-The count in ADR-0044 ("the platform's single standing credential") is therefore now two, and
-amending that record is a separate act this one does not perform.
+**It is standing because the dev enclave has one trust store, not because the design
+requires it, and an earlier draft of this note claimed otherwise.** That claim — "federation
+is not available across an administrative boundary" — was backwards. Federation is exactly
+the mechanism for crossing one. The correct target design is a Vault the *collector's*
+administrators own, holding its own database secrets engine against the collector Postgres
+and its own JWT auth backend trusting Nomad's JWKS — the same verifiable public issuer this
+platform's Vault already trusts. The mcp service would present the workload identity it
+already carries, to a store the platform does not administer, and receive a leased
+credential. Zero standing credentials, lifecycle control provably on the collector's side of
+the line, and revocation available to the collector's administrators unilaterally.
+
+What blocks that here is that the dev enclave runs a single Vault, and a single Vault cannot
+demonstrate the separation: the platform's root token administers all of it, so a second
+mount inside it would be a boundary drawn on paper. Standing up a second trust store is a
+feature — its own container, unseal, PKI, and bring-up sequencing — not a detail 015 could
+absorb. **So the standing credential is an artifact of the substrate, and it should not
+survive contact with a real deployment**, where the collector's operator has a secrets store
+of their own and the federated shape is available immediately.
+
+Two things follow, and they are separable:
+
+- **Manual rotation is not required even today.** Rotation belongs to whoever administers
+  the collector, and that party can rotate `harness_shipper` on a schedule and write the new
+  value to the KV path the platform reads. The platform stores the credential; it does not
+  own its lifecycle. Nothing here needs a human, and the current bring-up simply does not
+  automate it.
+- **The standing-ness itself needs the second trust store**, and is worth its own record.
+
+The count in ADR-0044 ("the platform's single standing credential") is therefore now two,
+and amending that record is a separate act this one does not perform — but the amendment
+should say *two, one of them temporary and blocked on a second trust store*, rather than
+recording an accident as a principle.

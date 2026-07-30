@@ -10,12 +10,23 @@
 -- that part in dev, and the fact that one operator wears both hats locally is a limitation
 -- of the dev enclave rather than of the design.
 --
--- **Not Vault-minted, and that is the argument rather than an omission.** Dynamic
--- credentials would be more convenient to rotate and would hand the platform's Vault — and
--- therefore the platform's administrators — control of the destination's credential
--- lifecycle. The party being guarded against would hold the keys to the guard. So this is a
--- standing credential, named and bounded, on the same footing ADR-0044 gave the TFE
--- management token: argued in the plan's Complexity Tracking, not smuggled in.
+-- **Not minted by the PLATFORM's Vault**, because a credential the platform's secrets engine
+-- issues is one the platform's administrators govern — the party being guarded against would
+-- hold the keys to the guard.
+--
+-- **That is not an argument against dynamic credentials, only against dynamic credentials
+-- minted here.** The right shape is a secrets store the COLLECTOR's administrators own,
+-- registered against this database and federating on Nomad's JWKS — the same verifiable
+-- issuer the platform's Vault already trusts. The mcp service would present the workload
+-- identity it already carries and receive a leased credential, with lifecycle control
+-- provably on this side of the line. The dev enclave runs a single Vault, so it cannot host
+-- that separation: the platform's root token administers all of it. The standing credential
+-- below is an artifact of that substrate and should not survive a real deployment.
+--
+-- Rotation, meanwhile, does not need a human even now. Whoever runs the collector can rotate
+-- this password on a schedule and write the new value to the KV path the platform reads; the
+-- platform stores the credential and does not own its lifecycle. Bring-up simply does not
+-- automate it yet.
 --
 -- What bounds it is this grant list. The platform can append and read; it cannot UPDATE,
 -- DELETE, or TRUNCATE. `probe()` in `core/audit/destination_postgres.py` demonstrates the
