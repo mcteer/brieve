@@ -142,6 +142,21 @@ explicit_package_bases = true
 module = "playwright.*"
 ignore_missing_imports = true
 
+# The same shape for the live-eval lane's provider SDK, and the reason is stronger here: the
+# platform's default posture is "calls no model", so `anthropic` deliberately lives in the
+# `evals` extra and no base lane installs it. `make check` must typecheck
+# `adapters/anthropic_scorer.py` without it — CI's fast-lane found this when my own venv had
+# the extra installed and resolved the import locally, which is a green that came from the
+# environment rather than from the code.
+#
+# What is lost is stub-level checking of the SDK's own API; what is kept is every line of
+# this repository's code in that module. The alternative — adding `--extra evals` to the
+# inner loop — would install a provider SDK into the lane whose whole claim is that it needs
+# none.
+[[tool.mypy.overrides]]
+module = "anthropic.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/component"]
 pythonpath = ["src", "."]
