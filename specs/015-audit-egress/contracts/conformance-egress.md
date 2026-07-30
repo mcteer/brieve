@@ -28,6 +28,12 @@ recorded in `tasks.md` there).
 | Nothing is lost to an outage | Take the destination down mid-run; runs complete; backlog rises and is observable; on return, every entry written during the outage arrives; none lost (SC-009/009a, FR-014a/015/016) | Stop the collector container; resume it |
 | Capture failure refuses the step | With the LOCAL append failing, the step is refused rather than proceeding unrecorded (SC-009b, FR-014) | Hermetic — the inherited `evidential_gap` path (research F2), asserted so the inheritance is a row rather than a belief |
 
+**The air-gapped shape is the suite's own shape** (spec US5, scenario 1). The dev collector
+binds to the local network only, and every row above runs against it with zero egress beyond
+the boundary — so "an air-gapped estate still has a second copy" is demonstrated by
+construction rather than by a dedicated row, and this sentence is where that claim lives
+rather than being implied.
+
 ## Break fixtures worth naming
 
 - The shipper advances the watermark before delivery confirms → the outage row loses the

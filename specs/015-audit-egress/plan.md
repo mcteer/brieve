@@ -109,7 +109,12 @@ src/core/audit/
 │                              #   watermark advance only on confirmed delivery
 ├── destination_postgres.py    # NEW — the destination impl (INSERT ... ON CONFLICT
 │                              #   DO NOTHING; first write wins) + the separation PROBE
-│                              #   (attempt UPDATE and DELETE, require both refused)
+│                              #   (attempt UPDATE and DELETE, require both refused).
+│                              #   The ship credential is read from platform Vault KV
+│                              #   under the service's own attested identity — NEVER
+│                              #   jobspec env: its SELECT half reads the whole evidence
+│                              #   copy, and a jobspec is readable with scheduler access
+│                              #   (analyze N1; the run_inputs rule, applied again)
 ├── reconcile.py               # NEW — compare local vs destination per stream; verdicts
 │                              #   distinguish pending (within lag) from missing;
 │                              #   destination chain verified on its own contents
@@ -127,10 +132,21 @@ infra/
 ├── jobs/collector-postgres.nomad.hcl   # NEW — the second store, its own volume,
 │                                       #   NOT registered in the platform Vault's
 │                                       #   database secrets engine
-└── bin/enclave-up             # + collector bring-up: create store, create the
-                               #   append-only role, apply destination_schema.sql,
-                               #   hold the admin credential OUTSIDE the platform's
-                               #   credential machinery (operator-held in dev)
+├── collector/roles.sql        # NEW — the append-only role, on the COLLECTOR side of
+│                              #   the line: applied by the collector admin (enclave-up
+│                              #   plays that role in dev), never by the trust-fabric
+│                              #   module — platform Terraform defining destination
+│                              #   roles would blur the administrative boundary the
+│                              #   feature exists to draw (analyze I2)
+├── modules/trust-fabric/policies.tf    # + ONE read grant: the mcp role may read the
+│                                       #   single KV path holding the ship credential.
+│                                       #   Platform-side on purpose — it is the
+│                                       #   platform's own policy about its own role
+└── bin/enclave-up             # + collector bring-up: start store, create the role
+                               #   (collector/roles.sql, as the collector admin), apply
+                               #   destination_schema.sql, write the ship credential to
+                               #   the KV path; the ADMIN credential stays operator-held,
+                               #   outside the platform's credential machinery entirely
 
 Makefile                       # + tests/conformance/evidence on the host_enclave line,
                                #   IN THE SAME CHANGE that creates the directory
@@ -151,5 +167,5 @@ applied by a different administrator to a different store: bundling it into
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| A standing (static, org-issued) credential for the destination | The platform must be *unable* to control the destination's credential lifecycle; a credential the platform's Vault mints is a credential the platform's administrators govern, which re-captures the destination administratively | Vault-minted dynamic credentials — rejected because they invert the trust requirement: rotation convenience is not worth handing the guarded system's keys back to the party being guarded against. Bounded instead: INSERT+SELECT only, probe-verified every reconcile pass |
+| A standing (static, org-issued) credential for the destination | The platform must be *unable* to control the destination's credential lifecycle; a credential the platform's Vault mints is a credential the platform's administrators govern, which re-captures the destination administratively | Vault-minted dynamic credentials — rejected because they invert the trust requirement: rotation convenience is not worth handing the guarded system's keys back to the party being guarded against. Bounded instead: INSERT+SELECT only, probe-verified every reconcile pass, and **delivered through platform Vault KV under the mcp role's own identity, never jobspec env** — the SELECT half reads the entire evidence copy, and a jobspec is readable by anyone with scheduler access. Storing the credential in the platform's Vault is storage, not lifecycle control: the collector admin wrote it there and can rotate it at the destination unilaterally |
 | A second Postgres container in the dev enclave | Tamper-evidence requires a copy outside the writer's blast radius; same-store and same-server copies share the administrator whose compromise is the threat | Reusing the existing Postgres (second database/schema) — rejected as the non-solution ADR-0055 names: one server administrator can rewrite both copies consistently |

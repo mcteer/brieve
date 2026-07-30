@@ -72,6 +72,7 @@ because a copy that differs from the original cannot be compared entry-for-entry
 | `streams_checked` | |
 | `findings[]` | Each: `correlation_id`, `kind`, `seq` range where applicable, detail. **Never payload content** — a report that quoted entries would be an ungoverned read path (FR-019) |
 | `backlog` | Total unshipped entries at report time (FR-016 / SC-009) |
+| `coverage` | **The range over which tamper-evidence holds** (FR-017): attested-since, derived from the earliest destination `received_at`. Entries written before egress was configured DO ship on the first drain — the watermark starts below every stream — but the destination then attests the local store's state *at import time*, not its history before it. A report that implied coverage of the pre-import past would be the overstated claim FR-018 forbids, one field over |
 | `destination_verified` | `verified` \| `non_compliant` \| `unverified` — the probe's result (D7). Only `verified` permits the posture "tamper-evidence in force" |
 | `posture` | `in_force` \| `absent` (no destination configured — FR-009) \| `unverified` \| `non_compliant` |
 | `basis` | `scheduled` \| `on_demand`, with caller |
