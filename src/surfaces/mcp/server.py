@@ -38,14 +38,12 @@ from collections.abc import Callable
 from types import FrameType
 from typing import Any
 
-from core.audit.destination_postgres import (
-    PostgresAuditDestination,
-    load_egress_credential,
-)
+from core.audit.destination_postgres import build_destination
 from core.audit.egress import ship_pass
 from core.audit.integrity import IntegrityReport, verify_stream_integrity
+from core.audit.local_store import run_connection_factory
 from core.audit.postgres_sink import PostgresAuditSink
-from core.audit.reconcile import emit_reconciled, reconcile
+from core.audit.reconcile import emit_reconciled, posture_reason, reconcile
 from core.dependencies.store import PostgresDependencyStore
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
@@ -85,28 +83,6 @@ __service_loop__ = True
 def build_credentials() -> VaultDatabaseCredentials:
     """This allocation's own identity. No token reaches this process any other way."""
     return VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role=VAULT_ROLE)
-
-
-def run_connection_factory(credentials: VaultDatabaseCredentials) -> Any:
-    """A factory for connections under the **run** role.
-
-    `verify_stream_integrity` needs one, and the evidence role cannot supply it:
-    `audit_stream_heads` deliberately carries no grant for the read path, because a reader
-    able to see the heads could learn what it would need to forge.
-    """
-    import pg8000.dbapi
-
-    def _open() -> Any:
-        cred = credentials.fetch()
-        return pg8000.dbapi.connect(
-            host="127.0.0.1",
-            port=5432,
-            database="brieve",
-            user=cred.username,
-            password=cred.password,
-        )
-
-    return _open
 
 
 def check_integrity(credentials: VaultDatabaseCredentials) -> IntegrityReport:
@@ -301,23 +277,6 @@ def _report_integrity(report: IntegrityReport) -> None:
         )
 
 
-def build_destination() -> Any:
-    """The second copy, or None when this estate has not configured one.
-
-    ``None`` is a posture rather than a failure (FR-009). An estate without a destination
-    has no tamper-evidence, and the honest response is to say so — `_report_egress` reports
-    ABSENT — rather than to run a pass that quietly does nothing and reads as protected.
-
-    The credential comes from Vault under this service's own attested identity, never from
-    the jobspec's env block: its SELECT half reads the entire evidence copy across every
-    tenant, and jobspec metadata is readable by anyone with scheduler access.
-    """
-    credential = load_egress_credential()
-    if credential is None:
-        return None
-    return PostgresAuditDestination.from_credential(credential)
-
-
 def _report_egress(credentials: VaultDatabaseCredentials, destination: Any) -> None:
     """Drain the unshipped tail, and say how far behind the second copy is.
 
@@ -367,8 +326,7 @@ def _report_reconcile(credentials: VaultDatabaseCredentials, destination: Any, s
         )
     if report.posture != "in_force":
         print(
-            f"::reconcile:: tamper-evidence is {report.posture.upper()} "
-            f"(destination {report.destination_verified})",
+            f"::reconcile:: tamper-evidence is {report.posture.upper()} — {posture_reason(report)}",
             file=sys.stderr,
             flush=True,
         )

@@ -155,6 +155,29 @@ def reconcile(
     return report
 
 
+#: Why the platform is in each posture, in the words an operator needs rather than a token.
+#: A status line reading `NON_COMPLIANT` tells someone that something is wrong; it does not
+#: tell them that the second copy is one their own administrators can rewrite, which is the
+#: sentence that gets it fixed. FR-020b requires the posture be reported as itself; naming the
+#: reason is what makes that report actionable rather than merely accurate.
+POSTURE_REASONS: dict[str, str] = {
+    "in_force": "the destination refused the platform's own attempts to alter and delete a "
+    "shipped record, so a single-domain compromise would leave evidence",
+    "absent": "no destination is configured — there is no second copy, and nothing here "
+    "detects a consistent rewrite of the local trail",
+    "unverified": "the destination could not be probed, so the separation it depends on has "
+    "not been demonstrated — this is not a claim that it is broken, and not a claim that it "
+    "holds",
+    "non_compliant": "the platform's own credential was able to alter or remove a shipped "
+    "record, so the second copy sits inside the administrative reach it exists to escape",
+}
+
+
+def posture_reason(report: ReconcileReport) -> str:
+    """The sentence behind the posture, for status lines and the audit payload."""
+    return POSTURE_REASONS[report.posture]
+
+
 def _differs(local: Any, shipped: Any) -> bool:
     """Do these two copies of one entry disagree, in content or in claim?
 
@@ -293,6 +316,7 @@ __all__ = [
     "ReconcileFinding",
     "ReconcileReport",
     "findings_by_kind",
+    "posture_reason",
     "reconcile",
 ]
 
@@ -334,6 +358,7 @@ def emit_reconciled(sink: Any, report: ReconcileReport, *, basis: str, caller: s
                 ),
                 "destination_verified": report.destination_verified,
                 "posture": report.posture,
+                "posture_reason": posture_reason(report),
             },
         )
     except Exception:  # noqa: BLE001 — see the docstring; the findings are already reported

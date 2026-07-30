@@ -363,8 +363,29 @@ def _row_to_entry(row: Any) -> AuditEntry:
 
 
 __all__ = [
+    "build_destination",
     "EGRESS_CREDENTIAL_PATH",
     "AuditDestinationError",
     "PostgresAuditDestination",
     "load_egress_credential",
 ]
+
+
+def build_destination() -> PostgresAuditDestination | None:
+    """The second copy, or ``None`` when this estate has not configured one.
+
+    ``None`` is a posture rather than a failure (FR-009). An estate without a destination
+    has no tamper-evidence, and the honest response is to say so — reporting ABSENT — rather
+    than to run a pass that quietly does nothing and reads as protected.
+
+    The credential comes from Vault under the calling service's own attested identity, never
+    from a jobspec env block: its SELECT half reads the entire evidence copy across every
+    tenant, and jobspec metadata is readable by anyone with scheduler access.
+
+    Lives here rather than in a surface because both surfaces need it, and a helper owned by
+    one of them would make the other import across the boundary to get its second copy.
+    """
+    credential = load_egress_credential()
+    if credential is None:
+        return None
+    return PostgresAuditDestination.from_credential(credential)

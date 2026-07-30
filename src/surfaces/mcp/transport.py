@@ -60,6 +60,7 @@ class McpTransport:
         change_status: Any | None = None,
         definitions: Any | None = None,
         thread_store: ThreadStore | None = None,
+        reconciler: Any | None = None,
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
@@ -78,6 +79,7 @@ class McpTransport:
         self._threads: ThreadStore = (
             thread_store if thread_store is not None else InMemoryThreadStore()
         )
+        self._reconciler = reconciler
 
     def tool_names(self) -> list[str]:
         return [op.tool_name for op in operations()]
@@ -95,6 +97,7 @@ class McpTransport:
             "start_run": self._start_run,
             "get_run": self._get_run,
             "read_evidence": self._read_evidence,
+            "reconcile_evidence": self._reconcile_evidence,
             "request_mapping_change": self._request_mapping_change,
             "collect_mapping_change": self._collect_mapping_change,
             "list_runs": self._list_runs,
@@ -162,6 +165,30 @@ class McpTransport:
                 "count": len(entries),
                 "disposition": str(disposition),
             },
+        )
+
+    def _reconcile_evidence(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        if self._evidence is None:
+            return McpResult(ok=False, status=503, payload={"reason": "evidence unavailable"})
+
+        from surfaces.api.app import _AbsentReconciler
+        from surfaces.api.evidence import _reconciliation_response, reconcile_evidence_for
+
+        # Defaulted the same way the app defaults it, so an estate with no second copy gives
+        # the same ABSENT answer on both transports. A transport that returned 503 where the
+        # other returned a posture would be two answers to one governance question.
+        report, _ = reconcile_evidence_for(
+            correlation_id=str(args["correlation_id"]),
+            query=self._evidence,
+            audit=self._audit,
+            subject=subject,
+            reconciler=self._reconciler or _AbsentReconciler(),
+        )
+        correlation_id = str(args["correlation_id"])
+        return McpResult(
+            ok=True,
+            status=200,
+            payload=_reconciliation_response(correlation_id, report).model_dump(mode="json"),
         )
 
     def _definition_views(self, subject: AuthenticatedSubject) -> Any:

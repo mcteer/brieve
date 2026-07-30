@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import os
 
+from core.audit.destination_postgres import build_destination
+from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
 from core.audit.postgres_sink import PostgresAuditSink
+from core.audit.reconcile_service import PostgresReconciler
 from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
@@ -89,6 +92,14 @@ def build() -> object:
         change_status=VaultChangeStatus(),
         definitions=fabric,
         thread_store=thread_store,
+        # 015. The comparison runs under the platform's own run-role credential and is
+        # authorized by the caller's evidence scope — see `reconcile_evidence_for`. The
+        # destination is built from the same config the mcp service reads, and `None`
+        # there is the ABSENT posture rather than a broken assembly.
+        reconciler=PostgresReconciler(
+            connection_factory=run_connection_factory(credentials),
+            destination=build_destination(),
+        ),
     )
 
 

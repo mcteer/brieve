@@ -76,6 +76,11 @@ def authority_submitter(request: Request) -> Any:
     return _component(request, "authority_submitter")
 
 
+def reconciler(request: Request) -> Any:
+    """The comparison seam (015). Absent when the estate has no second copy."""
+    return _component(request, "reconciler")
+
+
 def audit_sink(request: Request) -> AuditSink:
     sink: AuditSink = _component(request, "audit_sink")
     return sink
@@ -87,6 +92,7 @@ SubjectDep = Annotated[AuthenticatedSubject, Depends(current_subject)]
 DispatcherDep = Annotated[RunDispatcher, Depends(run_dispatcher)]
 EvidenceDep = Annotated[EvidenceQuery, Depends(evidence_query)]
 AuditDep = Annotated[AuditSink, Depends(audit_sink)]
+ReconcilerDep = Annotated[Any, Depends(reconciler)]
 AuthoritySubmitterDep = Annotated[Any, Depends(authority_submitter)]
 
 
@@ -130,6 +136,7 @@ __all__ = [
     "ChangeStatusDep",
     "DefinitionsDep",
     "DurabilityDep",
+    "ReconcilerDep",
     "RunIndexDep",
     "DispatcherDep",
     "EvidenceDep",

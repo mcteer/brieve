@@ -30,10 +30,12 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 
 from core.audit.query import EvidenceQuery, EvidenceQueryRequest
+from core.audit.reconcile import ReconcileReport, emit_reconciled, posture_reason
+from core.audit.reconcile_service import Reconciler
 from core.audit.schema import AuditEntry, AuditEventType, EvidenceDisposition
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
-from surfaces.api.dependencies import AuditDep, EvidenceDep, SubjectDep
+from surfaces.api.dependencies import AuditDep, EvidenceDep, ReconcilerDep, SubjectDep
 
 #: One stream per tenant, stable across reads.
 #:
@@ -96,6 +98,86 @@ def read_evidence_for(
     return entries, disposition
 
 
+class ReconciliationResponse(BaseModel):
+    """What the comparison found, located and never quoted.
+
+    Findings carry stream and sequence and no payload content (FR-019). The whole point of
+    this operation is that reading evidence is governed; a response that quoted the entries
+    it had just compared would be an ungoverned read wearing a report's clothes.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    correlation_id: str
+    posture: str
+    posture_reason: str
+    destination_verified: str
+    findings: list[dict[str, object]]
+    backlog: int
+    coverage_since: datetime | None
+
+
+def reconcile_evidence_for(
+    *,
+    correlation_id: str,
+    query: EvidenceQuery,
+    audit: AuditSink,
+    subject: AuthenticatedSubject,
+    reconciler: Reconciler,
+) -> tuple[ReconcileReport, EvidenceDisposition]:
+    """Compare one stream's two copies, for a caller entitled to read that stream.
+
+    **One stream, named.** Not an estate-wide sweep: the scheduled pass in the mcp service
+    already does that under the platform's own identity, and it is the right actor for an
+    estate-wide question. What a *caller* can ask is about evidence they may see, and a
+    report spanning every stream would name other tenants' correlation IDs to whoever asked
+    first — leaking through the report the read path exists to bound.
+
+    **Authorization is the evidence path's, unchanged** (Principle II). Whether this stream
+    is the caller's is decided by the same query and the same disposition that decide it for
+    a read, so there is no second answer to the question of who may see what. A caller
+    reaching for a stream outside their tenant is refused and the refusal is recorded — the
+    probe is the interesting event, not the empty result.
+    """
+    request = EvidenceQueryRequest(
+        # From the subject, on every transport. There is no tenant parameter to widen.
+        tenant_id=subject.tenant_id,
+        correlation_id=correlation_id,
+        limit=1,
+    )
+    visible = query.search(request)
+    disposition = _disposition(visible, request, query)
+
+    if disposition is EvidenceDisposition.OUT_OF_SCOPE:
+        _record_access(
+            audit=audit, subject=subject, request=request, entries=[], disposition=disposition
+        )
+        return ReconcileReport(), disposition
+
+    report = reconciler.reconcile_stream(correlation_id)
+    # The comparison read both copies of this stream in full, so it is itself audited
+    # (ADR-0035) — with counts and locations, never contents.
+    emit_reconciled(audit, report, basis="on_demand", caller=subject.subject_user_id)
+    return report, disposition
+
+
+def _reconciliation_response(
+    correlation_id: str, report: ReconcileReport
+) -> ReconciliationResponse:
+    return ReconciliationResponse(
+        correlation_id=correlation_id,
+        posture=report.posture,
+        posture_reason=posture_reason(report),
+        destination_verified=report.destination_verified,
+        findings=[
+            {"kind": f.kind, "seq": f.seq, "detail": f.detail, "correlation_id": f.correlation_id}
+            for f in report.findings
+        ],
+        backlog=report.backlog,
+        coverage_since=report.coverage_since,
+    )
+
+
 def build_router() -> APIRouter:
     router = APIRouter(tags=["evidence"])
 
@@ -124,6 +206,28 @@ def build_router() -> APIRouter:
             limit=limit,
         )
         return EvidenceReadResponse(entries=entries, count=len(entries))
+
+    @router.get("/evidence/reconciliation", response_model=ReconciliationResponse)
+    def reconcile_evidence(
+        subject: SubjectDep,
+        query: EvidenceDep,
+        audit: AuditDep,
+        reconciler: ReconcilerDep,
+        correlation_id: str,
+    ) -> ReconciliationResponse:
+        # Registered on the evidence router rather than its own, so it exists exactly when
+        # the read path does. A route whose presence varied independently would make the
+        # operation snapshot depend on assembly, which 011 already paid for once.
+        report, _ = reconcile_evidence_for(
+            correlation_id=correlation_id,
+            query=query,
+            audit=audit,
+            subject=subject,
+            reconciler=reconciler,
+        )
+        # Out of scope returns the same empty shape as a clean stream, deliberately: telling
+        # the caller which would leak the existence of what they may not see.
+        return _reconciliation_response(correlation_id, report)
 
     return router
 
@@ -206,6 +310,8 @@ def _record_access(
 __all__ = [
     "EVIDENCE_STREAM_PREFIX",
     "EvidenceReadResponse",
+    "ReconciliationResponse",
     "build_router",
     "evidence_stream_for",
+    "reconcile_evidence_for",
 ]

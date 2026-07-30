@@ -17,9 +17,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from core.audit.chain import GENESIS_PREV_HASH, compute_entry_hash
+from core.audit.chain import GENESIS_PREV_HASH, compute_entry_hash, verify_chain
 from core.audit.egress import DestinationVerification, HeadObservation, ship_pass
-from core.audit.reconcile import findings_by_kind, reconcile
+from core.audit.reconcile import findings_by_kind, posture_reason, reconcile
 from core.audit.schema import AuditEntry, AuditEventType
 
 
@@ -267,7 +267,56 @@ def test_one_failing_stream_does_not_strand_the_others() -> None:
     assert local.watermarks.get("run-2") == 3
 
 
+def test_every_chain_field_survives_the_trip() -> None:
+    """T010 — a digest-only copy is the wrong half (ADR-0055).
+
+    The second copy has to be independently chain-verifiable and comparable entry-for-entry,
+    and both of those need every hashed field. A shipper that dropped one would still look
+    like it worked right up until the copy had to stand on its own.
+    """
+    local, destination = _prepared()
+    ship_pass(local=local, destination=destination)
+
+    for original, shipped in zip(local.entries, destination.read_entries("run-0"), strict=True):
+        assert shipped == original, "a field did not survive shipping"
+    verify_chain(destination.read_entries("run-0"))
+
+
+def test_a_head_observation_is_added_never_replaced() -> None:
+    """D5 — observations are append-only because an updatable head defeats the point.
+
+    Each observation is the platform's own earlier claim about how long a stream was. If a
+    later pass could overwrite an earlier one, an actor who truncated the local trail could
+    lower the shipped claim to match and the truncation would disappear from both copies —
+    the exact attack shipping the head exists to catch.
+    """
+    local, destination = _prepared()
+    ship_pass(local=local, destination=destination)
+    local.append("run-0", 3)
+    ship_pass(local=local, destination=destination)
+
+    observed = sorted(o.highest_seq for o in destination.read_head_observations("run-0"))
+    assert observed == [3, 6], f"the earlier claim did not survive the later one: {observed}"
+
+
 # ---------------------------------------------------------------------- reconciliation
+
+
+def test_a_broken_chain_at_the_destination_is_reported() -> None:
+    """SC-002 — the second copy has to stand alone, so its own integrity is checked.
+
+    Reconciliation compares two copies; if the destination's copy is itself incoherent, the
+    comparison has no ground to stand on and says so rather than quietly treating a damaged
+    witness as a sound one.
+    """
+    local, destination = _prepared()
+    ship_pass(local=local, destination=destination)
+    broken = destination.entries[("run-0", 2)]
+    destination.entries[("run-0", 2)] = broken.model_copy(update={"prev_hash": "0" * 64})
+
+    report = reconcile(local=local, destination=destination)
+
+    assert "destination_chain_broken" in findings_by_kind(report)
 
 
 def test_agreeing_copies_report_no_findings() -> None:
@@ -388,3 +437,27 @@ def test_an_unverified_or_non_compliant_probe_never_reports_in_force() -> None:
         ship_pass(local=local, destination=destination)
         report = reconcile(local=local, destination=destination)
         assert report.posture == expected, f"{verification} produced posture {report.posture}"
+
+
+def test_every_posture_states_a_reason_and_only_one_of_them_claims_protection() -> None:
+    """T025/T026 — four postures, distinguishable by what they say, not just by their names.
+
+    A status line reading `NON_COMPLIANT` tells an operator something is wrong. It does not
+    tell them their second copy is one their own administrators can rewrite, which is the
+    sentence that gets it fixed. The reasons are asserted distinct because a shared or
+    defaulted string would quietly make the four postures interchangeable in the one place a
+    human actually reads them.
+    """
+    local, _ = _prepared()
+    reports = [reconcile(local=local, destination=None)]
+    probes: list[DestinationVerification] = ["verified", "non_compliant", "unverified"]
+    for verification in probes:
+        destination = FakeDestination(verification=verification)
+        ship_pass(local=local, destination=destination)
+        reports.append(reconcile(local=local, destination=destination))
+
+    reasons = [posture_reason(r) for r in reports]
+    assert len(set(reasons)) == 4, "two postures report the same reason"
+    assert [r.posture for r in reports] == ["absent", "in_force", "non_compliant", "unverified"]
+    claiming = [r.posture for r in reports if r.posture == "in_force"]
+    assert claiming == ["in_force"], "more than one posture claimed tamper-evidence"

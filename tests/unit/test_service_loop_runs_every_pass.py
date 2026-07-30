@@ -78,7 +78,9 @@ def test_every_pass_runs(monkeypatch: Any) -> None:
 
     ran = supervisory_pass(**parts)
 
-    assert set(ran) == {"trust-fabric", "health", "sweep", "integrity"}
+    # 015 adds two. Named here rather than loosened to a subset check: this row exists to
+    # notice a pass silently disappearing, and a subset assertion would stop noticing.
+    assert set(ran) == {"trust-fabric", "health", "sweep", "integrity", "egress", "reconcile"}
     assert calls == ["trust-fabric", "health", "sweep", "integrity"]
 
 
@@ -105,7 +107,7 @@ def test_one_failing_pass_does_not_stop_the_others(monkeypatch: Any) -> None:
 
     ran = supervisory_pass(**parts)
 
-    assert set(ran) == {"trust-fabric", "health", "sweep", "integrity"}
+    assert set(ran) == {"trust-fabric", "health", "sweep", "integrity", "egress", "reconcile"}
     assert calls == ["trust-fabric", "sweep", "integrity"], "a raising health pass stopped the rest"
 
 

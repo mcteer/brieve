@@ -50,6 +50,14 @@ NEW_OPERATIONS = [
         "send_turn",
         {"thread_id": "t", "message": "hello"},
     ),
+    # 015. Reconciliation reads both copies of a stream in full, so it is exactly the
+    # kind of operation that must not be reachable without an identity.
+    (
+        "GET",
+        "/evidence/reconciliation?correlation_id=c",
+        "reconcile_evidence",
+        {"correlation_id": "c"},
+    ),
 ]
 
 
