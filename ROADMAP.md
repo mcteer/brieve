@@ -247,28 +247,35 @@ sequence above, but a Proposed record that quietly becomes permanent is a failur
 Found while deriving this file. None blocks work; all three make the record harder to reason
 from, and each is worth its own small change.
 
-### 0a. `resume_run` has no production caller, so durability is a tested library
+### 0a. `resume_run` has no production caller — **CLOSED by 014, 2026-07-30**
 
-**Found 2026-07-29 while tracing 013's dispatch path.**
+**Found 2026-07-29 while tracing 013's dispatch path. Closed by
+[`specs/014-dispatched-resume`](specs/014-dispatched-resume/).**
 
-`SUSPENDED` is reachable in production, the sweeper re-dispatches on dependency recovery, and
-`step_index` is carried faithfully through the sweeper, the dispatcher, and the jobspec. The
-entrypoint then ignores `RUN_STEP_INDEX` and calls `start_governed_run`, beginning its loop at
-zero. **`resume_run` is invoked from tests and from nowhere in `src/`.**
+`resume_run` was invoked from tests and from nowhere in `src/`, so 005's conformance rows —
+"a disrupted run resumes and completes", "re-observe, never re-execute" — were true of the
+function and not of the dispatched path. The entrypoint ignored `RUN_STEP_INDEX`, called
+`start_governed_run`, and began its loop at zero.
 
-005's conformance rows — "a disrupted run resumes and completes", "re-observe, never
-re-execute" — are true of the function and not of the dispatched path. That scope is now
-recorded in
-[`specs/005-durable-execution/contracts/conformance-durability.md`](specs/005-durable-execution/contracts/conformance-durability.md)
-rather than left implied.
+**Closed with evidence rather than with a wiring change.** All ten dispatch-level rows in
+[`specs/014-dispatched-resume/contracts/conformance-resume.md`](specs/014-dispatched-resume/contracts/conformance-resume.md)
+pass against the live enclave: a real allocation killed mid-flight by the scheduler resumes in
+a second allocation and completes with exactly one execution per step, re-observation decides
+both directions against real Vault with the shipped observer, a suspension names its product
+and the sweeper revives it unaided, the revival budget is bounded and terminal, lapsed consent
+stops the run, and fencing holds through a real overlap.
 
-**Not a live defect today**: fixture tools are repeatable, bracket recording is
-`ON CONFLICT DO NOTHING`, and dispatched invocation is opt-in. **013 made it consequential**:
-`vault_write` is non-repeatable with an observer whose whole purpose is resolving an
-interrupted write by observation, and nothing production-side reaches it.
+**Four defects it uncovered on the way**, each invisible for the same reason — the only thing
+that would have exercised it was the caller that did not exist:
 
-Owed: wire the entrypoint to `resume_run`, and assert the property through a dispatch rather
-than a call. Belongs to 005's completion rather than to a new feature.
+1. The `grants` table did not exist. `checkpoints.grant_id` had resolved to nothing since 005
+   and carried the 15-minute credential id, so consent expiry was unevaluable.
+2. `record_suspension` had no callers at all — the suspended-run index had a reader and no
+   writer.
+3. **The sweeper had never dispatched anything since 009**, reaching the scheduler on a
+   loopback address that belongs to the container rather than the host.
+4. `VaultWriteObserver` could not be called: it required an argument the `Observer` protocol
+   does not pass, so every interrupted Vault write suspended its run rather than resolving.
 
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects*
 

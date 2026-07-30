@@ -1,35 +1,49 @@
 # Conformance: Wire resume into the dispatched path
 
-**Feature**: `specs/014-dispatched-resume` | **Date**: 2026-07-30 | **Status**: **Partially in
-force — see the status table below before citing any row here**
+**Feature**: `specs/014-dispatched-resume` | **Date**: 2026-07-30 | **Status**: **In force —
+every row below passes against the live enclave**
 
 ## Row status, as of the implementation run of 2026-07-30
 
-This table is the honest state, and it is at the top of the file on purpose. **This feature
-exists because a claim outran its evidence**, so a contract that listed ten planned rows
-without saying which ones run would be the same defect in the document that records it.
+This table is at the top of the file on purpose. **This feature exists because a claim outran
+its evidence**, so a contract listing rows without saying which ones run would be the same
+defect in the document that records it.
 
 | Row | State | Evidence |
 | --- | --- | --- |
-| Disrupt and complete, exactly once | **In force** | Passes against the live enclave. 400 bracketed steps, allocation killed at step 3, 400 `TOOL_OUTCOME` events across both allocations, distinct credential ids, `RUN_RESUMED` attempt 1. `tests/conformance/durability/test_dispatched_resume.py`, 5m03s |
-| A fresh dispatch is not a resume | **In force** | Same file, 6m45s. Asserts the id-collision pair — the flag set on a finished run does not re-enter its work; the same identifiers with no flag produce no `RUN_RESUMED` at all, so nothing inferred a resume |
-| Fresh authority, nothing crosses | **Partially in force** | The credential-distinctness half is asserted inside the exactly-once row above. The no-secret sweep extension to `grants` (T017) is **not built** |
-| Re-observe, both directions, live | **Not built** (T020) | The hermetic halves are in force: `tests/component/test_resume_consults_observers.py` asserts the observer is *called* and both outcomes route correctly. The live Vault row is not written |
-| Suspension names the product | **Partially in force** | Hermetic, in the file above and in 005's existing row. The dispatch-level row (T023) is not built |
-| The sweeper revives it | **Not built** (T023) | The prerequisites now exist — `record_suspension` has two callers where it had none — but nothing has driven the cycle end to end |
-| The cap is terminal | **Partially in force** | The arithmetic and terminality are in force hermetically across the whole 0–5 range (`tests/component/test_resume_cap.py`). The flapping dispatch row (T024) is not built |
-| Expired consent stops, terminally | **Partially in force** | Hermetic rows in force (`test_resume_under_lapsed_consent.py`, `test_entrypoint_resume_branch.py`). The dispatch row (T026) is not built |
-| Fencing holds through dispatch | **Partially in force** | The ordering property is in force hermetically (`test_resume_claims_before_observing.py`), including the claim-that-errors case. The overlapping-allocation dispatch row (T028) is not built |
-| `RUN_RESUMED` is in the trail | **Partially in force** | Read through the evidence path inside the exactly-once row. The dedicated flap-ordering row (T030) is not built |
+| Disrupt and complete, exactly once | **In force** | 400 bracketed steps, allocation killed at step 3 by the scheduler, exactly 400 `TOOL_OUTCOME` events across both allocations, distinct credential ids, `RUN_RESUMED` attempt 1. `test_dispatched_resume.py`, 5m03s |
+| A fresh dispatch is not a resume | **In force** | Same file, 6m45s. The id-collision pair: the flag on a finished run does not re-enter its work; the same identifiers with no flag produce no `RUN_RESUMED`, so nothing inferred a resume |
+| Fresh authority, nothing crosses | **In force** | Credential distinctness inside the exactly-once row; the no-secret sweep over `grants` and `checkpoints` against the LIVE tables in `test_dispatched_no_secret_sweep.py` |
+| Re-observe, both directions, live | **In force** | `test_dispatched_reobservation.py`. Real Vault, the shipped `VaultWriteObserver`; each direction arranges the product's state and cleans up. Landed → 2 invocations; not landed → 3 |
+| Suspension names the product | **In force** | `test_dispatched_suspension_cycle.py`. Suspends awaiting `terraform`, files an index row carrying roles/packs/steps, exits **zero** |
+| The sweeper revives it | **In force** | Same file, 1m30s for the pair. `record_probe("terraform", reachable=True)` → the sweeper re-dispatches with no human action, recorded as attempt 2. **The 009 sweeper's first end-to-end demonstration** |
+| The cap is terminal | **In force** | `test_dispatched_cap_is_terminal.py`, 6 dispatches. Exactly five revivals, then STOPPED `resume_attempts_exhausted` with exit 0, then the sweeper drops the exhausted candidate and never revives it again |
+| Expired consent stops, terminally | **In force** | `test_dispatched_grant_expiry.py`, 6m30s. Stops with the reason, zero further steps, zero invocations; a re-issued grant revives nothing |
+| Fencing holds through dispatch | **In force** | `test_dispatched_fencing.py`. A resume dispatched under a still-running incumbent: 401 invocations for 400 steps, lease held by the successor, two issuances |
+| `RUN_RESUMED` is in the trail | **In force** | `test_run_resumed_in_trail.py`. 1-based across a sequence of three, ordered first, and the hash chain verifies across allocation boundaries |
 
-**Not yet done, and each is a gate task:** T017 (no-secret sweep over `grants`), T020, T023,
-T024, T026, T028, T030, T031 (the four break fixtures), T032 (the FR-020 re-scoping), T034
-(the full `make conformance` run).
+## Break fixtures — applied, watched to fail, reverted
 
-**FR-020 is deliberately NOT discharged.** 005's scope note still says its rows assert
-`resume_run` the library function, and it stays until the rows above are in force — replacing
-it now would be the inverse of the defect this feature repairs, which T032 says in as many
-words. One row in force does not re-scope a contract.
+| Fixture | Row that caught it | Outcome |
+| --- | --- | --- |
+| The entrypoint ignores the `resume` flag | suspension cycle | **Caught**, 1m46s: "the revival was not recorded" — no `RUN_RESUMED` at all, because the dispatch started fresh |
+| The grant load is skipped and consent fabricated | grant expiry | **Caught**, 4.6s: the run continued under lapsed consent (`run_state=None` where `stopped` was required) |
+| The attempt is counted **before** the ownership claim | `test_resume_cap.py`, `test_resume_claims_before_observing.py` | **Caught** instantly by three rows, two of them the ones named for it |
+| The cap is read from dispatch metadata | cap-is-terminal | **Not exercised.** The other three were, and this one costs a seven-minute row to demonstrate a property already asserted structurally: `resume_run` has no parameter to pass a cap through, and `test_resume_cap.py::test_the_cap_cannot_be_supplied_by_a_caller` reads the signature. Recorded as a gap rather than implied to be done |
+
+**A note on the third fixture.** The contract described it as "the fencing row burns attempts
+it must not", which reads as though a superseded claimant could burn one. It cannot:
+`RunLease.acquire()` is an unconditional supersede and never fails for a loser. The property
+is real and the mechanism is a claim that *errors* — an unreachable store — and the rows drive
+it that way.
+
+## What the fencing row establishes, precisely
+
+**At most one in-flight call survives the supersede**, not zero. The lease is asserted before
+a handler runs, so a call already past the check completes; you cannot un-invoke work that is
+already executing. A row demanding zero would fail forever while describing a correct platform
+as broken. The bound is `steps + 1`, which still separates working fencing from absent fencing
+by a factor of a hundred — an unfenced incumbent runs on to the end of its own step list.
 
 The point of this contract is its lane: **every row here runs through a real dispatch**, in
 the merge-blocking enclave lane beside 005's existing rows (clarify Q2). The feature exists
