@@ -289,46 +289,45 @@ that would have exercised it was the caller that did not exist:
 4. `VaultWriteObserver` could not be called: it required an argument the `Observer` protocol
    does not pass, so every interrupted Vault write suspended its run rather than resolving.
 
-### 0b. The collector credential is a hand-written password where Vault could rotate it
+### 0b. The collector credential was a hand-written password — **CLOSED by 015, 2026-07-30**
 
-**Raised by Dan on 2026-07-30, reviewing 015, twice — the first correction was also wrong.**
-The platform holds `harness_shipper` as a fixed username and password written into a Vault KV
-path by bring-up, where every other database credential it uses is Vault-minted and expires.
+**Raised by Dan while reviewing 015, three times, because the first two answers were also
+wrong.** The platform held `harness_shipper` as a fixed password written into a Vault KV path
+by bring-up, where every other database credential it uses is Vault-managed. 015 defended this
+with claims that had not been checked: that federation was unavailable across an
+administrative boundary (backwards — federation is the mechanism *for* crossing one), that
+removing the standing credential needed a second Vault, and that rotation needed bespoke
+automation. None were true.
 
-**The claims 015 made about why were not researched.** It first said federation was
-unavailable across an administrative boundary (backwards — federation is the mechanism *for*
-crossing one), then said removing the standing credential needed a second Vault and that
-rotation needed bespoke collector-side automation. All three are wrong.
+**Closed by onboarding the account as a ROOTLESS static role**
+([`audit-egress.tf`](infra/modules/trust-fabric/audit-egress.tf)). `self_managed = true` means
+Vault holds no privileged account at the collector: it connects *as* `harness_shipper` and
+rotates that account's own password on a 24-hour period. The maximum privilege obtainable
+through this Vault at the destination — by an operator with the root token, or by anyone who
+compromises it entirely — is the shipper's own `INSERT`/`SELECT`. Seeding the collector's root
+instead, which is how a database is normally registered, would have let whoever controls this
+Vault define a role granting `UPDATE` on `shipped_entries`: exactly the tampering ADR-0055
+exists to prevent. Rootless is not the convenient option, it is the one that survives the
+threat model.
 
-**What is actually true.** Vault rotates database credentials natively: dynamic roles mint an
-ephemeral user per request, and *static roles* take over an existing named account and rotate
-its password on a `rotation_period` (default 24h) or schedule, with the application reading
-`database/static-creds/<role>`. This repository already runs the seed-once pattern for its own
-state store — bootstrap user, `rotate-root` so only Vault knows it, then dynamic roles. The
-collector is the only store built outside it.
+**The bootstrap password is a non-event**, which is the general principle worth keeping: Vault
+rotates on import, so the seed in `roles.sql` stops authenticating the moment onboarding
+succeeds, and the password in force afterwards is known to nothing but Vault. Same disposition
+`rotate-root` gives the state store. A row asserts the seed is dead rather than trusting it.
 
-The reason for building it outside was that registering the collector in the platform's Vault
-normally means seeding the collector's ROOT credential there, which is the capture ADR-0055
-forecloses. **Rootless static roles remove that requirement**: with `self_managed=true` on the
-connection and `self_managed_password` on the role, Vault connects *as* `harness_shipper` and
-rotates that account's own password. The platform's Vault holds no privileged account on the
-collector and gains nothing beyond the role's own `INSERT`/`SELECT`. Enterprise 1.18+,
-Postgres-only; the enclave runs `vault-enterprise:2.0.3-ent` already.
+**Three rows** in [`test_credential_rotates.py`](tests/conformance/evidence/test_credential_rotates.py):
+the seeded password authenticates nothing; a forced rotation changes the credential and kills
+the old one; and shipping survives a rotation because the shipper reads the current value
+rather than caching one — a cached credential fails on a 24-hour cadence, looking like the
+collector going down, days after anyone touched the code.
 
-The tamper-evidence property is unaffected, because it rests on the grant list and never on
-password secrecy — an administrator holding the password gains exactly what the platform
-already legitimately has, and `probe()` still demonstrates `UPDATE`/`DELETE` refused.
-Conflating those two is what made a second trust store look load-bearing.
+**The boundary never rested on password secrecy**, and this is what made the earlier reasoning
+go wrong: it rests on the grant list. An administrator holding the password gains exactly what
+the platform already legitimately has, and `probe()` goes on demonstrating `UPDATE`/`DELETE`
+refused every pass. Conflating "who knows the password" with "what the account may do" is what
+made a second trust store look load-bearing.
 
-**The work**: onboard `harness_shipper` as a rootless static role, replace the KV read in
-`load_egress_credential` with `database/static-creds/`, and add a conformance row asserting
-the password in force differs after a forced rotation while shipping continues. Then ADR-0044's
-count returns to **one** and this gap closes.
-
-**What a second trust store would still add** is narrower than 015 claimed: it would move the
-*auth* decision to the collector's side as well as the grants. Worth wanting, not required by
-"the platform must not administer the destination" — the collector's operator can already
-revoke this access unilaterally by altering the grants or dropping the role.
+**ADR-0044's count stands at one.** There is no second standing credential.
 
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
 

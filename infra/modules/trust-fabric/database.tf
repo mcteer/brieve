@@ -20,6 +20,9 @@ locals {
   database_connection_name = "brieve"
   database_role_name       = "harness"
   evidence_role_name       = "evidence"
+  # 015. The second copy, onboarded rootless — see `audit-egress.tf`.
+  collector_connection_name = "collector"
+  collector_role_name       = "audit-shipper"
 }
 
 resource "vault_database_secret_backend_connection" "state_store" {

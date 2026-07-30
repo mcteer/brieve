@@ -82,23 +82,22 @@ def _reachable() -> bool:
         return False
 
 
-def _wait_until_reachable(deadline_seconds: int) -> None:
+def _wait_until_reachable(credential: dict[str, Any], deadline_seconds: int) -> None:
     """Wait for the scheduler to bring it back, and for Postgres to accept connections.
 
     Both, in that order: an open port is not a ready database, and the difference shows up
     as an authentication failure that reads like a credential problem.
+
+    **Probes with the credential Vault currently holds, never a literal.** This function
+    hardcoded the seed password until the account was onboarded as a static role, at which
+    point Vault rotated it and the probe could never succeed — so a healthy collector read
+    as one that never came back. A test that hardcodes a rotating secret has a shelf life.
     """
     deadline = time.monotonic() + deadline_seconds
     while time.monotonic() < deadline:
         if _reachable():
             try:
-                PostgresAuditDestination(
-                    host="127.0.0.1",
-                    port=COLLECTOR_PORT,
-                    dbname="collector",
-                    username="harness_shipper",
-                    password="dev-only-shipper",
-                ).read_entries("readiness-probe")
+                PostgresAuditDestination.from_credential(credential).read_entries("readiness-probe")
                 return
             except Exception:  # noqa: BLE001 — still booting; that is what we are waiting for
                 pass
@@ -165,7 +164,7 @@ def test_row_an_outage_loses_no_entries_and_stops_no_runs(
         # Restoration belongs in `finally`: a failed assertion above must not leave the
         # enclave without its second copy for every row that runs after this one.
         subprocess.run(["docker", "start", container], capture_output=True, check=False)
-        _wait_until_reachable(RESTART_BUDGET_SECONDS)
+        _wait_until_reachable(egress_configured, RESTART_BUDGET_SECONDS)
 
     # ---- recovery: the owed tail is still owed, and drains.
     recovered = ship_pass(local=platform_admin_connection, destination=destination)

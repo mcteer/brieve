@@ -135,3 +135,34 @@ def _clean_report(calls: list[str]) -> Any:
 
     calls.append("integrity")
     return IntegrityReport()
+
+
+def test_the_destination_is_built_once_per_pass_because_the_credential_rotates(
+    monkeypatch: Any,
+) -> None:
+    """A destination built at startup dies at the first rotation.
+
+    Vault owns the shipper account and rotates its password on a period. A destination
+    constructed once holds whatever was in force then; it works, then fails authentication
+    on every subsequent pass — which reads in the logs as the collector going down, on a
+    24-hour cadence, days after anyone touched the code.
+
+    The service did exactly that until a conformance row rotated the credential underneath
+    it and the next `test_the_service_ships` run went red. Asserted here rather than left to
+    that row, because the enclave row costs three minutes and takes a rotation to expose it.
+    """
+    calls, parts = _fixture()
+    monkeypatch.setattr("surfaces.mcp.server.check_integrity", lambda _c: _clean_report(calls))
+    built = []
+
+    def factory() -> None:
+        built.append(1)
+        return None
+
+    supervisory_pass(**parts, destination_factory=factory)
+    supervisory_pass(**parts, destination_factory=factory)
+
+    assert len(built) == 2, (
+        "the destination was not rebuilt for the second pass — a rotating credential "
+        "captured once is a credential that expires into a fake outage"
+    )

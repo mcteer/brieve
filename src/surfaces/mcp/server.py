@@ -346,7 +346,7 @@ def supervisory_pass(
     sweeper: Sweeper,
     store: PostgresDependencyStore,
     credentials: VaultDatabaseCredentials,
-    destination: Any = None,
+    destination_factory: Callable[[], Any] | None = None,
     audit_sink: Any = None,
 ) -> list[str]:
     """One pass of everything this service exists to do. Returns the passes it ran.
@@ -383,6 +383,17 @@ def supervisory_pass(
     # the last pass would sit above the watermark and be reported as backlog — true, but it
     # would also mean the newest entries are never compared until the pass after the one
     # that shipped them. Shipping first narrows that to whatever arrives mid-pass.
+    # **Built per pass, not once at startup, because the credential ROTATES.** Vault owns
+    # `harness_shipper` and changes its password on a period; a destination constructed at
+    # startup holds whatever was in force then, works until the first rotation, and after
+    # that fails authentication on every pass — which reads in the logs as the collector
+    # going down, on a 24-hour cadence, days after anyone touched the code.
+    #
+    # An earlier version did exactly that, with a comment reasoning that rebuilding "would
+    # re-read Vault every interval for a credential that does not change". True when it was
+    # written and false the moment the account was onboarded as a static role. One Vault
+    # read per interval is the price of a credential nobody has to know.
+    destination = destination_factory() if destination_factory is not None else None
     _pass("egress", lambda: _report_egress(credentials, destination))
     ran.append("egress")
     _pass("reconcile", lambda: _report_reconcile(credentials, destination, audit_sink))
@@ -426,8 +437,8 @@ def main() -> int:
     #
     # The jobspec supplies the reachable address, the same way it already supplies
     # `VAULT_ADDR`. The default stays host-correct so nothing outside an allocation changes.
-    # The second copy, and the posture it implies. Constructed once: a destination rebuilt
-    # per pass would re-read Vault every interval for a credential that does not change.
+    # Probed once HERE only to state the posture at startup. Each pass builds its own,
+    # because the credential rotates — see `supervisory_pass`.
     destination = build_destination()
     audit_sink = PostgresAuditSink(credentials=credentials)
     if destination is None:
@@ -458,7 +469,7 @@ def main() -> int:
             sweeper=sweeper,
             store=store,
             credentials=credentials,
-            destination=destination,
+            destination_factory=build_destination,
             audit_sink=audit_sink,
         )
         supervisor.sleep()

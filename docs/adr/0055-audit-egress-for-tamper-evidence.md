@@ -154,15 +154,15 @@ from a separate spool table, and a failed *delivery* refuses nothing while a fai
 still refuses the step. The seam is asserted from both sides in
 `tests/component/test_capture_refuses.py`.
 
-**This feature introduces the platform's SECOND standing credential**, and ADR-0044 says a
-second one "would be a constitutional event rather than a configuration change" — so it is
-named here rather than left to be discovered by counting.
+**This feature was going to introduce the platform's SECOND standing credential, and in
+the end does not.** ADR-0044 says a second one "would be a constitutional event rather than
+a configuration change"; that count stands at one.
 
-**It should not have, and the argument below for why it had to is wrong.** Both drafts of
-this note were written without checking what Vault actually provides, and both overstated a
-limitation into a principle. What is true is recorded under "Correction" at the end of this
-section; the reasoning that follows it is kept because the record is append-only and because
-a wrong argument is worth being able to find.
+**The argument below for why a standing credential was unavoidable is wrong**, and is kept
+rather than deleted because the record is append-only and a wrong argument is worth being
+able to find. Both drafts of it were written without checking what Vault provides, and both
+turned a limitation into a principle. What was actually built is under "Correction" at the
+end of this section.
 
 It is the append-only account the platform holds at the collector: `INSERT` and `SELECT` on
 two tables, no `UPDATE`, no `DELETE`, no `TRUNCATE`, and the separation probe demonstrates
@@ -199,7 +199,7 @@ Two things follow, and they are separable:
   automate it.
 - **The standing-ness itself needs the second trust store**, and is worth its own record.
 
-### Correction (2026-07-30, after actually reading the documentation)
+### Correction — and what was built (2026-07-30, after reading the documentation)
 
 Raised by Dan: Vault has native mechanisms for exactly this, and needing a human to rotate a
 credential is not a design constraint anyone should accept. Both points are correct, and the
@@ -240,9 +240,22 @@ under the same attested identity as every other credential here, replacing the h
 value at a KV path. On that footing ADR-0044's count returns to **one**, and this record
 should not have claimed otherwise.
 
-Two honest caveats for whoever implements it: a rootless connection does not support dynamic
-roles (documented limitation), and out-of-band password changes desynchronise Vault from the
-database. Neither bites here — one account, rotated only by Vault.
+Two honest caveats, which held up in practice: a rootless connection does not support
+dynamic roles (documented limitation), and out-of-band password changes desynchronise Vault
+from the database. Neither bites here — one account, rotated only by Vault.
+
+**Built, in this feature.** [`audit-egress.tf`](../../infra/modules/trust-fabric/audit-egress.tf)
+onboards `harness_shipper` as a rootless static role on a 24-hour period; the policy grants
+read on `database/static-creds/audit-shipper` instead of a KV path; the shipper reads the
+current value each time it builds a destination, so rotation needs no restart and no human;
+and the collector's coordinates travel in the jobspec, where an address belongs and a
+credential does not. Verified live — the seed in `roles.sql` no longer authenticates, and the
+running service ships under a password nobody has ever seen.
+
+One ordering consequence worth knowing before debugging bring-up: the static role imports an
+account that must already exist, so it is applied *after* `roles.sql` rather than in the main
+trust-fabric apply. And the connection is expressed as reachable from the trust store's
+container, not from the operator's shell — the same trap `database_endpoint` already carries.
 
 What a second trust store would still add is narrower than the reasoning above suggests:
 it would put the *auth* decision on the collector's side too, rather than only the grants.
@@ -250,4 +263,4 @@ That is worth wanting and is not what "the platform must not administer the dest
 requires, since the collector's operator can already revoke this access unilaterally by
 altering the grants or dropping the role.
 
-Tracked as ROADMAP gap 0b, rewritten to say this rather than what it first said.
+ROADMAP gap 0b, opened and closed the same day this record was corrected.

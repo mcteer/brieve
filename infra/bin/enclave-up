@@ -454,14 +454,27 @@ if nomad job run "$REPO/infra/jobs/collector-postgres.nomad.hcl" >/dev/null 2>&1
     if { cat "$REPO/src/core/audit/destination_schema.sql"; cat "$REPO/infra/collector/roles.sql"; } \
        | docker run --rm -i --network host -e PGPASSWORD=dev-only-collector-admin postgres:17-alpine \
          psql -h 127.0.0.1 -p 5433 -U collector -d collector -v ON_ERROR_STOP=1 -q >/dev/null 2>&1; then
-      # The shipping credential goes to VAULT, never to the mcp jobspec's env block: it
-      # carries SELECT on the whole evidence copy, and jobspec metadata is readable by
-      # anyone with scheduler access. The mcp role holds read on this one path.
-      vault kv put secret/audit-egress/shipper \
-        host=127.0.0.1 port=5433 dbname=collector \
-        username=harness_shipper password=dev-only-shipper >/dev/null 2>&1 \
-        && ok "second copy up on :5433; shipper credential in Vault (append+read only)" \
-        || warn "collector store is up but its credential could not be stored — egress will report ABSENT"
+      # Onboard the shipper account into Vault's database engine, ROOTLESS — Vault
+      # connects as `harness_shipper` itself and rotates that account's own password, so
+      # this Vault holds no privileged account at the collector and gains nothing beyond
+      # the role's own INSERT/SELECT.
+      #
+      # Applied HERE rather than in the main trust-fabric apply above, because the static
+      # role imports an account that must already exist: `roles.sql` ran moments ago. The
+      # ordering is the reason this is a second, targeted apply rather than an oversight.
+      #
+      # Vault rotates on import, so `dev-only-shipper` in `roles.sql` stops working the
+      # instant this succeeds. That is the point — the seed is meant to die.
+      if ( cd "$REPO/infra/environments/dev" && terraform apply -input=false -auto-approve \
+             -var vault_token="$(env_val VAULT_ROOT_TOKEN)" \
+             ${TLS_ARGS[@]+"${TLS_ARGS[@]}"} ${NET_ARGS[@]+"${NET_ARGS[@]}"} \
+             -target=module.trust_fabric.vault_database_secret_backend_connection.collector \
+             -target=module.trust_fabric.vault_database_secret_backend_static_role.audit_shipper \
+             >/dev/null 2>&1 ); then
+        ok "second copy up on :5433; shipper credential onboarded to Vault and rotated"
+      else
+        warn "collector store is up but its credential could not be onboarded — egress will report ABSENT"
+      fi
     else
       warn "could not apply the destination schema — egress will report ABSENT"
     fi

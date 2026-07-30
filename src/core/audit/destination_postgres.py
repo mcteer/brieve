@@ -40,8 +40,9 @@ from core.audit.egress import (
 from core.audit.schema import AuditEntry, AuditEventType
 from core.errors import CoreError
 
-#: Where `enclave-up` writes the shipping credential and the mcp role may read it.
-EGRESS_CREDENTIAL_PATH = "secret/data/audit-egress/shipper"
+#: Vault's static-role path for the shipping account. Returns whatever password Vault most
+#: recently rotated `harness_shipper` to — nobody wrote it and nobody knows it.
+EGRESS_CREDENTIAL_PATH = "database/static-creds/audit-shipper"
 
 #: The Vault role whose policy grants read on exactly that one path, and nothing else.
 EGRESS_VAULT_ROLE = "mcp"
@@ -52,31 +53,53 @@ class AuditDestinationError(CoreError):
 
 
 def load_egress_credential(*, token: str | None = None) -> dict[str, Any] | None:
-    """Read the shipping credential from Vault, or None when egress is not configured.
+    """The current shipping credential, or None when egress is not configured.
 
-    **Two ways in, and the production one is the workload identity.** An earlier version of
-    this read `VAULT_TOKEN` from the environment and nothing else. Every conformance row
-    passed, because rows run on the host holding an operator token — and the mcp service,
-    which holds no such token and never will, reported ABSENT on every pass since the
-    feature landed. It had never shipped an entry in the enclave it was built for. The
-    seam that fixes it already existed: the service exchanges its Nomad workload identity
-    for a Vault token for its database credential, and this is the same exchange.
+    **Coordinates from the environment, the credential from Vault, and the split is the
+    point.** Where the second copy lives is not a secret and travels in the jobspec like any
+    other address. The password is, and it carries `SELECT` on the entire evidence copy
+    across every tenant — jobspec metadata is readable by anyone with scheduler access, so
+    delivering it there would open an ungoverned evidence read beside ADR-0035's governed
+    one.
 
-    So the env token stays as the *operator's* path — how a host process or a row reads
-    the same secret — and the attested path is the default.
+    **The credential is read fresh on every build, because it rotates.** Vault owns
+    `harness_shipper`'s password and changes it on a period; a value cached at startup would
+    work until the first rotation and then fail in a way that looks like the collector
+    going down. Reading `database/static-creds/` each time makes rotation invisible here —
+    no restart, no reload, no human.
 
     ``None`` rather than an exception, because an estate with no second destination is a
     valid posture — ABSENT (FR-009) — and the caller is the one positioned to report it as
     such. A raise here would make "not configured" indistinguishable from "misconfigured".
     """
+    host = os.environ.get("AUDIT_EGRESS_HOST", "").strip()
+    port = os.environ.get("AUDIT_EGRESS_PORT", "").strip()
+    dbname = os.environ.get("AUDIT_EGRESS_DBNAME", "").strip()
+    if not (host and port and dbname):
+        # No destination configured. Not a failure — the posture this estate is in.
+        return None
+
     explicit = token or os.environ.get("VAULT_TOKEN")
-    if explicit:
-        return _read_with_token(explicit)
-    return _read_as_workload()
+    secret = _read_with_token(explicit) if explicit else _read_as_workload()
+    if not secret:
+        return None
+    return {
+        "host": host,
+        "port": port,
+        "dbname": dbname,
+        "username": secret["username"],
+        "password": secret["password"],
+    }
 
 
 def _read_as_workload() -> dict[str, Any] | None:
-    """Exchange this allocation's identity for a token, then read the one path it may."""
+    """Exchange this allocation's identity for a token, then read the one path it may.
+
+    An earlier version read `VAULT_TOKEN` from the environment and nothing else. Rows on
+    the host always have one; an allocation never does, so the running service reported
+    ABSENT on every pass while twelve rows were green. Both paths exist now, and the
+    attested one is the default.
+    """
     from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 
     try:
@@ -84,13 +107,11 @@ def _read_as_workload() -> dict[str, Any] | None:
         body = fabric.read_path(EGRESS_CREDENTIAL_PATH)
     except Exception:  # noqa: BLE001 — no identity, or an unreachable fabric: no destination
         return None
-    if not body:
-        return None
-    data: dict[str, Any] = body.get("data", {}).get("data", body)
-    return data or None
+    return _credential_from(body)
 
 
 def _read_with_token(vault_token: str) -> dict[str, Any] | None:
+    """The operator's path: a host process or a conformance row, holding a real token."""
     addr = (os.environ.get("VAULT_ADDR") or "https://127.0.0.1:8200").rstrip("/")
     cacert = os.environ.get("VAULT_CACERT")
     context = ssl.create_default_context(cafile=cacert) if cacert else None
@@ -99,11 +120,26 @@ def _read_with_token(vault_token: str) -> dict[str, Any] | None:
     )
     try:
         with urllib.request.urlopen(request, timeout=10, context=context) as response:  # noqa: S310
-            body = json.loads(response.read())
-        data: dict[str, Any] = body["data"]["data"]
-        return data
+            return _credential_from(json.loads(response.read()))
     except Exception:  # noqa: BLE001 — absent and unreachable are both "no destination"
         return None
+
+
+def _credential_from(body: Any) -> dict[str, Any] | None:
+    """Pull username and password out of a static-role read.
+
+    Vault answers `database/static-creds/` with `data: {username, password, ttl, ...}`. The
+    KV-v2 shape (`data.data`) is tolerated so a misconfigured path fails as ABSENT rather
+    than as a KeyError three frames away from the cause.
+    """
+    if not body:
+        return None
+    data = body.get("data", body)
+    if "username" not in data and isinstance(data.get("data"), dict):
+        data = data["data"]
+    if "username" not in data or "password" not in data:
+        return None
+    return {"username": str(data["username"]), "password": str(data["password"])}
 
 
 class PostgresAuditDestination:

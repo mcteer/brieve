@@ -33,10 +33,15 @@ from typing import Any
 import pg8000.dbapi
 import pytest
 
-#: Where `enclave-up` puts the platform's shipping credential. Read through Vault under an
-#: operator token here, exactly as the mcp service reads it under its own attested identity —
-#: the same path, a different way of being allowed to see it.
-SHIPPER_CREDENTIAL_PATH = "secret/data/audit-egress/shipper"
+#: Vault's static-role path for the shipping account. Read through Vault under an operator
+#: token here, exactly as the mcp service reads it under its own attested identity — the same
+#: path, a different way of being allowed to see it.
+#:
+#: **Not a stored password.** Vault owns `harness_shipper` and rotates it on a period, so what
+#: comes back is whatever is in force right now. Rows read it fresh for the same reason the
+#: service does: a value captured at import would work until the first rotation and then fail
+#: looking like an outage.
+SHIPPER_CREDENTIAL_PATH = "database/static-creds/audit-shipper"
 
 #: The collector administrator's account. Held by the operator, never by the platform, and
 #: never in the platform's Vault — a credential the platform's Vault stored would be one the
@@ -63,8 +68,30 @@ def _vault_read(path: str) -> dict[str, Any]:
     )
     with urllib.request.urlopen(request, timeout=10, context=context) as response:  # noqa: S310
         body = json.loads(response.read())
-    data: dict[str, Any] = body["data"]["data"]
+    # `database/static-creds/` answers with `data: {username, password, ...}` — one level,
+    # unlike KV v2's `data.data`.
+    data: dict[str, Any] = body["data"]
     return data
+
+
+def _vault_write(path: str, payload: dict[str, Any] | None = None) -> None:
+    """POST to Vault as the operator — used to force a rotation on demand.
+
+    The operator can ask for a rotation; the operator still never learns the result except
+    by reading it back, which is the same read the service performs.
+    """
+    addr = (os.environ.get("VAULT_ADDR") or "https://127.0.0.1:8200").rstrip("/")
+    token = os.environ.get("VAULT_TOKEN") or os.environ.get("VAULT_ROOT_TOKEN")
+    cacert = os.environ.get("VAULT_CACERT")
+    context = ssl.create_default_context(cafile=cacert) if cacert else None
+    request = urllib.request.Request(  # noqa: S310 — fixed scheme, operator-supplied addr
+        f"{addr}/v1/{path}",
+        data=json.dumps(payload or {}).encode(),
+        headers={"X-Vault-Token": token or "", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=15, context=context):  # noqa: S310
+        return
 
 
 @pytest.fixture
@@ -76,12 +103,21 @@ def egress_configured() -> dict[str, Any]:
     would report the same green as one that verified the shipping actually works.
     """
     try:
-        return _vault_read(SHIPPER_CREDENTIAL_PATH)
+        secret = _vault_read(SHIPPER_CREDENTIAL_PATH)
     except Exception as exc:  # noqa: BLE001 — the diagnosis is the value
         pytest.fail(
-            f"the audit-egress shipping credential is not in Vault ({exc}). Run `make dev-up` "
-            f"— its 'Second copy' step brings up the collector store and stores this."
+            f"the audit-egress static role is not in Vault ({exc}). Run `make dev-up` — its "
+            f"'Second copy' step brings up the collector store and onboards this role."
         )
+    # Coordinates are configuration, not secret, and travel separately for that reason —
+    # the same split the mcp service makes between its jobspec env and this path.
+    return {
+        "host": "127.0.0.1",
+        "port": str(COLLECTOR_PORT),
+        "dbname": COLLECTOR_DB,
+        "username": str(secret["username"]),
+        "password": str(secret["password"]),
+    }
 
 
 @pytest.fixture

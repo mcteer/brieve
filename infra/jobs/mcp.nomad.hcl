@@ -17,6 +17,21 @@
 #
 # READ THIS JOBSPEC FOR WHAT IS ABSENT: no token, no password, no DSN, no mounted secret.
 
+variable "audit_egress_host" {
+  type    = string
+  default = "127.0.0.1"
+}
+
+variable "audit_egress_port" {
+  type    = string
+  default = "5433"
+}
+
+variable "audit_egress_dbname" {
+  type    = string
+  default = "collector"
+}
+
 variable "vault_addr" {
   type        = string
   default     = "https://127.0.0.1:8200"
@@ -157,6 +172,18 @@ job "mcp" {
         # Outside the mounted tree, so running the service does not rebuild the
         # developer's virtualenv against the container's interpreter and back again.
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
+
+        # WHERE the second copy is (015). Coordinates only, and deliberately here rather
+        # than in Vault: an address is not a secret, and jobspec metadata is readable by
+        # anyone with scheduler access. The CREDENTIAL never travels this way — it carries
+        # SELECT on the whole evidence copy, so it comes from `database/static-creds/`
+        # under this allocation's own attested identity, rotated by Vault on a period.
+        #
+        # Their absence is how an estate says it has no second copy: no coordinates, no
+        # destination, posture ABSENT — stated rather than defaulted.
+        AUDIT_EGRESS_HOST   = var.audit_egress_host
+        AUDIT_EGRESS_PORT   = var.audit_egress_port
+        AUDIT_EGRESS_DBNAME = var.audit_egress_dbname
 
         # Populated by `enclave-up`, shared by every allocation.
         UV_CACHE_DIR = "/uv-cache"
