@@ -44,6 +44,18 @@ from core.threads.postgres import PostgresThreadStore
 from surfaces.toolset import build_registry, content_pins, dependency_products
 
 
+#: What a dispatched run passes a tool it was asked to invoke.
+#:
+#: A fixture affordance, and it always was — `invoke_tools` is the opt-in that exists so a
+#: dispatched row can watch a pack tool reach a live product. What 014 added is `cas`, and the
+#: reason is worth stating: `vault_write` REQUIRES it and raises without it, and a handler
+#: exception does not make `outcome.allowed` false — `allowed` is `decision == "allow" and not
+#: evidential_gap`, both of which hold when the body throws. So a probe call missing `cas`
+#: would have every step report success while the tool errored, and the exactly-once row would
+#: be counting invocations that never did anything.
+_PROBE_ARGUMENTS = {"path": "conformance/probe", "cas": 0}
+
+
 def _product_action_of(registry: Any, tool_name: str) -> str:
     """The action a tool performs, or empty for unregistered/actionless tools."""
     try:
@@ -149,7 +161,7 @@ def _run_steps(
         if tool_name:
             from core.tools.invoke import invoke_tool
 
-            outcome = invoke_tool(run, tool_name, {"path": "conformance/probe"})
+            outcome = invoke_tool(run, tool_name, _PROBE_ARGUMENTS)
             print(f"tool {tool_name}: allowed={outcome.allowed}", flush=True)
             if not outcome.allowed:
                 print(f"tool {tool_name} refused: {outcome.reason_code}", file=sys.stderr)
@@ -668,7 +680,7 @@ def main() -> int:
         from core.tools.invoke import invoke_tool
 
         for tool_name in sorted(tools):
-            outcome = invoke_tool(run, tool_name, {"path": "conformance/probe"})
+            outcome = invoke_tool(run, tool_name, _PROBE_ARGUMENTS)
             print(f"tool {tool_name}: allowed={outcome.allowed}", flush=True)
             if not outcome.allowed:
                 # A refused invoke fails the allocation, so the dispatch row's

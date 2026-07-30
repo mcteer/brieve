@@ -84,7 +84,16 @@ variable "agent_definitions" {
       owner           = "platform"
       ceiling_policy  = "agent-ceiling-vault"
       allowed_paths   = ["secret/data/conformance/*"]
-      tool_names      = ["vault_read"]
+      # `vault_write` joins the ceiling for 014's live re-observation rows, and it is the only
+      # definition that names it. Required rather than convenient: FR-006a wants an
+      # interrupted write resolved by OBSERVATION against the real product in both
+      # directions, and a run whose ceiling omits the tool cannot leave an interrupted write
+      # to observe — the invoke refuses before an intent is ever opened.
+      #
+      # It buys no Vault capability. The tool is non-repeatable with a real observer, which is
+      # what makes the bracket and the re-observation real; the handler itself is a stub that
+      # writes nothing (see `agent-pack-secrets`, which deliberately grants no write).
+      tool_names      = ["vault_read", "vault_write"]
       # Empty, with the manifest's reasoning: the pack's tools are platform-identity
       # reads (product_mode none), so there is no product action to authorize until
       # credential translation (ADR-0044) federates the user into the product.
@@ -151,8 +160,17 @@ variable "role_bindings" {
     }
     # 013: the subject role for the pack-dispatch row. Separate from `operator` because
     # that role's exact contents are what the ceiling-pair rows intersect against.
+    #
+    # `vault_write` joins in 014, and it has to join HERE as well as in `vault-agent`'s
+    # ceiling — the two are independent bounds and manufacture intersects them, so a tool in
+    # the ceiling and not the role refuses `task scope exceeds user or ceiling`. Which is the
+    # intersection algebra working: the ceiling says what the DEFINITION may ever do, this
+    # says what the SUBJECT may ask for, and neither is permission on its own.
+    #
+    # Found by a dispatched row rather than by reading, and that is the argument for the row:
+    # the ceiling edit alone looked complete and every hermetic test still passed.
     "vault-operator" = {
-      tool_names      = ["vault_read"]
+      tool_names      = ["vault_read", "vault_write"]
       product_actions = []
     }
   }
