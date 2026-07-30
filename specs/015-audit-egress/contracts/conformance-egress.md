@@ -1,6 +1,6 @@
 # Conformance: Audit egress for tamper-evidence
 
-**Feature**: `specs/015-audit-egress` | **Date**: 2026-07-30 | **Status**: Planned
+**Feature**: `specs/015-audit-egress` | **Date**: 2026-07-30 | **Status**: In force
 
 The point of this contract is the credential boundary: **every row here runs against a live
 second store holding credentials the platform does not have.** A row against an in-process
@@ -34,14 +34,24 @@ the boundary — so "an air-gapped estate still has a second copy" is demonstrat
 construction rather than by a dedicated row, and this sentence is where that claim lives
 rather than being implied.
 
-## Break fixtures worth naming
+## Break fixtures — applied, observed, reverted (2026-07-30)
 
-- The shipper advances the watermark before delivery confirms → the outage row loses the
-  outage's entries.
-- Head observations become an upsert → the constant-length rewrite row stops detecting.
-- The probe is replaced by a config check → the writable-destination row reports compliant.
-- The reconciler treats all tail gaps as pending → the truncation row goes green while the
-  attack succeeds.
+| Fixture | Outcome |
+| --- | --- |
+| The shipper advances the watermark before delivery confirms | **Caught.** `test_row_an_outage_loses_no_entries_and_stops_no_runs` fails: the outage's entries are never re-attempted, which is silent loss. |
+| Head observations become an upsert | **Cannot be applied.** The destination's grant refuses `DELETE` and `UPDATE` on `shipped_head_observations` (SQLSTATE 42501), so the shipping pass fails loudly instead of the detection degrading quietly. The property is enforced by Postgres, not by the Python remembering to append. |
+| The probe is replaced by a config check | **Caught.** Both `test_row_a_writable_destination_is_reported_non_compliant` and `test_row_an_unreachable_destination_is_unverified_never_verified` fail — a probe that trusts configuration reports `verified` for a destination the platform can rewrite and for one that does not exist. |
+| The reconciler treats all tail gaps as pending | **Caught twice.** The live `test_row_the_consistent_truncation_is_reported` and the hermetic `test_the_consistent_truncation_is_caught_by_the_shipped_head` both fail. |
+
+The second fixture is the more interesting result. It was expected to make a row go green
+while the attack succeeded; instead it could not be written at all, because the same
+append-only grant that stops an attacker also stops the implementer. That is the difference
+between a property held by convention and one held by the database.
+
+Applying the first fixture also exposed a gap in the truncation row, now closed: the row
+tampered and reconciled without shipping again, and the real supervisory loop does ship
+again. Shipping after the tampering is the attacker's best remaining move, so the row makes
+it.
 
 ## What these rows do not prove
 

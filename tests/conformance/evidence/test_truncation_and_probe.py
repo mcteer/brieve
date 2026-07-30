@@ -107,6 +107,13 @@ def test_row_the_consistent_truncation_is_reported(
     )
     assert head[0][0] == 2, "the arranged head does not agree with the arranged entries"
 
+    # The supervisory loop keeps shipping after the tampering, so the row does too. This is
+    # not incidental: it is the attacker's best remaining move. If head observations were
+    # ever stored as an upsert rather than appended, this pass would lower the platform's
+    # own shipped claim to match the truncated head and destroy the only witness. Detecting
+    # a truncation that is never shipped over again would be detecting the easy case.
+    ship_pass(local=platform_admin_connection, destination=destination)
+
     report = reconcile(
         local=platform_admin_connection, destination=destination, only={correlation_id}
     )

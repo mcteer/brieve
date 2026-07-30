@@ -278,6 +278,36 @@ directions.
 only through a governed tenant-scoped path, and evidence access is itself audited
 (ADR-0035).
 
+**Audit egress** — shipping the trail to a **destination** the platform's own credentials
+cannot alter (ADR-0055). Not a backup: a copy the writer can rewrite detects nothing. The
+trust boundary is **administrative, not topological** — an organization-operated collector
+on the same machine satisfies it; object storage the enclave's own role can write does not.
+
+**Second copy / destination** — the store the trail is shipped to, holding full chain
+entries (so it verifies on its own contents) and the platform's own **head observations**
+(so a consistent truncation of the first copy contradicts something). Its credential grants
+the platform `INSERT` and `SELECT` and nothing else.
+
+**Reconciliation** — the named operation that compares the two copies and reports
+divergence by stream and sequence, never by content. Runs through the governed read path
+and is itself audited, because reading evidence is audited. It reports that the copies
+**differ**, never which one is honest — an attacker holding both administrative domains
+defeats it, and the record says so.
+
+**Separation probe** — the platform attempting to `UPDATE` and `DELETE` a shipped record
+and requiring both to be refused. `verified` only ever follows a refusal actually observed;
+a destination that cannot be probed is `unverified`, never assumed sound. This exists
+because "the collector is append-only" is otherwise an assertion in a config file.
+
+**Shipping lag window** — the entries written to the first copy and not yet confirmed at
+the second. A **security** measure, not an ops one: it is exactly the set that exists in one
+place, so a rising backlog is a widening interval in which a local rewrite would leave no
+trace anywhere.
+
+**Tamper-evidence posture** — `in_force`, `unverified`, `non_compliant`, or `absent`. Only
+the first claims protection, and only a passing probe produces it. An estate with no second
+copy reports `absent` — stated, never defaulted to something that reads as protected.
+
 **Grounded reporting / RunReport** — a typed report validated against actual run
 records before release, with read-back before terminal claims; reports are
 presentation, attestation rests on records (ADR-0018).

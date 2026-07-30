@@ -147,3 +147,24 @@ cannot carry silently.
 Not addressed here, and worth its own record if it turns out to matter: whether the *shipped*
 copy needs its own retention policy distinct from the local one, and what happens when the two
 disagree about how long an entry lives.
+
+**Built by `specs/015-audit-egress` (2026-07-30).** Both open questions were answered in
+clarification: shipping is **spooled**, draining from the entries already written rather than
+from a separate spool table, and a failed *delivery* refuses nothing while a failed *capture*
+still refuses the step. The seam is asserted from both sides in
+`tests/component/test_capture_refuses.py`.
+
+**This feature introduces the platform's SECOND standing credential**, and ADR-0044 says a
+second one "would be a constitutional event rather than a configuration change" — so it is
+named here rather than left to be discovered by counting.
+
+It is the append-only account the platform holds at the collector: `INSERT` and `SELECT` on
+two tables, no `UPDATE`, no `DELETE`, no `TRUNCATE`, and the separation probe demonstrates
+those refusals on every reconcile pass rather than asserting them. It is deliberately **not**
+minted by the platform's Vault, because a credential the platform's secrets engine issues is
+one the platform's administrators govern — which would re-capture the destination and defeat
+this entire record. Being unmintable by the platform is precisely what makes it standing:
+federation is not available across an administrative boundary the design requires be genuine.
+
+The count in ADR-0044 ("the platform's single standing credential") is therefore now two, and
+amending that record is a separate act this one does not perform.
