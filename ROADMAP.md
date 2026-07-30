@@ -247,6 +247,29 @@ sequence above, but a Proposed record that quietly becomes permanent is a failur
 Found while deriving this file. None blocks work; all three make the record harder to reason
 from, and each is worth its own small change.
 
+### 0a. `resume_run` has no production caller, so durability is a tested library
+
+**Found 2026-07-29 while tracing 013's dispatch path.**
+
+`SUSPENDED` is reachable in production, the sweeper re-dispatches on dependency recovery, and
+`step_index` is carried faithfully through the sweeper, the dispatcher, and the jobspec. The
+entrypoint then ignores `RUN_STEP_INDEX` and calls `start_governed_run`, beginning its loop at
+zero. **`resume_run` is invoked from tests and from nowhere in `src/`.**
+
+005's conformance rows — "a disrupted run resumes and completes", "re-observe, never
+re-execute" — are true of the function and not of the dispatched path. That scope is now
+recorded in
+[`specs/005-durable-execution/contracts/conformance-durability.md`](specs/005-durable-execution/contracts/conformance-durability.md)
+rather than left implied.
+
+**Not a live defect today**: fixture tools are repeatable, bracket recording is
+`ON CONFLICT DO NOTHING`, and dispatched invocation is opt-in. **013 made it consequential**:
+`vault_write` is non-repeatable with an observer whose whole purpose is resolving an
+interrupted write by observation, and nothing production-side reaches it.
+
+Owed: wire the entrypoint to `resume_run`, and assert the property through a dispatch rather
+than a call. Belongs to 005's completion rather than to a new feature.
+
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects*
 
 **Raised by Dan, 2026-07-29, during 013's live gate run. The most consequential gap on this
