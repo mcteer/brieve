@@ -73,7 +73,7 @@ job "portal" {
       driver = "docker"
 
       config {
-        image        = "python:3.12-slim"
+        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "host"
 
@@ -84,8 +84,22 @@ job "portal" {
           readonly = true
         }
 
+        # THE PACKAGE CACHE, SHARED ACROSS ALLOCATIONS. See `agent-run.nomad.hcl` for the
+        # full reasoning: every allocation built its virtualenv from the public index, which
+        # made the network a precondition for the service starting at all.
+        #
+        # Writable, unlike the source mount above — a cache nothing may write to is not a
+        # cache. The source stays read-only because this task COPIES what it needs out of it
+        # and must not be able to edit the tree it was given.
+        mount {
+          type     = "bind"
+          source   = "${var.repo}/.enclave/uv-cache"
+          target   = "/uv-cache"
+          readonly = false
+        }
+
         args = [
-          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra surfaces --extra portal python -m surfaces.portal.service"
+          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra surfaces --extra portal python -m surfaces.portal.service"
         ]
       }
 
@@ -104,6 +118,13 @@ job "portal" {
         # posture is a deployment concern and is deliberately not solved here.
 
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
+
+        # Populated by `enclave-up`, shared by every allocation.
+        UV_CACHE_DIR = "/uv-cache"
+        # Cache and venv sit on different filesystems, so hardlinking is unavailable
+        # and copying is the fallback uv would take anyway. Declared, so the warning
+        # stays out of the logs where it reads like a fault.
+        UV_LINK_MODE = "copy"
       }
 
       resources {

@@ -90,7 +90,7 @@ job "mcp" {
       }
 
       config {
-        image        = "python:3.12-slim"
+        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "host"
 
@@ -113,6 +113,20 @@ job "mcp" {
           readonly = true
         }
 
+        # THE PACKAGE CACHE, SHARED ACROSS ALLOCATIONS. See `agent-run.nomad.hcl` for the
+        # full reasoning: every allocation built its virtualenv from the public index, which
+        # made the network a precondition for the service starting at all.
+        #
+        # Writable, unlike the source mount above — a cache nothing may write to is not a
+        # cache. The source stays read-only because this task COPIES what it needs out of it
+        # and must not be able to edit the tree it was given.
+        mount {
+          type     = "bind"
+          source   = "${var.repo}/.enclave/uv-cache"
+          target   = "/uv-cache"
+          readonly = false
+        }
+
         # Copied out of the read-only mount, because the build needs somewhere to write.
         # A service is a fine place for a snapshot: it runs the code it started with, and
         # `change_mode = restart` above is what makes it pick up anything new.
@@ -122,7 +136,7 @@ job "mcp" {
         # would drag a 164 MB host virtualenv and the git history into a container that
         # uses neither.
         args = [
-          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra adapters --extra surfaces python -m surfaces.mcp.server"
+          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.mcp.server"
         ]
       }
 
@@ -143,6 +157,13 @@ job "mcp" {
         # Outside the mounted tree, so running the service does not rebuild the
         # developer's virtualenv against the container's interpreter and back again.
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
+
+        # Populated by `enclave-up`, shared by every allocation.
+        UV_CACHE_DIR = "/uv-cache"
+        # Cache and venv sit on different filesystems, so hardlinking is unavailable
+        # and copying is the fallback uv would take anyway. Declared, so the warning
+        # stays out of the logs where it reads like a fault.
+        UV_LINK_MODE = "copy"
       }
 
       # Cores, not MHz. This node fingerprints its CPU total as a couple of dozen MHz, so
