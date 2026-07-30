@@ -96,7 +96,23 @@ class VaultWriteObserver:
     this is the observing half.
     """
 
-    def observe(self, *, run_id: str, idempotency_key: str, **_: Any) -> Observation:
+    def observe(self, *, idempotency_key: str, **_: Any) -> Observation:
+        # `run_id` USED TO BE REQUIRED HERE, and that made this observer unusable.
+        #
+        # The `Observer` protocol passes exactly one argument — `resolve_open_intents` calls
+        # `observer.observe(idempotency_key=...)` — so a required `run_id` raised `TypeError`
+        # on every call. The resume path catches an observer that raises and treats it as
+        # CANNOT_DETERMINE, which is the right posture for an observer that cannot reach its
+        # product and exactly the wrong reading of one that cannot be called: every
+        # interrupted Vault write suspended its run awaiting `vault`, forever, instead of
+        # being resolved.
+        #
+        # Invisible until 014 for the usual reason — 013 shipped the observer and the only
+        # thing that would have called it was `resume_run`, which had no caller in `src/`. The
+        # unit rows constructed it directly and passed both arguments, so they agreed with the
+        # implementation rather than with the protocol.
+        # `tests/unit/test_observers_match_the_protocol.py` now asserts the call shape the
+        # caller actually uses.
         try:
             record = _fabric().read_path(f"{AGENT_SECRET_MOUNT}/metadata/{idempotency_key}")
         except Exception as exc:  # noqa: BLE001 — unreachable is CANNOT_DETERMINE, not "no"

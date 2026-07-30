@@ -15,6 +15,7 @@ minutes per row, because waiting is what this row tests.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import pytest
@@ -100,8 +101,33 @@ def test_row_a_flapping_dependency_revives_a_run_exactly_to_its_cap(conn: Any) -
     assert last["outcome"] == "stopped", f"the sixth revival suspended again: {last}"
     assert last["reason"] == "resume_attempts_exhausted"
 
-    # ---- and it stays stopped. The index must not hold a row for a run nothing can revive.
+    # ---- and it STAYS stopped, which is the half that makes the bound a bound.
+    #
+    # The index still holds a row here, and that is correct rather than a leak — a first
+    # draft of this row asserted it was already gone and failed, which taught the contract:
+    # `suspended_runs` is a CANDIDATE list and the checkpoint is authoritative
+    # (`Sweeper._resume_one` re-reads it, finds a terminal state, and forgets the candidate as
+    # stale). Having the entrypoint delete the row instead would put a second deleter beside
+    # the sweeper's, for a case the sweeper already handles.
+    #
+    # So the property to assert is not "the row is gone" but "the row is harmless": the
+    # sweeper drops it, and no further revival happens. With terraform healthy the sweeper
+    # examines this run on every pass, which is exactly the condition under which an
+    # unbounded implementation would revive it again.
+    h.mark_reachable("terraform", reachable=True)
+    revivals_at_cap = len(h.events(conn, run_id, "run_resumed"))
+
+    deadline = time.time() + 180
+    while time.time() < deadline and h.suspended_rows(conn, run_id):
+        h.mark_reachable("terraform", reachable=True)
+        time.sleep(5)
+
     assert h.suspended_rows(conn, run_id) == [], (
-        "an exhausted run is still indexed as suspended — the sweeper will pick it up and "
-        "refuse it on every pass forever, which is a bound presenting as a leak"
+        "the sweeper never dropped the exhausted run from its candidate list, so it will "
+        "examine it on every pass forever — a bound presenting as a leak"
     )
+    assert len(h.events(conn, run_id, "run_resumed")) == revivals_at_cap, (
+        "the exhausted run was revived again after its cap — the sweeper re-dispatched a run "
+        "that can never make progress, which is the loop the cap exists to end"
+    )
+    assert h.checkpoint(conn, run_id)["stop_reason"] == "resume_attempts_exhausted"
