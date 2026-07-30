@@ -43,6 +43,9 @@ from core.errors import CoreError
 #: Where `enclave-up` writes the shipping credential and the mcp role may read it.
 EGRESS_CREDENTIAL_PATH = "secret/data/audit-egress/shipper"
 
+#: The Vault role whose policy grants read on exactly that one path, and nothing else.
+EGRESS_VAULT_ROLE = "mcp"
+
 
 class AuditDestinationError(CoreError):
     """The second copy could not be reached or written. Never swallowed."""
@@ -51,16 +54,44 @@ class AuditDestinationError(CoreError):
 def load_egress_credential(*, token: str | None = None) -> dict[str, Any] | None:
     """Read the shipping credential from Vault, or None when egress is not configured.
 
+    **Two ways in, and the production one is the workload identity.** An earlier version of
+    this read `VAULT_TOKEN` from the environment and nothing else. Every conformance row
+    passed, because rows run on the host holding an operator token — and the mcp service,
+    which holds no such token and never will, reported ABSENT on every pass since the
+    feature landed. It had never shipped an entry in the enclave it was built for. The
+    seam that fixes it already existed: the service exchanges its Nomad workload identity
+    for a Vault token for its database credential, and this is the same exchange.
+
+    So the env token stays as the *operator's* path — how a host process or a row reads
+    the same secret — and the attested path is the default.
+
     ``None`` rather than an exception, because an estate with no second destination is a
     valid posture — ABSENT (FR-009) — and the caller is the one positioned to report it as
     such. A raise here would make "not configured" indistinguishable from "misconfigured".
     """
-    addr = (os.environ.get("VAULT_ADDR") or "https://127.0.0.1:8200").rstrip("/")
-    vault_token = token or os.environ.get("VAULT_TOKEN")
-    if not vault_token:
-        # Inside an allocation the service exchanges its workload identity for a token
-        # before reaching here; without one there is nothing to read with.
+    explicit = token or os.environ.get("VAULT_TOKEN")
+    if explicit:
+        return _read_with_token(explicit)
+    return _read_as_workload()
+
+
+def _read_as_workload() -> dict[str, Any] | None:
+    """Exchange this allocation's identity for a token, then read the one path it may."""
+    from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
+
+    try:
+        fabric = VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role=EGRESS_VAULT_ROLE)
+        body = fabric.read_path(EGRESS_CREDENTIAL_PATH)
+    except Exception:  # noqa: BLE001 — no identity, or an unreachable fabric: no destination
         return None
+    if not body:
+        return None
+    data: dict[str, Any] = body.get("data", {}).get("data", body)
+    return data or None
+
+
+def _read_with_token(vault_token: str) -> dict[str, Any] | None:
+    addr = (os.environ.get("VAULT_ADDR") or "https://127.0.0.1:8200").rstrip("/")
     cacert = os.environ.get("VAULT_CACERT")
     context = ssl.create_default_context(cafile=cacert) if cacert else None
     request = urllib.request.Request(  # noqa: S310 — fixed scheme, operator-supplied addr

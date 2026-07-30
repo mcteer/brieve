@@ -26,6 +26,7 @@ recorded in `tasks.md` there).
 | Reconciliation is audited, refusal recorded | Every reconcile run appears as `AUDIT_RECONCILED` naming basis and caller; an unauthorized on-demand attempt is refused and the refusal recorded (SC-007, ADR-0035) | Read the trail through the evidence path |
 | Lag is not divergence | Reconcile concurrently with active writing: zero false findings; the tail reads as backlog (SC-008, FR-013) | Write while reconciling |
 | Nothing is lost to an outage | Take the destination down mid-run; runs complete; backlog rises and is observable; on return, every entry written during the outage arrives; none lost (SC-009/009a, FR-014a/015/016) | Stop the collector container; resume it |
+| **The running service ships, under its own identity** | The mcp allocation — not the row — moves entries to the destination, holding the workload identity the egress policy names (FR-005, ADR-0048) | Write to the first copy; ship nothing; wait for the service's own supervisory pass |
 | Capture failure refuses the step | With the LOCAL append failing, the step is refused rather than proceeding unrecorded (SC-009b, FR-014) | Hermetic — the inherited `evidential_gap` path (research F2), asserted so the inheritance is a row rather than a belief |
 
 **The air-gapped shape is the suite's own shape** (spec US5, scenario 1). The dev collector
@@ -52,6 +53,19 @@ Applying the first fixture also exposed a gap in the truncation row, now closed:
 tampered and reconciled without shipping again, and the real supervisory loop does ship
 again. Shipping after the tampering is the attacker's best remaining move, so the row makes
 it.
+
+## Why the service row exists
+
+Every other row here calls the ship pass itself. All of them passed while the running mcp
+service had **never shipped a single entry**: its credential loader read `VAULT_TOKEN` from
+the environment, which a host process running a row always has and an allocation never does.
+The service reported ABSENT on every pass — correctly, and uselessly — and no row was
+watching the one actor that matters in production.
+
+That is the fourth time this repository has paid for the same shape: `resume_run` with no
+production caller (014), a sweeper that had never dispatched since 009, an observer the
+protocol could not call, and this. A capability that is correct, tested, and wired to
+nothing passes everything except use.
 
 ## What these rows do not prove
 
