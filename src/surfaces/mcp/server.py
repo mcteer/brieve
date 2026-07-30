@@ -138,6 +138,11 @@ def _resume_dispatcher(dispatcher: RunDispatcher) -> Any:
     no subject of its own to lend. It carries no credential either way: the allocation
     manufactures its own from its own attested identity, which is what makes
     re-authentication structural rather than a rule someone remembers.
+
+    **This is the only caller in the platform that may set ``resume=True``.** The sweeper is
+    the only component that knows a dispatch is a revival, so the knowledge travels from
+    here as data rather than being inferred downstream from a checkpoint's existence (D1).
+    A fresh dispatch reusing these identifiers stays a fresh dispatch.
     """
 
     def _dispatch(record: Any) -> None:
@@ -149,6 +154,18 @@ def _resume_dispatcher(dispatcher: RunDispatcher) -> Any:
             requested_tools=frozenset(),
             run_id=record.run_id,
             step_index=record.step_index,
+            # What the run needs to be itself rather than a fresh run under its identity
+            # (T010a). These parameters already existed on `dispatch()` and already
+            # travelled to the jobspec — until 014 they travelled EMPTY, which is why a
+            # dispatched resume would have refused `no_role_for_subject` before doing
+            # anything, and why a resumed multi-step run would have completed trivially with
+            # its pending work dropped. Nothing new travels here; it finally travels
+            # populated.
+            subject_roles=record.subject_roles,
+            packs=record.packs,
+            steps=record.steps,
+            invoke_tools=record.invoke_tools,
+            resume=True,
         )
 
     return _dispatch

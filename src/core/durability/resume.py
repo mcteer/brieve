@@ -8,7 +8,10 @@ The order below is not stylistic. Each step is a gate on the next:
    STOPS rather than resuming — an execution bound like any other (ADR-0049).
 3. **Do we own the run?** Acquire the lease *before* acting, so a zombie is superseded
    before it can write anything more (FR-009).
-4. **What actually happened?** Resolve open intents by observation, never by
+4. **Have we tried too often?** Count the revival — *after* the claim, so a superseded
+   instance cannot burn an attempt — and stop terminally past the platform cap. A
+   flapping dependency must not revive one run forever (014, D3).
+5. **What actually happened?** Resolve open intents by observation, never by
    assumption. ``cannot_determine`` SUSPENDS, naming the dependency it could not
    observe, so the sweeper can resume it when that dependency recovers (ADR-0049).
 
@@ -35,7 +38,7 @@ from core.durability.lease import RunLease
 from core.durability.types import CheckpointBlob, DurabilityProvider, IntentRecord
 from core.observation.bracket import resolve_open_intents
 from core.observation.types import Observation, ObservationOutcome, Observer
-from core.run import RunState
+from core.run import RESUME_ATTEMPT_CAP, RunState
 
 
 @dataclass(frozen=True)
@@ -64,6 +67,16 @@ class ResumeDecision:
     #: no sink and no tenant, so the caller that has both emits `MATRIX_FALLBACK`. A resumed
     #: run's fallback going unrecorded is the identical defect one phase later.
     matrix_fallback: MatrixFallback | None = None
+    #: Which revival this was — 1-based, so the trail reads "attempt 3 of 5" without
+    #: arithmetic (014, D3).
+    #:
+    #: Carried explicitly rather than left to be read off ``checkpoint``, for two reasons.
+    #: The caller must thread it into **every** checkpoint the resumed run writes, because
+    #: `save()` overwrites the whole row and a blob built without it would reset the bound
+    #: to zero. And the decisions that stop before a checkpoint is ever loaded carry no
+    #: checkpoint at all, so an attempt number read from one would be missing exactly where
+    #: the audit trail needs a number.
+    resume_count: int = 0
 
     @property
     def resumable(self) -> bool:
@@ -124,6 +137,53 @@ def resume_run(
     lease = RunLease(provider, run_id=run_id, holder_identity=holder_identity)
     lease.acquire()
 
+    # THE ATTEMPT CAP (014, clarify Q1, D3) — the only behavioural change this feature
+    # makes to the 005 library. Everything else 014 does is consumption: giving this
+    # function a caller in `src/`, and building the grant store its first argument always
+    # implied. This is the one place it changes what resume *decides*.
+    #
+    # AFTER the claim, deliberately — and the reason is narrower than it first looks.
+    #
+    # `acquire()` does not raise for a loser: it is an unconditional supersede, because a
+    # resumed run must WIN against the zombie it replaces rather than lose to it
+    # (`RunLease.acquire`, and the in-memory provider's comment saying so). So the ordering
+    # does not protect against losing a race — nobody loses one here.
+    #
+    # What it protects is the case where the claim cannot be made at all: the provider is
+    # unreachable, or the credential fails auth, and `acquire_lease` raises
+    # `DurabilityStoreError`. Incrementing first would spend an attempt on a resume that
+    # never got as far as owning the run, so a store having a bad minute would eat a
+    # flapping run's whole budget and stop it with `resume_attempts_exhausted` — a bound
+    # reporting a cause that never happened. Claim first, and a failed claim costs nothing.
+    #
+    # The conformance contract states this break fixture as "the fencing row burns attempts
+    # it must not", which reads as though a superseded claimant could burn one. It cannot,
+    # for the reason above. The property is real; the mechanism is a claim that errors, and
+    # the component row drives it that way.
+    #
+    # Persisted immediately, not at the end. A resumed allocation can die at any point
+    # after this line, and an attempt that was spent but not recorded is an attempt that
+    # never happened — which is how a bound becomes a suggestion.
+    attempt = checkpoint.resume_count + 1
+    checkpoint = checkpoint.model_copy(update={"resume_count": attempt})
+    provider.save(checkpoint)
+
+    if attempt > RESUME_ATTEMPT_CAP:
+        # STOPPED, and TERMINAL. Never SUSPENDED again: a run past its cap that suspended
+        # would wait for a revival that can never come, so it would sit in the index
+        # forever while the sweeper picked it up and refused it on every pass — a bound
+        # that presents as a leak.
+        #
+        # The cap is read from the module constant. There is no parameter for it on this
+        # function and none may be added: a bound the bounded thing can raise is not a
+        # bound (FR-009c), and the component row asserts that against this signature.
+        return ResumeDecision(
+            state=RunState.STOPPED,
+            checkpoint=checkpoint,
+            stop_reason="resume_attempts_exhausted",
+            resume_count=attempt,
+        )
+
     # Fresh authority under the surviving grant, from THIS allocation's identity.
     # Nothing is read from the checkpoint here, and nothing should be.
     try:
@@ -151,6 +211,7 @@ def resume_run(
             state=RunState.STOPPED,
             checkpoint=checkpoint,
             stop_reason=str(getattr(exc, "reason_code", "") or "authority_refused"),
+            resume_count=attempt,
         )
 
     resolved = resolve_open_intents(provider, run_id=run_id, observers=observers or {}, clock=clock)
@@ -171,6 +232,7 @@ def resume_run(
                     checkpoint=checkpoint,
                     awaiting=(depends_on or {}).get(intent.tool_name, intent.tool_name),
                     stop_reason=_unobservable_reason(intent, observation),
+                    resume_count=attempt,
                 )
 
     return ResumeDecision(
@@ -180,6 +242,7 @@ def resume_run(
         completed_steps=completed,
         pending_steps=pending,
         matrix_fallback=authority.matrix_fallback,
+        resume_count=attempt,
     )
 
 

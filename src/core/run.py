@@ -34,6 +34,26 @@ if TYPE_CHECKING:
     from core.durability.types import DurabilityProvider
 
 
+#: How many times one run may be revived before the platform stops reviving it (D3).
+#:
+#: **Deliberately not in `core.bounds`**, which is where "beside the other bounds" would
+#: put it. Every constant there — `DEFAULT_MAX_DURATION`, `DEFAULT_MAX_STEPS`,
+#: `DEFAULT_STUCK_WAIT` — is the default for a field on `ExecutionBounds`, a dataclass a
+#: caller constructs. A cap living there would arrive with an override slot already
+#: fitted, and the next person to want a longer flap would fit one. FR-009c forbids
+#: exactly that: the cap never comes from workflow code, the agent definition, or
+#: dispatch metadata, because a bound the bounded thing can raise is not a bound. Here it
+#: is a module constant that `core.durability.resume` reads directly rather than accepts
+#: as a parameter — so there is no seam to pass a larger number through, and the
+#: component row asserts that by inspecting the signature.
+#:
+#: Five is a tunable starting point rather than a finding: large enough that a real
+#: outage's recovery — one suspension, one revival — never approaches it, small enough
+#: that a flapping dependency stops within minutes. The rows prove exhaustion is terminal
+#: and recorded. They do not prove five is the number an operator wants.
+RESUME_ATTEMPT_CAP = 5
+
+
 class RunState(StrEnum):
     """Terminal states are three, not one.
 

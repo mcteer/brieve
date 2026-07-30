@@ -93,6 +93,29 @@ class AuditEventType(StrEnum):
     #: run start, the resume caller on resume — because the module that RESOLVES a fallback
     #: holds neither a sink nor a tenant, and `AuditEntry` requires both.
     MATRIX_FALLBACK = "matrix_fallback"
+    #: A disrupted run was revived, and what came of the revival (ADR-0049, 014).
+    #:
+    #: Payload: run_id, `attempt` (1-based, so the trail reads "attempt 3 of 5" without
+    #: arithmetic), `outcome` (``continued`` | ``stopped`` | ``suspended``), `reason` (the
+    #: stop reason or the awaited dependency; empty when continued), and `completed_steps`
+    #: / `pending_steps` as COUNTS rather than contents — enough for an investigator to see
+    #: "it skipped 3 and ran 2" without the trail carrying step payloads.
+    #:
+    #: One event with the outcome in the payload, on the `MODEL_GATE` pattern: one type,
+    #: the distinction inside. Three event types would make "how many times was this run
+    #: revived" a three-way union for no gain, and every filter that wanted revivals would
+    #: have to know all three names or silently miss one.
+    #:
+    #: **Not a flag on `RUN_START`.** A resumed run that stops — expired consent, a missing
+    #: checkpoint, the attempt cap — never starts, so a `RUN_START` carrying `resumed=true`
+    #: would be a record of a beginning that did not happen, in exactly the failure cases
+    #: an investigator is reading the trail to understand.
+    #:
+    #: Written by the entrypoint, before any pending step executes, on the same reasoning
+    #: as `MATRIX_FALLBACK` above: the library returns a decision, the caller that holds
+    #: the sink and the tenant records it. Ordering it first is what makes the trail show
+    #: the revival before its consequences (FR-017).
+    RUN_RESUMED = "run_resumed"
 
 
 class AuditEntry(BaseModel):

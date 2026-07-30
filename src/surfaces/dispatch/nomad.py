@@ -104,6 +104,7 @@ class NomadDispatcher:
         steps: int | None = None,
         packs: frozenset[str] = frozenset(),
         invoke_tools: bool = False,
+        resume: bool = False,
     ) -> RunHandle:
         """Schedule the run and return immediately.
 
@@ -132,6 +133,20 @@ class NomadDispatcher:
                 # 013. Empty means none, which is every pre-013 dispatch unchanged.
                 "packs": ",".join(sorted(packs)),
                 "invoke_tools": "1" if invoke_tools else "",
+                # 014, D1: a resume is DECLARED, never inferred.
+                #
+                # The entrypoint takes the resume path if and only if this is set, and the
+                # sweeper's resume dispatch is the only caller that sets it. The
+                # alternatives were both worse in the same way — they turn a coincidence
+                # into a resume. Inferring from `step_index > 0` misses a run interrupted at
+                # step zero; inferring from "a checkpoint exists for this run_id" turns an
+                # id collision into a silent resume, which is precisely what the
+                # `meta_required` comment in the jobspec warns about for `run_id` itself.
+                #
+                # The dispatcher KNOWS whether it is resuming, so the knowledge travels as
+                # data rather than being reconstructed downstream from evidence that is
+                # consistent with two different histories.
+                "resume": "1" if resume else "",
                 "run_id": run_id or correlation_id,
                 "step_index": str(step_index if step_index is not None else 0),
             },

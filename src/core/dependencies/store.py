@@ -243,6 +243,10 @@ class PostgresDependencyStore:
         subject_user_id: str = "",
         tenant_id: str = "",
         agent_definition_id: str = "",
+        subject_roles: frozenset[str] | None = None,
+        packs: frozenset[str] | None = None,
+        steps: int | None = None,
+        invoke_tools: bool = False,
         now: datetime | None = None,
     ) -> None:
         """Index a suspended run so the sweeper can find it.
@@ -252,6 +256,16 @@ class PostgresDependencyStore:
         question — "what is waiting on this product" — is an indexed lookup rather than a
         scan of every run. The sweeper re-reads the checkpoint before acting on anything
         it finds here.
+
+        The roles, packs, steps, and invoke flag are what the run needs to be **itself**
+        again rather than a fresh run under its identity (014, T010a). All four are
+        claims-derived metadata or configuration and none of them grants anything — see
+        `SuspendedRunRecord` for the four distinct ways a resume fails without them.
+
+        **This method had zero callers until 014** — in `src/` and in `tests/` alike. The
+        index was a store with a reader and no writer, which is `resume_run`'s own defect
+        one layer earlier in the lifecycle: the sweeper swept an index nothing filled, so
+        every property downstream of it was structurally unreachable while looking wired.
         """
         moment = now or datetime.now(UTC)
 
@@ -260,14 +274,19 @@ class PostgresDependencyStore:
             cur.execute(
                 "INSERT INTO suspended_runs "
                 "(run_id, correlation_id, awaiting, suspended_at, step_index, "
-                " subject_user_id, tenant_id, agent_definition_id) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+                " subject_user_id, tenant_id, agent_definition_id, "
+                " subject_roles, packs, steps, invoke_tools) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
                 "ON CONFLICT (run_id) DO UPDATE SET "
                 "  correlation_id = EXCLUDED.correlation_id, awaiting = EXCLUDED.awaiting, "
                 "  suspended_at = EXCLUDED.suspended_at, step_index = EXCLUDED.step_index, "
                 "  subject_user_id = EXCLUDED.subject_user_id, "
                 "  tenant_id = EXCLUDED.tenant_id, "
-                "  agent_definition_id = EXCLUDED.agent_definition_id",
+                "  agent_definition_id = EXCLUDED.agent_definition_id, "
+                "  subject_roles = EXCLUDED.subject_roles, "
+                "  packs = EXCLUDED.packs, "
+                "  steps = EXCLUDED.steps, "
+                "  invoke_tools = EXCLUDED.invoke_tools",
                 (
                     run_id,
                     correlation_id,
@@ -277,6 +296,12 @@ class PostgresDependencyStore:
                     subject_user_id,
                     tenant_id,
                     agent_definition_id,
+                    # Sorted, so a re-suspension of an unchanged run writes identical bytes
+                    # — the same reasoning as the grant store's scope serialization.
+                    ",".join(sorted(subject_roles or ())),
+                    ",".join(sorted(packs or ())),
+                    steps,
+                    invoke_tools,
                 ),
             )
             conn.commit()
@@ -311,7 +336,8 @@ class PostgresDependencyStore:
             cur = conn.cursor()
             cur.execute(
                 "SELECT run_id, correlation_id, awaiting, suspended_at, step_index, "
-                "       subject_user_id, tenant_id, agent_definition_id "
+                "       subject_user_id, tenant_id, agent_definition_id, "
+                "       subject_roles, packs, steps, invoke_tools "
                 "FROM suspended_runs WHERE awaiting = %s ORDER BY suspended_at",
                 (product,),
             )
@@ -326,6 +352,10 @@ class PostgresDependencyStore:
                     subject_user_id=str(r[5]),
                     tenant_id=str(r[6]),
                     agent_definition_id=str(r[7]),
+                    subject_roles=_split(r[8]),
+                    packs=_split(r[9]),
+                    steps=int(r[10]) if r[10] is not None else None,
+                    invoke_tools=bool(r[11]),
                 )
                 for r in rows
             ]
@@ -353,6 +383,16 @@ class PostgresDependencyStore:
         result = self._run(_read)
         assert isinstance(result, list)
         return result
+
+
+def _split(raw: Any) -> frozenset[str]:
+    """Comma-separated text back to a set, dropping empties.
+
+    Empty string means "none", not "one nameless member" — which is the bug a bare
+    ``split(",")`` produces, and it would arrive as a role or pack named ``""`` that the
+    trust fabric then refuses to resolve.
+    """
+    return frozenset(part for part in str(raw or "").split(",") if part)
 
 
 __all__ = [

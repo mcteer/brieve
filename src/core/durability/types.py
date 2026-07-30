@@ -14,6 +14,8 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.authority.grant import DelegationGrant
+
 
 class RunOutcome(BaseModel):
     """Terminal state as recorded on a checkpoint.
@@ -42,6 +44,16 @@ class CheckpointBlob(BaseModel):
     step_index: int = 0
     written_by: str = ""
     outcome: RunOutcome | None = None
+    #: How many times this run has been revived (014, D3). Additive and defaulted, so
+    #: every existing construction site is unchanged.
+    #:
+    #: **The default is the trap.** `save()` overwrites the whole row, so a per-step blob
+    #: constructed without this field resets the stored count to zero — which would make
+    #: the attempt cap a bound that clears itself whenever any work happens, and a
+    #: flapping run immortal. A resumed run's caller must thread the decision's count
+    #: into every checkpoint it writes; the entrypoint does, and a component row asserts
+    #: it from the store side.
+    resume_count: int = 0
 
 
 class IntentRecord(BaseModel):
@@ -102,4 +114,33 @@ class DurabilityProvider(Protocol):
 
     def open_intents(self, run_id: str) -> list[IntentRecord]:
         """Intents with no result — exactly what resume must resolve by observation."""
+        ...
+
+    def save_grant(self, grant: DelegationGrant) -> None:
+        """Persist the subject's consent, once, at issuance.
+
+        The durable half of ADR-0026, added in 014 because it was never built: a
+        checkpoint has referenced consent by ``grant_id`` since 005, and until now the id
+        resolved to nothing. Resume's first act is ``grant.assert_live(clock)``, so
+        without this method consent expiry was unevaluable on the dispatched path.
+
+        Written once and never updated — a grant's terms do not change, and a new consent
+        is a new grant. Implementations therefore need no update path, and the absence of
+        one is deliberate rather than pending.
+
+        Holds consent metadata and **no credential material**: ``DelegationGrant`` has no
+        field for any, and the store must not add one (FR-012).
+        """
+        ...
+
+    def load_grant(self, grant_id: str) -> DelegationGrant | None:
+        """Return the grant, or None when there is none.
+
+        ``None`` rather than an exception, mirroring :meth:`load`'s absence semantics, so
+        **the caller decides what absence means**. That matters here more than it does for
+        checkpoints: a missing grant is not "no consent required", and the only code
+        positioned to know that is the caller that was about to act under it. A provider
+        raising would make the refusal the store's decision; a provider returning an empty
+        grant would manufacture consent nobody gave.
+        """
         ...

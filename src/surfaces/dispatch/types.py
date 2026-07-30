@@ -48,16 +48,33 @@ class RunDispatcher(Protocol):
         run_id: str | None = None,
         step_index: int | None = None,
         subject_roles: frozenset[str] = frozenset(),
+        steps: int | None = None,
+        packs: frozenset[str] = frozenset(),
+        invoke_tools: bool = False,
+        resume: bool = False,
     ) -> RunHandle:
         """Start a run and return immediately with a handle.
 
         ``run_id`` and ``step_index`` are **resume state, and optional**. A resumed run
         keeps its identity and picks up where it stopped; a fresh one supplies neither.
+        ``resume`` says which of those two this dispatch is: it is declared here rather than
+        inferred downstream, because the dispatcher is the only party that knows (014, D1).
 
         Optional is not a style choice. 008's ``POST /runs`` calls this with exactly five
         keyword arguments, so required parameters would stop the API route compiling —
         which is the rule this feature adopted after finding the same shape three times:
         **optional-by-default wherever a prior caller exists.**
+
+        **``steps``, ``packs``, and ``invoke_tools`` are catch-up rather than new.** They
+        have been on ``NomadDispatcher.dispatch()`` since 010 and 013 and have travelled to
+        the jobspec ever since, but they were never added *here* — so the seam described
+        less than every implementation of it did. Nothing caught the drift because the only
+        consumer typed against this protocol, the sweeper's resume dispatch, happened to
+        pass just the subset the protocol knew. 014 needed all of them (a resumed run
+        without its packs re-suspends on every pack tool; without its steps it completes
+        trivially), and the type checker found the gap the moment a caller wanted the whole
+        set. Recorded because the shape recurs: a seam stays honest only while something
+        type-checks against it.
         """
         ...
 

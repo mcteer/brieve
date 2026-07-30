@@ -54,6 +54,18 @@ class InProcessDispatcher:
         run_id: str | None = None,
         step_index: int | None = None,
         subject_roles: frozenset[str] = frozenset(),
+        # Accepted and unused, and that is the honest shape for this double rather than a
+        # gap in it. Each of these changes what a real ALLOCATION does — how many steps it
+        # brackets, which packs it loads, whether it invokes tools, whether it takes the
+        # resume path — and this dispatcher starts a governed run in the caller's process
+        # instead of placing an allocation. Implementing them here would mean simulating the
+        # entrypoint, and a hermetic double that simulates the thing under test is how a
+        # dispatched-resume claim gets made without a dispatch. That is the defect 014
+        # exists to repair; the resume rows drive `surfaces.dispatch.nomad`.
+        steps: int | None = None,
+        packs: frozenset[str] = frozenset(),
+        invoke_tools: bool = False,
+        resume: bool = False,
     ) -> RunHandle:
         run = start_governed_run(
             correlation_id=correlation_id,

@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pg8000.dbapi
 
+from core.authority.grant import DelegationGrant
+from core.authority.types import AuthorityScope
 from core.durability.credentials import (
     CredentialUnavailableError,
     DatabaseCredential,
@@ -119,14 +122,29 @@ class PostgresDurabilityProvider:
                 """
                 INSERT INTO checkpoints
                     (blob_id, payload, correlation_id, grant_id, step_index,
-                     written_by, run_state, stop_reason)
-                VALUES (%s, %s::jsonb, %s, %s, %s, %s, %s, %s)
+                     written_by, run_state, stop_reason, resume_count)
+                VALUES (%s, %s::jsonb, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (blob_id) DO UPDATE SET
                     payload = EXCLUDED.payload,
                     correlation_id = EXCLUDED.correlation_id,
                     grant_id = EXCLUDED.grant_id,
                     step_index = EXCLUDED.step_index,
                     written_by = EXCLUDED.written_by,
+                    -- MONOTONIC, on the same reasoning as the terminal-once guard below.
+                    --
+                    -- The revival count is a safety bound, and `save()` overwrites the
+                    -- whole row — so a per-step checkpoint constructed without the count
+                    -- would reset it to zero, making the cap a bound that clears itself
+                    -- whenever any work happens and a flapping run immortal. The resumed
+                    -- run's caller threads the count into every blob it writes, and a row
+                    -- asserts that; this makes forgetting structurally survivable rather
+                    -- than merely tested, which is what Principle III asks of a bound.
+                    --
+                    -- Nothing legitimately lowers it: a run's revival count only ever
+                    -- rises, and a superseded zombie holding a stale lower count must not
+                    -- be able to hand the successor a fresh budget. Same blob-ids-are-not-
+                    -- reused assumption the terminal-once guard already rests on.
+                    resume_count = GREATEST(checkpoints.resume_count, EXCLUDED.resume_count),
                     -- TERMINAL-ONCE. A terminal state, once written, is never cleared and
                     -- never replaced; the FIRST terminal write wins.
                     --
@@ -157,6 +175,7 @@ class PostgresDurabilityProvider:
                     blob.written_by,
                     blob.outcome.state if blob.outcome else None,
                     blob.outcome.stop_reason if blob.outcome else None,
+                    blob.resume_count,
                 ),
             )
 
@@ -168,14 +187,14 @@ class PostgresDurabilityProvider:
                 conn,
                 """
                 SELECT payload, correlation_id, grant_id, step_index, written_by,
-                       run_state, stop_reason
+                       run_state, stop_reason, resume_count
                 FROM checkpoints WHERE blob_id = %s
                 """,
                 (blob_id,),
             )
             if row is None:
                 return None
-            payload, correlation_id, grant_id, step_index, written_by, state, reason = row
+            payload, correlation_id, grant_id, step_index, written_by, state, reason, resumes = row
             return CheckpointBlob(
                 blob_id=blob_id,
                 payload=payload or {},
@@ -184,6 +203,7 @@ class PostgresDurabilityProvider:
                 step_index=step_index,
                 written_by=written_by,
                 outcome=RunOutcome(state=state, stop_reason=reason) if state else None,
+                resume_count=resumes,
             )
 
         blob: CheckpointBlob | None = self._execute(work)
@@ -282,6 +302,101 @@ class PostgresDurabilityProvider:
 
         result = self._execute(work)
         return list(result)
+
+    # ---------------------------------------------------------------------- consent
+
+    def save_grant(self, grant: DelegationGrant) -> None:
+        """Persist consent once. A second save of the same grant changes nothing."""
+
+        def work(conn: Any) -> None:
+            _exec(
+                conn,
+                """
+                INSERT INTO grants
+                    (grant_id, subject_user_id, agent_definition_id, requested_scope,
+                     issued_at, expires_at)
+                VALUES (%s, %s, %s, %s::jsonb, %s, %s)
+                -- DO NOTHING, not DO UPDATE. A grant's terms do not change; a new consent
+                -- is a new grant with a new id. An update path here would make consent
+                -- mutable after the fact, which is the one thing an audit trail cannot
+                -- tolerate about it — the run would have executed under terms the record
+                -- no longer shows.
+                ON CONFLICT (grant_id) DO NOTHING
+                """,
+                (
+                    grant.grant_id,
+                    grant.subject_user_id,
+                    grant.agent_definition_id,
+                    json.dumps(_scope_to_json(grant.requested_scope)),
+                    grant.issued_at,
+                    grant.expires_at,
+                ),
+            )
+
+        self._execute(work)
+
+    def load_grant(self, grant_id: str) -> DelegationGrant | None:
+        def work(conn: Any) -> DelegationGrant | None:
+            row = _one(
+                conn,
+                """
+                SELECT subject_user_id, agent_definition_id, requested_scope,
+                       issued_at, expires_at
+                FROM grants WHERE grant_id = %s
+                """,
+                (grant_id,),
+            )
+            if row is None:
+                return None
+            subject, definition, scope, issued_at, expires_at = row
+            return DelegationGrant(
+                grant_id=grant_id,
+                subject_user_id=subject,
+                agent_definition_id=definition,
+                requested_scope=_scope_from_json(scope or {}),
+                issued_at=_as_utc(issued_at),
+                expires_at=_as_utc(expires_at),
+            )
+
+        grant: DelegationGrant | None = self._execute(work)
+        return grant
+
+
+def _scope_to_json(scope: AuthorityScope) -> dict[str, list[str]]:
+    """Serialize a scope **deterministically**, which is a decision rather than a detail.
+
+    ``AuthorityScope`` holds frozensets, and a frozenset has no order — so writing one
+    straight to jsonb produces whichever order the set happened to iterate in, and two
+    saves of one unchanged grant differ byte for byte. That breaks nothing today and
+    breaks two things later: the no-secret sweep reads these bytes and would have no
+    stable value to compare, and anyone diffing consent records would see churn that
+    means nothing. Sorted lists in, frozensets out, once, here.
+    """
+    return {
+        "tool_names": sorted(scope.tool_names),
+        "product_actions": sorted(scope.product_actions),
+    }
+
+
+def _scope_from_json(raw: Any) -> AuthorityScope:
+    data = raw if isinstance(raw, dict) else {}
+    return AuthorityScope(
+        tool_names=frozenset(data.get("tool_names") or ()),
+        product_actions=frozenset(data.get("product_actions") or ()),
+    )
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Guarantee an aware datetime coming out of the store.
+
+    The columns are ``TIMESTAMPTZ`` and the driver returns aware values, so this is
+    normally a no-op. It exists because of what the alternative costs: ``assert_live``
+    compares this against ``clock.now()``, and comparing a naive datetime to an aware one
+    raises ``TypeError``. That would surface as a crashed resume rather than as lapsed
+    consent — the one failure mode US4 exists to make orderly — and it would surface only
+    against the real store, where the trail is hardest to read.
+    """
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
 def _run(cursor: Any, sql: str, params: tuple[Any, ...] | None) -> None:

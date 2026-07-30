@@ -371,14 +371,26 @@ EV_PASS="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.loa
 # 013 adds the eval schema here rather than anywhere later, on the rule above: results
 # are written by the gate lane and read at review, and a table created by whichever
 # ephemeral credential ran the first gate would strand every later one.
+#
+# **FIVE TIMES, AND THE FIFTH WAS THE SCHEMA THAT TAUGHT THE RULE.** 014 went looking for
+# the durability schema in this list — its task said "verify the new DDL rides that block"
+# — and it was not here. Every other store was added after being caught; durability was
+# the one still on `PostgresDurabilityProvider.migrate()`, i.e. on first use by whichever
+# process happens to start first. It survived because a dispatched run's entrypoint calls
+# `migrate()` early and the conformance conftest calls it too, so something always
+# happened to run it in time. That is luck holding a rule's place, and 014 removes the
+# luck: it adds the first ALTER TABLE in the repository (`resume_count`), and an additive
+# column that applies only when someone remembers to call `migrate()` is a column that is
+# absent exactly when a resumed run needs it.
 if { echo "SET ROLE brieve;"; cat "$REPO/src/core/audit/evidence_schema.sql"; \
      cat "$REPO/src/core/dependencies/schema.sql"; \
      cat "$REPO/src/core/runs/schema.sql"; \
      cat "$REPO/src/core/threads/schema.sql"; \
-     cat "$REPO/src/core/evals/schema.sql"; } \
+     cat "$REPO/src/core/evals/schema.sql"; \
+     cat "$REPO/src/core/durability/schema.sql"; } \
    | docker run --rm -i -e PGPASSWORD="$EV_PASS" --network host postgres:17-alpine \
      psql -h 127.0.0.1 -p 5432 -U "$EV_USER" -d brieve -v ON_ERROR_STOP=1 -q >/dev/null 2>&1; then
-  ok "evidence, dependency, run-index, thread, and eval schemas applied"
+  ok "evidence, dependency, run-index, thread, eval, and durability schemas applied"
 else
   die "evidence schema failed to apply — the evidence role cannot issue credentials without it"
 fi

@@ -42,8 +42,36 @@ CREATE TABLE IF NOT EXISTS suspended_runs (
     -- a suspension nobody can match to a recovery never resumes.
     awaiting       TEXT        NOT NULL,
     suspended_at   TIMESTAMPTZ NOT NULL,
-    step_index     INTEGER     NOT NULL
+    step_index     INTEGER     NOT NULL,
+    -- 014: the rest of what the run needs to be itself again.
+    --
+    -- The three columns above answered "as whom", which is what 009 needed to argue for.
+    -- These answer "as what": the roles its claims resolved to, the packs whose observers
+    -- re-observation consults, how many steps it had, and whether it invokes tools. A
+    -- resume dispatched without them is a different run wearing the same identity — it
+    -- refuses on `no_role_for_subject`, or re-suspends every pack-tool intent because the
+    -- observer is missing, or completes trivially with its pending work silently dropped.
+    --
+    -- Denormalized for the same reason and with the same discipline as the identity
+    -- columns: all of it is claims-derived metadata or configuration, and none of it grants
+    -- anything. The roles say what the dispatching surface established; the allocation
+    -- still resolves what they permit from the trust fabric.
+    subject_roles  TEXT        NOT NULL DEFAULT '',
+    packs          TEXT        NOT NULL DEFAULT '',
+    -- Nullable, unlike the two above, because "no steps requested" and "zero steps" are
+    -- different dispatches and the entrypoint distinguishes them.
+    steps          INTEGER,
+    invoke_tools   BOOLEAN     NOT NULL DEFAULT FALSE
 );
+
+-- The columns above, for databases that already have this table (see the durability
+-- schema's note — `CREATE TABLE IF NOT EXISTS` does not reconcile columns, so on any
+-- enclave brought up before 014 the definition above is never read and every one of these
+-- would silently not exist).
+ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS subject_roles TEXT NOT NULL DEFAULT '';
+ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS packs TEXT NOT NULL DEFAULT '';
+ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS steps INTEGER;
+ALTER TABLE suspended_runs ADD COLUMN IF NOT EXISTS invoke_tools BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- The sweeper asks "what is waiting on this product", not "which runs are suspended", so
 -- the index leads with the dependency rather than making it a scan.
