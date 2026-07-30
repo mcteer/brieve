@@ -32,7 +32,7 @@ from core.authority.grant import DEFAULT_MAX_RUN_DURATION, issue_grant
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
 from core.dependencies.store import PostgresDependencyStore
-from core.durability.checkpoint import stop_requested
+from core.durability.checkpoint import checkpoint_run, stop_requested
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.lease import RunLease
 from core.durability.postgres import PostgresDurabilityProvider
@@ -42,7 +42,6 @@ from core.run import RunState, start_governed_run
 from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
 from surfaces.toolset import build_registry, content_pins, dependency_products
-
 
 #: What a dispatched run passes a tool it was asked to invoke.
 #:
@@ -54,6 +53,14 @@ from surfaces.toolset import build_registry, content_pins, dependency_products
 #: would have every step report success while the tool errored, and the exactly-once row would
 #: be counting invocations that never did anything.
 _PROBE_ARGUMENTS = {"path": "conformance/probe", "cas": 0}
+
+#: `_run_steps` met a mid-run suspension. Not an exit code — the caller files the index row
+#: and then exits ZERO, because a suspension is a wait rather than a failure.
+#:
+#: A sentinel rather than a third return value: every existing caller reads the first element
+#: as a process exit code, and a suspension that leaked out as one would be a wait presented
+#: as a crash. The number is negative so it can never be mistaken for one.
+_SUSPENDED = -1
 
 
 def _product_action_of(registry: Any, tool_name: str) -> str:
@@ -165,6 +172,15 @@ def _run_steps(
             print(f"tool {tool_name}: allowed={outcome.allowed}", flush=True)
             if not outcome.allowed:
                 print(f"tool {tool_name} refused: {outcome.reason_code}", file=sys.stderr)
+                # A SUSPENSION IS NOT A REFUSAL, and until 014 this line could not tell them
+                # apart (analyze C3). The dependency gate suspends a run whose product is
+                # unreachable — `suspend_for_dependency` sets the state and names what it
+                # waits on — and every such run arrived here, returned 1, and failed the
+                # allocation. So the spec's own US1 narrative, the fabric blinking mid-run,
+                # presented as a crashed run with no index row and nothing for the sweeper to
+                # find. A wait that looks like a failure is a wait nobody comes back for.
+                if run.state is RunState.SUSPENDED:
+                    return _SUSPENDED, executed, skipped
                 # Any intent the engine opened stays OPEN on purpose. A refused step did not
                 # happen, and the record of "we were about to" is what lets a resume resolve
                 # it by observation rather than by assumption.
@@ -458,6 +474,21 @@ def resume_dispatched_run(
         already_done=already_done,
     )
     print(f"resumed {blob_id}: executed={executed} skipped={skipped}", flush=True)
+    if code == _SUSPENDED:
+        # A revived run that suspended AGAIN mid-flight — the flapping case, and the one the
+        # attempt cap exists to bound. Indexed and exited zero like any other wait; the next
+        # recovery revives it, and the revival after the cap stops it terminally.
+        return _suspend_mid_run(
+            run,
+            durability=durability,
+            blob_id=blob_id,
+            record_suspension=record_suspension,
+            grant=grant,
+            tenant_id=tenant_id,
+            tools=tools,
+            total_steps=total_steps,
+            invoke_tools=invoke_tools,
+        )
     if code != 0:
         return code
 
@@ -473,6 +504,48 @@ def resume_dispatched_run(
             resume_count=decision.resume_count,
         )
     )
+    return 0
+
+
+def _suspend_mid_run(
+    run: Any,
+    *,
+    durability: Any,
+    blob_id: str,
+    record_suspension: Any,
+    grant: Any,
+    tenant_id: str,
+    tools: list[str],
+    total_steps: int,
+    invoke_tools: bool,
+) -> int:
+    """File a mid-run suspension and end the allocation cleanly.
+
+    The second writer of the suspended-run index, and after 014 there are exactly two — this
+    one and the resume-time arm. Both are in this module because both are the caller that owns
+    the run's durability, which is the division `core.hooks.suspension` describes: the hook
+    marks the state, the owner persists it and indexes it.
+
+    The checkpoint carries the suspended state and **no terminal outcome** — a suspended run
+    must stay resumable, and a terminal record would make `resume_run` refuse it and the
+    sweeper drop it as stale.
+    """
+    awaiting = str(run.stop_reason or "").removeprefix("awaiting:") or "unknown"
+    print(f"run {blob_id} suspended mid-run awaiting {awaiting}", flush=True)
+    _file_suspension(
+        record_suspension,
+        run_id=blob_id,
+        correlation_id=run.correlation_id,
+        awaiting=awaiting,
+        step_index=run.step_index,
+        grant=grant,
+        tenant_id=tenant_id,
+        tools=tools,
+        total_steps=total_steps,
+        invoke_tools=invoke_tools,
+    )
+    checkpoint_run(run, payload={"step": run.step_index})
+    # Zero. The run is waiting, and the sweeper is what ends the wait.
     return 0
 
 
@@ -718,6 +791,25 @@ def main() -> int:
             invoke_tools=invoke_tools,
             already_done=lambda _step: False,
         )
+        if code == _SUSPENDED:
+            # A FRESH run can suspend too, and this arm is the more common one in production:
+            # the fabric blinks or a product goes unreachable partway through work that had
+            # never been disrupted. Same index row, same exit zero — the sweeper does not care
+            # which arm filed it, and the run must not reach the terminal COMPLETED checkpoint
+            # below, because it has not completed.
+            return _suspend_mid_run(
+                run,
+                durability=durability,
+                blob_id=blob_id,
+                record_suspension=PostgresDependencyStore(
+                    credentials=credentials
+                ).record_suspension,
+                grant=grant,
+                tenant_id=tenant_id,
+                tools=sorted(tools),
+                total_steps=steps,
+                invoke_tools=invoke_tools,
+            )
         if code != 0:
             return code
 
