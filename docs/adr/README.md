@@ -111,7 +111,7 @@ same change.
 | [0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md) | The first judge is qualified by a human-labeled seed set | Accepted |
 | [0053](0053-automated-skill-intake-gauntlet.md) | An automated intake gauntlet for skill adoption; the human gate is unchanged | Proposed |
 | [0054](0054-model-written-orchestration-parity.md) | Model-written orchestration: per-call and per-delegation governance parity | Proposed |
-| [0055](0055-audit-egress-for-tamper-evidence.md) | Tamper-evidence requires a copy outside the writer's blast radius | Proposed |
+| [0055](0055-audit-egress-for-tamper-evidence.md) | Tamper-evidence requires a copy outside the writer's blast radius | Accepted |
 
 ## Reviews
 

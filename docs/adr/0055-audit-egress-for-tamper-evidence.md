@@ -1,6 +1,6 @@
 # ADR-0055: Tamper-evidence requires a copy outside the writer's blast radius
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-07-29
 - **Extends**: [ADR-0020](0020-otel-only-backends-at-the-collector.md)
 - **Relates to**: [ADR-0021](0021-connectivity-tiers.md), [ADR-0025](0025-enclave-is-the-default-topology.md), [ADR-0026](0026-delegation-grants-and-per-step-tokens.md), [ADR-0035](0035-audit-as-a-governed-read-path.md)
@@ -133,9 +133,12 @@ visibly non-compliant rather than arguably sufficient.
 
 ## Notes
 
-**Status is Proposed.** No shipper exists, no spool exists, no collector is configured for the
-audit plane, and no reconciliation operation is defined. This captures a decision so the two
-open questions above can be argued before something is built that answers them by accident.
+**Accepted, and nothing is built.** No shipper exists, no spool exists, no collector is
+configured for the audit plane, and no reconciliation operation is defined. What is settled is
+the *rule* — the trust boundary is administrative, the head ships with the entries, and storage
+the enclave's own role can write does not qualify. The two questions in the Decision remain
+open by design, and accepting this record does not answer them: it makes them the questions the
+implementing feature must answer rather than ones it may resolve by accident.
 
 Raised by Dan on 2026-07-29 during 013's live gate run, and recorded as the first known gap in
 [`ROADMAP.md`](../../ROADMAP.md) — a gap in the evidence plane is the one kind this platform

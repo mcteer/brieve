@@ -250,8 +250,9 @@ from, and each is worth its own small change.
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects*
 
 **Raised by Dan, 2026-07-29, during 013's live gate run. The most consequential gap on this
-page.** Now carried by [ADR-0055](docs/adr/0055-audit-egress-for-tamper-evidence.md)
-(**Proposed**).
+page.** Now **decided** by [ADR-0055](docs/adr/0055-audit-egress-for-tamper-evidence.md)
+(**Accepted**) — the rule is settled and nothing is built, so this stays a gap in the
+*implementation* rather than in the record.
 
 **One correction to how this entry was first written.** It framed off-host shipping as a
 straightforward mitigation without citing
