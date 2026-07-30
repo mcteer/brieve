@@ -116,6 +116,22 @@ class DurabilityProvider(Protocol):
         """Intents with no result — exactly what resume must resolve by observation."""
         ...
 
+    def closed_intents(self, run_id: str) -> list[IntentRecord]:
+        """Intents that DO have results — steps whose effect is recorded as complete.
+
+        The counterpart to :meth:`open_intents`, and the one 005 did not need until a
+        resumed run had to decide what to skip.
+
+        **A closed bracket is the authoritative record that a step took effect**, and it is
+        stronger evidence than the checkpoint's step index: the result is written by the
+        step itself, at the moment it finished, while the checkpoint is written afterwards
+        and can be lost to a disruption landing in between. A resume that consults only the
+        checkpoint therefore re-runs a step whose effect already happened — an exactly-once
+        violation for any non-repeatable tool, and invisible, because the re-run looks
+        exactly like the first run.
+        """
+        ...
+
     def save_grant(self, grant: DelegationGrant) -> None:
         """Persist the subject's consent, once, at issuance.
 

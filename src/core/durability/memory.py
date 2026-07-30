@@ -74,6 +74,13 @@ class InMemoryDurabilityProvider:
             if rid == run_id and (rid, key) not in self._results
         ]
 
+    def closed_intents(self, run_id: str) -> list[IntentRecord]:
+        return [
+            record
+            for (rid, key), record in sorted(self._intents.items())
+            if rid == run_id and (rid, key) in self._results
+        ]
+
     def save_grant(self, grant: DelegationGrant) -> None:
         # Written once, like the Postgres provider's ON CONFLICT DO NOTHING. A grant's
         # terms do not change, so a re-save of a known id keeps the recorded consent

@@ -453,12 +453,28 @@ def resume_dispatched_run(
     # says otherwise, which is what `pending` overrides.
     completed = {intent.step_index for intent in decision.completed_steps}
     pending = {intent.step_index for intent in decision.pending_steps}
+    recorded = {intent.step_index for intent in decision.recorded_steps}
     resume_from = checkpoint.step_index + 1
 
     def already_done(step: int) -> bool:
         if step in pending:
             return False
-        return step in completed or step < resume_from
+        # `recorded` is the fix for an exactly-once violation the conformance row caught, and
+        # the ordering of these three inputs is the whole of it.
+        #
+        # A step writes its result and THEN its checkpoint. Killed in between — a window that
+        # is a real fraction of every step, since a checkpoint is a lease-checked save — the
+        # step is invisible to the other two inputs: its bracket is closed, so re-observation
+        # never sees it (`completed`/`pending` are drawn from OPEN intents), and the
+        # checkpoint still names the step before it, so `step < resume_from` is false at
+        # exactly that index. The resumed run then re-executed an effect that had already
+        # happened, which for a non-repeatable tool is the one thing this feature exists to
+        # prevent — and it looked identical to a first run, so nothing downstream disagreed.
+        #
+        # The closed bracket is the stronger record: the result is written by the step at the
+        # moment it finished, while the checkpoint is written afterwards and can be lost.
+        # `step < resume_from` stays as the coarser backstop for steps that never bracketed.
+        return step in recorded or step in completed or step < resume_from
 
     code, executed, skipped = _run_steps(
         run,
