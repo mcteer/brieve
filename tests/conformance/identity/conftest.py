@@ -33,11 +33,16 @@ from core.durability.credentials import (
     VaultDatabaseCredentials,
 )
 from core.registry.memory import ToolRegistry
+from surfaces.toolset import build_registry, known_actions, known_tools
 
-#: What this platform can do, as the ceiling records name it. The fixture definitions in
-#: `infra/environments/dev/variables.tf` are authored against exactly these.
-KNOWN_TOOLS = frozenset({"echo", "plan", "apply"})
-KNOWN_ACTIONS = frozenset({"product.workspace.read", "product.workspace.write"})
+#: What this platform can do, as the ceiling records name it — **derived from a registry**,
+#: not declared. The fixture definitions in `infra/environments/dev/variables.tf` are
+#: authored against exactly these, so a literal here that drifted from what registered would
+#: make a correct ceiling record refuse `unknown_ceiling_entry` against the LIVE fabric,
+#: and the error would name the ceiling rather than this file.
+_VOCABULARY_REGISTRY = build_registry()[0]
+KNOWN_TOOLS = known_tools(_VOCABULARY_REGISTRY)
+KNOWN_ACTIONS = known_actions(_VOCABULARY_REGISTRY)
 
 
 def production_fabric(**kwargs: object) -> VaultIdentityFabric:
@@ -51,11 +56,14 @@ def production_fabric(**kwargs: object) -> VaultIdentityFabric:
 
 
 def registry_of_known_tools() -> ToolRegistry:
-    """Every tool the ceiling records may name, so none of them is an unknown entry."""
-    registry = ToolRegistry()
-    for name in sorted(KNOWN_TOOLS):
-        registry.register(name, lambda _arguments: {"ok": "ran"})
-    return registry
+    """Every tool the ceiling records may name, so none of them is an unknown entry.
+
+    The shared builder rather than re-registering names in a loop, which is what this did
+    before 013. Re-registering by name dropped every product binding, so `product_actions()`
+    came back empty and any product-shaped ceiling refused — a defect this lane never saw
+    because it read `KNOWN_ACTIONS` from a literal instead of from the registry.
+    """
+    return build_registry()[0]
 
 
 def subject_fabric(*roles: str) -> SubjectScopedVaultFabric:

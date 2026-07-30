@@ -102,6 +102,8 @@ class NomadDispatcher:
         step_index: int | None = None,
         subject_roles: frozenset[str] = frozenset(),
         steps: int | None = None,
+        packs: frozenset[str] = frozenset(),
+        invoke_tools: bool = False,
     ) -> RunHandle:
         """Schedule the run and return immediately.
 
@@ -127,6 +129,9 @@ class NomadDispatcher:
                 "subject_roles": ",".join(sorted(subject_roles)),
                 # Absent unless asked for. A run given neither behaves exactly as before.
                 "steps": str(steps) if steps is not None else "",
+                # 013. Empty means none, which is every pre-013 dispatch unchanged.
+                "packs": ",".join(sorted(packs)),
+                "invoke_tools": "1" if invoke_tools else "",
                 "run_id": run_id or correlation_id,
                 "step_index": str(step_index if step_index is not None else 0),
             },

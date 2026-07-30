@@ -121,6 +121,9 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
   token_policies = [
     vault_policy.harness_database.name,
     vault_policy.harness_authority_read.name,
+    # 013: the agent secret space pack tools read. Role-level by declared limitation —
+    # see the policy's own comment; per-definition narrowing is ADR-0044's translation.
+    vault_policy.agent_pack_secrets.name,
   ]
   token_ttl  = 3600
   token_type = "service"

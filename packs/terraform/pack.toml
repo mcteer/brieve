@@ -1,0 +1,95 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The ADOPTED pack. Its skills come from hashicorp/agent-skills at a pinned commit, which
+# is what gives ADR-0004's supply chain a genuine subject — real provenance to check, a real
+# upstream version to pin, and content somebody else wrote to run an injection lens over.
+#
+# **Terraform is not deployed in the enclave**, so this pack's TOOL layer is fixture-backed
+# and the record says so (FR-027c). The tool half is what Principle II governs, so a pack
+# whose tools were never called must not read as one whose tools were. Its eval status and
+# its tool reachability are separate facts, and a row asserts they stay that way.
+
+# PRODUCT_MODE IS "none", AND THE FIRST DISPATCH TAUGHT WHY. These tools run on the
+# ALLOCATION'S platform identity — the workload logs into Vault as itself and reads the
+# agent secret space. `federate` means the USER'S identity is carried into the product,
+# which is ADR-0044's credential translation and RFC 8693 territory: explicitly out of
+# 013's scope. Declaring federate anyway made the entitlement mirror refuse the first
+# real invoke — the governance layer correctly catching a manifest that claimed
+# user-identity semantics for a platform-identity tool. `product` stays declared, because
+# reachability monitoring and the dependency gate key on it, and neither is about whose
+# identity a call carries.
+
+[pack]
+name       = "terraform"
+product    = "terraform"
+version    = "0.1.0"
+provenance = "adopted"
+# Fixture-backed, because Terraform does not run here. Named rather than omitted: a pack
+# reaching a product with no probe records UNHEALTHY, and every one of its tools would then
+# be denied `dependency_unavailable` naming a product that is simply absent.
+probe = "terraform_probe"
+
+[upstream]
+repository = "https://github.com/hashicorp/agent-skills"
+commit     = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
+licence    = "MPL-2.0"
+retrieved  = "2026-07-29"
+
+# Transport is MCP because a mature server exists — `hashicorp/terraform-mcp-server`, which
+# upstream's own plugin manifest declares. Principle II: transport is a tool PROPERTY, and
+# authoring an MCP server merely for protocol uniformity is never required. Here one exists,
+# so it is used; the Vault pack goes native for the same rule read the other way.
+[[tools]]
+name           = "terraform_plan"
+risk_class     = "read"
+transport      = "mcp"
+handler        = "terraform_plan"
+product        = "terraform"
+repeatable     = true
+
+[[tools]]
+name       = "terraform_apply"
+risk_class = "destructive"
+transport  = "mcp"
+handler    = "terraform_apply"
+# Non-repeatable, therefore an observer is REQUIRED — the loader refuses `observer_required`
+# without one. An apply that was interrupted mid-flight resolves to CANNOT_DETERMINE and
+# parks the run unless something can go and find out what actually happened.
+observer       = "terraform_apply_observer"
+product        = "terraform"
+repeatable     = false
+
+[[skills]]
+name    = "terraform-style-guide"
+path    = "skills/terraform-style-guide/SKILL.md"
+version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
+digest  = "fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d41762120059c49540c2"
+
+[[skills]]
+name    = "terraform-style-guide-security"
+path    = "skills/terraform-style-guide/SECURITY.md"
+version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
+digest  = "3dc8ffa10139e9772c5c102fee6377f66f5167bd043a7c43e6e5df682dc75f92"
+
+# Tier 1 is paved paths only, so a lowest-tier definition may run this and nothing else.
+[[workflows]]
+name         = "review-configuration"
+minimum_tier = 1
+paved        = true
+
+[[workflows]]
+name         = "author-module"
+minimum_tier = 2
+paved        = false
+
+[evals]
+suites = ["must_deny", "must_decline", "citation_accuracy", "estate_state"]
+
+# Five per suite is the floor, and a pack below it is REFUSED at load rather than warned
+# about — a floor nothing enforces is a suggestion, and a suite of one happy path greens a
+# gate while asserting nothing.
+[evals.cases]
+must_deny         = 5
+must_decline      = 5
+citation_accuracy = 5
+estate_state      = 5

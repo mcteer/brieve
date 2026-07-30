@@ -27,9 +27,10 @@ cost of the guarantee rather than an oversight.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
+from core.authority.bindings import DefinitionBindings, parse_definition_bindings
 from core.authority.ceiling import parse_ceiling_record
 from core.authority.errors import ResolutionRefused
 from core.authority.types import AuthorityScope
@@ -44,6 +45,14 @@ REGISTRATION_PATH = "agent-registry/registration/display-name"
 CEILING_PATH = "harness-authority/data/harness-ceilings"
 ROLE_BINDING_PATH = "harness-authority/data/role-bindings"
 POLICY_PATH = "harness-authority/data/policies"
+#: Which packs a definition reaches, its per-role model bindings, and its tier (013).
+#: Written by the same apply as the ceiling, so a definition never holds one without
+#: the other.
+DEFINITION_BINDINGS_PATH = "harness-authority/data/definition-bindings"
+#: The Qualified Model Matrix (013). One record, not one per definition: a cell is an
+#: estate-wide authorization fact, and per-definition copies would let two definitions
+#: disagree about whether a model is qualified.
+MATRIX_PATH = "harness-authority/data/model-matrix"
 
 #: Policies the `agent_registry` engine appends to every registration on its own.
 #:
@@ -174,6 +183,45 @@ class VaultIdentityFabric:
         return parse_ceiling_record(
             record, known_tools=self._known_tools, known_actions=self._known_actions
         )
+
+    def resolve_definition_bindings(self, agent_definition_id: str) -> DefinitionBindings:
+        """Which packs this definition reaches, its binding map, and its tier.
+
+        **Refuses loudly when absent**, on the 010 ceiling pattern. A definition with no
+        bindings record is not a definition that reaches nothing — those are different
+        claims, and resolving the second to the first would let a record that failed to
+        apply present as a definition deliberately scoped to nothing. The Terraform writes
+        this in the same apply as the ceiling precisely so the absence means something went
+        wrong rather than something was omitted.
+        """
+        record = self._kv_data(self._read(f"{DEFINITION_BINDINGS_PATH}/{agent_definition_id}"))
+        if record is None:
+            raise ResolutionRefused(
+                f"agent definition {agent_definition_id!r} has no definition-bindings "
+                f"record; it is written by the same apply as the ceiling, so its absence "
+                f"means the apply is incomplete rather than that the definition reaches "
+                f"nothing",
+                reason_code="missing_ceiling_record",
+            )
+        return parse_definition_bindings(record, agent_definition_id=agent_definition_id)
+
+    def read_matrix(self) -> Mapping[str, Any]:
+        """The Qualified Model Matrix, raw. Parsing belongs to `core.authority.matrix`.
+
+        Refuses loudly when absent for the same reason as above, and with a sharper
+        consequence: an empty matrix resolves every binding map to `unqualified_cell`, so a
+        matrix that failed to apply would present as every definition in the estate being
+        wrongly configured.
+        """
+        record = self._kv_data(self._read(MATRIX_PATH))
+        if record is None:
+            raise ResolutionRefused(
+                "no Qualified Model Matrix record; an absent matrix would refuse every "
+                "binding map as unqualified, so this refuses as a fabric problem rather "
+                "than as an estate of misconfigured definitions",
+                reason_code="missing_ceiling_record",
+            )
+        return record
 
     def observed_policies(self, agent_definition_id: str) -> dict[str, list[str]]:
         """What the registry actually holds, split into configured and engine-appended.

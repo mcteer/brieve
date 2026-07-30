@@ -27,12 +27,19 @@ from surfaces.api.app import create_app
 from surfaces.api.authority_submit import VaultAuthoritySubmitter
 from surfaces.api.verification import TokenVerifier
 from surfaces.dispatch.nomad import NomadDispatcher
+from surfaces.toolset import build_registry, known_actions, known_tools
 
-#: What the platform can do, as the ceiling records name it. Same values the identity
-#: conformance lane uses — a fabric that disagreed with them would report every ceiling
-#: entry as an unknown tool.
-KNOWN_TOOLS = frozenset({"echo", "plan", "apply"})
-KNOWN_ACTIONS = frozenset({"product.workspace.read", "product.workspace.write"})
+#: What the platform can do, as the ceiling records name it — **derived from what actually
+#: registered**, not declared here.
+#:
+#: This was a literal `frozenset` until 013, and it had to agree with three other copies. A
+#: pack declaring `vault_read` would have made a correct ceiling record refuse
+#: `unknown_ceiling_entry`, and that error names the ceiling — sending whoever reads it to
+#: the ceiling and the trust fabric, both of which are fine, and not to the stale constant
+#: in this module, which is not.
+_REGISTRY = build_registry()[0]
+KNOWN_TOOLS = known_tools(_REGISTRY)
+KNOWN_ACTIONS = known_actions(_REGISTRY)
 
 
 def build() -> object:

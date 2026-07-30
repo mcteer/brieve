@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import sys
 from datetime import UTC, datetime
+from typing import Any
 
 from core.audit.postgres_sink import PostgresAuditSink
 from core.authority.types import AuthorityScope
@@ -31,10 +32,18 @@ from core.durability.checkpoint import stop_requested
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
 from core.durability.types import CheckpointBlob, IntentRecord, ResultRecord, RunOutcome
-from core.registry.memory import ToolRegistry
 from core.run import RunState, start_governed_run
 from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
+from surfaces.toolset import build_registry, content_pins
+
+
+def _product_action_of(registry: Any, tool_name: str) -> str:
+    """The action a tool performs, or empty for unregistered/actionless tools."""
+    try:
+        return str(registry.resolve(tool_name).product_action or "")
+    except Exception:  # noqa: BLE001 — manufacture refuses unknown tools; not our job here
+        return ""
 
 
 def main() -> int:
@@ -71,32 +80,16 @@ def main() -> int:
     audit = PostgresAuditSink(credentials=credentials)
     audit.migrate()
 
-    # The reference toolset. An empty registry knows no tools, so a ceiling naming any of
-    # them would refuse `unknown_ceiling_entry` — correct behaviour, and useless as an
-    # entrypoint. 008 could leave this empty because it only proved a run STARTS; a run
-    # that resolves a real ceiling has to know what the ceiling is talking about.
+    # The toolset. **This is the line capability packs were signposted to replace**, and
+    # 013 is the feature that replaced it — the comment that stood here said "when they
+    # land, this is the line they replace", and it was right about where and about why.
     #
-    # Hardcoded here because the real toolset arrives with capability packs, which are a
-    # later feature. When they land, this is the line they replace.
-    registry = ToolRegistry()
-    registry.register("echo", lambda _arguments: {"ok": "ran"})
-    # Product-tagged, because the ceiling records name product actions and a ceiling may
-    # only name things the platform can do. The registry is the source of that truth, so
-    # a toolset declaring no product actions makes every product-shaped ceiling refuse
-    # `unknown_ceiling_entry` — which is correct, precise, and impossible to satisfy.
-    registry.register(
-        "plan",
-        lambda _arguments: {"ok": "planned"},
-        product_mode="federate",
-        product="workspace",
-        product_action="product.workspace.read",
-    )
-    registry.register(
-        "apply",
-        lambda _arguments: {"ok": "applied"},
-        product_mode="federate",
-        product="workspace",
-        product_action="product.workspace.write",
+    # The fixture tools stay, for definitions that name no pack: 008-012's rows are built
+    # on them, and removing them would break a dozen lanes to prove a point about packs.
+    # Packs named by RUN_PACKS are loaded alongside, and a definition reaches only what it
+    # names.
+    registry, _loaded_packs = build_registry(
+        packs=[p for p in os.environ.get("RUN_PACKS", "").split(",") if p]
     )
 
     # The roles the dispatching surface already resolved from this subject's verified
@@ -109,7 +102,23 @@ def main() -> int:
         subject_user_id=subject_user_id,
         tenant_id=tenant_id,
         agent_definition_id=definition_id,
-        requested_scope=AuthorityScope(tool_names=tools),
+        # Tools AND the product actions those tools perform, both derived from the
+        # registry. The intersection algebra is strict — an empty requested action set
+        # yields an empty effective action set — so a request naming only tools
+        # manufactures authority that can hold a product tool and never invoke it:
+        # the authority hook refuses `authority_insufficient` at the first call. Nothing
+        # dispatched ever invoked a product tool before 013's opt-in step, which is why
+        # five features' worth of dispatched rows never met this. Unknown names skip —
+        # manufacture refuses them on the tool set, which is the right refusal.
+        requested_scope=AuthorityScope(
+            tool_names=tools,
+            product_actions=frozenset(
+                action
+                for name in tools
+                for action in [_product_action_of(registry, name)]
+                if action
+            ),
+        ),
         # The production fabric, resolving every term from the control-plane trust fabric
         # under this allocation's own identity. What this line used to say is the whole
         # reason the module lived under `tests/`.
@@ -121,10 +130,29 @@ def main() -> int:
         ),
         registry=registry,
         audit_sink=audit,
+        content_pins=content_pins(_loaded_packs),
     )
     # The audit trail is the evidence that this happened, and the row reads it back
     # through the evidence path rather than trusting this line.
     print(f"run {run.correlation_id} started, state={run.state}")
+
+    # 013, opt-in: invoke each requested tool once through the real pipeline. This is what
+    # makes "a pack tool reaches a live product through the same hooks as any other tool"
+    # a demonstrated fact rather than a structural argument — the allocation holds the
+    # attested identity the tool's handler manufactures credentials from, which no host
+    # process has. Opt-in because every pre-013 dispatched row asserts a trail this
+    # appends TOOL_OUTCOME events to.
+    if os.environ.get("RUN_INVOKE_TOOLS", "").strip() == "1":
+        from core.tools.invoke import invoke_tool
+
+        for tool_name in sorted(tools):
+            outcome = invoke_tool(run, tool_name, {"path": "conformance/probe"})
+            print(f"tool {tool_name}: allowed={outcome.allowed}", flush=True)
+            if not outcome.allowed:
+                # A refused invoke fails the allocation, so the dispatch row's
+                # "complete" assertion means every requested tool actually ran.
+                print(f"tool {tool_name} refused: {outcome.reason_code}", file=sys.stderr)
+                return 1
 
     # Optional multi-step mode, for rows that need a run still running when something
     # happens to it. Every existing fixture completes immediately, so a stop row against

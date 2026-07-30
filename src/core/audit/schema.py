@@ -65,6 +65,34 @@ class AuditEventType(StrEnum):
     #: In the chain, so "the deletion itself appears in the trail" is a row rather than a
     #: claim — and so deletion is demonstrably not a masking primitive.
     THREAD_DELETED = "thread_deleted"
+    #: A model verdict that gated a step (ADR-0039, 013). Payload: run_id, role, model,
+    #: cell, verdict, step_index.
+    #:
+    #: **This ESTABLISHES a distinction rather than repairing one.** FR-015 requires the
+    #: trail to distinguish a model gate from a human approval, and there is no approval
+    #: member in this enum at all — `core/approvals/types.py` is a Protocol and two doubles
+    #: with no event of its own (research.md F3). So the distinction could not be made by
+    #: adding nuance to an existing pair, because the pair did not exist. Adding this one
+    #: unilaterally means that when human approvals gain their own event, the two are
+    #: already separate rather than needing to be untangled.
+    #:
+    #: A model verdict MAY gate a step and **never** satisfies an approval requirement that
+    #: policy assigns to a human (Principle IX). That rule is enforced where approvals are
+    #: resolved; this event is what makes it auditable.
+    MODEL_GATE = "model_gate"
+    #: The pinned matrix cell was unavailable and another QUALIFIED cell was used
+    #: (ADR-0022/0039, 013). Payload: run_id, role, pinned_cell, used_cell, reason.
+    #:
+    #: Separate from MODEL_GATE because they answer different questions — "a model decided
+    #: something" versus "the model that ran was not the model that was pinned" — and an
+    #: investigator looking for the second should not have to filter the first.
+    #:
+    #: The recording is the load-bearing half of FR-010: falling back to an unqualified
+    #: model is impossible, and falling back *silently* would leave a definition that does
+    #: not describe what ran. Written by whoever holds the sink — `start_governed_run` at
+    #: run start, the resume caller on resume — because the module that RESOLVES a fallback
+    #: holds neither a sink nor a tenant, and `AuditEntry` requires both.
+    MATRIX_FALLBACK = "matrix_fallback"
 
 
 class AuditEntry(BaseModel):

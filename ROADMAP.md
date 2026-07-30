@@ -182,7 +182,7 @@ ADR — never a passing stub.**
 | Durability scenarios (ADR-0024/0026, as amended by ADR-0049) | 005, amended by 009 | ✅ In force — all seven, both providers, under an attested identity. **Now run by CI** on same-repo pull requests: 009's enclave lane holds the licensed Vault as a repository secret, which a fork-originating run cannot read. Fork pull requests still fall to the agent harness per `AGENTS.md`. The grant-expiry row asserts *stopping* rather than parking — inverted by ADR-0049, not removed |
 | Surface parity | 009 | ✅ **In force.** Amended, then satisfied. It read "across all four transports"; 009 has two, so claiming it would have asserted something untrue — the stub ADR-0047 forbids. 009 amends it to bind **incrementally**, across every pair of implemented transports, and satisfies it for the API/MCP pair. Better than claiming or deferring: the gate now binds at two, three, and four rather than catching nothing until the last transport lands, which is well after divergence would start. Compared against `specs/008-northbound-api/contracts/operations.snapshot.json` |
 | Tool-call parity under deferred disclosure | Deferred-disclosure feature | Deferred — ADR-0040 |
-| Eval gates (packs, models, policies) | Capability packs | Deferred — Principle VIII |
+| Eval gates (packs, models, policies) | 013 | ✅ **In force — four of five.** Must-deny, must-decline, citation accuracy, and estate-state run blocking against both shipped packs, scored on fixtures with a marked live lane behind a named runner. **Report fidelity stays owed** against ADR-0018: `RunReport` does not exist, and per ADR-0047 the row is an explicit skip citing its deferring record rather than a stub. The judge chain terminates at a human-labeled seed set (ADR-0052) |
 | Registry isolation (control-plane write denials) | — | **Unassigned** — see gaps below |
 | Accessibility (WCAG 2.2 AA, rendered interface) | 012 | ✅ **In force.** A gate class no prior lane could run: every other gate asserts something about a process, this one about a rendered page. Twenty-one rows: a vendored, pinned axe ruleset over every page state, **plus a keyboard-and-screen-reader harness** that walks the real tab order against visual position, reads the browser's own accessibility tree over CDP, measures focus indicators and target sizes, and re-renders under the reflow and text-spacing criteria. **No named runner is owed** — what was once a manual checklist runs in CI, and it found three defects on its first run. What stays outside a browser's reach (whether the words are good; any specific screen reader's behaviour) is recorded in the contract |
 
@@ -199,6 +199,47 @@ sequence above, but a Proposed record that quietly becomes permanent is a failur
 
 Found while deriving this file. None blocks work; all three make the record harder to reason
 from, and each is worth its own small change.
+
+### 0. The audit trail is not shipped off-host, and hash-chaining only *detects*
+
+**Raised by Dan, 2026-07-29, during 013's live gate run. The most consequential gap on this
+page.**
+
+Everything downstream of the audit plane rests on evidence being trustworthy, and today the
+whole of it lives in one Postgres this platform operates. The chain is honest about what it
+gives: `audit_entries` is append-only *by grant* (the evidence role holds `SELECT` and nothing
+on `audit_stream_heads`), and `audit_stream_heads` exists because a hash chain cannot detect
+truncation — delete the newest three entries and `seq 0..N-4` verifies perfectly.
+
+**But detection is not prevention, and both tables are in the same database.** An actor with
+write access to that Postgres can rewrite entries *and* the head that would have exposed the
+rewrite, consistently, and nothing anywhere disagrees. The property the platform claims —
+evidence that cannot be mutated or masked — is currently enforced by a grant inside the same
+blast radius as the data it protects.
+
+**The mitigation is to ship each entry off-host as it is written**, to a system under
+different administrative control: Splunk HEC, an OTLP log endpoint, New Relic, syslog to a
+collector — the target matters less than the trust boundary. Tampering then requires
+compromising two systems that do not trust each other, and the off-host copy is what an
+investigator reconciles against.
+
+**The seam already exists and this is cheap.** `AuditSink` is a protocol
+(`core/audit/sink.py`) with two implementations; a fan-out sink that writes Postgres *and*
+streams to a collector needs no signature change and no core rework. Two design questions are
+real and unresolved:
+
+- **Synchronous or asynchronous.** Principle VI says nothing blocking that could be an async
+  emitter — but an emitter that can drop is an evidence gap nobody sees, which is the failure
+  this whole idea exists to close. A local durable spool that the emitter drains is probably
+  the answer: the write blocks on the spool, never on the network.
+- **What a failed ship means.** `start_governed_run` already refuses a run whose
+  `AUTHORITY_ISSUED` could not be audited. Whether an unshippable entry should refuse a *step*
+  is the same question one layer out, and the answer decides whether this is a governance
+  control or a convenience.
+
+Needs an ADR before a feature. It is not 013's work — recorded here while the reasoning is
+fresh, because a gap in the evidence plane is the one kind this platform cannot afford to
+carry silently.
 
 1. **R1–R17 are referenced but never defined in-repo.** The constitution requires every spec to
    declare which mandated requirements it touches, and the spec template enforces it — but no

@@ -22,6 +22,16 @@ variable "agent_definitions" {
     # are authored rather than one being generated from the other.
     tool_names      = list(string)
     product_actions = list(string)
+    # 013. `optional` with defaults rather than required fields, because every definition
+    # authored before packs existed must keep applying unchanged — 008-012's fixtures name
+    # no pack and are what a dozen conformance lanes run against.
+    #
+    # The defaults are the narrowest thing that still runs: no packs reached, no model
+    # bound, and tier 1, which is paved paths only. A definition that acquired capability
+    # by omission would be the widening FR-005 forbids, arriving through a variable default.
+    packs       = optional(list(string), [])
+    binding_map = optional(map(string), {})
+    tier        = optional(number, 1)
   }))
 }
 

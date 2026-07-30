@@ -28,6 +28,13 @@ variable "agent_definitions" {
     # are authored rather than one being generated from the other.
     tool_names      = list(string)
     product_actions = list(string)
+    # 013. Declared here as well as in the module: Terraform's object-type conversion
+    # silently DROPS attributes the type does not name, and the first apply of vault-agent
+    # wrote packs = [] for exactly that reason — the values were in the tfvars map and the
+    # root variable's type threw them away without a warning.
+    packs       = optional(list(string), [])
+    binding_map = optional(map(string), {})
+    tier        = optional(number, 1)
   }))
   default = {
     # The 006 registration proof. Its ceiling grants a path under a mount that DOES exist
@@ -61,6 +68,29 @@ variable "agent_definitions" {
       allowed_paths   = ["secret/data/applier/*"]
       tool_names      = ["echo", "plan", "apply"]
       product_actions = ["product.workspace.read", "product.workspace.write"]
+    }
+
+    # 013: the definition whose pack tools reach a product that actually answers. A NEW
+    # record rather than a widened existing one, because the ceiling pair above is a
+    # fixture whose exact bounds other rows assert — widening planner or applier would
+    # move what their refusal rows refuse.
+    #
+    # `allowed_paths` covers the conformance probe path the vault_read handler reads;
+    # `tool_names`/`product_actions` are the harness-domain ceiling naming the pack's
+    # tools. `packs`, `binding_map`, `tier` land in the definition-bindings record the
+    # same apply writes (optional() with narrow defaults for every other definition).
+    "vault-agent" = {
+      description     = "Operates Vault through the vault capability pack (013)"
+      owner           = "platform"
+      ceiling_policy  = "agent-ceiling-vault"
+      allowed_paths   = ["secret/data/conformance/*"]
+      tool_names      = ["vault_read"]
+      # Empty, with the manifest's reasoning: the pack's tools are platform-identity
+      # reads (product_mode none), so there is no product action to authorize until
+      # credential translation (ADR-0044) federates the user into the product.
+      product_actions = []
+      packs           = ["vault"]
+      tier            = 1
     }
   }
 }
@@ -118,6 +148,12 @@ variable "role_bindings" {
     "reader" = {
       tool_names      = ["echo", "plan"]
       product_actions = ["product.workspace.read"]
+    }
+    # 013: the subject role for the pack-dispatch row. Separate from `operator` because
+    # that role's exact contents are what the ceiling-pair rows intersect against.
+    "vault-operator" = {
+      tool_names      = ["vault_read"]
+      product_actions = []
     }
   }
 }

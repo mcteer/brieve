@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up
+# `evals` is .PHONY twice over: it is a recipe, and a DIRECTORY named evals/ exists at
+# the repository root — without the declaration, make reports the seed set 'up to date'
+# and the gate never runs, which is a skip wearing a build system's clothes.
+.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
@@ -50,12 +53,18 @@ conformance:
 	C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
-	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity -m host_enclave -q
+	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs -m host_enclave -q
 	#
 	# 012's containment lane. Named here in the same change that created the directory —
 	# 010 lost a whole feature's rows to a directory no lane enumerated, and the fix is to
 	# wire it at birth rather than to remember later.
 	$(UV_RUN) pytest tests/conformance/portal -q
+	#
+	# 013's pack lane. Its HERMETIC rows need no wiring — the first line of this recipe
+	# collects `tests/conformance` wholesale — so only the host_enclave line above needed
+	# the directory added, and it was added in the change that created it. Recorded here
+	# because "already collected" is exactly the assumption 010 made and paid for: the
+	# distinction is that line 34 names a tree and the host line names directories.
 
 # The accessibility gate (012, FR-020a). Its own target because it is its own DISCIPLINE:
 # every other gate here asserts something about a process, and this one asserts something
@@ -75,6 +84,39 @@ portal-up:
 a11y:
 	uv run --extra surfaces --extra portal --extra a11y playwright install chromium
 	uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y -q
+
+# The eval gates (013, Principle VIII). `evals` scores FIXTURES and blocks — it is part
+# of what a merge must pass, and it is hermetic so it never fails for reasons unrelated to
+# the change under review. `evals-live` scores a REAL model: it needs a paid credential
+# (EVAL_PROVIDER_API_KEY) and is non-deterministic, so it is never in a blocking lane and
+# has a named runner (plan.md: Dan, before merge, per-cell outcome recorded in
+# specs/013-capability-packs/contracts/conformance-packs.md).
+evals:
+	$(UV_RUN) pytest tests/component/test_eval_gates.py tests/component/test_judge_chain.py -q
+
+# The credential comes from .env's ANTHROPIC_API_KEY, passed on the command line as the
+# name the lane reads — scoped to this one invocation, never exported, on the same pattern
+# as the conformance recipe's Vault coordinates. The directory is NAMED because it sits
+# outside `testpaths` (like tests/a11y): a bare `pytest -m live_model` collects nothing,
+# which is a gate that cannot run reporting an empty pass.
+# TWO CALLS BEFORE ONE HUNDRED AND EIGHTY. Building the live lane took six full runs and
+# four of them existed only to surface a HARNESS defect — a truncating token budget, a
+# rejected temperature, a subject that did not know its own scope, a judge starved of
+# context. Every one was visible in a single call with the response printed. Run this
+# first; `evals-live` is for qualifying cells, not for finding out whether the harness
+# works. See tests/evals_live/smoke.py for the full accounting.
+evals-smoke:
+	@K=$$(grep '^ANTHROPIC_API_KEY=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	[ -n "$$K" ] || { echo "no ANTHROPIC_API_KEY in .env" >&2; exit 1; } ; \
+	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra portal --extra evals \
+	  python tests/evals_live/smoke.py
+
+evals-live: evals-smoke
+	@K=$$(grep '^ANTHROPIC_API_KEY=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	[ -n "$$K" ] || { echo "no ANTHROPIC_API_KEY in .env; the live lane cannot run" >&2; exit 1; } ; \
+	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra portal --extra evals \
+	  pytest tests/evals_live -m live_model -q
+
 
 # The subset that needs no enclave, for the fork-safe CI fast lane, which has no Vault
 # Enterprise license and cannot stand one up. This is a real coverage gap and is

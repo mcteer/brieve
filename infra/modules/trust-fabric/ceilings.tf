@@ -48,6 +48,40 @@ resource "vault_kv_secret_v2" "harness_ceiling" {
   })
 }
 
+# Which packs a definition reaches, which model it uses per role, and what it may compose.
+#
+# **The record the whole of 013 reads.** FR-005's isolation consumes `packs`, binding-map
+# validation consumes `binding_map`, and tier resolution consumes `tier` — and until analyze
+# pass 8 these three fields lived in the glossary, in four tasks' logic, and in no record at
+# all. Every consumer had been written against something nothing produced.
+#
+# BESIDE THE CEILING, NOT ON THE REGISTRATION, for the reason recorded at the top of this
+# file: the registry engine's `register` endpoint takes a closed parameter set with no
+# extension point. Same store, same jurisdiction, same governance.
+#
+# Written by the SAME apply as the ceiling, for the reason the ceiling records: two applies
+# leave a window where a definition has one and not the other. That window is fail-closed —
+# a missing binding record refuses — but it would present as an outage with no cause.
+#
+# `for_each` over the same variable, so a definition cannot acquire a ceiling without
+# acquiring bindings. Defaults are the narrowest thing that still runs: no packs, no
+# bindings, tier 1 (paved paths only). A definition that names no pack is exactly what
+# 008-012's fixtures are, and they must keep working unchanged.
+resource "vault_kv_secret_v2" "definition_bindings" {
+  for_each = var.agent_definitions
+
+  mount = vault_mount.harness_authority.path
+  name  = "definition-bindings/${each.key}"
+
+  data_json = jsonencode({
+    schema_version      = 1
+    agent_definition_id = each.key
+    packs               = each.value.packs
+    binding_map         = each.value.binding_map
+    tier                = each.value.tier
+  })
+}
+
 # What a claim-derived role means in the harness domain.
 #
 # Same store and same governance as the ceilings above, because it is the same

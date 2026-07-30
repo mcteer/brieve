@@ -86,8 +86,10 @@ skip visible in the output rather than silent.
 ## 6 — The gates *(live model — named runner)*
 
 ```bash
-export EVAL_PROVIDER_KEY=...     # the name is defined in src/core/evals/scoring.py and
-                                 # asserted by T045 against that constant, not a literal.
+export EVAL_PROVIDER_API_KEY=... # the VALUE of scoring.EVAL_PROVIDER_KEY — the first
+                                 # draft of this line said to export the constant's NAME,
+                                 # which nothing reads. Exactly the drift T045 exists to
+                                 # catch, caught here by walking the doc (T051).
                                  # Dev-lane only: never in a jobspec, never read by a run.
 make evals-live
 ```

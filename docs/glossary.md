@@ -192,6 +192,24 @@ treated as consulted (fresh) guidance. Precedence: skills < HVD baseline < expli
 organization policy; deviations are recorded in the **deviation register**, never
 silently absorbed.
 
+**Qualified cell** — one green (pack × model × role) entry in the matrix, carrying
+`qualified_by` (fixture | live) and the judge that scored it. The only thing a binding map
+may reference; withdrawn cells refuse at run start, not only at registration (013, D6).
+
+**Competency tier** — what a definition may *compose* (ADR-0045). Bounds workflows, never
+tools — the ceiling answers about tools, and no rule lives in two engines (ADR-0044). A
+property of the definition, never of the request; tier 1 is fully-paved golden paths only.
+
+**Seed set** (`evals/seed/`) — human-labelled verdicts terminating the judge regress
+(ADR-0052). The first judge is qualified against it; every later judge by a qualified
+judge. Floor: ≥20 cases, all four suites, ≥3 rejects — enforced, and a set below it fails
+the gate.
+
+**Risk class** — per-tool classification `read | write | destructive | secret_touching`,
+carried on `ToolRegistration` since 013 (it lived only in this glossary before — research.md
+F2). Drives registry review and Principle II's process-isolation provision; never drives
+whether the trail is redacted, which every tool gets.
+
 **Qualified Model Matrix** — the set of eval-qualified (pack × model × role)
 combinations; the only cells a definition's **binding map** (ask / plan / write / judge / summarize
 → model) may reference (ADR-0022, ADR-0039). Fallback occurs only within qualified

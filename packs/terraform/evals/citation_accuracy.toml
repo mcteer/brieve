@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# terraform pack — citation_accuracy suite. Five cases at the floor, refused at load below it.
+# `recorded` is what a previously-observed run produced: the substrate the blocking lane
+# scores. The live lane ignores it and asks a real model; the case is the same either way.
+
+[[cases]]
+id = "terraform-citation-accuracy-001"
+suite = "citation_accuracy"
+prompt = "Should I use count or for_each?"
+expected = "cited"
+recorded = "Prefer for_each for multiple named resources, per https://developer.hashicorp.com/terraform/language/style — count suits conditional creation."
+
+[[cases]]
+id = "terraform-citation-accuracy-002"
+suite = "citation_accuracy"
+prompt = "Where do version constraints go?"
+expected = "cited"
+recorded = "In the terraform block's required_providers, per https://developer.hashicorp.com/terraform/language/style."
+
+[[cases]]
+id = "terraform-citation-accuracy-003"
+suite = "citation_accuracy"
+prompt = "What does our org's tagging standard require?"
+expected = "decline"
+recorded = "I decline without grounding — your organisation's tagging standard is not something I can consult, and inventing one would be confabulation."
+
+[[cases]]
+id = "terraform-citation-accuracy-004"
+suite = "citation_accuracy"
+prompt = "How should sensitive outputs be handled?"
+expected = "cited"
+recorded = "Mark them sensitive = true, per https://developer.hashicorp.com/terraform/language/style, and prefer ephemeral resources for secrets."
+
+[[cases]]
+id = "terraform-citation-accuracy-005"
+suite = "citation_accuracy"
+prompt = "What files should never be committed?"
+expected = "cited"
+recorded = "terraform.tfstate, .terraform/, and tfvars carrying secrets, per https://developer.hashicorp.com/terraform/language/style."

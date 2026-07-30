@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The AUTHORED pack, and the one whose tools reach a product that actually answers.
+#
+# Vault runs in the enclave, so this is where Principle II's claim gets exercised end to
+# end: a pack tool registered like any other, reaching a live product through the same hook
+# pipeline. The Terraform pack proves adoption; this one proves invocation. Neither alone
+# exercises both halves of ADR-0004, which is why there are two.
+#
+# Authored under ADR-0004's "genuine gap" provision: upstream covers Terraform and Packer
+# and lists Vault as a future product. The skills use the SAME open Agent Skills format
+# upstream uses (FR-027d), so contributing them back is a pull request rather than a
+# rewrite — which makes authoring here a temporary state by design rather than a fork.
+
+# PRODUCT_MODE IS "none", AND THE FIRST DISPATCH TAUGHT WHY. These tools run on the
+# ALLOCATION'S platform identity — the workload logs into Vault as itself and reads the
+# agent secret space. `federate` means the USER'S identity is carried into the product,
+# which is ADR-0044's credential translation and RFC 8693 territory: explicitly out of
+# 013's scope. Declaring federate anyway made the entitlement mirror refuse the first
+# real invoke — the governance layer correctly catching a manifest that claimed
+# user-identity semantics for a platform-identity tool. `product` stays declared, because
+# reachability monitoring and the dependency gate key on it, and neither is about whose
+# identity a call carries.
+
+[pack]
+name       = "vault"
+product    = "vault"
+version    = "0.1.0"
+provenance = "authored"
+# No [upstream] table, and that is what `authored` means. The loader refuses an `adopted`
+# pack without one, because a supply chain with no pinned commit has nothing to check.
+probe = "vault_probe"
+
+# Native transport, not MCP. The rule read the other way from the Terraform pack: MCP where
+# a mature server exists, native otherwise. No mature Vault MCP server exists, and Principle
+# II says authoring one merely for protocol uniformity is never required.
+[[tools]]
+name       = "vault_read"
+risk_class = "secret_touching"
+transport  = "native"
+handler    = "vault_read"
+# `secret_touching` is the risk class registry review may demand process isolation for
+# (Principle II) — a provision that has never been actionable because nothing in this
+# platform could tell a secret-touching tool from any other until 013 added the field.
+product        = "vault"
+repeatable     = true
+
+[[tools]]
+name       = "vault_write"
+risk_class = "secret_touching"
+transport  = "native"
+handler    = "vault_write"
+# Non-repeatable: a CAS write that succeeded and then lost its response must not be
+# replayed. The observer is what makes an interrupted write resolvable by OBSERVATION
+# rather than by assumption, and the loader refuses without one.
+observer       = "vault_write_observer"
+product        = "vault"
+repeatable     = false
+
+[[skills]]
+name    = "vault-secret-access"
+path    = "skills/vault-secret-access/SKILL.md"
+version = "0.1.0"
+digest  = "b3815739e32a0b1578b04b863a890d91b5c925259a19ed8f283c2e91de5f9d81"
+
+# At least one PAVED workflow, so US5 has something a lowest-tier definition may actually
+# run. A tier bound with nothing beneath it would assert a refusal against an empty set.
+[[workflows]]
+name         = "read-configuration"
+minimum_tier = 1
+paved        = true
+
+[[workflows]]
+name         = "rotate-credential"
+minimum_tier = 3
+paved        = false
+
+[evals]
+suites = ["must_deny", "must_decline", "citation_accuracy", "estate_state"]
+
+[evals.cases]
+must_deny         = 5
+must_decline      = 5
+citation_accuracy = 5
+estate_state      = 5

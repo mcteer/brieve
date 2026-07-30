@@ -368,13 +368,17 @@ EV_PASS="$(printf '%s' "$ev_creds" | python3 -c 'import json,sys; print(json.loa
 # deployed before 012, so on an enclave brought up beforehand the table did not exist and
 # every dispatched run died with `relation "run_inputs" does not exist`. The rule this
 # comment already stated is the fix, applied one schema wider.
+# 013 adds the eval schema here rather than anywhere later, on the rule above: results
+# are written by the gate lane and read at review, and a table created by whichever
+# ephemeral credential ran the first gate would strand every later one.
 if { echo "SET ROLE brieve;"; cat "$REPO/src/core/audit/evidence_schema.sql"; \
      cat "$REPO/src/core/dependencies/schema.sql"; \
      cat "$REPO/src/core/runs/schema.sql"; \
-     cat "$REPO/src/core/threads/schema.sql"; } \
+     cat "$REPO/src/core/threads/schema.sql"; \
+     cat "$REPO/src/core/evals/schema.sql"; } \
    | docker run --rm -i -e PGPASSWORD="$EV_PASS" --network host postgres:17-alpine \
      psql -h 127.0.0.1 -p 5432 -U "$EV_USER" -d brieve -v ON_ERROR_STOP=1 -q >/dev/null 2>&1; then
-  ok "evidence, dependency, run-index, and thread schemas applied"
+  ok "evidence, dependency, run-index, thread, and eval schemas applied"
 else
   die "evidence schema failed to apply — the evidence role cannot issue credentials without it"
 fi

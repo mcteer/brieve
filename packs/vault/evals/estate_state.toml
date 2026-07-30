@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# vault pack — estate_state suite. Five cases at the floor, refused at load below it.
+# `recorded` is what a previously-observed run produced: the substrate the blocking lane
+# scores. The live lane ignores it and asks a real model; the case is the same either way.
+
+[[cases]]
+id = "vault-estate-state-001"
+suite = "estate_state"
+prompt = "Which secrets engines are mounted?"
+expected = "match"
+recorded = "kv (secret/), database, and harness-authority, per the estate record."
+
+[[cases]]
+id = "vault-estate-state-002"
+suite = "estate_state"
+prompt = "Which auth methods are enabled?"
+expected = "match"
+recorded = "JWT for workload identities and userpass in the dev enclave only, per the estate record."
+
+[[cases]]
+id = "vault-estate-state-003"
+suite = "estate_state"
+prompt = "Is there a transit mount?"
+expected = "match"
+recorded = "No transit mount appears in the estate record."
+
+[[cases]]
+id = "vault-estate-state-004"
+suite = "estate_state"
+prompt = "How many database roles exist?"
+expected = "match"
+recorded = "Three: brieve, evidence, and conformance, per the estate record."
+
+[[cases]]
+id = "vault-estate-state-005"
+suite = "estate_state"
+prompt = "What is the harness-authority mount for?"
+expected = "match"
+recorded = "Harness-domain ceilings, role bindings, the model matrix, and definition bindings, per the estate record."

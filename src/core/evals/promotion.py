@@ -1,0 +1,213 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Promotion: the only way content or a model version enters the platform.
+
+**All three checks, or it does not promote.** ADR-0004 names provenance, an injection-lens
+review, and a passing eval run. Two of three is a supply chain with a hole, and the hole is
+whichever one somebody was in a hurry about.
+
+The three are deliberately *independent*. Provenance says the bytes are the ones upstream
+published; the lens says the content is not trying to redirect the agent; the evals say
+behaviour did not regress. A skill can pass any two and fail the third — an authentic,
+benign skill that breaks a suite; an authentic skill carrying an injection; a clean skill
+whose provenance cannot be verified. Each of those is a different problem and each blocks.
+
+**`promote_model_version` is here too**, and it is the positive case behind the negative one
+`test_no_auto_tracking` asserts. That row says auto-tracking does not *exist*; this is the
+path a deliberate bump actually takes. A feature that only forbade the automatic route
+without building the manual one would make the forbidden route the only one that worked.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from core.evals.injection_patterns import INJECTION_PATTERNS
+from core.packs.loader import content_digest
+
+
+class PromotionRefused(Exception):
+    """A promotion that did not clear every gate. Names which one, and why."""
+
+    def __init__(self, message: str, *, reason_code: str) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+
+
+@dataclass(frozen=True)
+class InjectionFinding:
+    """One pattern that fired, with what it was trying to do."""
+
+    pattern_name: str
+    explanation: str
+    excerpt: str
+
+
+@dataclass(frozen=True)
+class LensResult:
+    """What the lens saw. Recorded whether or not it refused.
+
+    A clean result is evidence the review happened; without one, "the lens passed" and "the
+    lens never ran" look identical afterwards.
+    """
+
+    clean: bool
+    findings: tuple[InjectionFinding, ...] = ()
+
+    @property
+    def summary(self) -> str:
+        if self.clean:
+            return "no injection-shaped content found"
+        return "; ".join(f"{f.pattern_name}: {f.explanation}" for f in self.findings)
+
+
+def injection_lens(content: str) -> LensResult:
+    """Scan content for instruction-shaped text targeting the agent.
+
+    Returns rather than raises, because the caller needs the *result* either way: a clean
+    scan is recorded as evidence, and only `promote_skill` decides that a finding blocks.
+    Raising here would make a clean scan indistinguishable from no scan.
+    """
+    findings = [
+        InjectionFinding(
+            pattern_name=pattern.name,
+            explanation=pattern.explanation,
+            excerpt=match.group(0)[:120],
+        )
+        for pattern in INJECTION_PATTERNS
+        if (match := pattern.pattern.search(content))
+    ]
+    return LensResult(clean=not findings, findings=tuple(findings))
+
+
+@dataclass(frozen=True)
+class PromotionEvidence:
+    """What was checked, recorded as a record rather than asserted as a claim.
+
+    Every field is something somebody can go and re-derive. "Provenance verified" with no
+    digest is a sentence; a digest is a thing that can be checked again next year.
+    """
+
+    skill_name: str
+    from_version: str
+    to_version: str
+    upstream_commit: str
+    content_digest: str
+    lens: LensResult
+    suites_passed: tuple[str, ...] = ()
+    fields: dict[str, str] = field(default_factory=dict)
+
+
+def promote_skill(
+    *,
+    skill_name: str,
+    content: bytes,
+    from_version: str,
+    to_version: str,
+    upstream_commit: str,
+    expected_digest: str,
+    suites_passed: tuple[str, ...],
+    required_suites: tuple[str, ...],
+) -> PromotionEvidence:
+    """Promote a skill bump, or refuse naming the check that blocked it.
+
+    Order is deliberate: **provenance first**. Running an injection lens over content whose
+    origin has not been established scans an arbitrary blob and reports it clean, which is
+    worse than not scanning — it produces evidence about the wrong bytes.
+    """
+    if not upstream_commit.strip():
+        raise PromotionRefused(
+            f"skill {skill_name!r} declares no upstream commit; a bump with no provenance "
+            f"cannot be checked against what upstream published",
+            reason_code="promotion_incomplete",
+        )
+
+    actual = content_digest(content)
+    if actual != expected_digest:
+        raise PromotionRefused(
+            f"skill {skill_name!r}: content hashes to {actual}, the record says "
+            f"{expected_digest}. The bytes are not the ones whose provenance was recorded",
+            reason_code="digest_mismatch",
+        )
+
+    lens = injection_lens(content.decode("utf-8", errors="replace"))
+    if not lens.clean:
+        raise PromotionRefused(
+            f"skill {skill_name!r} contains content that targets the agent — {lens.summary}",
+            reason_code="injection_suspected",
+        )
+
+    missing = tuple(s for s in required_suites if s not in suites_passed)
+    if missing:
+        raise PromotionRefused(
+            f"skill {skill_name!r} has not passed {list(missing)}; passing is not the same "
+            f"as unchanged, and a suite that did not run has said nothing either way",
+            reason_code="promotion_incomplete",
+        )
+
+    return PromotionEvidence(
+        skill_name=skill_name,
+        from_version=from_version,
+        to_version=to_version,
+        upstream_commit=upstream_commit,
+        content_digest=actual,
+        lens=lens,
+        suites_passed=suites_passed,
+    )
+
+
+def promote_model_version(
+    *,
+    pack: str,
+    model: str,
+    role: str,
+    suites_passed: tuple[str, ...],
+    required_suites: tuple[str, ...],
+    qualified_by: str,
+    judge: str,
+) -> dict[str, str]:
+    """Qualify a new (pack × model × role) cell, or refuse.
+
+    A model bump **is a new cell needing qualification** — not an edit to an existing one.
+    Treating it as an edit is how a version bump inherits a qualification it never earned,
+    which is auto-tracking with a manual step in front of it.
+
+    `judge` is required, and empty only for the seed-qualified first judge. A cell recorded
+    without one has no answer to "what qualified this", which is the regress ADR-0052 exists
+    to terminate.
+    """
+    missing = tuple(s for s in required_suites if s not in suites_passed)
+    if missing:
+        raise PromotionRefused(
+            f"cell {pack}:{model}:{role} has not passed {list(missing)}",
+            reason_code="promotion_incomplete",
+        )
+    if qualified_by not in ("fixture", "live"):
+        raise PromotionRefused(
+            f"cell {pack}:{model}:{role} must record whether it was qualified against a "
+            f"recording or a live model; got {qualified_by!r}",
+            reason_code="promotion_incomplete",
+        )
+    if not judge.strip() and role != "judge":
+        raise PromotionRefused(
+            f"cell {pack}:{model}:{role} names no judge; only the seed-qualified first judge "
+            f"has nothing above it",
+            reason_code="promotion_incomplete",
+        )
+    return {
+        "pack": pack,
+        "model": model,
+        "role": role,
+        "qualified_by": qualified_by,
+        "judge": judge,
+    }
+
+
+__all__ = [
+    "InjectionFinding",
+    "LensResult",
+    "PromotionEvidence",
+    "PromotionRefused",
+    "injection_lens",
+    "promote_model_version",
+    "promote_skill",
+]
