@@ -217,6 +217,22 @@ column exists so it cannot be read as more than it is.
   the mapping ready for that wiring, asserted by a row, and wired to nothing. Wiring resume
   into the entrypoint is 005's integration and its own change; 013 does not do it, and must
   not read as though it had.
+- **The diff form of SC-002.** **OWED, and the row that claimed it has been replaced.**
+  SC-002's second clause reads "adding a pack changes no core file — shown by the diff, not
+  argued", and a row asserted exactly that: find the commit adding `packs/vault/pack.toml`,
+  assert it touched no `src/core/`. It passed on the feature branch and **failed the moment 013
+  squash-merged**, because one commit then contained both the packs and the core support they
+  load through. The row was asserting a property of *branch topology*, which squash-merge
+  destroys — a defect in the row, not in the platform.
+
+  The claim is only demonstrable by a commit that adds a pack **without** adding pack support,
+  and no such commit exists: 013 introduced both together. So the structural half is asserted
+  instead — pack discovery enumerates a directory and names no pack, so adding a product is a
+  content change — and the diff half is owed until the next pack lands on its own. When it
+  does, write the diff assertion and delete the placeholder row.
+
+  The lesson generalises past this row: **any check keyed to "which commit changed file X" is
+  unstable under squash-merge**, and this repository squash-merges.
 - **That availability gating covers every transport.** **OWED, and inherited rather than
   introduced here** (analyze pass 12). `dependency_health` is passed only by the MCP server;
   the API, the portal, and the in-process dispatcher leave it `None`, and `dependency_pre_hook`
