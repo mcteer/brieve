@@ -27,6 +27,41 @@ Postgres; `make dev-up` is a prerequisite for them, not an alternative to them.
 | Re-observe, never re-execute | An interrupted non-repeatable step is resolved against observed external state, in both directions | FR-006/007, SC-005 |
 | Fencing against double resume | A superseded holder's tool calls and checkpoint writes are rejected; zero side effects, zero state mutation | FR-009, SC-006 |
 | **Stop** on grant expiry | Resume under expired consent **stops** with the reason recorded and zero subsequent steps. Terminal — renewed consent does **not** revive it | FR-005, SC-004 |
+
+### What these rows assert, and what they do not (recorded 2026-07-29)
+
+**Every row above asserts `resume_run()` — the library function — and none of them asserts
+that a dispatched run reaches it.** The distinction was invisible until 013 traced the path,
+and it matters because the table reads as a claim about the deployed system.
+
+The chain is closed except at its last link. A trust-fabric outage mid-run calls
+`suspend_for_dependency` (`core/hooks/authority.py`), so `SUSPENDED` is reachable in
+production. The MCP service's supervisory loop sweeps on dependency recovery and
+re-dispatches. The sweeper carries `step_index` from the suspended-run index, the dispatcher
+puts it in Nomad metadata, and the jobspec maps it to `RUN_STEP_INDEX`. **Then
+`src/surfaces/dispatch/entrypoint.py` never reads it, and never calls `resume_run`** — it
+calls `start_governed_run` and its step loop begins at zero.
+
+So "a disrupted run resumes and completes; already-completed steps show exactly one execution"
+is demonstrated of the function and not of the path a dispatch actually takes. `resume_run` has
+**no caller anywhere in `src/`**.
+
+**Why this is not a live defect today**, stated so the severity is not overread: the fixture
+toolset is `echo`, which is repeatable and has no external effect; `record_intent` and
+`record_result` are `ON CONFLICT DO NOTHING`, so re-recording a bracket is a no-op; and
+dispatched tool invocation is opt-in (`RUN_INVOKE_TOOLS`), set today only by 013's conformance
+row. Redoing steps currently costs nothing observable, which is why five features did not
+notice.
+
+**Why 013 made it consequential.** The Vault pack declares `vault_write` as non-repeatable
+with an observer, precisely because replaying a check-and-set write is wrong. The observer
+exists so an interrupted write is resolved *by observation* — and nothing on the dispatched
+path consults it. The first feature to dispatch real write work inherits a resumed run that
+re-executes from step zero with no re-observation.
+
+**Owed:** wiring `resume_run` into the entrypoint, and a row asserting the property end to end
+through a *dispatch* rather than through a function call. Until then these rows stay in force
+for what they assert, with this note as their scope.
 | Duplicate side-effect rejection | A repeated step carrying the same stable key is recognised as the same step | FR-010, SC-001 |
 | Drain across upgrade | A controlled in-process handover preserves the run and its evidence | FR-015, SC-008 |
 

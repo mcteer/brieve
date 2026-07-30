@@ -217,6 +217,11 @@ column exists so it cannot be read as more than it is.
   the mapping ready for that wiring, asserted by a row, and wired to nothing. Wiring resume
   into the entrypoint is 005's integration and its own change; 013 does not do it, and must
   not read as though it had.
+  **Traced to its end on 2026-07-29** and recorded where the claim lives:
+  `specs/005-durable-execution/contracts/conformance-durability.md` now scopes its five resume
+  rows to the library rather than to the dispatched path, and `ROADMAP.md` carries it as a
+  known gap. The chain is closed except at the last link — the sweeper carries `step_index`
+  faithfully and the entrypoint ignores it.
 - **The diff form of SC-002.** **OWED, and the row that claimed it has been replaced.**
   SC-002's second clause reads "adding a pack changes no core file — shown by the diff, not
   argued", and a row asserted exactly that: find the commit adding `packs/vault/pack.toml`,
