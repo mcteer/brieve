@@ -28,9 +28,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
-from core.audit.chain import verify_chain
+from core.audit.chain import canonical_bytes, canonical_entry_dict, verify_chain
 from core.audit.egress import PROBE_STREAM, AuditDestination, backlog_depth
 from core.audit.postgres_sink import _row_to_entry
+from core.audit.schema import AuditEventType
 
 Posture = Literal["in_force", "absent", "unverified", "non_compliant"]
 
@@ -134,7 +135,7 @@ def reconcile(
                         )
                     )
                 continue
-            if counterpart.entry_hash != entry.entry_hash:
+            if _differs(entry, counterpart):
                 # One copy was rewritten. Which one is a question this cannot answer and does
                 # not pretend to (SC-003).
                 report.findings.append(
@@ -152,6 +153,39 @@ def reconcile(
         )
 
     return report
+
+
+def _differs(local: Any, shipped: Any) -> bool:
+    """Do these two copies of one entry disagree, in content or in claim?
+
+    **Not a comparison of the two ``entry_hash`` columns.** That column is an assertion made
+    by whoever wrote the row, and the local writer here is the threat actor: an administrator
+    who rewrites a payload and leaves the hash column alone produces two records that agree
+    on their claims and disagree on their contents. Comparing the claims would have called
+    that identical. A conformance row caught exactly this.
+
+    So both are compared, because they fail differently:
+
+    - **Content** — the canonical bytes over every hashed field. Catches a rewrite of the
+      evidence itself, whatever the hash column was left saying about it.
+    - **The stored claim** — catches a rewrite of the hash alone, where the content still
+      matches but one copy now attests to something else.
+    """
+    return _content_of(local) != _content_of(shipped) or local.entry_hash != shipped.entry_hash
+
+
+def _content_of(entry: Any) -> bytes:
+    return canonical_bytes(
+        canonical_entry_dict(
+            correlation_id=entry.correlation_id,
+            tenant_id=entry.tenant_id,
+            seq=entry.seq,
+            event_type=str(entry.event_type),
+            timestamp=entry.timestamp,
+            payload=entry.payload,
+            prev_hash=entry.prev_hash,
+        )
+    )
 
 
 def _posture_of(verification: str) -> Posture:
@@ -255,8 +289,52 @@ def findings_by_kind(report: ReconcileReport) -> dict[str, int]:
 
 __all__ = [
     "Posture",
+    "emit_reconciled",
     "ReconcileFinding",
     "ReconcileReport",
     "findings_by_kind",
     "reconcile",
 ]
+
+
+def emit_reconciled(sink: Any, report: ReconcileReport, *, basis: str, caller: str) -> None:
+    """Record that the two copies were compared, and what came of it.
+
+    ADR-0035 makes reading evidence an audited act, and reconciliation is the most
+    evidence-reading thing this platform does — it reads both copies of everything. So the
+    check leaves its own trace, naming who asked and on what basis.
+
+    **Counts and locations, never contents.** The payload carries findings by kind and a
+    coverage boundary; it never carries a payload from either copy. An audit event that
+    quoted the evidence it had just read would be an ungoverned read path wearing an audit
+    event's clothes — and this event exists precisely because reads are governed.
+
+    Failures to emit are swallowed deliberately, and only here. Everywhere else in this
+    feature an unrecorded thing is a defect; but a reconciliation that FOUND divergence and
+    then could not write its own event must still have reported that divergence to stderr,
+    which it has by the time this is called. Losing the summary is bad; losing the finding
+    because the summary failed would be worse.
+    """
+    if sink is None:
+        return
+    try:
+        sink.append_event(
+            correlation_id=f"audit-reconcile-{basis}",
+            tenant_id="__platform__",
+            event_type=AuditEventType.AUDIT_RECONCILED,
+            payload={
+                "basis": basis,
+                "caller": caller,
+                "streams_checked": report.streams_checked,
+                "findings": findings_by_kind(report),
+                "finding_count": len(report.findings),
+                "backlog": report.backlog,
+                "coverage_since": (
+                    report.coverage_since.isoformat() if report.coverage_since else None
+                ),
+                "destination_verified": report.destination_verified,
+                "posture": report.posture,
+            },
+        )
+    except Exception:  # noqa: BLE001 — see the docstring; the findings are already reported
+        pass

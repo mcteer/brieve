@@ -38,7 +38,14 @@ from collections.abc import Callable
 from types import FrameType
 from typing import Any
 
+from core.audit.destination_postgres import (
+    PostgresAuditDestination,
+    load_egress_credential,
+)
+from core.audit.egress import ship_pass
 from core.audit.integrity import IntegrityReport, verify_stream_integrity
+from core.audit.postgres_sink import PostgresAuditSink
+from core.audit.reconcile import emit_reconciled, reconcile
 from core.dependencies.store import PostgresDependencyStore
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
@@ -294,12 +301,95 @@ def _report_integrity(report: IntegrityReport) -> None:
         )
 
 
+def build_destination() -> Any:
+    """The second copy, or None when this estate has not configured one.
+
+    ``None`` is a posture rather than a failure (FR-009). An estate without a destination
+    has no tamper-evidence, and the honest response is to say so — `_report_egress` reports
+    ABSENT — rather than to run a pass that quietly does nothing and reads as protected.
+
+    The credential comes from Vault under this service's own attested identity, never from
+    the jobspec's env block: its SELECT half reads the entire evidence copy across every
+    tenant, and jobspec metadata is readable by anyone with scheduler access.
+    """
+    credential = load_egress_credential()
+    if credential is None:
+        return None
+    return PostgresAuditDestination.from_credential(credential)
+
+
+def _report_egress(credentials: VaultDatabaseCredentials, destination: Any) -> None:
+    """Drain the unshipped tail, and say how far behind the second copy is.
+
+    The backlog is printed every pass because it is a **security** signal, not an ops
+    nicety: it is exactly the set of entries that exist in one place only, so a rising
+    number is a widening window in which a local rewrite would leave no trace anywhere.
+    """
+    if destination is None:
+        print("::egress:: no destination configured — tamper-evidence ABSENT", flush=True)
+        return
+    conn = run_connection_factory(credentials)()
+    try:
+        outcome = ship_pass(local=conn, destination=destination)
+        if outcome.shipped or outcome.backlog:
+            print(
+                f"::egress:: shipped {outcome.shipped} entries "
+                f"across {outcome.streams} streams; backlog {outcome.backlog}",
+                flush=True,
+            )
+        for correlation_id, why in outcome.failures:
+            print(f"::egress:: {correlation_id} not shipped: {why}", file=sys.stderr, flush=True)
+    finally:
+        _close_quietly(conn)
+
+
+def _report_reconcile(credentials: VaultDatabaseCredentials, destination: Any, sink: Any) -> None:
+    """Compare the copies on a schedule, and record that the comparison happened.
+
+    **Scheduled rather than only on request** (clarify Q3). The threat is an administrator
+    rewriting the local trail; a check that fires only when someone is already suspicious
+    adds little to the investigation they were going to run anyway, and leaves the window
+    open until somebody wonders — which may be never.
+    """
+    if destination is None:
+        return
+    conn = run_connection_factory(credentials)()
+    try:
+        report = reconcile(local=conn, destination=destination)
+    finally:
+        _close_quietly(conn)
+
+    for finding in report.findings:
+        print(
+            f"::reconcile:: {finding.correlation_id} {finding.kind}: {finding.detail}",
+            file=sys.stderr,
+            flush=True,
+        )
+    if report.posture != "in_force":
+        print(
+            f"::reconcile:: tamper-evidence is {report.posture.upper()} "
+            f"(destination {report.destination_verified})",
+            file=sys.stderr,
+            flush=True,
+        )
+    emit_reconciled(sink, report, basis="scheduled", caller="mcp-supervisory-loop")
+
+
+def _close_quietly(conn: Any) -> None:
+    try:
+        conn.close()
+    except Exception:  # noqa: BLE001 — a close failure must not mask the pass's own result
+        pass
+
+
 def supervisory_pass(
     *,
     checker: HealthChecker,
     sweeper: Sweeper,
     store: PostgresDependencyStore,
     credentials: VaultDatabaseCredentials,
+    destination: Any = None,
+    audit_sink: Any = None,
 ) -> list[str]:
     """One pass of everything this service exists to do. Returns the passes it ran.
 
@@ -330,6 +420,15 @@ def supervisory_pass(
     ran.append("sweep")
     _pass("integrity", lambda: _report_integrity(check_integrity(credentials)))
     ran.append("integrity")
+    # SHIP BEFORE RECONCILE, in that order and not the reverse. Reconciling first would
+    # compare against a destination one full interval behind, so every entry written since
+    # the last pass would sit above the watermark and be reported as backlog — true, but it
+    # would also mean the newest entries are never compared until the pass after the one
+    # that shipped them. Shipping first narrows that to whatever arrives mid-pass.
+    _pass("egress", lambda: _report_egress(credentials, destination))
+    ran.append("egress")
+    _pass("reconcile", lambda: _report_reconcile(credentials, destination, audit_sink))
+    ran.append("reconcile")
     return ran
 
 
@@ -369,6 +468,17 @@ def main() -> int:
     #
     # The jobspec supplies the reachable address, the same way it already supplies
     # `VAULT_ADDR`. The default stays host-correct so nothing outside an allocation changes.
+    # The second copy, and the posture it implies. Constructed once: a destination rebuilt
+    # per pass would re-read Vault every interval for a credential that does not change.
+    destination = build_destination()
+    audit_sink = PostgresAuditSink(credentials=credentials)
+    if destination is None:
+        print(
+            "::egress:: no audit destination configured — tamper-evidence ABSENT",
+            file=sys.stderr,
+            flush=True,
+        )
+
     sweeper = build_sweeper(
         store,
         NomadDispatcher(nomad_addr=os.environ.get("NOMAD_ADDR") or DEFAULT_NOMAD_ADDR),
@@ -385,7 +495,14 @@ def main() -> int:
 
     supervisor = _Supervisor(interval)
     while supervisor.running:
-        supervisory_pass(checker=checker, sweeper=sweeper, store=store, credentials=credentials)
+        supervisory_pass(
+            checker=checker,
+            sweeper=sweeper,
+            store=store,
+            credentials=credentials,
+            destination=destination,
+            audit_sink=audit_sink,
+        )
         supervisor.sleep()
 
     print("mcp service stopping on signal", flush=True)
