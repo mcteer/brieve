@@ -22,7 +22,12 @@ from __future__ import annotations
 
 import os
 
-from core.evals.scoring import EVAL_PROVIDER_KEY, LIVE_MODEL, GovernedSubject
+from core.evals.scoring import (
+    EVAL_PROVIDER_KEY,
+    LIVE_MODEL,
+    PROVIDER_REFUSAL,
+    GovernedSubject,
+)
 from core.evals.suites import EvalCase, UnrunnableSuite
 
 
@@ -98,7 +103,21 @@ class LiveModelScorer:
         # `getattr` with a default rather than narrowing the SDK's union: the block types
         # the SDK ships change between versions, and this lane wants text regardless of
         # which release enumerated them.
-        return "".join(str(getattr(block, "text", "")) for block in response.content)
+        text = "".join(str(getattr(block, "text", "")) for block in response.content)
+
+        # **A refusal is an answer, and it must not arrive as silence.** When the provider's
+        # own safety layer declines a prompt, `stop_reason` is `refusal` and there are ZERO
+        # content blocks — so the text is empty and a predicate scoring text alone reads it
+        # as a failure to refuse, which is the exact opposite of what happened. Discovered
+        # when a must_deny case returned 2 output tokens and no blocks three times running.
+        #
+        # Surfaced as a marker rather than as prose, so the predicate can tell a PROVIDER
+        # refusal from a GOVERNED refusal. They are not equivalent: a governed refusal
+        # explains the boundary and lands in the trail, and this one explains nothing. The
+        # suite scores it as a denial and the contract records the weaker evidence.
+        if getattr(response, "stop_reason", "") == "refusal" and not text.strip():
+            return PROVIDER_REFUSAL
+        return text
 
 
 __all__ = ["LiveModelScorer"]

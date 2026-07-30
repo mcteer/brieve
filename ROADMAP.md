@@ -200,6 +200,47 @@ sequence above, but a Proposed record that quietly becomes permanent is a failur
 Found while deriving this file. None blocks work; all three make the record harder to reason
 from, and each is worth its own small change.
 
+### 0. The audit trail is not shipped off-host, and hash-chaining only *detects*
+
+**Raised by Dan, 2026-07-29, during 013's live gate run. The most consequential gap on this
+page.**
+
+Everything downstream of the audit plane rests on evidence being trustworthy, and today the
+whole of it lives in one Postgres this platform operates. The chain is honest about what it
+gives: `audit_entries` is append-only *by grant* (the evidence role holds `SELECT` and nothing
+on `audit_stream_heads`), and `audit_stream_heads` exists because a hash chain cannot detect
+truncation — delete the newest three entries and `seq 0..N-4` verifies perfectly.
+
+**But detection is not prevention, and both tables are in the same database.** An actor with
+write access to that Postgres can rewrite entries *and* the head that would have exposed the
+rewrite, consistently, and nothing anywhere disagrees. The property the platform claims —
+evidence that cannot be mutated or masked — is currently enforced by a grant inside the same
+blast radius as the data it protects.
+
+**The mitigation is to ship each entry off-host as it is written**, to a system under
+different administrative control: Splunk HEC, an OTLP log endpoint, New Relic, syslog to a
+collector — the target matters less than the trust boundary. Tampering then requires
+compromising two systems that do not trust each other, and the off-host copy is what an
+investigator reconciles against.
+
+**The seam already exists and this is cheap.** `AuditSink` is a protocol
+(`core/audit/sink.py`) with two implementations; a fan-out sink that writes Postgres *and*
+streams to a collector needs no signature change and no core rework. Two design questions are
+real and unresolved:
+
+- **Synchronous or asynchronous.** Principle VI says nothing blocking that could be an async
+  emitter — but an emitter that can drop is an evidence gap nobody sees, which is the failure
+  this whole idea exists to close. A local durable spool that the emitter drains is probably
+  the answer: the write blocks on the spool, never on the network.
+- **What a failed ship means.** `start_governed_run` already refuses a run whose
+  `AUTHORITY_ISSUED` could not be audited. Whether an unshippable entry should refuse a *step*
+  is the same question one layer out, and the answer decides whether this is a governance
+  control or a convenience.
+
+Needs an ADR before a feature. It is not 013's work — recorded here while the reasoning is
+fresh, because a gap in the evidence plane is the one kind this platform cannot afford to
+carry silently.
+
 1. **R1–R17 are referenced but never defined in-repo.** The constitution requires every spec to
    declare which mandated requirements it touches, and the spec template enforces it — but no
    file enumerates them. Every spec to date has cited them from context. They should be written
