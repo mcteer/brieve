@@ -93,6 +93,21 @@ class AuditEventType(StrEnum):
     #: run start, the resume caller on resume — because the module that RESOLVES a fallback
     #: holds neither a sink nor a tenant, and `AuditEntry` requires both.
     MATRIX_FALLBACK = "matrix_fallback"
+    #: The two copies of the trail were compared, and what came of it (ADR-0055, 015).
+    #:
+    #: Payload: `basis` (``scheduled`` | ``on_demand``), `caller`, `streams_checked`,
+    #: `findings` by kind with counts, `backlog`, `coverage` (attested-since), and `posture`
+    #: (``in_force`` | ``absent`` | ``unverified`` | ``non_compliant``).
+    #:
+    #: One type with the distinction in the payload, on the `MODEL_GATE` pattern: an
+    #: investigator filtering for reconciliation wants every run, and three event types
+    #: would make "how often was this checked" a union nobody remembers to write in full.
+    #:
+    #: **Findings carry stream and sequence, never payload content.** A record of an
+    #: evidence read that quoted the evidence would be an ungoverned read path wearing an
+    #: audit event's clothes — and this one is written precisely because reading evidence is
+    #: audited (ADR-0035).
+    AUDIT_RECONCILED = "audit_reconciled"
     #: A disrupted run was revived, and what came of the revival (ADR-0049, 014).
     #:
     #: Payload: run_id, `attempt` (1-based, so the trail reads "attempt 3 of 5" without
