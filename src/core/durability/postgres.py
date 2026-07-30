@@ -303,6 +303,36 @@ class PostgresDurabilityProvider:
         result = self._execute(work)
         return list(result)
 
+    def closed_intents(self, run_id: str) -> list[IntentRecord]:
+        """The same walk as `open_intents`, with the join condition inverted."""
+
+        def work(conn: Any) -> list[IntentRecord]:
+            rows = _all(
+                conn,
+                """
+                SELECT i.run_id, i.step_index, i.tool_name, i.idempotency_key, i.recorded_at
+                FROM intents i
+                JOIN results r
+                  ON r.run_id = i.run_id AND r.idempotency_key = i.idempotency_key
+                WHERE i.run_id = %s
+                ORDER BY i.step_index
+                """,
+                (run_id,),
+            )
+            return [
+                IntentRecord(
+                    run_id=row[0],
+                    step_index=row[1],
+                    tool_name=row[2],
+                    idempotency_key=row[3],
+                    recorded_at=row[4],
+                )
+                for row in rows
+            ]
+
+        result = self._execute(work)
+        return list(result)
+
     # ---------------------------------------------------------------------- consent
 
     def save_grant(self, grant: DelegationGrant) -> None:

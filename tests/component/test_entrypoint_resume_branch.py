@@ -156,6 +156,39 @@ def test_a_resumed_run_does_not_re_execute_completed_steps() -> None:
     assert _result(prepared["durability"])["steps"] == [2], "only the pending step ran"
 
 
+def test_a_step_whose_result_landed_but_whose_checkpoint_did_not_is_not_re_run() -> None:
+    """The window between `record_result` and the checkpoint save — an exactly-once violation.
+
+    **Caught by the dispatched exactly-once row in CI, non-deterministically**, because it
+    needs the kill to land inside that window. This reproduces it on purpose, so the property
+    stops depending on timing: a run reaching step 2, whose bracket for step 2 CLOSED, and
+    whose checkpoint still says step 1.
+
+    That step is invisible to the two inputs the resume decision used to have. Its bracket is
+    closed, so re-observation never sees it — `completed_steps` and `pending_steps` are drawn
+    from OPEN intents. And the checkpoint names step 1, so `step < resume_from` is false at
+    exactly index 2. The resumed run therefore re-executed an effect that had already
+    happened, and it looked identical to a first run.
+
+    The closed bracket is the stronger record: written by the step at the moment it finished,
+    where the checkpoint is written afterwards and can be lost.
+    """
+    # reached=3 closes brackets for steps 0, 1, AND 2 ...
+    prepared = _prepared(steps=4, reached=3)
+    provider = prepared["durability"]
+    stored = provider.load("run-1")
+    assert stored is not None
+    # ... while the checkpoint lags at step 1, exactly as a kill in the window would leave it.
+    provider.save(stored.model_copy(update={"step_index": 1, "payload": {"step": 1}}))
+
+    assert _call(prepared) == 0
+
+    assert _result(provider)["steps"] == [3], (
+        "step 2's result was already recorded, so re-running it repeats an effect that "
+        "already happened — the exactly-once violation this row exists to pin down"
+    )
+
+
 def test_a_resume_with_no_checkpoint_stops_and_never_starts_fresh() -> None:
     """A missing checkpoint means we cannot know what already happened.
 

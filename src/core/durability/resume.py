@@ -61,6 +61,22 @@ class ResumeDecision:
     completed_steps: list[IntentRecord] = field(default_factory=list)
     #: Steps observed *not* to have taken effect — these may proceed.
     pending_steps: list[IntentRecord] = field(default_factory=list)
+    #: Steps whose bracket CLOSED — recorded complete, never in question.
+    #:
+    #: Distinct from ``completed_steps``, and the distinction is the evidence: those were
+    #: *observed* to have taken effect because their bracket was left open and only the
+    #: product could say; these *recorded* their own result and need no observation at all.
+    #: Both mean "do not run this again"; they differ in what makes them true.
+    #:
+    #: **Carried because a caller reconstructing this got it wrong.** The obvious proxy —
+    #: "steps below the checkpoint's index are done" — misses the step whose result was
+    #: written and whose checkpoint was not, which is precisely where a disruption lands
+    #: often enough to matter: the window between `record_result` and the checkpoint save is
+    #: a real fraction of every step. That step is in neither ``completed_steps`` nor
+    #: ``pending_steps`` (its bracket is closed, so re-observation never sees it) and sits at
+    #: exactly the checkpoint's next index, so a predicate built from those three inputs
+    #: re-runs an effect that already happened.
+    recorded_steps: list[IntentRecord] = field(default_factory=list)
     #: Set when this resume fell back to a different qualified cell than the run pinned.
     #:
     #: Carried for the same reason `ManufacturedAuthority` carries it: this function holds
@@ -241,6 +257,12 @@ def resume_run(
         authority=authority,
         completed_steps=completed,
         pending_steps=pending,
+        # Read AFTER the open intents are resolved, and the ordering is incidental — the two
+        # sets are disjoint by construction, since a bracket is either closed or it is not.
+        # Loaded here rather than left to the caller so the decision is complete: "what has
+        # already taken effect" is this function's question, and a caller that answers part
+        # of it from the checkpoint is a caller reconstructing a decision it was handed.
+        recorded_steps=provider.closed_intents(run_id),
         matrix_fallback=authority.matrix_fallback,
         resume_count=attempt,
     )
