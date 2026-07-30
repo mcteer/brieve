@@ -59,10 +59,20 @@ Two things the first gate run taught, both fixed rather than tolerated:
   the check is now scoped to checkpoints a real allocation wrote, which is the claim worth
   making anyway.
 
-**Known flakiness, stated rather than papered over.** Every allocation builds its environment
-from the public package index, so any row can fail on a network timeout. It fails *distinctly*
-— the guard names it — but it does fail, and on a slow connection a full gate may need a
-re-run. Caching the environment in the image would remove it and is not this feature's work.
+**The flakiness this contract recorded is fixed.** It read: *"every allocation builds its
+environment from the public package index, so any row can fail on a network timeout … caching
+the environment would remove it and is not this feature's work."* It became the next piece of
+work. Allocations now run an image that ships `uv` and share a package cache warmed by
+`enclave-up`, so a run reaches the network only on a genuine cache miss — verified by running
+the bootstrap with the container's network disconnected entirely.
+
+Measured on this lane: **15 dispatch rows in 4m03s**, against 41–61 minutes for the same rows
+before. The wait was never the work; it was seventy wheels per allocation, seventeen times.
+
+`assert_entrypoint_ran` stays. A cache makes the timeout rare rather than impossible — a cold
+machine still has to fill it once — and a guard that only matters occasionally is worth more
+than one that never fires, because the failure it names is the one nobody would otherwise
+recognise.
 
 ## What the fencing row establishes, precisely
 

@@ -124,7 +124,7 @@ job "agent-run" {
       }
 
       config {
-        image        = "python:3.12-slim"
+        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "host"
 
@@ -135,11 +135,35 @@ job "agent-run" {
           readonly = false
         }
 
+        # THE PACKAGE CACHE, SHARED ACROSS ALLOCATIONS.
+        #
+        # Every allocation builds its own virtualenv, and until this mount existed it built
+        # it from the public package index — roughly seventy wheels over the network, per
+        # run. That is the single largest source of red gates this tree has: a row that
+        # drives the scheduler cannot start until PyPI answers, and when PyPI times out the
+        # allocation dies before reaching the entrypoint. 014's gate run lost two rows that
+        # way, and an earlier one spent ten minutes reporting a read timeout as a failure of
+        # the revival cap.
+        #
+        # Cached rather than baked into an image, which keeps the reason the repo is MOUNTED
+        # rather than baked (see `var.repo` on the conformance job): an image build per
+        # change would make these rows something people avoid running. The cache is the
+        # middle ground — the tree stays live, the downloads happen once per machine.
+        #
+        # Measured: 90s+ of downloads becomes 72 packages installed in ~400ms, and the
+        # bootstrap completes with the network disconnected entirely.
+        mount {
+          type     = "bind"
+          source   = "${var.repo}/.enclave/uv-cache"
+          target   = "/uv-cache"
+          readonly = false
+        }
+
         # No shell parameter expansion: Nomad interpolates ${...} before the shell sees
         # it, so a default like ${VAR:-x} fails to parse with an error about
         # interpolation rather than about the script.
         args = [
-          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; pip install --quiet --disable-pip-version-check uv; uv run --extra adapters --extra surfaces python -m surfaces.dispatch.entrypoint"
+          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.dispatch.entrypoint"
         ]
       }
 
@@ -160,6 +184,15 @@ job "agent-run" {
         # Outside the mounted tree, so running a dispatched run does not rebuild the
         # developer's virtualenv against the container's interpreter and back again.
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
+
+        # Where the wheels come from. Populated by `enclave-up` and shared by every
+        # allocation, so a run reaches for the network only on a genuine cache miss.
+        UV_CACHE_DIR = "/uv-cache"
+        # The cache and the venv are on different filesystems, so uv cannot hardlink
+        # between them. Copying is what it falls back to anyway; saying so keeps a
+        # warning about degraded performance out of every allocation's logs, where it
+        # reads like a fault and is not one.
+        UV_LINK_MODE = "copy"
 
         # What the dispatch asked for. Metadata, not authority.
         RUN_CORRELATION_ID  = "${NOMAD_META_correlation_id}"

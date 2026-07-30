@@ -405,6 +405,46 @@ if [ -z "$(env_val HARNESS_DEFAULT_TENANT)" ]; then
 fi
 ok "HARNESS_DEFAULT_TENANT=$(env_val HARNESS_DEFAULT_TENANT)"
 
+# ---------------------------------------------------------- 4b-bis. package cache
+# Every allocation builds its own virtualenv, and until this cache existed it built it
+# from the public package index — about seventy wheels over the network, per run. That
+# made PyPI a precondition for a dispatched run STARTING, which is the largest source of
+# red gates this tree has had: a conformance row that drives the scheduler dies before
+# reaching the entrypoint, and reports whatever property it was about to test.
+#
+# Warmed HERE rather than left to the first allocation, on the same rule as the schemas
+# above: a cost that has to be paid once should be paid at bring-up, where it is expected
+# and visible, not in the middle of a gate run where it looks like a failure.
+#
+# In a container, not on the host, and that is the whole reason this is a `docker run`
+# rather than a `uv sync`: wheels are platform-specific, and a cache populated by an
+# arm64 macOS host serves a linux/amd64 allocation nothing at all.
+say "Package cache"
+mkdir -p "$REPO/.enclave/uv-cache"
+# The tree is mounted READ-ONLY and copied inside the container before the sync, which is
+# not fussiness — it is the fix for a real failure. Syncing over a writable mount builds
+# the editable project and leaves `src/harness.egg-info` owned by ROOT in the working
+# tree; the next non-root build then dies with "Cannot update time stamp of directory".
+# That took down CI's enclave lane on this change's first push.
+#
+# `--no-install-project` was the other candidate and does not work: skipping the project
+# build also skips caching the BUILD BACKEND, so the allocation still reaches for
+# setuptools over the network and the whole point is lost. Build it, and build it
+# somewhere disposable.
+if docker run --rm \
+     -v "$REPO:/src:ro" -v "$REPO/.enclave/uv-cache:/uv-cache" \
+     -e UV_CACHE_DIR=/uv-cache -e UV_LINK_MODE=copy -e UV_PROJECT_ENVIRONMENT=/tmp/venv \
+     ghcr.io/astral-sh/uv:python3.12-bookworm-slim \
+     sh -c 'mkdir -p /build && cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /build/ && cd /build && uv sync --extra adapters --extra surfaces --extra portal' \
+     >/dev/null 2>&1; then
+  ok "allocation package cache warm ($(du -sh "$REPO/.enclave/uv-cache" 2>/dev/null | cut -f1)) — dispatched runs start without reaching the network"
+else
+  # NOT fatal. A cold cache costs time, not correctness: `uv` falls back to the index, so
+  # every allocation still works and merely starts slowly. Dying here would turn a slow
+  # network into an enclave that refuses to come up.
+  warn "could not warm the package cache — allocations will fall back to the package index"
+fi
+
 # ---------------------------------------------------------------- 4c. run job
 # The parameterized job a dispatched run becomes. Registered here rather than left to
 # whoever runs the tests, because `NomadDispatcher` submitting to a job that does not
