@@ -12,7 +12,7 @@ without saying which ones run would be the same defect in the document that reco
 | Row | State | Evidence |
 | --- | --- | --- |
 | Disrupt and complete, exactly once | **In force** | Passes against the live enclave. 400 bracketed steps, allocation killed at step 3, 400 `TOOL_OUTCOME` events across both allocations, distinct credential ids, `RUN_RESUMED` attempt 1. `tests/conformance/durability/test_dispatched_resume.py`, 5m03s |
-| A fresh dispatch is not a resume | **Written, not yet run** | Same file. Asserts the id-collision pair — flag set on a finished run does not re-enter; no flag means no `RUN_RESUMED` at all |
+| A fresh dispatch is not a resume | **In force** | Same file, 6m45s. Asserts the id-collision pair — the flag set on a finished run does not re-enter its work; the same identifiers with no flag produce no `RUN_RESUMED` at all, so nothing inferred a resume |
 | Fresh authority, nothing crosses | **Partially in force** | The credential-distinctness half is asserted inside the exactly-once row above. The no-secret sweep extension to `grants` (T017) is **not built** |
 | Re-observe, both directions, live | **Not built** (T020) | The hermetic halves are in force: `tests/component/test_resume_consults_observers.py` asserts the observer is *called* and both outcomes route correctly. The live Vault row is not written |
 | Suspension names the product | **Partially in force** | Hermetic, in the file above and in 005's existing row. The dispatch-level row (T023) is not built |
