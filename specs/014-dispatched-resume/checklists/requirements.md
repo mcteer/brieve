@@ -31,22 +31,45 @@
 
 ## Notes
 
-**16/16 on the first pass**, verified rather than asserted: the spec body was grepped for
-`resume_run`, `entrypoint.py`, `dependency_products`, `RUN_STEP_INDEX`, `step_index`,
-`start_governed_run`, `ResumeDecision`, and `SuspendedRunIndex`, and contains none of them.
+**16/16 → 16/16.** No item changed state in the clarification session, and it did not fix a
+failing spec — it changed what the passing spec describes, which is the more useful outcome and
+the one this checklist cannot see. Verified rather than asserted: the spec body was grepped for
+`resume_run`, `entrypoint.py`, `dependency_products`, `RUN_STEP_INDEX`, `start_governed_run`,
+and `ResumeDecision` both before and after clarification, and contains none of them. The
+**Input** block keeps the original names deliberately — quoting a finding is not specifying a
+solution.
 
 **A first draft of these notes claimed two iterations and a fixed implementation-naming
 failure. That did not happen** — one write was rejected by a tool precondition and rewritten
-with the same content, which is not a revision. The claim is removed rather than left as a
-tidier story, because a checklist that invents its own process is the same defect as a
-conformance row that overstates its scope, and this feature exists to fix one of those.
+with identical content, which is not a revision. Removed rather than left as a tidier story,
+because a checklist that invents its own process is the same defect as a conformance row that
+overstates its scope, and this feature exists to fix one of those.
 
-**The risk that made it worth checking is real**, though it did not materialise. This feature is
-a wiring change, and a wiring change is most naturally described by naming the two things being
-wired — so the pull toward `resume_run` and `entrypoint.py` in requirement text is strong. The
-spec says "the resume path" and "the dispatched path" instead. The **Input** block keeps the
-original names deliberately: it quotes what was reported, and quoting a finding is not
-specifying a solution.
+### What the clarification session changed
+
+**Three questions, and the session made the feature bigger in one place and stricter in two.**
+FR count went 20 → 25, SC count 11 → 14.
+
+1. **A resume-attempt cap, chosen over the execution budget as the sole bound.** My
+   recommendation was the budget, on ADR-0044 disjointness grounds — two mechanisms answering one
+   question. Dan chose the cap, and the objection turns out not to hold: *"how long may this run
+   execute"* and *"how many times may it be revived"* are different questions. The decisive case
+   is a run whose every resume dies in its first second — it barely spends budget, so a budget
+   bound would re-dispatch it almost indefinitely. This is the session's only genuine addition
+   (FR-009a/b/c, SC-006a) and the only place a number now has to be chosen.
+2. **The dispatch-level assertions are merge-blocking.** The tempting alternative was moving the
+   slow flapping row behind a named runner — rejected because the cap is the newest bound and the
+   least covered elsewhere, so putting it in the one lane nobody runs automatically would
+   relocate this feature's own defect rather than fix it.
+3. **Re-observation is asserted against a live product, both directions.** A fixture observer
+   would prove the resume path calls *something*, which is narrower than the claim. Deliberately
+   **not** extended to the cannot-determine direction, which was offered and declined so two
+   decisions did not get bundled — it stays covered by US2 scenario 3 and planning chooses how it
+   is exercised.
+
+**Two things stayed out of scope on purpose**, both because they are architecture rather than
+description: how a resume is distinguished from a fresh dispatch, and whether the resume decision
+needs its own audit event type or rides existing ones. Clarify describes; it does not design.
 
 **Three things carried forward rather than resolved**, all visible in the spec:
 
