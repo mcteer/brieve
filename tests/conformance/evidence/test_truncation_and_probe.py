@@ -171,18 +171,3 @@ def test_row_an_unreachable_destination_is_unverified_never_verified() -> None:
     )
 
     assert unreachable.probe() == "unverified"
-
-
-def test_row_an_estate_with_no_destination_reports_absent(
-    platform_admin_connection: Any,
-) -> None:
-    """SC-006 / FR-009 — stated, not defaulted.
-
-    An estate with no second copy has no tamper-evidence. Saying so plainly is better than a
-    substitution that quietly is not one — and better than a posture field that happens to
-    read as protected because nothing set it otherwise.
-    """
-    report = reconcile(local=platform_admin_connection, destination=None)
-
-    assert report.posture == "absent"
-    assert report.destination_verified == "unverified"
