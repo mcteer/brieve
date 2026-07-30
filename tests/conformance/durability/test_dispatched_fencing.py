@@ -74,34 +74,53 @@ def test_row_a_superseded_allocation_writes_nothing_further(conn: Any) -> None:
     )
 
     final = h.checkpoint(conn, run_id)
-    assert final["written_by"] != holder_before or final["run_state"] == "completed", (
-        "the last write came from the superseded instance"
+    assert final["run_state"] == "completed", (
+        f"the successor did not finish the run it took over: {final!r}. "
+        f"nomad alloc logs -stderr {second_alloc} harness"
     )
 
-    # ---- what the loser managed before it was stopped, counted through the trail
-    #
-    # **AT MOST ONE, and the one is not a defect.** The lease is asserted before the handler
-    # runs, so a call that had already passed the check when the successor claimed the run
-    # completes: you cannot un-invoke work that is already executing. Every call after it is
-    # rejected. That is the ceiling any check-then-act design has, and a row demanding zero
-    # would be demanding something no implementation can deliver — it would fail forever while
-    # describing a correct platform as broken.
-    #
-    # The bound is still sharp. An UNFENCED incumbent carries on from where it was to the end
-    # of its own step list, which is hundreds of further invocations, not one. So this
-    # separates "fencing works, with the in-flight call inherent to the design" from "fencing
-    # does nothing" by a factor of a hundred, which is all a count needs to do.
-    invocations = h.tool_invocations(conn, run_id)
-    assert invocations <= h.DISRUPTION_STEPS + 1, (
-        f"{invocations} invocations for {h.DISRUPTION_STEPS} steps — at most one call may "
-        f"survive the supersede (the one already past its lease check), so the superseded "
-        f"allocation went on working after losing the run (FR-009, SC-008)"
-    )
-
-    # And the run is not left half-owned: whoever holds the lease is the successor.
+    # ---- the loser owns the run no longer, and the run is not left half-owned
     holder = h.query(conn, "SELECT holder_identity FROM run_leases WHERE run_id = %s", (run_id,))
     assert holder, "the run has no lease at all"
     assert holder[0][0] != holder_before, (
         f"the lease still names the superseded holder {holder_before!r} — the successor never "
         f"claimed the run, so nothing was fenced"
+    )
+
+    # ---- duplicated work is BOUNDED, and this row's first version got the bound wrong
+    #
+    # It asserted `steps + 1`, reasoning that only the one in-flight call could survive the
+    # supersede. That is true of the LEASE CHECK and false of the row, and caching the
+    # allocation environment is what exposed the difference: the incumbent went from ~90s of
+    # startup to ~2s, so it now covers far more ground in the window this row cares about.
+    #
+    # The window is not "after the successor claimed". It is **between the successor reading
+    # the checkpoint and the incumbent noticing it has been superseded**. In it, the incumbent
+    # is still legitimately advancing a run it still owns, and every step it takes there is a
+    # step the successor has already decided to redo. That duplication is inherent to
+    # overlapping a LIVE incumbent — which is the pathological case this row engineers on
+    # purpose, and not the case resume exists for: in production the successor is dispatched
+    # *because* the original is gone.
+    #
+    # So the count cannot be pinned to the step total, and pretending otherwise makes the row
+    # a function of how fast the machine is. What it can do is separate working fencing from
+    # absent fencing, and the gap there is enormous: an unfenced incumbent runs its own list to
+    # completion, so both instances would do nearly every step and the total would approach
+    # twice the run. The bound is set there, and the assertion below is the sharp one.
+    invocations = h.tool_invocations(conn, run_id)
+    assert invocations < h.DISRUPTION_STEPS * 2, (
+        f"{invocations} invocations for {h.DISRUPTION_STEPS} steps — approaching double means "
+        f"the superseded allocation ran its list to the end alongside the successor, so it was "
+        f"never fenced at all (FR-009, SC-008)"
+    )
+
+    # ---- THE SHARP ONE: the superseded instance wrote nothing after losing the run.
+    #
+    # Timing-independent, which the count is not. `checkpoint_run` asserts the lease before
+    # every write, so once the successor holds it the incumbent's writes raise rather than
+    # land — and the final state of the run therefore cannot bear the loser's name. This is
+    # FR-009's actual claim ("rejected, not merely raced") in the form a row can check.
+    assert final["written_by"] != holder_before, (
+        f"the run's last checkpoint was written by the SUPERSEDED holder {holder_before!r} — "
+        f"its writes were racing the successor's rather than being rejected"
     )
