@@ -37,6 +37,33 @@ it must not", which reads as though a superseded claimant could burn one. It can
 is real and the mechanism is a claim that *errors* — an unreachable store — and the rows drive
 it that way.
 
+## The gate run (T034), 2026-07-30
+
+`make check`: **759 passed**. `make conformance`, full, against a live enclave on a clean
+tree: **34 passed, 2 failed in 1h01m**, and both failures were PyPI read timeouts during
+allocation bootstrap — caught and named as such by `assert_entrypoint_ran`, which exists
+because an earlier run spent ten minutes reporting "exhausting the revival budget failed the
+allocation" when what had happened was a network timeout. Both rows pass on re-run (26s).
+
+**The in-allocation lane exited 0**, which is the half of T034 that matters most: 005's
+existing durability rows still pass with the one behavioural change this feature made to the
+library (the attempt cap).
+
+Two things the first gate run taught, both fixed rather than tolerated:
+
+- `wait_dead`'s bound was sized for a row run alone. Inside the whole gate, allocations queue
+  behind each other and a run waits on the node rather than on anything under test — so a
+  bound that only holds in isolation turns a busy machine into a red gate. Raised to 900s.
+- The dangling-grant check caught `test_cross_process.py`'s hand-written `grant_id="grant-1"`.
+  A gate that failed on a fixture's shorthand would be reporting it as a production defect;
+  the check is now scoped to checkpoints a real allocation wrote, which is the claim worth
+  making anyway.
+
+**Known flakiness, stated rather than papered over.** Every allocation builds its environment
+from the public package index, so any row can fail on a network timeout. It fails *distinctly*
+— the guard names it — but it does fail, and on a slow connection a full gate may need a
+re-run. Caching the environment in the image would remove it and is not this feature's work.
+
 ## What the fencing row establishes, precisely
 
 **At most one in-flight call survives the supersede**, not zero. The lease is asserted before

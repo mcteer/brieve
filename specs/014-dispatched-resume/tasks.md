@@ -152,7 +152,7 @@ case skips, the not-landed case proceeds.
 - [X] T031 Apply the contract's four break fixtures to the tree, watch each named row fail, revert, and record outcomes in `specs/014-dispatched-resume/contracts/conformance-resume.md`: entrypoint ignores the flag → exactly-once fails; grant load skipped → expiry row completes when it must stop; count incremented before the claim → fencing burns attempts; cap read from dispatch meta → the terminal row catches the sixth revival
 - [X] T032 [GATE:conformance] **FR-020, the re-scoping**: replace the scope note in `specs/005-durable-execution/contracts/conformance-durability.md` with a pointer to `specs/014-dispatched-resume/contracts/conformance-resume.md`, keeping the note for any property still function-only; close `ROADMAP.md` gap 0a naming this feature; update 013's cross-reference in its conformance contract. **Leaving the note after the rows land is the inverse defect — evidence outrunning the claim** — so this task is a gate, not documentation
 - [X] T033 [P] Update `docs/glossary.md`: `resume` cross-references (grant store, attempt cap, RUN_RESUMED) where the durability terms live
-- [ ] T034 Run `make check`, `make conformance` (full, against a live enclave, on a clean tree — including 005's existing rows, which must still pass with the library's one behavioural change), and walk `specs/014-dispatched-resume/quickstart.md` sections 2–6. Record rows **In force** in the contract
+- [X] T034 Run `make check`, `make conformance` (full, against a live enclave, on a clean tree — including 005's existing rows, which must still pass with the library's one behavioural change), and walk `specs/014-dispatched-resume/quickstart.md` sections 2–6. Record rows **In force** in the contract
 
 ---
 
