@@ -46,6 +46,16 @@ def test_row_a_flapping_dependency_revives_a_run_exactly_to_its_cap(conn: Any) -
     dispatcher = h.dispatcher()
     h.arrange_disrupted(conn, run_id, tool_name="terraform_apply", step_index=1)
 
+    # The narrowing above only holds if the sweeper stays out of it. This row COUNTS
+    # revivals and dispatches every one itself; a sweeper that also revived would add
+    # attempts the arithmetic does not expect, and the row would fail claiming the cap was
+    # miscounted when what actually happened is that two actors were reviving.
+    #
+    # Terraform's health is estate state that outlives a row, so leaving it healthy is a
+    # message to whatever runs next. Marked down here rather than assumed down, because
+    # under a random seed "whatever ran last" is not a thing this row can know.
+    h.mark_reachable("terraform", reachable=False)
+
     revival = h.dispatch_args(
         run_id,
         resume=True,
