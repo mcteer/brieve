@@ -208,5 +208,22 @@ has a caller in `src/`. That alone closes the headline of ROADMAP gap 0a — eve
 it makes the remaining 005 properties dispatch-proven.
 
 The dispatch rows are deliberately one-per-file and join 005's existing lane rather than a
-new directory: the lane is already wired into `make conformance` and CI, so no
-lane-wiring task exists to forget — the 010 lesson, inverted into a free ride.
+new directory.
+
+**The lane wiring was not free, and an earlier draft of this file said it was.** The claim
+here was that `tests/conformance/durability` is already collected by `make conformance`, so
+no lane-wiring task could be forgotten — the 010 lesson inverted into a free ride. It is
+half true and therefore worse than false: the directory *is* named by a lane, the
+in-allocation one, which runs it with `-m "not host_enclave"`. Every row this feature adds
+is `host_enclave` by nature — it drives the scheduler, which nothing the scheduler placed
+can do — so all ten would have been deselected there and collected nowhere else
+(`make conformance`'s first line ignores the path; `pytest -m enclave` reads `testpaths`,
+which is `tests/unit` and `tests/component`). They would have passed when run by hand and
+been invisible to the gate: this feature's own defect, rebuilt inside the gate meant to
+prove it fixed.
+
+The fix — adding the directory to the host_enclave line in the `Makefile` — landed in a
+preparatory commit **before** this feature's first row, so no task here carries it and
+T034's run certifies rows a lane actually collects. The general form, for the next feature
+that reasons about a lane: "already named by a lane" and "named by a lane that will run
+*this* row" are different questions, and only the second one is the gate.

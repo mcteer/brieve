@@ -45,6 +45,16 @@ conformance:
 	# passing everywhere it was asked to run, which is the same shape as the rows the
 	# in-allocation lane could not see.
 	#
+	# 014 adds `tests/conformance/durability`, and the trap there is subtler than the
+	# missing directory 010 paid for. That directory IS named by a lane — the
+	# in-allocation one — but it runs with `-m "not host_enclave"`, so a row that drives
+	# the scheduler is DESELECTED there, and no other lane could see it either: the first
+	# line of this recipe ignores the path, and `pytest -m enclave` above reads
+	# `testpaths`, which is tests/unit and tests/component. Ten dispatched-resume rows
+	# would have passed when run by hand and been invisible to this gate — the defect 014
+	# exists to fix, rebuilt inside the gate that was meant to prove it fixed. "Already
+	# named by a lane" is not the same question as "named by a lane that will run it".
+	#
 	# The enclave's coordinates come from .env because `uv run` does not read it, and
 	# 011's divergence rows read the trail as an OPERATOR — a host process holds no
 	# attested identity, so the alternative is a row that cannot run where it belongs.
@@ -53,7 +63,7 @@ conformance:
 	C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
-	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs -m host_enclave -q
+	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability -m host_enclave -q
 	#
 	# 012's containment lane. Named here in the same change that created the directory —
 	# 010 lost a whole feature's rows to a directory no lane enumerated, and the fix is to
