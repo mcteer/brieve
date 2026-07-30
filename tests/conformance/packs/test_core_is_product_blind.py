@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import ast
 import re
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -170,31 +169,64 @@ def test_the_check_fires_on_a_contrived_violation(tmp_path: Path) -> None:
     assert _named_in_code(prose_only, MANAGED_PRODUCTS) == set()
 
 
-def test_adding_the_second_pack_changed_no_core_file() -> None:
-    """SC-002's second clause — **shown by the diff, not argued.**
+def test_adding_a_pack_requires_no_core_edit() -> None:
+    """SC-002's second clause — **structurally, because the diff form does not survive squash.**
 
-    The conformance contract says this is demonstrated rather than claimed, so the row runs
-    the diff. Every file the pack-adding commit touched is under `packs/`, `specs/`, or
-    `tests/`; if any were under `src/core`, "new products are new packs" would be a slogan.
+    This row used to find the commit that added `packs/vault/pack.toml` and assert it touched
+    no `src/core/`. That passed on the feature branch, where the pack-adding commit touched
+    only `packs/` and `specs/`, and **failed the moment 013 squash-merged**: one commit now
+    contains both the packs and the core support they load through, so the lookup returns a
+    commit that necessarily changed core. The row asserted a property of *branch topology*,
+    and squash-merge destroys branch topology.
+
+    The property SC-002 actually promises is that **adding a product is a content change**.
+    That is a fact about the mechanism, not about history, and it is checkable now: pack
+    discovery enumerates a directory. A new pack is a new directory with a manifest, so no
+    module has to learn its name — which is the same claim the diff was reaching for, asserted
+    where it cannot be invalidated by how a branch was merged.
     """
-    commit = subprocess.run(
-        ["git", "log", "--format=%H", "-1", "--", "packs/vault/pack.toml"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    assert commit, "no commit found adding the second pack; this row cannot verify anything"
+    loader_source = (CORE / "packs" / "loader.py").read_text()
+    tree = ast.parse(loader_source)
 
-    changed = subprocess.run(
-        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", commit],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.split()
-    core_changes = [p for p in changed if p.startswith("src/core/")]
-    assert not core_changes, (
-        f"the commit adding the second pack changed core files: {core_changes}. Adding a "
-        f"product must change no core module — that is the property, and this is the diff"
+    available = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "available"
+        and any(isinstance(n, ast.Attribute) and n.attr == "iterdir" for n in ast.walk(node))
+    )
+    assert available is not None, (
+        "the filesystem loader no longer discovers packs by enumerating a directory. If pack "
+        "names are now listed somewhere, adding a product is a code change and SC-002 is false"
+    )
+
+    # And the negative half: no pack name appears in the discovery path at all.
+    discovered_names = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    for pack in ("vault", "terraform"):
+        assert pack not in discovered_names, (
+            f"the loader names {pack!r} as a literal; discovery must not know which packs exist"
+        )
+
+
+def test_the_diff_form_of_sc002_is_recorded_as_owed() -> None:
+    """The stronger claim, and why it is not asserted here.
+
+    "Adding the second pack changed no core file, shown by the diff" is only demonstrable by a
+    commit that adds a pack **without** adding pack support — and no such commit exists yet,
+    because 013 introduced both together. Asserting it against the feature-introducing commit
+    is what broke; asserting it against a commit that does not exist would be worse.
+
+    So it is **owed**, not stubbed (ADR-0047), and this row fails if the conformance contract
+    stops saying so — which is the moment the next pack lands and the diff form becomes real.
+    """
+    contract = (
+        ROOT / "specs" / "013-capability-packs" / "contracts" / "conformance-packs.md"
+    ).read_text()
+    assert "diff form of SC-002" in contract, (
+        "the conformance contract no longer records the diff form of SC-002 as owed. If a pack "
+        "has landed separately from pack support, write the diff assertion and delete this row"
     )
