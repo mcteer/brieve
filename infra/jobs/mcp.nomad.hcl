@@ -23,6 +23,17 @@ variable "vault_addr" {
   description = "Where the trust store answers. HTTPS once bring-up has switched the listener."
 }
 
+variable "nomad_addr" {
+  description = <<-DESC
+    Where the sweeper reaches the scheduler to dispatch a resume.
+
+    `host.docker.internal` rather than `127.0.0.1`, because this service runs inside an
+    allocation and the scheduler does not. A deployment whose scheduler is reachable on the
+    container's own loopback should override this; the default is the dev enclave's shape.
+  DESC
+  default     = "http://host.docker.internal:4646"
+}
+
 variable "vault_cacert" {
   type    = string
   default = "/src/.enclave/ca.pem"
@@ -117,6 +128,16 @@ job "mcp" {
 
       env {
         VAULT_ADDR   = var.vault_addr
+        # WHERE THE SCHEDULER IS, from in here. Not `127.0.0.1`, which is what the dispatcher
+        # defaults to and what a host process would want: this task runs inside an allocation,
+        # and on the dev substrate its loopback is the Docker VM's. Vault and Postgres answer
+        # there because they are containers in that VM; the scheduler runs natively on the host
+        # and does not.
+        #
+        # Without this the sweeper's resume dispatch fails `Connection refused` on every pass —
+        # which is what it did from 009 until 014, unnoticed, because nothing had ever written
+        # a suspended-run index row for it to act on.
+        NOMAD_ADDR   = var.nomad_addr
         VAULT_CACERT = var.vault_cacert
 
         # Outside the mounted tree, so running the service does not rebuild the

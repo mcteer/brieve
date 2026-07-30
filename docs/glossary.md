@@ -93,7 +93,32 @@ for.
 
 **Delegation grant** — the durable record of a user's consent to a long-running task;
 per-step tokens are manufactured under it and evaporate. Checkpoints hold state, never
-credentials (ADR-0026).
+credentials (ADR-0026). Persisted in the `grants` table since 014 — before that the record
+was built in memory and the `grant_id` a checkpoint carried resolved to nothing, so consent
+expiry was unevaluable on the dispatched path.
+
+**Resume** — reviving a disrupted run in a **new** allocation with a new attested identity,
+so the prior credential is unobtainable rather than merely forbidden (ADR-0048). A resume is
+*declared* by the dispatcher and never inferred from a run's identifiers: a fresh dispatch
+reusing a used `run_id` stays a fresh dispatch. Ordered — terminal check, consent, ownership
+claim, attempt count, then re-observation — because each step gates the next.
+
+**Re-observation** — resolving an interrupted step by asking the product what happened rather
+than assuming. A step whose intent was recorded and whose result was not may or may not have
+taken effect, and only the product knows; a non-repeatable tool therefore requires an
+observer. `CANNOT_DETERMINE` suspends the run naming the **product**, never the tool, because
+the sweeper watches products.
+
+**Resume-attempt cap** — the platform bound on how many times one run may be revived
+(`RESUME_ATTEMPT_CAP`, 5). Counted on the checkpoint so it survives the disruption it counts,
+incremented after the ownership claim so a failed claim costs nothing, and terminal on
+exhaustion — never another suspension, which would wait for a revival that can never come.
+Platform-set: never from workflow code, the definition, or dispatch metadata (FR-009c).
+
+**`RUN_RESUMED`** — the audit event recording a revival and what came of it: attempt number
+(1-based), outcome (`continued`/`stopped`/`suspended`), reason, and step counts. One event
+with the outcome in the payload rather than three types, and written *before* the revived run
+does anything, so a trail read in order shows the revival before its consequences.
 
 **Act chain** — the on-behalf-of lineage in exchanged tokens (user → agent A →
 agent B); scopes only narrow along it, preserving non-repudiation across handoffs.

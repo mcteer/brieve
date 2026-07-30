@@ -44,6 +44,21 @@ resource "vault_policy" "agent_pack_secrets" {
     path "${vault_mount.agent_secrets.path}/metadata/*" {
       capabilities = ["read"]
     }
+    # NO WRITE CAPABILITY, and 014 checked before concluding that.
+    #
+    # FR-006a needs an interrupted `vault_write` resolved by observation against the real
+    # product, both directions, which reads as though a dispatched run must be able to write
+    # here. It does not. `surfaces.handlers.vault_write` is a STUB: it validates its
+    # arguments, requires `cas`, and returns `{"written": True}` without touching Vault. What
+    # is real is the OBSERVER, which reads `metadata/{idempotency_key}` — covered by the read
+    # grant above.
+    #
+    # So the live re-observation rows arrange the external state from the HOST, with an
+    # operator token, and the dispatched run only has to leave an open intent behind. A write
+    # grant added here would have been a standing capability for every dispatched run, bought
+    # to satisfy a requirement that turned out not to need it — which is worth recording,
+    # because the reasoning that asks for it is entirely plausible right up to reading the
+    # handler.
   HCL
 }
 

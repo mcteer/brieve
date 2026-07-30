@@ -11,6 +11,7 @@ both and prove they are written to the seam rather than to an implementation (FR
 
 from __future__ import annotations
 
+from core.authority.grant import DelegationGrant
 from core.durability.types import CheckpointBlob, IntentRecord, ResultRecord
 
 
@@ -22,6 +23,7 @@ class InMemoryDurabilityProvider:
         self._leases: dict[str, str] = {}
         self._intents: dict[tuple[str, str], IntentRecord] = {}
         self._results: set[tuple[str, str]] = set()
+        self._grants: dict[str, DelegationGrant] = {}
 
     def save(self, blob: CheckpointBlob) -> None:
         # TERMINAL-ONCE, matching the Postgres provider's COALESCE guard. The two must
@@ -39,6 +41,13 @@ class InMemoryDurabilityProvider:
         existing = self._blobs.get(blob.blob_id)
         if existing is not None and existing.outcome is not None:
             blob = blob.model_copy(update={"outcome": existing.outcome})
+        # MONOTONIC resume_count, matching the Postgres provider's GREATEST. Same rule as
+        # the terminal-once guard above and the same reason it is repeated here: a property
+        # proven against one provider says nothing about the other, and the divergence
+        # would be found by whichever row happened to run against Postgres — which for the
+        # revival cap is the flap row, the slowest one in the suite.
+        if existing is not None and existing.resume_count > blob.resume_count:
+            blob = blob.model_copy(update={"resume_count": existing.resume_count})
         self._blobs[blob.blob_id] = blob
 
     def load(self, blob_id: str) -> CheckpointBlob | None:
@@ -64,3 +73,13 @@ class InMemoryDurabilityProvider:
             for (rid, key), record in sorted(self._intents.items())
             if rid == run_id and (rid, key) not in self._results
         ]
+
+    def save_grant(self, grant: DelegationGrant) -> None:
+        # Written once, like the Postgres provider's ON CONFLICT DO NOTHING. A grant's
+        # terms do not change, so a re-save of a known id keeps the recorded consent
+        # rather than replacing it — otherwise a hermetic row could demonstrate a mutation
+        # the real store would refuse.
+        self._grants.setdefault(grant.grant_id, grant)
+
+    def load_grant(self, grant_id: str) -> DelegationGrant | None:
+        return self._grants.get(grant_id)

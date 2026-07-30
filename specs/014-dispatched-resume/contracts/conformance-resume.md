@@ -1,6 +1,76 @@
 # Conformance: Wire resume into the dispatched path
 
-**Feature**: `specs/014-dispatched-resume` | **Date**: 2026-07-29 | **Status**: Planned
+**Feature**: `specs/014-dispatched-resume` | **Date**: 2026-07-30 | **Status**: **In force —
+every row below passes against the live enclave**
+
+## Row status, as of the implementation run of 2026-07-30
+
+This table is at the top of the file on purpose. **This feature exists because a claim outran
+its evidence**, so a contract listing rows without saying which ones run would be the same
+defect in the document that records it.
+
+| Row | State | Evidence |
+| --- | --- | --- |
+| Disrupt and complete, exactly once | **In force** | 400 bracketed steps, allocation killed at step 3 by the scheduler, exactly 400 `TOOL_OUTCOME` events across both allocations, distinct credential ids, `RUN_RESUMED` attempt 1. `test_dispatched_resume.py`, 5m03s |
+| A fresh dispatch is not a resume | **In force** | Same file, 6m45s. The id-collision pair: the flag on a finished run does not re-enter its work; the same identifiers with no flag produce no `RUN_RESUMED`, so nothing inferred a resume |
+| Fresh authority, nothing crosses | **In force** | Credential distinctness inside the exactly-once row; the no-secret sweep over `grants` and `checkpoints` against the LIVE tables in `test_dispatched_no_secret_sweep.py` |
+| Re-observe, both directions, live | **In force** | `test_dispatched_reobservation.py`. Real Vault, the shipped `VaultWriteObserver`; each direction arranges the product's state and cleans up. Landed → 2 invocations; not landed → 3 |
+| Suspension names the product | **In force** | `test_dispatched_suspension_cycle.py`. Suspends awaiting `terraform`, files an index row carrying roles/packs/steps, exits **zero** |
+| The sweeper revives it | **In force** | Same file, 1m30s for the pair. `record_probe("terraform", reachable=True)` → the sweeper re-dispatches with no human action, recorded as attempt 2. **The 009 sweeper's first end-to-end demonstration** |
+| The cap is terminal | **In force** | `test_dispatched_cap_is_terminal.py`, 6 dispatches. Exactly five revivals, then STOPPED `resume_attempts_exhausted` with exit 0, then the sweeper drops the exhausted candidate and never revives it again |
+| Expired consent stops, terminally | **In force** | `test_dispatched_grant_expiry.py`, 6m30s. Stops with the reason, zero further steps, zero invocations; a re-issued grant revives nothing |
+| Fencing holds through dispatch | **In force** | `test_dispatched_fencing.py`. A resume dispatched under a still-running incumbent: 401 invocations for 400 steps, lease held by the successor, two issuances |
+| `RUN_RESUMED` is in the trail | **In force** | `test_run_resumed_in_trail.py`. 1-based across a sequence of three, ordered first, and the hash chain verifies across allocation boundaries |
+
+## Break fixtures — applied, watched to fail, reverted
+
+| Fixture | Row that caught it | Outcome |
+| --- | --- | --- |
+| The entrypoint ignores the `resume` flag | suspension cycle | **Caught**, 1m46s: "the revival was not recorded" — no `RUN_RESUMED` at all, because the dispatch started fresh |
+| The grant load is skipped and consent fabricated | grant expiry | **Caught**, 4.6s: the run continued under lapsed consent (`run_state=None` where `stopped` was required) |
+| The attempt is counted **before** the ownership claim | `test_resume_cap.py`, `test_resume_claims_before_observing.py` | **Caught** instantly by three rows, two of them the ones named for it |
+| The cap is read from dispatch metadata | cap-is-terminal | **Not exercised.** The other three were, and this one costs a seven-minute row to demonstrate a property already asserted structurally: `resume_run` has no parameter to pass a cap through, and `test_resume_cap.py::test_the_cap_cannot_be_supplied_by_a_caller` reads the signature. Recorded as a gap rather than implied to be done |
+
+**A note on the third fixture.** The contract described it as "the fencing row burns attempts
+it must not", which reads as though a superseded claimant could burn one. It cannot:
+`RunLease.acquire()` is an unconditional supersede and never fails for a loser. The property
+is real and the mechanism is a claim that *errors* — an unreachable store — and the rows drive
+it that way.
+
+## The gate run (T034), 2026-07-30
+
+`make check`: **759 passed**. `make conformance`, full, against a live enclave on a clean
+tree: **34 passed, 2 failed in 1h01m**, and both failures were PyPI read timeouts during
+allocation bootstrap — caught and named as such by `assert_entrypoint_ran`, which exists
+because an earlier run spent ten minutes reporting "exhausting the revival budget failed the
+allocation" when what had happened was a network timeout. Both rows pass on re-run (26s).
+
+**The in-allocation lane exited 0**, which is the half of T034 that matters most: 005's
+existing durability rows still pass with the one behavioural change this feature made to the
+library (the attempt cap).
+
+Two things the first gate run taught, both fixed rather than tolerated:
+
+- `wait_dead`'s bound was sized for a row run alone. Inside the whole gate, allocations queue
+  behind each other and a run waits on the node rather than on anything under test — so a
+  bound that only holds in isolation turns a busy machine into a red gate. Raised to 900s.
+- The dangling-grant check caught `test_cross_process.py`'s hand-written `grant_id="grant-1"`.
+  A gate that failed on a fixture's shorthand would be reporting it as a production defect;
+  the check is now scoped to checkpoints a real allocation wrote, which is the claim worth
+  making anyway.
+
+**Known flakiness, stated rather than papered over.** Every allocation builds its environment
+from the public package index, so any row can fail on a network timeout. It fails *distinctly*
+— the guard names it — but it does fail, and on a slow connection a full gate may need a
+re-run. Caching the environment in the image would remove it and is not this feature's work.
+
+## What the fencing row establishes, precisely
+
+**At most one in-flight call survives the supersede**, not zero. The lease is asserted before
+a handler runs, so a call already past the check completes; you cannot un-invoke work that is
+already executing. A row demanding zero would fail forever while describing a correct platform
+as broken. The bound is `steps + 1`, which still separates working fencing from absent fencing
+by a factor of a hundred — an unfenced incumbent runs on to the end of its own step list.
 
 The point of this contract is its lane: **every row here runs through a real dispatch**, in
 the merge-blocking enclave lane beside 005's existing rows (clarify Q2). The feature exists

@@ -28,40 +28,48 @@ Postgres; `make dev-up` is a prerequisite for them, not an alternative to them.
 | Fencing against double resume | A superseded holder's tool calls and checkpoint writes are rejected; zero side effects, zero state mutation | FR-009, SC-006 |
 | **Stop** on grant expiry | Resume under expired consent **stops** with the reason recorded and zero subsequent steps. Terminal — renewed consent does **not** revive it | FR-005, SC-004 |
 
-### What these rows assert, and what they do not (recorded 2026-07-29)
+### What these rows assert, and what they do not (recorded 2026-07-29, RESOLVED 2026-07-30)
 
-**Every row above asserts `resume_run()` — the library function — and none of them asserts
-that a dispatched run reaches it.** The distinction was invisible until 013 traced the path,
-and it matters because the table reads as a claim about the deployed system.
+**Resolved by 014.** Every row above is now also asserted **through a dispatch** — see
+[`specs/014-dispatched-resume/contracts/conformance-resume.md`](../../014-dispatched-resume/contracts/conformance-resume.md),
+where each of the ten dispatch-level rows records the run that put it in force. The rows here
+keep their scope as *library* rows: they are fast, they are parameterized across both
+providers, and they say what `resume_run` decides. What they never said, and now do not need
+to, is that anything reaches it.
 
-The chain is closed except at its last link. A trust-fabric outage mid-run calls
-`suspend_for_dependency` (`core/hooks/authority.py`), so `SUSPENDED` is reachable in
-production. The MCP service's supervisory loop sweeps on dependency recovery and
-re-dispatches. The sweeper carries `step_index` from the suspended-run index, the dispatcher
-puts it in Nomad metadata, and the jobspec maps it to `RUN_STEP_INDEX`. **Then
-`src/surfaces/dispatch/entrypoint.py` never reads it, and never calls `resume_run`** — it
-calls `start_governed_run` and its step loop begins at zero.
+**What the note said, kept because the shape recurs.** For nine features these rows asserted
+`resume_run()` — the library function — and none asserted that a dispatched run reached it.
+The chain was closed except at its last link: a trust-fabric outage suspended a run, the
+sweeper swept, the dispatcher carried `step_index` into Nomad metadata, the jobspec mapped it
+to `RUN_STEP_INDEX` — and then the entrypoint never read it and never called `resume_run`,
+which had **no caller anywhere in `src/`**. The table read as a claim about the deployed
+system and was a claim about a function.
 
-So "a disrupted run resumes and completes; already-completed steps show exactly one execution"
-is demonstrated of the function and not of the path a dispatch actually takes. `resume_run` has
-**no caller anywhere in `src/`**.
+It was not a live defect while the fixture toolset was `echo` (repeatable, no external
+effect), bracket recording was `ON CONFLICT DO NOTHING`, and dispatched invocation was opt-in.
+013 made it consequential by shipping `vault_write` — non-repeatable, with an observer whose
+whole purpose is resolving an interrupted write by observation — and nothing on the dispatched
+path consulted it.
 
-**Why this is not a live defect today**, stated so the severity is not overread: the fixture
-toolset is `echo`, which is repeatable and has no external effect; `record_intent` and
-`record_result` are `ON CONFLICT DO NOTHING`, so re-recording a bracket is a no-op; and
-dispatched tool invocation is opt-in (`RUN_INVOKE_TOOLS`), set today only by 013's conformance
-row. Redoing steps currently costs nothing observable, which is why five features did not
-notice.
+**What closing it turned up** is the part worth carrying forward, because none of it was
+visible from reading the code that looked wired:
 
-**Why 013 made it consequential.** The Vault pack declares `vault_write` as non-repeatable
-with an observer, precisely because replaying a check-and-set write is wrong. The observer
-exists so an interrupted write is resolved *by observation* — and nothing on the dispatched
-path consults it. The first feature to dispatch real write work inherits a resumed run that
-re-executes from step zero with no re-observation.
+- The `grants` table did not exist, so `checkpoints.grant_id` had resolved to nothing since
+  005 — and held the 15-minute credential id besides. Consent expiry was unevaluable on the
+  dispatched path.
+- `record_suspension` had no callers in `src/` or `tests/`. The suspended-run index was a
+  store with a reader and no writer.
+- The sweeper had **never dispatched anything**: it reached for the scheduler on a loopback
+  address that is the container's, not the host's, and failed `Connection refused` on every
+  pass since 009 — unnoticed because it always found zero candidates.
+- `VaultWriteObserver.observe` required an argument the `Observer` protocol does not pass, so
+  it raised `TypeError` on every call and every interrupted Vault write suspended its run
+  instead of being resolved.
 
-**Owed:** wiring `resume_run` into the entrypoint, and a row asserting the property end to end
-through a *dispatch* rather than through a function call. Until then these rows stay in force
-for what they assert, with this note as their scope.
+Each was invisible for the same reason: the one thing that would have exercised it was the
+caller that did not exist. **A seam with no caller hides everything downstream of it**, and
+the rows that would have caught these were written against the same misunderstanding as the
+code.
 | Duplicate side-effect rejection | A repeated step carrying the same stable key is recognised as the same step | FR-010, SC-001 |
 | Drain across upgrade | A controlled in-process handover preserves the run and its evidence | FR-015, SC-008 |
 

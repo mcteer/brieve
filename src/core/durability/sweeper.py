@@ -63,6 +63,28 @@ class SuspendedRunRecord:
     run — a record that only said "run-7 waits on terraform-cloud" would let the sweeper
     know a run should resume and not say as whom. It carries no credential and no
     authority: the resumed allocation manufactures its own from its own attested identity.
+
+    **014 finished the sentence above.** "Dispatches *as* the run" argued for the subject,
+    the tenant, and the definition, and stopped there — but a run is also the roles its
+    claims resolved to, the packs it loaded, the steps it had left, and whether it invokes
+    tools at all. Dispatching without those four produces an allocation that is a different
+    run wearing the same identity, and it fails in four distinct ways, none of which reads
+    as "the record was short":
+
+    - **Roles absent** → `resolve_user_scope` raises `no_role_for_subject` before resume can
+      manufacture anything, so every dispatched resume refuses. As designed, and fatal.
+    - **Packs absent** → `registry.observers()` is missing the very observers re-observation
+      consults. A missing observer is `CANNOT_DETERMINE`, so every pack-tool intent
+      re-suspends — naming the *tool*, because `dependency_products({})` is empty too, so
+      the suspension also loses the vocabulary the sweeper matches on.
+    - **Steps absent** → a resumed multi-step run completes trivially, with its pending work
+      silently dropped. Exit zero, nothing done, and nothing anywhere says so.
+    - **invoke_tools absent** → the resumed run brackets steps but invokes nothing, so
+      exactly-once holds vacuously.
+
+    All four are claims-derived metadata or configuration. None grants anything: the roles
+    say what the dispatching surface established, and the allocation still resolves what
+    they MEAN from the trust fabric.
     """
 
     run_id: str
@@ -73,6 +95,18 @@ class SuspendedRunRecord:
     subject_user_id: str = ""
     tenant_id: str = ""
     agent_definition_id: str = ""
+    #: What the dispatching surface established about who is asking. Metadata — the resumed
+    #: allocation resolves what these roles permit from the trust fabric, so carrying them
+    #: cannot grant authority.
+    subject_roles: frozenset[str] = frozenset()
+    #: The capability packs this run loaded, so its observers and product mapping come back
+    #: with it.
+    packs: frozenset[str] = frozenset()
+    #: How many steps the run was dispatched to take. Without it a resumed multi-step run
+    #: has no work to return to.
+    steps: int | None = None
+    #: Whether this run invokes its requested tools through the real pipeline.
+    invoke_tools: bool = False
 
 
 @dataclass

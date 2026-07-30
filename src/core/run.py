@@ -16,7 +16,7 @@ from core.authority.errors import AuthorityRefuseError
 from core.authority.fabric import IdentityFabric
 from core.authority.grant import DelegationGrant
 from core.authority.hashing import content_hash
-from core.authority.manufacture import manufacture_authority
+from core.authority.manufacture import ManufacturedAuthority, manufacture_authority
 from core.authority.types import AuthorityScope, TaskCredentialRef
 from core.correlation import validate_correlation_id
 from core.errors import CoreError, CorrelationRequiredError
@@ -32,6 +32,26 @@ if TYPE_CHECKING:
     from core.dependencies.types import DependencyHealthReader
     from core.durability.lease import RunLease
     from core.durability.types import DurabilityProvider
+
+
+#: How many times one run may be revived before the platform stops reviving it (D3).
+#:
+#: **Deliberately not in `core.bounds`**, which is where "beside the other bounds" would
+#: put it. Every constant there — `DEFAULT_MAX_DURATION`, `DEFAULT_MAX_STEPS`,
+#: `DEFAULT_STUCK_WAIT` — is the default for a field on `ExecutionBounds`, a dataclass a
+#: caller constructs. A cap living there would arrive with an override slot already
+#: fitted, and the next person to want a longer flap would fit one. FR-009c forbids
+#: exactly that: the cap never comes from workflow code, the agent definition, or
+#: dispatch metadata, because a bound the bounded thing can raise is not a bound. Here it
+#: is a module constant that `core.durability.resume` reads directly rather than accepts
+#: as a parameter — so there is no seam to pass a larger number through, and the
+#: component row asserts that by inspecting the signature.
+#:
+#: Five is a tunable starting point rather than a finding: large enough that a real
+#: outage's recovery — one suspension, one revival — never approaches it, small enough
+#: that a flapping dependency stops within minutes. The rows prove exhaustion is terminal
+#: and recorded. They do not prove five is the number an operator wants.
+RESUME_ATTEMPT_CAP = 5
 
 
 class RunState(StrEnum):
@@ -101,6 +121,17 @@ class GovernedRun:
     bounds: BoundsTracker | None = None
     #: Monotonic step counter; the resume point recorded on each checkpoint.
     step_index: int = 0
+    #: How many times this run has been revived, carried so every checkpoint it writes
+    #: reports the same number (014, D3).
+    #:
+    #: On the run because `checkpoint_run` is the single place checkpoints are built, and it
+    #: has only the run to build from. Without this field the helpers that go *through* it —
+    #: `suspend_run`, `stop_run`, `complete_run` — would each write a blob claiming zero
+    #: revivals, and the suspension path is exactly where a flapping run's count matters. The
+    #: stores refuse to lower a count, so this is the second of two defences rather than the
+    #: only one; it exists so the in-memory blob agrees with the row instead of merely
+    #: failing to corrupt it.
+    resume_count: int = 0
     probe_log: list[str] = field(default_factory=list)
     # Recomputed by the authority hook on every invoke; issue-time authority never widens it.
     live_effective: AuthorityScope | None = None
@@ -144,38 +175,61 @@ def start_governed_run(
     dependency_health: DependencyHealthReader | None = None,
     brokered_material_source: BrokeredMaterialSource | None = None,
     content_pins: Mapping[str, str] | None = None,
+    manufactured: ManufacturedAuthority | None = None,
 ) -> GovernedRun:
     """Start an active governed run with bound task authority, or refuse.
 
     ``tenant_id`` is the claim a surface established, when there was a surface. Runs
     started without one — the adapter, the older suites — resolve the configured default.
     Resolved before anything is audited, because the refusal path writes an entry too.
+
+    ``manufactured`` lets a caller that has **already** manufactured this run's authority
+    supply it instead of having a second credential made (014). One caller needs that:
+    `resume_run` manufactures fresh authority as part of deciding whether the run may
+    continue at all, and re-manufacturing here would mean the credential the run executes
+    under is not the one resume vetted, with two ``AUTHORITY_ISSUED`` events for one
+    revival — which an investigator reads as two runs.
+
+    Supplying it also moves who records a matrix fallback, and that follows the rule
+    `MATRIX_FALLBACK`'s own docstring already states — *"written by whoever holds the sink
+    — `start_governed_run` at run start, the resume caller on resume"*. A caller holding a
+    `ManufacturedAuthority` has already seen its fallback, and it must record the fallback
+    even when the decision then stops or suspends the run and this function is never
+    reached. So when the authority is supplied, the emit belongs to the supplier and is
+    skipped here; emitting in both places would file one substitution twice.
+
+    **A resumed run is constructed by this function and no other.** A parallel assembly
+    path was the alternative, and it is the more dangerous one: hooks are registered here,
+    so a second constructor is a place a future hook can fail to be added, and a resumed run
+    would then execute ungoverned while every test passed (Principle II).
     """
     cid = validate_correlation_id(correlation_id)
     tenant = resolve_tenant(tenant_id)
     clk: Clock = clock if clock is not None else SystemClock()
     sink: AuditSink = audit_sink if audit_sink is not None else InMemoryAuditSink()
 
-    try:
-        manufactured = manufacture_authority(
-            subject_user_id=subject_user_id,
-            requested_scope=requested_scope,
-            identity_fabric=identity_fabric,
-            clock=clk,
-            agent_definition_id=agent_definition_id,
-            correlation_id=cid,
-        )
-    except AuthorityRefuseError as exc:
+    supplied = manufactured is not None
+    if manufactured is None:
         try:
-            sink.append_event(
+            manufactured = manufacture_authority(
+                subject_user_id=subject_user_id,
+                requested_scope=requested_scope,
+                identity_fabric=identity_fabric,
+                clock=clk,
+                agent_definition_id=agent_definition_id,
                 correlation_id=cid,
-                tenant_id=tenant,
-                event_type=AuditEventType.AUTHORITY_REFUSED,
-                payload={"reason_code": exc.reason_code},
             )
-        except Exception:
-            pass
-        raise
+        except AuthorityRefuseError as exc:
+            try:
+                sink.append_event(
+                    correlation_id=cid,
+                    tenant_id=tenant,
+                    event_type=AuditEventType.AUTHORITY_REFUSED,
+                    payload={"reason_code": exc.reason_code},
+                )
+            except Exception:
+                pass
+            raise
 
     # The fallback travels back on the return value; the emit belongs here, where the sink
     # and the tenant already are. `MATRIX_FALLBACK` had no writer at all until this line:
@@ -185,7 +239,10 @@ def start_governed_run(
     # pinned" is a fact about the authority being issued, so it must not appear after the
     # record saying authority was issued — an investigator reading in order would otherwise
     # see the run start under a cell nothing had yet said was substituted.
-    if manufactured.matrix_fallback is not None:
+    #
+    # Skipped when the authority was supplied: the supplier saw the fallback first and
+    # records it for every outcome, including the ones that never reach this line.
+    if manufactured.matrix_fallback is not None and not supplied:
         try:
             sink.append_event(
                 correlation_id=cid,

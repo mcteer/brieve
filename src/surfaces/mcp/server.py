@@ -45,7 +45,7 @@ from core.durability.postgres import PostgresDurabilityProvider
 from core.durability.sweeper import Sweeper
 from core.hooks.suspension import TRUST_FABRIC_DEPENDENCY
 from core.registry.memory import ToolRegistry
-from surfaces.dispatch.nomad import NomadDispatcher
+from surfaces.dispatch.nomad import DEFAULT_NOMAD_ADDR, NomadDispatcher
 from surfaces.dispatch.types import RunDispatcher
 from surfaces.mcp.health import HealthChecker, Probe
 
@@ -138,6 +138,11 @@ def _resume_dispatcher(dispatcher: RunDispatcher) -> Any:
     no subject of its own to lend. It carries no credential either way: the allocation
     manufactures its own from its own attested identity, which is what makes
     re-authentication structural rather than a rule someone remembers.
+
+    **This is the only caller in the platform that may set ``resume=True``.** The sweeper is
+    the only component that knows a dispatch is a revival, so the knowledge travels from
+    here as data rather than being inferred downstream from a checkpoint's existence (D1).
+    A fresh dispatch reusing these identifiers stays a fresh dispatch.
     """
 
     def _dispatch(record: Any) -> None:
@@ -149,6 +154,18 @@ def _resume_dispatcher(dispatcher: RunDispatcher) -> Any:
             requested_tools=frozenset(),
             run_id=record.run_id,
             step_index=record.step_index,
+            # What the run needs to be itself rather than a fresh run under its identity
+            # (T010a). These parameters already existed on `dispatch()` and already
+            # travelled to the jobspec — until 014 they travelled EMPTY, which is why a
+            # dispatched resume would have refused `no_role_for_subject` before doing
+            # anything, and why a resumed multi-step run would have completed trivially with
+            # its pending work dropped. Nothing new travels here; it finally travels
+            # populated.
+            subject_roles=record.subject_roles,
+            packs=record.packs,
+            steps=record.steps,
+            invoke_tools=record.invoke_tools,
+            resume=True,
         )
 
     return _dispatch
@@ -336,7 +353,27 @@ def main() -> int:
     checker = build_health_checker(registry, store, unconfigured_probe)
 
     checkpoints = PostgresDurabilityProvider(credentials=credentials)
-    sweeper = build_sweeper(store, NomadDispatcher(), checkpoints.load)
+    # THE SCHEDULER'S ADDRESS IS CONFIGURATION, and it took 014 to find out (research F2's
+    # sibling finding). This said `NomadDispatcher()`, which defaults to
+    # `http://127.0.0.1:4646` — correct for a host process and wrong for this one, because this
+    # service runs INSIDE an allocation. On the dev substrate the container's loopback is the
+    # Docker VM's, where Vault and Postgres live as containers and the natively-hosted
+    # scheduler does not, so every resume dispatch failed with `Connection refused`.
+    #
+    # **The sweeper had therefore never dispatched anything, on any substrate, since 009.**
+    # Invisible for five features for the same reason `record_suspension` had no callers: the
+    # index nothing wrote was an index the sweep always found empty, so the dispatch it could
+    # not perform was a dispatch it never attempted. 014 became the first writer and the
+    # failure surfaced on the first suspended run — buried under the integrity pass's output,
+    # which is its own lesson about a supervisory loop that logs per-run at INFO volume.
+    #
+    # The jobspec supplies the reachable address, the same way it already supplies
+    # `VAULT_ADDR`. The default stays host-correct so nothing outside an allocation changes.
+    sweeper = build_sweeper(
+        store,
+        NomadDispatcher(nomad_addr=os.environ.get("NOMAD_ADDR") or DEFAULT_NOMAD_ADDR),
+        checkpoints.load,
+    )
 
     tenant = os.environ.get("HARNESS_DEFAULT_TENANT", "").strip()
     interval = float(os.environ.get("MCP_INTERVAL_SECONDS", DEFAULT_INTERVAL_SECONDS))

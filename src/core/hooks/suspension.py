@@ -7,9 +7,20 @@ governance pipeline's import path — a coupling that would make the hook engine
 without a checkpoint store.
 
 So this is a small indirection with one job: mark the run suspended and name what it waits
-on, letting whoever owns the run's durability persist that on the next checkpoint. The
-state transition is what the sweeper reads; the checkpoint write is what makes it durable,
-and the two happen in different places because they always have.
+on, letting whoever owns the run's durability persist that on the next checkpoint.
+
+**What the sweeper reads is the INDEX, verified against the checkpoint** — and this docstring
+said "the state transition is what the sweeper reads" until 014, which is wrong in a way that
+mattered. The sweeper queries `suspended_runs` for a product, then re-reads the checkpoint to
+confirm the candidate is still suspended (`Sweeper._resume_one`). A state transition nothing
+indexed is invisible to it: the run sits suspended forever, which is the hang ADR-0049 removed
+a human to avoid, produced by the mechanism meant to prevent it.
+
+That mattered because the sentence read as a complete account of the contract, and the caller
+that suspends mid-run duly did the transition and nothing else — so `record_suspension` had no
+caller anywhere in `src/` until 014, and the index was a store with a reader and no writer. A
+docstring that understates the contract is how the next feature repeats this one; the writer
+is `surfaces.dispatch.entrypoint`, in both of its suspension arms.
 """
 
 from __future__ import annotations

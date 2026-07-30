@@ -92,9 +92,29 @@ ENCLAVE_PATHS = frozenset(
         # workload identity at all — that is the property the lane exists to preserve —
         # and they belong there because they drive the scheduler, which the allocation
         # cannot. So the choice is an operator token or a row that cannot run where the
-        # thing it checks happens. `OperatorCredentials` in that conftest is test-only and
-        # deliberately not a `core` class, so the fallback stays out of production reach.
+        # thing it checks happens. `OperatorCredentials` is test-only and deliberately not a
+        # `core` class, so the fallback stays out of production reach.
         "conformance/identity/conftest.py",
+        # `OperatorCredentials` itself, moved out of the conftest above in 014 (see that
+        # module's docstring). It is the same code with the same justification, and it moved
+        # for a mechanical reason: conftests do not cross sibling packages, and 014's
+        # dispatch-level rows are a second host-lane package that needs the same operator
+        # read. The alternative was a second copy, and a duplicated credential path means
+        # the copy nobody edits is the one still trusted.
+        #
+        # This entry REPLACES nothing — the conftest above still holds the fixtures — and it
+        # is a move rather than a widening: no lane gained access it did not have.
+        "harness/operator_credentials.py",
+        # 014's dispatch-level rows. They reach the enclave's Vault as an OPERATOR to arrange
+        # what a PRODUCT holds, which is the only way the live re-observation rows can mean
+        # anything: the shipped `VaultWriteObserver` reads Vault and believes what it finds, so
+        # "the write landed" has to be made true *there*. Arranging it with a scripted observer
+        # would test the row's own fixture rather than the observer — the substitution clarify
+        # Q3 rejected in as many words.
+        #
+        # Same posture as the entries above and no wider: a host process holds no attested
+        # identity, and these rows belong on the host because they drive the scheduler.
+        "conformance/durability/dispatch_harness.py",
         # Talks to the control-plane Vault to exercise Control Groups (007). There is no
         # fake: one that always approves proves the caller can proceed, one that never
         # approves proves it handles denial, and neither proves the gate holds.

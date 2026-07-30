@@ -82,6 +82,16 @@ job "agent-run" {
       # pipeline. Opt-in, because every pre-013 dispatched row asserts a trail this would
       # append TOOL_OUTCOME events to.
       "invoke_tools",
+      # 014: when "1", this dispatch is a RESUME and the entrypoint takes the resume path.
+      #
+      # Optional, and read the `meta_required` note above for the contrast: `run_id` is
+      # required because omitting it silently starts a fresh run under a resumed
+      # correlation id. Omitting THIS one is safe in the same sense the roles are — a
+      # dispatch that forgets it starts fresh, which re-executes work but never skips it,
+      # so nothing is lost and nothing is silently believed to have happened. The
+      # dangerous direction is the other one, and it is unreachable: a resume cannot be
+      # inferred, so a flag nobody set is never invented.
+      "resume",
     ]
   }
 
@@ -169,6 +179,11 @@ job "agent-run" {
         RUN_STEPS = "${NOMAD_META_steps}"
         RUN_PACKS = "${NOMAD_META_packs}"
         RUN_INVOKE_TOOLS = "${NOMAD_META_invoke_tools}"
+        # "1" when this allocation is reviving a disrupted run rather than starting one.
+        # Metadata, like every line above it: knowing WHICH run it is resuming grants this
+        # allocation nothing, and it still manufactures its own credentials from its own
+        # attested identity (ADR-0048).
+        RUN_RESUME = "${NOMAD_META_resume}"
         RUN_ID              = "${NOMAD_META_run_id}"
         RUN_STEP_INDEX      = "${NOMAD_META_step_index}"
       }
