@@ -82,6 +82,14 @@ nothing passes everything except use.
   honest. A compromise of both administrative domains defeats this, by design and by ADR-0055's
   own admission.
 
+## Gate run — 2026-07-30
+
+`make check` (784 rows) and `make conformance` green on a clean tree against a live enclave
+with the collector store up: 122 hermetic conformance, 81 in-allocation, 10 enclave-marked,
+50 host_enclave (this directory's thirteen among them), 8 portal. Quickstart sections 2–6
+walked; section 6's scheduled half is what exposed the credential defect above, because
+walking it means reading the service's log rather than a row's result.
+
 ## Who runs these
 
 | Where the change comes from | What covers these rows |
