@@ -33,11 +33,25 @@ being re-derived at the start of every spec.
 | 010 | Production identity fabric | ADR-0015 (**first feature that reads the registry at runtime**), ADR-0050 (new), ADR-0044 (mirroring seam; credential translation still deferred), ADR-0048 | Identity rows against the live trust fabric, in-allocation. **The gap every prior feature rested on** |
 | 011 | Northbound API operations | ADR-0033 (the parity row grows with the catalogue), ADR-0034 (the portal's precondition), ADR-0035, ADR-0016, ADR-0049 (stop as withdrawal, not the pause it removed) | Sixteen operation rows, plus verdict parity over the grown catalogue |
 | 012 | The conversational portal | ADR-0034 (**built**), ADR-0051 (new — a turn is evidence, a thread is a view), ADR-0033 (the portal is a consumer, so parity still binds one pair), ADR-0032 (the ungoverned loop, made structurally impossible), ADR-0049 (no pause, asserted as an absence) | Eight containment rows, eight accessibility rows, and the API's first deployment |
+| 013 | Capability packs and eval gates | ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045 (**built** — the toolset line 008–012 signposted, replaced by product knowledge a definition opts into), ADR-0018 (consumed) | Four of five eval gates blocking against both shipped packs; the fifth (report fidelity) an explicit skip citing ADR-0018, per ADR-0047 |
+| 014 | Dispatched resume | ADR-0026 (**the durable half built** — `resume_run` gets its first `src/` caller), ADR-0048 (a resume is a new allocation with a new attested identity), ADR-0049 (grant expiry stops terminally), ADR-0047 (FR-020 re-scoping — 005's rows now asserted through a dispatch) | Ten dispatch-level rows in the durability lane. **Closed ROADMAP gap 0a**, and uncovered four latent defects — the missing grant store, an index with no writer, a sweeper that had never dispatched since 009, an observer that could not be called |
 
 ## In progress
 
-Nothing. 012 shipped; the next feature has no number until `/speckit-specify` creates its
-directory.
+**Audit egress for tamper-evidence** (`specs/015-audit-egress`) — specified, clarified, planned.
+Implements ADR-0055 and targets ROADMAP gap 0 below, the most consequential gap on this page.
+Ships every audit entry and stream head to a second store under credentials the platform does
+not hold, and makes reconciliation a named, scheduled, audited operation. Not yet implemented.
+
+> **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
+> work by name. Guessing the next number reads as a fact, propagates into merged documents, and
+> is wrong the moment anything is specified out of order.
+>
+> **Numbers are identifiers, not sequence.** 005 was assigned to durable execution before the
+> local environment was understood to precede it — and then 005 shipped first anyway, because
+> the blocking part of the environment turned out to be one Makefile target. The order of work
+> here does not match numeric order and is not meant to. Renaming a merged spec directory would
+> churn every reference to it for no gain.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
