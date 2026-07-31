@@ -41,3 +41,31 @@ CREATE TABLE IF NOT EXISTS audit_stream_heads (
     head_hash      TEXT        NOT NULL,
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- How far each stream has been CONFIRMED at the second copy (015, ADR-0055).
+--
+-- Operational state, not evidence: the run role writes it, and the evidence role holds no
+-- grant here for the same reason it holds none on the heads. It lives in this file because
+-- it applies in the same bring-up block, not because it shares the evidence tables' posture
+-- — a distinction worth stating, since proximity in a file is how postures get assumed.
+--
+-- **There is no spool table, and that is the design** (research D1). The obvious outbox
+-- would copy every entry into a queue; `audit_entries` is already durable, already ordered,
+-- and already written transactionally, so the copy would be bytes rather than safety. What
+-- is actually missing is a bookmark, and this is it.
+--
+-- The watermark advances only AFTER the destination confirms, which is what makes a crash
+-- safe: re-shipping is idempotent by the destination's first-write-wins primary key, so the
+-- worst a badly-timed failure costs is a repeated insert that changes nothing. Advancing it
+-- first would be the classic outbox defect — the entries between the advance and the crash
+-- are never sent and nothing knows.
+--
+-- Per-STREAM rather than a global cursor, and that is exact rather than convenient: the
+-- sink assigns positions under a row lock on the stream head, so per-stream seq is gapless
+-- and `seq > shipped_seq` is precisely the unshipped set. A global cursor over a serial
+-- column would race on commit order — N+1 committing before N — and silently skip rows.
+CREATE TABLE IF NOT EXISTS audit_egress_watermarks (
+    correlation_id TEXT PRIMARY KEY,
+    shipped_seq    INTEGER     NOT NULL,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);

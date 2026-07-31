@@ -38,7 +38,12 @@ from collections.abc import Callable
 from types import FrameType
 from typing import Any
 
+from core.audit.destination_postgres import build_destination
+from core.audit.egress import ship_pass
 from core.audit.integrity import IntegrityReport, verify_stream_integrity
+from core.audit.local_store import run_connection_factory
+from core.audit.postgres_sink import PostgresAuditSink
+from core.audit.reconcile import emit_reconciled, posture_reason, reconcile
 from core.dependencies.store import PostgresDependencyStore
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
@@ -78,28 +83,6 @@ __service_loop__ = True
 def build_credentials() -> VaultDatabaseCredentials:
     """This allocation's own identity. No token reaches this process any other way."""
     return VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role=VAULT_ROLE)
-
-
-def run_connection_factory(credentials: VaultDatabaseCredentials) -> Any:
-    """A factory for connections under the **run** role.
-
-    `verify_stream_integrity` needs one, and the evidence role cannot supply it:
-    `audit_stream_heads` deliberately carries no grant for the read path, because a reader
-    able to see the heads could learn what it would need to forge.
-    """
-    import pg8000.dbapi
-
-    def _open() -> Any:
-        cred = credentials.fetch()
-        return pg8000.dbapi.connect(
-            host="127.0.0.1",
-            port=5432,
-            database="brieve",
-            user=cred.username,
-            password=cred.password,
-        )
-
-    return _open
 
 
 def check_integrity(credentials: VaultDatabaseCredentials) -> IntegrityReport:
@@ -294,12 +277,77 @@ def _report_integrity(report: IntegrityReport) -> None:
         )
 
 
+def _report_egress(credentials: VaultDatabaseCredentials, destination: Any) -> None:
+    """Drain the unshipped tail, and say how far behind the second copy is.
+
+    The backlog is printed every pass because it is a **security** signal, not an ops
+    nicety: it is exactly the set of entries that exist in one place only, so a rising
+    number is a widening window in which a local rewrite would leave no trace anywhere.
+    """
+    if destination is None:
+        print("::egress:: no destination configured — tamper-evidence ABSENT", flush=True)
+        return
+    conn = run_connection_factory(credentials)()
+    try:
+        outcome = ship_pass(local=conn, destination=destination)
+        if outcome.shipped or outcome.backlog:
+            print(
+                f"::egress:: shipped {outcome.shipped} entries "
+                f"across {outcome.streams} streams; backlog {outcome.backlog}",
+                flush=True,
+            )
+        for correlation_id, why in outcome.failures:
+            print(f"::egress:: {correlation_id} not shipped: {why}", file=sys.stderr, flush=True)
+    finally:
+        _close_quietly(conn)
+
+
+def _report_reconcile(credentials: VaultDatabaseCredentials, destination: Any, sink: Any) -> None:
+    """Compare the copies on a schedule, and record that the comparison happened.
+
+    **Scheduled rather than only on request** (clarify Q3). The threat is an administrator
+    rewriting the local trail; a check that fires only when someone is already suspicious
+    adds little to the investigation they were going to run anyway, and leaves the window
+    open until somebody wonders — which may be never.
+    """
+    if destination is None:
+        return
+    conn = run_connection_factory(credentials)()
+    try:
+        report = reconcile(local=conn, destination=destination)
+    finally:
+        _close_quietly(conn)
+
+    for finding in report.findings:
+        print(
+            f"::reconcile:: {finding.correlation_id} {finding.kind}: {finding.detail}",
+            file=sys.stderr,
+            flush=True,
+        )
+    if report.posture != "in_force":
+        print(
+            f"::reconcile:: tamper-evidence is {report.posture.upper()} — {posture_reason(report)}",
+            file=sys.stderr,
+            flush=True,
+        )
+    emit_reconciled(sink, report, basis="scheduled", caller="mcp-supervisory-loop")
+
+
+def _close_quietly(conn: Any) -> None:
+    try:
+        conn.close()
+    except Exception:  # noqa: BLE001 — a close failure must not mask the pass's own result
+        pass
+
+
 def supervisory_pass(
     *,
     checker: HealthChecker,
     sweeper: Sweeper,
     store: PostgresDependencyStore,
     credentials: VaultDatabaseCredentials,
+    destination_factory: Callable[[], Any] | None = None,
+    audit_sink: Any = None,
 ) -> list[str]:
     """One pass of everything this service exists to do. Returns the passes it ran.
 
@@ -330,6 +378,26 @@ def supervisory_pass(
     ran.append("sweep")
     _pass("integrity", lambda: _report_integrity(check_integrity(credentials)))
     ran.append("integrity")
+    # SHIP BEFORE RECONCILE, in that order and not the reverse. Reconciling first would
+    # compare against a destination one full interval behind, so every entry written since
+    # the last pass would sit above the watermark and be reported as backlog — true, but it
+    # would also mean the newest entries are never compared until the pass after the one
+    # that shipped them. Shipping first narrows that to whatever arrives mid-pass.
+    # **Built per pass, not once at startup, because the credential ROTATES.** Vault owns
+    # `harness_shipper` and changes its password on a period; a destination constructed at
+    # startup holds whatever was in force then, works until the first rotation, and after
+    # that fails authentication on every pass — which reads in the logs as the collector
+    # going down, on a 24-hour cadence, days after anyone touched the code.
+    #
+    # An earlier version did exactly that, with a comment reasoning that rebuilding "would
+    # re-read Vault every interval for a credential that does not change". True when it was
+    # written and false the moment the account was onboarded as a static role. One Vault
+    # read per interval is the price of a credential nobody has to know.
+    destination = destination_factory() if destination_factory is not None else None
+    _pass("egress", lambda: _report_egress(credentials, destination))
+    ran.append("egress")
+    _pass("reconcile", lambda: _report_reconcile(credentials, destination, audit_sink))
+    ran.append("reconcile")
     return ran
 
 
@@ -369,6 +437,17 @@ def main() -> int:
     #
     # The jobspec supplies the reachable address, the same way it already supplies
     # `VAULT_ADDR`. The default stays host-correct so nothing outside an allocation changes.
+    # Probed once HERE only to state the posture at startup. Each pass builds its own,
+    # because the credential rotates — see `supervisory_pass`.
+    destination = build_destination()
+    audit_sink = PostgresAuditSink(credentials=credentials)
+    if destination is None:
+        print(
+            "::egress:: no audit destination configured — tamper-evidence ABSENT",
+            file=sys.stderr,
+            flush=True,
+        )
+
     sweeper = build_sweeper(
         store,
         NomadDispatcher(nomad_addr=os.environ.get("NOMAD_ADDR") or DEFAULT_NOMAD_ADDR),
@@ -385,7 +464,14 @@ def main() -> int:
 
     supervisor = _Supervisor(interval)
     while supervisor.running:
-        supervisory_pass(checker=checker, sweeper=sweeper, store=store, credentials=credentials)
+        supervisory_pass(
+            checker=checker,
+            sweeper=sweeper,
+            store=store,
+            credentials=credentials,
+            destination_factory=build_destination,
+            audit_sink=audit_sink,
+        )
         supervisor.sleep()
 
     print("mcp service stopping on signal", flush=True)

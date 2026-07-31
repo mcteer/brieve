@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import FastAPI
 
 from core.audit.query import EvidenceQuery
+from core.audit.reconcile import ReconcileReport
 from core.audit.sink import AuditSink
 from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
@@ -25,6 +26,18 @@ from surfaces.api.verification import TokenVerifier
 from surfaces.dispatch.types import RunDispatcher
 
 TITLE = "Enterprise Agent Harness API"
+
+
+class _AbsentReconciler:
+    """No destination configured: every stream reports ABSENT, and nothing raises.
+
+    Not a null object smoothing over a misassembly. FR-009 makes "there is no second copy"
+    a posture the platform must state plainly, and this is where an unconfigured estate
+    states it.
+    """
+
+    def reconcile_stream(self, correlation_id: str) -> ReconcileReport:
+        return ReconcileReport()
 
 
 def create_app(
@@ -40,6 +53,7 @@ def create_app(
     change_status: Any | None = None,
     definitions: Any | None = None,
     thread_store: ThreadStore | None = None,
+    reconciler: Any | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -75,6 +89,11 @@ def create_app(
     # snapshot defect had. What varies by assembly is what the operations can *do*, never
     # whether they exist.
     app.state.thread_store = thread_store if thread_store is not None else InMemoryThreadStore()
+    # 015's collaborator. `None` is an estate with no second copy, which the reconcile
+    # operation reports as the ABSENT posture rather than as a failure — the route exists
+    # either way, because whether tamper-evidence is in force is exactly the question it
+    # answers, and a route that vanished when the answer was 'no' would answer it wrong.
+    app.state.reconciler = reconciler if reconciler is not None else _AbsentReconciler()
 
     app.include_router(runs.build_router())
     app.include_router(threads.build_router())

@@ -115,6 +115,13 @@ ENCLAVE_PATHS = frozenset(
         # Same posture as the entries above and no wider: a host process holds no attested
         # identity, and these rows belong on the host because they drive the scheduler.
         "conformance/durability/dispatch_harness.py",
+        # 015's evidence rows read the SHIPPING credential out of Vault, over HTTP, as an
+        # operator — the same path the mcp service reads under its own attested identity,
+        # reached the only way a host process can. These rows are on the host because they
+        # must arrange tampering with the collector administrator's credential, which the
+        # platform must never hold; that is the administrative boundary ADR-0055 draws, and
+        # a row holding both credentials inside an allocation would dissolve it.
+        "conformance/evidence/conftest.py",
         # Talks to the control-plane Vault to exercise Control Groups (007). There is no
         # fake: one that always approves proves the caller can proceed, one that never
         # approves proves it handles denial, and neither proves the gate holds.

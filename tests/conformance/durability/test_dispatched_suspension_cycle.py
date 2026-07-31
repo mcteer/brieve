@@ -48,6 +48,16 @@ def test_row_a_resumed_run_suspends_naming_the_product_and_is_indexed(conn: Any)
     dispatcher = h.dispatcher()
     h.arrange_disrupted(conn, run_id, tool_name="terraform_apply", step_index=1)
 
+    # Down first, for the same reason the revival row below does it: this row asserts the
+    # index row EXISTS, and the sweeper's job is to consume it. If the other row in this
+    # file ran first under a random seed, it left terraform marked reachable, and the
+    # sweeper could revive this run between the suspension and the read below — emptying
+    # the index and failing a row about whether the index was ever written.
+    #
+    # An order-dependent row is a flake that will only ever fail in the lane, where the
+    # seed is not the one anybody debugged with.
+    h.mark_reachable("terraform", reachable=False)
+
     dispatcher.dispatch(
         **h.dispatch_args(
             run_id,

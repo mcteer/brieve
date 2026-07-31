@@ -156,6 +156,11 @@ resource "vault_jwt_auth_backend_role" "mcp" {
   token_policies = [
     vault_policy.harness_database.name,
     vault_policy.harness_authority_read.name,
+    # 015: the mcp service is the only workload that ships to the second copy, because it
+    # is the only one running the supervisory loop. One path, read-only — and not the
+    # jobspec's env block, where the credential's SELECT half would be readable by anyone
+    # with scheduler access.
+    vault_policy.audit_egress_credential.name,
   ]
   # Longer than a batch job's, because this one is long-lived by design — and still a TTL
   # rather than none, which is the difference between a re-issued identity and a standing

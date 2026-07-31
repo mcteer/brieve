@@ -35,13 +35,11 @@ being re-derived at the start of every spec.
 | 012 | The conversational portal | ADR-0034 (**built**), ADR-0051 (new — a turn is evidence, a thread is a view), ADR-0033 (the portal is a consumer, so parity still binds one pair), ADR-0032 (the ungoverned loop, made structurally impossible), ADR-0049 (no pause, asserted as an absence) | Eight containment rows, eight accessibility rows, and the API's first deployment |
 | 013 | Capability packs and eval gates | ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045 (**built** — the toolset line 008–012 signposted, replaced by product knowledge a definition opts into), ADR-0018 (consumed) | Four of five eval gates blocking against both shipped packs; the fifth (report fidelity) an explicit skip citing ADR-0018, per ADR-0047 |
 | 014 | Dispatched resume | ADR-0026 (**the durable half built** — `resume_run` gets its first `src/` caller), ADR-0048 (a resume is a new allocation with a new attested identity), ADR-0049 (grant expiry stops terminally), ADR-0047 (FR-020 re-scoping — 005's rows now asserted through a dispatch) | Ten dispatch-level rows in the durability lane. **Closed ROADMAP gap 0a**, and uncovered four latent defects — the missing grant store, an index with no writer, a sweeper that had never dispatched since 009, an observer that could not be called |
+| 015 | Audit egress for tamper-evidence | ADR-0055 (**built** — the rule was settled and nothing existed), ADR-0020 (unchanged — this adds a NEAR destination, not a far one), ADR-0035 (reconciliation runs through the governed read path and is itself audited) | Thirteen rows against a live second store under the collector administrator's credential. **Closed ROADMAP gap 0**, the most consequential gap on this page. Found a reconciler that compared the two copies' hash *claims* rather than their contents — an administrator who rewrote a payload and left `entry_hash` alone passed the comparison |
 
 ## In progress
 
-**Audit egress for tamper-evidence** (`specs/015-audit-egress`) — specified, clarified, planned.
-Implements ADR-0055 and targets ROADMAP gap 0 below, the most consequential gap on this page.
-Ships every audit entry and stream head to a second store under credentials the platform does
-not hold, and makes reconciliation a named, scheduled, audited operation. Not yet implemented.
+*Nothing in progress.*
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
@@ -291,7 +289,107 @@ that would have exercised it was the caller that did not exist:
 4. `VaultWriteObserver` could not be called: it required an argument the `Observer` protocol
    does not pass, so every interrupted Vault write suspended its run rather than resolving.
 
-### 0. The audit trail is not shipped off-host, and hash-chaining only *detects*
+### 0b. The collector credential was a hand-written password — **CLOSED by 015, 2026-07-30**
+
+**Raised by Dan while reviewing 015, three times, because the first two answers were also
+wrong.** The platform held `harness_shipper` as a fixed password written into a Vault KV path
+by bring-up, where every other database credential it uses is Vault-managed. 015 defended this
+with claims that had not been checked: that federation was unavailable across an
+administrative boundary (backwards — federation is the mechanism *for* crossing one), that
+removing the standing credential needed a second Vault, and that rotation needed bespoke
+automation. None were true.
+
+**Closed by onboarding the account as a ROOTLESS static role**
+([`audit-egress.tf`](infra/modules/trust-fabric/audit-egress.tf)). `self_managed = true` means
+Vault holds no privileged account at the collector: it connects *as* `harness_shipper` and
+rotates that account's own password on a 24-hour period. The maximum privilege obtainable
+through this Vault at the destination — by an operator with the root token, or by anyone who
+compromises it entirely — is the shipper's own `INSERT`/`SELECT`. Seeding the collector's root
+instead, which is how a database is normally registered, would have let whoever controls this
+Vault define a role granting `UPDATE` on `shipped_entries`: exactly the tampering ADR-0055
+exists to prevent. Rootless is not the convenient option, it is the one that survives the
+threat model.
+
+**The bootstrap password is a non-event**, which is the general principle worth keeping: Vault
+rotates on import, so the seed in `roles.sql` stops authenticating the moment onboarding
+succeeds, and the password in force afterwards is known to nothing but Vault. Same disposition
+`rotate-root` gives the state store. A row asserts the seed is dead rather than trusting it.
+
+**Three rows** in [`test_credential_rotates.py`](tests/conformance/evidence/test_credential_rotates.py):
+the seeded password authenticates nothing; a forced rotation changes the credential and kills
+the old one; and shipping survives a rotation because the shipper reads the current value
+rather than caching one — a cached credential fails on a 24-hour cadence, looking like the
+collector going down, days after anyone touched the code.
+
+**The boundary never rested on password secrecy**, and this is what made the earlier reasoning
+go wrong: it rests on the grant list. An administrator holding the password gains exactly what
+the platform already legitimately has, and `probe()` goes on demonstrating `UPDATE`/`DELETE`
+refused every pass. Conflating "who knows the password" with "what the account may do" is what
+made a second trust store look load-bearing.
+
+**ADR-0044's count stands at one.** There is no second standing credential.
+
+### 0c. A kill between a step's result and its audit entry loses the entry
+
+**Found 2026-07-30 by 015's full gate run**, which failed `test_dispatched_resume`'s
+exactly-once row with 399 outcomes for 400 steps. The run's data settles what happened: 400
+intents, **400 results**, 399 `TOOL_OUTCOME` events. Every step's effect happened and was
+durably recorded exactly once; one produced no audit entry.
+
+**The window.** A step records its result and *then* audits `TOOL_OUTCOME`. A kill between
+the two leaves an effect that happened, is recorded in `results`, and has no entry in the
+trail — and the resume correctly does **not** re-execute it, because `closed_intents` sees
+the result, so the entry is never written afterwards either. At most one step per disruption
+can be in that window.
+
+**The ordering is not the bug.** Auditing first would be worse: a kill between the audit and
+the result would leave a `TOOL_OUTCOME` for a step with no recorded result, the resume would
+re-execute it, and the side effect would happen twice. Exactly-once is the more important of
+the two properties and the current order is the right trade.
+
+**What is missing is the record of the skip.** The resumed allocation *knows* it skipped step
+N because N had a result — that is exactly what `recorded_steps` tells it. Emitting an event
+saying so would close the gap: the trail would then read "step N's effect was recorded, and a
+later allocation observed rather than repeated it", which is 005's "re-observe, never
+re-execute" written down instead of inferred. That is the fix, and it belongs to whoever
+touches the resume path next rather than to 015.
+
+**Meanwhile the row is bounded, not relaxed.** `test_dispatched_resume` now measures
+exactly-once on `results`, asserts no re-execution on `TOOL_OUTCOME`, and asserts the audit
+shortfall is **at most one** — so closing this gap tightens the bound to zero and that row is
+what notices. A relaxed assertion with no bound would have hidden this instead of pinning it.
+
+**Scope of the claim this dents**: narrow and worth stating plainly. The platform can still
+prove the effect happened, from `results`. What it cannot do, for one step per disruption, is
+show that proof *in the audit trail* — which is the artifact every tamper-evidence guarantee
+in 015 is about. A gap in the evidence plane is the one kind this platform said it would not
+carry silently, so it is here.
+
+### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
+
+**Closed by [`specs/015-audit-egress`](specs/015-audit-egress/), which implements ADR-0055.**
+Every entry and every stream head now ships to a second Postgres the platform holds an
+append-only credential for and nothing more, and reconciliation is a named, scheduled,
+audited operation on both transports. Thirteen rows in
+[`contracts/conformance-egress.md`](specs/015-audit-egress/contracts/conformance-egress.md)
+run against that store under the collector administrator's credential — including the
+consistent truncation that defeats chain, grant, and local head together, and a real
+outage that stops the collector's container mid-flight.
+
+**Both open questions were answered in clarification rather than by whoever built it
+first**, which is what ADR-0055 asked for: shipping is spooled (draining the entries
+already written, so no spool table exists), and a failed *delivery* refuses nothing while
+a failed *capture* still refuses the step.
+
+**The claim does not grow.** This detects; it does not prevent. A single-domain compromise
+now leaves evidence of itself, an attacker holding both domains still defeats it, and the
+lag window — entries written but not yet confirmed at the second copy — is real, bounded by
+the ship interval, and reported as a backlog anyone can watch. It also introduces the
+platform's **second standing credential**, which ADR-0044 called a constitutional event;
+that is named in ADR-0055's Notes and ADR-0044's count is not amended here.
+
+The original entry follows, unedited.
+
 
 **Raised by Dan, 2026-07-29, during 013's live gate run. The most consequential gap on this
 page.** Now **decided** by [ADR-0055](docs/adr/0055-audit-egress-for-tamper-evidence.md)

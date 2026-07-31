@@ -280,6 +280,22 @@ def tool_invocations(conn: Any, run_id: str) -> int:
     return len(events(conn, run_id, "tool_outcome"))
 
 
+def recorded_results(conn: Any, run_id: str) -> int:
+    """How many steps have a durable record that their effect happened.
+
+    **The authoritative exactly-once measurement.** `results` is keyed
+    `(run_id, idempotency_key)` with `ON CONFLICT DO NOTHING`, so it cannot over-count a
+    re-executed step — which is why `tool_invocations` exists alongside it. What it *can* do,
+    and audit events cannot, is survive a kill between the effect and the record about it.
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT count(*) FROM results WHERE run_id = %s", (run_id,))
+        return int(cursor.fetchall()[0][0])
+    finally:
+        cursor.close()
+
+
 def credential_ids(conn: Any, run_id: str) -> list[str]:
     """The credential each allocation manufactured, in order.
 

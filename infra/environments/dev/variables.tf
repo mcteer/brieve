@@ -80,10 +80,10 @@ variable "agent_definitions" {
     # tools. `packs`, `binding_map`, `tier` land in the definition-bindings record the
     # same apply writes (optional() with narrow defaults for every other definition).
     "vault-agent" = {
-      description     = "Operates Vault through the vault capability pack (013)"
-      owner           = "platform"
-      ceiling_policy  = "agent-ceiling-vault"
-      allowed_paths   = ["secret/data/conformance/*"]
+      description    = "Operates Vault through the vault capability pack (013)"
+      owner          = "platform"
+      ceiling_policy = "agent-ceiling-vault"
+      allowed_paths  = ["secret/data/conformance/*"]
       # `vault_write` joins the ceiling for 014's live re-observation rows, and it is the only
       # definition that names it. Required rather than convenient: FR-006a wants an
       # interrupted write resolved by OBSERVATION against the real product in both
@@ -93,7 +93,7 @@ variable "agent_definitions" {
       # It buys no Vault capability. The tool is non-repeatable with a real observer, which is
       # what makes the bracket and the re-observation real; the handler itself is a stub that
       # writes nothing (see `agent-pack-secrets`, which deliberately grants no write).
-      tool_names      = ["vault_read", "vault_write"]
+      tool_names = ["vault_read", "vault_write"]
       # Empty, with the manifest's reasoning: the pack's tools are platform-identity
       # reads (product_mode none), so there is no product action to authorize until
       # credential translation (ADR-0044) federates the user into the product.

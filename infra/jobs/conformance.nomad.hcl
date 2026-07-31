@@ -142,8 +142,20 @@ job "conformance" {
         UV_LINK_MODE = "copy"
       }
 
+      # ONE core, not two, and the arithmetic is the reason.
+      #
+      # A GitHub runner fingerprints as 4 cores / 9200 MHz — 2300 MHz per core. With
+      # `cores = 2` this job reserved 4600, and postgres and mcp reserve 2300 each, which
+      # commits 9200 of 9200: the enclave ran at exactly 100% of the runner with no
+      # headroom at all. 015 added a second store, and four megahertz of it was enough to
+      # make this job unplaceable — "Dimension cpu exhausted", over by 4 of 9200.
+      #
+      # Two was never a measured requirement. This task waits on allocations, databases and
+      # sleeps; it is not CPU-bound, and the wait budget is 900s against a lane that takes
+      # about five minutes. Reserving half the machine to run tests that mostly wait is what
+      # left no room for the estate those tests exercise.
       resources {
-        cores  = 2
+        cores  = 1
         memory = 1024
       }
     }

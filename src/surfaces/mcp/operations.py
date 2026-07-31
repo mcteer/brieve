@@ -30,6 +30,9 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "start_run": ("POST", "/runs"),
     "get_run": ("GET", "/runs/{run_id}"),
     "read_evidence": ("GET", "/evidence"),
+    # 015. Reconciliation is a NAMED operation, which ADR-0055 requires precisely so it
+    # cannot be an implied capability someone reaches for informally.
+    "reconcile_evidence": ("GET", "/evidence/reconciliation"),
     "request_mapping_change": ("POST", "/claim-mappings"),
     "collect_mapping_change": ("GET", "/claim-mappings/{accessor}"),
     "list_runs": ("GET", "/runs"),
@@ -111,6 +114,25 @@ def operations() -> list[McpOperation]:
                 },
                 # No tenant. Scope comes from the authenticated subject, and a tenant
                 # parameter would be a request to widen it — the same absence the API has.
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="reconcile_evidence",
+            method="GET",
+            path="/evidence/reconciliation",
+            description=(
+                "Compare a stream's audit trail against the second copy held outside this "
+                "platform's administrative control, and report any divergence. Reports "
+                "locations, never contents, and is itself recorded."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"correlation_id": {"type": "string", "minLength": 1}},
+                # Required, and one stream at a time. An estate-wide sweep would name other
+                # tenants' streams to whoever asked; that sweep is the platform's own
+                # scheduled pass, run under the platform's identity.
+                "required": ["correlation_id"],
                 "additionalProperties": False,
             },
         ),

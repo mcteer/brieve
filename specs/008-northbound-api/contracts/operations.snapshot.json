@@ -26,6 +26,11 @@
   },
   {
     "method": "GET",
+    "name": "reconcile_evidence",
+    "path": "/evidence/reconciliation"
+  },
+  {
+    "method": "GET",
     "name": "list_runs",
     "path": "/runs"
   },

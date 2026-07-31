@@ -29,7 +29,25 @@ curl -sf -o /dev/null --max-time 3 http://127.0.0.1:4646/v1/status/leader \
 # trade for a gate: the verdict must belong to the tree in front of you.
 say "Submitting the durability and API evidence rows as a scheduled workload"
 nomad job stop -purge conformance >/dev/null 2>&1 || true
-nomad job run -var="repo=$REPO" "$REPO/infra/jobs/conformance.nomad.hcl" >/dev/null
+
+# CAPTURED, not discarded. This was `>/dev/null`, and when the scheduler refused to place
+# the job — which it did on every CI run of a branch that added one more workload — the
+# only thing anyone saw was `make: *** Error 2`. The placement failure names the exact
+# resource that came up short and went straight to the bit bucket, so three rounds of
+# diagnosis went into guessing which one it was.
+#
+# A gate that will not say why it failed costs more than the failure.
+if ! run_output="$(nomad job run -var="repo=$REPO" "$REPO/infra/jobs/conformance.nomad.hcl" 2>&1)"; then
+  printf '%s\n' "$run_output" >&2
+  printf '\033[31mthe conformance job could not be submitted or placed\033[0m — the scheduler'"'"'s reason is above\n' >&2
+  # What the node actually has, and what is already holding it. A placement failure is a
+  # statement about both, and reading either alone is how three rounds get spent guessing.
+  nomad job status conformance 2>&1 | sed -n '/Placement Failure/,/^$/p' >&2 || true
+  nomad node status -self 2>&1 | sed -n '/Allocated Resources/,/^$/p' >&2 || true
+  nomad node status -self -verbose 2>&1 | grep -E 'cpu\.(numcores|reservablecores|totalcompute)|memory\.totalbytes' >&2 || true
+  nomad status 2>&1 >&2 || true
+  exit 2
+fi
 
 alloc=""
 for _ in $(seq 1 30); do

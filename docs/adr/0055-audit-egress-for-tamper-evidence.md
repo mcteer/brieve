@@ -147,3 +147,120 @@ cannot carry silently.
 Not addressed here, and worth its own record if it turns out to matter: whether the *shipped*
 copy needs its own retention policy distinct from the local one, and what happens when the two
 disagree about how long an entry lives.
+
+**Built by `specs/015-audit-egress` (2026-07-30).** Both open questions were answered in
+clarification: shipping is **spooled**, draining from the entries already written rather than
+from a separate spool table, and a failed *delivery* refuses nothing while a failed *capture*
+still refuses the step. The seam is asserted from both sides in
+`tests/component/test_capture_refuses.py`.
+
+**This feature was going to introduce the platform's SECOND standing credential, and in
+the end does not.** ADR-0044 says a second one "would be a constitutional event rather than
+a configuration change"; that count stands at one.
+
+**The argument below for why a standing credential was unavoidable is wrong**, and is kept
+rather than deleted because the record is append-only and a wrong argument is worth being
+able to find. Both drafts of it were written without checking what Vault provides, and both
+turned a limitation into a principle. What was actually built is under "Correction" at the
+end of this section.
+
+It is the append-only account the platform holds at the collector: `INSERT` and `SELECT` on
+two tables, no `UPDATE`, no `DELETE`, no `TRUNCATE`, and the separation probe demonstrates
+those refusals on every reconcile pass rather than asserting them. It is deliberately **not**
+minted by the platform's Vault, because a credential the platform's secrets engine issues is
+one the platform's administrators govern — which would re-capture the destination and defeat
+this entire record.
+
+**It is standing because the dev enclave has one trust store, not because the design
+requires it, and an earlier draft of this note claimed otherwise.** That claim — "federation
+is not available across an administrative boundary" — was backwards. Federation is exactly
+the mechanism for crossing one. The correct target design is a Vault the *collector's*
+administrators own, holding its own database secrets engine against the collector Postgres
+and its own JWT auth backend trusting Nomad's JWKS — the same verifiable public issuer this
+platform's Vault already trusts. The mcp service would present the workload identity it
+already carries, to a store the platform does not administer, and receive a leased
+credential. Zero standing credentials, lifecycle control provably on the collector's side of
+the line, and revocation available to the collector's administrators unilaterally.
+
+What blocks that here is that the dev enclave runs a single Vault, and a single Vault cannot
+demonstrate the separation: the platform's root token administers all of it, so a second
+mount inside it would be a boundary drawn on paper. Standing up a second trust store is a
+feature — its own container, unseal, PKI, and bring-up sequencing — not a detail 015 could
+absorb. **So the standing credential is an artifact of the substrate, and it should not
+survive contact with a real deployment**, where the collector's operator has a secrets store
+of their own and the federated shape is available immediately.
+
+Two things follow, and they are separable:
+
+- **Manual rotation is not required even today.** Rotation belongs to whoever administers
+  the collector, and that party can rotate `harness_shipper` on a schedule and write the new
+  value to the KV path the platform reads. The platform stores the credential; it does not
+  own its lifecycle. Nothing here needs a human, and the current bring-up simply does not
+  automate it.
+- **The standing-ness itself needs the second trust store**, and is worth its own record.
+
+### Correction — and what was built (2026-07-30, after reading the documentation)
+
+Raised by Dan: Vault has native mechanisms for exactly this, and needing a human to rotate a
+credential is not a design constraint anyone should accept. Both points are correct, and the
+second trust store the reasoning above leans on is **not required**.
+
+**Vault rotates database credentials two ways**, and neither needs a human past initial
+seeding. *Dynamic roles* mint an ephemeral user per request under a lease. *Static roles*
+take over an existing named account and rotate its password on a `rotation_period` (default
+24 hours) or a `rotation_schedule`; the application reads the current value from
+`database/static-creds/<role>`. This repository already runs the seed-once pattern for its
+own state store — a bootstrap user, `rotate-root` so that afterwards only Vault knows the
+password ([`database.tf`](../../infra/modules/trust-fabric/database.tf)), then dynamic roles
+for the harness and evidence personas. The collector is the only store built outside it.
+
+**The objection to registering the collector in the platform's Vault was that doing so means
+seeding the collector's root credential there** — handing the platform's administrators the
+destination's credential lifecycle, which is the capture this record forecloses. That
+objection is sound and the conclusion drawn from it was not, because it assumed root seeding
+is the only way in.
+
+**Rootless static roles are the way in.** Vault Enterprise 1.18+ supports `self_managed=true`
+on a Postgres connection with `self_managed_password` on the static role: Vault connects *as*
+`harness_shipper` itself and rotates that account's own password. The platform's Vault holds
+**no privileged account on the collector** and gains nothing beyond what `harness_shipper`
+already has — `INSERT` and `SELECT` on two tables. The enclave already runs
+`hashicorp/vault-enterprise:2.0.3-ent`, so this is available today rather than pending.
+
+**The tamper-evidence property is untouched by any of this, because it never rested on
+password secrecy.** It rests on the grant list. Even an administrator who obtained
+`harness_shipper`'s password gains exactly the capability the platform already legitimately
+has, and `probe()` goes on demonstrating that `UPDATE` and `DELETE` are refused. Confusing
+"who knows the password" with "what the account may do" is what made the second trust store
+look load-bearing.
+
+**So the credential should stop being standing at all**: a Vault-managed account whose
+password rotates on a period and which no human knows, read from `database/static-creds/`
+under the same attested identity as every other credential here, replacing the hand-written
+value at a KV path. On that footing ADR-0044's count returns to **one**, and this record
+should not have claimed otherwise.
+
+Two honest caveats, which held up in practice: a rootless connection does not support
+dynamic roles (documented limitation), and out-of-band password changes desynchronise Vault
+from the database. Neither bites here — one account, rotated only by Vault.
+
+**Built, in this feature.** [`audit-egress.tf`](../../infra/modules/trust-fabric/audit-egress.tf)
+onboards `harness_shipper` as a rootless static role on a 24-hour period; the policy grants
+read on `database/static-creds/audit-shipper` instead of a KV path; the shipper reads the
+current value each time it builds a destination, so rotation needs no restart and no human;
+and the collector's coordinates travel in the jobspec, where an address belongs and a
+credential does not. Verified live — the seed in `roles.sql` no longer authenticates, and the
+running service ships under a password nobody has ever seen.
+
+One ordering consequence worth knowing before debugging bring-up: the static role imports an
+account that must already exist, so it is applied *after* `roles.sql` rather than in the main
+trust-fabric apply. And the connection is expressed as reachable from the trust store's
+container, not from the operator's shell — the same trap `database_endpoint` already carries.
+
+What a second trust store would still add is narrower than the reasoning above suggests:
+it would put the *auth* decision on the collector's side too, rather than only the grants.
+That is worth wanting and is not what "the platform must not administer the destination"
+requires, since the collector's operator can already revoke this access unilaterally by
+altering the grants or dropping the role.
+
+ROADMAP gap 0b, opened and closed the same day this record was corrected.

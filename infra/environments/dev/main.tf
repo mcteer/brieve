@@ -40,10 +40,11 @@ module "substrate" {
 module "trust_fabric" {
   source = "../../modules/trust-fabric"
 
-  nomad_jwks_url    = module.substrate.nomad_jwks_url
-  database_endpoint = module.substrate.database_endpoint
-  profile           = "development"
-  enable_tls        = var.enable_tls
+  nomad_jwks_url     = module.substrate.nomad_jwks_url
+  database_endpoint  = module.substrate.database_endpoint
+  collector_endpoint = module.substrate.collector_endpoint
+  profile            = "development"
+  enable_tls         = var.enable_tls
 
   agent_definitions   = var.agent_definitions
   role_bindings       = var.role_bindings

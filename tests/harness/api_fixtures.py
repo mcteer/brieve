@@ -110,6 +110,7 @@ def surface_under_test(
     *,
     subject: str = "alice",
     submit_outcome: str = "pending",
+    reconciler: object | None = None,
 ) -> SurfaceUnderTest:
     idp = FakeOIDCProvider()
     audit = InMemoryAuditSink()
@@ -148,6 +149,10 @@ def surface_under_test(
         change_status=ScriptedChangeStatus(),
         definitions=definitions_fabric,
         thread_store=thread_store,
+        # 015's collaborator, shared like the six above. `None` leaves both surfaces on
+        # the ABSENT reconciler, which is what an estate with no second copy actually
+        # has — the parity rows then compare two surfaces giving that same answer.
+        reconciler=reconciler,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
@@ -160,6 +165,7 @@ def surface_under_test(
         change_status=ScriptedChangeStatus(),
         definitions=definitions_fabric,
         thread_store=thread_store,
+        reconciler=reconciler,
     )
     return SurfaceUnderTest(
         app=app,

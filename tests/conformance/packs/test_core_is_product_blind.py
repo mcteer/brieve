@@ -54,6 +54,12 @@ SUBSTRATE_ALLOWED = {
     "audit/postgres_query.py": "obtains its connection credential from the fabric",
     "dependencies/store.py": "obtains its connection credential from the fabric",
     "runs/changes.py": "reads gated change status from the fabric",
+    # 015. The credential for the second copy is STORED in the platform's Vault and
+    # deliberately not minted by it — the collector's administrator issues it, and the
+    # platform only holds a copy. That distinction is the feature, so this module reads a
+    # KV path rather than reaching the database secrets engine like the entries above.
+    "audit/destination_postgres.py": "reads the stored shipping credential from a KV path",
+    "audit/local_store.py": "obtains its connection credential from the fabric",
 }
 
 

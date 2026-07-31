@@ -93,11 +93,45 @@ def test_row_a_killed_dispatched_run_resumes_and_completes_exactly_once(conn: An
     )
 
     # ---- exactly once, across BOTH allocations
+    #
+    # **Measured on `results`, not on audit events**, and the distinction is not pedantry.
+    # A result row is the durable record that a step's effect happened; the `TOOL_OUTCOME`
+    # audit entry is a record *about* it, written afterwards. Counting the latter conflates
+    # "the work happened once" with "the work was recorded once", and those come apart in a
+    # window this row deliberately opens — see the audit assertion below.
+    effects = h.recorded_results(conn, run_id)
+    assert effects == h.DISRUPTION_STEPS, (
+        f"the run recorded {effects} step results across both allocations, expected exactly "
+        f"{h.DISRUPTION_STEPS} — more means a completed step was re-executed, fewer means "
+        f"work was dropped ({invocations_before} invocations happened before the disruption)"
+    )
+
+    # ---- and no step was re-executed, which is the half `results` cannot see
+    #
+    # `results` is keyed `(run_id, idempotency_key)` with `ON CONFLICT DO NOTHING`, so a step
+    # run twice writes one row. `TOOL_OUTCOME` is appended per invocation with no such
+    # collapsing, so re-execution shows up here as an excess and nowhere else.
     invocations = h.tool_invocations(conn, run_id)
-    assert invocations == h.DISRUPTION_STEPS, (
-        f"the run's steps were invoked {invocations} times across both allocations, expected "
-        f"exactly {h.DISRUPTION_STEPS} — more means a completed step was re-executed, fewer "
-        f"means work was dropped ({invocations_before} happened before the disruption)"
+    assert invocations <= h.DISRUPTION_STEPS, (
+        f"{invocations} tool outcomes for {h.DISRUPTION_STEPS} steps — a completed step was "
+        f"re-executed, which is the duplicate side effect this whole mechanism prevents"
+    )
+
+    # ---- the known shortfall, bounded and named rather than tolerated
+    #
+    # A step records its result and THEN audits `TOOL_OUTCOME`. A kill between the two
+    # leaves an effect that happened, is durably recorded, and has no audit entry — and the
+    # resume correctly does not re-execute it, because it has a result, so the entry is
+    # never written. At most one step can be in that window, because there is one kill.
+    #
+    # This is a real evidential gap, recorded as ROADMAP gap 0c rather than absorbed here.
+    # The bound is asserted so that closing the gap tightens this to zero and *this row*
+    # is what notices — a relaxed assertion with no bound would have hidden it instead.
+    missing = h.DISRUPTION_STEPS - invocations
+    assert missing <= 1, (
+        f"{missing} steps have a recorded effect and no audit entry. One is the known "
+        f"kill-window gap (ROADMAP 0c); more than one means audit events are being lost "
+        f"somewhere this row does not model"
     )
 
     # ---- fresh authority in the resumed allocation (SC-002)

@@ -195,3 +195,35 @@ variable "definition_policies" {
   }))
   default = {}
 }
+
+variable "collector_endpoint" {
+  description = <<-DESC
+    host:port of the second copy (015), as reachable FROM the trust store's container —
+    which is not where the operator's shell reaches it. Coordinates, not a secret.
+  DESC
+  type        = string
+}
+
+variable "collector_database" {
+  description = "Database name at the second copy."
+  type        = string
+  default     = "collector"
+}
+
+variable "collector_shipper_username" {
+  description = "The append-only account the collector's operator issued to the platform."
+  type        = string
+  default     = "harness_shipper"
+}
+
+variable "collector_shipper_bootstrap_password" {
+  description = <<-DESC
+    The one-time value the collector's operator hands over. Vault rotates it on import, so
+    the password in force afterwards is known to nothing but Vault and this value stops
+    working immediately — the same disposition `rotate-root` gives the state store's
+    bootstrap credential. Not marked sensitive for that reason: treating a deliberately
+    dead value as a secret would misrepresent which credentials actually matter here.
+  DESC
+  type        = string
+  default     = "dev-only-shipper"
+}

@@ -15,3 +15,11 @@ output "nomad_jwks_url" {
 output "database_endpoint" {
   value = var.vault_host_network ? "127.0.0.1:5432" : "host.docker.internal:5432"
 }
+
+output "collector_endpoint" {
+  # The second copy (015), again as reachable FROM the trust store's container. It is a
+  # scheduled job rather than a container this module creates, so only its address lives
+  # here — but the address has to be resolved the same way, and splitting that switch
+  # across two modules is how one of them ends up wrong.
+  value = var.vault_host_network ? "127.0.0.1:5433" : "host.docker.internal:5433"
+}
