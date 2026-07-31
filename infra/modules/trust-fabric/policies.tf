@@ -131,6 +131,21 @@ resource "vault_policy" "harness_authority_read" {
     path "${vault_mount.harness_authority.path}/data/harness-ceilings/*" {
       capabilities = ["read"]
     }
+    # Claim-to-role mappings, written under Control Group by the submit endpoint and
+    # read back here to build the token verifier. Read AND list, because KV v2 splits
+    # them: without `list` on the metadata path the surface can read a mapping it
+    # already knows the name of and can discover none, which resolves every token to no
+    # roles — indistinguishable, from the caller's side, from a correctly empty estate.
+    #
+    # Still no write. The surface REQUESTS a mapping change through the gated path and
+    # the Control Group decides; a surface that could write its own mappings could grant
+    # itself a role, which is the escalation ADR-0016 closes.
+    path "${vault_mount.harness_authority.path}/data/claim-mappings/*" {
+      capabilities = ["read"]
+    }
+    path "${vault_mount.harness_authority.path}/metadata/claim-mappings" {
+      capabilities = ["list"]
+    }
     path "${vault_mount.harness_authority.path}/data/role-bindings/*" {
       capabilities = ["read"]
     }
