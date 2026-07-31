@@ -58,10 +58,6 @@ marker in the suite MUST carry the same reference:
   northbound surface has shipped, so there is nothing to assert parity across
 - Deferred-disclosure tool-call parity —
   [ADR-0040](../../../docs/adr/0040-deferred-tool-disclosure.md) productization
-- Registry isolation control-plane write denials beyond what 002 already covers — the rule
-  originates in [ADR-0025](../../../docs/adr/0025-enclave-is-the-default-topology.md)
-  ("agents are structurally excluded from managing their own platform") and Principle IV.
-  **No ADR defers this row specifically** — see Notes
 - Eval gates (packs/models/policies) — Principle VIII;
   [ADR-0004](../../../docs/adr/0004-adopt-skills-as-governed-supply-chain.md) (packs),
   [ADR-0022](../../../docs/adr/0022-qualified-model-matrix.md) and
@@ -78,16 +74,26 @@ marker in the suite MUST carry the same reference:
 
 ## Notes
 
-**Registry isolation has no deferring ADR.** Constitution v1.0.1 requires each deferred
-row to be "absent or a single explicit skip carrying the ADR that defers it," which
-assumes every row traces to one. The registry-isolation row does not: it derives from
-Principle IV and ADR-0025's structural-exclusion rule, neither of which defers it — 004
-simply has no control-plane write surface to test. The row is therefore recorded as
-not-yet-attached rather than deferred-by-decision.
+**Registry isolation is now IN FORCE**, carried by
+[018](../../018-registry-isolation/spec.md), which attempts the writes against the live
+control plane under a run's own authority and observes each one refused. It is no longer
+listed above.
 
-This is a wording gap in ADR-0047, not a gap in 004. If a second row turns out to lack a
-deferring ADR, the fix is a PATCH to ADR-0047 distinguishing *deferred by decision* from
-*not yet applicable*, rather than inventing citations to satisfy the clause.
+It sat in this list for a year, and the reason is worth keeping. Constitution v1.0.1 required
+each deferred row to be "absent or a single explicit skip carrying the ADR that defers it,"
+which assumes every row traces to one. This one did not — it derives from Principle IV and
+ADR-0025's structural-exclusion rule, neither of which defers it, and 004 simply had no
+control-plane write surface to test. So it was recorded here as not-yet-attached rather than
+deferred-by-decision, and the gap was called what it was:
+
+> This is a wording gap in ADR-0047, not a gap in 004. If a second row turns out to lack a
+> deferring ADR, the fix is a PATCH to ADR-0047 distinguishing *deferred by decision* from
+> *not yet applicable*, rather than inventing citations to satisfy the clause.
+
+That fix landed with 018, as [ADR-0047's amendment of 2026-07-31](../../../docs/adr/0047-conformance-gate-rows-attach-as-features-land.md).
+**The row that prompted the distinction is the first thing the distinction is applied to** —
+naming the states while leaving this row unplaced would have left the situation the amendment
+exists to end.
 
 ## Related
 

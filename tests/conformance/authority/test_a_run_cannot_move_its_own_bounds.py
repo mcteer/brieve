@@ -12,6 +12,8 @@ would have passed every check in this repository.
 
 from __future__ import annotations
 
+import ast
+
 import pytest
 from tests.conformance.authority import bounding_records as b
 
@@ -202,3 +204,83 @@ def test_ordinary_writes_are_not_in_scope() -> None:
             f"{path} is in the agent secret space. Writing there is what a run is FOR — the "
             f"vault pack ships a write tool for exactly it."
         )
+
+
+def test_nothing_here_widens_authority() -> None:
+    """FR-018: no module in this feature writes a policy or grants a capability.
+
+    **Scoped to the act, not the authority.** Reading with an administrator's token is
+    neither, and the coverage rows above require it — a check keyed on *which token appears*
+    would forbid the enumeration another requirement mandates, which is the shape of 017's
+    rule that forbade retry loops in words that caught its own readiness wait.
+
+    So the check is structural: no request body may carry a policy document or a capability
+    list, and the one body that names policies at all — minting a run-shaped token — may name
+    only what a run already holds. Attaching existing policies to a short-lived token is not
+    widening; writing the document that *defines* those policies is.
+
+    Until this row existed, the sharpest safety property in the feature rested on nobody
+    adding such a fixture later. A property enforced by everyone remembering is a property
+    this repository has already paid for twice.
+
+    **What it cannot see**: a body assembled at runtime from pieces, or one built through a
+    helper in another package. It reads the literals in this directory. That limit is real
+    and is the reason the demonstration in the contract is performed by hand rather than by
+    anything importable.
+    """
+    here = b.ROOT / "tests/conformance/authority"
+    offences: list[str] = []
+
+    for module in sorted(here.glob("*.py")):
+        tree = ast.parse(module.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Dict):
+                continue
+            keys = {k.value for k in node.keys if isinstance(k, ast.Constant)}
+            for forbidden in ("policy", "capabilities"):
+                if forbidden in keys:
+                    offences.append(f"{module.name}:{node.lineno} writes a {forbidden}")
+            if "policies" in keys:
+                value = next(
+                    v
+                    for k, v in zip(node.keys, node.values, strict=True)
+                    if isinstance(k, ast.Constant) and k.value == "policies"
+                )
+                if ast.unparse(value) != "list(RUN_POLICIES)":
+                    offences.append(
+                        f"{module.name}:{node.lineno} names policies other than a run's own: "
+                        f"{ast.unparse(value)}"
+                    )
+
+    assert not offences, (
+        "this feature grants authority somewhere, which is the one thing a gate that "
+        "observes refusals must never do:\n" + "\n".join(f"  {o}" for o in offences)
+    )
+
+
+def test_the_contract_states_what_this_gate_does_not_assert() -> None:
+    """FR-022: the honest limit is checked, not trusted.
+
+    This gate asserts a run cannot CHANGE what bounds it. It says nothing about whether those
+    bounds are RIGHT — a ceiling granting far too much, written through the reviewed
+    configuration path, is invisible here and every row still passes.
+
+    That limit is written in the contract. It is asserted here because a later edit could
+    remove the sentence, and then a green row would imply something no row examined — which is
+    the precise failure ADR-0047 forbids in the shape of a passing stub.
+    """
+    contract = (b.ROOT / "specs/018-registry-isolation/contracts/conformance.md").read_text()
+
+    required = {
+        "the records' contents are not asserted correct": (
+            "Not that the bounding records are correct"
+        ),
+        "the two failures that share a colour": "could not attribute",
+    }
+    missing = [why for why, phrase in required.items() if phrase not in contract]
+
+    assert not missing, (
+        "the conformance contract no longer records a limit these rows depend on: "
+        + ", ".join(missing)
+        + ". A gate whose limits are unwritten is read as asserting more than it does."
+    )

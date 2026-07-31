@@ -28,11 +28,23 @@ second.
 
 | Row | Asserts | Requirement |
 | --- | --- | --- |
-| `test_a_run_cannot_write_any_bounding_record` | Every derived bounding path refuses a write under a real run's authority | FR-001, FR-010 |
-| `test_the_refusal_is_attributable` | The same authority can **read** each path — so the refusal is about the capability, not a wrong path | FR-006 |
-| `test_the_bounding_set_is_derived_not_listed` | The set comes from the deployed policy; a path added there is covered without anyone remembering | FR-011 |
-| `test_a_permitted_write_is_its_own_outcome` | A write that succeeds reports distinctly and is undone | FR-007, FR-008 |
-| `test_ordinary_writes_are_not_in_scope` | A run's own space is untouched by this gate | FR-009 |
+| `test_a_run_cannot_write_any_bounding_record` | Every **derived** bounding path refuses a write under a real run's authority | FR-001, FR-010 |
+| `test_a_run_cannot_write_the_grant_itself` | Every **named** bound refuses — the ceiling grant, what decides which grants a run receives, the trusted-key configuration | FR-001, FR-016 |
+| `test_a_refusal_is_attributable` | The same authority can **see** each path, so the refusal is about the capability and not about a path that is not there | FR-006 |
+| `test_a_typo_in_a_path_does_not_pass` | One letter wrong reports *unattributable*, not *refused* — the row that tests the guard | FR-006 |
+| `test_no_refusal_is_asserted_with_administrator_authority` | Enumeration may use an administrator; assertion may not | FR-004 |
+| `test_every_existing_record_is_covered` | Nothing exists in the jurisdictions that no bounding path covers | FR-011, FR-014 |
+| `test_every_enumerable_surface_is_named_or_excluded` | The named half is checked against what the control plane lists | FR-012 |
+| `test_the_named_half_cannot_shrink_silently` | The five underivable bounds cannot be removed without a red row | FR-012 |
+| `test_a_permitted_write_is_undone` | A write that succeeded is removed — and the row **says whether the removal worked** | FR-007, FR-008 |
+| `test_nothing_here_widens_authority` | No module in this feature writes a policy or grants a capability | FR-018 |
+| `test_ordinary_writes_are_not_in_scope` | A run's own secret space is untouched by this gate | FR-009 |
+| `test_the_contract_states_what_this_gate_does_not_assert` | This file still records the limits the rows depend on | FR-022 |
+
+**Fourteen paths, twelve rows.** The count of paths moves with the deployment — seven derived
+from a run's read grants, seven named — and that is the intent: adding a bounding record to a
+jurisdiction extends the check without anyone editing this file.
+
 
 ---
 
@@ -124,14 +136,97 @@ and T003d exists so that removing one is at least deliberate.
 
 ## SC-007: did anything stop running?
 
-To be completed when the feature lands: per-directory `pytest --collect-only -q` counts
-compared against `main`, confirming no pre-existing directory lost rows.
+Per-directory `pytest --collect-only -q`, 2026-07-31. `tests/conformance/authority/` did not
+exist on `main`; every other test file in the tree is byte-identical to `main` (`git diff
+--stat main...HEAD -- tests/` touches three files, two of them new), so these counts **are**
+the baseline for the pre-existing directories rather than a comparison against one.
+
+| Directory | On `main` | With 018 |
+| --- | --- | --- |
+| `adapter/` | 12 | 12 |
+| `api/` | 46 | 46 |
+| `authority/` | — | **12** |
+| `deployment/` | 22 | 22 |
+| `durability/` | 48 | 48 |
+| `evidence/` | 17 | 17 |
+| `identity/` | 28 | 28 |
+| `mcp/` | 56 | 56 |
+| `packs/` | 30 | 30 |
+| `portal/` | 8 | 8 |
+
+Nothing stopped running. The total rises by exactly the rows this feature adds, which is the
+only comparison that means anything — a feature that adds rows will always raise the total,
+and a directory that quietly lost one would be invisible in that number.
 
 ---
 
 ## The one-time demonstration
 
-To be completed at implementation. Must record: the grant made, the row's failure output, the
-revocation, and **verification that the revocation took** (FR-019). Whoever performs it is
-responsible for leaving the platform exactly as they found it, and the record must show that
-rather than assert it.
+Performed by hand on **2026-07-31** against a local enclave. Not a fixture, not in a lane
+(FR-017): a fixture killed between grant and revoke leaves a real control plane permissive
+with nobody watching, and a window that is small is not one that is closed.
+
+**1. The original captured first, so the restore could be exact** rather than reconstructed:
+
+```
+vault policy read harness-authority-read > original-policy.hcl    # 59 lines, sha256 a6735092c378ab54
+```
+
+**2. The grant** — appended to `harness-authority-read`, the write capability the policy's own
+comment says must never appear:
+
+```hcl
+path "harness-authority/data/harness-ceilings/*" {
+  capabilities = ["create", "update"]
+}
+```
+
+**3. The rows went red.** Two of eleven, and the output is the whole point:
+
+```
+E   AssertionError:   harness-authority/data/harness-ceilings/probe-018: permitted — HTTP 200 — the write took effect
+E   AssertionError: a run WROTE a record bounding it — the platform's central claim is false.
+E       harness-authority/data/harness-ceilings/probe-018: removal COULD NOT REMOVE: HTTP 403
+E     	* permission denied
+E
+E     AND THE RECORDS ARE STILL THERE. A run granted create is not granted delete, so this
+E     check created something it cannot remove:
+E       harness-authority/data/harness-ceilings/probe-018
+FAILED ...::test_a_run_cannot_write_any_bounding_record
+FAILED ...::test_a_permitted_write_is_undone
+2 failed, 10 passed
+```
+
+**The second failure is the one worth reading.** `create` does not imply `delete`, so the
+check wrote a record it had no authority to remove. An earlier version of the row called the
+removal and discarded its answer — which is how the first run of this demonstration left a
+`probe-018` record sitting on a real control plane with nothing reporting it. That is fixed,
+and the fix is visible above: the row now names the leftover rather than passing over it.
+
+**4. The revocation, and the verification that it took** (FR-019) — an assertion that it was
+revoked is exactly the kind of claim this feature exists to replace:
+
+```
+vault policy write harness-authority-read original-policy.hcl
+restored byte-identical: YES          # cmp against the captured original
+capability present after revoke: 0    # grep -c 'create'
+12 passed                             # the rows, green again
+```
+
+**5. What the demonstration created was removed.** `harness-ceilings/probe-018` deleted with
+operator authority; `vault kv list` then shows the four real definitions —
+`applier-agent`, `demo-agent`, `planner-agent`, `vault-agent` — and nothing else.
+
+---
+
+## Two opposite meanings, one colour
+
+**If a run's read grant were removed, every row here would fail** — correctly, because the
+refusal could no longer be attributed. At a glance that is indistinguishable from isolation
+having broken, and the two call for opposite responses: one is a configuration change to
+undo, the other is an emergency.
+
+The rows are built so the message tells them apart. A failure reporting
+`could not attribute` means the authority can no longer see the path — the read grant went
+away. A failure reporting `a run WROTE a record bounding it` means what it says. `test_a_typo_in_a_path_does_not_pass`
+exists to keep the first from ever being reported as the second.
