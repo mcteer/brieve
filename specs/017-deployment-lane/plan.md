@@ -133,7 +133,8 @@ infra/
 │   ├── mcp.nomad.hcl            # + meta (already covered; declares itself anyway)
 │   └── agent-run.nomad.hcl      # + meta (already covered; dispatched shape)
 └── bin/
-    └── deployment-conformance   # NEW — stands the uncovered surfaces up, then hands off
+    └── deployment-conformance   # NEW — stands the uncovered surfaces up, runs the rows,
+                                 #   and stops exactly what it started (FR-007a)
 
 tests/
 └── conformance/

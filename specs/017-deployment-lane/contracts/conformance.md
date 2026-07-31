@@ -92,6 +92,13 @@ on every invocation. The 010/014 lesson is "named by a lane that **will run it**
 runner is that lane; a row asserts the runner names this directory, so the wiring cannot be
 lost the way 010's was.
 
+**The gate stops only the surfaces it started.** If a developer brought the portal up
+themselves to use it, the gate reuses it and leaves it running — so its reservations persist
+and can still crowd the conformance batch job on a later run. That is the developer's own
+choice and `portal-up` already warns about it; what the gate guarantees is that *it* adds
+nothing durable. Recorded because "the gate leaves no footprint" and "the enclave has spare
+capacity" are different claims and only the first is made.
+
 **Two processes are covered by rows that live elsewhere.** The dispatched entrypoint by
 014's durability rows; the mcp service by 015's shipping row. Those rows are stronger than a
 reach assertion, and duplicating them would be two gates for one guarantee (Principle VII).

@@ -75,6 +75,22 @@
 - Two wordings that named no referent: "the same verdict" as what, and "count rows" against
   which baseline. Both now say.
 
+### Analysis pass 4 — 2026-07-31
+
+- **The surfaces had no lifecycle, so the gate starved the checks it must not disturb.**
+  Pass 3 moved the runner into the recipe without saying what happens to the processes it
+  starts. They persisted, and on the *next* invocation held reservations while the
+  conformance batch job tried to place — verbatim the failure `portal-up`'s header records.
+  Invisible on a fresh automated runner, which gets one invocation; visible on a developer's
+  second run. FR-007a now requires the gate to leave spare capacity as it found it, and the
+  runner stops only what it started, so a developer's own surfaces are left alone.
+- **`harness_covered_by` was checked for one process out of two.** The contract claims
+  coverage-elsewhere is checkable rather than assumed; for `mcp` it was assumed. Every target
+  is resolved now.
+- Two measurement wordings sharpened: the pre-existing row comparison uses collection counts
+  rather than a full run on `main`, and FR-001 gets an assertion rather than resting on
+  construction.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A deployed process that cannot start fails the merge (Priority: P1)
@@ -265,6 +281,11 @@ confirm it produces the same verdict the automated run produces for the same tre
   repeatedly restarting. A process that never ran is a failure, never a skip.
 - **FR-007**: The gate MUST NOT reduce the coverage of the existing merge-blocking gates, and
   MUST NOT prevent them running — including by consuming the resources they need.
+- **FR-007a**: The gate MUST leave the deployment's spare capacity as it found it. Anything
+  it starts, it MUST stop — **across invocations, not only within one**. A gate that stands
+  processes up and leaves them holding reservations starves the merge-blocking checks on the
+  *next* run, which is a failure that passes on a fresh automated runner and appears only on
+  a reused one.
 - **FR-008**: The gate MUST be runnable by a contributor against a local deployment and reach
   the same verdict as the automated run for the same tree.
 - **FR-009**: The gate MUST distinguish "the surface refused this request" from "nothing
