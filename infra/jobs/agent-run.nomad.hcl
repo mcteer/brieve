@@ -41,6 +41,16 @@ variable "repo" {
 }
 
 job "agent-run" {
+  # 017's deployment lane. Every job definition must be a declared subject or an
+  # explicitly excluded one — coverage that a process opts into is fail-open, and the
+  # process nobody remembered to enrol is exactly the one nobody remembered to cover.
+  meta {
+    harness_surface     = "true"
+    harness_shape       = "dispatched"
+    harness_covered_by  = "tests/conformance/durability/"
+    harness_lane_starts = "false"
+  }
+
   type = "batch"
 
   parameterized {

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Stop the surfaces the deployment lane left standing, and nothing else.
+#
+# A failed lane leaves them running on purpose — the allocation is what someone needs to
+# diagnose the failure. This is the manual half of clearing them; the next
+# `make conformance` does it automatically before submitting its batch job.
+#
+# Stops only MARKED jobs. A portal a contributor brought up with `portal-up` carries no
+# mark and is untouched.
+set -euo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO/infra/bin/deployment-marks"
+
+if ! stop_marked; then
+  printf '\033[31mcould not stop every marked surface\033[0m — see above\n' >&2
+  exit 1
+fi
+printf '    \033[32mok\033[0m nothing marked is left running\n'

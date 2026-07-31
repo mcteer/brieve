@@ -37,6 +37,7 @@ being re-derived at the start of every spec.
 | 014 | Dispatched resume | ADR-0026 (**the durable half built** — `resume_run` gets its first `src/` caller), ADR-0048 (a resume is a new allocation with a new attested identity), ADR-0049 (grant expiry stops terminally), ADR-0047 (FR-020 re-scoping — 005's rows now asserted through a dispatch) | Ten dispatch-level rows in the durability lane. **Closed ROADMAP gap 0a**, and uncovered four latent defects — the missing grant store, an index with no writer, a sweeper that had never dispatched since 009, an observer that could not be called |
 | 015 | Audit egress for tamper-evidence | ADR-0055 (**built** — the rule was settled and nothing existed), ADR-0020 (unchanged — this adds a NEAR destination, not a far one), ADR-0035 (reconciliation runs through the governed read path and is itself audited) | Thirteen rows against a live second store under the collector administrator's credential. **Closed ROADMAP gap 0**, the most consequential gap on this page. Found a reconciler that compared the two copies' hash *claims* rather than their contents — an administrator who rewrote a payload and left `entry_hash` alone passed the comparison |
 | — | Federated sign-in and the surface that serves it | ADR-0033 (the API's first *working* deployment), ADR-0016 (claim mappings become readable, so the gate has an effect), ADR-0048 (the API gets its own attested identity), ADR-0057 (the phrasing it left owed, amended) | No new gate class. Three component suites and one conformance row on the real Vault path, plus a unit gate over the API assembly. **Not a numbered feature** — direct work off 016's parking, PRs #76–#80, recorded here because the ROADMAP's own rule is that deferrals and landings are written down where the next planner will see them |
+| 017 | Deployment lane | ADR-0047 (**the inverse case it governs** — gates that PASSED while the guarantee was absent, because they asserted about the wrong object), ADR-0048 (a surface's identity is attested, and an assembly asking for the wrong role fails at login), ADR-0033, ADR-0025 | Twenty-one rows against the served surfaces, in a lane that stands them up. **Closed ROADMAP gap 0d.** A gate class no prior lane could run: every other asserts about a process the test constructs, this about the one a deployment constructs. Eight analysis passes before implementation, six of which found something in the surfaces' lifecycle; running it then found two more |
 
 ## In progress
 
@@ -382,7 +383,7 @@ reconciliation is by count and by the re-observations' named steps rather than b
 join. Adding the index would make it exact and is a small change to the hooks engine's
 payload — worth doing whenever that path is next open.
 
-### 0d. No lane runs a served surface, so `build()` has never been executed by CI — **OPEN**
+### 0d. No lane runs a served surface, so `build()` has never been executed by CI — **CLOSED by 017, 2026-07-31**
 
 **Raised 2026-07-31, while wiring the API to a real identity provider.** The API job's
 workload identity is `nomad_job_id = "api"`; `service.py` asked Vault for the default
@@ -423,7 +424,25 @@ Open questions worth settling before building:
   surface that never read its configuration is indistinguishable at the socket. The row has to
   assert something only a correctly assembled process can produce.
 
-Claimed as the next feature, 2026-07-31.
+**Closed by [`specs/017-deployment-lane`](specs/017-deployment-lane/).** `make conformance`
+now ends by standing the API and the portal up and asserting each answers **as itself** — an
+unauthenticated request returning the surface's own reason code, which a process that read no
+configuration cannot produce. Twenty-one rows. The break was demonstrated rather than argued:
+the API pointed at a nonexistent Vault role failed the lane, named the API, and printed
+`role "no-such-role" could not be found`.
+
+**What it does NOT close, stated because the entry above invites the wrong reading.** Four of
+the five instances listed here were already covered — by 014's durability rows and 015's
+shipping row, built for those features. This gate's own contribution is the fifth, the API's
+start-up, plus making the other four's coverage *checkable* rather than incidental. The full
+assessment is in the feature's conformance contract, including the rows it would not have
+caught.
+
+**Two defects were found by running it that eight analysis passes had not**: the failure path
+reported "answered nothing" while the process's own error sat unread in the allocation's
+stderr, and the wait stopped at *placed* rather than at *answering* — so rows failed against
+surfaces that were merely young. Both are the shape this whole gap is about, arriving one
+level up: a thing that looked right on paper and was wrong when run.
 
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
 

@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# The deployment lane (017): stand the served surfaces up, prove they answer, put the
+# enclave back the way it was found.
+#
+# THIS SCRIPT IS THE LANE. `make conformance`'s pytest lines all run before these surfaces
+# exist, so rows collected there would assert against an API and a portal that are not
+# deployed yet and fail on every invocation. "Named by a lane" is not the requirement —
+# 014 found that a directory can be named by a lane that deselects it. Named by a lane
+# that WILL RUN IT is, and this is that lane.
+#
+# Invoked as the FINAL line of `make conformance`, so the conformance batch job has
+# completed and released its reservation before two more services are submitted.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO"
+
+say()  { printf '\033[1m==>\033[0m %s\n' "$*"; }
+ok()   { printf '    \033[32mok\033[0m %s\n' "$*"; }
+warn() { printf '    \033[33m--\033[0m %s\n' "$*"; }
+die()  { printf '\033[31mthe deployment lane could not run:\033[0m %s\n' "$*" >&2; exit 1; }
+
+command -v nomad >/dev/null 2>&1 || die "nomad is not on PATH — run \`make dev-up\` first"
+nomad node status >/dev/null 2>&1 \
+  || die "the enclave is not up — run \`make dev-up\` first"
+
+# The mark. Anything this script starts carries it in the job's own meta, so a LATER
+# invocation can tell a leftover from a surface a contributor brought up themselves. An
+# in-process record would die with this process and leave reclamation choosing between
+# stopping everything (taking someone's portal with it) and stopping nothing.
+source "$REPO/infra/bin/deployment-marks"
+
+say "Deployment lane — surfaces the assembly must reach"
+
+# What is already running is not ours to manage (FR-007a clause 1).
+STARTED=()
+for job in $(harness_surface_jobs); do
+  if job_is_running "$job"; then
+    ok "$job already running — reusing, not restarting"
+  else
+    STARTED+=("$job")
+  fi
+done
+
+if [ ${#STARTED[@]} -gt 0 ]; then
+  say "Standing up: ${STARTED[*]}"
+  # Through `portal-up`, not a bespoke submit: FR-001 requires the same definitions a
+  # deployment uses. A test-specific jobspec would assert against a configuration no
+  # deployment runs, which is the shape of defect this whole feature exists to close.
+  HARNESS_STARTED_BY="$MARK" bash "$REPO/infra/bin/portal-up" >/dev/null \
+    || die "portal-up failed — the surfaces could not be submitted"
+  for job in "${STARTED[@]}"; do ok "$job submitted, marked $MARK"; done
+fi
+
+# --repeat N: stand the surfaces up ONCE and run the rows N times, failing on differing
+# verdicts (SC-008). Repeats the ASSERTIONS, not bring-up — SC-008 is about this gate's
+# determinism, and re-deploying each pass would measure the scheduler instead while costing
+# minutes per iteration. Bring-up determinism is deliberately not covered; the contract says so.
+#
+# Refusing retries (FR-014) without evidence the gate is stable would be a decision taken on
+# hope. This is that evidence, and it is a flag rather than a row: a row inside this package
+# would be inside the set this script invokes, and running the gate from within the gate
+# recurses without bound.
+REPEAT=1
+[ "${1:-}" = "--repeat" ] && REPEAT="${2:-2}"
+
+say "Asserting the surfaces answer as themselves"
+ROWS=0
+VERDICTS=""
+for pass_no in $(seq 1 "$REPEAT"); do
+  set +e
+  uv run pytest tests/conformance/deployment -q
+  this=$?
+  set -e
+  VERDICTS="$VERDICTS $this"
+  [ "$this" -ne 0 ] && ROWS="$this"
+  [ "$REPEAT" -gt 1 ] && ok "pass $pass_no of $REPEAT: exit $this"
+done
+
+if [ "$REPEAT" -gt 1 ]; then
+  # shellcheck disable=SC2086
+  if [ "$(printf '%s\n' $VERDICTS | sort -u | wc -l | tr -d ' ')" != "1" ]; then
+    die "the gate is NOT deterministic — verdicts across $REPEAT passes:$VERDICTS. Intermittency here is a defect IN THE GATE (SC-008), not a reason to relax FR-014"
+  fi
+  ok "identical verdict across $REPEAT passes"
+fi
+
+if [ "$ROWS" -eq 0 ]; then
+  # Stop what we started, and only that (FR-007a clause 2). Otherwise these reservations
+  # starve the conformance batch job on the NEXT run — the failure portal-up's own header
+  # records, invisible on a fresh CI runner and fatal on a reused local enclave.
+  if [ ${#STARTED[@]} -gt 0 ]; then
+    stop_marked || die "could not stop the surfaces this run started — the next run will be starved (FR-007a clause 5)"
+    ok "stopped what this run started; spare capacity is as it was found"
+  fi
+  ok "deployment lane passed"
+  exit 0
+fi
+
+# Left standing DELIBERATELY (FR-007a clause 3). The allocation is what someone needs to
+# diagnose this, and a captured log tail is often not enough — the credential refusal that
+# motivated this feature appeared mid-log, not at its end.
+if [ ${#STARTED[@]} -gt 0 ]; then
+  warn "left ${STARTED[*]} running for inspection"
+  warn "the next \`make conformance\` clears it automatically, or run \`make deployment-down\` now"
+fi
+die "the deployment lane failed — the rows' output is above"

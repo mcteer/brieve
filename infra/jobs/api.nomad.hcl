@@ -90,7 +90,32 @@ variable "repo" {
   description = "Working tree to mount, as for the MCP service."
 }
 
+variable "harness_started_by" {
+  type    = string
+  default = ""
+  description = <<-DESC
+    Set by the deployment lane to claim ownership of a surface it started.
+
+    Empty when a person runs `portal-up` — their surfaces carry no mark and the lane will
+    never stop them. The value lives in the job's `Meta` rather than in the memory of
+    whatever submitted it, so a LATER invocation can tell a leftover from someone's own
+    work; an in-process record dies with the run and leaves reclamation choosing between
+    stopping everything and stopping nothing (017, FR-007a).
+  DESC
+}
+
 job "api" {
+  # 017's deployment lane. Every job definition must be a declared subject or an
+  # explicitly excluded one — coverage that a process opts into is fail-open, and the
+  # process nobody remembered to enrol is exactly the one nobody remembered to cover.
+  meta {
+    harness_surface     = "true"
+    harness_shape       = "served"
+    harness_covered_by  = "tests/conformance/deployment/test_the_api_answers_as_itself.py"
+    harness_lane_starts = "true"
+    harness_started_by  = var.harness_started_by
+  }
+
   type = "service"
 
   group "api" {
