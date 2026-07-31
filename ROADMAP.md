@@ -487,6 +487,38 @@ HTTP port; the service uses host networking, which on Docker Desktop is the VM's
 and not the developer's machine — the same unreachability the portal has. Small next to the
 above, and it is what stands between "the platform works" and "I can watch it work."
 
+### 0f. The MCP surface has no server — nothing frames the transport in the protocol — **OPEN**
+
+**Raised 2026-07-31, while scoping "connect it to Cursor."** The expected answer was
+networking: the mcp job uses host mode, which on Docker Desktop is the VM's namespace and not
+the developer's machine. That is real and it is not the problem.
+
+`McpTransport` — ADR-0033's second transport, with 56 conformance rows and the surface-parity
+gate in force against it — **is constructed nowhere in `src/`**. Its only caller is
+`tests/harness/api_fixtures.py`. There is no JSON-RPC framing anywhere in the tree: no
+`initialize`, no `tools/list`, no `tools/call`. `mcp==1.28.1` is a declared dependency that
+nothing imports.
+
+The `mcp` job is named for the surface and does not serve it. What it runs is the supervisory
+loop — health checks, the sweeper, audit egress — which is what 010 owed and delivered. The
+module's own docstring said the rest was next: *"The transport's operations and the sweeper's
+resume path are the tasks that follow."* The sweeper's half landed in 014. The transport's did
+not, and nothing noticed because the parity gate compares the transport **class** against the
+API's, and the class is correct.
+
+**This is the seventh instance of the shape 0d names**, and the sharpest: parity is asserted
+in force between one surface that answers real requests over a real socket (017 proved it —
+`GET /threads → 200` from the API's own log) and one that no client can reach.
+
+**What it needs**: a process that speaks the protocol over a transport a client can attach to,
+constructing `McpTransport` the way `api.nomad.hcl` constructs `build()`, plus the
+reachability fix the networking question was actually about. The operations exist and are
+tested; what is missing is the framing and the front door.
+
+**Ordering note.** This is separate from 0e and smaller. A served MCP surface with the current
+round-robin tool selection is still the platform working — a client connects, a governed
+operation runs, evidence is written — and it is what makes 0e watchable when it lands.
+
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
 
 **Closed by [`specs/015-audit-egress`](specs/015-audit-egress/), which implements ADR-0055.**
