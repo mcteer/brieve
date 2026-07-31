@@ -83,6 +83,17 @@ ENCLAVE_PATHS = frozenset(
         # matrix-grant rows read Vault as the OPERATOR, and the pack-dispatch rows drive
         # the scheduler, which only a host process legitimately can.
         "conformance/identity/test_matrix_is_readable.py",
+        # 018's registry-isolation rows. They ATTEMPT WRITES to the control plane and
+        # observe them refused, which is the whole of what the constitution's Quality Gates
+        # asks for — "agent-credential control-plane writes observed denied" — and cannot be
+        # done through a client that does not speak HTTP.
+        #
+        # A note on why this is the enclave and not a live dependency: every request goes to
+        # the local control plane, under a token carrying exactly the policies a dispatched
+        # run carries. Nothing here reaches a provider, and the one place administrator
+        # authority appears is enumeration — never an assertion of denial, because a refusal
+        # to an administrator proves nothing.
+        "conformance/authority/bounding_records.py",
         "conformance/identity/test_pack_tools_dispatch.py",
         # 011's divergence rows read the audit trail as an OPERATOR, with a token.
         #

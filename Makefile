@@ -63,7 +63,16 @@ conformance:
 	C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
-	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability tests/conformance/evidence -m host_enclave -q
+	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability tests/conformance/evidence tests/conformance/authority -m host_enclave -q
+	#
+	# 018 adds `tests/conformance/authority`, and it very nearly repeated 010's mistake in
+	# the feature built to end exactly this class of gap. Its rows passed by hand and its
+	# conformance contract SAID this line already enumerated them. No lane collected the
+	# directory: the first recipe line runs `-m "not enclave"` and these rows are marked
+	# enclave, and nothing else names the path. Twelve rows asserting that a run cannot
+	# widen its own authority, green on demand and invisible to the gate.
+	#
+	# Found by reading this comment block, which is the third time it has paid for itself.
 	#
 	# 012's containment lane. Named here in the same change that created the directory —
 	# 010 lost a whole feature's rows to a directory no lane enumerated, and the fix is to

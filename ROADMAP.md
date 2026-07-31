@@ -260,7 +260,7 @@ ADR — never a passing stub.**
 | Surface parity | 009 | ✅ **In force.** Amended, then satisfied. It read "across all four transports"; 009 has two, so claiming it would have asserted something untrue — the stub ADR-0047 forbids. 009 amends it to bind **incrementally**, across every pair of implemented transports, and satisfies it for the API/MCP pair. Better than claiming or deferring: the gate now binds at two, three, and four rather than catching nothing until the last transport lands, which is well after divergence would start. Compared against `specs/008-northbound-api/contracts/operations.snapshot.json` |
 | Tool-call parity under deferred disclosure | Deferred-disclosure feature | Deferred — ADR-0040 |
 | Eval gates (packs, models, policies) | 013 | ✅ **In force — four of five.** Must-deny, must-decline, citation accuracy, and estate-state run blocking against both shipped packs, scored on fixtures with a marked live lane behind a named runner. **Report fidelity stays owed** against ADR-0018: `RunReport` does not exist, and per ADR-0047 the row is an explicit skip citing its deferring record rather than a stub. The judge chain terminates at a human-labeled seed set (ADR-0052) |
-| Registry isolation (control-plane write denials) | — | **Unassigned** — see gaps below |
+| Registry isolation (control-plane write denials) | 018 | ✅ **In force.** Fourteen bounding paths get a real write attempt under a real run's authority, against the live control plane, and every refusal is observed. The mechanism always held — every policy grants read and list and nothing else — but nothing had ever *attempted* one, so the guarantee rested on someone having read the Terraform and concluded correctly. **Half the paths are named rather than derived**, because a run holds no read access to the grant that bounds it, to what decides which grants it receives, or to the trusted-key configuration, and no derivation can reach what it cannot see. A refusal counts only where the same authority can see the path — the control plane answers identically for *forbidden* and *absent*, so a row reading denial as proof would pass with one letter wrong in its path, forever. The break was demonstrated, not argued |
 | Accessibility (WCAG 2.2 AA, rendered interface) | 012 | ✅ **In force.** A gate class no prior lane could run: every other gate asserts something about a process, this one about a rendered page. Twenty-one rows: a vendored, pinned axe ruleset over every page state, **plus a keyboard-and-screen-reader harness** that walks the real tab order against visual position, reads the browser's own accessibility tree over CDP, measures focus indicators and target sizes, and re-renders under the reflow and text-spacing criteria. **No named runner is owed** — what was once a manual checklist runs in CI, and it found three defects on its first run. What stays outside a browser's reach (whether the words are good; any specific screen reader's behaviour) is recorded in the contract |
 
 ## Open records
@@ -572,11 +572,15 @@ carry silently.
    constitution says it is "sourced from architecture v1.14"; that document lives elsewhere.
    Anything it contains that governs — including sequencing — is currently unavailable to anyone
    working only from the repo, which is what made this file necessary.
-3. **The registry-isolation gate row has no owning feature.** It is named in the constitution's
-   Quality Gates but no ADR defers it and no planned feature attaches it. Noted in 004's
-   conformance contract as deriving from Principle IV and ADR-0025 rather than from a deferral.
-   Either a feature should claim it or ADR-0047 should distinguish *deferred by decision* from
-   *not yet applicable*.
+3. **The registry-isolation gate row has no owning feature — CLOSED by 018, 2026-07-31.** It was
+   named in the constitution's Quality Gates while no ADR deferred it and no planned feature
+   attached it. 004's conformance contract recorded it as deriving from Principle IV and ADR-0025
+   rather than from a deferral, and named both possible fixes: a feature claims it, or ADR-0047
+   distinguishes *deferred by decision* from *not yet applicable*.
+
+   **Both happened, in one change.** 018 carries the row against the live control plane, and
+   ADR-0047's amendment of 2026-07-31 names the two states — with the row that prompted the
+   distinction as the first thing the distinction is applied to.
 
 ## Maintaining this file
 
