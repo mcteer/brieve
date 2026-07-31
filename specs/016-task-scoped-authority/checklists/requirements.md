@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,23 +31,37 @@
 
 ## Notes
 
-**Two `[NEEDS CLARIFICATION]` markers remain, both deliberate**, and both are questions
-ADR-0056 explicitly handed to this feature rather than settling. Neither has a reasonable
-default, and guessing either would decide the control's strength by accident:
+**16/16 after clarification (was 15/16).** Both markers are resolved and the answers are
+recorded in the spec's Clarifications section.
 
-1. **FR-015 — what a resumed run presents in place of the person's token.** The person is
-   gone and the grant is what authorises, but something must carry that grant into the
-   resumed allocation without becoming a durable credential that could re-mint authority on
-   its own. The candidate answers differ in what an attacker who reads the run record gets.
+**What the three answers settled, and what each cost:**
 
-2. **Assumptions — how a task's entailed scope is determined.** This decides how tight the
-   narrowing can be and how much an agent definition's author must declare up front. Deriving
-   it from requested tools is cheap and coarse; declaring it per definition is precise and
-   pushes work onto authors. The wrong answer here is the one that over-grants to be safe,
-   which is how a ceiling becomes decorative.
+1. **The grant covers resource access only.** Tool authority stays with the in-process hooks
+   exactly as today. This *narrows the feature's claim* — SC-001 now speaks of the resource
+   ceiling rather than the ceiling entire — and that is the point: only the externally
+   enforced half gains the property of surviving a compromised process, so claiming the tool
+   half would have overstated the control. FR-011a pins that nothing about tool enforcement
+   moves.
 
-A third question ADR-0056 raised — how an estate knows which arrangement is in force — did
-**not** need a marker: it has a reasonable default (report it, name the reason, never default
-to the stronger reading) and is specified as FR-016 through FR-018.
+2. **Entailed scope is derived from the run's requested tools**, not declared per definition.
+   Zero authoring burden and nothing new that can drift from what it describes. The accepted
+   cost is stated rather than hidden: the narrowing is only as tight as the tools' own
+   declarations, so a broadly-declaring tool yields a broader grant. It remains a strict
+   subset of the ceiling whenever the requested tools are, which is the property being bought,
+   and tightening further is a later question about tool declarations rather than about this
+   mechanism.
 
-These are for `/speckit-clarify` to resolve, not for planning to assume.
+3. **A resumed run re-derives its authority from the run record**, under the platform's own
+   attested identity and bounded by the recorded expiry. The two alternatives were foreclosed
+   by existing decisions rather than by preference — storing the token violates ADR-0026's
+   "checkpoints hold state, never credentials", and storing a refresh token creates exactly
+   the durable credential FR-019 forbids. SC-006a makes the "record is data, not a credential"
+   property falsifiable: presented directly to the trust store, the record must obtain
+   nothing.
+
+**One power this grants, named because it is easy to miss**: the platform can mint authority
+for a person who is not present, bounded only by what was recorded at launch. That is what
+makes long-running work possible at all, and it is why FR-015b makes the record a *ceiling*
+on the resume rather than a seed for a fresh decision.
+
+Ready for `/speckit-plan`.
