@@ -106,6 +106,15 @@ The gate reuses anything already running and never restarts it — clause 1 of F
 by `test_the_runner_leaves_no_footprint` alongside the teardown directions, because an
 implementation that quietly restarted them would satisfy every other clause.
 
+**Ownership is marked in the deployment record, not held in memory.** Anything the gate starts
+carries a `harness_started_by` value; stopping — whether the automatic reclamation or
+`make deployment-down` — acts only on processes carrying it. This is what lets clause 1 hold
+*between* invocations rather than only within one: a later run has no memory of what an
+earlier one started, and without the mark reclamation could only stop everything (taking a
+contributor's portal with it) or stop nothing (leaving the starvation it exists to prevent).
+One implementation does the stopping, called from both places, because two copies of that
+decision would drift and the wrong copy decides whether someone's work survives.
+
 **The gate stops only the surfaces it started.** If a developer brought the portal up
 themselves to use it, the gate reuses it and leaves it running — so its reservations persist
 and can still crowd the conformance batch job on a later run. That is the developer's own

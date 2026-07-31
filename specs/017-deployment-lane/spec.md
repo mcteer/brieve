@@ -135,6 +135,23 @@
   undecided either/or, a phantom command, an unasserted clause. Unlike passes 4–6, none came
   from a paragraph being amended again.
 
+### Analysis pass 8 — 2026-07-31
+
+- **Ownership did not survive the run that established it.** Clause 1 recorded what the gate
+  started in memory; clause 4 asked a *later* invocation to act on that record. Nothing
+  carried it across, so reclamation had to either stop everything — tearing down a
+  contributor's own portal, breaking clause 1 and the reuse promise — or stop nothing, which
+  returns the starvation clause 4 exists to prevent. Consolidation had removed the
+  contradiction within a run and left one between runs. Ownership is now marked in the
+  deployment record.
+- The stop logic was about to be written twice, in the reclamation step and in the
+  `deployment-down` target. One implementation now, two callers: the wrong copy of a
+  safety-critical action is what would decide whether someone's portal survives.
+- **Eight passes, six of which found something in this lifecycle** — including the
+  consolidation meant to end that. It is the one part of the feature with real state and
+  real cross-invocation behaviour, and it has been designed entirely on paper. The task
+  order now puts it first, so the code settles the remainder.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A deployed process that cannot start fails the merge (Priority: P1)
@@ -329,9 +346,16 @@ confirm it produces the same verdict the automated run produces for the same tre
   is stated here.** Three sub-requirements were patched into this paragraph across two
   analysis passes and ended up contradicting each other, so it is one requirement now:
 
-  1. **Start.** The gate reuses any process already running and starts only what is missing,
-     recording which ones it started. A process a contributor brought up themselves is not
-     the gate's to manage.
+  1. **Start.** The gate reuses any process already running and starts only what is missing.
+     Anything it starts, it **marks durably** — in the deployment record itself, not in the
+     running gate's memory. A process a contributor brought up themselves carries no mark and
+     is not the gate's to manage.
+
+     The mark is what makes clause 4 possible. An in-process record of "what I started" dies
+     with the process, so a *later* invocation could only guess — and both guesses are wrong:
+     stop everything and it tears down a contributor's own portal, stop nothing and there are
+     no leftovers it can safely identify. Ownership has to outlive the run that established
+     it.
   2. **On a passing run, stop exactly what it started.** Spare capacity returns to what it
      was. Otherwise those reservations starve the merge-blocking checks on the *next* run —
      a failure that passes on a fresh automated runner, which gets one invocation, and
@@ -343,14 +367,19 @@ confirm it produces the same verdict the automated run produces for the same tre
   4. **Clear leftovers early, not late.** Because (3) leaves processes running, the *next*
      invocation must reclaim that capacity **before** the merge-blocking checks need it —
      and the gate itself runs last, which is too late. Locally a prior failure is the normal
-     case: the gate gets re-run *because* it failed.
+     case: the gate gets re-run *because* it failed. Reclamation stops **only marked
+     processes**, which is how it honours clause 1 across invocations rather than only
+     within one.
   5. **A failure to stop what it started fails the gate.** Swallowed, it returns the
      processes to persisting and the next run to being starved — reported green by the
      mechanism built to prevent exactly that.
 
-  Clauses 2 and 3 are the pair that must be read together: an unqualified "always stop"
-  destroys evidence, and an unqualified "always leave" starves the next run. Neither alone
-  is correct, which is why they are no longer separate requirements.
+  Two pairs must be read together, and each pair was a contradiction before it was one
+  requirement. **2 and 3**: an unqualified "always stop" destroys evidence, an unqualified
+  "always leave" starves the next run, and neither alone is correct. **1 and 4**: ownership
+  must be durable or reclamation cannot act on it — the mark is not an implementation
+  convenience, it is what keeps the two clauses from contradicting each other one invocation
+  apart.
 
 - **FR-008**: The gate MUST be runnable by a contributor against a local deployment and reach
   the same verdict as the automated run for the same tree.

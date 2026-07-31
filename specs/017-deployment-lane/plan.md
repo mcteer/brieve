@@ -136,9 +136,12 @@ infra/
     ├── enclave-conformance      # + early reclamation of leftovers (FR-007a clause 4),
     │                            #   in its existing purge phase — it covers the direct
     │                            #   invocation path a Makefile-only step would miss.
-    └── deployment-conformance   # NEW — stands the uncovered surfaces up, runs the rows,
-                                 #   and owns their lifecycle: stop what it started on a
-                                 #   pass, leave it standing on a failure (FR-007a)
+    ├── deployment-conformance   # NEW — stands the uncovered surfaces up, runs the rows,
+    │                            #   and owns their lifecycle: mark what it starts, stop
+    │                            #   that on a pass, leave it standing on a failure.
+    └── deployment-down          # NEW — the SINGLE implementation of stopping. Acts only
+                                 #   on marked processes; called by the `deployment-down`
+                                 #   target and by the early reclamation (FR-007a).
 
 tests/
 └── conformance/
