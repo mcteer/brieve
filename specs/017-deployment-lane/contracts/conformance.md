@@ -13,6 +13,27 @@ Quality Gates).
 Recorded explicitly because "no runner named" and "no runner needed" look identical in a
 table, and the first is a defect while the second is a property.
 
+### Two criteria are verified once, not by a gate
+
+**SC-006** — a contributor reaches the same verdict locally as the automated run. A Linux
+runner has no macOS half to compare against, so nothing automated can re-check this. Verified
+at implementation on both substrates and recorded here.
+
+**SC-008** — repeated runs against an unchanged tree agree. Checked by
+`infra/bin/deployment-conformance --repeat`, run at implementation. Running it on every
+invocation would double the lane for a property that changes only when the gate itself
+changes.
+
+**Neither is a row, and neither is silently unverified.** Re-verify both when the gate's
+reach mechanism or its waits change — those are the two things that would break them. The
+distinction matters because "every row is automated" is true and would otherwise be read as
+"every criterion is enforced continuously", which is not.
+
+**Why SC-008 is not a row**: a row inside `tests/conformance/deployment/` that ran the gate
+would be inside the set the runner invokes, and would recurse without bound. The check
+belongs one level out, in the thing that runs the rows. Found by analysis pass 2, against a
+design pass 1 had just added.
+
 ---
 
 ## The rows
@@ -21,7 +42,6 @@ table, and the first is a defect while the second is a property.
 | --- | --- | --- | --- |
 | `test_every_declared_process_is_asserted` | Declared processes and asserted processes are the same set — **in both directions** | FR-005 | US3 |
 | `test_an_unenrolled_definition_fails` | A job definition that is neither declared nor excluded **fails the gate** | FR-005a | US3 |
-| `test_the_gate_is_deterministic` | Two runs against an unchanged tree reach the same verdict | SC-008 | — |
 | `test_the_api_answers_as_itself` | An unauthenticated request to the running API returns its own refusal reason, not a generic rejection | FR-003, FR-009 | US1, US2 |
 | `test_the_portal_read_its_configuration` | The running portal redirects to sign-in at the **configured** issuer, with a PKCE challenge | FR-003 | US1, US2 |
 | `test_the_dispatched_process_is_covered` | The dispatched entrypoint is asserted somewhere, and that assertion dispatches rather than reading prior records | FR-005, FR-013 | US5 |

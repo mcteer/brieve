@@ -46,6 +46,20 @@
 - **US5 was P1 and sat after a P3 story.** Moved above US3; the identifier is unchanged
   because the task list references it.
 
+### Analysis pass 2 — 2026-07-31
+
+- **The determinism check could not have been built as written.** Pass 1 added it as a row
+  in the package the gate runs, so running the gate from inside the gate recursed without
+  bound. Moved one level out, into the runner. Pass 1's own remediation introduced this.
+- **SC-006 and SC-008 are verified once at implementation, not by a recurring gate.** A
+  Linux runner cannot check the macOS half of SC-006, and repeating the whole gate on every
+  invocation would double the lane. The plan's "no named human runner is owed" is true of
+  the rows and broader than what is true of these two criteria; the contract now says which
+  is which.
+- **Proving the directory is collected must not commit a failing row.** A deliberately red
+  row on a branch whose lane is merge-blocking blocks every push until someone removes it.
+  The probe now lives and dies inside one working session.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A deployed process that cannot start fails the merge (Priority: P1)
@@ -69,7 +83,7 @@ Then confirm the unbroken tree passes. Delivers the whole of the feature's value
 **Acceptance Scenarios**:
 
 1. **Given** a tree where every surface's assembly is correct, **When** the gate runs,
-   **Then** every surface reaches a serving state within a bounded time and the gate passes.
+   **Then** every process reaches a working state within its own wait and the gate passes.
 2. **Given** a surface whose assembly names a credential it cannot obtain, **When** the gate
    runs, **Then** the gate fails, names that surface, and surfaces the process's own error
    rather than only a timeout.

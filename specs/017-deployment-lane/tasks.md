@@ -12,7 +12,7 @@
 
 | Gate type | Applies | Where |
 | --- | --- | --- |
-| **Fail-closed** | **Yes** | T008a — a definition nobody enrolled fails, so coverage is not opt-in (FR-005a). T012 — absent, unschedulable or restarting fails, never skips (FR-006). T013 — no retry may absorb a failure (FR-014). T036a — the gate is demonstrably deterministic, which is what makes refusing retries defensible (SC-008) |
+| **Fail-closed** | **Yes** | T008a — a definition nobody enrolled fails, so coverage is not opt-in (FR-005a). T012 — absent, unschedulable or restarting fails, never skips (FR-006). T013 — no retry may absorb a failure (FR-014). T036a — the gate is demonstrably deterministic, which is what makes refusing retries defensible (SC-008), checked by the runner rather than by a row inside the set it runs |
 | **Conformance** | **Yes** | The whole feature. Transport surfaces are the subject |
 | **Correlation / evidence** | **No** | This feature participates in no run and writes no audit entry. It observes surfaces from outside; nothing joins a correlation ID because nothing here is part of a run |
 | **Eval** | **No** | No pack, prompt, model or policy promotes here |
@@ -30,7 +30,7 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 
 - [ ] T001 Create `tests/conformance/deployment/__init__.py` with a module docstring stating what this package asserts (reach, not correctness) and what it does not
 - [ ] T002 Add `tests/conformance/deployment` to the `host_enclave` pytest line in the `conformance` target in `Makefile`, with a comment citing the 010 and 014 directory-enumeration failures the recipe already records
-- [ ] T003 Add a placeholder row in `tests/conformance/deployment/test_the_lane_collects_this_directory.py` that fails, run `make conformance`, and confirm it fails — proving the directory is collected before any real row depends on it
+- [ ] T003 Prove the directory is collected **before committing anything that depends on it**: add a temporary always-failing row at `tests/conformance/deployment/test_the_lane_collects_this_directory.py`, run `make conformance`, observe it fail, then **delete it in the same working session**. It is never committed — a deliberately red row on a branch whose lane is merge-blocking would block every push until someone removed it, which is a self-inflicted version of the problem this feature exists to fix
 
 ---
 
@@ -43,8 +43,7 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 - [ ] T006 [P] Add a `meta` block to `infra/jobs/mcp.nomad.hcl` with `harness_shape = "served"` and `harness_covered_by` naming `tests/conformance/evidence/test_the_service_ships.py` — covered elsewhere, and the declaration is what makes that checkable rather than assumed
 - [ ] T007 [P] Add a `meta` block to `infra/jobs/agent-run.nomad.hcl` with `harness_shape = "dispatched"` and `harness_covered_by` naming `tests/conformance/durability/`
 - [ ] T007a Decide and record a verdict for `infra/jobs/harness-probe.nomad.hcl` — ours and batch-shaped, and unaddressed until analysis pass 1 raised it. Either declare it a subject or exclude it with a reason; **not deciding is what FR-005a forbids**
-- [ ] T007b Define the exclusion list in `tests/conformance/deployment/surfaces.py` — `postgres` and `collector-postgres` (vendor images, no assembly of ours) and `conformance` (the gate's own runner; asserting against it is circular). Each entry carries its reason in source
-- [ ] T008 Implement `tests/conformance/deployment/surfaces.py` — parse **every** `infra/jobs/*.nomad.hcl`, return declared subjects and excluded definitions separately, and **raise on an unrecognised `harness_shape`** rather than defaulting, so a typo cannot silently drop a process from coverage (data-model.md)
+- [ ] T008 Implement `tests/conformance/deployment/surfaces.py` — parse **every** `infra/jobs/*.nomad.hcl`, return declared subjects and excluded definitions separately, define the exclusion list in the same module with each entry carrying its reason in source (`postgres` and `collector-postgres`: vendor images, no assembly of ours; `conformance`: the gate's own runner, asserting against it is circular), and **raise on an unrecognised `harness_shape`** rather than defaulting, so a typo cannot silently drop a process from coverage (data-model.md)
 - [ ] T008a [GATE:fail-closed] Implement the discovery check in `tests/conformance/deployment/surfaces.py` — a definition on disk that is neither declared nor excluded **fails**, and a stale exclusion naming a file that no longer exists also fails (FR-005a). This is the row that makes coverage fail closed rather than opt-in; without it a process nobody enrolled is invisible, which is this feature's own subject matter one level up
 - [ ] T009 Implement the allocation lookup in `tests/conformance/deployment/conftest.py` — resolve a job's **running** allocation, filtering by status rather than taking the last row of `nomad job status` (the stopped allocation sorts last, which cost a wrong reading on 2026-07-31)
 - [ ] T010 Implement `exec_request()` in `tests/conformance/deployment/conftest.py` — issue an HTTP request from **inside** the allocation via `nomad alloc exec`, returning status, body and headers (research R5: a shell reaches host-networked surfaces on Linux CI and not on Docker Desktop)
@@ -53,7 +52,7 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 - [ ] T013 [GATE:fail-closed] Add `tests/conformance/deployment/test_no_retry_and_no_skip.py` asserting that no module **other than the single wait helper in `conftest.py`** loops over an assertion, and that `pytest.skip` appears nowhere in the package — FR-014. Scoped to "every module except the one allowed to wait" rather than to loop syntax, because a readiness poll and an assertion retry look identical textually and a row that could not tell them apart would either false-positive on T011 or be weakened until it asserted nothing
 - [ ] T014 [GATE:no-secret-leak] Implement failure reporting in `tests/conformance/deployment/conftest.py` that prints the allocation's own error output (FR-004) **with a redaction pass**, and add a row asserting a token-shaped value in captured output is redacted — allocation output is exactly where a credential surfaces
 - [ ] T015 Implement `infra/bin/deployment-conformance` — stand up the uncovered surfaces via `infra/bin/portal-up`, force a **new allocation** rather than trusting `nomad job run` against an unchanged jobspec (research R7, observed 2026-07-31), capture and print the scheduler's placement output on failure, then invoke the rows
-- [ ] T016 Delete `tests/conformance/deployment/test_the_lane_collects_this_directory.py` once a real row in that package depends on collection
+- [ ] T016 Confirm no temporary or placeholder row survives in `tests/conformance/deployment/` before the first push — T003's probe is deleted in its own session, and this is the check that it actually was
 
 **Checkpoint**: the directory is collected, **every** job definition has a verdict, and a row can reach a surface from inside its allocation. A definition nobody enrolled now fails rather than being invisible.
 
@@ -139,7 +138,9 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 ## Phase 8: Polish & cross-cutting
 
 - [ ] T036 [GATE:conformance] Run `make conformance` and confirm **every row that ran before this feature still runs** — count rows, not just the exit code. A lane that silently stopped collecting a directory looks exactly like a pass (FR-007, SC-005)
-- [ ] T036a [GATE:fail-closed] Add `tests/conformance/deployment/test_the_gate_is_deterministic.py` — run the gate twice against an unchanged tree and assert identical verdicts (SC-008). Refusing retries (FR-014) without evidence the gate is stable is a decision taken on hope; this is that evidence
+- [ ] T036a [GATE:fail-closed] Add a `--repeat N` mode to `infra/bin/deployment-conformance` that runs the row set N times and fails on differing verdicts, then run it and record the result in `specs/017-deployment-lane/contracts/conformance.md` (SC-008).
+  **Not a row in `tests/conformance/deployment/`.** A row there would be inside the set the script invokes, so running the gate from within the gate recurses without bound. The check belongs one level out, in the thing that runs the rows. Refusing retries (FR-014) without evidence the gate is stable is a decision taken on hope; this is that evidence
+- [ ] T036b Record in `specs/017-deployment-lane/contracts/conformance.md` that **SC-006 and SC-008 are verified once at implementation, not by a recurring gate** — a Linux runner cannot check the macOS half of SC-006, and running the gate twice on every invocation would double the lane. Name what would re-verify them and when. The plan's "no named human runner is owed" is true of the ROWS and broader than what is true of these two criteria
 - [ ] T037 Complete the SC-007 assessment in `specs/017-deployment-lane/contracts/conformance.md`: for each of the five known instances, state whether this gate would have caught it — **including the ones it would not**. On current research the expected answer is that three were in the dispatched path and were caught by 014, which makes this feature's own contribution narrower than gap 0d implies
 - [ ] T038 Update `ROADMAP.md` — close gap 0d, add the 017 row, and record what the gate does **not** cover. In the same change, per the file's own maintenance rule
 - [ ] T039 [P] Add `docs/development/deployment-lane.md` describing how to run the gate, how to add a process to it, and the two traps (host networking, and an unchanged jobspec placing no new allocation)
@@ -152,7 +153,7 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 ```
 Phase 1 (Setup)          T001 → T002 → T003
                              ↓
-Phase 2 (Foundational)   T004–T007 [P] → T007a → T007b → T008 → T008a
+Phase 2 (Foundational)   T004–T007 [P] → T007a → T008 → T008a
                          T009 → T010 → T011 → T012, T013, T014 → T015 → T016
                              ↓
         ┌────────────────────┼────────────────────┐
@@ -165,7 +166,7 @@ Phase 6 (US3, P2)        T029–T032 (incl. T031a)
                              ↓
 Phase 7 (US4, P3)        T033–T035
                              ↓
-Phase 8 (Polish)         T036, T036a, T037–T040
+Phase 8 (Polish)         T036, T036a, T036b, T037–T040
 ```
 
 **Story dependencies**: US1, US2 and US5 are independent of each other once Phase 2 lands —

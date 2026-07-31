@@ -86,8 +86,16 @@ addition to the CI lane.
 
 **Blocking-row ownership** (constitution v1.1.0, Quality Gates): this feature adds
 merge-blocking rows, and **every one is executed by an automated check** — the enclave lane,
-extended. **No named human runner is owed.** The conformance contract must record that
-explicitly, because "no runner named" and "no runner needed" look identical in a table.
+extended. **No named human runner is owed for the rows.** The conformance contract must
+record that explicitly, because "no runner named" and "no runner needed" look identical in a
+table.
+
+**Two success criteria are not rows, and analysis pass 2 caught the claim above being
+broader than the truth.** SC-006 (a contributor reaches the same verdict locally) cannot be
+checked by a Linux runner, which has no macOS half to compare against; SC-008 (repeated runs
+agree) would double the lane if it ran every time. Both are **verified once at
+implementation and recorded**, not enforced continuously. That is a defensible position and
+an undefensible silence, which is why the contract names it.
 
 **Gate result**: **PASS — proceed to Phase 0**
 
@@ -136,8 +144,11 @@ tests/
         ├── test_the_portal_read_its_configuration.py    # FR-003, US1/US2
         ├── test_the_dispatched_process_is_covered.py    # FR-005 for the dispatched shape
         ├── test_no_retry_and_no_skip.py                 # FR-014, by source inspection
-        ├── test_break_a_surface_assembly.py             # FR-012, the break fixture
-        └── test_the_gate_is_deterministic.py            # SC-008, run twice, compare
+        └── test_break_a_surface_assembly.py             # FR-012, the break fixture
+
+    # SC-008 is NOT a row here. A row inside this package that ran the gate would be
+    # inside the set the runner invokes, so it would recurse without bound. The repeat
+    # check lives in infra/bin/deployment-conformance, one level out.
 
 Makefile                          # `conformance` gains the new directory
 .github/workflows/enclave.yml     # one step after `make conformance`
