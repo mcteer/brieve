@@ -107,7 +107,7 @@ def _run_steps(
     total_steps: int,
     tools: list[str],
     invoke_tools: bool,
-    already_done: Any,
+    skip_reason: Any,
 ) -> tuple[int, list[int], list[int]]:
     """Execute the run's steps, skipping the ones re-observation says already happened.
 
@@ -116,11 +116,17 @@ def _run_steps(
     for the zero-open-intents row to count — which would make the row that exists to prevent
     vacuous stop rows produce one.
 
-    ``already_done`` decides skipping and is the only difference between a fresh run and a
+    ``skip_reason`` decides skipping and is the only difference between a fresh run and a
     resumed one, which is deliberate: the skip is a *predicate*, not a second code path, so a
     resumed run cannot execute a step through any route a fresh run does not. The skip
     happens **before** invocation, so nothing reaches a tool without passing the hooks
     (Principle II).
+
+    It returns a REASON rather than a boolean, because the reason is evidence. A skipped step
+    whose effect already happened has no `TOOL_OUTCOME` of its own — the allocation that ran
+    it may have died before writing one — so without a record of the skip the trail is simply
+    short, and an investigator counting outcomes finds a step missing with nothing to explain
+    it (ROADMAP gap 0c).
 
     Returns ``(exit_code, executed, skipped)``.
     """
@@ -128,11 +134,20 @@ def _run_steps(
     skipped: list[int] = []
 
     for step in range(total_steps):
-        if already_done(step):
-            # Not re-executed, and not silently forgotten either — the caller reports the
+        if (why := skip_reason(step)) is not None:
+            # Not re-executed, and not silently forgotten either. The caller reports the
             # counts, because "skipped 3 and ran 2" is what an investigator needs and a bare
-            # completion cannot distinguish from "ran none of them".
+            # completion cannot distinguish from "ran none of them" — and each skip also
+            # records ITSELF, so the step is accounted for in the trail rather than only in a
+            # summary that has to be trusted.
             skipped.append(step)
+            _emit(
+                run.audit_sink,
+                correlation_id=run.correlation_id,
+                tenant_id=run.tenant_id,
+                event=AuditEventType.STEP_REOBSERVED,
+                payload={"run_id": blob_id, "step_index": step, "reason": why},
+            )
             continue
 
         if (reason := stop_requested(run)) is not None:
@@ -358,6 +373,10 @@ def resume_dispatched_run(
             # carrying step payloads.
             "completed_steps": len(decision.completed_steps),
             "pending_steps": len(decision.pending_steps),
+            # The third category, and the one that produces a step with no outcome of its
+            # own: a closed result whose allocation died before auditing it. Counted here and
+            # named per step by `STEP_REOBSERVED` below.
+            "recorded_steps": len(decision.recorded_steps),
         },
     )
 
@@ -456,9 +475,16 @@ def resume_dispatched_run(
     recorded = {intent.step_index for intent in decision.recorded_steps}
     resume_from = checkpoint.step_index + 1
 
-    def already_done(step: int) -> bool:
+    def skip_reason(step: int) -> str | None:
+        """Why this step will not run, or ``None`` to run it.
+
+        The reason is named rather than reduced to a boolean because it goes in the trail,
+        and the three are genuinely different claims: a closed result is the step's own
+        record that it finished, re-observation is a judgement about an open bracket, and
+        the checkpoint mark is a coarser backstop for steps that never bracketed at all.
+        """
         if step in pending:
-            return False
+            return None
         # `recorded` is the fix for an exactly-once violation the conformance row caught, and
         # the ordering of these three inputs is the whole of it.
         #
@@ -474,7 +500,13 @@ def resume_dispatched_run(
         # The closed bracket is the stronger record: the result is written by the step at the
         # moment it finished, while the checkpoint is written afterwards and can be lost.
         # `step < resume_from` stays as the coarser backstop for steps that never bracketed.
-        return step in recorded or step in completed or step < resume_from
+        if step in recorded:
+            return "result_recorded"
+        if step in completed:
+            return "reobserved_complete"
+        if step < resume_from:
+            return "below_checkpoint"
+        return None
 
     code, executed, skipped = _run_steps(
         run,
@@ -483,7 +515,7 @@ def resume_dispatched_run(
         total_steps=total_steps,
         tools=tools,
         invoke_tools=invoke_tools,
-        already_done=already_done,
+        skip_reason=skip_reason,
     )
     print(f"resumed {blob_id}: executed={executed} skipped={skipped}", flush=True)
     if code == _SUSPENDED:
@@ -811,7 +843,7 @@ def main() -> int:
             total_steps=steps,
             tools=sorted(tools),
             invoke_tools=invoke_tools,
-            already_done=lambda _step: False,
+            skip_reason=lambda _step: None,
         )
         if code == _SUSPENDED:
             # A FRESH run can suspend too, and this arm is the more common one in production:

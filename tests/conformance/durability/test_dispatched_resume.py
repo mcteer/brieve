@@ -117,22 +117,36 @@ def test_row_a_killed_dispatched_run_resumes_and_completes_exactly_once(conn: An
         f"re-executed, which is the duplicate side effect this whole mechanism prevents"
     )
 
-    # ---- the known shortfall, bounded and named rather than tolerated
+    # ---- no step is silent (ROADMAP gap 0c)
     #
-    # A step records its result and THEN audits `TOOL_OUTCOME`. A kill between the two
-    # leaves an effect that happened, is durably recorded, and has no audit entry — and the
-    # resume correctly does not re-execute it, because it has a result, so the entry is
-    # never written. At most one step can be in that window, because there is one kill.
+    # This used to assert only that the shortfall was AT MOST ONE, because there was nothing
+    # in the trail to reconcile it against: a step whose result was recorded and whose
+    # allocation died before auditing the outcome simply went missing, and the row could
+    # bound the hole but not close it.
     #
-    # This is a real evidential gap, recorded as ROADMAP gap 0c rather than absorbed here.
-    # The bound is asserted so that closing the gap tightens this to zero and *this row*
-    # is what notices — a relaxed assertion with no bound would have hidden it instead.
-    missing = h.DISRUPTION_STEPS - invocations
-    assert missing <= 1, (
-        f"{missing} steps have a recorded effect and no audit entry. One is the known "
-        f"kill-window gap (ROADMAP 0c); more than one means audit events are being lost "
-        f"somewhere this row does not model"
+    # **Not a partition, and the earlier draft of this assertion got that wrong.** A step the
+    # FIRST allocation ran has an outcome, and the resumed allocation re-observes it — so the
+    # two records overlap by design and their counts do not sum to the run's length. What
+    # holds is that between them nothing is unaccounted for: an outcome means an allocation
+    # ran it here, a re-observation means one ran it earlier and this allocation saw that.
+    reobserved = h.events(conn, run_id, "step_reobserved")
+    assert invocations + len(reobserved) >= h.DISRUPTION_STEPS, (
+        f"{invocations} outcomes + {len(reobserved)} re-observations cannot account for "
+        f"{h.DISRUPTION_STEPS} steps — at least one step's effect happened and nothing in "
+        f"the audit plane says so, which is the hole this record exists to close"
     )
+
+    # And the re-observations name steps, not just a count — a summary an investigator has to
+    # trust is not the same artifact as a record they can check.
+    named = [e["step_index"] for e in reobserved]
+    assert all(isinstance(i, int) and 0 <= i < h.DISRUPTION_STEPS for i in named), (
+        f"a re-observation named no step, or one outside the run: {reobserved[:3]}"
+    )
+    assert len(set(named)) == len(named), (
+        "a step was re-observed twice in one allocation, so the count overstates what was "
+        "actually skipped"
+    )
+    assert all(e.get("reason") for e in reobserved), "a re-observation did not say why"
 
     # ---- fresh authority in the resumed allocation (SC-002)
     credentials = h.credential_ids(conn, run_id)

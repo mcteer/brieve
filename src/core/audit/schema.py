@@ -132,6 +132,20 @@ class AuditEventType(StrEnum):
     #: the revival before its consequences (FR-017).
     RUN_RESUMED = "run_resumed"
 
+    #: A step a resumed allocation did NOT execute, and why (ROADMAP gap 0c).
+    #:
+    #: **The counterpart to `TOOL_OUTCOME`, and together they must account for every step.**
+    #: A step records its result and then audits its outcome; a kill between the two leaves
+    #: an effect that happened, is durably recorded, and has no entry in the trail — and the
+    #: resume correctly does not repeat it, so the entry was never going to appear later
+    #: either. The trail was short by one and nothing said why.
+    #:
+    #: So the skip records itself. An investigator reconciling a resumed run finds, for every
+    #: step, either an outcome (this allocation ran it) or one of these (a previous allocation
+    #: ran it and this one observed that rather than repeating it). "Re-observe, never
+    #: re-execute" stops being an inference from counts and becomes a statement in the record.
+    STEP_REOBSERVED = "step_reobserved"
+
 
 class AuditEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")

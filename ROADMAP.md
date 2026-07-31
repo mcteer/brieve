@@ -329,41 +329,41 @@ made a second trust store look load-bearing.
 
 **ADR-0044's count stands at one.** There is no second standing credential.
 
-### 0c. A kill between a step's result and its audit entry loses the entry
+### 0c. A kill between a step's result and its audit entry loses the entry — **CLOSED 2026-07-31**
 
 **Found 2026-07-30 by 015's full gate run**, which failed `test_dispatched_resume`'s
-exactly-once row with 399 outcomes for 400 steps. The run's data settles what happened: 400
+exactly-once row with 399 outcomes for 400 steps. The run's data settled what happened: 400
 intents, **400 results**, 399 `TOOL_OUTCOME` events. Every step's effect happened and was
 durably recorded exactly once; one produced no audit entry.
 
 **The window.** A step records its result and *then* audits `TOOL_OUTCOME`. A kill between
-the two leaves an effect that happened, is recorded in `results`, and has no entry in the
-trail — and the resume correctly does **not** re-execute it, because `closed_intents` sees
-the result, so the entry is never written afterwards either. At most one step per disruption
-can be in that window.
+the two left an effect that happened, was recorded in `results`, and had no entry in the
+trail — and the resume correctly did **not** re-execute it, because `closed_intents` saw the
+result, so the entry was never written afterwards either.
 
-**The ordering is not the bug.** Auditing first would be worse: a kill between the audit and
-the result would leave a `TOOL_OUTCOME` for a step with no recorded result, the resume would
-re-execute it, and the side effect would happen twice. Exactly-once is the more important of
-the two properties and the current order is the right trade.
+**The ordering was never the bug.** Auditing first would be worse: a kill between the audit
+and the result leaves a `TOOL_OUTCOME` for a step with no recorded result, the resume
+re-executes it, and the side effect happens twice. Exactly-once is the more important of the
+two properties and the current order is the right trade.
 
-**What is missing is the record of the skip.** The resumed allocation *knows* it skipped step
-N because N had a result — that is exactly what `recorded_steps` tells it. Emitting an event
-saying so would close the gap: the trail would then read "step N's effect was recorded, and a
-later allocation observed rather than repeated it", which is 005's "re-observe, never
-re-execute" written down instead of inferred. That is the fix, and it belongs to whoever
-touches the resume path next rather than to 015.
+**Closed by recording the skip.** `STEP_REOBSERVED` names each step a resumed allocation did
+not execute and why — `result_recorded`, `reobserved_complete`, or `below_checkpoint`. Those
+are three genuinely different claims (the step's own record that it finished; a judgement
+about an open bracket; a coarser backstop for steps that never bracketed), and collapsing
+them to "skipped" would lose the difference an investigator is asking about. "Re-observe,
+never re-execute" is now a statement in the trail rather than an inference from counts.
 
-**Meanwhile the row is bounded, not relaxed.** `test_dispatched_resume` now measures
-exactly-once on `results`, asserts no re-execution on `TOOL_OUTCOME`, and asserts the audit
-shortfall is **at most one** — so closing this gap tightens the bound to zero and that row is
-what notices. A relaxed assertion with no bound would have hidden this instead of pinning it.
+**What the conformance row asserts now**, having previously only bounded the hole at one:
+between outcomes and re-observations, no step is silent. Deliberately not a partition — a
+step the first allocation ran has an outcome *and* is re-observed by the resumed one, so the
+records overlap by design and their counts do not sum to the run's length. An earlier draft
+of the assertion claimed a partition and failed on a clean run, which is how the overlap got
+noticed.
 
-**Scope of the claim this dents**: narrow and worth stating plainly. The platform can still
-prove the effect happened, from `results`. What it cannot do, for one step per disruption, is
-show that proof *in the audit trail* — which is the artifact every tamper-evidence guarantee
-in 015 is about. A gap in the evidence plane is the one kind this platform said it would not
-carry silently, so it is here.
+**Still true, and worth keeping visible**: `TOOL_OUTCOME` carries no step index, so the
+reconciliation is by count and by the re-observations' named steps rather than by a per-step
+join. Adding the index would make it exact and is a small change to the hooks engine's
+payload — worth doing whenever that path is next open.
 
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
 
