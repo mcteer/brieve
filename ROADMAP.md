@@ -36,6 +36,7 @@ being re-derived at the start of every spec.
 | 013 | Capability packs and eval gates | ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045 (**built** — the toolset line 008–012 signposted, replaced by product knowledge a definition opts into), ADR-0018 (consumed) | Four of five eval gates blocking against both shipped packs; the fifth (report fidelity) an explicit skip citing ADR-0018, per ADR-0047 |
 | 014 | Dispatched resume | ADR-0026 (**the durable half built** — `resume_run` gets its first `src/` caller), ADR-0048 (a resume is a new allocation with a new attested identity), ADR-0049 (grant expiry stops terminally), ADR-0047 (FR-020 re-scoping — 005's rows now asserted through a dispatch) | Ten dispatch-level rows in the durability lane. **Closed ROADMAP gap 0a**, and uncovered four latent defects — the missing grant store, an index with no writer, a sweeper that had never dispatched since 009, an observer that could not be called |
 | 015 | Audit egress for tamper-evidence | ADR-0055 (**built** — the rule was settled and nothing existed), ADR-0020 (unchanged — this adds a NEAR destination, not a far one), ADR-0035 (reconciliation runs through the governed read path and is itself audited) | Thirteen rows against a live second store under the collector administrator's credential. **Closed ROADMAP gap 0**, the most consequential gap on this page. Found a reconciler that compared the two copies' hash *claims* rather than their contents — an administrator who rewrote a payload and left `entry_hash` alone passed the comparison |
+| — | Federated sign-in and the surface that serves it | ADR-0033 (the API's first *working* deployment), ADR-0016 (claim mappings become readable, so the gate has an effect), ADR-0048 (the API gets its own attested identity), ADR-0057 (the phrasing it left owed, amended) | No new gate class. Three component suites and one conformance row on the real Vault path, plus a unit gate over the API assembly. **Not a numbered feature** — direct work off 016's parking, PRs #76–#80, recorded here because the ROADMAP's own rule is that deferrals and landings are written down where the next planner will see them |
 
 ## In progress
 
@@ -239,7 +240,7 @@ the decision, not an omission.
 | Wire-level guardrail (second protection layer) | ADR-0014 | Optional by design; in-process hooks are the primary layer |
 | Retrieval | ADR-0029 | Runs in the Postgres a deployment already has — needs that Postgres to exist first |
 | Row-level security on the evidence store | 008 | The tenant boundary on evidence reads is enforced by the application, not the database. `exists_outside_tenant` shows why that matters: the SQL role can see that rows exist under another tenant even though no content crosses. Postgres RLS moves the enforcement a layer down and is the right eventual home |
-| RFC 8693 + RAR authority manufacture | **Closed by [ADR-0057](docs/adr/0057-context-hungry-agents-want-breadth-not-narrower-reads.md)**, and not by building it | Principle IV describes manufacture as "attested workload identity → control-plane Vault → **RFC 8693 + RAR** against ceiling policies"; what runs is a JWT auth-method login. **ADR-0056 established the mechanism** by reading the substrate rather than inferring it — Vault is the RESOURCE SERVER and cannot perform the exchange, its OIDC token endpoint accepting `authorization_code` and nothing else. **ADR-0057 then established that the narrowing is not wanted here**: these agents read widely before acting, so breadth of read is how the output gets informed, and the property the narrowing was for — just-in-time, short-lived, attested — is already held. `task scope` is satisfied for reads by per-allocation manufacture with a bounded TTL. RAR remains the mechanism for WRITE and ACT scopes when those enter a ceiling. **Owed**: ADR-0048 and Principle IV still carry the old phrasing and should be amended to describe what runs, which needs its own change with a Sync Impact Report |
+| RFC 8693 + RAR authority manufacture | **Closed by [ADR-0057](docs/adr/0057-context-hungry-agents-want-breadth-not-narrower-reads.md)**, and not by building it | Principle IV describes manufacture as "attested workload identity → control-plane Vault → **RFC 8693 + RAR** against ceiling policies"; what runs is a JWT auth-method login. **ADR-0056 established the mechanism** by reading the substrate rather than inferring it — Vault is the RESOURCE SERVER and cannot perform the exchange, its OIDC token endpoint accepting `authorization_code` and nothing else. **ADR-0057 then established that the narrowing is not wanted here**: these agents read widely before acting, so breadth of read is how the output gets informed, and the property the narrowing was for — just-in-time, short-lived, attested — is already held. `task scope` is satisfied for reads by per-allocation manufacture with a bounded TTL. RAR remains the mechanism for WRITE and ACT scopes when those enter a ceiling. **Owed — discharged 2026-07-31 (#77)**: ADR-0048 carries an appended amendment with the Decision left in place, the glossary's "effective authority" is corrected and gains a RAR entry, and Principle IV describes attested manufacture bounded by a ceiling and a lifetime. Constitution 1.2.0 → 1.3.0, MINOR on the v1.2.0 ADR-0033 precedent — a correction, not a policy change |
 | Brokered credential translation | ADR-0044 | Principle IV names the broker's rotated management token as **the platform's single permitted standing credential**, and the mechanism it exists for does not exist. Until 010 the branch wrote a placeholder string and returned `allow`; it now refuses `broker_not_implemented`, which makes the gap visible when a deployment configures a brokered product. The entitlement-mirroring check in front of it is real and enforced |
 | `no_default_ceiling_policy` on registrations | ADR-0050 | Vault appends `default` and `default-ceiling` to every registration unless this is set, which nothing here has ever set — so the effective ceiling has never been the declared one. The added policies are benign; the point is that a difference existed where the mechanism's whole claim is that none does. Setting it changes the posture of every registration and deserves its own decision |
 | Ceiling / policy jurisdiction coherence | ADR-0050 | Two records for one definition can disagree: an agent granted a tool whose secrets it cannot read, or the reverse. A consequence of ADR-0044's disjoint jurisdictions rather than a defect, and nothing reports it. A cross-check would be a rule duplicated across engines, which is what ADR-0044 forbids — so the fix is probably an operator-facing report, not a gate |
@@ -380,6 +381,49 @@ noticed.
 reconciliation is by count and by the re-observations' named steps rather than by a per-step
 join. Adding the index would make it exact and is a small change to the hooks engine's
 payload — worth doing whenever that path is next open.
+
+### 0d. No lane runs a served surface, so `build()` has never been executed by CI — **OPEN**
+
+**Raised 2026-07-31, while wiring the API to a real identity provider.** The API job's
+workload identity is `nomad_job_id = "api"`; `service.py` asked Vault for the default
+`harness` role, whose bound claim is a different job. Every login was refused, the allocation
+died in `audit_sink.migrate()`, and **the northbound surface had never served a request in a
+deployed enclave.** It surfaced by running `portal-up` and reading the allocation logs, which
+nothing in CI does.
+
+The specific bug is fixed (#79). The gap is what let it live: **no lane executes
+`service.build()`.** `make dev-up` brings up Vault, Nomad, Postgres, the mcp service and
+agent-run; `portal-up` brings up the API and the portal and is never run by CI. Component
+tests call `create_app` with doubles, so the assembly — the one code path with no coverage by
+construction — is exercised by nothing.
+
+That is the common cause behind a pattern this file has recorded five times under different
+names: `resume_run` with no production caller (014), a sweeper that had not dispatched since
+009, an observer the protocol could not call, an egress loader reading a `VAULT_TOKEN` no
+allocation has (015), and claim mappings nothing read back (#78). Each was found separately
+and fixed separately. **They are one absence seen five times**, and 015 already wrote the
+answer for a single service in
+[`test_the_service_ships.py`](tests/conformance/evidence/test_the_service_ships.py), whose
+docstring counts four of them and names the shape: *"a capability that is correct, tested,
+and wired to nothing."*
+
+**The mitigation is a lane that stands the served surfaces up and puts a real request through
+each.** Not a health check — a request that traverses the assembly, the attested identity, and
+the trust fabric, so the row fails for the reason the deployment would. Precedent for the
+shape exists twice: the mcp shipping row above, and 012's accessibility lane, which was also
+a gate class no prior lane could run.
+
+Open questions worth settling before building:
+
+- **Whether it joins the enclave lane or becomes a third.** Registering these services at
+  bring-up once cost the enclave lane ten minutes and left the conformance job unplaceable,
+  which is why `portal-up` is separate — recorded in its own header. That constraint has not
+  gone away.
+- **What "answered" must mean.** A 401 from a surface that booted is a pass; a 401 from a
+  surface that never read its configuration is indistinguishable at the socket. The row has to
+  assert something only a correctly assembled process can produce.
+
+Claimed as the next feature, 2026-07-31.
 
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
 
