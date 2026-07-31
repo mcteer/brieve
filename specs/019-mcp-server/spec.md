@@ -318,13 +318,21 @@ than it shows.
   verifies human credentials on its other surface, against a real identity provider. This
   feature carries a subject across a protocol boundary; it does not invent a second way to
   establish one.
-- **Static ports on the platform's network are reachable from the developer's machine.** The
-  other served surface and the portal are addressed this way and a browser on the developer's
-  machine has reached them. Stated as an assumption rather than a fact because it was inferred
-  from the portal's sign-in working rather than measured for this surface. **If it is wrong,
-  FR-014 becomes the largest part of this feature rather than the smallest, and it stays in
-  scope anyway** — settled in Clarifications. Planning MUST measure this before scoping the
-  rest, because every estimate downstream depends on the answer.
+- ~~**Static ports on the platform's network are reachable from the developer's machine.**~~
+  **MEASURED FALSE, 2026-07-31 — see [research.md](./research.md) F1.** With the API answering
+  `200` inside the Docker VM and its own log confirming it was listening, nothing answered on
+  macOS. Host network mode puts a container in the *VM's* namespace, and a port block declared
+  alongside it is inert.
+
+  The inference that produced this assumption came from the portal's sign-in appearing to work.
+  It is left visible with a strikethrough rather than deleted, because the same wrong belief is
+  written into `make portal-up`, which tells a developer to open an address that does not
+  answer — two independent authors, same boundary, same mistake.
+
+  **FR-014 stays in scope** and is now real work, per the clarification. The mitigating finding
+  is that the fix is already proven in-repo: `postgres` and `collector-postgres` run in bridge
+  mode with mapped ports and the host lanes reach them on every run.
+
 - **The supervisory loop keeps its home.** The process that runs health checks, the sweeper, and
   audit egress is load-bearing and must not stop running because a transport moved in.
 - **One demonstration is enough for FR-017**, recorded with its output, on the model 018 set —
