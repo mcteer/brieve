@@ -1,0 +1,197 @@
+# Tasks: A deployment lane — every deployed process is proven to run
+
+**Feature**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md) | **Branch**: `spec/017-deployment-lane`
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: Can run in parallel (different files, no dependencies)
+- **[Story]**: Which user story this task belongs to
+- Exact file paths in every description
+
+## Gate Task Types
+
+| Gate type | Applies | Where |
+| --- | --- | --- |
+| **Fail-closed** | **Yes** | T012, T013 — a process that is absent, restarting, or unreachable must fail, never skip; and no retry may absorb it (FR-006, FR-014) |
+| **Conformance** | **Yes** | The whole feature. Transport surfaces are the subject |
+| **Correlation / evidence** | **No** | This feature participates in no run and writes no audit entry. It observes surfaces from outside; nothing joins a correlation ID because nothing here is part of a run |
+| **Eval** | **No** | No pack, prompt, model or policy promotes here |
+| **No-secret-leak** | **Yes** | T014 — the gate prints allocation output on failure (FR-004), and allocation output is exactly where a credential would surface |
+
+---
+
+## Phase 1: Setup
+
+**Purpose**: Create the directory and **wire it to a lane in the same change**. This
+ordering is not stylistic: `make conformance`'s own comments record that 010 lost a whole
+feature's rows to a directory no lane enumerated, and that 014 nearly repeated it with a
+directory a lane named but deselected. Creating the package before it is collected would
+rebuild, inside this feature, the exact failure the feature exists to close.
+
+- [ ] T001 Create `tests/conformance/deployment/__init__.py` with a module docstring stating what this package asserts (reach, not correctness) and what it does not
+- [ ] T002 Add `tests/conformance/deployment` to the `host_enclave` pytest line in the `conformance` target in `Makefile`, with a comment citing the 010 and 014 directory-enumeration failures the recipe already records
+- [ ] T003 Add a placeholder row in `tests/conformance/deployment/test_the_lane_collects_this_directory.py` that fails, run `make conformance`, and confirm it fails — proving the directory is collected before any real row depends on it
+
+---
+
+## Phase 2: Foundational (blocking prerequisites)
+
+**Purpose**: The declaration mechanism and the reach helper. Every story depends on these.
+
+- [ ] T004 [P] Add a `meta` block to `infra/jobs/api.nomad.hcl` declaring `harness_surface`, `harness_shape = "served"`, and `harness_covered_by` naming this feature's rows
+- [ ] T005 [P] Add the same `meta` block to `infra/jobs/portal.nomad.hcl` with `harness_shape = "served"`
+- [ ] T006 [P] Add a `meta` block to `infra/jobs/mcp.nomad.hcl` with `harness_shape = "served"` and `harness_covered_by` naming `tests/conformance/evidence/test_the_service_ships.py` — covered elsewhere, and the declaration is what makes that checkable rather than assumed
+- [ ] T007 [P] Add a `meta` block to `infra/jobs/agent-run.nomad.hcl` with `harness_shape = "dispatched"` and `harness_covered_by` naming `tests/conformance/durability/`
+- [ ] T008 Implement `tests/conformance/deployment/surfaces.py` — parse `infra/jobs/*.nomad.hcl`, return the declared processes, and **raise on an unrecognised `harness_shape`** rather than defaulting, so a typo cannot silently drop a process from coverage (data-model.md)
+- [ ] T009 Implement the allocation lookup in `tests/conformance/deployment/conftest.py` — resolve a job's **running** allocation, filtering by status rather than taking the last row of `nomad job status` (the stopped allocation sorts last, which cost a wrong reading on 2026-07-31)
+- [ ] T010 Implement `exec_request()` in `tests/conformance/deployment/conftest.py` — issue an HTTP request from **inside** the allocation via `nomad alloc exec`, returning status, body and headers (research R5: a shell reaches host-networked surfaces on Linux CI and not on Docker Desktop)
+- [ ] T011 Implement per-process waits in `tests/conformance/deployment/conftest.py`, read from the declaration or a named constant per process, with a docstring recording that these are **measured on the runner, not guessed** (research, residual unknowns)
+- [ ] T012 [GATE:fail-closed] Implement `require_running()` in `tests/conformance/deployment/conftest.py` — a process that is absent, unschedulable, or has restarted more than once fails; `pytest.skip` MUST NOT appear anywhere in this package (FR-006)
+- [ ] T013 [GATE:fail-closed] Add `tests/conformance/deployment/test_no_retry_and_no_skip.py` asserting by source inspection that this package contains no retry loop around an assertion and no skip — FR-014, and the same shape as the existing gate that forbids a `pytest.skip` in a blocking lane
+- [ ] T014 [GATE:no-secret-leak] Implement failure reporting in `tests/conformance/deployment/conftest.py` that prints the allocation's own error output (FR-004) **with a redaction pass**, and add a row asserting a token-shaped value in captured output is redacted — allocation output is exactly where a credential surfaces
+- [ ] T015 Implement `infra/bin/deployment-conformance` — stand up the uncovered surfaces via `infra/bin/portal-up`, force a **new allocation** rather than trusting `nomad job run` against an unchanged jobspec (research R7, observed 2026-07-31), capture and print the scheduler's placement output on failure, then invoke the rows
+- [ ] T016 Delete `tests/conformance/deployment/test_the_lane_collects_this_directory.py` once a real row in that package depends on collection
+
+**Checkpoint**: the directory is collected, processes declare themselves, and a row can reach a surface from inside its allocation.
+
+---
+
+## Phase 3: User Story 1 — A deployed process that cannot start fails the merge (P1) 🎯 MVP
+
+**Goal**: A surface whose assembly cannot obtain its credentials fails the gate, naming that surface and reporting its own error.
+
+**Independent test**: Point the API at a Vault role that does not exist; the gate fails, names the API, and reports the login refusal rather than a bare timeout.
+
+- [ ] T017 [US1] Implement `test_the_api_reaches_a_working_state` in `tests/conformance/deployment/test_the_api_answers_as_itself.py` — assert the API's allocation reaches a running state within its wait and has not restarted
+- [ ] T018 [P] [US1] Implement `test_the_portal_reaches_a_working_state` in `tests/conformance/deployment/test_the_portal_read_its_configuration.py` — same for the portal
+- [ ] T019 [US1] Add failure attribution in `tests/conformance/deployment/conftest.py`: on timeout, report the allocation's stderr tail so the verdict names the surface's own error rather than the wait elapsing (FR-004, SC-001)
+- [ ] T020 [GATE:conformance] [US1] Add the break fixture in `tests/conformance/deployment/test_break_a_surface_assembly.py` — submit the API with a credential role that does not exist, assert the gate fails, then restore. **The break must be in the assembly, not in a route** (contracts/conformance.md), because a broken route proves the row can fail without proving it detects this failure class
+- [ ] T021 [US1] Record in `specs/017-deployment-lane/contracts/conformance.md` the observed cold-start time per process and the wait actually set, replacing the "measured, not guessed" placeholder
+
+**Checkpoint**: US1 is independently valuable — a surface that cannot start now blocks the merge.
+
+---
+
+## Phase 4: User Story 2 — A process that starts without its dependencies is not counted as working (P1)
+
+**Goal**: Assert something only a completed assembly can produce. This is the criterion a naive implementation misses.
+
+**Independent test**: A process running and accepting connections but holding no credential fails the gate.
+
+- [ ] T022 [US2] Implement `test_the_api_answers_with_its_own_refusal` in `tests/conformance/deployment/test_the_api_answers_as_itself.py` — an unauthenticated request returns `401` carrying the verifier's own reason code, which exists only if a verifier was constructed and passed in (data-model.md; verified against the running service 2026-07-31)
+- [ ] T023 [P] [US2] Implement `test_the_portal_redirects_to_the_configured_issuer` in `tests/conformance/deployment/test_the_portal_read_its_configuration.py` — the redirect's `Location` carries the **configured** issuer and a PKCE challenge, which a process holding defaults would not emit
+- [ ] T024 [GATE:fail-closed] [US2] Add `test_a_generic_answer_does_not_satisfy_the_gate` to `tests/conformance/deployment/test_the_api_answers_as_itself.py`, asserting that a bare `200`, an empty body, or a refusal without a reason code fails — SC-002, and the row that keeps this gate from degrading into a liveness check
+- [ ] T025 [US2] Add a comment in `tests/conformance/deployment/test_the_api_answers_as_itself.py` recording why a health endpoint was rejected: it would have passed throughout the entire period the API could not start
+
+**Checkpoint**: the gate now distinguishes *running* from *assembled*.
+
+---
+
+## Phase 5: User Story 5 — The dispatched process is proven to run, not just to have run (P1)
+
+**Goal**: The dispatched entrypoint is covered, and the coverage is asserted rather than incidental.
+
+**Independent test**: Remove the dispatch from the durability rows and confirm this gate fails.
+
+**Note**: research R1 found this is **already covered** — 014's durability rows dispatch real allocations and assert completion. The work here is to make that coverage checkable, not to rebuild it.
+
+- [ ] T026 [US5] Implement `test_the_dispatched_process_is_covered` in `tests/conformance/deployment/test_the_dispatched_process_is_covered.py` — assert the module named by `agent-run`'s `harness_covered_by` exists and contains a row that **dispatches**, rather than one that reads prior records (FR-013)
+- [ ] T027 [US5] In `tests/conformance/deployment/test_the_dispatched_process_is_covered.py`, assert the durability rows are collected by a lane that will run them — parsed from the `conformance` target in `Makefile` — not merely that the directory is named, which 014 already found is a different question (`make conformance`'s own comment records a lane that named the directory and deselected the rows)
+- [ ] T028 [US5] Record in `specs/017-deployment-lane/contracts/conformance.md` that this row asserts coverage exists, and would **not** catch a change that gutted a durability row while leaving its name in place
+
+**Checkpoint**: the dispatched shape cannot lose its coverage silently.
+
+---
+
+## Phase 6: User Story 3 — The rule covers every deployed process (P2)
+
+**Goal**: Set equality, in both directions.
+
+**Independent test**: Add a declaration with no assertion — the gate fails. Remove a declaration and leave its assertion — the gate fails.
+
+- [ ] T029 [US3] Implement `test_every_declared_process_is_asserted` in `tests/conformance/deployment/test_every_declared_process_is_asserted.py` — declared processes and asserted processes are the same set
+- [ ] T030 [US3] Assert the **reverse** direction in the same row: an assertion against an undeclared process fails, because such a row passes forever while testing nothing (data-model.md)
+- [ ] T031 [US3] Add the vendor-image exclusion check to `tests/conformance/deployment/test_every_declared_process_is_asserted.py` — `postgres` and `collector-postgres` carry no declaration and must not appear as uncovered, with a comment saying why (no assembly of ours)
+- [ ] T032 [US3] Record in `specs/017-deployment-lane/contracts/conformance.md` the known limit: a job definition in the tree but never deployed reads as uncovered rather than absent, which is the correct failure but will read as a false positive the first time
+
+**Checkpoint**: a process added later is covered without anyone remembering.
+
+---
+
+## Phase 7: User Story 4 — A contributor can run the gate before pushing (P3)
+
+**Goal**: Same verdict locally and in the automated run.
+
+**Independent test**: Run on macOS and on Linux against the same tree; verdicts match.
+
+- [ ] T033 [US4] Verify `infra/bin/deployment-conformance` runs on macOS against a local enclave and reaches the same verdict, exercising the `nomad alloc exec` path that exists for this reason (research R5)
+- [ ] T034 [US4] Add a clear failure message in `infra/bin/deployment-conformance` when the surfaces are not up, instructing the contributor to run bring-up rather than erroring obscurely (US4 scenario 2)
+- [ ] T035 [US4] Add the lane step to `.github/workflows/enclave.yml` **after** `make conformance`, so the batch job has released its reservation before the surfaces are submitted (research R4, FR-007)
+
+**Checkpoint**: one way to run the gate, on both substrates.
+
+---
+
+## Phase 8: Polish & cross-cutting
+
+- [ ] T036 [GATE:conformance] Run `make conformance` and confirm **every row that ran before this feature still runs** — count rows, not just the exit code. A lane that silently stopped collecting a directory looks exactly like a pass (FR-007, SC-005)
+- [ ] T037 Complete the SC-007 assessment in `specs/017-deployment-lane/contracts/conformance.md`: for each of the five known instances, state whether this gate would have caught it — **including the ones it would not**. On current research the expected answer is that three were in the dispatched path and were caught by 014, which makes this feature's own contribution narrower than gap 0d implies
+- [ ] T038 Update `ROADMAP.md` — close gap 0d, add the 017 row, and record what the gate does **not** cover. In the same change, per the file's own maintenance rule
+- [ ] T039 [P] Add `docs/development/deployment-lane.md` describing how to run the gate, how to add a process to it, and the two traps (host networking, and an unchanged jobspec placing no new allocation)
+- [ ] T040 Run `make check` and `make conformance-hermetic` — both are separate targets and the fast lane runs the second
+
+---
+
+## Dependencies & Execution Order
+
+```
+Phase 1 (Setup)          T001 → T002 → T003
+                             ↓
+Phase 2 (Foundational)   T004–T007 [P] → T008 → T009 → T010 → T011
+                         T012, T013, T014 → T015 → T016
+                             ↓
+        ┌────────────────────┼────────────────────┐
+        ↓                    ↓                    ↓
+Phase 3 (US1, P1)   Phase 4 (US2, P1)   Phase 5 (US5, P1)
+   T017–T021           T022–T025           T026–T028
+        └────────────────────┼────────────────────┘
+                             ↓
+Phase 6 (US3, P2)        T029–T032
+                             ↓
+Phase 7 (US4, P3)        T033–T035
+                             ↓
+Phase 8 (Polish)         T036–T040
+```
+
+**Story dependencies**: US1, US2 and US5 are independent of each other once Phase 2 lands —
+they assert different things about different processes. US3 depends on US1/US2/US5 existing,
+because set equality needs a set of assertions to compare against. US4 is last because it
+verifies the others behave identically on a second substrate.
+
+**Parallel opportunities**:
+
+- T004–T007: four job definitions, four files, no ordering between them
+- T018 with T017; T023 with T022 — API and portal rows live in different files
+- T039 with T036–T038 — documentation is independent of the verification tasks
+
+**MVP scope**: **Phases 1–3.** US1 alone closes the gap that motivated the feature: a
+surface that cannot start blocks the merge. US2 makes the gate honest rather than a liveness
+check and should follow immediately, but US1 has standalone value on the day it lands.
+
+---
+
+## Notes
+
+**T003 exists because of a real failure, not caution.** A placeholder row that must be seen
+to fail before anything depends on the directory being collected. The `make conformance`
+recipe records two features that lost rows to enumeration problems — one to a directory no
+lane named, one to a directory a lane named and deselected. Building this feature without
+proving collection first would rebuild that failure inside the gate meant to close it.
+
+**T020's break fixture must break the assembly.** Breaking a route proves the row can go
+red; it does not prove the row detects *this* failure class. The defect that motivated the
+feature was a credential role bound to the wrong job, and that is what the fixture should
+reproduce.
+
+**T037 is expected to be unflattering and must be written that way.** A success criterion
+satisfiable only by good news is not a criterion.
