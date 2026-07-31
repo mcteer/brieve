@@ -142,18 +142,48 @@ Whoever implements this owns the question of how a task's entailed scope is comp
 without over-granting to be safe, because over-granting to be safe is how a ceiling becomes
 decorative.
 
-**One question this record leaves open deliberately, because it decides what kind of control
-this is and should not be settled by whoever implements it first:**
+**Nothing in the platform signs the Tier 2 token. Vault does, and the private key never leaves
+it.**
 
-**What signs the Tier 2 token, and how that avoids being a second standing credential.** The
-platform's issuer signs tokens Vault will honour, so its key is as load-bearing as anything in
-the trust fabric — and a signing key held by a long-lived service is the shape of a standing
-credential, which Principle IV permits exactly once and has already spent. The obvious answer
-is a Vault-managed key (transit, or short-lived PKI) so the issuer holds no durable secret of
-its own; the obvious answer deserves to be checked rather than assumed. **Tier 1 does not have
-this problem at all**, which — now that the exchange is per run rather than per action — is a
-stronger argument for treating Tier 1 as the target than it was when the cost was a round trip
-per tool call.
+This was drafted as an open question — a signing key held by a long-lived service is the shape
+of a standing credential, and Principle IV permits exactly one, already spent. The question
+dissolves rather than needing an answer, and the mechanism was demonstrated end to end against
+this enclave before being written down:
+
+- **Transit holds the key.** An `ecdsa-p256` transit key signs the JWT's signing input with
+  `marshaling_algorithm=jws`, which produces a JWS-compatible ES256 signature in url-safe
+  base64. The private key does not exist in the issuing service, on its disk, or in its
+  memory — it exists only inside the trust store, like every other secret here.
+- **Vault takes the public half as a static PEM.**
+  `sys/config/oauth-resource-server/<name>` accepts `public_keys` — a list of `key_id` and
+  `pem` pairs — as an alternative to `jwks_uri`. So the issuer serves **no discovery document
+  and no JWKS endpoint**, and there is no public surface to operate or secure. Terraform
+  registers the key alongside the profile, the same way it registers everything else.
+- **The issuer's only credential is its attested workload identity**, exchanged for a Vault
+  token exactly as every other workload's is. Nothing durable, nothing to rotate by hand,
+  nothing to leak that outlives the allocation.
+- **Revocation is a policy edit or a key rotation**, both in Vault, both immediate, and
+  neither requiring the issuing service to cooperate — which matters, because the case where
+  you revoke is the case where you do not trust it.
+
+**So Tier 2 introduces no second standing credential**, and the sentence in Principle IV
+naming one permitted exception stays accurate. That was the objection that made this question
+worth leaving open, and it is answered rather than mitigated.
+
+**Two constraints this pins, and both are worth stating rather than discovering.**
+`marshaling_algorithm=jws` is documented as *"currently only valid for ECDSA P-256 key types"*,
+so the signing algorithm is ES256 and not a free choice. And the authority to call
+`transit/sign/<key>` becomes a load-bearing grant: whoever holds it can mint task scope. That
+policy deserves the same care as the ceiling itself, because it *is* the ceiling's issuer.
+
+**A simplification this exposes.** Because the exchange happens once per run rather than per
+action, the signing step lives naturally inside the path that already starts runs — which
+already holds an attested identity and already talks to Vault. **Tier 2 may need no new
+long-lived component at all**, only a step in an existing one. The first draft of this record
+assumed a standalone STS and reasoned about its blast radius; on this construction there may
+be nothing new to attest, monitor, or keep alive. Whether that holds through the resume path,
+where no user is present and the surviving grant is what authorises, is the implementing
+feature's to confirm.
 
 ## Consequences
 
@@ -174,9 +204,9 @@ precisely because the in-process check is the one an attacker is already inside 
 describing this as "now we enforce task scope" would be overstating it; the accurate claim is
 "task scope is now enforced somewhere the workload cannot reach."
 
-**Costs, and they are not small.** Tier 2 means a component that mints tokens — one more
-thing to attest, monitor, rotate, and reason about, sitting in the credential path of every
-governed action, so its availability becomes the platform's. Tier 1 trades that for a
+**Costs.** Tier 2 means a token-minting step in the run-start path — possibly not a new
+component at all, per the signing decision above, but certainly new code on the path that
+starts every governed run, so its correctness becomes the platform's availability. Tier 1 trades that for a
 dependency on a customer's IdP being reachable and correctly configured at launch — a
 different failure mode, and a smaller one now that it is not in the path of every action: a
 run that cannot start is a clear refusal, where a run that cannot take its next step is a
@@ -206,9 +236,11 @@ above is left open rather than answered casually.
 authorization server is configured, and neither tier exists. What is settled here is the
 *shape*: Vault is the resource server, RAR is the mechanism, attribution federates to the
 customer's IdP, task scope is computed by the platform because the inputs live nowhere else,
-who mints the final token is a tier chosen by what the customer's IdP can do, and the exchange
-happens once per run rather than per action. The one open question above is the implementing
-feature's to answer rather than to resolve by accident.
+who mints the final token is a tier chosen by what the customer's IdP can do, the exchange
+happens once per run rather than per action, and Tier 2's signing key lives in Vault's transit
+engine so no service holds one. No open questions remain in the shape; what is left is
+construction, and the two places it could still go wrong are named above — computing a task's
+entailed scope without over-granting, and confirming the resume path needs no standing issuer.
 
 **What this record's research did and did not establish.** Verified directly against the
 running enclave: Vault's supported grant types, the RAR structure and its intersection
