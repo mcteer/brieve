@@ -16,13 +16,18 @@ variable "api_base_url" {
     Where the northbound API answers, AS SEEN FROM THIS CONTAINER.
 
     Not loopback any more. This task runs in bridge mode (see the config block below), so
-    `127.0.0.1` is the portal's own container and reaches nothing. The API still runs in host
-    mode, in the Docker VM's namespace, which from here is `host.docker.internal`.
+    `127.0.0.1` is the portal's own container and reaches nothing.
 
-    This is the same distinction 014 paid for in the sweeper's dispatcher: an address that is
-    correct for a host process and wrong for an allocation, failing with `Connection refused`
-    in a place nobody was watching. The difference here is that the failure is loud — the
-    portal's first page load reports it.
+    **And it is not `host.docker.internal` either**, which is the obvious wrong guess. Measured
+    from inside this container: that name resolves to Docker Desktop's macOS-facing address and
+    routes OUT to the developer's machine, where the API — still in host mode — publishes
+    nothing. The API listens in the Linux VM's host namespace, reachable from a bridge
+    container only at that bridge's own gateway, which `portal-up` derives.
+
+    This is the same distinction 014 paid for in the sweeper's dispatcher: an address correct
+    for a host process and wrong for an allocation, failing with `Connection refused` where
+    nobody was watching. The difference here is that the failure is loud — the portal's first
+    page load reports it.
   DESC
 }
 
@@ -177,10 +182,25 @@ job "portal" {
         PORTAL_REDIRECT_URI     = var.portal_redirect_uri
         PORTAL_BIND             = "0.0.0.0:8082"
 
+        # TLS. The paths are as seen INSIDE this container — `/src` is the working tree,
+        # bind-mounted read-only above, and `.enclave/` is where bring-up materialises what
+        # the control plane issued. Both files are gitignored.
+        PORTAL_TLS_CERT = "/src/.enclave/portal.crt"
+        PORTAL_TLS_KEY  = "/src/.enclave/portal.key"
+
         # The session cookie is ALWAYS Secure and always `__Host-` prefixed; there is no
-        # setting for it. Dev works over plain HTTP because browsers treat loopback as a
-        # trustworthy origin. A real deployment terminates TLS in front of this — that
-        # posture is a deployment concern and is deliberately not solved here.
+        # setting for it, and `session.cookie_attributes` explains at length why the flag
+        # must not come back.
+        #
+        # **What used to be written here was wrong.** It said dev works over plain HTTP
+        # because browsers treat loopback as a trustworthy origin. Chromium and Firefox do;
+        # Safari does not, and wants a real https scheme. The accessibility lane drives
+        # Chromium, so the claim was only ever checked where it holds — and in Safari the
+        # callback succeeded, the cookie was discarded, and the portal rendered its own
+        # sign-in page forever.
+        #
+        # So dev serves TLS too, with a certificate the control plane's own CA issued. That
+        # is not "deferring the deployment posture" — it IS the posture, one enclave early.
 
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
 

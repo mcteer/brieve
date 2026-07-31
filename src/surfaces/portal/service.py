@@ -51,11 +51,37 @@ def main() -> None:  # pragma: no cover - process entrypoint
 
     bind = os.environ.get("PORTAL_BIND", "127.0.0.1:8082")
     host, _, port = bind.rpartition(":")
+
+    # TLS, BECAUSE THE SESSION COOKIE IS `Secure` AND THAT IS NOT NEGOTIABLE.
+    #
+    # `session.cookie_attributes` explains why the flag cannot come back, and it is right.
+    # What its docstring claimed — "browsers treat http://localhost and http://127.0.0.1 as
+    # trustworthy origins, so a Secure cookie is accepted there" — is true of Chromium and
+    # Firefox and NOT of Safari, which wants an actual https scheme.
+    #
+    # The whole platform's accessibility suite drives Chromium (`tests/a11y/conftest.py`), so
+    # the claim was only ever tested where it holds. In Safari the callback succeeds, the
+    # cookie is discarded silently, and the next request renders the sign-in page again —
+    # observed 2026-07-31 with an empty cookie store and a `303` in the access log.
+    #
+    # So the portal serves TLS when handed a certificate. Unset, it serves plain HTTP exactly
+    # as before, which keeps every test client and the a11y lane working unchanged.
+    cert = os.environ.get("PORTAL_TLS_CERT", "").strip()
+    key = os.environ.get("PORTAL_TLS_KEY", "").strip()
+    if bool(cert) != bool(key):
+        raise RuntimeError(
+            "PORTAL_TLS_CERT and PORTAL_TLS_KEY must be set together. One without the other "
+            "would serve plain HTTP while looking configured for TLS — and the failure is a "
+            "sign-in page that silently never signs anyone in."
+        )
+
     uvicorn.run(
         build(),  # type: ignore[arg-type]  # FastAPI is an ASGI app; `build` returns object
         host=host or "127.0.0.1",
         port=int(port or 8082),
         log_level="info",
+        ssl_certfile=cert or None,
+        ssl_keyfile=key or None,
     )
 
 

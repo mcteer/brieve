@@ -127,6 +127,50 @@ nomad job run -detach -var="repo=$REPO" \
   || die "could not submit the api service"
 
 say "Portal"
+
+# THE PORTAL'S TLS CERTIFICATE, ISSUED BY THE CONTROL PLANE'S OWN CA.
+#
+# The session cookie is `__Host-` prefixed and therefore `Secure`, and `Secure` over plain
+# HTTP is accepted by Chromium and Firefox on loopback and REFUSED BY SAFARI. The symptom is
+# the cruellest available: sign-in succeeds, the callback returns 303, the cookie is silently
+# discarded, and the portal renders its own sign-in page again. Observed 2026-07-31 with an
+# empty Safari cookie store.
+#
+# Issued fresh on every bring-up rather than kept: it costs one API call, it cannot expire in
+# a drawer, and it means nobody has to know it exists to get a working portal.
+PORTAL_CRT="$REPO/.enclave/portal.crt"
+PORTAL_KEY="$REPO/.enclave/portal.key"
+# The coordinates come from `.env` through this script's own reader, which is the only thing
+# here that knows where `.env` is. The first version of this block assumed VAULT_ADDR and a
+# token were already exported; nothing in `portal-up` exports either, so `vault` ran with no
+# address and failed producing NO OUTPUT AT ALL — and the die message discarded what little
+# there was. Both halves are fixed: the values are read the way every other value here is
+# read, and the message carries the cause.
+_vault_addr="$(env_val VAULT_ADDR)"
+_vault_cacert="$(env_val VAULT_CACERT)"
+_vault_token="$(env_val VAULT_ROOT_TOKEN)"
+[ -n "$_vault_token" ] || die "VAULT_ROOT_TOKEN is not in .env — the portal's certificate cannot be issued"
+
+if ! _cert=$(VAULT_ADDR="$_vault_addr" VAULT_CACERT="$_vault_cacert" VAULT_TOKEN="$_vault_token" \
+      vault write -format=json \
+      pki/issue/control-plane \
+      common_name="localhost" \
+      ip_sans="127.0.0.1" \
+      alt_names="localhost,host.docker.internal" \
+      ttl="8760h" 2>&1); then
+  die "could not issue the portal's certificate — it would serve plain HTTP and sign nobody in: ${_cert}"
+fi
+printf '%s' "$_cert" | python3 -c '
+import json, os, sys
+d = json.load(sys.stdin)["data"]
+crt, key = sys.argv[1], sys.argv[2]
+open(crt, "w").write(d["certificate"] + "\n" + "\n".join(d.get("ca_chain", [])))
+open(key, "w").write(d["private_key"])
+os.chmod(key, 0o600)
+' "$PORTAL_CRT" "$PORTAL_KEY" || die "could not write the portal certificate"
+unset _cert _vault_addr _vault_cacert _vault_token
+ok "portal certificate issued by the control plane CA (localhost, 127.0.0.1)"
+
 # TWO ADDRESSES FOR THE SAME ENCLAVE, AND THE DIFFERENCE IS NOT A TYPO.
 #
 #   api_base_url        — where the PORTAL PROCESS reaches the API. A server-to-server hop
@@ -158,7 +202,7 @@ nomad job run -detach -var="repo=$REPO" \
   -var="oidc_token_endpoint=${OIDC_TOKEN}" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \
   -var="portal_client_id=${PORTAL_CLIENT_ID}" \
-  -var="portal_redirect_uri=http://127.0.0.1:8082/callback" \
+  -var="portal_redirect_uri=https://127.0.0.1:8082/callback" \
   -var="harness_started_by=${HARNESS_STARTED_BY}" \
   "$REPO/infra/jobs/portal.nomad.hcl" >/dev/null \
   && ok "portal submitted (thin client; holds no credential of any kind)" \
@@ -171,7 +215,7 @@ cat <<MSG
         nomad job status api
         nomad job status portal
 
-    Then open http://127.0.0.1:8082/ and sign in.
+    Then open https://127.0.0.1:8082/ and sign in.
 
 MSG
 
