@@ -27,6 +27,20 @@ curl -sf -o /dev/null --max-time 3 http://127.0.0.1:4646/v1/status/leader \
 #
 # This does mean an invocation abandons a run already in flight. That is the right
 # trade for a gate: the verdict must belong to the tree in front of you.
+# 017: reclaim what a FAILED deployment-lane run left standing, BEFORE this job is placed.
+#
+# That lane leaves its surfaces running on failure so someone can diagnose them, and it runs
+# LAST in `make conformance` — so it cannot free that capacity before this job needs it.
+# Locally a prior failure is the normal case, because the lane gets re-run precisely when it
+# failed, and without this one red run starves these merge-blocking rows on every subsequent
+# one. Here rather than in the Makefile because this script is also invoked directly.
+#
+# Stops only MARKED surfaces. A portal someone brought up with `portal-up` is untouched.
+if [ -r "$REPO/infra/bin/deployment-marks" ]; then
+  source "$REPO/infra/bin/deployment-marks"
+  stop_marked || say "warning: could not stop every marked deployment surface — placement below may fail"
+fi
+
 say "Submitting the durability and API evidence rows as a scheduled workload"
 nomad job stop -purge conformance >/dev/null 2>&1 || true
 

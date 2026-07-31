@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Ownership of the deployment lane's surfaces, and the ONE implementation of stopping them.
+#
+# Sourced by `deployment-conformance` (which starts and stops them), by
+# `deployment-down` (which a failure message tells a developer to run), and by
+# `enclave-conformance` (which reclaims leftovers before submitting its batch job). Three
+# callers, one implementation — two copies of a safety-critical action drift, and the wrong
+# copy is what decides whether a contributor's own portal survives.
+#
+# THE MARK IS DURABLE, and that is the whole point. It lives in the submitted job's `Meta`,
+# not in the memory of the process that submitted it. An in-process record dies with the
+# run, so a later invocation could only guess which surfaces were leftovers and which a
+# contributor started — and both guesses are wrong. Stop everything and you take someone's
+# work with it; stop nothing and the leftovers starve the merge-blocking checks.
+
+#: What the lane writes into `Meta.harness_started_by`. Read back to decide what may be
+#: stopped; a surface without it was started by someone else and is not ours to touch.
+MARK="deployment-conformance"
+
+NOMAD_ADDR_DEFAULT="http://127.0.0.1:4646"
+
+#: The served surfaces this lane manages. Read from the job definitions rather than listed
+#: here, so a surface added to the deployment is discovered rather than remembered.
+harness_surface_jobs() {
+  local repo
+  repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  python3 - "$repo/infra/jobs" <<'PY'
+import pathlib, re, sys
+for path in sorted(pathlib.Path(sys.argv[1]).glob("*.nomad.hcl")):
+    text = path.read_text()
+    # A served surface this lane stands up: declared, and of the shape that stays running.
+    if re.search(r'harness_surface\s*=\s*"true"', text) and re.search(
+        r'harness_shape\s*=\s*"served"', text
+    ) and re.search(r'harness_lane_starts\s*=\s*"true"', text):
+        print(path.name.removesuffix(".nomad.hcl"))
+PY
+}
+
+job_is_running() {
+  local job="$1" addr="${NOMAD_ADDR:-$NOMAD_ADDR_DEFAULT}"
+  [ "$(nomad job status -address="$addr" -short "$job" 2>/dev/null | awk '/^Status/{print $3}')" = "running" ]
+}
+
+#: Every running job carrying our mark. The read is the authority — never a list compiled
+#: at submit time, which is exactly the state that does not survive the process.
+marked_jobs() {
+  local addr="${NOMAD_ADDR:-$NOMAD_ADDR_DEFAULT}"
+  for job in $(harness_surface_jobs); do
+    if nomad job inspect -address="$addr" "$job" 2>/dev/null \
+      | python3 -c "
+import json, sys
+try:
+    meta = json.load(sys.stdin)['Job'].get('Meta') or {}
+except Exception:
+    sys.exit(1)
+sys.exit(0 if meta.get('harness_started_by') == '$MARK' else 1)
+"; then
+      printf '%s\n' "$job"
+    fi
+  done
+}
+
+#: Stop every marked surface, and nothing else. Returns non-zero if a stop fails, because
+#: a swallowed failure returns the surfaces to persisting and reports green from the
+#: mechanism built to prevent that (FR-007a clause 5).
+stop_marked() {
+  local addr="${NOMAD_ADDR:-$NOMAD_ADDR_DEFAULT}" failed=0 found=0
+  for job in $(marked_jobs); do
+    found=1
+    if nomad job stop -address="$addr" -purge "$job" >/dev/null 2>&1; then
+      printf '    stopped %s\n' "$job"
+    else
+      printf '    COULD NOT STOP %s\n' "$job" >&2
+      failed=1
+    fi
+  done
+  [ "$found" -eq 0 ] && return 0
+  return "$failed"
+}

@@ -75,6 +75,20 @@ conformance:
 	# the directory added, and it was added in the change that created it. Recorded here
 	# because "already collected" is exactly the assumption 010 made and paid for: the
 	# distinction is that line 34 names a tree and the host line names directories.
+	#
+	# 017's deployment lane, and it is deliberately NOT a pytest line. Those all run before
+	# the API and the portal are stood up, so rows there would assert against surfaces that
+	# do not exist yet and fail on every invocation — FR-006 makes an absent process a
+	# failure, never a skip. The runner below stands them up first and enumerates the
+	# directory itself, which is what "named by a lane that WILL RUN IT" actually requires;
+	# 010 lost a feature's rows to a directory no lane named, and 014 nearly repeated it
+	# with a directory a lane named and deselected.
+	#
+	# LAST, so the conformance batch job above has completed and released its reservation
+	# before two more services are submitted. Ordering is a property of this position rather
+	# than of a workflow file nobody runs locally — registering these surfaces at bring-up
+	# once left that batch job unplaceable and the merge-blocking durability rows never ran.
+	@bash infra/bin/deployment-conformance
 
 # The accessibility gate (012, FR-020a). Its own target because it is its own DISCIPLINE:
 # every other gate here asserts something about a process, and this one asserts something
@@ -90,6 +104,13 @@ conformance:
 # The surfaces a person uses, separate from `dev-up` on purpose — see infra/bin/portal-up.
 portal-up:
 	@bash infra/bin/portal-up
+
+# Clears what a FAILED deployment lane left standing. Named by that lane's own failure
+# message, so it has to exist — a message pointing at a missing command is the one output
+# someone reads when the gate is already red. Stops only MARKED surfaces; a portal you
+# brought up yourself is untouched.
+deployment-down:
+	@bash infra/bin/deployment-down
 
 a11y:
 	uv run --extra surfaces --extra portal --extra a11y playwright install chromium

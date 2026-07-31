@@ -27,6 +27,11 @@ nomad node status >/dev/null 2>&1 || die "the enclave is not up — run \`make d
 
 DEV_IDP_PORT="${DEV_IDP_PORT:-8090}"
 
+# Ownership, for 017's deployment lane. EMPTY when a person runs this, which is the point:
+# an unmarked surface is theirs and the lane will never stop it. The lane sets this so what
+# it starts is identifiable by a LATER invocation — see infra/bin/deployment-marks.
+HARNESS_STARTED_BY="${HARNESS_STARTED_BY:-}"
+
 # Which identity provider these surfaces authenticate against.
 #
 # A real one when `.env` names an AUTH0_DOMAIN, the development double otherwise. The
@@ -34,9 +39,16 @@ DEV_IDP_PORT="${DEV_IDP_PORT:-8090}"
 # operator who believed they were federated when they were not is the unstated posture
 # this platform legislates against everywhere else. It says which one it is, every time,
 # rather than leaving it to be inferred from whether a sign-in page looks familiar.
+# A key that is not there is an ANSWER, not a failure. Under `set -euo pipefail` a `grep`
+# that matches nothing exits 1, `pipefail` propagates it, and `VAR="$(env_val KEY)"` then
+# kills the script — so this died on its first line in any environment whose .env lacks the
+# key it was asked for. Locally that never happened, because the key was always there; CI
+# writes a minimal .env and portal-up exited in 160ms having done nothing.
+#
+# Found by 017's lane running this script in CI, which is the first time anything had.
 env_val() {
   [ -f "$REPO/.env" ] || return 0
-  grep "^$1=" "$REPO/.env" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'
+  grep "^$1=" "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true
 }
 
 AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"
@@ -105,6 +117,7 @@ nomad job run -detach -var="repo=$REPO" \
   -var="oidc_jwks_uri=${OIDC_JWKS_URI}" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \
   -var="oidc_tenant_claim=${OIDC_TENANT_CLAIM}" \
+  -var="harness_started_by=${HARNESS_STARTED_BY}" \
   "$REPO/infra/jobs/api.nomad.hcl" >/dev/null \
   && ok "api submitted (the northbound surface, served for the first time in 012)" \
   || die "could not submit the api service"
@@ -118,6 +131,7 @@ nomad job run -detach -var="repo=$REPO" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \
   -var="portal_client_id=${PORTAL_CLIENT_ID}" \
   -var="portal_redirect_uri=http://127.0.0.1:8082/callback" \
+  -var="harness_started_by=${HARNESS_STARTED_BY}" \
   "$REPO/infra/jobs/portal.nomad.hcl" >/dev/null \
   && ok "portal submitted (thin client; holds no credential of any kind)" \
   || die "could not submit the portal"

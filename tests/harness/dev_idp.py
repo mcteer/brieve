@@ -27,7 +27,15 @@ from tests.harness.fake_oidc_provider import AuthorizationRefused, FakeOIDCProvi
 
 #: The banner every response carries, so a stray screenshot of this in a real environment
 #: is self-incriminating.
-DEV_ONLY = "DEVELOPMENT IDENTITY PROVIDER — authenticates nobody, never deploy"
+#: ASCII only, and the hyphen is load-bearing. This value goes into an HTTP header, and
+#: header values must encode as latin-1 — an em-dash raised `UnicodeEncodeError` inside the
+#: handler, so **every** request to this provider died before returning anything. The
+#: warning is the same warning either way; the punctuation was the whole defect.
+#:
+#: Found on 2026-07-31 by 017's deployment lane, which is the first thing that ever ran
+#: `portal-up`'s development-provider path in CI. It had been broken in place, and the JSON
+#: body below carries the same text where a wider character would have been harmless.
+DEV_ONLY = "DEVELOPMENT IDENTITY PROVIDER - authenticates nobody, never deploy"
 
 
 class _Handler(BaseHTTPRequestHandler):

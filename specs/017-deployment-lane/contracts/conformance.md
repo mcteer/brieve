@@ -49,7 +49,8 @@ design pass 1 had just added.
 | `test_the_api_answers_as_itself` | An unauthenticated request to the running API returns its own refusal reason, not a generic rejection | FR-003, FR-009 | US1, US2 |
 | `test_the_portal_read_its_configuration` | The running portal redirects to sign-in at the **configured** issuer, with a PKCE challenge | FR-003 | US1, US2 |
 | `test_the_dispatched_process_is_covered` | The dispatched entrypoint is asserted somewhere, and that assertion dispatches rather than reading prior records | FR-005, FR-013 | US5 |
-| *(break fixture)* | A surface whose assembly is deliberately broken fails the gate | FR-012 | US1 |
+| `test_an_absent_surface_fails_rather_than_skipping` | An absent surface fails, never skips, and the failure names it | FR-006, FR-012 | US1 |
+| `test_the_failure_says_no_allocation_was_placed` | The verdict distinguishes "never placed" from "placed and broken" | FR-004 | US1 |
 
 ---
 
@@ -129,24 +130,60 @@ The declaration names where each is covered, so the coverage is checkable rather
 assumed — but a change that gutted one of those rows while leaving its name in place would
 not be caught here.
 
-**SC-007 must be answered honestly, including the parts that are unflattering.** The
-assessment of the five known instances belongs in this contract when the feature lands, and
-it must record any the gate would **not** have caught. On the research available now, the
-expected answer is that three of five were in the dispatched path and were caught by 014
-rather than by this gate — which means this feature's *own* contribution is narrower than
-the gap entry implies, and the contract should say so plainly.
+## SC-007 — would this gate have caught the five known instances?
+
+Answered against the built gate, and the answer is mostly no.
+
+| Instance | Caught? | By what |
+| --- | --- | --- |
+| `resume_run` had no production caller (014) | **No** | Already covered by 014's own durability rows. This gate asserts that coverage exists, which would catch its *removal*, not its original absence. |
+| A sweeper that had not dispatched since 009 (014) | **No** | Same. The dispatched path was closed by 014. |
+| An observer the protocol could not call (014) | **No** | Same. |
+| An egress loader reading a `VAULT_TOKEN` no allocation has (015) | **No** | Covered by 015's shipping row, which is stronger than a reach assertion — it requires the mcp service to complete a pass. |
+| Claim mappings nothing read back (#78) | **Partly** | The API would have started and answered `401 absent_identity`, which this gate accepts. What it would have caught is the *cause*: the API could not start at all, because its Vault role was wrong — and that is the defect this feature was raised for. |
+
+**So this gate's own contribution is one of five, and that one is the API's start-up.** The
+other four were closed by 014 and 015 building coverage for their own features; this feature
+makes that coverage *checkable* rather than incidental, which is worth having and is not the
+same claim.
+
+Stated plainly because the ROADMAP entry describes gap 0d as the common cause behind five
+findings, and a reader could take this feature as closing all five. It closes the one that
+was still open, and stops the other four's coverage from being lost silently.
+
+**What would have caught the four, had it existed earlier**, is exactly what 014 and 015
+built: rows that assert about the running process rather than about a constructed one. The
+generalisable lesson is in the ROADMAP, not in this gate.
 
 ---
 
-## The break fixture
+## The break fixture — demonstrated 2026-07-31
 
 FR-012 requires the gate to fail against a deliberately broken assembly, demonstrated rather
-than argued. The repository has an established practice of break fixtures for exactly this.
+than argued. It was, by hand, against the live enclave: `service.py`'s `VAULT_ROLE` was
+changed to a role that does not exist and the API redeployed. The lane failed with exit 1,
+named the API, and printed the API's own account:
 
-The break must be **in the assembly**, not in the surface's behaviour: point a surface at a
-credential role that does not exist, which is precisely the defect that motivated the
-feature. A fixture that broke a route would prove the row can fail without proving it can
-detect the failure class it exists for.
+```
+CredentialUnavailableError: could not obtain a database credential from Vault at
+https://127.0.0.1:8200 as role 'no-such-role': HTTP 400
+{"errors":["role \"no-such-role\" could not be found"]}
+```
+
+That is the defect that motivated the feature, reproduced and caught. The break was in the
+**assembly**, not in a route — a fixture that broke a route proves a row can go red without
+proving it detects this class.
+
+**Not automated, deliberately.** Doing so means editing source, redeploying, and waiting out
+a cold start on every run, to re-prove something that does not change. What *is* automated is
+the detection mechanism underneath it (`test_break_a_surface_assembly.py`): an absent surface
+must fail rather than skip, and the failure must distinguish "never placed" from "placed and
+broken". Recorded as a limit per ADR-0047 rather than left implied.
+
+**The demonstration also found a defect in this gate.** The first run reported only
+"answered nothing" — the API's own error sat unread in the allocation's stderr, because the
+failure path printed the request's output and not the process's. FR-004 was unmet by the
+thing built to satisfy it, and only the break fixture showed it.
 
 ---
 
