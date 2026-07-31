@@ -106,8 +106,17 @@ list — a set with one mechanism *is* a list, and a list omits in silence.
 trusted-key configuration: write that and the control plane believes identities somebody else
 mints, without any record in any jurisdiction changing.
 
-**What survives**: a bound the control plane does not enumerate as a configuration surface
-and which no derived path occupies. The named list is the part that cannot be derived and therefore
+**What the named half's check actually covers, stated precisely.** The control plane
+enumerates four kinds: its mounts, its auth methods, the roles those methods issue, and the
+grants it holds. Every member of those four must be named or excluded. It does **not**
+enumerate "surfaces where a write would change what a run may do" — that is a judgement, and
+no enumeration answers it.
+
+**What survives**: a surface that bounds a run and is not a member of those four kinds. It is
+in the named half only because somebody judged it belonged, and a new one of that shape needs
+somebody to notice. Recorded here as a limit rather than left implied, because an earlier
+draft of this check was phrased to sound total and would have been read that way — which is
+what the four analysis passes before this one were each, in different forms, about. The named list is the part that cannot be derived and therefore
 cannot self-extend; adding a bounding surface of that kind requires someone to add it here,
 and T003d exists so that removing one is at least deliberate.
 

@@ -180,6 +180,24 @@ not about this feature. Twice now the correct principle was written in these ver
 the next design violated it anyway — so recording a lesson does not prevent repeating it, and
 what caught each repetition was re-reading the whole chain rather than remembering.
 
+**Analysis pass 5 — 2026-07-31.** Three findings, and for the first time none is a bound
+going unchecked.
+
+- **The completeness check's predicate was undecidable**, so it would have collapsed into the
+  hand-chosen set it replaced. It asked for "every enumerable surface where a write would
+  change what a run may do". A control plane enumerates what it HAS — mounts, auth methods,
+  roles, grants — not what bounds a run, which is a judgement. An implementer would have
+  enumerated those four and believed the set complete. Now the requirement names the four and
+  records the residual instead of implying there isn't one.
+- Two checks overlapped without saying so: for the four enumerated kinds, T003d already covers
+  what T003e asserts. T003e's value is the entries a judgement put there, and that is now what
+  it asserts.
+
+**Different in kind from passes 1–4.** Those each found a bound that would go entirely
+unchecked. This one found a sentence claiming more than any mechanism can deliver — the
+coverage is unchanged; what changed is whether the artifact admits its own limit. First
+evidence of convergence rather than another instance of the same failure.
+
 Two things flagged for planning rather than fixed here:
 
 - **US4's amendment and US1's gate could be separated.** They are one feature because the

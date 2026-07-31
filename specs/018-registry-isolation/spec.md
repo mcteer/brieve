@@ -239,11 +239,26 @@ every row not in force, which of the two states it is in and where the reason is
 - **FR-006**: A bounding record kind with no attempted write MUST fail the gate rather than
   be silently uncovered.
 - **FR-006aa**: **Both halves MUST have a completeness check, and neither may rest on a list
-  somebody maintains.** The named half is checked against the control plane's own enumeration
-  of its configuration surfaces — the auth methods it trusts, the mounts it serves, the grants
-  it holds. Every enumerable surface where a write would change what a run may do MUST be
-  named or excluded with a reason. Enumerating is a COVERAGE act under FR-002a and may use
-  administrator authority; it must never assert a denial.
+  somebody maintains.** The named half is checked against **four surfaces the control plane
+  genuinely enumerates** — its mounts, its auth methods, the roles those methods issue, and
+  the grants it holds. Every member of those four MUST be named or excluded with a reason.
+  Enumerating is a COVERAGE act under FR-002a and may use administrator authority; it must
+  never assert a denial.
+
+  **Four named surfaces, not "everything policy-affecting", and the difference is the
+  requirement.** A control plane enumerates what it *has*; it does not enumerate what *bounds
+  a run* — that is a judgement. An earlier draft asked for "every enumerable surface where a
+  write would change what a run may do", which sounds total and is undecidable: the system
+  administration tree alone exposes dozens of write paths, and sorting them is exactly the
+  judgement an enumeration cannot make. An implementer meeting that phrase would enumerate
+  the four obvious ones and believe they had covered everything — the hand-chosen set the
+  check was added to replace, wearing a mechanism's clothes.
+
+- **FR-006ab**: The residual MUST be recorded rather than implied. A surface that bounds a run
+  and is not a member of the four enumerated kinds is outside this check, placed in the named
+  half only if somebody judged it belonged. **A named limit is worth more than a predicate
+  that reads as total and is not** — and this feature has now spent four analysis passes on
+  claims that exceeded their coverage.
 
   **Why, stated because the reasoning was available and went unused**: a set with one
   mechanism is a list, and a list omits silently. That is written down in this feature's own
