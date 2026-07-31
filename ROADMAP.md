@@ -444,6 +444,49 @@ stderr, and the wait stopped at *placed* rather than at *answering* — so rows 
 surfaces that were merely young. Both are the shape this whole gap is about, arriving one
 level up: a thing that looked right on paper and was wrong when run.
 
+### 0e. No model is in the loop — a dispatched run executes a scripted tool sequence — **OPEN**
+
+**Raised 2026-07-31, answering "how close are we to running a task end to end?"** The
+governance chassis is complete and proven; the agent is not connected to it.
+
+`surfaces/dispatch/entrypoint.py` picks each step's tool by round-robin:
+
+```python
+def _tool_for_step(tools: list[str], step: int) -> str:
+    return tools[step % len(tools)] if tools else ""
+```
+
+`adapters.pydantic_ai.build_governed_agent(model, ...)` exists, takes a model, and installs
+governance outermost so no capability downstream can produce an ungoverned execution. **No
+production caller passes it a model.** The only real provider call in the tree is
+`adapters/anthropic_scorer.py`, which scores evals — not runs.
+
+**What this does and does not mean.** Every durability and governance guarantee is real and
+asserted against live infrastructure: kill/resume, fencing, re-observe-never-re-execute,
+grant expiry, hash-chained evidence, hooks failing closed, authority manufactured per
+allocation from an attested identity. Those hold. What has never happened is a **model**
+choosing a tool and that choice being governed — which is the thing the platform exists to
+do, and the one path with no coverage because it has no caller.
+
+This is the sixth instance of the shape ROADMAP gap 0d names, and the largest: a capability
+that is correct, tested, and wired to nothing. 017's lane would not catch it — the dispatch
+entrypoint runs, completes, and writes evidence; it simply never consults a model.
+
+**What it needs**, and why it is a feature rather than an afternoon:
+
+- The Qualified Model Matrix binding path (ADR-0022, ADR-0039) exercised for real rather
+  than resolved and discarded. A definition's binding map names a model per role; nothing
+  currently turns that into a provider call.
+- Principle VIII: models promote only through eval gates. Putting a live model in the run
+  loop makes those gates load-bearing rather than advisory.
+- ADR-0018's `RunReport` is still owed, and a model-driven run is the first thing whose
+  output a report would be about.
+
+**Related but separate**: reaching the mcp service from an IDE. Cursor speaks stdio or an
+HTTP port; the service uses host networking, which on Docker Desktop is the VM's namespace
+and not the developer's machine — the same unreachability the portal has. Small next to the
+above, and it is what stands between "the platform works" and "I can watch it work."
+
 ### 0. The audit trail is not shipped off-host, and hash-chaining only *detects* — **CLOSED by 015, 2026-07-30**
 
 **Closed by [`specs/015-audit-egress`](specs/015-audit-egress/), which implements ADR-0055.**
