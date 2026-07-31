@@ -46,7 +46,7 @@ matches paths **exactly** — no wildcards; `jti` mandatory or the token fails s
 every RAR rejection surfaces to the caller as an indistinguishable `403`, with the reason only
 in Vault's server log
 
-**Scale/Scope**: Two packs, four agent definitions, ~12 conformance rows. Additive to the
+**Scale/Scope**: Two packs, four agent definitions, 14 conformance rows. Additive to the
 authority path — the existing JWT-auth credential path is untouched
 
 ## Constitution Check

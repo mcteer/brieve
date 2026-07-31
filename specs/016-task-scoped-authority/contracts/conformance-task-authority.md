@@ -29,6 +29,7 @@ no lane enumerated, and 014 lost ten more to a directory a lane named but desele
 | The posture names the arrangement in force | Federated, platform-issued, and absent each report as themselves, with a reason (SC-008) | Configure each; read the posture |
 | Tool authority is unchanged | Tool decisions for the same run are identical before and after this feature (SC-009a) | Differential against the recorded trail |
 | No new standing credential | The count of standing credentials is unchanged (SC-009) | The issuer holds a Vault token from its own attested identity and no key |
+| **A task cannot widen its own authority** | A run attempting work outside its grant is refused, the refusal recorded, and the cause named — "outside the granted task" distinguished from "outside the agent's ceiling" (FR-009/010) | Different causes, different remedies: one is re-consent, the other a ceiling change |
 | **Only the issuer may mint task scope** | A workload other than the grant issuer is refused `transit/sign` on the signing key (FR-020) | The new privilege this feature creates — whoever holds it can manufacture authority, so it is bounded by policy and the bound is asserted rather than assumed |
 
 ## Break fixtures worth naming
