@@ -105,6 +105,30 @@ ran, which is weak evidence it was the obvious hole rather than the only one.
   same. `FR-004aa` renumbered — it was the most important requirement in the feature and had
   the least legible identifier.
 
+**Analysis pass 2 — 2026-07-31.** Four findings, and the first is pass 1's own fix having
+the defect pass 1 was fixing.
+
+- **The cross-check's scope was unbounded and covered one of two mounts.** FR-006a said
+  "anything present in the control plane", which is every mount — the gate fails on day one —
+  and which an implementer would narrow to whichever mount came to mind. The bounding paths
+  span **two**: the authority store and the agent registry. Narrowing to the first leaves the
+  record deciding whether a definition exists at all outside the check added to make coverage
+  complete. The jurisdictions are now derived from the paths, so a third extends the check for
+  free.
+
+  Third time in two features that a coverage mechanism has been blind in a direction its
+  author did not consider. Worth watching for by name.
+- **The exclusion list had no home and no staleness check.** 017 accepted an exclusion list
+  after rejecting a subject list, on the grounds that a stale exclusion names something that
+  is not there and fails, while a stale subject list omits silently. That reasoning only holds
+  if something checks — T003b now requires every exclusion to name something that exists.
+- **T007a forbade what T003a requires.** A rule against "widening authority", checked by
+  source inspection, would flag the enumeration that legitimately reads with an administrator
+  token. Scoped to the *act* now — writing a policy, granting a capability — not to which
+  authority appears. The identical shape as 017's rule that forbade retry loops in words that
+  caught its own readiness wait.
+- FR-011's "the contract MUST say so" is now checked rather than trusted.
+
 Two things flagged for planning rather than fixed here:
 
 - **US4's amendment and US1's gate could be separated.** They are one feature because the

@@ -213,11 +213,18 @@ every row not in force, which of the two states it is in and where the reason is
   may ever do, whether a definition exists at all, and what a person may delegate.
 - **FR-006**: A bounding record kind with no attempted write MUST fail the gate rather than
   be silently uncovered.
-- **FR-006a**: The set MUST be checked against **what actually exists** in the control plane,
-  not only against what a run may read. Deriving it from a run's read grants is sound for
-  every record inside them and blind to any outside — and a record placed where a run cannot
-  read still bounds that run, because the platform consults it whether or not the run can.
-  Anything present in the control plane and absent from the set MUST fail.
+- **FR-006a**: The set MUST be checked against **what actually exists in the jurisdictions
+  the derived paths occupy** — not only against what a run may read, and not against the
+  whole control plane. Deriving from a run's read grants is sound for every record inside
+  them and blind to any outside; a record placed where a run cannot read still bounds that
+  run, because the platform consults it whether or not the run can. Anything present in
+  those jurisdictions and absent from the set MUST fail.
+
+  **The jurisdictions are derived, not named.** They are wherever the bounding paths already
+  live — two of them at planning time, and a bounding record added in a third extends the
+  check without anyone editing it. Naming them would put a list in the one requirement whose
+  purpose is not having one, and scoping to "the control plane" would fail on every unrelated
+  mount from the first run.
 
   This is the direction a derivation cannot see by construction, and it is the same hole 017
   found in its own coverage mechanism after four analysis passes: a subject that never
@@ -234,10 +241,15 @@ every row not in force, which of the two states it is in and where the reason is
   permissive on every run, and a lane interrupted mid-fixture would leave it that way. A
   window that is small is not a window that is closed, and this is the one guarantee whose
   temporary suspension is least acceptable.
-- **FR-008b**: FR-008 MUST be enforced by a check rather than by convention. Nothing in the
-  suite may issue a policy write or grant a capability, and that MUST be asserted — a safety
-  property resting on everyone remembering is the shape this repository has already paid for
-  more than once.
+- **FR-008b**: FR-008 MUST be enforced by a check rather than by convention, and the check
+  MUST be scoped to **the act, not the authority**. Nothing in the suite may *write a policy*
+  or *grant a capability*; reading with an administrator's authority is neither, and is
+  required by FR-006b. A check keyed on which authority appears rather than on what is done
+  with it would forbid the enumeration another requirement mandates.
+
+  Recorded this precisely because a safety property resting on everyone remembering is the
+  shape this repository has paid for more than once — and because a rule that catches the
+  wrong thing gets relaxed until it catches nothing.
 - **FR-008a**: The one-time demonstration MUST restore the authority it changed, and MUST
   verify the restoration rather than assume it. Whoever performs it is responsible for
   leaving the platform exactly as they found it, and the recorded output MUST show that.
@@ -249,7 +261,8 @@ every row not in force, which of the two states it is in and where the reason is
   it exists to end.
 - **FR-011**: The gate MUST NOT assert that the bounding records' **contents** are correct.
   A record that is wrong in a way the reviewed configuration wrote is outside what a
-  refusal can show, and the contract MUST say so.
+  refusal can show, and the contract MUST say so — **checked, not trusted**, since a later
+  edit could remove the statement and let a green row imply more than it asserts.
 
 ### Key Entities
 

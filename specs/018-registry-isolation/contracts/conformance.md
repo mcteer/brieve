@@ -75,9 +75,20 @@ added the derivation would need revisiting" — which is a limit nobody would no
 exceeded. FR-006a makes it a failure instead. 017 found the identical hole in its own coverage
 mechanism after four passes: a scheme built from enrolments is blind to what never enrolled.
 
-**What survives**: a bounding record held somewhere the enumeration does not reach — a
-different mount, another system. The cross-check covers the authority jurisdiction, and a
-bound outside it would be outside both halves.
+**The cross-check's jurisdictions are derived from the bounding paths**, not named. Two at
+the time of writing — the authority store and the agent registry — and a bounding record
+placed in a third extends the check without anyone editing it.
+
+*Analysis pass 2 found this.* Pass 1 added the cross-check to close a fail-open hole, and
+wrote its scope as "the control plane" — which is every mount, so the gate would have failed
+on the first run, and which an implementer would sensibly narrow to the mount they thought of
+first. That is the authority store. The agent registry — the record deciding whether a
+definition exists at all — would have sat outside the very check added to make coverage
+complete.
+
+**What survives**: a bounding record held somewhere outside every derived jurisdiction —
+another system entirely. Both halves are scoped to where the bounding paths already live, so
+a bound outside all of them is outside both.
 
 ---
 
