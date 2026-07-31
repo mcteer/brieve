@@ -16,7 +16,21 @@ A control-plane path holding a record that decides what a run or a person may do
 from the **deployed** policy and then **cross-checked against what exists**, because a
 derivation from read grants is blind to anything outside them.
 
-**Source**: the read grants on the policy a run actually carries. Every path a run may read
+**Two sources, and the second is not a special case.**
+
+| Half | Source | Why |
+| --- | --- | --- |
+| **Derived** | the read grants on the policy a run carries | every readable path in that jurisdiction is a bound it must not write |
+| **Named** | an explicit list, each entry with its reason | the grant of authority itself, and what decides which grants a run receives. **A run holds no read access to any of them**, so no derivation from its grants can reach them |
+
+The named half exists because derivation is *structurally* blind, not because the derivation
+is incomplete. A run's limits are stated twice — once as a record the platform consults, once
+as the grant the control plane enforces — and rewriting the second moves the bound without
+touching the first. Analysis passes 1 and 2 both built schemes anchored on what a run can
+see; pass 3 found that the most direct route to widening authority is a thing a run cannot
+see at all.
+
+**Source of the derived half**: the read grants on the policy a run actually carries. Every path a run may read
 in that jurisdiction is a bound it must not be able to write — that equivalence is what makes
 derivation sound, and it is why the set needs no separate list to fall out of date.
 

@@ -159,7 +159,11 @@ every row not in force, which of the two states it is in and where the reason is
   A check that accepted any refusal would pass against an authority that could have written
   had it been valid.
 - **A bounding record kind exists that nobody enumerated.** The gap this row exists to close,
-  reproduced inside it.
+  reproduced inside it — and it happened, twice, before implementation began. First the
+  derivation was blind to records outside a run's read grants; then the cross-check added to
+  fix that was blind to the grant of authority itself.
+- **A bound that a run cannot read.** Invisible to any scheme anchored on what a run can see,
+  which is what every version of this design was until analysis pass 3.
 - **The demonstration is interrupted.** Whoever grants the write to prove the gate can fail
   is responsible for revoking it, and must verify the revocation. This is why the
   demonstration is manual and one-time: an automated fixture killed between grant and revoke
@@ -209,8 +213,22 @@ every row not in force, which of the two states it is in and where the reason is
   secrets in its own space, configuration, or product state is what a run is for. Only the
   records that decide what a run may do are in scope, and a check that drifted into the
   first would forbid the platform's purpose while appearing stricter.
-- **FR-005**: The gate MUST cover every kind of record that bounds a run: what a definition
-  may ever do, whether a definition exists at all, and what a person may delegate.
+- **FR-005**: The gate MUST cover every kind of record that bounds a run, in **both** of the
+  places such records live:
+
+  **Records a run can read** — what a definition may ever do, whether a definition exists,
+  what a person may delegate, and the rest of that jurisdiction. These are derived.
+
+  **Bounds a run cannot read, and which bind it anyway** — the grant of authority *itself*,
+  the rule deciding which grants a run receives, and the attachment of grants to an identity.
+  A run holds no read access to any of them, so no derivation from its grants can find them.
+  These are **named**, each with the reason it cannot be derived.
+
+  The second kind is the more direct route and was missed for two analysis passes. A run's
+  limits are stated twice — once as a record the platform consults, and once as the grant the
+  control plane enforces — and rewriting the second moves the bound without touching the
+  first. A gate covering only records *about* the bounds, while missing the bound itself,
+  asserts the wrong half of its own name.
 - **FR-006**: A bounding record kind with no attempted write MUST fail the gate rather than
   be silently uncovered.
 - **FR-006a**: The set MUST be checked against **what actually exists in the jurisdictions
@@ -220,11 +238,16 @@ every row not in force, which of the two states it is in and where the reason is
   run, because the platform consults it whether or not the run can. Anything present in
   those jurisdictions and absent from the set MUST fail.
 
-  **The jurisdictions are derived, not named.** They are wherever the bounding paths already
-  live — two of them at planning time, and a bounding record added in a third extends the
-  check without anyone editing it. Naming them would put a list in the one requirement whose
-  purpose is not having one, and scoping to "the control plane" would fail on every unrelated
-  mount from the first run.
+  **The jurisdictions are derived where derivation works, and named where it cannot.** They
+  are wherever the derived bounding paths already live — two at planning time — and a
+  bounding record added in one of those extends the check without anyone editing it.
+
+  **Derivation is structurally blind to bounds a run cannot read**, and that is not a gap to
+  be closed by a better derivation. Any scheme anchored on a run's grants cannot see a
+  surface the run holds no grant on, and the grant of authority itself is exactly such a
+  surface. So FR-005's second kind is named rather than derived, each entry carrying the
+  reason — and the named part MUST NOT shrink silently, for the same reason the exclusion
+  list must not.
 
   This is the direction a derivation cannot see by construction, and it is the same hole 017
   found in its own coverage mechanism after four analysis passes: a subject that never
@@ -290,8 +313,10 @@ every row not in force, which of the two states it is in and where the reason is
 - **SC-001**: A configuration change granting a run write access to its own bounds fails a
   merge-blocking check. Demonstrated by making the change and observing the failure, not
   argued.
-- **SC-002**: Every kind of bounding record has an attempted write and an observed refusal.
-  A kind with no attempt is itself a failure.
+- **SC-002**: Every kind of bounding record has an attempted write and an observed refusal —
+  **both the records a run can read and the grants it cannot**. A kind with no attempt is
+  itself a failure, and the second kind is where "every" was quietly untrue for two analysis
+  passes.
 - **SC-003**: A check that did not issue its write is distinguishable from one that did and
   was refused. The first must not report success.
 - **SC-004**: After the one-time demonstration, and after any run in which a write

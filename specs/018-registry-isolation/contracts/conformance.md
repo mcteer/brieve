@@ -86,9 +86,21 @@ first. That is the authority store. The agent registry — the record deciding w
 definition exists at all — would have sat outside the very check added to make coverage
 complete.
 
-**What survives**: a bounding record held somewhere outside every derived jurisdiction —
-another system entirely. Both halves are scoped to where the bounding paths already live, so
-a bound outside all of them is outside both.
+**The set has a derived half and a named half, and the named half is the important one.**
+A run's limits are stated twice: as a record the platform consults, and as the grant the
+control plane enforces. Rewriting the grant moves the bound without touching any record — and
+a run holds no read access to the grant, so nothing derived from its grants can reach it.
+
+*Analysis pass 3 found this, after two passes had built schemes anchored on what a run can
+see.* The blind spot contained the ceiling policy itself: the single most direct way a run
+could widen its own authority, and the thing this feature is named after. All three named
+bounds refuse today — probed 2026-07-31 — so the platform was sound throughout and the gate's
+**claim** was not.
+
+**What survives**: a bound held outside both halves — outside the derived jurisdictions and
+absent from the named list. The named list is the part that cannot be derived and therefore
+cannot self-extend; adding a bounding surface of that kind requires someone to add it here,
+and T003d exists so that removing one is at least deliberate.
 
 ---
 

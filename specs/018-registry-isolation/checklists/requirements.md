@@ -129,6 +129,31 @@ the defect pass 1 was fixing.
   caught its own readiness wait.
 - FR-011's "the contract MUST say so" is now checked rather than trusted.
 
+**Analysis pass 3 — 2026-07-31.** Three findings, and the first is the same wrong instinct
+for the third time.
+
+- **The gate checked the records that DESCRIBE a run's bounds and missed the record that IS
+  one.** A run's ceiling is stated twice: as a KV record the platform consults, and as the
+  grant the control plane enforces. Writing the second widens authority directly, bypassing
+  every record the derived rows check — and it sits outside both halves by construction,
+  because a run holds no read access to it. Two more surfaces share the blind spot: what
+  decides which grants a run receives, and the attachment of grants to an identity.
+
+  All three refuse today, probed against the live control plane. **The platform was sound and
+  the gate's claim was not** — it would have reported "a run cannot widen its bounds" while
+  never testing the most direct way to do so. That distinction is what ADR-0047 exists for,
+  arriving against this feature's own coverage.
+- **The derivation principle was stated as sufficient and is provably not.** Pass 2 wrote
+  that a record added in a third mount extends the check for free — true only where a derived
+  path already exists. Any scheme anchored on a run's grants is blind to what the run cannot
+  read, and that is structural rather than a gap a better derivation closes.
+- The model implied derivation was the whole story; it now carries both halves.
+
+**Three passes, three HIGHs, each inside the previous pass's fix.** The pattern is now
+explicit enough to state: every coverage mechanism in this feature was anchored on what a run
+can see, and every bound a run cannot see was invisible to it. Not a bug in any one design —
+the same instinct three times.
+
 Two things flagged for planning rather than fixed here:
 
 - **US4's amendment and US1's gate could be separated.** They are one feature because the
