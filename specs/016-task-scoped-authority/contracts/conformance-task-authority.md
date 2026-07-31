@@ -29,6 +29,7 @@ no lane enumerated, and 014 lost ten more to a directory a lane named but desele
 | The posture names the arrangement in force | Federated, platform-issued, and absent each report as themselves, with a reason (SC-008) | Configure each; read the posture |
 | Tool authority is unchanged | Tool decisions for the same run are identical before and after this feature (SC-009a) | Differential against the recorded trail |
 | No new standing credential | The count of standing credentials is unchanged (SC-009) | The issuer holds a Vault token from its own attested identity and no key |
+| **Only the issuer may mint task scope** | A workload other than the grant issuer is refused `transit/sign` on the signing key (FR-020) | The new privilege this feature creates — whoever holds it can manufacture authority, so it is bounded by policy and the bound is asserted rather than assumed |
 
 ## Break fixtures worth naming
 
@@ -41,6 +42,9 @@ no lane enumerated, and 014 lost ten more to a directory a lane named but desele
   the "same scope" row catches it.
 - A tool's `paths` declaration is widened to a wildcard → the grant stops narrowing, and the
   row that notices is the ceiling-remainder one rather than anything about manifests.
+- The signing policy is widened to any authenticated workload → the "only the issuer may mint"
+  row fails. Worth naming because the failure is silent otherwise: every other row still
+  passes, since the grants they use are still correctly scoped.
 
 ## What these rows do not prove
 
@@ -69,3 +73,9 @@ no lane enumerated, and 014 lost ten more to a directory a lane named but desele
 Per constitution v1.1.0, a blocking row no automated check executes needs a named runner.
 Every row here runs in the enclave lane, so the automated runner covers them; none is owed a
 human name.
+
+**Sealed-core review**: this feature changes identity and authority flows, which Principle V
+places in the sealed core and which require security-maintainer review before merge. **Dan
+McTeer** holds that role. Recorded here rather than left to CODEOWNERS alone, because the
+principle names the review and a contract that omitted it would be the same shape as a gate
+whose only enforcement is everyone remembering.

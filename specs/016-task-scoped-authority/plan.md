@@ -98,6 +98,7 @@ src/core/authority/
 └── vault_fabric.py      # extended — read the ceiling paths the grant is bounded by
 
 src/core/packs/
+├── manifest.py          # extended — the tool model gains a `paths` field
 └── registration.py      # extended — parse and validate the tools' `paths` declaration
 
 src/core/durability/
@@ -109,6 +110,9 @@ src/surfaces/api/
 
 src/surfaces/dispatch/
 └── entrypoint.py        # extended — re-derive the grant token on resume from the record
+
+src/surfaces/mcp/
+└── server.py            # extended — report which arrangement is in force (US4)
 
 infra/modules/trust-fabric/
 ├── task-authority.tf    # NEW — transit key, resource-server profile, static public key
