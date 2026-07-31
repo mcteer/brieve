@@ -279,6 +279,22 @@ fi
 vault status 2>/dev/null | grep -q "^Sealed *false" \
   || die "trust store is sealed — refusing to apply, which would corrupt Terraform state"
 
+# The resource-server feature is behind an activation flag and ships OFF (016). Activated
+# here, before the fabric applies, because `sys/config/oauth-resource-server` cannot be
+# written until it is on — and a targeted apply afterwards is the ordering mistake 015 paid
+# for on every cold enclave.
+#
+# REVERSIBLE, and that is why this is an ordinary bring-up step rather than a staged
+# migration: `.../deactivate` turns it back off, exercised in both directions during 016's
+# research. `make dev-up` stays the single description of what an enclave is.
+# The root token explicitly: `VAULT_TOKEN` is not exported until the surfaces section far
+# below, and a `vault write` here without one fails silently into the warn branch — which
+# reads as "the feature is unavailable" when the truth is "nobody was logged in".
+VAULT_TOKEN="$(env_val VAULT_ROOT_TOKEN)" \
+  vault write -f sys/activation-flags/oauth-resource-server/activate >/dev/null 2>&1 \
+  && ok "oauth resource server activated (task-scoped authority)" \
+  || warn "could not activate oauth-resource-server — task-scoped grants will not validate"
+
 say "Trust fabric"
 # TLS is ON by default. The path you develop against should be the path that ships;
 # an opt-in security property is one most environments never opt into.
