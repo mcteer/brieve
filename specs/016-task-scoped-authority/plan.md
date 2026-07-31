@@ -90,7 +90,9 @@ specs/016-task-scoped-authority/
 
 ```text
 src/core/authority/
-├── grant.py             # NEW — TaskGrant, EntailedScope, the derivation from requested tools
+├── grant.py             # EXTENDED — `DelegationGrant` and `issue_grant` already exist
+│                        #   (005/014). Gains `entailed_paths`; does NOT become a new object.
+├── scope.py             # NEW — EntailedScope: derive paths from requested tools
 ├── grant_token.py       # NEW — assemble + transit-sign the RAR token; no key material here
 ├── types.py             # unchanged — AuthorityScope stays tool/action only (F6)
 └── vault_fabric.py      # extended — read the ceiling paths the grant is bounded by
@@ -126,6 +128,13 @@ tests/
 `src/core/authority/` beside the ceiling reader it depends on; the two surfaces that already
 hold attested identities gain the mint and the re-derive. No new package, no new service, and
 no new long-lived component — which is what F2 and ADR-0056's per-run exchange bought.
+
+**Corrected during `/speckit-tasks`**: `DelegationGrant`, `issue_grant`, and the provider's
+`save_grant`/`load_grant` **already exist** from 005/014 — this plan's first draft listed
+`grant.py` as new. The durable-consent object the spec calls a "task grant" is that existing
+record with `entailed_paths` added, not a second grant beside it. Two grant objects for one
+consent would have been exactly the fragmentation Principle VII forbids, and the correction
+also removes the persistence work the task list would otherwise have carried.
 
 ## Complexity Tracking
 
