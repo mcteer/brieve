@@ -113,6 +113,7 @@ same change.
 | [0054](0054-model-written-orchestration-parity.md) | Model-written orchestration: per-call and per-delegation governance parity | Proposed |
 | [0055](0055-audit-egress-for-tamper-evidence.md) | Tamper-evidence requires a copy outside the writer's blast radius | Accepted |
 | [0056](0056-task-scope-needs-an-authorization-server-vault-is-not-one.md) | Task scope needs an authorization server, and Vault is not one | Accepted |
+| [0057](0057-context-hungry-agents-want-breadth-not-narrower-reads.md) | Read-scope narrowing is the wrong control for context-hungry expert agents | Accepted |
 
 ## Reviews
 

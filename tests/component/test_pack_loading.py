@@ -94,12 +94,18 @@ def test_a_manifest_parses_into_records() -> None:
                     "product": "vault",
                     "product_mode": "federate",
                     "product_action": "vault.read",
+                    # 016: a secret_touching tool must say what it reaches, or the loader
+                    # refuses. Asserted below rather than merely satisfied, so this fixture
+                    # documents the field rather than working around it.
+                    "paths": [{"path": "secret/data/{agent}/*", "capabilities": ["read"]}],
                 }
             ],
         }
     )
     assert manifest.name == "vault"
     assert manifest.tools[0].risk_class == "secret_touching"
+    assert manifest.tools[0].paths[0].path == "secret/data/{agent}/*"
+    assert manifest.tools[0].paths[0].capabilities == ("read",)
 
 
 def test_an_adopted_pack_must_declare_upstream() -> None:
