@@ -133,6 +133,9 @@ infra/
 │   ├── mcp.nomad.hcl            # + meta (already covered; declares itself anyway)
 │   └── agent-run.nomad.hcl      # + meta (already covered; dispatched shape)
 └── bin/
+    ├── enclave-conformance      # + early reclamation of leftovers (FR-007a clause 4),
+    │                            #   in its existing purge phase — it covers the direct
+    │                            #   invocation path a Makefile-only step would miss.
     └── deployment-conformance   # NEW — stands the uncovered surfaces up, runs the rows,
                                  #   and owns their lifecycle: stop what it started on a
                                  #   pass, leave it standing on a failure (FR-007a)
@@ -155,8 +158,9 @@ tests/
     # inside the set the runner invokes, so it would recurse without bound. The repeat
     # check lives in infra/bin/deployment-conformance, one level out.
 
-Makefile                          # `conformance` gains an EARLY step reclaiming leftovers
-                                  #   (FR-007a clause 4) and a FINAL line invoking the runner.
+Makefile                          # `conformance` gains a FINAL line invoking the runner;
+                                  #   a new `deployment-down` target clears what a failed
+                                  #   run left standing (named by the failure message).
                                   #   NOT a pytest line — those run before the surfaces
                                   #   are up, so rows there would fail on every invocation.
 .github/workflows/enclave.yml     # unchanged — the lane already runs `make conformance`

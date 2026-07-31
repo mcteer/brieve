@@ -101,6 +101,11 @@ submitted: the gate runs last and cannot do it in time. A stop that itself fails
 gate; swallowed, it would return the surfaces to persisting and report green from the
 mechanism built to prevent that.
 
+**A contributor's own processes are left alone, and that is asserted rather than promised.**
+The gate reuses anything already running and never restarts it — clause 1 of FR-007a, checked
+by `test_the_runner_leaves_no_footprint` alongside the teardown directions, because an
+implementation that quietly restarted them would satisfy every other clause.
+
 **The gate stops only the surfaces it started.** If a developer brought the portal up
 themselves to use it, the gate reuses it and leaves it running — so its reservations persist
 and can still crowd the conformance batch job on a later run. That is the developer's own

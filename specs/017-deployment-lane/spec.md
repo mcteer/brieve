@@ -120,6 +120,21 @@
   early reclamation, and teardown failure — the corner is stated once instead of amended
   again.
 
+### Analysis pass 7 — 2026-07-31
+
+- **The reclamation task left a decision open**, offering two placements without choosing.
+  Settled on the purge phase the enclave runner already has, because it also covers direct
+  invocation, which a recipe-only step would miss.
+- **The failure message named a command nobody was told to build.** It now exists, and the
+  message states both routes and that neither is required — saying only the manual one
+  implies action is needed when it is not, and saying nothing about the automatic clear
+  loses a developer's evidence the first time they re-run.
+- **Clause 1 was implemented but unasserted.** Nothing checked that a contributor's own
+  processes are left alone, which is a promise the contract makes.
+- These are the profile of a task list read closely rather than a design still moving: an
+  undecided either/or, a phantom command, an unasserted clause. Unlike passes 4–6, none came
+  from a paragraph being amended again.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A deployed process that cannot start fails the merge (Priority: P1)
