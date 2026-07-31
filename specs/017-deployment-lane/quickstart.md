@@ -28,6 +28,14 @@ bash infra/bin/deployment-conformance
 Expected: each declared process reaches a working state within its own wait, and each
 assertion reports what it observed rather than only that it passed.
 
+**The gate stops the surfaces it started**, so a passing run leaves the enclave's spare
+capacity as it found it — otherwise those reservations would starve the conformance batch job
+on your next run. If you want the portal to stay up, bring it up yourself with
+`infra/bin/portal-up`; the gate reuses what is already running and leaves it alone.
+
+**A failing run leaves them standing**, deliberately, and says so. The allocation is what you
+need to diagnose the failure, and the next run replaces it.
+
 The same script is the final line of `make conformance`, so the CI lane and a contributor
 run identical code (Principle VII). It is deliberately **not** a pytest line in that recipe:
 those lines run before the surfaces are stood up, and rows there would assert against an API

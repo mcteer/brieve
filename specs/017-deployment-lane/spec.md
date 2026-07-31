@@ -91,6 +91,18 @@
   rather than a full run on `main`, and FR-001 gets an assertion rather than resting on
   construction.
 
+### Analysis pass 5 — 2026-07-31
+
+- **Teardown had no failure path.** Pass 4 gave the gate a lifecycle and said "on success or
+  failure", which destroys the allocation a developer needs to diagnose a red run — the
+  captured stderr tail is often not enough, since the Vault-role refusal that motivated this
+  feature appeared mid-log rather than at its end. FR-007b now leaves things standing on
+  failure and says so. FR-007c makes a *failed* teardown fail the gate, because swallowing it
+  returns the defect silently, reported green by the mechanism built to prevent it.
+- The first pass to find no HIGH. Passes 1–4 each found something that would have produced a
+  gate that could not work; this one found two gaps in the failure path, both in the corner
+  those four fixes kept adding to.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A deployed process that cannot start fails the merge (Priority: P1)
@@ -286,6 +298,13 @@ confirm it produces the same verdict the automated run produces for the same tre
   processes up and leaves them holding reservations starves the merge-blocking checks on the
   *next* run, which is a failure that passes on a fresh automated runner and appears only on
   a reused one.
+- **FR-007b**: On **failure**, the gate MUST leave what it started running and say so. A
+  failing gate blocks the merge, so no recurring run depends on the capacity being free —
+  and tearing down on failure destroys the very process someone needs to inspect. FR-007a's
+  guarantee is about the path that repeats, which is the passing one.
+- **FR-007c**: A failure to stop what the gate started MUST fail the gate. Swallowed, it
+  returns the processes to persisting and the next run to being starved — reported green by
+  the mechanism built to prevent exactly that.
 - **FR-008**: The gate MUST be runnable by a contributor against a local deployment and reach
   the same verdict as the automated run for the same tree.
 - **FR-009**: The gate MUST distinguish "the surface refused this request" from "nothing
