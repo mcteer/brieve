@@ -127,8 +127,32 @@ nomad job run -detach -var="repo=$REPO" \
   || die "could not submit the api service"
 
 say "Portal"
+# TWO ADDRESSES FOR THE SAME ENCLAVE, AND THE DIFFERENCE IS NOT A TYPO.
+#
+#   api_base_url        — where the PORTAL PROCESS reaches the API. A server-to-server hop
+#                         inside the substrate.
+#   portal_redirect_uri — where the BROWSER comes back to. A human's address bar, on the
+#                         developer's machine, where the portal's port is now published.
+#
+# They were the same string only while the portal was in host mode and reachable by nobody.
+#
+# **`host.docker.internal` is NOT the answer here, and it is the obvious wrong guess.**
+# Measured from inside the running portal container: `host.docker.internal` resolves to
+# 192.168.65.254 and `gateway.docker.internal` to 192.168.65.1 — both Docker Desktop's
+# macOS-facing addresses. From a bridge container they route OUT to the developer's machine,
+# where the API (host mode) publishes nothing. Both refuse the connection.
+#
+# The API listens in the LINUX VM's host namespace. The only address that reaches it from a
+# bridge container is that bridge's own gateway, derived below rather than hardcoded as
+# `172.17.0.1` — the value is stable on this substrate, and a magic constant would be
+# indistinguishable from a guess by whoever reads it next.
+#
+# The durable fix is to publish the API too, at which point this whole hop becomes an
+# ordinary published port. That belongs with 019, which needs the API reachable anyway.
+API_GATEWAY=$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null)
+[ -n "$API_GATEWAY" ] || die "could not derive the docker bridge gateway — the portal would start and reach nothing"
 nomad job run -detach -var="repo=$REPO" \
-  -var="api_base_url=http://127.0.0.1:8081" \
+  -var="api_base_url=http://${API_GATEWAY}:8081" \
   -var="oidc_issuer=${OIDC_ISSUER}" \
   -var="oidc_authorize_endpoint=${OIDC_AUTHORIZE}" \
   -var="oidc_token_endpoint=${OIDC_TOKEN}" \

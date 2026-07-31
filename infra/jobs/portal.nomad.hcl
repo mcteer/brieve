@@ -12,7 +12,18 @@
 
 variable "api_base_url" {
   type        = string
-  description = "Where the northbound API answers. Loopback inside the enclave for dev."
+  description = <<-DESC
+    Where the northbound API answers, AS SEEN FROM THIS CONTAINER.
+
+    Not loopback any more. This task runs in bridge mode (see the config block below), so
+    `127.0.0.1` is the portal's own container and reaches nothing. The API still runs in host
+    mode, in the Docker VM's namespace, which from here is `host.docker.internal`.
+
+    This is the same distinction 014 paid for in the sweeper's dispatcher: an address that is
+    correct for a host process and wrong for an allocation, failing with `Connection refused`
+    in a place nobody was watching. The difference here is that the failure is loud — the
+    portal's first page load reports it.
+  DESC
 }
 
 variable "oidc_authorize_endpoint" {
@@ -111,9 +122,24 @@ job "portal" {
       driver = "docker"
 
       config {
-        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
-        entrypoint   = ["/bin/sh", "-c"]
-        network_mode = "host"
+        image      = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
+        entrypoint = ["/bin/sh", "-c"]
+
+        # BRIDGE MODE, AND THIS IS THE WHOLE FIX. It said `network_mode = "host"`, and the
+        # port block above was therefore inert: host mode shares the Docker VM's network
+        # namespace and publishes nothing, so `docker ps` showed an empty Ports column and
+        # nothing on the developer's machine could reach 8082 — while `portal-up` ended by
+        # telling them to open it in a browser.
+        #
+        # Measured 2026-07-31 with the portal running and answering: `200` from inside the
+        # VM's namespace, no answer from macOS. `docker inspect` states it in one line —
+        # `host  ports=map[]` here against `bridge  ports=map[5432/tcp:[{127.0.0.1 5432}]]`
+        # for the database, which the host lanes reach from macOS on every run.
+        #
+        # **A browser-facing surface is the one thing that cannot live in host mode**, because
+        # the browser is the one client that is never inside the VM. `postgres.nomad.hcl` had
+        # the answer the whole time; this is its port block, copied.
+        ports = ["http"]
 
         mount {
           type     = "bind"
