@@ -28,10 +28,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
-from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
+from core.durability.credentials import VaultDatabaseCredentials, WorkloadIdentity
 from core.identity.claims import ClaimMapping, resolve_roles
 from core.identity.mappings_store import ClaimMappingsUnavailable, VaultClaimMappings
 from surfaces.api.authority_submit import VaultAuthoritySubmitter
@@ -49,6 +50,10 @@ DATA_PATH = "harness-authority/data/claim-mappings"
 METADATA_PATH = "harness-authority/metadata/claim-mappings"
 
 CLAIM = "https://brieve.dev/roles"
+
+#: The one policy under test. Named rather than inherited from the workload role, which
+#: carries three — a grant arriving from either of the others would pass unnoticed.
+READ_POLICY = "harness-authority-read"
 
 
 @pytest.fixture
@@ -88,14 +93,54 @@ def a_mapping(role: str = "operator") -> ClaimMapping:
     return ClaimMapping(claim_name=CLAIM, claim_value=f"conformance-{uuid.uuid4().hex}", role=role)
 
 
-def reader(**kwargs: object) -> VaultClaimMappings:
-    """The reader the API assembly builds: data path in, metadata path derived.
+class _TokenBound(VaultDatabaseCredentials):
+    """Reads Vault under a supplied token instead of a workload identity.
 
-    `ttl_seconds=0` because the cache has its own component coverage and a row that
+    These rows run on the HOST — the `host_enclave` marker — because setting a record up
+    and destroying it afterwards needs an admin token, and the allocation deliberately
+    carries none. On the host there is no Nomad workload identity to present, so the
+    ordinary login path cannot run at all.
+
+    Binding a token is the right substitute rather than a compromise, because the token
+    is minted with **only** `harness-authority-read`. The workload role carries three
+    policies, so a grant that actually arrived from `harness-database` would satisfy a
+    row that logged in as the workload. Here it cannot: if the claim-mappings grant is
+    missing from this one policy, the read fails.
+    """
+
+    def __init__(self, *, token: str, **kwargs: object) -> None:
+        super().__init__(identity=_NoIdentity(), **kwargs)  # type: ignore[arg-type]
+        self._bound = token
+
+    def read_path(self, path: str, *, token: str | None = None) -> dict[str, Any] | None:
+        return super().read_path(path, token=token or self._bound)
+
+    def list_path(self, path: str, *, token: str | None = None) -> list[str] | None:
+        return super().list_path(path, token=token or self._bound)
+
+
+class _NoIdentity(WorkloadIdentity):
+    """There is no attested identity on the host, and pretending otherwise would hide it."""
+
+    def jwt(self) -> str:  # pragma: no cover - reaching this means the token was ignored
+        raise AssertionError(
+            "a host row tried to present a workload identity. The token binding is what "
+            "makes these rows runnable off-allocation; falling back to a login would "
+            "fail with an error naming Nomad rather than naming this mistake."
+        )
+
+
+def reader(admin: VaultAdmin, **kwargs: object) -> VaultClaimMappings:
+    """The reader the API assembly builds, under the deployed read policy alone.
+
+    `ttl_seconds=0` because the cache has its own component coverage, and a row that
     waited out a TTL would be measuring the clock rather than Vault.
     """
     return VaultClaimMappings(
-        credentials=VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role="conformance"),
+        credentials=_TokenBound(
+            token=admin.token_for(READ_POLICY),
+            vault_addr=admin.addr,
+        ),
         data_path=DATA_PATH,
         ttl_seconds=0.0,
         **kwargs,  # type: ignore[arg-type]
@@ -119,7 +164,7 @@ def test_a_submitted_mapping_is_found_again(admin: VaultAdmin, scratch: list[Cla
     mapping = a_mapping()
     submit(admin, scratch, mapping)
 
-    mappings = reader().current()
+    mappings = reader(admin).current()
 
     assert mapping in mappings, (
         f"submitted mapping was not read back. Found {len(mappings)} mapping(s) at "
@@ -145,7 +190,7 @@ def test_a_second_mapping_does_not_displace_the_first(
     submit(admin, scratch, first)
     submit(admin, scratch, second)
 
-    mappings = reader().current()
+    mappings = reader(admin).current()
 
     assert first in mappings
     assert second in mappings
@@ -165,14 +210,14 @@ def test_resubmitting_a_mapping_does_not_duplicate_it(
         requester="someone-else@example.test", mapping=mapping
     )
 
-    assert [m for m in reader().current() if m == mapping] == [mapping]
+    assert [m for m in reader(admin).current() if m == mapping] == [mapping]
 
 
 def test_a_revoked_mapping_stops_granting(admin: VaultAdmin, scratch: list[ClaimMapping]) -> None:
     """Revocation has to take effect, or the grant outlives the decision to remove it."""
     mapping = a_mapping()
     submit(admin, scratch, mapping)
-    assert mapping in reader().current()
+    assert mapping in reader(admin).current()
 
     key = (
         VaultAuthoritySubmitter(controlled_path=DATA_PATH, token=admin.token)
@@ -181,10 +226,10 @@ def test_a_revoked_mapping_stops_granting(admin: VaultAdmin, scratch: list[Claim
     )
     admin.request(f"{METADATA_PATH}/{key}", method="DELETE")
 
-    assert mapping not in reader().current()
+    assert mapping not in reader(admin).current()
 
 
-def test_a_prefix_the_workload_may_not_list_refuses() -> None:
+def test_a_prefix_the_workload_may_not_list_refuses(admin: VaultAdmin) -> None:
     """The failure the `list` capability exists to make visible.
 
     Vault answers 403 for a prefix the token holds no grant on — NOT 404 — so a reader
@@ -196,7 +241,7 @@ def test_a_prefix_the_workload_may_not_list_refuses() -> None:
     the refusal comes from the policy rather than from an unreachable Vault.
     """
     unlisted = VaultClaimMappings(
-        credentials=VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role="conformance"),
+        credentials=_TokenBound(token=admin.token_for(READ_POLICY), vault_addr=admin.addr),
         data_path="harness-authority/data/claim-mappings-not-granted",
         ttl_seconds=0.0,
     )

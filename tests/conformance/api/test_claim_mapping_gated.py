@@ -151,7 +151,10 @@ def test_row_an_ungated_path_applies_rather_than_queueing(
         )
         assert submitter.submit(requester="alice", mapping=MAPPING) is ChangeDisposition.APPROVED
 
-        status, _ = admin.request(f"{ungated_mount}/data/mapping-c", method="GET")
+        # `record_path`, not the configured prefix: each mapping occupies its own record
+        # so that approving one cannot overwrite another. Reading the prefix itself 404s,
+        # which would read here as "the write did not take effect".
+        status, _ = admin.request(submitter.record_path(MAPPING), method="GET")
         assert status == 200, "an ungated write should have taken effect"
     finally:
         admin.request(f"sys/mounts/{ungated_mount}", method="DELETE")
