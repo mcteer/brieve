@@ -24,12 +24,17 @@ from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
 from core.identity.mappings_store import VaultClaimMappings
+from core.identity.types import SubjectKind
 from core.runs.changes import PostgresChangeRequestStore, VaultChangeStatus
 from core.runs.index import PostgresRunIndex
 from core.threads.postgres import PostgresThreadStore
 from surfaces.api.app import create_app
 from surfaces.api.authority_submit import VaultAuthoritySubmitter
-from surfaces.api.verification import DEFAULT_TENANT_CLAIM, TokenVerifier
+from surfaces.api.verification import (
+    DEFAULT_TENANT_CLAIM,
+    FederatedVerifier,
+    TokenVerifier,
+)
 from surfaces.dispatch.nomad import NomadDispatcher
 from surfaces.toolset import build_registry, known_actions, known_tools
 
@@ -87,18 +92,45 @@ def build() -> object:
         credentials=credentials, data_path=_required("AUTHORITY_CONTROLLED_PATH")
     )
 
-    return create_app(
-        token_verifier=TokenVerifier(
-            issuer=issuer,
+    def verifier_for(kind: SubjectKind, *, iss: str, jwks: str) -> TokenVerifier:
+        return TokenVerifier(
+            issuer=iss,
             audience=audience,
-            jwks_uri=jwks_uri,
+            jwks_uri=jwks,
             mappings_source=claim_mappings,
             # Auth0, Okta and Ping all namespace custom claims, so the tenant does not
             # arrive under a bare name. Configurable rather than assumed: the default is
             # right for a provider that emits `tenant` and wrong for every provider that
             # cannot, and getting it wrong refuses every token with `no_tenant`.
             tenant_claim=os.environ.get("OIDC_TENANT_CLAIM", DEFAULT_TENANT_CLAIM),
-        ),
+            subject_kind=kind,
+        )
+
+    verifiers = [verifier_for(SubjectKind.HUMAN, iss=issuer, jwks=jwks_uri)]
+
+    # Machines, only where a deployment says so. Absent this the surface accepts people
+    # and refuses everything else, which is the fail-closed default — and a change from
+    # what shipped, where a `client_credentials` token was admitted as a person because
+    # nothing checked. A leaked client secret was a working operator login.
+    #
+    # Usually the SAME issuer: Auth0, Okta, Ping and Entra all serve both grants from one.
+    # It is still named rather than assumed, because "this surface accepts machine
+    # credentials" is a posture somebody decides, not one they discover.
+    workload_issuer = os.environ.get("OIDC_WORKLOAD_ISSUER", "").strip()
+    if workload_issuer:
+        verifiers.append(
+            verifier_for(
+                SubjectKind.WORKLOAD,
+                iss=workload_issuer,
+                jwks=os.environ.get("OIDC_WORKLOAD_JWKS_URI", "").strip() or jwks_uri,
+            )
+        )
+
+    return create_app(
+        # One verifier or two, always through the federated wrapper — so the branch that
+        # accepts a second kind is the same code path in both cases rather than one that
+        # only runs where somebody enabled it.
+        token_verifier=FederatedVerifier(verifiers),
         run_dispatcher=NomadDispatcher(run_index=run_index),
         evidence_query=PostgresEvidenceQuery(
             credentials=VaultDatabaseCredentials(

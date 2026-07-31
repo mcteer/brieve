@@ -32,13 +32,14 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol
 
 import jwt
 from jwt import PyJWKClient
 
 from core.errors import CoreError
 from core.identity.claims import ClaimMapping, resolve_roles
+from core.identity.kind import looks_like_a_machine_credential
 from core.identity.types import AuthenticatedSubject, SubjectKind
 
 #: We choose these. The token does not get a vote.
@@ -78,6 +79,19 @@ class _KeyCache:
     def put(self, keys: dict[str, Any]) -> None:
         self._keys = keys
         self._fetched_at = self._clock()
+
+
+class IdentityVerifier(Protocol):
+    """Anything that turns a token into a subject, or refuses.
+
+    The surface needs exactly this and knows nothing else about its verifier. A protocol
+    rather than the concrete class because there are two implementations, and the
+    composing one — `FederatedVerifier` — is what a real assembly builds: typing the app
+    against `TokenVerifier` made the composed form a type error, which is the wrong way
+    round for the only shape production uses.
+    """
+
+    def verify(self, token: str | None) -> AuthenticatedSubject: ...
 
 
 class TokenVerifier:
@@ -150,6 +164,35 @@ class TokenVerifier:
             )
         return key
 
+    def _require_declared_kind(self, claims: dict[str, Any]) -> None:
+        """Refuse a machine's credential where a person's was expected.
+
+        `subject_kind` used to be asserted onto every subject this verifier produced,
+        unchecked. That is sound only while each kind arrives from its own issuer — and
+        Auth0, Okta, Ping and Entra all serve `client_credentials` and `authorization_code`
+        from ONE issuer, one JWKS, one audience. So a surface configured for people
+        recorded a machine as a person, and, worse, **let it in**: a leaked client secret
+        was a working operator login that the trail showed as somebody signing in.
+
+        **Asymmetric, deliberately.** Positive evidence of a machine contradicts a `HUMAN`
+        declaration, so it is refused. The reverse is not true, and enforcing it would be a
+        mistake: a Nomad workload identity carries `sub = <job id>` and no `azp`, no `gty`,
+        nothing marking it as a machine at all — because it comes from an issuer that
+        serves nothing else. There the declaration IS the evidence, and demanding a marker
+        would refuse every genuine federated workload.
+
+        The residual risk that leaves is ordering. Where one issuer serves both kinds, a
+        person's token satisfies both verifiers and whichever is tried first wins. The
+        assembly puts `HUMAN` first for that reason, and a row asserts it — a
+        `FederatedVerifier` built the other way round would label people as machines.
+        """
+        if self._subject_kind is SubjectKind.HUMAN and looks_like_a_machine_credential(claims):
+            raise AuthenticationRefused(
+                "this credential was issued to a client with no person present, and this "
+                "surface accepts human identities here",
+                reason_code="subject_kind_mismatch",
+            )
+
     def verify(self, token: str | None) -> AuthenticatedSubject:
         """Return the subject this token establishes, or refuse with nothing executed."""
         if not token or not token.strip():
@@ -189,6 +232,8 @@ class TokenVerifier:
         tenant = str(claims.get(self._tenant_claim, "") or "").strip()
         if not tenant:
             raise AuthenticationRefused("identity carries no tenant claim", reason_code="no_tenant")
+
+        self._require_declared_kind(claims)
 
         # After signature, issuer, audience and tenant — so an unreachable mapping store
         # cannot be probed with a token this surface would have refused anyway.
@@ -230,10 +275,15 @@ class FederatedVerifier:
     _SPECIFICITY = {
         "unmapped_claim": 0,
         "no_tenant": 1,
-        "expired_identity": 2,
-        "idp_unreachable": 3,
-        "unverifiable_identity": 4,
-        "absent_identity": 5,
+        # Below `no_tenant` on purpose. A federated pair tries both members, so a person's
+        # token missing its tenant refuses `no_tenant` from one and `subject_kind_mismatch`
+        # from the other — and the caller needs to hear about the tenant, which is the
+        # fault, rather than about a verifier that was never going to accept it.
+        "subject_kind_mismatch": 2,
+        "expired_identity": 3,
+        "idp_unreachable": 4,
+        "unverifiable_identity": 5,
+        "absent_identity": 6,
     }
 
     def __init__(self, verifiers: list[TokenVerifier]) -> None:
@@ -260,5 +310,6 @@ __all__ = [
     "ALLOWED_ALGORITHMS",
     "AuthenticationRefused",
     "FederatedVerifier",
+    "IdentityVerifier",
     "TokenVerifier",
 ]

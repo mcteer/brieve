@@ -22,7 +22,7 @@ from core.runs.index import InMemoryRunIndex, RunIndex
 from core.threads.store import InMemoryThreadStore, ThreadStore
 from surfaces.api import definitions as definitions_routes
 from surfaces.api import evidence, mappings, runs, threads
-from surfaces.api.verification import TokenVerifier
+from surfaces.api.verification import IdentityVerifier
 from surfaces.dispatch.types import RunDispatcher
 
 TITLE = "Enterprise Agent Harness API"
@@ -42,7 +42,7 @@ class _AbsentReconciler:
 
 def create_app(
     *,
-    token_verifier: TokenVerifier,
+    token_verifier: IdentityVerifier,
     run_dispatcher: RunDispatcher,
     evidence_query: EvidenceQuery | None = None,
     audit_sink: AuditSink | None = None,

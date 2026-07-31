@@ -40,6 +40,26 @@ variable "oidc_jwks_uri" {
   description = "Where the API fetches signing keys. Public material only."
 }
 
+variable "oidc_workload_issuer" {
+  type        = string
+  default     = ""
+  description = <<-DESC
+    Issuer whose tokens this surface accepts as MACHINE identities. Empty accepts none.
+
+    Usually the same string as `oidc_issuer`: Auth0, Okta, Ping and Entra all serve
+    `client_credentials` and `authorization_code` from one issuer. Named anyway rather
+    than inferred, because "this surface accepts machine credentials" is a posture
+    somebody decides. Left empty, a leaked client secret is refused rather than being a
+    working operator login.
+  DESC
+}
+
+variable "oidc_workload_jwks_uri" {
+  type        = string
+  default     = ""
+  description = "JWKS for the workload issuer. Empty reuses `oidc_jwks_uri`, which is right when one issuer serves both."
+}
+
 variable "oidc_tenant_claim" {
   type        = string
   default     = "tenant"
@@ -145,10 +165,12 @@ job "api" {
         VAULT_ADDR   = var.vault_addr
         VAULT_CACERT = var.vault_cacert
 
-        OIDC_ISSUER       = var.oidc_issuer
-        OIDC_JWKS_URI     = var.oidc_jwks_uri
-        OIDC_AUDIENCE     = var.oidc_audience
-        OIDC_TENANT_CLAIM = var.oidc_tenant_claim
+        OIDC_ISSUER            = var.oidc_issuer
+        OIDC_JWKS_URI          = var.oidc_jwks_uri
+        OIDC_AUDIENCE          = var.oidc_audience
+        OIDC_TENANT_CLAIM      = var.oidc_tenant_claim
+        OIDC_WORKLOAD_ISSUER   = var.oidc_workload_issuer
+        OIDC_WORKLOAD_JWKS_URI = var.oidc_workload_jwks_uri
 
         API_BIND = "0.0.0.0:8081"
 
