@@ -28,6 +28,19 @@ Provenance = Literal["adopted", "authored"]
 Transport = Literal["mcp", "native"]
 
 
+@dataclass(frozen=True)
+class ToolPathGrant:
+    """One path a tool reaches, and what it may do there.
+
+    Mirrors Vault's `vault:path_access` RAR shape deliberately — a declaration that needed
+    translating into the wire format would be a second vocabulary for one idea, and the
+    translation is where they would drift.
+    """
+
+    path: str
+    capabilities: tuple[str, ...]
+
+
 class ManifestError(ValueError):
     """A manifest that cannot be trusted. Carries the reason code the refusal records."""
 
@@ -91,6 +104,20 @@ class ToolDeclaration:
     #: pack author because only they know, and deliberately not inferred from `risk_class`:
     #: a `read` against a paginating API can be non-repeatable and a `write` idempotent.
     repeatable: bool = True
+    #: WHAT THIS TOOL REACHES, and with what capability (016, research F7).
+    #:
+    #: The input to a run's task scope: the grant a launch mints is the union of the declared
+    #: paths of the tools that run requested, so a run asking for fewer tools reaches fewer
+    #: paths. Nothing derived this before — a tool declared `secret_touching` without saying
+    #: what it touched — and inferring it from handler code would be a static analysis that
+    #: breaks the first time a path is computed at runtime, failing OPEN.
+    #:
+    #: `{agent}` expands against the definition at grant time. Vault matches RAR paths
+    #: EXACTLY, so a template surviving into a grant would be a path that matches nothing.
+    #:
+    #: Absent means undeclared, which refuses the launch rather than granting broadly
+    #: (FR-004) — see the loader's rule for `secret_touching` tools.
+    paths: tuple[ToolPathGrant, ...] = ()
 
 
 @dataclass(frozen=True)

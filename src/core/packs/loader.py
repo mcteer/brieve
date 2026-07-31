@@ -30,6 +30,7 @@ from core.packs.manifest import (
     PackManifest,
     SkillPin,
     ToolDeclaration,
+    ToolPathGrant,
     UpstreamPin,
     WorkflowDeclaration,
 )
@@ -152,11 +153,44 @@ def _parse_tool(entry: dict[str, Any]) -> ToolDeclaration:
             product=str(entry["product"]) if entry.get("product") else None,
             product_action=str(entry["product_action"]) if entry.get("product_action") else None,
             repeatable=bool(entry.get("repeatable", True)),
+            paths=_parse_tool_paths(entry),
         )
     except KeyError as exc:
         raise ManifestError(
             f"tool declaration missing required field: {exc}", reason_code="malformed_manifest"
         ) from exc
+
+
+def _parse_tool_paths(entry: dict[str, Any]) -> tuple[ToolPathGrant, ...]:
+    """What this tool reaches, as the grant will state it (016).
+
+    **A `secret_touching` tool MUST declare this.** The same shape as the rule that a
+    non-repeatable tool must declare an observer, and for the same reason: the declaration
+    is what makes the governance decidable. A tool that has not said what it touches cannot
+    be granted access to it, and granting broadly "to be safe" is how a ceiling becomes
+    decorative — so the loader refuses instead (FR-004).
+    """
+    declared = entry.get("paths") or []
+    if not declared and entry.get("risk_class") == "secret_touching":
+        raise ManifestError(
+            f"tool {entry.get('name')!r} is secret_touching and declares no `paths`. A run's "
+            f"task scope is the union of its tools' declared paths, so a tool that does not "
+            f"say what it reaches cannot be granted anything — and granting the whole ceiling "
+            f"instead would make the ceiling decorative. Declare paths, or lower risk_class.",
+            reason_code="malformed_manifest",
+        )
+    grants: list[ToolPathGrant] = []
+    for item in declared:
+        try:
+            caps = tuple(str(c) for c in item["capabilities"])
+            grants.append(ToolPathGrant(path=str(item["path"]), capabilities=caps))
+        except (KeyError, TypeError) as exc:
+            raise ManifestError(
+                f"tool {entry.get('name')!r} has a malformed `paths` entry: {exc}. Each needs "
+                f"`path` and `capabilities`.",
+                reason_code="malformed_manifest",
+            ) from exc
+    return tuple(grants)
 
 
 def _parse_skill(entry: dict[str, Any]) -> SkillPin:

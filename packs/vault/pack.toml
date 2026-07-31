@@ -37,6 +37,17 @@ probe = "vault_probe"
 [[tools]]
 name       = "vault_read"
 risk_class = "secret_touching"
+# WHAT THIS TOOL REACHES (016). `{agent_space}` expands to whatever the definition's CEILING
+# grants — read from the policy, not guessed from the agent's name. An earlier draft templated
+# on the name and produced `secret/data/planner-agent/*` against a ceiling granting
+# `secret/data/planner/*`; `vault-agent`, whose space is `secret/data/conformance/*`, could
+# never have matched at all.
+#
+# So for today's packs the PATH narrowing yields nothing — every tool here reaches the same
+# agent space — and what narrows is the CAPABILITY: a run asking only to read never receives
+# create or update. Stated plainly because a reader will otherwise expect more than this
+# buys.
+paths      = [{ path = "{agent_space}", capabilities = ["read"] }]
 transport  = "native"
 handler    = "vault_read"
 # `secret_touching` is the risk class registry review may demand process isolation for
@@ -48,6 +59,10 @@ repeatable     = true
 [[tools]]
 name       = "vault_write"
 risk_class = "secret_touching"
+# Write needs `create` and `update`: a KV v2 put is an update to an existing version and a
+# create when there is none, and a grant naming only one of them fails on whichever case
+# happens to arrive first.
+paths      = [{ path = "{agent_space}", capabilities = ["create", "update"] }]
 transport  = "native"
 handler    = "vault_write"
 # Non-repeatable: a CAS write that succeeded and then lost its response must not be

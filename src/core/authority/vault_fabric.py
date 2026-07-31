@@ -27,6 +27,7 @@ cost of the guarantee rather than an oversight.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -183,6 +184,37 @@ class VaultIdentityFabric:
         return parse_ceiling_record(
             record, known_tools=self._known_tools, known_actions=self._known_actions
         )
+
+    def resolve_ceiling_paths(self, agent_definition_id: str) -> dict[str, frozenset[str]]:
+        """The SECRETS half of the ceiling, as path → capabilities (016).
+
+        `resolve_ceiling` above returns the harness half — tools and product actions, which
+        the hooks enforce in-process. This returns what the registration's ceiling *policy*
+        permits, which is what a task-scoped grant is bounded by. ADR-0044 keeps the two
+        jurisdictions disjoint; this reads the other one rather than merging them.
+
+        Parsed from the policy document because that is where the truth is. Deriving it from
+        anywhere else — a convention, a second record — would create a copy that can disagree
+        with what Vault actually enforces, and the copy would be the one we checked against.
+        """
+        registration = self._read_registration(agent_definition_id)
+        if registration is None:
+            raise ResolutionRefused(
+                f"no registration for agent definition {agent_definition_id!r}",
+                reason_code="unknown_agent_definition",
+            )
+        permitted: dict[str, frozenset[str]] = {}
+        for name in registration.get("ceiling_policies") or []:
+            # `default` and `default-ceiling` are Vault's own additions (ADR-0050) and grant
+            # nothing at the agent secret space, so skipping them keeps the parse to policies
+            # this platform authored.
+            if name in ("default", "default-ceiling"):
+                continue
+            document = self._read(f"sys/policies/acl/{name}")
+            if document is None:
+                continue
+            permitted.update(_policy_paths(str(document.get("policy", ""))))
+        return permitted
 
     def resolve_definition_bindings(self, agent_definition_id: str) -> DefinitionBindings:
         """Which packs this definition reaches, its binding map, and its tier.
@@ -360,3 +392,23 @@ class SubjectScopedVaultFabric(VaultIdentityFabric):
 
 
 __all__ = ["SubjectScopedVaultFabric", "VaultIdentityFabric"]
+
+
+def _policy_paths(document: str) -> dict[str, frozenset[str]]:
+    """Pull `path "x" { capabilities = [...] }` out of a Vault policy document.
+
+    A deliberately small parser rather than an HCL dependency: these documents are written by
+    this repository's own Terraform, in one shape, and a general parser would be a larger
+    surface for no gain. If that ever stops being true this should fail loudly rather than
+    silently return fewer paths — which is why an unparseable block yields nothing rather
+    than a permissive default.
+    """
+    found: dict[str, frozenset[str]] = {}
+    for match in re.finditer(
+        r'path\s+"([^"]+)"\s*\{[^}]*capabilities\s*=\s*\[([^\]]*)\]', document, re.S
+    ):
+        path, raw = match.group(1), match.group(2)
+        caps = frozenset(c.strip().strip("\"'") for c in raw.split(",") if c.strip())
+        if caps:
+            found[path] = caps
+    return found

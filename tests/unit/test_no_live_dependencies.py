@@ -122,6 +122,9 @@ ENCLAVE_PATHS = frozenset(
         # platform must never hold; that is the administrative boundary ADR-0055 draws, and
         # a row holding both credentials inside an allocation would dissolve it.
         "conformance/evidence/conftest.py",
+        # 016. Mints grants against the local Vault and reads its verdict — the enclave, by
+        # definition: these rows exist to assert what the trust store refuses.
+        "conformance/authority/conftest.py",
         # Talks to the control-plane Vault to exercise Control Groups (007). There is no
         # fake: one that always approves proves the caller can proceed, one that never
         # approves proves it handles denial, and neither proves the gate holds.

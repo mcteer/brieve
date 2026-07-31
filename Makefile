@@ -63,7 +63,7 @@ conformance:
 	C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
-	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability tests/conformance/evidence -m host_enclave -q
+	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability tests/conformance/evidence tests/conformance/authority -m host_enclave -q
 	#
 	# 012's containment lane. Named here in the same change that created the directory —
 	# 010 lost a whole feature's rows to a directory no lane enumerated, and the fix is to
