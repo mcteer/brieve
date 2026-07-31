@@ -141,6 +141,52 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
 # under the run role, because `audit_stream_heads` deliberately carries no grant for the
 # evidence role — a read path able to see the heads could learn what it would need to
 # forge.
+# The northbound API. Its own role, because its job id is its own.
+#
+# **This did not exist, and the surface could not start without it.** `service.py` builds
+# its collaborators with the default `harness` role, whose bound claim is
+# `nomad_job_id = "harness"` — a job that is not the API. Every login was refused with
+#
+#     claim "nomad_job_id" does not match any associated bound claim values
+#
+# which names the claim rather than the missing role, and the allocation died in
+# `audit_sink.migrate()` before serving a request. Nothing downstream of `build()` had
+# ever run in a deployed enclave, which is the shape of every "correct, tested, wired to
+# nothing" finding this feature turned up: the assembly was never exercised because the
+# process it assembles never started.
+#
+# Three policies, matching what the assembly actually constructs. Listed rather than
+# borrowed from `harness`, so that widening one workload's authority is not a side effect
+# of widening another's.
+resource "vault_jwt_auth_backend_role" "api" {
+  backend                 = vault_jwt_auth_backend.workload.path
+  role_name               = "api"
+  role_type               = "jwt"
+  bound_audiences         = ["vault.io"]
+  user_claim              = "/nomad_job_id"
+  user_claim_json_pointer = true
+
+  bound_claims = {
+    nomad_job_id = var.api_job_id
+  }
+
+  token_policies = [
+    # The run index, thread store, audit sink, durability provider and change-request
+    # store — every one of which the assembly migrates at start.
+    vault_policy.harness_database.name,
+    # The evidence read path draws its own SELECT-only credential, deliberately separate:
+    # the surface that serves evidence must not be able to write it.
+    vault_policy.evidence_database.name,
+    # Ceilings, role bindings, the model matrix — and the claim-to-role mappings, without
+    # which `resolve_roles` returns empty and this surface refuses everyone.
+    vault_policy.harness_authority_read.name,
+  ]
+  # Long-lived by design, like the mcp service, and still a TTL rather than none — the
+  # difference between a re-issued identity and a standing credential.
+  token_ttl  = 3600
+  token_type = "service"
+}
+
 resource "vault_jwt_auth_backend_role" "mcp" {
   backend                 = vault_jwt_auth_backend.workload.path
   role_name               = "mcp"

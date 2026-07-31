@@ -40,6 +40,19 @@ variable "oidc_jwks_uri" {
   description = "Where the API fetches signing keys. Public material only."
 }
 
+variable "oidc_tenant_claim" {
+  type        = string
+  default     = "tenant"
+  description = <<-DESC
+    Which claim carries the tenant.
+
+    Configuration rather than a constant because no provider emits a bare `tenant`, and
+    Auth0, Okta and Ping all REFUSE to mint an un-namespaced custom claim — so a real
+    deployment sends `https://example.com/tenant` and the default refuses every token it
+    issues with `no_tenant`.
+  DESC
+}
+
 variable "oidc_audience" {
   type        = string
   default     = "harness-api"
@@ -132,9 +145,10 @@ job "api" {
         VAULT_ADDR   = var.vault_addr
         VAULT_CACERT = var.vault_cacert
 
-        OIDC_ISSUER   = var.oidc_issuer
-        OIDC_JWKS_URI = var.oidc_jwks_uri
-        OIDC_AUDIENCE = var.oidc_audience
+        OIDC_ISSUER       = var.oidc_issuer
+        OIDC_JWKS_URI     = var.oidc_jwks_uri
+        OIDC_AUDIENCE     = var.oidc_audience
+        OIDC_TENANT_CLAIM = var.oidc_tenant_claim
 
         API_BIND = "0.0.0.0:8081"
 

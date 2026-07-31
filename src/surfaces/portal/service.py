@@ -29,6 +29,9 @@ def build() -> object:
             redirect_uri=_required("PORTAL_REDIRECT_URI"),
             authorize_endpoint=_required("OIDC_AUTHORIZE_ENDPOINT"),
             token_endpoint=_required("OIDC_TOKEN_ENDPOINT"),
+            # Optional, because the development provider does not use it. Against a
+            # real provider its absence produces an opaque token the API refuses.
+            audience=os.environ.get("OIDC_AUDIENCE", "").strip() or None,
         ),
     )
 

@@ -111,6 +111,12 @@ variable "harness_job_id" {
   default     = "harness"
 }
 
+variable "api_job_id" {
+  description = "Scheduler job id serving the northbound API."
+  type        = string
+  default     = "api"
+}
+
 variable "conformance_job_id" {
   description = "Scheduler job id running the conformance suite under its own identity."
   type        = string
