@@ -154,15 +154,32 @@ rather than through the host's network namespace.
 
 ## R6 — Coverage by construction, via a marker in the jobspec
 
-**Decision**: Each harness-owned deployed process declares itself in its own job
-definition; the gate enumerates definitions and fails on any marked process it has no
-assertion for.
+**Decision**: The gate enumerates **every** job definition and fails on any that is neither
+a declared subject nor an explicitly excluded one. Declaration lives in the job definition
+itself.
 
-**Finding**: No jobspec currently carries a `meta` block, so this is purely additive.
-Deriving the set any other way does not work: `type = "service"` also matches
-`postgres` and `collector-postgres`, which are vendor images with no assembly of ours, and
-the two `type` values are supplied as variables in five of the eight files, so static
-parsing of `type` alone is unreliable.
+**Corrected by analysis pass 1 (2026-07-31).** The first version of this decision had the
+gate enumerate *marked* definitions only, which is fail-open: a definition added without a
+marker is invisible, and the gate cannot fail for a process it never knew about. The
+process nobody remembered to enrol is exactly the one nobody remembered to cover. Inverting
+the default costs an exclusion list — and an exclusion list is the point, because each
+entry carries a reason someone had to write down.
+
+**Finding**: No jobspec currently carries a `meta` block, so this is purely additive. Eight
+definitions exist and every one needs a verdict:
+
+| Definition | Disposition |
+| --- | --- |
+| `api`, `portal` | Subjects — the two this feature adds |
+| `mcp` | Subject, `harness_covered_by` naming 015's shipping row |
+| `agent-run` | Subject, dispatched shape, covered by 014's durability rows |
+| `postgres`, `collector-postgres` | **Excluded** — vendor images, no assembly of ours |
+| `conformance` | **Excluded** — the gate's own runner; asserting against it is circular |
+| `harness-probe` | **Needs a verdict.** Ours and batch-shaped; unaddressed until analysis pass 1 raised it |
+
+Deriving the set from `type` does not work: `type = "service"` also matches the two vendor
+images, and the value is supplied as a variable in five of the eight files, so static
+parsing is unreliable.
 
 **Rationale**: FR-005 says a process added to the deployment must be covered *or the gate
 must fail for not knowing how*. A declaration in the job definition puts the obligation
@@ -170,11 +187,14 @@ where the process is added, which is the only place someone adding one is certai
 looking.
 
 **Alternatives considered**:
-- *A list in the test suite.* Rejected — it is the thing that goes stale, and 010 lost a
-  feature's rows to exactly that (a directory no lane enumerated).
+- *A list in the test suite.* Rejected as the **subject** list — it is the thing that goes
+  stale, and 010 lost a feature's rows to exactly that. Accepted as the **exclusion** list,
+  which is different: it is checked against the filesystem on every run, so a stale entry
+  fails rather than hides.
 - *Querying the scheduler for running jobs.* Rejected — it enumerates what IS running, so a
   surface that failed to start is absent from the set and the gate passes. That inverts the
   guarantee.
+- *Marker-only enumeration.* Rejected by analysis pass 1, above. Fail-open.
 
 ---
 

@@ -19,7 +19,9 @@ table, and the first is a defect while the second is a property.
 
 | Row | Asserts | Requirement | Story |
 | --- | --- | --- | --- |
-| `test_every_declared_process_is_asserted` | The set of processes declaring themselves in the deployment equals the set the gate asserts against — **in both directions** | FR-005 | US3 |
+| `test_every_declared_process_is_asserted` | Declared processes and asserted processes are the same set — **in both directions** | FR-005 | US3 |
+| `test_an_unenrolled_definition_fails` | A job definition that is neither declared nor excluded **fails the gate** | FR-005a | US3 |
+| `test_the_gate_is_deterministic` | Two runs against an unchanged tree reach the same verdict | SC-008 | — |
 | `test_the_api_answers_as_itself` | An unauthenticated request to the running API returns its own refusal reason, not a generic rejection | FR-003, FR-009 | US1, US2 |
 | `test_the_portal_read_its_configuration` | The running portal redirects to sign-in at the **configured** issuer, with a PKCE challenge | FR-003 | US1, US2 |
 | `test_the_dispatched_process_is_covered` | The dispatched entrypoint is asserted somewhere, and that assertion dispatches rather than reading prior records | FR-005, FR-013 | US5 |
@@ -47,11 +49,17 @@ worse than one that skips, because the overstatement is believed.
 
 ## Known limits, recorded rather than closed
 
-**A job definition present in the tree but never deployed reads as uncovered, not absent.**
-The gate enumerates from `infra/jobs/`, so adding a definition ahead of deploying it fails
-the gate. This is the correct failure — a surface nobody deployed is not a surface that
-works — but it will read as a false positive the first time it happens, and it is written
-down here so whoever hits it can tell the difference in one reading rather than three.
+**Adding a job definition fails the gate until someone declares or excludes it.** That is
+deliberate, and it is the correction analysis pass 1 made: the first design let a process
+become a subject by opting in, so a definition added without a declaration was invisible and
+the gate could not fail for a process it never knew about. The friction now lands on the
+exact action that has been silently losing coverage. It will read as a false positive the
+first time it happens, which is why it is written down here — whoever hits it should be able
+to tell the difference in one reading rather than three.
+
+**A definition present in the tree but never deployed reads as uncovered, not absent.** Also
+the correct failure — a surface nobody deployed is not a surface that works — and the
+resolution is the same: declare it, or exclude it with a reason.
 
 **Two processes are covered by rows that live elsewhere.** The dispatched entrypoint by
 014's durability rows; the mcp service by 015's shipping row. Those rows are stronger than a

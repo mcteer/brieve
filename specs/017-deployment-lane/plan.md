@@ -29,8 +29,11 @@ The approach is therefore composition, not construction:
    unproducible by a process that read nothing (R3).
 3. **Reach surfaces through the scheduler.** `nomad alloc exec`, not the shell — host
    networking means the shell can reach them on a Linux runner and cannot on macOS (R5).
-4. **Enumerate from the deployment.** Each harness-owned process declares itself in its own
-   job definition; the gate fails on a declared process it has no assertion for (R6).
+4. **Enumerate from the deployment, failing closed on discovery.** The gate reads *every*
+   job definition and requires each to be a declared subject or an explicitly excluded one;
+   a definition that is neither fails the gate (R6, FR-005a). Analysis pass 1 corrected this
+   — the first design read only *marked* definitions, so a process nobody enrolled was
+   invisible, which is this feature's own subject matter one level up.
 
 ## Technical Context
 
@@ -59,9 +62,10 @@ overrunning, which is the misattribution FR-004 exists to prevent.
 **Constraints**: The lane must not make the merge-blocking rows unplaceable (FR-007), a
 documented past failure. No retries (FR-014). The lane must add no second enclave bring-up.
 
-**Scale/Scope**: Four deployed processes; two already covered, two to add. One new
-conformance directory, one addition to the CI lane, one `meta` declaration per
-harness-owned job definition.
+**Scale/Scope**: Eight job definitions, every one of which needs a verdict — four declared
+subjects (two already covered elsewhere, two to add), three explicit exclusions, and
+`harness-probe`, which analysis pass 1 found unaddressed. One new conformance directory, one
+addition to the CI lane.
 
 ## Constitution Check
 
@@ -125,11 +129,15 @@ tests/
     └── deployment/              # NEW directory — MUST be named by a lane in this change
         ├── __init__.py
         ├── conftest.py          # allocation lookup; exec-based reach; per-process waits
-        ├── surfaces.py          # enumerates declared processes from infra/jobs/*.hcl
-        ├── test_every_declared_process_is_asserted.py   # FR-005, US3
+        ├── surfaces.py          # enumerates EVERY infra/jobs/*.hcl; declared u excluded
+        │                        #   must equal what is on disk (FR-005a)
+        ├── test_every_declared_process_is_asserted.py   # FR-005/FR-005a, US3
         ├── test_the_api_answers_as_itself.py            # FR-003/FR-009, US1/US2
         ├── test_the_portal_read_its_configuration.py    # FR-003, US1/US2
-        └── test_the_dispatched_process_is_covered.py    # FR-005 for the dispatched shape
+        ├── test_the_dispatched_process_is_covered.py    # FR-005 for the dispatched shape
+        ├── test_no_retry_and_no_skip.py                 # FR-014, by source inspection
+        ├── test_break_a_surface_assembly.py             # FR-012, the break fixture
+        └── test_the_gate_is_deterministic.py            # SC-008, run twice, compare
 
 Makefile                          # `conformance` gains the new directory
 .github/workflows/enclave.yml     # one step after `make conformance`
@@ -150,10 +158,17 @@ lane and a developer both invoke, so there is one way to run the gate (Principle
 > No Constitution Check violations. Table omitted.
 
 One risk is worth naming without being a violation. **FR-005 and FR-008 pull against each
-other**, as the spec's checklist flagged: enumerating declared processes from `infra/jobs/`
-satisfies coverage-by-construction and works identically on both substrates, since it reads
-files rather than querying a scheduler. R6 resolves the tension in that direction, and the
-cost is that a job definition present in the tree but never submitted would be reported as
-uncovered rather than as absent. That is the correct failure — a surface nobody deployed is
-not a surface that works — but it will read as a false positive the first time someone adds
-a job definition ahead of deploying it, and the contract should say so.
+other**, as the spec's checklist flagged: enumerating from `infra/jobs/` satisfies
+coverage-by-construction and works identically on both substrates, since it reads files
+rather than querying a scheduler. R6 resolves the tension in that direction.
+
+**Analysis pass 1 changed the enumeration default, and the cost with it.** The gate now
+reads *every* definition and requires each to be declared or explicitly excluded (FR-005a),
+rather than reading only the marked ones. The old scheme was fail-open: a definition added
+without a marker was invisible, and a coverage mechanism that cannot see a gap is this
+feature's own subject matter one level up.
+
+The cost is now paid when a job definition is added rather than never — adding one fails the
+gate until someone declares or excludes it. That is deliberate friction on the exact action
+that has been silently losing coverage, and the contract records it so the first person to
+hit it can tell it from a defect in one reading.

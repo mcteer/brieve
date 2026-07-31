@@ -15,7 +15,7 @@ because that is the only place someone adding one is certainly looking (research
 
 | Field | Meaning | Validation |
 | --- | --- | --- |
-| `harness_surface` | Marks this definition as in scope. Its presence *is* the declaration. | Absent → not a subject. `postgres` and `collector-postgres` are vendor images with no assembly of ours and carry no marker. |
+| `harness_surface` | Marks this definition as in scope. Its presence *is* the declaration. | Absent → **the definition must appear on the exclusion list, or the gate fails.** Absence is never silently "not a subject" — see below. |
 | `harness_shape` | `served` or `dispatched`. | Must be one of the two. An unrecognised value fails the gate rather than defaulting — a typo must not silently drop a process from coverage. |
 | `harness_covered_by` | Where the assertion for this process lives. | Must name something the gate can find. A declared process with no assertion fails the gate (FR-005). |
 
@@ -25,13 +25,48 @@ shipping row (research R1, R2). Without a way to say *"covered, over there"*, th
 either duplicate them or silently exempt them. Naming the location makes the coverage a
 claim someone can check rather than a gap nobody sees.
 
-**Validation rule that carries the guarantee**: the set of declared processes and the set of
-processes the gate has an assertion for MUST be equal. An inequality in **either** direction
-fails:
+---
 
-- declared but unasserted → the gap this feature closes, reopened;
-- asserted but undeclared → an assertion against something the deployment no longer runs,
-  which is a row that will pass forever while testing nothing.
+## ExcludedProcess
+
+A job definition deliberately outside the gate's subjects, **and the reason**.
+
+**Source**: an explicit list in `tests/conformance/deployment/surfaces.py`, checked against
+the filesystem on every run so a stale entry fails rather than hides.
+
+| Entry | Reason |
+| --- | --- |
+| `postgres`, `collector-postgres` | Vendor images. No assembly of ours to reach. |
+| `conformance` | The gate's own runner. Asserting against it is circular. |
+
+**Why a list here is acceptable when one was rejected as the subject list.** A stale
+*subject* list silently omits a process — 010 lost a feature's rows to exactly that. A stale
+*exclusion* list names something the filesystem does not have, which fails on the next run.
+The failure modes are opposite, and only one of them is silent.
+
+---
+
+## The validation rule that carries the guarantee
+
+**Three sets, and two equalities.** Both directions of both, because each inequality is a
+different way the gate lies.
+
+```
+  definitions on disk  ==  declared ∪ excluded
+  declared             ==  asserted
+```
+
+| Inequality | What it means | Verdict |
+| --- | --- | --- |
+| a definition in neither set | **a process nobody enrolled** — the fail-open hole | FAIL |
+| excluded but not on disk | a stale exclusion, hiding nothing but claiming to | FAIL |
+| declared but unasserted | the gap this feature closes, reopened | FAIL |
+| asserted but undeclared | a row that passes forever while testing nothing | FAIL |
+
+The first row is the one analysis pass 1 added, and it is the load-bearing one. Without it,
+coverage is something a process opts into — and **the process nobody remembered to enrol is
+exactly the one nobody remembered to cover.** A coverage mechanism that cannot see an
+unenrolled process reproduces this feature's own subject matter one level up.
 
 ---
 
@@ -48,7 +83,8 @@ One statement about one process, evaluated inside the enclave.
 **States**, and the distinctions that matter:
 
 ```
-not_declared   ──▶  not a subject          (vendor image, no assembly of ours)
+on disk, undeclared, unexcluded ──▶ FAIL   nobody enrolled it, and nobody said why not
+on disk, excluded              ──▶ not a subject (with a recorded reason)
 declared
   ├─▶ never_started      FAIL   nothing was placed
   ├─▶ restarting         FAIL   placed, and failing repeatedly (FR-006)

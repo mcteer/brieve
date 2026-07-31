@@ -12,7 +12,7 @@
 
 | Gate type | Applies | Where |
 | --- | --- | --- |
-| **Fail-closed** | **Yes** | T012, T013 — a process that is absent, restarting, or unreachable must fail, never skip; and no retry may absorb it (FR-006, FR-014) |
+| **Fail-closed** | **Yes** | T008a — a definition nobody enrolled fails, so coverage is not opt-in (FR-005a). T012 — absent, unschedulable or restarting fails, never skips (FR-006). T013 — no retry may absorb a failure (FR-014). T036a — the gate is demonstrably deterministic, which is what makes refusing retries defensible (SC-008) |
 | **Conformance** | **Yes** | The whole feature. Transport surfaces are the subject |
 | **Correlation / evidence** | **No** | This feature participates in no run and writes no audit entry. It observes surfaces from outside; nothing joins a correlation ID because nothing here is part of a run |
 | **Eval** | **No** | No pack, prompt, model or policy promotes here |
@@ -42,17 +42,20 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 - [ ] T005 [P] Add the same `meta` block to `infra/jobs/portal.nomad.hcl` with `harness_shape = "served"`
 - [ ] T006 [P] Add a `meta` block to `infra/jobs/mcp.nomad.hcl` with `harness_shape = "served"` and `harness_covered_by` naming `tests/conformance/evidence/test_the_service_ships.py` — covered elsewhere, and the declaration is what makes that checkable rather than assumed
 - [ ] T007 [P] Add a `meta` block to `infra/jobs/agent-run.nomad.hcl` with `harness_shape = "dispatched"` and `harness_covered_by` naming `tests/conformance/durability/`
-- [ ] T008 Implement `tests/conformance/deployment/surfaces.py` — parse `infra/jobs/*.nomad.hcl`, return the declared processes, and **raise on an unrecognised `harness_shape`** rather than defaulting, so a typo cannot silently drop a process from coverage (data-model.md)
+- [ ] T007a Decide and record a verdict for `infra/jobs/harness-probe.nomad.hcl` — ours and batch-shaped, and unaddressed until analysis pass 1 raised it. Either declare it a subject or exclude it with a reason; **not deciding is what FR-005a forbids**
+- [ ] T007b Define the exclusion list in `tests/conformance/deployment/surfaces.py` — `postgres` and `collector-postgres` (vendor images, no assembly of ours) and `conformance` (the gate's own runner; asserting against it is circular). Each entry carries its reason in source
+- [ ] T008 Implement `tests/conformance/deployment/surfaces.py` — parse **every** `infra/jobs/*.nomad.hcl`, return declared subjects and excluded definitions separately, and **raise on an unrecognised `harness_shape`** rather than defaulting, so a typo cannot silently drop a process from coverage (data-model.md)
+- [ ] T008a [GATE:fail-closed] Implement the discovery check in `tests/conformance/deployment/surfaces.py` — a definition on disk that is neither declared nor excluded **fails**, and a stale exclusion naming a file that no longer exists also fails (FR-005a). This is the row that makes coverage fail closed rather than opt-in; without it a process nobody enrolled is invisible, which is this feature's own subject matter one level up
 - [ ] T009 Implement the allocation lookup in `tests/conformance/deployment/conftest.py` — resolve a job's **running** allocation, filtering by status rather than taking the last row of `nomad job status` (the stopped allocation sorts last, which cost a wrong reading on 2026-07-31)
 - [ ] T010 Implement `exec_request()` in `tests/conformance/deployment/conftest.py` — issue an HTTP request from **inside** the allocation via `nomad alloc exec`, returning status, body and headers (research R5: a shell reaches host-networked surfaces on Linux CI and not on Docker Desktop)
-- [ ] T011 Implement per-process waits in `tests/conformance/deployment/conftest.py`, read from the declaration or a named constant per process, with a docstring recording that these are **measured on the runner, not guessed** (research, residual unknowns)
+- [ ] T011 Implement per-process waits in `tests/conformance/deployment/conftest.py` behind a **single named helper** (`wait_for_working_state`), read from the declaration or a named constant per process, with a docstring recording that these are **measured on the runner, not guessed** (research, residual unknowns). One helper, so T013 can tell a readiness poll from an assertion retry structurally rather than by reading loop syntax
 - [ ] T012 [GATE:fail-closed] Implement `require_running()` in `tests/conformance/deployment/conftest.py` — a process that is absent, unschedulable, or has restarted more than once fails; `pytest.skip` MUST NOT appear anywhere in this package (FR-006)
-- [ ] T013 [GATE:fail-closed] Add `tests/conformance/deployment/test_no_retry_and_no_skip.py` asserting by source inspection that this package contains no retry loop around an assertion and no skip — FR-014, and the same shape as the existing gate that forbids a `pytest.skip` in a blocking lane
+- [ ] T013 [GATE:fail-closed] Add `tests/conformance/deployment/test_no_retry_and_no_skip.py` asserting that no module **other than the single wait helper in `conftest.py`** loops over an assertion, and that `pytest.skip` appears nowhere in the package — FR-014. Scoped to "every module except the one allowed to wait" rather than to loop syntax, because a readiness poll and an assertion retry look identical textually and a row that could not tell them apart would either false-positive on T011 or be weakened until it asserted nothing
 - [ ] T014 [GATE:no-secret-leak] Implement failure reporting in `tests/conformance/deployment/conftest.py` that prints the allocation's own error output (FR-004) **with a redaction pass**, and add a row asserting a token-shaped value in captured output is redacted — allocation output is exactly where a credential surfaces
 - [ ] T015 Implement `infra/bin/deployment-conformance` — stand up the uncovered surfaces via `infra/bin/portal-up`, force a **new allocation** rather than trusting `nomad job run` against an unchanged jobspec (research R7, observed 2026-07-31), capture and print the scheduler's placement output on failure, then invoke the rows
 - [ ] T016 Delete `tests/conformance/deployment/test_the_lane_collects_this_directory.py` once a real row in that package depends on collection
 
-**Checkpoint**: the directory is collected, processes declare themselves, and a row can reach a surface from inside its allocation.
+**Checkpoint**: the directory is collected, **every** job definition has a verdict, and a row can reach a surface from inside its allocation. A definition nobody enrolled now fails rather than being invisible.
 
 ---
 
@@ -111,7 +114,8 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 
 - [ ] T029 [US3] Implement `test_every_declared_process_is_asserted` in `tests/conformance/deployment/test_every_declared_process_is_asserted.py` — declared processes and asserted processes are the same set
 - [ ] T030 [US3] Assert the **reverse** direction in the same row: an assertion against an undeclared process fails, because such a row passes forever while testing nothing (data-model.md)
-- [ ] T031 [US3] Add the vendor-image exclusion check to `tests/conformance/deployment/test_every_declared_process_is_asserted.py` — `postgres` and `collector-postgres` carry no declaration and must not appear as uncovered, with a comment saying why (no assembly of ours)
+- [ ] T031 [US3] Add the exclusion check to `tests/conformance/deployment/test_every_declared_process_is_asserted.py` — an excluded definition must not appear as uncovered, and every exclusion must still exist on disk
+- [ ] T031a [US3] Add `test_an_unenrolled_definition_fails` to `tests/conformance/deployment/test_every_declared_process_is_asserted.py` — write a job definition carrying neither a declaration nor an exclusion, assert the gate fails, then remove it. **Demonstrated, not argued**: this is the direction the first design could not detect at all (FR-005a, SC-003)
 - [ ] T032 [US3] Record in `specs/017-deployment-lane/contracts/conformance.md` the known limit: a job definition in the tree but never deployed reads as uncovered rather than absent, which is the correct failure but will read as a false positive the first time
 
 **Checkpoint**: a process added later is covered without anyone remembering.
@@ -135,6 +139,7 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 ## Phase 8: Polish & cross-cutting
 
 - [ ] T036 [GATE:conformance] Run `make conformance` and confirm **every row that ran before this feature still runs** — count rows, not just the exit code. A lane that silently stopped collecting a directory looks exactly like a pass (FR-007, SC-005)
+- [ ] T036a [GATE:fail-closed] Add `tests/conformance/deployment/test_the_gate_is_deterministic.py` — run the gate twice against an unchanged tree and assert identical verdicts (SC-008). Refusing retries (FR-014) without evidence the gate is stable is a decision taken on hope; this is that evidence
 - [ ] T037 Complete the SC-007 assessment in `specs/017-deployment-lane/contracts/conformance.md`: for each of the five known instances, state whether this gate would have caught it — **including the ones it would not**. On current research the expected answer is that three were in the dispatched path and were caught by 014, which makes this feature's own contribution narrower than gap 0d implies
 - [ ] T038 Update `ROADMAP.md` — close gap 0d, add the 017 row, and record what the gate does **not** cover. In the same change, per the file's own maintenance rule
 - [ ] T039 [P] Add `docs/development/deployment-lane.md` describing how to run the gate, how to add a process to it, and the two traps (host networking, and an unchanged jobspec placing no new allocation)
@@ -147,8 +152,8 @@ rebuild, inside this feature, the exact failure the feature exists to close.
 ```
 Phase 1 (Setup)          T001 → T002 → T003
                              ↓
-Phase 2 (Foundational)   T004–T007 [P] → T008 → T009 → T010 → T011
-                         T012, T013, T014 → T015 → T016
+Phase 2 (Foundational)   T004–T007 [P] → T007a → T007b → T008 → T008a
+                         T009 → T010 → T011 → T012, T013, T014 → T015 → T016
                              ↓
         ┌────────────────────┼────────────────────┐
         ↓                    ↓                    ↓
@@ -156,11 +161,11 @@ Phase 3 (US1, P1)   Phase 4 (US2, P1)   Phase 5 (US5, P1)
    T017–T021           T022–T025           T026–T028
         └────────────────────┼────────────────────┘
                              ↓
-Phase 6 (US3, P2)        T029–T032
+Phase 6 (US3, P2)        T029–T032 (incl. T031a)
                              ↓
 Phase 7 (US4, P3)        T033–T035
                              ↓
-Phase 8 (Polish)         T036–T040
+Phase 8 (Polish)         T036, T036a, T037–T040
 ```
 
 **Story dependencies**: US1, US2 and US5 are independent of each other once Phase 2 lands —
@@ -195,3 +200,16 @@ reproduce.
 
 **T037 is expected to be unflattering and must be written that way.** A success criterion
 satisfiable only by good news is not a criterion.
+
+**T008a and T031a exist because analysis pass 1 found the coverage mechanism fail-open.**
+The first design had a process become a subject by opting in, so a job definition added
+without a declaration was invisible — the gate could not fail for a process it never knew
+about, and the process nobody remembered to enrol is exactly the one nobody remembered to
+cover. Building a coverage mechanism that cannot see a gap would have reproduced this
+feature's own subject matter one level up, inside the feature meant to close it. T008a
+inverts the default; T031a demonstrates the inversion works rather than asserting it.
+
+**T013's scope is "every module except the wait helper", not "no loops".** A readiness poll
+and an assertion retry are textually identical, so a row keyed on loop syntax would either
+false-positive on T011 or be relaxed until it asserted nothing. T011 exists as a single
+named helper so the distinction is structural.

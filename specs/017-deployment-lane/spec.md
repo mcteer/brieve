@@ -33,6 +33,19 @@
   how it would hide again. A process that reached a working state on the second attempt did
   not reach it on the first, and that is the defect.
 
+### Analysis pass 1 — 2026-07-31
+
+- **FR-005 was fail-open.** Coverage keyed on a process opting in, so a definition added
+  without enrolling was invisible: the gate could not fail for a process it never knew
+  about. FR-005a inverts the default — every definition is a subject or an explicit,
+  reasoned exclusion. A coverage mechanism that could not see a gap would have reproduced
+  this feature's own subject matter one level up.
+- **SC-008 had no way to be met.** It claimed the gate is deterministic while nothing ran it
+  twice. Refusing retries (FR-014) without evidence of stability is a decision taken on
+  hope, so SC-008 now requires demonstration.
+- **US5 was P1 and sat after a P3 story.** Moved above US3; the identifier is unchanged
+  because the task list references it.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A deployed process that cannot start fails the merge (Priority: P1)
@@ -94,6 +107,36 @@ unobtainable, and confirm the gate fails — even though the process is running 
 
 ---
 
+### User Story 5 - The dispatched process is proven to run, not just to have run (Priority: P1)
+
+A run is dispatched on demand rather than staying up. It has an assembly exactly as a served
+surface does — it obtains its own attested identity, resolves authority, and writes evidence
+— and it is where most of the known instances of this failure class have lived. The gate
+causes one to be dispatched and watches it reach a working state.
+
+**Why this priority**: P1, on the evidence rather than on symmetry. Of the five occasions
+this failure class has been found, three were in the dispatched path: a resume operation with
+no production caller, a sweeper that had not dispatched since the surface that owns it
+shipped, and an observer the protocol could not call. A gate over long-lived surfaces alone
+would have caught two of five, and the feature exists because of all five.
+
+**Independent Test**: Break the dispatched process's assembly and confirm the gate fails —
+distinguishing it from a run that was never dispatched at all.
+
+**Acceptance Scenarios**:
+
+1. **Given** a correctly assembled dispatched process, **When** the gate causes one to be
+   dispatched, **Then** it reaches a working state within a bounded time and the gate passes.
+2. **Given** a dispatched process whose assembly cannot obtain its identity, **When** the
+   gate dispatches one, **Then** the gate fails and reports that process's own error.
+3. **Given** a dispatch that never starts, **When** the bounded wait elapses, **Then** the
+   gate fails and distinguishes "never dispatched" from "dispatched and failed".
+4. **Given** records left by an earlier successful run, **When** the gate runs against a
+   process that can no longer start, **Then** the gate fails — a prior run's evidence MUST
+   NOT satisfy it.
+
+---
+
 ### User Story 3 - The rule covers every deployed process, including the one already covered (Priority: P2)
 
 Four processes are deployed — three that stay up and one dispatched on demand. One of them
@@ -140,36 +183,6 @@ confirm it produces the same verdict the automated run produces for the same tre
 
 ---
 
-### User Story 5 - The dispatched process is proven to run, not just to have run (Priority: P1)
-
-A run is dispatched on demand rather than staying up. It has an assembly exactly as a served
-surface does — it obtains its own attested identity, resolves authority, and writes evidence
-— and it is where most of the known instances of this failure class have lived. The gate
-causes one to be dispatched and watches it reach a working state.
-
-**Why this priority**: P1, on the evidence rather than on symmetry. Of the five occasions
-this failure class has been found, three were in the dispatched path: a resume operation with
-no production caller, a sweeper that had not dispatched since the surface that owns it
-shipped, and an observer the protocol could not call. A gate over long-lived surfaces alone
-would have caught two of five, and the feature exists because of all five.
-
-**Independent Test**: Break the dispatched process's assembly and confirm the gate fails —
-distinguishing it from a run that was never dispatched at all.
-
-**Acceptance Scenarios**:
-
-1. **Given** a correctly assembled dispatched process, **When** the gate causes one to be
-   dispatched, **Then** it reaches a working state within a bounded time and the gate passes.
-2. **Given** a dispatched process whose assembly cannot obtain its identity, **When** the
-   gate dispatches one, **Then** the gate fails and reports that process's own error.
-3. **Given** a dispatch that never starts, **When** the bounded wait elapses, **Then** the
-   gate fails and distinguishes "never dispatched" from "dispatched and failed".
-4. **Given** records left by an earlier successful run, **When** the gate runs against a
-   process that can no longer start, **Then** the gate fails — a prior run's evidence MUST
-   NOT satisfy it.
-
----
-
 ### Edge Cases
 
 - **A surface is slow rather than broken.** Bring-up installs dependencies before serving.
@@ -213,6 +226,12 @@ distinguishing it from a run that was never dispatched at all.
 - **FR-005**: The gate MUST cover every deployed process by construction, so a process added
   to the deployment is covered without a check being written for it — or the gate MUST fail
   for not knowing how to cover it.
+- **FR-005a**: Coverage MUST fail closed on **discovery**, not only on assertion. Every
+  process definition in the deployment MUST either be a subject of the gate or be
+  **explicitly excluded with a recorded reason**; a definition that is neither MUST fail the
+  gate. A scheme where a process becomes a subject only by opting in is fail-open — the
+  process nobody remembered to enrol is exactly the one nobody remembered to cover, and a
+  gate that cannot see it reproduces this feature's own subject matter one level up.
 - **FR-006**: The gate MUST NOT pass when a deployed process is absent, unschedulable, or
   repeatedly restarting. A process that never ran is a failure, never a skip.
 - **FR-007**: The gate MUST NOT reduce the coverage of the existing merge-blocking gates, and
@@ -268,7 +287,9 @@ distinguishing it from a run that was never dispatched at all.
 - **SC-002**: A process that is running but completed no assembly fails the gate. This is the criterion distinguishing this gate from a liveness check, and
   the one a naive implementation will not meet.
 - **SC-003**: Every deployed process is covered, of both shapes. A process present in the
-  deployment and absent from the gate's subjects is itself a failure.
+  deployment and absent from the gate's subjects is itself a failure — **including one the
+  gate was never told about**, which is the case a subject list built by opting in cannot
+  detect.
 - **SC-004**: **Each** deployed process reaches a working state within its own stated wait,
   and one that does not produces a failure naming that process. The gate is **not** judged
   against a total: a single budget for the whole gate would report whichever process was slow
@@ -278,10 +299,12 @@ distinguishing it from a run that was never dispatched at all.
   and none becomes unschedulable.
 - **SC-006**: A contributor running the gate locally against the same tree reaches the same
   verdict as the automated run.
-- **SC-008**: The gate produces the same verdict on repeated runs against an unchanged tree.
-  A gate that sometimes fails a correct tree would be retried, and retrying is what returns
-  this whole class of defect to invisibility — so intermittency in the gate is a defect **in
-  the gate**, tracked as one, and not a reason to relax FR-014.
+- **SC-008**: The gate produces the same verdict on repeated runs against an unchanged tree,
+  **demonstrated by running it more than once rather than asserted**. A gate that sometimes
+  fails a correct tree would be retried, and retrying is what returns this whole class of
+  defect to invisibility — so intermittency in the gate is a defect **in the gate**, tracked
+  as one, and not a reason to relax FR-014. Refusing retries without evidence that the gate
+  is stable would be a decision taken on hope.
 - **SC-007**: The five previously-found instances of this failure class are each assessed
   against the gate by inspection, and the assessment is recorded — **including any the gate
   would not have caught**, which bounds the claim rather than inflating it.
