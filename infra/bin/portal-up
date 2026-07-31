@@ -39,9 +39,16 @@ HARNESS_STARTED_BY="${HARNESS_STARTED_BY:-}"
 # operator who believed they were federated when they were not is the unstated posture
 # this platform legislates against everywhere else. It says which one it is, every time,
 # rather than leaving it to be inferred from whether a sign-in page looks familiar.
+# A key that is not there is an ANSWER, not a failure. Under `set -euo pipefail` a `grep`
+# that matches nothing exits 1, `pipefail` propagates it, and `VAR="$(env_val KEY)"` then
+# kills the script — so this died on its first line in any environment whose .env lacks the
+# key it was asked for. Locally that never happened, because the key was always there; CI
+# writes a minimal .env and portal-up exited in 160ms having done nothing.
+#
+# Found by 017's lane running this script in CI, which is the first time anything had.
 env_val() {
   [ -f "$REPO/.env" ] || return 0
-  grep "^$1=" "$REPO/.env" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'
+  grep "^$1=" "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true
 }
 
 AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"

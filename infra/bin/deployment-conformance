@@ -49,8 +49,15 @@ if [ ${#STARTED[@]} -gt 0 ]; then
   # Through `portal-up`, not a bespoke submit: FR-001 requires the same definitions a
   # deployment uses. A test-specific jobspec would assert against a configuration no
   # deployment runs, which is the shape of defect this whole feature exists to close.
-  HARNESS_STARTED_BY="$MARK" bash "$REPO/infra/bin/portal-up" >/dev/null \
-    || die "portal-up failed — the surfaces could not be submitted"
+  # CAPTURED, not discarded. `enclave-conformance` already records what discarding costs:
+  # "A gate that will not say why it failed costs more than the failure" — three rounds of
+  # diagnosis went into guessing which resource came up short, because the output went to
+  # the bit bucket. This gate made the same mistake on its first CI run, in the feature
+  # about gates that do not report, and learned nothing from a 160ms failure.
+  if ! bringup_output="$(HARNESS_STARTED_BY="$MARK" bash "$REPO/infra/bin/portal-up" 2>&1)"; then
+    printf '%s\n' "$bringup_output" >&2
+    die "portal-up failed — its own output is above"
+  fi
   for job in "${STARTED[@]}"; do ok "$job submitted, marked $MARK"; done
 fi
 
