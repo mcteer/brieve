@@ -220,9 +220,16 @@ every row not in force, which of the two states it is in and where the reason is
   what a person may delegate, and the rest of that jurisdiction. These are derived.
 
   **Bounds a run cannot read, and which bind it anyway** — the grant of authority *itself*,
-  the rule deciding which grants a run receives, and the attachment of grants to an identity.
-  A run holds no read access to any of them, so no derivation from its grants can find them.
-  These are **named**, each with the reason it cannot be derived.
+  the rule deciding which grants a run receives, the configuration deciding **whose
+  identities are trusted at all**, and the attachment of grants to identities and groups. A
+  run holds no read access to any of them, so no derivation from its grants can find them.
+
+  These are named — **and the named half MUST have its own completeness check** (FR-005a).
+  A hand-written list is a *subject* list, which this repository has twice concluded goes
+  stale silently, and pass 3's version of it was incomplete on the day it was written. The
+  most powerful surface of all was missing: write the trusted-key configuration and the
+  control plane starts believing identities somebody else mints, which outranks every record
+  in either half.
 
   The second kind is the more direct route and was missed for two analysis passes. A run's
   limits are stated twice — once as a record the platform consults, and once as the grant the
@@ -231,8 +238,22 @@ every row not in force, which of the two states it is in and where the reason is
   asserts the wrong half of its own name.
 - **FR-006**: A bounding record kind with no attempted write MUST fail the gate rather than
   be silently uncovered.
-- **FR-006a**: The set MUST be checked against **what actually exists in the jurisdictions
-  the derived paths occupy** — not only against what a run may read, and not against the
+- **FR-006aa**: **Both halves MUST have a completeness check, and neither may rest on a list
+  somebody maintains.** The named half is checked against the control plane's own enumeration
+  of its configuration surfaces — the auth methods it trusts, the mounts it serves, the grants
+  it holds. Every enumerable surface where a write would change what a run may do MUST be
+  named or excluded with a reason. Enumerating is a COVERAGE act under FR-002a and may use
+  administrator authority; it must never assert a denial.
+
+  **Why, stated because the reasoning was available and went unused**: a set with one
+  mechanism is a list, and a list omits silently. That is written down in this feature's own
+  checklist as the reason 017 accepted an exclusion list after rejecting a subject list — and
+  the named half was introduced as a subject list anyway, incomplete on the day it was
+  written. Two documented anti-patterns in one feature, and the fix for one was an instance of
+  the other.
+
+- **FR-006a**: The **derived** half MUST be checked against **what actually exists in the
+  jurisdictions the derived paths occupy** — not only against what a run may read, and not against the
   whole control plane. Deriving from a run's read grants is sound for every record inside
   them and blind to any outside; a record placed where a run cannot read still bounds that
   run, because the platform consults it whether or not the run can. Anything present in

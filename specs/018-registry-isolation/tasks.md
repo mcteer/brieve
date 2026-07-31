@@ -12,7 +12,7 @@
 
 | Gate type | Applies | Where |
 | --- | --- | --- |
-| **Fail-closed** | **Yes** | T003d — the named half cannot shrink silently, and nothing else would notice if it did. T003b — a bounding record that exists in ANY derived jurisdiction but was never derived fails, so coverage is not blind in the one direction a derivation cannot see. T007a — nothing in the suite may widen authority, asserted rather than trusted. T006, T007, T012 — an unattributable refusal fails, a permitted write fails distinctly, and nothing skips |
+| **Fail-closed** | **Yes** | T003d — the named half is checked against the control plane's own enumeration, so it cannot be quietly incomplete. T003e — and it cannot quietly shrink. T003b — a bounding record that exists in ANY derived jurisdiction but was never derived fails, so coverage is not blind in the one direction a derivation cannot see. T007a — nothing in the suite may widen authority, asserted rather than trusted. T006, T007, T012 — an unattributable refusal fails, a permitted write fails distinctly, and nothing skips |
 | **Conformance** | **Yes** | The whole feature. It *is* a conformance row the constitution names |
 | **Correlation / evidence** | **No** | Participates in no run and writes no audit entry. It observes the control plane refusing, from outside |
 | **Eval** | **No** | Nothing promotes |
@@ -39,8 +39,9 @@ both.
 - [ ] T003 Implement `bounding_paths()` in `tests/conformance/authority/bounding_records.py` — parse the **deployed** policy a run carries and return every path it may read in the authority jurisdiction. Each readable bounding path is one the run must not write, and that equivalence is what keeps the set from going stale. **Not** from Terraform source: reading configuration is the argument this feature replaces with evidence
 - [ ] T003a Implement `existing_bounding_prefixes()` in `tests/conformance/authority/bounding_records.py` — **derive the jurisdictions from the bounding paths themselves** (two mounts at planning time: the authority store and the agent registry) and enumerate what actually exists in each, using administrator authority. **Derived, not named**: a bounding record added in a third mount extends the check without anyone editing it, and hard-coding one mount would leave the registry — the record deciding whether a definition exists at all — outside the very check added to close the fail-open hole. Legal here and only here: this is a COVERAGE act, and FR-002a forbids it from ever asserting a denial
 - [ ] T003b [GATE:fail-closed] Assert in `tests/conformance/authority/bounding_records.py` that every existing prefix **in every derived jurisdiction** appears in the set, or is on the exclusion list defined in that same module with a reason in source. **Every exclusion must name something that exists** — a stale entry fails rather than hides, which is the difference between an exclusion list and a subject list and the reason 017 accepted one after rejecting the other — **the direction a derivation cannot see by construction** (FR-006a). A record placed where a run cannot read still bounds that run, because the platform consults it whether or not the run can; 017 found the identical hole in its own coverage after four analysis passes
-- [ ] T003c Define `NAMED_BOUNDS` in `tests/conformance/authority/bounding_records.py` — the bounds a run **cannot read** and which bind it anyway: the grant of authority itself, the rule deciding which grants a run receives, and the attachment of grants to an identity. Each entry carries the reason it cannot be derived. **This is the more direct route to widening authority and it was missed for two analysis passes** — a run's limits are stated twice, once as a record the platform consults and once as the grant the control plane enforces, and rewriting the second moves the bound without touching the first
-- [ ] T003d [GATE:fail-closed] Assert in `tests/conformance/authority/bounding_records.py` that `NAMED_BOUNDS` is non-empty and that **removing an entry is a deliberate act** — the named half cannot shrink silently, for the same reason the exclusion list cannot. Derivation is structurally blind here: any scheme anchored on a run's grants cannot see a surface the run holds no grant on, so nothing else would notice this half getting smaller
+- [ ] T003c Define `NAMED_BOUNDS` in `tests/conformance/authority/bounding_records.py` — the bounds a run **cannot read** and which bind it anyway: the grant of authority itself, the rule deciding which grants a run receives, **the configuration deciding whose identities are trusted at all**, the mounts the control plane serves, and the attachment of grants to identities and groups. Seven surfaces, not the three pass 3 named — and the missing one that outranks them all is the trusted-key configuration: write it and the control plane starts believing identities somebody else mints. Each entry carries the reason it cannot be derived. **This is the more direct route to widening authority and it was missed for two analysis passes** — a run's limits are stated twice, once as a record the platform consults and once as the grant the control plane enforces, and rewriting the second moves the bound without touching the first
+- [ ] T003d [GATE:fail-closed] Implement `enumerate_configuration_surfaces()` in `tests/conformance/authority/bounding_records.py` — ask the control plane, under administrator authority, for the auth methods it trusts, the mounts it serves and the grants it holds, and assert **every enumerable surface where a write would change what a run may do is in `NAMED_BOUNDS` or excluded with a reason** (FR-006aa). A COVERAGE act under FR-002a, never an assertion of denial
+- [ ] T003e [GATE:fail-closed] Assert in `tests/conformance/authority/bounding_records.py` that `NAMED_BOUNDS` contains at least the seven surfaces known at implementation, **by name** — so shrinking the list fails rather than being deliberate-by-convention. T003d catches what is missing from the control plane's side; this catches what is quietly removed from ours, and neither direction sees the other
 - [ ] T004 Assert in `tests/conformance/authority/bounding_records.py` that the derived set is non-empty and raise if it is not — an empty set would make every row in this feature pass vacuously, which is the most dangerous way this gate can fail
 - [ ] T005 Implement `run_authority()` in `tests/conformance/authority/bounding_records.py` — obtain a token carrying **all** the policies a run holds, as deployed. Not a synthesized single-grant token: the claim is that a run cannot write its bounds, and stripping its authority proves something narrower (research R2, correcting the spec's original FR-003)
 - [ ] T006 [GATE:fail-closed] Implement `attempt_write()` in `tests/conformance/authority/bounding_records.py` returning one of four outcomes — REFUSED, UNATTRIBUTABLE, PERMITTED, UNREACHABLE. **A write is REFUSED only when the same authority can read the path**: verified 2026-07-31 that a nonexistent mount is denied in identical words to a real bounding record, so 403 alone would pass a row with one letter wrong in its path (FR-012)
@@ -118,7 +119,8 @@ both.
 ```
 Phase 1 (Setup)        T001 → T002
                            ↓
-Phase 2 (Foundational) T003 → T003a → T003b → T003c → T003d → T004 → T005
+Phase 2 (Foundational) T003 → T003a → T003b → T003c → T003d → T003e
+                       → T004 → T005
                        → T006 → T007 → T007a → T008
                            ↓
         ┌──────────────────┼──────────────────┐
@@ -161,6 +163,18 @@ is invisible to it — and a record the run cannot read still bounds that run, b
 platform consults it regardless. Analysis found this, as it found the identical hole in 017's
 coverage after four passes. The cross-check is the only direction the derivation cannot see by
 construction.
+
+**T003d exists because T003c was the wrong shape, and the reasoning was already written
+down.** A hand-written list of bounds is a *subject* list. This feature's own checklist
+records why 017 accepted an exclusion list after rejecting one: a stale exclusion names
+something absent and fails, a stale subject list omits in silence. The named half was
+introduced as a subject list anyway and was incomplete the day it was written — missing the
+trusted-key configuration, which outranks every record in either half, because writing it
+makes the control plane believe identities somebody else mints.
+
+So both halves now have a completeness check, and neither rests on someone maintaining a
+list. Four analysis passes, four coverage mechanisms, and this is the second distinct
+anti-pattern the feature documented and then committed.
 
 **T003c is the third-order version, and the sharpest.** A run's limits are stated twice —
 once as a record the platform consults, and once as the grant the control plane enforces.

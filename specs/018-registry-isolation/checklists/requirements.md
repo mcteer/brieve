@@ -154,6 +154,32 @@ explicit enough to state: every coverage mechanism in this feature was anchored 
 can see, and every bound a run cannot see was invisible to it. Not a bug in any one design —
 the same instinct three times.
 
+**Analysis pass 4 — 2026-07-31.** Three findings, and the first is this feature committing
+the second anti-pattern it had already written down.
+
+- **`NAMED_BOUNDS` was a subject list, and it was incomplete the day it was written.** Pass 3
+  named three surfaces. Four more bound a run just as directly: the trusted-key configuration,
+  identity groups, the auth methods the control plane serves, and its mounts. The first of
+  those outranks everything in either half — write it and the control plane starts believing
+  identities somebody else mints, and no record in any jurisdiction has to change.
+
+  All seven refuse today. The platform was sound; the claim was not, for the fourth
+  consecutive pass.
+- **The reasoning was available and went unused.** These notes already say why 017 accepted an
+  exclusion list after rejecting a subject list — *"a stale exclusion names something absent
+  and fails; a stale subject list omits silently."* Pass 3 then closed its gap with a subject
+  list. Pass 3 also correctly named the *other* pattern — every mechanism anchored on what a
+  run can see — and did not notice its own fix was an instance of a different one.
+
+  Both halves now have a completeness check and neither rests on a maintained list.
+- T003d's "removing an entry is a deliberate act" named no mechanism; T003e names the
+  expected entries so shrinking fails rather than being deliberate-by-convention.
+
+**Four passes, four HIGHs, each inside the previous pass's fix.** The useful conclusion is
+not about this feature. Twice now the correct principle was written in these very files and
+the next design violated it anyway — so recording a lesson does not prevent repeating it, and
+what caught each repetition was re-reading the whole chain rather than remembering.
+
 Two things flagged for planning rather than fixed here:
 
 - **US4's amendment and US1's gate could be separated.** They are one feature because the

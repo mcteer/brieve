@@ -97,8 +97,17 @@ could widen its own authority, and the thing this feature is named after. All th
 bounds refuse today — probed 2026-07-31 — so the platform was sound throughout and the gate's
 **claim** was not.
 
-**What survives**: a bound held outside both halves — outside the derived jurisdictions and
-absent from the named list. The named list is the part that cannot be derived and therefore
+**Both halves have a completeness check, and that is the point.** The derived half is
+compared against what exists in its jurisdictions; the named half against the control plane's
+own enumeration of auth methods, mounts and grants. Neither rests on someone maintaining a
+list — a set with one mechanism *is* a list, and a list omits in silence.
+
+*Analysis pass 4 found the named half incomplete on the day it was written*, missing the
+trusted-key configuration: write that and the control plane believes identities somebody else
+mints, without any record in any jurisdiction changing.
+
+**What survives**: a bound the control plane does not enumerate as a configuration surface
+and which no derived path occupies. The named list is the part that cannot be derived and therefore
 cannot self-extend; adding a bounding surface of that kind requires someone to add it here,
 and T003d exists so that removing one is at least deliberate.
 
