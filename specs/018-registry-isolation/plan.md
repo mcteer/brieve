@@ -23,13 +23,13 @@ Research changed three things about how to build it:
    refused in identical words — verified. Vault will not distinguish *forbidden* from
    *absent*, correctly, because doing so leaks the tree's shape. **A refusal counts only
    when the same authority can read the path** (R1).
-2. **FR-003 was backwards and the spec is corrected.** It required an authority carrying only
+2. **FR-004 was backwards and the spec is corrected.** It required an authority carrying only
    the bound under test; the claim is about the authority a run *actually holds*, all three
    policies of it (R2).
 3. **There are more bounding record kinds than the spec named**, one added the same day it
    was written. The set is derived from the deployed policy, not listed in the suite (R4).
 
-Plus the ADR-0047 amendment, in the same change, because FR-010 requires the row that
+Plus the ADR-0047 amendment, in the same change, because FR-021 requires the row that
 prompted it to move to in-force with it (R5).
 
 ## Technical Context
@@ -41,7 +41,7 @@ prompted it to move to in-force with it (R5).
 Principle VI.
 
 **Storage**: N/A. Every write it attempts is expected to be refused, and any that is not is
-removed (FR-004b).
+removed (FR-008).
 
 **Testing**: pytest, in `tests/conformance/authority/` — the package that already holds
 authority-manufacture rows, so this joins an enumerated directory rather than creating one a
@@ -51,7 +51,7 @@ lane must be taught about.
 
 **Performance Goals**: None. A handful of refused requests.
 
-**Constraints**: **No automated check may widen authority** (FR-008). The demonstration that
+**Constraints**: **No automated check may widen authority** (FR-017). The demonstration that
 the gate can fail is manual, one-time, and recorded. This is the sharpest constraint in the
 feature, and it is a safety property rather than a preference.
 
@@ -72,8 +72,8 @@ No `src/` change expected.
 | VI — Lean by Default | **Pass** | No new operated component, dependency, or lane. |
 | VII — Anti-Fragmentation | **Pass** | One suite, one way to run it. The rows join a directory the recipe already enumerates. |
 | VIII — Eval-Gated Promotion | **N/A** | Nothing promotes. |
-| IX — Evidence Over Claims | **Pass, and this is the feature** | Replacing an argument about configuration with an observed refusal. FR-011 bounds the claim so a green row does not imply more than it asserts. |
-| X — The Decision Record Governs | **Pass** | Amends ADR-0047 at PATCH level, naming a state that existed in practice and was unnamed. No row's assertion changes; nothing in force is relaxed. |
+| IX — Evidence Over Claims | **Pass, and this is the feature** | Replacing an argument about configuration with an observed refusal. FR-022 bounds the claim so a green row does not imply more than it asserts. |
+| X — The Decision Record Governs | **Pass** | Appends an amendment to ADR-0047 with the Decision left intact, naming a state that existed in practice and was unnamed. ADRs carry no version, so the amendment says in words what a PATCH bump would have implied: no row's assertion changes and nothing in force is relaxed. |
 
 **Blocking-row ownership** (Quality Gates): this row becomes blocking and is **executed by an
 automated check** — **no named human runner is owed for it.** The one-time demonstration that
@@ -136,4 +136,4 @@ read grant continuing to exist.** If a future change removed `harness-authority-
 the run role, every row would fail — correctly, because the refusal could no longer be
 attributed, but at first glance reading as though isolation had broken. The failure message
 must distinguish *"the write was permitted"* from *"the refusal could not be attributed"*.
-FR-004a requires the first; the contract must state the second.
+FR-007 requires the first; the contract must state the second.

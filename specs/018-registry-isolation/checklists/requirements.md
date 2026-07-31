@@ -40,21 +40,21 @@ start.
 **The strongest requirement is FR-002, and it is the one an implementation will weaken by
 accident.** The claim is *structural exclusion*: a run cannot widen its bounds even if its
 own code tried. A check that never issued the request, or one refused by a guard above the
-control plane, produces the same green and asserts nothing. FR-004 makes the distinction
+control plane, produces the same green and asserts nothing. FR-005 makes the distinction
 explicit and SC-003 makes it measurable, because "the write did not happen" has at least
 four causes and only one of them is evidence.
 
-**FR-003 exists because of a specific near-miss.** A run's authority carries several bounds
+**FR-004 exists because of a specific near-miss.** A run's authority carries several bounds
 at once. A refusal caused by the absence of an unrelated one would satisfy a careless check
 while proving nothing about the bound under test — the same trap 017 hit and documented when
 a row could have been satisfied by a grant arriving from a different policy.
 
-**FR-008 is not housekeeping.** The break fixture temporarily widens real authority on a real
+**FR-017 is not housekeeping.** The break fixture temporarily widens real authority on a real
 control plane. A fixture that failed partway would leave the platform more permissive than it
 found it, which is a worse outcome than having no test — so restoration is verified rather
 than attempted.
 
-**FR-011 bounds the claim deliberately.** This proves the refusal, not that the bounds are
+**FR-022 bounds the claim deliberately.** This proves the refusal, not that the bounds are
 right. A record that is wrong in a way the reviewed configuration wrote is invisible here,
 and the contract must say so rather than let a green row imply more than it asserts.
 
@@ -74,7 +74,7 @@ and the contract must say so rather than let a green row imply more than it asse
    `vault_write` tool for exactly that. The spec said "bounding record" and meant something
    narrow, but did not say where the line was.
 
-   FR-004c and a rewritten entity definition now say it: **acting within authority versus
+   FR-009 and a rewritten entity definition now say it: **acting within authority versus
    changing what the authority is.** A run may spend the budget and may not edit the budget.
    A check that drifted across that line would forbid the platform's whole purpose while
    looking stricter — which is a worse failure than the one this feature exists to fix, and
@@ -85,15 +85,15 @@ ran, which is weak evidence it was the obvious hole rather than the only one.
 
 - **The bounding set was fail-open.** It derives from what a run may *read*; a record placed
   outside those grants is invisible to the derivation — and still bounds the run, because the
-  platform consults it whether or not the run can. FR-006 promised that an uncovered kind
+  platform consults it whether or not the run can. FR-011 promised that an uncovered kind
   fails the gate; the design could only deliver that for records already inside the policy,
   and the contract had recorded the difference as a *known limit* rather than a defect. A
-  limit nobody would notice being exceeded is not a limit. FR-006a makes it a failure, by
+  limit nobody would notice being exceeded is not a limit. FR-014 makes it a failure, by
   cross-checking against what exists.
 
   017 found the identical hole in its own coverage after four analysis passes. Twice now, a
   set built from enrolments has been blind to what never enrolled.
-- **FR-008 had no check.** "No automated check may widen authority" is the sharpest safety
+- **FR-017 had no check.** "No automated check may widen authority" is the sharpest safety
   property here — the reason the demonstration is manual — and it rested entirely on nobody
   adding such a fixture later. T007a asserts it by source inspection.
 - **One task forbade what another required.** T014 said no row may use administrator
@@ -102,13 +102,14 @@ ran, which is weak evidence it was the obvious hole rather than the only one.
   else, enumerations may use admin and must never assert a denial. A denial to an
   administrator proves nothing.
 - Terminology settled on one concept with two spellings, and the model says they are the
-  same. `FR-004aa` renumbered — it was the most important requirement in the feature and had
-  the least legible identifier.
+  same. The read-discriminator requirement was renumbered — it was the most important one in
+  the feature and had the least legible identifier, reading as a typo. (Renumbered again in
+  pass 6, when the whole list was made sequential; it is FR-006 now.)
 
 **Analysis pass 2 — 2026-07-31.** Four findings, and the first is pass 1's own fix having
 the defect pass 1 was fixing.
 
-- **The cross-check's scope was unbounded and covered one of two mounts.** FR-006a said
+- **The cross-check's scope was unbounded and covered one of two mounts.** FR-014 said
   "anything present in the control plane", which is every mount — the gate fails on day one —
   and which an implementer would narrow to whichever mount came to mind. The bounding paths
   span **two**: the authority store and the agent registry. Narrowing to the first leaves the
@@ -127,7 +128,7 @@ the defect pass 1 was fixing.
   token. Scoped to the *act* now — writing a policy, granting a capability — not to which
   authority appears. The identical shape as 017's rule that forbade retry loops in words that
   caught its own readiness wait.
-- FR-011's "the contract MUST say so" is now checked rather than trusted.
+- FR-022's "the contract MUST say so" is now checked rather than trusted.
 
 **Analysis pass 3 — 2026-07-31.** Three findings, and the first is the same wrong instinct
 for the third time.
@@ -198,13 +199,40 @@ unchecked. This one found a sentence claiming more than any mechanism can delive
 coverage is unchanged; what changed is whether the artifact admits its own limit. First
 evidence of convergence rather than another instance of the same failure.
 
+**Analysis pass 6 — 2026-07-31.** Three findings, none about coverage — the first pass where
+that is true.
+
+- **"Amend ADR-0047 at PATCH level" applied semver to a document with no version.** ADRs carry
+  Status, Date, Relates-to and Requirements. PATCH/MINOR is the *constitution's* vocabulary,
+  borrowed without noticing the difference, and an implementer would look for a field that does
+  not exist. The repo's actual convention — set by ADR-0048's amendment the same day — is an
+  appended `## Amendment` section with the Decision left intact.
+- **The identifiers had accreted past readability.** `FR-006, FR-006aa, FR-006ab, FR-006a,
+  FR-006b` — three suffix generations on one number, presented out of their own order, in the
+  document whose job is to be held against a pull request. Renumbered sequentially, once, before
+  implementation makes them load-bearing in code comments.
+
+  Renumbering is also where this pass made its own mistake: the first attempt applied the
+  renames in sequence, so a requirement renamed to FR-004 was then caught by the FR-004 rule
+  and renamed again. A single pass with one callback fixes it — every occurrence matched once
+  against the original text. Two references to *017's* FR-005a were nearly rewritten as well,
+  and are correct as they stand.
+- **"MVP: phases 1–3" had stopped describing what it points at.** Phase 2 grew from 6 tasks to
+  13 across six passes, each adding a coverage mechanism rather than a story. The MVP is 18
+  tasks and now says so, with the smaller split named for anyone who wants one.
+
+**Six passes.** Findings moved from *a bound is invisible* (1–4) to *a claim exceeds its
+coverage* (5) to *the artifact is hard to use* (6). Three categories, in that order, each
+strictly less serious than the last — offered as a description of what happened, not a
+forecast.
+
 Two things flagged for planning rather than fixed here:
 
 - **US4's amendment and US1's gate could be separated.** They are one feature because the
   amendment without the gate leaves the row unowned, and the gate without the amendment
   leaves the next row in the same ambiguity. But they land in different artifacts, and the
   plan should decide whether they are one change or two.
-- **Enumerating "every kind of bounding record" (FR-005, FR-006) needs a discovery
+- **Enumerating "every kind of bounding record" (FR-010, FR-011) needs a discovery
   mechanism**, or it is a list that goes stale — which is the failure mode 017's FR-005a was
   raised for after analysis found an opt-in scheme fail-open. The plan should not repeat that
   by hand-listing three kinds.

@@ -29,7 +29,7 @@ grant and revoke leaves the platform permissive with nobody watching.
 
 1. Add a write capability to the run's read policy on one bounding path.
 2. Run the rows. Expected: red, reporting **that the write was permitted** — not "assertion
-   failed", and the row should have removed what it wrote (FR-004b).
+   failed", and the row should have removed what it wrote (FR-008).
 3. Revoke the capability.
 4. **Verify the revocation took**, and record that you did. Not "I ran the revoke command" —
    check that the write is refused again.

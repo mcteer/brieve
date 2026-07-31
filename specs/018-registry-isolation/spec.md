@@ -20,7 +20,7 @@
 
 ### Session 2026-07-31
 
-- Q: FR-007 proves the gate can fail by granting a run write access to its own bounds, which
+- Q: FR-016 proves the gate can fail by granting a run write access to its own bounds, which
   temporarily makes a real control plane permissive. When does that run? → A: **Never in a
   merge lane.** Performed once at implementation against a developer's own enclave and
   recorded with its output; the merge lane runs only the refusal rows. Nothing automated
@@ -177,7 +177,7 @@ every row not in force, which of the two states it is in and where the reason is
   using authority a run actually holds, and MUST observe the control plane refusing it.
 - **FR-002**: The refusal MUST come from the control plane. A refusal produced by the
   platform's own code, or the absence of an attempt, MUST NOT satisfy the gate.
-- **FR-002a**: Two kinds of act, two authorities, and they MUST NOT be mixed:
+- **FR-003**: Two kinds of act, two authorities, and they MUST NOT be mixed:
 
   | Act | Authority | May assert |
   | --- | --- | --- |
@@ -186,34 +186,34 @@ every row not in force, which of the two states it is in and where the reason is
 
   An enumeration that drifted into asserting a denial would assert that an *administrator*
   was refused, which is the opposite of interesting.
-- **FR-003**: The authority used MUST be **the authority a run actually holds** — all of it,
+- **FR-004**: The authority used MUST be **the authority a run actually holds** — all of it,
   as deployed. The claim is that a run cannot write its own bounds; stripping its authority
   to a single grant would prove something narrower, leaving open whether some combination
   permits the write.
 
   *Corrected during planning.* This originally required the opposite — an authority carrying
   only the bound under test — to stop a refusal being caused by the absence of an unrelated
-  grant. That concern was real and is met better by FR-004a: discriminating on whether the
+  grant. That concern was real and is met better by FR-007: discriminating on whether the
   **path** is readable, rather than on which grants are present.
-- **FR-004**: The gate MUST distinguish "refused" from "never attempted", "unreachable", and
+- **FR-005**: The gate MUST distinguish "refused" from "never attempted", "unreachable", and
   "refused for an unrelated reason" — and MUST treat only a genuine refusal as evidence.
-- **FR-012**: A refusal counts **only when the same authority can read the path**. The
+- **FR-006**: A refusal counts **only when the same authority can read the path**. The
   control plane deliberately answers identically for *forbidden* and *absent* — it will not
   disclose which, because that would leak the shape of the tree to an unauthorized caller.
   Verified during planning: a mount that does not exist is refused in exactly the same words
   as a real bounding record. So a row with a typo in its path passes while asserting nothing,
   and only a successful read proves the refusal was about the capability.
-- **FR-004a**: A write that **succeeds** MUST be reported as its own outcome, distinct from
+- **FR-007**: A write that **succeeds** MUST be reported as its own outcome, distinct from
   an assertion that could not be made. A red check is something someone reruns; a bounding
   record that was actually changed is a live condition the platform claims cannot exist.
-- **FR-004b**: A gate that succeeded in writing a bounding record MUST remove what it wrote,
+- **FR-008**: A gate that succeeded in writing a bounding record MUST remove what it wrote,
   and MUST say whether it managed to. The check created that condition; leaving it for
   someone to notice would make the gate the thing that widened a ceiling.
-- **FR-004c**: The gate MUST NOT treat a run's ordinary writes as violations. Writing
+- **FR-009**: The gate MUST NOT treat a run's ordinary writes as violations. Writing
   secrets in its own space, configuration, or product state is what a run is for. Only the
   records that decide what a run may do are in scope, and a check that drifted into the
   first would forbid the platform's purpose while appearing stricter.
-- **FR-005**: The gate MUST cover every kind of record that bounds a run, in **both** of the
+- **FR-010**: The gate MUST cover every kind of record that bounds a run, in **both** of the
   places such records live:
 
   **Records a run can read** — what a definition may ever do, whether a definition exists,
@@ -224,7 +224,7 @@ every row not in force, which of the two states it is in and where the reason is
   identities are trusted at all**, and the attachment of grants to identities and groups. A
   run holds no read access to any of them, so no derivation from its grants can find them.
 
-  These are named — **and the named half MUST have its own completeness check** (FR-005a).
+  These are named — **and the named half MUST have its own completeness check** (FR-012).
   A hand-written list is a *subject* list, which this repository has twice concluded goes
   stale silently, and pass 3's version of it was incomplete on the day it was written. The
   most powerful surface of all was missing: write the trusted-key configuration and the
@@ -236,13 +236,13 @@ every row not in force, which of the two states it is in and where the reason is
   control plane enforces — and rewriting the second moves the bound without touching the
   first. A gate covering only records *about* the bounds, while missing the bound itself,
   asserts the wrong half of its own name.
-- **FR-006**: A bounding record kind with no attempted write MUST fail the gate rather than
+- **FR-011**: A bounding record kind with no attempted write MUST fail the gate rather than
   be silently uncovered.
-- **FR-006aa**: **Both halves MUST have a completeness check, and neither may rest on a list
+- **FR-012**: **Both halves MUST have a completeness check, and neither may rest on a list
   somebody maintains.** The named half is checked against **four surfaces the control plane
   genuinely enumerates** — its mounts, its auth methods, the roles those methods issue, and
   the grants it holds. Every member of those four MUST be named or excluded with a reason.
-  Enumerating is a COVERAGE act under FR-002a and may use administrator authority; it must
+  Enumerating is a COVERAGE act under FR-003 and may use administrator authority; it must
   never assert a denial.
 
   **Four named surfaces, not "everything policy-affecting", and the difference is the
@@ -254,7 +254,7 @@ every row not in force, which of the two states it is in and where the reason is
   the four obvious ones and believe they had covered everything — the hand-chosen set the
   check was added to replace, wearing a mechanism's clothes.
 
-- **FR-006ab**: The residual MUST be recorded rather than implied. A surface that bounds a run
+- **FR-013**: The residual MUST be recorded rather than implied. A surface that bounds a run
   and is not a member of the four enumerated kinds is outside this check, placed in the named
   half only if somebody judged it belonged. **A named limit is worth more than a predicate
   that reads as total and is not** — and this feature has now spent four analysis passes on
@@ -267,7 +267,7 @@ every row not in force, which of the two states it is in and where the reason is
   written. Two documented anti-patterns in one feature, and the fix for one was an instance of
   the other.
 
-- **FR-006a**: The **derived** half MUST be checked against **what actually exists in the
+- **FR-014**: The **derived** half MUST be checked against **what actually exists in the
   jurisdictions the derived paths occupy** — not only against what a run may read, and not against the
   whole control plane. Deriving from a run's read grants is sound for every record inside
   them and blind to any outside; a record placed where a run cannot read still bounds that
@@ -281,44 +281,44 @@ every row not in force, which of the two states it is in and where the reason is
   **Derivation is structurally blind to bounds a run cannot read**, and that is not a gap to
   be closed by a better derivation. Any scheme anchored on a run's grants cannot see a
   surface the run holds no grant on, and the grant of authority itself is exactly such a
-  surface. So FR-005's second kind is named rather than derived, each entry carrying the
+  surface. So FR-010's second kind is named rather than derived, each entry carrying the
   reason — and the named part MUST NOT shrink silently, for the same reason the exclusion
   list must not.
 
   This is the direction a derivation cannot see by construction, and it is the same hole 017
   found in its own coverage mechanism after four analysis passes: a subject that never
   enrolled is invisible to a scheme built from enrolments.
-- **FR-006b**: Enumerating what exists MAY use administrator authority; **asserting a
+- **FR-015**: Enumerating what exists MAY use administrator authority; **asserting a
   refusal MUST NOT**. Those are different acts and conflating them would destroy the
   feature — a denial to an administrator proves nothing, because an administrator is not
   what the claim is about.
-- **FR-007**: The gate MUST fail when the refusal stops holding, demonstrated by granting
+- **FR-016**: The gate MUST fail when the refusal stops holding, demonstrated by granting
   the write, observing the failure, and revoking it — **performed once at implementation and
   recorded with its output**, never in a merge lane.
-- **FR-008**: **No automated check may widen authority.** The demonstration in FR-007 is
+- **FR-017**: **No automated check may widen authority.** The demonstration in FR-016 is
   manual and one-time precisely because an automated one would make a real control plane
   permissive on every run, and a lane interrupted mid-fixture would leave it that way. A
   window that is small is not a window that is closed, and this is the one guarantee whose
   temporary suspension is least acceptable.
-- **FR-008b**: FR-008 MUST be enforced by a check rather than by convention, and the check
+- **FR-018**: FR-017 MUST be enforced by a check rather than by convention, and the check
   MUST be scoped to **the act, not the authority**. Nothing in the suite may *write a policy*
   or *grant a capability*; reading with an administrator's authority is neither, and is
-  required by FR-006b. A check keyed on which authority appears rather than on what is done
+  required by FR-015. A check keyed on which authority appears rather than on what is done
   with it would forbid the enumeration another requirement mandates.
 
   Recorded this precisely because a safety property resting on everyone remembering is the
   shape this repository has paid for more than once — and because a rule that catches the
   wrong thing gets relaxed until it catches nothing.
-- **FR-008a**: The one-time demonstration MUST restore the authority it changed, and MUST
+- **FR-019**: The one-time demonstration MUST restore the authority it changed, and MUST
   verify the restoration rather than assume it. Whoever performs it is responsible for
   leaving the platform exactly as they found it, and the recorded output MUST show that.
-- **FR-009**: The governing record MUST name **two** states for a gate row not in force:
+- **FR-020**: The governing record MUST name **two** states for a gate row not in force:
   deferred by a decision that is cited, and not yet applicable with the reason recorded in
   the feature's contract. A row in neither state MUST be a defect.
-- **FR-010**: This row MUST move to in-force, and the record MUST say so — an amendment that
+- **FR-021**: This row MUST move to in-force, and the record MUST say so — an amendment that
   only described states without placing the row that prompted it would leave the situation
   it exists to end.
-- **FR-011**: The gate MUST NOT assert that the bounding records' **contents** are correct.
+- **FR-022**: The gate MUST NOT assert that the bounding records' **contents** are correct.
   A record that is wrong in a way the reviewed configuration wrote is outside what a
   refusal can show, and the contract MUST say so — **checked, not trusted**, since a later
   edit could remove the statement and let a green row imply more than it asserts.
@@ -377,7 +377,7 @@ every row not in force, which of the two states it is in and where the reason is
   least six readable bounding paths, one of which was added the same day this spec was
   written. The set must therefore be derived from the deployed configuration rather than
   listed here — a list would have been stale before the feature landed, which is the failure
-  mode FR-006 exists to prevent.
+  mode FR-011 exists to prevent.
 - **Proving the gate can fail requires temporarily widening real authority**, and that is
   why it happens once, by hand, and is recorded — rather than on every merge. 017's break
   fixture set the precedent for a one-time recorded demonstration; here the stakes are higher,

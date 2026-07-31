@@ -30,7 +30,7 @@ So a row with a typo in its path — `harness-ceilingz` — passes, having prove
 | `no-such-mount/data/x` | `403` |
 | `harness-authority/data/harness-ceilingz/typo` (typo) | `403` |
 
-**Rationale**: This is FR-004's "refused for an unrelated reason" arriving immediately and
+**Rationale**: This is FR-005's "refused for an unrelated reason" arriving immediately and
 concretely. Vault deliberately does not distinguish *forbidden* from *absent* — disclosing
 which would leak the shape of the tree to an unauthorized caller. That is correct of Vault
 and fatal to a row that reads 403 as proof.
@@ -42,7 +42,7 @@ and fatal to a row that reads 403 as proof.
 
 ---
 
-## R2 — FR-003 is wrong, and the spec should be corrected
+## R2 — FR-004 is wrong, and the spec should be corrected
 
 **Decision**: Use the authority **a run actually holds**, not a synthesized token carrying
 only the bound under test.
@@ -53,18 +53,18 @@ only the bound under test.
 ['agent-pack-secrets', 'harness-database', 'harness-authority-read']
 ```
 
-FR-003 says the authority "MUST carry **only** the bound under test, so a refusal cannot be
+FR-004 says the authority "MUST carry **only** the bound under test, so a refusal cannot be
 caused by the absence of an unrelated grant." Applied here that is backwards. The
 constitution's claim is *a run cannot write its own bounds* — about the authority a run
 holds, all of it. Stripping it to one policy proves something narrower: that one policy does
 not grant write, which leaves open whether some combination does.
 
-**The concern behind FR-003 was real and is met differently.** It was written against a
+**The concern behind FR-004 was real and is met differently.** It was written against a
 refusal that came from the wrong cause; R1's read-200 check addresses exactly that, and
 addresses it better, because it discriminates on the *path* rather than on the *grants*.
 
 **This is a correction to the spec, not a planning decision**, and it is recorded here rather
-than applied silently. FR-003 should be rewritten to require the run's real authority.
+than applied silently. FR-004 should be rewritten to require the run's real authority.
 
 **Alternatives considered**:
 - *Both — a single-policy token and the full run authority.* Rejected as redundant once R1
@@ -126,11 +126,11 @@ for a row not in force, and its worked example is this row moving to in-force. L
 amendment alone leaves the row still unowned and the example hypothetical; landing the gate
 alone leaves the next row in the same ambiguity 004 documented and declined to paper over.
 
-**Rationale**: FR-010 already requires the row to move to in-force *with* the amendment —
+**Rationale**: FR-021 already requires the row to move to in-force *with* the amendment —
 "an amendment that only described states without placing the row that prompted it would leave
 the situation it exists to end."
 
-**Alternatives considered**: Two pull requests. Rejected on FR-010, which settles it.
+**Alternatives considered**: Two pull requests. Rejected on FR-021, which settles it.
 
 ---
 

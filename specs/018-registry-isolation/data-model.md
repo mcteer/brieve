@@ -122,7 +122,7 @@ Not an administrator's, not a synthesized token carrying one grant. The claim un
 *a run cannot write its own bounds*; proving that a single policy lacks the grant leaves open
 whether some combination supplies it.
 
-*This reverses the spec's original FR-003, corrected during planning.* The concern behind it —
+*This reverses the spec's original FR-004, corrected during planning.* The concern behind it —
 that a refusal might come from the wrong cause — is real and is met by the read
 discriminator above, which tests the **path** rather than the **grants**, and tests it
 directly.
