@@ -142,10 +142,11 @@ also removes the persistence work the task list would otherwise have carried.
 
 ## Complexity Tracking
 
-> No Constitution Check violations. This section is empty by design.
+**No Constitution Check violations, so nothing below requires justification.** One judgement
+is recorded anyway, because it sat close enough to a trade-off that a reader deserves the
+reasoning.
 
-The one judgement call worth recording without a violation to justify: the pack manifest
-gains a field. The alternative was inferring each tool's paths from its handler code, which
+The pack manifest gains a field. The alternative was inferring each tool's paths from its handler code, which
 would be a static analysis that breaks the first time a path is computed at runtime — and
 would fail **open**, granting access it could not prove was needed. A declaration that
 refuses when absent (FR-004) fails closed instead, which is the direction Principle III

@@ -19,7 +19,7 @@ priority order → Polish.
 | --- | --- |
 | **Fail-closed** | A tool with no declared paths refuses the launch (T008); an undetermined scope refuses rather than granting broadly (T013) |
 | **Conformance** | The fourteen rows in `contracts/conformance-task-authority.md`, host_enclave, against a live Vault with the flag activated |
-| **No-secret-leak** | The grant record is not a credential (T034); no key material outside Vault (T017); only the issuer may sign (T002) |
+| **No-secret-leak** | The grant record is not a credential (T036); no key material outside Vault (T017); only the issuer may sign (T002) |
 | **Correlation / evidence** | The launch decision and refusals recorded and walkable (T027); the grant names the principal it derives from (T022) |
 
 ## Path Conventions
@@ -101,7 +101,9 @@ same change that creates it** (T006).
 - [ ] T026 [US2] Enforce and record the single decision in `src/surfaces/api/runs.py`: the entitlement intersection (`user ∩ ceiling ∩ task`) is evaluated once and the outcome recorded on the grant. Steps consume it; nothing re-evaluates (FR-005).
 - [ ] T027 [US2] [GATE:correlation] Emit the launch decision to the audit trail with the person, the task, and the resulting scope — counts and paths, never secret values. Refusals recorded too (FR-009/010).
 - [ ] T028 [P] [US2] Component rows in `tests/component/test_one_decision_per_launch.py`: a multi-step run triggers exactly one decision; a person beyond their entitlements is refused at launch.
-- [ ] T029 [US2] [GATE:conformance] Row in `tests/conformance/authority/test_one_decision_per_launch.py`: count exchanges across a multi-step run (SC-004); a person whose entitlements do not cover the task is refused at launch and the refusal is recorded naming person and task (SC-005), read through the evidence path.
+- [ ] T029 [P] [US2] [GATE:fail-closed] Component row in `tests/component/test_idp_unreachable_at_launch.py`: when the organization's identity provider cannot be reached, the run **does not start** and the failure names the identity provider — not a scope or permission refusal (spec Edge Cases). The distinction will not happen by accident: the natural implementation returns a generic refusal, and an operator told "permission denied" when the truth is "your IdP is down" debugs the wrong system.
+- [ ] T030 [P] [US2] Component row in `tests/component/test_concurrent_runs_hold_distinct_grants.py`: the same task launched by two different people yields two grants, each attributed to its own person, and neither run can act under the other's (spec Edge Cases). Asserted because `DelegationGrant` is keyed by `grant_id` — a bug that reused one across runs would be invisible to every other row here, and would silently attribute one person's work to another.
+- [ ] T031 [US2] [GATE:conformance] Row in `tests/conformance/authority/test_one_decision_per_launch.py`: count exchanges across a multi-step run (SC-004); a person whose entitlements do not cover the task is refused at launch and the refusal is recorded naming person and task (SC-005), read through the evidence path.
 
 **Checkpoint**: US1 and US2 both independently demonstrated.
 
@@ -113,13 +115,13 @@ same change that creates it** (T006).
 
 **Independent Test**: Kill a run mid-task, let it resume, compare the resumed grant's scope to the launch grant's.
 
-- [ ] T030 [US3] Re-derive the grant token on resume in `src/surfaces/dispatch/entrypoint.py`, from the **recorded grant** under the platform's own attested identity, bounded by the recorded expiry (FR-015/015b). The record is a **ceiling on the resume**, never a seed for a fresh decision — a resume that re-derived from the request would let scope drift.
-- [ ] T031 [US3] Confirm the existing grant-expiry path stops the run rather than resuming it when the recorded expiry has passed (FR-014, ADR-0049). This is assertion against machinery that already exists, not new behaviour.
-- [ ] T032 [P] [US3] Component rows in `tests/component/test_resume_keeps_its_scope.py`: the re-derived scope equals the recorded scope; an expired grant stops; nothing durable is written that could widen it.
-- [ ] T033 [US3] [GATE:conformance] Row in `tests/conformance/authority/test_resume_keeps_its_scope.py`: disrupt a run mid-task, resume it, assert the scope is identical — neither wider nor narrower — with no person present (SC-006).
-- [ ] T034 [US3] [GATE:no-secret-leak] [GATE:conformance] Row in the same file: present the **recorded grant's bytes directly to the trust store** and assert it obtains nothing (SC-006a). This is what makes "the record is data, not a credential" falsifiable rather than asserted.
+- [ ] T032 [US3] Re-derive the grant token on resume in `src/surfaces/dispatch/entrypoint.py`, from the **recorded grant** under the platform's own attested identity, bounded by the recorded expiry (FR-015/015b). The record is a **ceiling on the resume**, never a seed for a fresh decision — a resume that re-derived from the request would let scope drift.
+- [ ] T033 [US3] Confirm the existing grant-expiry path stops the run rather than resuming it when the recorded expiry has passed (FR-014, ADR-0049). This is assertion against machinery that already exists, not new behaviour.
+- [ ] T034 [P] [US3] Component rows in `tests/component/test_resume_keeps_its_scope.py`: the re-derived scope equals the recorded scope; an expired grant stops; nothing durable is written that could widen it.
+- [ ] T035 [US3] [GATE:conformance] Row in `tests/conformance/authority/test_resume_keeps_its_scope.py`: disrupt a run mid-task, resume it, assert the scope is identical — neither wider nor narrower — with no person present (SC-006).
+- [ ] T036 [US3] [GATE:no-secret-leak] [GATE:conformance] Row in the same file: present the **recorded grant's bytes directly to the trust store** and assert it obtains nothing (SC-006a). This is what makes "the record is data, not a credential" falsifiable rather than asserted.
 
-- [ ] T035 [US3] [GATE:conformance] Row in `tests/conformance/authority/test_an_expired_grant_stops.py`: a run whose recorded grant has expired **stops at a step boundary with nothing half-done** rather than resuming (SC-007). The contract has always listed this row; the task list's first draft covered it hermetically only, which would have left a contract row with no creating task — the gate regression the constitution's Quality Gates section names.
+- [ ] T037 [US3] [GATE:conformance] Row in `tests/conformance/authority/test_an_expired_grant_stops.py`: a run whose recorded grant has expired **stops at a step boundary with nothing half-done** rather than resuming (SC-007). The contract has always listed this row; the task list's first draft covered it hermetically only, which would have left a contract row with no creating task — the gate regression the constitution's Quality Gates section names.
 
 **Checkpoint**: long-running work survives disruption without widening or standing credentials.
 
@@ -131,9 +133,9 @@ same change that creates it** (T006).
 
 **Independent Test**: Configure each arrangement in turn and read the posture; each reports as itself with a reason.
 
-- [ ] T036 [US4] Detect and report the arrangement in `src/surfaces/mcp/server.py`'s supervisory reporting: `federated`, `platform_issued`, or `absent`, each with a reason (FR-016/017). Detection reads the resource-server profile and whether a customer IdP is configured for exchange.
-- [ ] T037 [P] [US4] Component rows in `tests/component/test_authority_posture.py`: three arrangements, three distinct reports, three distinct reasons; the unconfigured case reports `absent` **plainly** rather than defaulting to a value that reads as protected (FR-018).
-- [ ] T038 [US4] [GATE:conformance] Row in `tests/conformance/authority/test_posture_names_the_arrangement.py`: configure each arrangement against the live enclave and assert the report matches what is actually operating (SC-008), including the unconfigured case.
+- [ ] T038 [US4] Detect and report the arrangement in `src/surfaces/mcp/server.py`'s supervisory reporting: `federated`, `platform_issued`, or `absent`, each with a reason (FR-016/017). Detection reads the resource-server profile and whether a customer IdP is configured for exchange.
+- [ ] T039 [P] [US4] Component rows in `tests/component/test_authority_posture.py`: three arrangements, three distinct reports, three distinct reasons; the unconfigured case reports `absent` **plainly** rather than defaulting to a value that reads as protected (FR-018).
+- [ ] T040 [US4] [GATE:conformance] Row in `tests/conformance/authority/test_posture_names_the_arrangement.py`: configure each arrangement against the live enclave and assert the report matches what is actually operating (SC-008), including the unconfigured case.
 
 **Checkpoint**: an operator can no longer hold a false assurance about which protection they have.
 
@@ -145,21 +147,21 @@ same change that creates it** (T006).
 
 **Independent Test**: Launch a run, attempt work outside the grant, confirm refusal and its recorded cause.
 
-- [ ] T039 [US5] Distinguish the two refusal causes in the audit payload — "outside the granted task" versus "outside the agent's ceiling" (FR-010). Different causes with different remedies: one is re-consent, the other is a ceiling change.
-- [ ] T040 [P] [US5] Component rows in `tests/component/test_grant_refusals_name_their_cause.py`: both causes recorded distinctly; neither carries a secret value.
-- [ ] T041 [US5] [GATE:conformance] Row in `tests/conformance/authority/test_a_task_cannot_widen_itself.py`: a run attempting work outside its grant is refused, the refusal recorded, and the cause named (US5 scenarios).
+- [ ] T041 [US5] Distinguish the two refusal causes in the audit payload — "outside the granted task" versus "outside the agent's ceiling" (FR-010). Different causes with different remedies: one is re-consent, the other is a ceiling change.
+- [ ] T042 [P] [US5] Component rows in `tests/component/test_grant_refusals_name_their_cause.py`: both causes recorded distinctly; neither carries a secret value.
+- [ ] T043 [US5] [GATE:conformance] Row in `tests/conformance/authority/test_a_task_cannot_widen_itself.py`: a run attempting work outside its grant is refused, the refusal recorded, and the cause named (US5 scenarios).
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T042 [P] Update `docs/glossary.md`: `task grant`, `entailed scope`, `rich authorization request`, `resource server`, `arrangement (federated / platform-issued / absent)` — cross-referenced to the ceiling terms already there.
-- [ ] T043 [GATE:conformance] Row asserting **tool authority is unchanged** by this feature: the same run's tool decisions are identical before and after (SC-009a). A row proving the *absence* of an effect, which is what FR-011a promises.
-- [ ] T044 [GATE:conformance] Row in `tests/conformance/authority/test_no_new_standing_credential.py`: the standing-credential count is unchanged by this feature (SC-009) — the issuer holds a Vault token from its own attested identity and no key, and nothing was added to the one named exception in Principle IV. **A row, not a confirmation**: the contract lists it, and a contract row whose only enforcement is someone checking is the shape Quality Gates forbids. This is the same defect the SC-007 row had, found by sweeping the class rather than patching the instance.
-- [ ] T045 [GATE:no-secret-leak] Assert no row in `tests/conformance/authority/` imports a Vault double or in-process substitute (SC-010). The same shape 015 used for its separation claim: a suite where the trust store could be faked would assert the comparator rather than the boundary, and nothing else in this contract would notice.
-- [ ] T046 Apply the contract's five break fixtures (grant minted with ceiling paths; `jti` dropped; resume re-derives from the request; a tool's `paths` widened to a wildcard; the signing policy widened to any authenticated workload), watch each named row fail, revert, and record outcomes **In force** in `specs/016-task-scoped-authority/contracts/conformance-task-authority.md`. The `jti` fixture earns its place by making that failure mode — every row red with the reason only in Vault's log — familiar before it is met under time pressure.
-- [ ] T047 Close the ROADMAP's RFC 8693 + RAR row naming this feature, and confirm the three "what these rows do not prove" limits (narrowing only as tight as tool declarations; no containment claim for a compromised allocation; nothing established about customers' IdPs) are stated in the contract and overclaimed nowhere in spec, plan, or ADR-0056.
-- [ ] T048 Run `make check`, `make conformance` (full, live enclave, clean tree), and walk `specs/016-task-scoped-authority/quickstart.md` sections 1–6. Record rows **In force** in the contract.
+- [ ] T044 [P] Update `docs/glossary.md`: `task grant`, `entailed scope`, `rich authorization request`, `resource server`, `arrangement (federated / platform-issued / absent)` — cross-referenced to the ceiling terms already there.
+- [ ] T045 [GATE:conformance] Row asserting **tool authority is unchanged** by this feature: the same run's tool decisions are identical before and after (SC-009a). A row proving the *absence* of an effect, which is what FR-011a promises.
+- [ ] T046 [GATE:conformance] Row in `tests/conformance/authority/test_no_new_standing_credential.py`: the standing-credential count is unchanged by this feature (SC-009) — the issuer holds a Vault token from its own attested identity and no key, and nothing was added to the one named exception in Principle IV. **A row, not a confirmation**: the contract lists it, and a contract row whose only enforcement is someone checking is the shape Quality Gates forbids. This is the same defect the SC-007 row had, found by sweeping the class rather than patching the instance.
+- [ ] T047 [GATE:no-secret-leak] Assert no row in `tests/conformance/authority/` imports a Vault double or in-process substitute (SC-010). The same shape 015 used for its separation claim: a suite where the trust store could be faked would assert the comparator rather than the boundary, and nothing else in this contract would notice.
+- [ ] T048 Apply the contract's five break fixtures (grant minted with ceiling paths; `jti` dropped; resume re-derives from the request; a tool's `paths` widened to a wildcard; the signing policy widened to any authenticated workload), watch each named row fail, revert, and record outcomes **In force** in `specs/016-task-scoped-authority/contracts/conformance-task-authority.md`. The `jti` fixture earns its place by making that failure mode — every row red with the reason only in Vault's log — familiar before it is met under time pressure.
+- [ ] T049 Close the ROADMAP's RFC 8693 + RAR row naming this feature, and confirm the three "what these rows do not prove" limits (narrowing only as tight as tool declarations; no containment claim for a compromised allocation; nothing established about customers' IdPs) are stated in the contract and overclaimed nowhere in spec, plan, or ADR-0056.
+- [ ] T050 Run `make check`, `make conformance` (full, live enclave, clean tree), and walk `specs/016-task-scoped-authority/quickstart.md` sections 1–6. Record rows **In force** in the contract.
 
 ---
 
@@ -167,24 +169,24 @@ same change that creates it** (T006).
 
 ### Phase dependencies
 
-- **Setup (T001–T004)**: no dependencies. T002 bounds the signing key the moment it exists —
-  a key created in one task and left unbounded until a later one is a window, however short.
+- **Setup (T001–T004)**: no dependencies. T002 bounds the signing key the moment it
+  exists — a key created in one task and left unbounded until a later one is a window,
+  however short.
 - **T005**: depends on Setup, and **blocks everything else in the feature**. It is a research
   task with an unknown answer, scheduled first because nothing downstream can be demonstrated
   until a grant validates.
 - **Foundational (T006–T018)**: T006 can run beside T005; T007–T018 can be *written* against
   an unvalidated assumption but must not be *finished* against one.
 - **US1 (T019–T025)**: depends on Foundational.
-- **US2 (T026–T029)**: depends on Foundational; independent of US1.
-- **US3 (T030–T035)**: depends on Foundational and on US1's minting path.
-- **US4 (T036–T038)**: depends on Foundational only.
-- **US5 (T039–T041)**: depends on US1.
-- **Polish (T042–T048)**: depends on the stories being delivered.
+- **US2 (T026–T031)**: depends on Foundational; independent of US1.
+- **US3 (T032–T037)**: depends on Foundational and on US1's minting path.
+- **US4 (T038–T040)**: depends on Foundational only.
+- **US5 (T041–T043)**: depends on US1.
+- **Polish (T044–T050)**: depends on the stories being delivered.
 
 ### Parallel opportunities
 
-- `[P]` tasks: T009 (pack declarations), T011 (scope unit rows), T021 and T022 (US1 component
-  rows), T028, T032, T037, T040 — all different files with no dependency on incomplete work.
+- `[P]` tasks, all different files with no dependency on incomplete work: T009, T011, T021, T022, T028, T029, T030, T034, T039, T042, T044.
 - US2 and US4 are genuinely independent of US1 and of each other — with capacity, three people
   could take US1, US2, and US4 concurrently once Foundational lands.
 - **T005 parallelises with nothing**, and pretending otherwise is how a plan discovers in week
@@ -203,4 +205,4 @@ durability, honesty, and refusal clarity on top of a property that already holds
 - **Eval gate omitted deliberately**: this feature promotes no pack, prompt, model, or policy, so Principle VIII is N/A — recorded here rather than left as a silent absence.
 - The `[P]` marker means different files and no dependency on incomplete work.
 - Commit after each task or logical group; stop at any checkpoint to validate a story independently.
-- **T004 is the honest risk in this plan.** If the entity binding turns out to require something the platform cannot supply — a customer IdP feature, or a Vault configuration the enclave cannot express — the tier analysis in ADR-0056 changes and the ADR should be amended before the code is. That is a better outcome than discovering it in T020.
+- **T005 is the honest risk in this plan.** If the entity binding turns out to require something the platform cannot supply — a customer IdP feature, or a Vault configuration the enclave cannot express — the tier analysis in ADR-0056 changes and the ADR should be amended before the code is. That is a better outcome than discovering it in T023.
