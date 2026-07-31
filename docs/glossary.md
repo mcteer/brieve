@@ -87,9 +87,15 @@ unique short-lived identity. Unregistered workloads obtain no credentials.
 **Ceiling policy** — the compiled maximum authority of a definition, enforced by the
 control-plane Vault. No task scope can exceed it.
 
-**Effective authority** — user ∩ agent ceiling ∩ task scope ∩ policy, computed per
-task via token exchange (RFC 8693 + RAR). An agent can never exceed the human it acts
-for.
+**Effective authority** — user ∩ agent ceiling ∩ task scope ∩ policy. Manufactured per task
+from an attested workload identity, bounded by a short lifetime rather than by a per-task
+exchange: for read access the ceiling *is* the task scope, deliberately (ADR-0057). An agent
+can never exceed the human it acts for.
+
+**Rich authorization request (RAR)** — RFC 9396's `authorization_details`, which the
+control-plane Vault **consumes and enforces** against a ceiling. It does not issue them:
+Vault is an OAuth *resource server*, and the token must be minted elsewhere (ADR-0056). The
+mechanism is held for write and act scopes; read scopes do not use it.
 
 **Delegation grant** — the durable record of a user's consent to a long-running task;
 per-step tokens are manufactured under it and evaporate. Checkpoints hold state, never

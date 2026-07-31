@@ -41,6 +41,10 @@ rich authorization requests against ceiling policies. This is the concrete form 
 `attested workload identity → control-plane Vault → RFC 8693 + RAR` chain. No other path to
 per-task authority is supported.
 
+> **Amended 2026-07-31 — the sentence above is half wrong, and the half that is wrong is
+> "Vault performs".** See the Notes for what replaces it. Left in place rather than rewritten,
+> because this record is append-only and the mistake is worth being able to find.
+
 **Nomad schedules the enclave's supporting components**, Postgres among them — the same
 scheduling substrate in development and in production, so what is exercised locally is what runs
 for real.
@@ -121,3 +125,37 @@ framing was a consequence of the gap, not a deliberate deferral.
 The seam those specs built against holds: `IdentityFabric` is a protocol, and a Vault-backed
 implementation satisfies it exactly as the fake does. What changes is which implementation the
 guarantees are proven against.
+
+
+## Amendment — 2026-07-31
+
+**What the Decision got wrong.** "Vault performs RFC 8693 token exchange with rich
+authorization requests" conflates two RFCs, and Vault's role in each is different:
+
+| | What it is | Vault |
+| --- | --- | --- |
+| **RFC 9396 — RAR** | The `authorization_details` structure | **Consumes it.** Reads it from a presented JWT and enforces it against the agent registry's ceiling policies |
+| **RFC 8693 — Token exchange** | Swapping one token for another | **Does not do it.** Its OIDC provider's token endpoint accepts `authorization_code` and nothing else |
+
+The give-away is in the endpoint's own name: `sys/config/oauth-resource-server`. A resource
+server *consumes* tokens; an authorization server *issues* them. Every setting on that path —
+`issuer_id`, `audiences`, `jwks_uri`, `public_keys` — answers "whose tokens do I trust?"
+Nothing there mints anything. Established in [ADR-0056](0056-task-scope-needs-an-authorization-server-vault-is-not-one.md)
+by reading the binary's own request schema rather than inferring from documentation.
+
+**What actually runs, and is correct.** The allocation presents its Nomad workload identity to
+a JWT auth-method role; Vault validates it and returns a token carrying that role's ceiling
+policies with a one-hour TTL. Manufactured per allocation from an attested identity, bounded
+in time, nothing standing. That satisfies Principle IV's substance — authority per task,
+evaporating with it — and it is what "no other path is supported" should have described.
+
+**And "no other path to per-task authority is supported" was self-contradicting**: as written
+it excluded the only path that exists, which would make the running platform non-conformant
+with its own record. Read now as: *attested workload identity presented to the control-plane
+Vault is the only supported path; the exchange and RAR are the mechanism for write and act
+scopes when a ceiling carries them* ([ADR-0057](0057-context-hungry-agents-want-breadth-not-narrower-reads.md)).
+
+**Nothing about the substrate decision changes.** Nomad remains the execution substrate,
+workload identity remains the attestation, and no static credential reaches an allocation. The
+correction is to how the credential is obtained at the far end of that attestation, which was
+described as a mechanism the substrate cannot perform.
