@@ -12,7 +12,7 @@
 
 | Gate type | Applies | Where |
 | --- | --- | --- |
-| **Fail-closed** | **Yes** | T006, T007, T012 — an unattributable refusal fails, a permitted write fails distinctly, and nothing skips |
+| **Fail-closed** | **Yes** | T003b — a bounding record that exists but was never derived fails, so coverage is not blind in the one direction a derivation cannot see. T007a — nothing in the suite may widen authority, asserted rather than trusted. T006, T007, T012 — an unattributable refusal fails, a permitted write fails distinctly, and nothing skips |
 | **Conformance** | **Yes** | The whole feature. It *is* a conformance row the constitution names |
 | **Correlation / evidence** | **No** | Participates in no run and writes no audit entry. It observes the control plane refusing, from outside |
 | **Eval** | **No** | Nothing promotes |
@@ -37,13 +37,16 @@ the recipe's `host_enclave` line.
 both.
 
 - [ ] T003 Implement `bounding_paths()` in `tests/conformance/authority/bounding_records.py` — parse the **deployed** policy a run carries and return every path it may read in the authority jurisdiction. Each readable bounding path is one the run must not write, and that equivalence is what keeps the set from going stale. **Not** from Terraform source: reading configuration is the argument this feature replaces with evidence
+- [ ] T003a Implement `existing_bounding_prefixes()` in `tests/conformance/authority/bounding_records.py` — enumerate what **actually exists** in the control plane, using administrator authority, and return the prefixes found. Legal here and only here: this is a COVERAGE check, and FR-002a forbids it from ever asserting a denial, because a refusal to an administrator is the opposite of interesting
+- [ ] T003b [GATE:fail-closed] Assert in `tests/conformance/authority/bounding_records.py` that every existing prefix appears in the derived set, or is explicitly excluded with a reason — **the direction a derivation cannot see by construction** (FR-006a). A record placed where a run cannot read still bounds that run, because the platform consults it whether or not the run can; 017 found the identical hole in its own coverage after four analysis passes
 - [ ] T004 Assert in `tests/conformance/authority/bounding_records.py` that the derived set is non-empty and raise if it is not — an empty set would make every row in this feature pass vacuously, which is the most dangerous way this gate can fail
 - [ ] T005 Implement `run_authority()` in `tests/conformance/authority/bounding_records.py` — obtain a token carrying **all** the policies a run holds, as deployed. Not a synthesized single-grant token: the claim is that a run cannot write its bounds, and stripping its authority proves something narrower (research R2, correcting the spec's original FR-003)
-- [ ] T006 [GATE:fail-closed] Implement `attempt_write()` in `tests/conformance/authority/bounding_records.py` returning one of four outcomes — REFUSED, UNATTRIBUTABLE, PERMITTED, UNREACHABLE. **A write is REFUSED only when the same authority can read the path**: verified 2026-07-31 that a nonexistent mount is denied in identical words to a real bounding record, so 403 alone would pass a row with one letter wrong in its path (FR-004aa)
+- [ ] T006 [GATE:fail-closed] Implement `attempt_write()` in `tests/conformance/authority/bounding_records.py` returning one of four outcomes — REFUSED, UNATTRIBUTABLE, PERMITTED, UNREACHABLE. **A write is REFUSED only when the same authority can read the path**: verified 2026-07-31 that a nonexistent mount is denied in identical words to a real bounding record, so 403 alone would pass a row with one letter wrong in its path (FR-012)
 - [ ] T007 [GATE:fail-closed] Implement the PERMITTED path in `tests/conformance/authority/bounding_records.py` — report it as its own outcome and **remove what was written**, reporting whether the removal succeeded. A red test is something someone reruns; a widened ceiling is a live condition the gate itself created (FR-004a, FR-004b)
+- [ ] T007a [GATE:fail-closed] Add `test_nothing_here_widens_authority` to `tests/conformance/authority/test_a_run_cannot_move_its_own_bounds.py` — assert by source inspection that no module in this package issues a policy write or grants a capability (FR-008b). The sharpest safety property in the feature rested entirely on nobody adding such a fixture later; a property enforced by everyone remembering is the shape this repository has paid for more than once
 - [ ] T008 [GATE:no-secret-leak] Add a redaction pass over refusal output in `tests/conformance/authority/bounding_records.py`, and a row asserting a token-shaped value is masked. **Build the fixture value from parts** — a literal matching the provider's published pattern gets the push blocked, correctly, and 017 paid for that on its first push
 
-**Checkpoint**: the set is derived, a run's real authority is available, and the four outcomes are distinguishable.
+**Checkpoint**: the set is derived AND cross-checked against what exists, a run's real authority is available, the four outcomes are distinguishable, and nothing in the package can widen authority.
 
 ---
 
@@ -69,7 +72,7 @@ both.
 
 - [ ] T012 [GATE:fail-closed] [US2] Implement `test_the_refusal_is_attributable` in `tests/conformance/authority/test_a_run_cannot_move_its_own_bounds.py` — assert every derived path is **readable** by the same authority, so each refusal is about the capability rather than a wrong path
 - [ ] T013 [US2] Add `test_a_typo_in_a_path_does_not_pass` to `tests/conformance/authority/test_a_run_cannot_move_its_own_bounds.py` — a deliberately misspelled path must produce UNATTRIBUTABLE and fail. **This is the row that would have caught the naive implementation**, and without it the guard is untested
-- [ ] T014 [US2] Assert no row uses an administrator's authority, in `tests/conformance/authority/test_a_run_cannot_move_its_own_bounds.py` — a refusal that never could have succeeded proves nothing, and an admin token would not be refused at all
+- [ ] T014 [US2] Assert in `tests/conformance/authority/test_a_run_cannot_move_its_own_bounds.py` that **no refusal assertion uses administrator authority** — a denial to an administrator proves nothing, because an administrator is not what the claim is about. Scoped to refusal assertions rather than to the whole package: the coverage enumeration in T003a legitimately needs admin, and an earlier draft of this task forbade the thing another task requires (FR-002a)
 
 ---
 
@@ -111,7 +114,8 @@ both.
 ```
 Phase 1 (Setup)        T001 → T002
                            ↓
-Phase 2 (Foundational) T003 → T004 → T005 → T006 → T007 → T008
+Phase 2 (Foundational) T003 → T003a → T003b → T004 → T005
+                       → T006 → T007 → T007a → T008
                            ↓
         ┌──────────────────┼──────────────────┐
         ↓                  ↓                  ↓
@@ -146,6 +150,19 @@ has standalone value on the day it lands.
 **T004 guards the most dangerous failure in this feature.** If `bounding_paths()` returned an
 empty set, every row would iterate nothing and pass. A gate that asserts isolation while
 asserting nothing at all is worse than no gate, because it is believed.
+
+**T003b guards the second most dangerous, and it is subtler.** A non-empty set can still be
+incomplete: the derivation reads a run's read grants, so a bounding record placed outside them
+is invisible to it — and a record the run cannot read still bounds that run, because the
+platform consults it regardless. Analysis found this, as it found the identical hole in 017's
+coverage after four passes. The cross-check is the only direction the derivation cannot see by
+construction.
+
+**T003a and T014 are the pair to read together.** Enumerating what exists needs administrator
+authority; asserting a refusal must never use it, because a denial to an administrator proves
+nothing. An earlier draft of T014 forbade the whole package from touching admin authority,
+which would have made T003a impossible — the resolution is a distinction between two kinds of
+act, not a compromise between them.
 
 **T013 is the row that tests the guard.** T006 implements the read discriminator; T013 proves
 it works by feeding it a path that does not exist. Without T013 the discriminator is

@@ -173,6 +173,15 @@ every row not in force, which of the two states it is in and where the reason is
   using authority a run actually holds, and MUST observe the control plane refusing it.
 - **FR-002**: The refusal MUST come from the control plane. A refusal produced by the
   platform's own code, or the absence of an attempt, MUST NOT satisfy the gate.
+- **FR-002a**: Two kinds of act, two authorities, and they MUST NOT be mixed:
+
+  | Act | Authority | May assert |
+  | --- | --- | --- |
+  | **Assert a refusal** | a run's own, all of it | that a run cannot write |
+  | **Enumerate what exists** | administrator | what the set must contain |
+
+  An enumeration that drifted into asserting a denial would assert that an *administrator*
+  was refused, which is the opposite of interesting.
 - **FR-003**: The authority used MUST be **the authority a run actually holds** — all of it,
   as deployed. The claim is that a run cannot write its own bounds; stripping its authority
   to a single grant would prove something narrower, leaving open whether some combination
@@ -184,7 +193,7 @@ every row not in force, which of the two states it is in and where the reason is
   **path** is readable, rather than on which grants are present.
 - **FR-004**: The gate MUST distinguish "refused" from "never attempted", "unreachable", and
   "refused for an unrelated reason" — and MUST treat only a genuine refusal as evidence.
-- **FR-004aa**: A refusal counts **only when the same authority can read the path**. The
+- **FR-012**: A refusal counts **only when the same authority can read the path**. The
   control plane deliberately answers identically for *forbidden* and *absent* — it will not
   disclose which, because that would leak the shape of the tree to an unauthorized caller.
   Verified during planning: a mount that does not exist is refused in exactly the same words
@@ -204,6 +213,19 @@ every row not in force, which of the two states it is in and where the reason is
   may ever do, whether a definition exists at all, and what a person may delegate.
 - **FR-006**: A bounding record kind with no attempted write MUST fail the gate rather than
   be silently uncovered.
+- **FR-006a**: The set MUST be checked against **what actually exists** in the control plane,
+  not only against what a run may read. Deriving it from a run's read grants is sound for
+  every record inside them and blind to any outside — and a record placed where a run cannot
+  read still bounds that run, because the platform consults it whether or not the run can.
+  Anything present in the control plane and absent from the set MUST fail.
+
+  This is the direction a derivation cannot see by construction, and it is the same hole 017
+  found in its own coverage mechanism after four analysis passes: a subject that never
+  enrolled is invisible to a scheme built from enrolments.
+- **FR-006b**: Enumerating what exists MAY use administrator authority; **asserting a
+  refusal MUST NOT**. Those are different acts and conflating them would destroy the
+  feature — a denial to an administrator proves nothing, because an administrator is not
+  what the claim is about.
 - **FR-007**: The gate MUST fail when the refusal stops holding, demonstrated by granting
   the write, observing the failure, and revoking it — **performed once at implementation and
   recorded with its output**, never in a merge lane.
@@ -212,6 +234,10 @@ every row not in force, which of the two states it is in and where the reason is
   permissive on every run, and a lane interrupted mid-fixture would leave it that way. A
   window that is small is not a window that is closed, and this is the one guarantee whose
   temporary suspension is least acceptable.
+- **FR-008b**: FR-008 MUST be enforced by a check rather than by convention. Nothing in the
+  suite may issue a policy write or grant a capability, and that MUST be asserted — a safety
+  property resting on everyone remembering is the shape this repository has already paid for
+  more than once.
 - **FR-008a**: The one-time demonstration MUST restore the authority it changed, and MUST
   verify the restoration rather than assume it. Whoever performs it is responsible for
   leaving the platform exactly as they found it, and the recorded output MUST show that.

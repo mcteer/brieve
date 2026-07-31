@@ -29,7 +29,7 @@ second.
 | Row | Asserts | Requirement |
 | --- | --- | --- |
 | `test_a_run_cannot_write_any_bounding_record` | Every derived bounding path refuses a write under a real run's authority | FR-001, FR-005 |
-| `test_the_refusal_is_attributable` | The same authority can **read** each path — so the refusal is about the capability, not a wrong path | FR-004aa |
+| `test_the_refusal_is_attributable` | The same authority can **read** each path — so the refusal is about the capability, not a wrong path | FR-012 |
 | `test_the_bounding_set_is_derived_not_listed` | The set comes from the deployed policy; a path added there is covered without anyone remembering | FR-006 |
 | `test_a_permitted_write_is_its_own_outcome` | A write that succeeds reports distinctly and is undone | FR-004a, FR-004b |
 | `test_ordinary_writes_are_not_in_scope` | A run's own space is untouched by this gate | FR-004c |
@@ -64,11 +64,20 @@ as a real bounding record. Vault will not distinguish forbidden from absent — 
 since disclosing which leaks the tree's shape to an unauthorized caller. A row that read 403
 as proof would pass with one letter wrong in its path, forever.
 
-**The set is derived from what a run may READ.** Every readable path in that jurisdiction is
-a bound it must not write, which is what makes derivation sound. A bounding record placed
-somewhere a run cannot read would be outside the set and uncovered — no such record exists
-today, and if one were added the derivation would need revisiting rather than silently
-missing it.
+**The set is derived from what a run may READ, and then cross-checked against what exists.**
+Every readable path in that jurisdiction is a bound it must not write, which makes derivation
+sound — but the equivalence runs one way, and a record placed where a run cannot read still
+bounds that run because the platform consults it regardless. So the derived set is compared
+against the control plane's actual contents, and anything present but underived fails.
+
+*Analysis found this.* The first design recorded it here as a known limit — "if one were
+added the derivation would need revisiting" — which is a limit nobody would notice being
+exceeded. FR-006a makes it a failure instead. 017 found the identical hole in its own coverage
+mechanism after four passes: a scheme built from enrolments is blind to what never enrolled.
+
+**What survives**: a bounding record held somewhere the enumeration does not reach — a
+different mount, another system. The cross-check covers the authority jurisdiction, and a
+bound outside it would be outside both halves.
 
 ---
 

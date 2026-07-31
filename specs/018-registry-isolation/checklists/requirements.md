@@ -80,6 +80,31 @@ and the contract must say so rather than let a green row imply more than it asse
    looking stricter — which is a worse failure than the one this feature exists to fix, and
    the spec was one careless implementation away from inviting it.
 
+**Analysis pass 1 — 2026-07-31.** Five findings, and the first was predicted before the pass
+ran, which is weak evidence it was the obvious hole rather than the only one.
+
+- **The bounding set was fail-open.** It derives from what a run may *read*; a record placed
+  outside those grants is invisible to the derivation — and still bounds the run, because the
+  platform consults it whether or not the run can. FR-006 promised that an uncovered kind
+  fails the gate; the design could only deliver that for records already inside the policy,
+  and the contract had recorded the difference as a *known limit* rather than a defect. A
+  limit nobody would notice being exceeded is not a limit. FR-006a makes it a failure, by
+  cross-checking against what exists.
+
+  017 found the identical hole in its own coverage after four analysis passes. Twice now, a
+  set built from enrolments has been blind to what never enrolled.
+- **FR-008 had no check.** "No automated check may widen authority" is the sharpest safety
+  property here — the reason the demonstration is manual — and it rested entirely on nobody
+  adding such a fixture later. T007a asserts it by source inspection.
+- **One task forbade what another required.** T014 said no row may use administrator
+  authority; the cross-check above needs exactly that to enumerate. The resolution is a
+  distinction rather than a compromise: refusal assertions use a run's authority and nothing
+  else, enumerations may use admin and must never assert a denial. A denial to an
+  administrator proves nothing.
+- Terminology settled on one concept with two spellings, and the model says they are the
+  same. `FR-004aa` renumbered — it was the most important requirement in the feature and had
+  the least legible identifier.
+
 Two things flagged for planning rather than fixed here:
 
 - **US4's amendment and US1's gate could be separated.** They are one feature because the

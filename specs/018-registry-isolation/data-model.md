@@ -6,14 +6,25 @@ alike from the outside.
 
 ---
 
-## BoundingPath
+## BoundingPath — the *bounding record* the spec names
+
+One name for the concept, two spellings for two purposes: the prose says **bounding record**
+because that is what it is; the type is `BoundingPath` because what the code holds is the
+path the record lives at. They are the same thing and nothing distinguishes them.
 
 A control-plane path holding a record that decides what a run or a person may do. Derived
-from the **deployed** policy, never listed.
+from the **deployed** policy and then **cross-checked against what exists**, because a
+derivation from read grants is blind to anything outside them.
 
 **Source**: the read grants on the policy a run actually carries. Every path a run may read
 in that jurisdiction is a bound it must not be able to write — that equivalence is what makes
 derivation sound, and it is why the set needs no separate list to fall out of date.
+
+**And a cross-check, because the equivalence runs one way.** Every readable path is a bound;
+not every bound is readable. A record placed where a run cannot read still bounds that run,
+because the platform consults it whether or not the run can — so the set is also compared
+against what **exists** in the control plane, and anything present but underived fails.
+Analysis found this hole; 017 found the identical one in its own coverage after four passes.
 
 | Field | Meaning |
 | --- | --- |
@@ -72,6 +83,19 @@ fatal to a row that treats 403 as proof.
 
 So `harness-ceilingz` — one letter wrong — passes a naive row, forever, having asserted
 nothing. The read is the only thing that tells them apart.
+
+---
+
+## Two authorities, two purposes, never mixed
+
+| Act | Authority | May assert |
+| --- | --- | --- |
+| **Assert a refusal** | a run's own, all of it | that a run cannot write |
+| **Enumerate what exists** | administrator | what the set must contain |
+
+An enumeration that drifted into asserting a denial would assert that an *administrator* was
+refused, which is the opposite of interesting. The separation is why the cross-check above is
+legal at all.
 
 ---
 
