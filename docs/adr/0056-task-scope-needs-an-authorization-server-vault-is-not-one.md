@@ -1,6 +1,6 @@
 # ADR-0056: Task scope needs an authorization server, and Vault is not one
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-07-31
 - **Relates to**: [ADR-0026](0026-delegation-grants-and-per-step-tokens.md), [ADR-0044](0044-authz-doctrine-and-credential-translation.md), [ADR-0048](0048-nomad-is-the-agent-execution-substrate.md), [ADR-0050](0050-harness-ceilings-live-in-the-trust-fabric.md), [ADR-0054](0054-model-written-orchestration-parity.md)
 - **Requirements**: R2, R3
@@ -232,7 +232,7 @@ above is left open rather than answered casually.
 
 ## Notes
 
-**Proposed, and nothing is built.** `oauth-resource-server` is unactivated, no trusted
+**Accepted 2026-07-31, and nothing is built.** `oauth-resource-server` is unactivated, no trusted
 authorization server is configured, and neither tier exists. What is settled here is the
 *shape*: Vault is the resource server, RAR is the mechanism, attribution federates to the
 customer's IdP, task scope is computed by the platform because the inputs live nowhere else,
