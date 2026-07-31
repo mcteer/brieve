@@ -37,6 +37,13 @@ probe = "vault_probe"
 [[tools]]
 name       = "vault_read"
 risk_class = "secret_touching"
+# WHAT THIS TOOL REACHES. `{agent_space}` is the agent's own secret space, whatever its
+# ceiling grants — and the honest answer here is "all of it", because the path is an argument
+# the agent supplies at call time. A tool shaped like this is telling you breadth is the
+# point, which for a HashiCorp-expert agent gathering context it is (ADR-0057).
+#
+# Declared for review rather than enforcement: nothing reads this at runtime.
+paths      = [{ path = "{agent_space}", capabilities = ["read"] }]
 transport  = "native"
 handler    = "vault_read"
 # `secret_touching` is the risk class registry review may demand process isolation for
@@ -48,6 +55,10 @@ repeatable     = true
 [[tools]]
 name       = "vault_write"
 risk_class = "secret_touching"
+# Write needs `create` and `update`: a KV v2 put is an update to an existing version and a
+# create when there is none, and a grant naming only one of them fails on whichever case
+# happens to arrive first.
+paths      = [{ path = "{agent_space}", capabilities = ["create", "update"] }]
 transport  = "native"
 handler    = "vault_write"
 # Non-repeatable: a CAS write that succeeded and then lost its response must not be

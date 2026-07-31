@@ -28,6 +28,19 @@ Provenance = Literal["adopted", "authored"]
 Transport = Literal["mcp", "native"]
 
 
+@dataclass(frozen=True)
+class ToolPathGrant:
+    """One path a tool reaches, and what it may do there.
+
+    Shaped like Vault's `vault:path_access` so that a future consumer — a rich authorization
+    request, an intake report — can use it without a translation layer. Nothing consumes it
+    today; see the field's own note.
+    """
+
+    path: str
+    capabilities: tuple[str, ...]
+
+
 class ManifestError(ValueError):
     """A manifest that cannot be trusted. Carries the reason code the refusal records."""
 
@@ -91,6 +104,23 @@ class ToolDeclaration:
     #: pack author because only they know, and deliberately not inferred from `risk_class`:
     #: a `read` against a paginating API can be non-repeatable and a `write` idempotent.
     repeatable: bool = True
+    #: WHAT THIS TOOL REACHES, and with what capability.
+    #:
+    #: **Declared for review, not for enforcement.** Nothing at runtime reads this: a run's
+    #: authority is the ceiling its definition carries, manufactured per allocation and
+    #: short-lived (ADR-0057). What this field buys is that a reviewer — or ADR-0004's intake
+    #: gauntlet — can see what a tool touches without reading its handler, and that a pack
+    #: author has to think about it before shipping.
+    #:
+    #: It arrived with 016, which intended to derive per-run scope from it. That feature was
+    #: parked when the workload turned out to want breadth rather than narrowness, and the
+    #: declaration survived on its own merits: `risk_class` sat here unread for two features
+    #: before 013 gave it meaning, and was worth having in the meantime for the same reason.
+    #:
+    #: `{agent_space}` names the agent's own secret space, resolved against its ceiling. Kept
+    #: as a token rather than expanded because expanding it needs a ceiling read, and the
+    #: point of this field is to be legible without one.
+    paths: tuple[ToolPathGrant, ...] = ()
 
 
 @dataclass(frozen=True)

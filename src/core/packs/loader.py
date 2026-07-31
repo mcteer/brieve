@@ -30,6 +30,7 @@ from core.packs.manifest import (
     PackManifest,
     SkillPin,
     ToolDeclaration,
+    ToolPathGrant,
     UpstreamPin,
     WorkflowDeclaration,
 )
@@ -152,11 +153,47 @@ def _parse_tool(entry: dict[str, Any]) -> ToolDeclaration:
             product=str(entry["product"]) if entry.get("product") else None,
             product_action=str(entry["product_action"]) if entry.get("product_action") else None,
             repeatable=bool(entry.get("repeatable", True)),
+            paths=_parse_tool_paths(entry),
         )
     except KeyError as exc:
         raise ManifestError(
             f"tool declaration missing required field: {exc}", reason_code="malformed_manifest"
         ) from exc
+
+
+def _parse_tool_paths(entry: dict[str, Any]) -> tuple[ToolPathGrant, ...]:
+    """What this tool reaches, declared so a reviewer does not have to read the handler.
+
+    **A `secret_touching` tool MUST declare this.** The same shape as the rule that a
+    non-repeatable tool must declare an observer, and for the same reason: a pack that
+    withholds the fact governance turns on is one whose review is guesswork. This is the
+    cheapest moment to require it — the author is right there, and the alternative is a
+    reviewer inferring reach from code months later.
+
+    Enforced at load rather than used at runtime. Authority is the ceiling's, per allocation
+    and short-lived (ADR-0057); this is documentation the platform refuses to ship without.
+    """
+    declared = entry.get("paths") or []
+    if not declared and entry.get("risk_class") == "secret_touching":
+        raise ManifestError(
+            f"tool {entry.get('name')!r} is secret_touching and declares no `paths`. A tool "
+            f"whose reach is only discoverable by reading its handler makes its own review "
+            f"guesswork, and this is the cheapest moment to say it. Declare `paths`, or "
+            f"lower `risk_class` if it does not touch secrets after all.",
+            reason_code="malformed_manifest",
+        )
+    grants: list[ToolPathGrant] = []
+    for item in declared:
+        try:
+            caps = tuple(str(c) for c in item["capabilities"])
+            grants.append(ToolPathGrant(path=str(item["path"]), capabilities=caps))
+        except (KeyError, TypeError) as exc:
+            raise ManifestError(
+                f"tool {entry.get('name')!r} has a malformed `paths` entry: {exc}. Each needs "
+                f"`path` and `capabilities`.",
+                reason_code="malformed_manifest",
+            ) from exc
+    return tuple(grants)
 
 
 def _parse_skill(entry: dict[str, Any]) -> SkillPin:
