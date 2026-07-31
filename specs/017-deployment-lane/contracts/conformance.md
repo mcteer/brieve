@@ -92,13 +92,14 @@ on every invocation. The 010/014 lesson is "named by a lane that **will run it**
 runner is that lane; a row asserts the runner names this directory, so the wiring cannot be
 lost the way 010's was.
 
-**The gate cleans up after a pass, not after a failure.** A passing run stops what it
-started, so the enclave's spare capacity is as it was found (FR-007a). A **failing** run
-leaves them standing and says so (FR-007b) — the allocation is what someone needs to diagnose
-the failure, and a failing gate blocks the merge anyway, so no recurring run depends on that
-capacity being free. A teardown that itself fails, fails the gate (FR-007c); swallowed, it
-would return the surfaces to persisting and report green from the mechanism built to prevent
-that.
+**The gate cleans up after a pass, not after a failure** (FR-007a). A passing run stops what
+it started, so spare capacity returns to what it was. A **failing** run leaves them standing
+and says so — the allocation is what someone needs to diagnose the failure, and a failing gate
+blocks the merge anyway, so nothing recurring depends on that capacity yet. Because of that,
+the *next* invocation reclaims leftovers **early**, before the conformance batch job is
+submitted: the gate runs last and cannot do it in time. A stop that itself fails, fails the
+gate; swallowed, it would return the surfaces to persisting and report green from the
+mechanism built to prevent that.
 
 **The gate stops only the surfaces it started.** If a developer brought the portal up
 themselves to use it, the gate reuses it and leaves it running — so its reservations persist

@@ -134,7 +134,8 @@ infra/
 │   └── agent-run.nomad.hcl      # + meta (already covered; dispatched shape)
 └── bin/
     └── deployment-conformance   # NEW — stands the uncovered surfaces up, runs the rows,
-                                 #   and stops exactly what it started (FR-007a)
+                                 #   and owns their lifecycle: stop what it started on a
+                                 #   pass, leave it standing on a failure (FR-007a)
 
 tests/
 └── conformance/
@@ -154,7 +155,8 @@ tests/
     # inside the set the runner invokes, so it would recurse without bound. The repeat
     # check lives in infra/bin/deployment-conformance, one level out.
 
-Makefile                          # `conformance` gains a FINAL line invoking the runner.
+Makefile                          # `conformance` gains an EARLY step reclaiming leftovers
+                                  #   (FR-007a clause 4) and a FINAL line invoking the runner.
                                   #   NOT a pytest line — those run before the surfaces
                                   #   are up, so rows there would fail on every invocation.
 .github/workflows/enclave.yml     # unchanged — the lane already runs `make conformance`

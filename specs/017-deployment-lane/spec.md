@@ -82,7 +82,8 @@
   starts. They persisted, and on the *next* invocation held reservations while the
   conformance batch job tried to place — verbatim the failure `portal-up`'s header records.
   Invisible on a fresh automated runner, which gets one invocation; visible on a developer's
-  second run. FR-007a now requires the gate to leave spare capacity as it found it, and the
+  second run. The gate's lifecycle (FR-007a) now requires it to leave spare capacity as it
+  found it, and the
   runner stops only what it started, so a developer's own surfaces are left alone.
 - **`harness_covered_by` was checked for one process out of two.** The contract claims
   coverage-elsewhere is checkable rather than assumed; for `mcp` it was assumed. Every target
@@ -96,12 +97,28 @@
 - **Teardown had no failure path.** Pass 4 gave the gate a lifecycle and said "on success or
   failure", which destroys the allocation a developer needs to diagnose a red run — the
   captured stderr tail is often not enough, since the Vault-role refusal that motivated this
-  feature appeared mid-log rather than at its end. FR-007b now leaves things standing on
-  failure and says so. FR-007c makes a *failed* teardown fail the gate, because swallowing it
-  returns the defect silently, reported green by the mechanism built to prevent it.
+  feature appeared mid-log rather than at its end. The gate now leaves things standing on
+  failure and says so, and a *failed* teardown fails the gate — swallowed, it returns the
+  defect silently, reported green by the mechanism built to prevent it. (Both landed as
+  separate sub-requirements and were consolidated in pass 6.)
 - The first pass to find no HIGH. Passes 1–4 each found something that would have produced a
   gate that could not work; this one found two gaps in the failure path, both in the corner
   those four fixes kept adding to.
+
+### Analysis pass 6 — 2026-07-31
+
+- **Two MUSTs contradicted each other.** "Anything it starts, it MUST stop" and "on failure
+  it MUST leave what it started running" were both requirements, and a reader following the
+  first alone would build the unconditional teardown pass 5 had just removed.
+- **The failure carve-out reintroduced the starvation it was carved out of.** Leaving
+  processes standing after a failure means the *next* invocation meets them at the point the
+  merge-blocking checks need capacity — before the gate, which runs last, can reclaim it.
+  Locally that is the normal case, because the gate is re-run precisely when it failed.
+- **Consolidated rather than patched.** Three sub-requirements accreted across two passes,
+  each fixing the last one's defect, and the third introduced a contradiction with the
+  first. FR-007a is now one requirement covering start, teardown-on-pass, leave-on-fail,
+  early reclamation, and teardown failure — the corner is stated once instead of amended
+  again.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -293,18 +310,33 @@ confirm it produces the same verdict the automated run produces for the same tre
   repeatedly restarting. A process that never ran is a failure, never a skip.
 - **FR-007**: The gate MUST NOT reduce the coverage of the existing merge-blocking gates, and
   MUST NOT prevent them running — including by consuming the resources they need.
-- **FR-007a**: The gate MUST leave the deployment's spare capacity as it found it. Anything
-  it starts, it MUST stop — **across invocations, not only within one**. A gate that stands
-  processes up and leaves them holding reservations starves the merge-blocking checks on the
-  *next* run, which is a failure that passes on a fresh automated runner and appears only on
-  a reused one.
-- **FR-007b**: On **failure**, the gate MUST leave what it started running and say so. A
-  failing gate blocks the merge, so no recurring run depends on the capacity being free —
-  and tearing down on failure destroys the very process someone needs to inspect. FR-007a's
-  guarantee is about the path that repeats, which is the passing one.
-- **FR-007c**: A failure to stop what the gate started MUST fail the gate. Swallowed, it
-  returns the processes to persisting and the next run to being starved — reported green by
-  the mechanism built to prevent exactly that.
+- **FR-007a**: **The gate owns a lifecycle for the processes it starts, and the whole of it
+  is stated here.** Three sub-requirements were patched into this paragraph across two
+  analysis passes and ended up contradicting each other, so it is one requirement now:
+
+  1. **Start.** The gate reuses any process already running and starts only what is missing,
+     recording which ones it started. A process a contributor brought up themselves is not
+     the gate's to manage.
+  2. **On a passing run, stop exactly what it started.** Spare capacity returns to what it
+     was. Otherwise those reservations starve the merge-blocking checks on the *next* run —
+     a failure that passes on a fresh automated runner, which gets one invocation, and
+     appears only on a reused one.
+  3. **On a failing run, leave them standing and say so.** The allocation is what someone
+     needs to diagnose the failure, and a captured log tail is often not enough — the
+     credential refusal that motivated this feature appeared mid-log, not at its end. A
+     failing gate blocks the merge, so nothing that recurs depends on that capacity yet.
+  4. **Clear leftovers early, not late.** Because (3) leaves processes running, the *next*
+     invocation must reclaim that capacity **before** the merge-blocking checks need it —
+     and the gate itself runs last, which is too late. Locally a prior failure is the normal
+     case: the gate gets re-run *because* it failed.
+  5. **A failure to stop what it started fails the gate.** Swallowed, it returns the
+     processes to persisting and the next run to being starved — reported green by the
+     mechanism built to prevent exactly that.
+
+  Clauses 2 and 3 are the pair that must be read together: an unqualified "always stop"
+  destroys evidence, and an unqualified "always leave" starves the next run. Neither alone
+  is correct, which is why they are no longer separate requirements.
+
 - **FR-008**: The gate MUST be runnable by a contributor against a local deployment and reach
   the same verdict as the automated run for the same tree.
 - **FR-009**: The gate MUST distinguish "the surface refused this request" from "nothing
