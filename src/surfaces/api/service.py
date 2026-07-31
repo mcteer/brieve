@@ -41,6 +41,14 @@ from surfaces.toolset import build_registry, known_actions, known_tools
 #: `unknown_ceiling_entry`, and that error names the ceiling — sending whoever reads it to
 #: the ceiling and the trust fabric, both of which are fine, and not to the stale constant
 #: in this module, which is not.
+#: The Vault role this surface authenticates as — its own, matching its job id.
+#:
+#: Named rather than left to the `harness` default, which is what shipped: the default
+#: role's bound claim is a different job, so every login was refused and the process died
+#: before serving anything. The mcp service names its role for the same reason, one module
+#: over.
+VAULT_ROLE = "api"
+
 _REGISTRY = build_registry()[0]
 KNOWN_TOOLS = known_tools(_REGISTRY)
 KNOWN_ACTIONS = known_actions(_REGISTRY)
@@ -57,7 +65,7 @@ def build() -> object:
     jwks_uri = _required("OIDC_JWKS_URI")
     audience = os.environ.get("OIDC_AUDIENCE", "harness-api")
 
-    credentials = VaultDatabaseCredentials(identity=NomadWorkloadIdentity())
+    credentials = VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role=VAULT_ROLE)
     fabric = VaultIdentityFabric(
         credentials=credentials, known_tools=KNOWN_TOOLS, known_actions=KNOWN_ACTIONS
     )
@@ -94,7 +102,9 @@ def build() -> object:
         run_dispatcher=NomadDispatcher(run_index=run_index),
         evidence_query=PostgresEvidenceQuery(
             credentials=VaultDatabaseCredentials(
-                identity=NomadWorkloadIdentity(), creds_path="database/creds/evidence"
+                identity=NomadWorkloadIdentity(),
+                role=VAULT_ROLE,
+                creds_path="database/creds/evidence",
             )
         ),
         audit_sink=audit_sink,
