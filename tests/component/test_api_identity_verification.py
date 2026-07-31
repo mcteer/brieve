@@ -159,3 +159,56 @@ def test_list_valued_claims_match_per_element(
 def test_expiry_is_carried_onto_the_subject(idp: FakeOIDCProvider, verifier: TokenVerifier) -> None:
     subject = verifier.verify(_token(idp, lifetime=timedelta(minutes=7)))
     assert subject.expires_at is not None
+
+
+def test_a_mapping_source_is_consulted_per_verification(idp: FakeOIDCProvider) -> None:
+    """A mapping that clears quorum must take effect without a deploy.
+
+    Captured at construction, the approval would sit inert until someone restarted the
+    surface — which makes "whoever remembers to bounce the service" the second half of
+    the quorum mechanism.
+    """
+    granted: list[ClaimMapping] = []
+    verifier = TokenVerifier(
+        issuer=ISSUER,
+        audience=AUDIENCE,
+        mappings_source=lambda: list(granted),
+        key_loader=lambda: {idp.key_id: idp.jwks_public_key()},
+    )
+
+    with pytest.raises(AuthenticationRefused) as refusal:
+        verifier.verify(_token(idp))
+    assert refusal.value.reason_code == "unmapped_claim"
+
+    granted.extend(MAPPINGS)
+
+    assert verifier.verify(_token(idp)).roles == frozenset({"operator"})
+
+
+def test_a_revoked_mapping_stops_granting_without_a_restart(idp: FakeOIDCProvider) -> None:
+    granted = list(MAPPINGS)
+    verifier = TokenVerifier(
+        issuer=ISSUER,
+        audience=AUDIENCE,
+        mappings_source=lambda: list(granted),
+        key_loader=lambda: {idp.key_id: idp.jwks_public_key()},
+    )
+    assert verifier.verify(_token(idp)).roles == frozenset({"operator"})
+
+    granted.clear()
+
+    with pytest.raises(AuthenticationRefused) as refusal:
+        verifier.verify(_token(idp))
+    assert refusal.value.reason_code == "unmapped_claim"
+
+
+def test_literal_mappings_and_a_source_are_a_contradiction(idp: FakeOIDCProvider) -> None:
+    """Not merged. A caller that passed both meant one, and would get neither."""
+    with pytest.raises(ValueError, match="not both"):
+        TokenVerifier(
+            issuer=ISSUER,
+            audience=AUDIENCE,
+            mappings=MAPPINGS,
+            mappings_source=lambda: [],
+            key_loader=lambda: {idp.key_id: idp.jwks_public_key()},
+        )

@@ -90,6 +90,7 @@ class TokenVerifier:
         audience: str,
         jwks_uri: str | None = None,
         mappings: list[ClaimMapping] | None = None,
+        mappings_source: Callable[[], list[ClaimMapping]] | None = None,
         tenant_claim: str = DEFAULT_TENANT_CLAIM,
         jwks_ttl_seconds: float = DEFAULT_JWKS_TTL_SECONDS,
         key_loader: Callable[[], dict[str, Any]] | None = None,
@@ -97,7 +98,21 @@ class TokenVerifier:
     ) -> None:
         self._issuer = issuer
         self._audience = audience
-        self._mappings = mappings or []
+        # Resolved per verification rather than captured at construction, so a mapping
+        # that clears quorum takes effect without restarting the surface. A restart is a
+        # deploy, and needing one to complete an approval means the gate that governs
+        # authority changes is only half the mechanism — the other half being whoever
+        # remembers to bounce the service.
+        #
+        # Literal `mappings` stays for tests and for a deployment that pins its grants in
+        # configuration. Both is a contradiction, not a merge: a caller that passed each
+        # of them meant one of the two and would get a set matching neither.
+        if mappings is not None and mappings_source is not None:
+            raise ValueError("pass either mappings or mappings_source, not both")
+        frozen = list(mappings or [])
+        self._mappings_source: Callable[[], list[ClaimMapping]] = (
+            mappings_source if mappings_source is not None else lambda: frozen
+        )
         self._tenant_claim = tenant_claim
         self._subject_kind = subject_kind
         self._cache = _KeyCache(jwks_ttl_seconds)
@@ -175,7 +190,9 @@ class TokenVerifier:
         if not tenant:
             raise AuthenticationRefused("identity carries no tenant claim", reason_code="no_tenant")
 
-        roles = resolve_roles(claims, self._mappings)
+        # After signature, issuer, audience and tenant — so an unreachable mapping store
+        # cannot be probed with a token this surface would have refused anyway.
+        roles = resolve_roles(claims, self._mappings_source())
         if not roles:
             # Distinct from a failed signature on purpose. An operator debugging an
             # integration needs to tell "your token is bad" from "your claim is not

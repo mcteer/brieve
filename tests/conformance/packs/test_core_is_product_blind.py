@@ -60,6 +60,11 @@ SUBSTRATE_ALLOWED = {
     # KV path rather than reaching the database secrets engine like the entries above.
     "audit/destination_postgres.py": "reads the stored shipping credential from a KV path",
     "audit/local_store.py": "obtains its connection credential from the fabric",
+    # Which claim grants which role, read from the Control-Group-gated path the submit
+    # endpoint writes to. Beside `runs/changes.py` in kind: both read the outcome of a
+    # governed change rather than a product's state, which is the distinction this
+    # allowlist tracks.
+    "identity/mappings_store.py": "reads the gated claim-to-role records from the fabric",
 }
 
 

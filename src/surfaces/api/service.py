@@ -23,12 +23,13 @@ from core.audit.reconcile_service import PostgresReconciler
 from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
+from core.identity.mappings_store import VaultClaimMappings
 from core.runs.changes import PostgresChangeRequestStore, VaultChangeStatus
 from core.runs.index import PostgresRunIndex
 from core.threads.postgres import PostgresThreadStore
 from surfaces.api.app import create_app
 from surfaces.api.authority_submit import VaultAuthoritySubmitter
-from surfaces.api.verification import TokenVerifier
+from surfaces.api.verification import DEFAULT_TENANT_CLAIM, TokenVerifier
 from surfaces.dispatch.nomad import NomadDispatcher
 from surfaces.toolset import build_registry, known_actions, known_tools
 
@@ -70,8 +71,26 @@ def build() -> object:
     run_index.migrate()
     thread_store.migrate()
 
+    # The approved claim-to-role mappings, read back from the same gated path the submit
+    # endpoint writes to. Without this the verifier holds no mappings, `resolve_roles`
+    # returns empty for every token, and the surface refuses every authenticated request
+    # — which it did, for any identity provider, until the read end of the loop existed.
+    claim_mappings = VaultClaimMappings(
+        credentials=credentials, data_path=_required("AUTHORITY_CONTROLLED_PATH")
+    )
+
     return create_app(
-        token_verifier=TokenVerifier(issuer=issuer, audience=audience, jwks_uri=jwks_uri),
+        token_verifier=TokenVerifier(
+            issuer=issuer,
+            audience=audience,
+            jwks_uri=jwks_uri,
+            mappings_source=claim_mappings,
+            # Auth0, Okta and Ping all namespace custom claims, so the tenant does not
+            # arrive under a bare name. Configurable rather than assumed: the default is
+            # right for a provider that emits `tenant` and wrong for every provider that
+            # cannot, and getting it wrong refuses every token with `no_tenant`.
+            tenant_claim=os.environ.get("OIDC_TENANT_CLAIM", DEFAULT_TENANT_CLAIM),
+        ),
         run_dispatcher=NomadDispatcher(run_index=run_index),
         evidence_query=PostgresEvidenceQuery(
             credentials=VaultDatabaseCredentials(

@@ -32,6 +32,7 @@ from typing import Any
 from core.authority.changes import BlockedPendingApprovalError, ChangeDisposition
 from core.errors import CoreError
 from core.identity.claims import ClaimMapping
+from core.identity.mappings_store import mapping_key
 
 
 class AuthorityChangeRefused(CoreError):
@@ -81,6 +82,15 @@ class VaultAuthoritySubmitter:
         ca = cacert or os.environ.get("VAULT_CACERT")
         self._ssl = ssl.create_default_context(cafile=ca) if ca else None
 
+    def record_path(self, mapping: ClaimMapping) -> str:
+        """Where this mapping's record lives — the path `VaultClaimMappings` reads.
+
+        Public because the two ends agreeing is a property worth asserting rather than
+        assuming. They agree structurally, by sharing `mapping_key` and the same
+        configured prefix, and this is what lets a test say so without a socket.
+        """
+        return f"{self._path}/{mapping_key(mapping)}"
+
     def submit(self, *, requester: str, mapping: ClaimMapping) -> ChangeDisposition:
         """Submit the change; raise if it is pending or denied.
 
@@ -96,7 +106,11 @@ class VaultAuthoritySubmitter:
                 "requested_by": requester,
             }
         }
-        status, body = self._post(payload)
+        # One record per mapping. Writing every mapping to the configured path itself —
+        # which is what this did — meant the second approved mapping overwrote the first,
+        # so granting one person a role revoked someone else's. Nothing caught it because
+        # nothing read the records back at all.
+        status, body = self._post(payload, self.record_path(mapping))
 
         if status == 403:
             raise AuthorityChangeRefused(
@@ -118,9 +132,9 @@ class VaultAuthoritySubmitter:
         # which is the development default and must never be the production one.
         return ChangeDisposition.APPROVED
 
-    def _post(self, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    def _post(self, payload: dict[str, Any], path: str) -> tuple[int, dict[str, Any]]:
         request = urllib.request.Request(  # noqa: S310 — fixed scheme, operator-supplied addr
-            f"{self._addr}/v1/{self._path}",
+            f"{self._addr}/v1/{path}",
             data=json.dumps(payload).encode(),
             headers={
                 "Content-Type": "application/json",
