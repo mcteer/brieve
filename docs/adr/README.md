@@ -112,6 +112,7 @@ same change.
 | [0053](0053-automated-skill-intake-gauntlet.md) | An automated intake gauntlet for skill adoption; the human gate is unchanged | Proposed |
 | [0054](0054-model-written-orchestration-parity.md) | Model-written orchestration: per-call and per-delegation governance parity | Proposed |
 | [0055](0055-audit-egress-for-tamper-evidence.md) | Tamper-evidence requires a copy outside the writer's blast radius | Accepted |
+| [0056](0056-task-scope-needs-an-authorization-server-vault-is-not-one.md) | Task scope needs an authorization server, and Vault is not one | Proposed |
 
 ## Reviews
 
