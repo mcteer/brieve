@@ -1,5 +1,39 @@
 <!--
 Sync Impact Report
+- This revision (1.2.0 → 1.3.0, MINOR — one passage corrected to describe a mechanism that
+  exists; no principle removed or redefined). Motivated by ADR-0056 and ADR-0057, both
+  Accepted 2026-07-31.
+
+  **Principle IV described something the substrate cannot do.** "attested workload identity →
+  control-plane Vault → RFC 8693 + RAR against ceiling policies" conflated two RFCs. Vault
+  CONSUMES RFC 9396 rich authorization requests — reading `authorization_details` from a
+  presented JWT and enforcing them against a ceiling — and does NOT perform RFC 8693 token
+  exchange: its OIDC provider's token endpoint accepts `authorization_code` and nothing else,
+  established in ADR-0056 from the binary's own request schema. Vault is an OAuth *resource
+  server*; the endpoint is even named `sys/config/oauth-resource-server`.
+
+  What runs, and is correct: the allocation presents its Nomad workload identity to a JWT
+  auth-method role and receives a token carrying that role's ceiling policies with a one-hour
+  TTL. Manufactured per allocation from an attested identity, bounded in time, nothing
+  standing — which is the principle's substance, unchanged.
+
+  **MINOR, not MAJOR, on the same reasoning v1.2.0 applied to the ADR-0033 wording**: this is
+  a correction, not a policy change. The principle's requirements are untouched — zero
+  standing credentials, authority manufactured per task, evaporating with it, never exceeding
+  the human. Only the sentence naming the mechanism was wrong, and it was wrong from
+  ratification rather than being changed now. Nothing that was permitted becomes forbidden and
+  nothing forbidden becomes permitted.
+
+  Also added, because its absence is what let the error stand: task scope MAY narrow the
+  ceiling and is not required to. ADR-0057 records why read scopes deliberately do not — these
+  agents read widely before acting, and narrowing that makes the output worse while making the
+  trail look stricter.
+
+  Propagation: `docs/adr/0048-nomad-is-the-agent-execution-substrate.md` (amendment appended,
+  Decision left in place — the record is append-only), `docs/glossary.md` (effective authority;
+  a RAR entry added).
+
+Prior Sync Impact Report
 - This revision (1.1.0 → 1.2.0, MINOR — three passages follow Accepted ADRs; no principle
   removed or redefined). Motivated by ADR-0049 (Accepted in the same change) and by a
   long-standing mis-statement of ADR-0033.
@@ -115,9 +149,13 @@ packs use schema-based calling regardless of context-efficiency advantage.
 The enclave holds no standing credentials to anything it manages — with exactly one
 named exception: the rotated, Control-Group-governed management token behind the TFE
 broker (ADR-0044). Authority is manufactured per task — attested workload identity →
-control-plane Vault → RFC 8693 + RAR against ceiling policies — and evaporates with
-it; effective authority = user ∩ agent ceiling ∩ task scope ∩ policy, so an agent
-never exceeds its human. Credential translation follows one rule (ADR-0044): federate
+control-plane Vault, bounded by the definition's ceiling and by a short lifetime — and
+evaporates with it; effective authority = user ∩ agent ceiling ∩ task scope ∩ policy, so an
+agent never exceeds its human. **Task scope may narrow the ceiling; it is not required to.**
+For read access the ceiling is the task scope by design, because an expert agent denied
+context advises badly and silently (ADR-0057). RFC 9396 rich authorization requests, which
+the control-plane Vault consumes and enforces, are the mechanism for narrowing **write and
+act** scopes when a ceiling carries them (ADR-0056). Credential translation follows one rule (ADR-0044): federate
 where the product validates external identity; broker only where it cannot. Brokered
 action is entitlement-mirrored — the requester's own effective product entitlements
 are resolved and enforced pre-tool-use, before any shared-grain credential is wielded
@@ -244,4 +282,4 @@ change.
   train for drift against newly Accepted decisions; `/speckit.analyze` findings that
   implicate a principle block `/speckit.implement`.
 
-**Version**: 1.2.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-28
+**Version**: 1.3.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-31
