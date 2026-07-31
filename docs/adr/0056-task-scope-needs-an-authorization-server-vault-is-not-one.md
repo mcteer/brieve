@@ -2,7 +2,7 @@
 
 - **Status**: Proposed
 - **Date**: 2026-07-31
-- **Relates to**: [ADR-0026](0026-delegation-grants-and-per-step-tokens.md), [ADR-0044](0044-authz-doctrine-and-credential-translation.md), [ADR-0048](0048-nomad-is-the-agent-execution-substrate.md), [ADR-0050](0050-harness-ceilings-live-in-the-trust-fabric.md)
+- **Relates to**: [ADR-0026](0026-delegation-grants-and-per-step-tokens.md), [ADR-0044](0044-authz-doctrine-and-credential-translation.md), [ADR-0048](0048-nomad-is-the-agent-execution-substrate.md), [ADR-0050](0050-harness-ceilings-live-in-the-trust-fabric.md), [ADR-0054](0054-model-written-orchestration-parity.md)
 - **Requirements**: R2, R3
 
 ## Context
@@ -86,6 +86,11 @@ mints the task-scoped token and Vault trusts the customer's IdP directly. **The 
 no signing key at all**, which is the strongest form of this and the reason the tier exists.
 PingFederate documents the token-exchange grant explicitly, and so does PingAM.
 
+Because the exchange is per run rather than per action (below), the load this puts on a
+customer's IdP is one call per launch and one per resume — an ordinary integration, not a
+throughput dependency. That difference is what makes this tier realistic rather than
+aspirational.
+
 **Tier 2 — platform-minted, where it does not.** The platform performs the second-stage
 exchange itself: the customer's IdP token goes in as the subject token, proving who this is
 acting for; a short-lived token carrying the task-scoped details comes out; Vault trusts the
@@ -106,25 +111,49 @@ layer in: federate where the other side can validate the claim, and do it oursel
 where it cannot. The difference from that record is which half is which — here the customer's
 IdP owns the *subject* and can never own the *scope*.
 
-**Two questions this record leaves open deliberately, because each decides what kind of
-control this is and neither should be settled by whoever implements it first:**
+**The exchange happens once, when the run is launched — not per action.**
+
+[ADR-0026](0026-delegation-grants-and-per-step-tokens.md) already settles this and this record
+had mis-framed it as open. Authority is **two-level**: the user's *delegation grant* — "their
+consent to the task, ceilinged by the definition's maximum duration" — is the durable object,
+and "per-step tokens are manufactured under it as needed and expire normally." Per-step tokens
+are a **lifetime** mechanism, not a scope one. They exist so a leaked token expires quickly,
+not so each step carries different permissions.
+
+So the RFC 8693 exchange belongs at **grant issuance**: the user is present, authenticated
+against their own IdP, and asking for a task. That is the moment the platform can decide
+whether this user may perform this task *and everything it entails*, and it is the only moment
+the user is there to be asked. Re-authenticating per action would be asking a question of
+somebody who left — which is precisely what the delegation grant exists to avoid, and why
+ADR-0026 has a resume "re-exchange **under the surviving grant**" rather than a fresh
+authorization decision.
+
+Principle IV's own wording is "authority is manufactured **per task**". Per task is the launch;
+per action is the hooks.
+
+**What this costs, and it is a real edge**: the grant must cover the task's full scope at
+issuance, so the platform has to know at launch what the task entails. An agent that decides
+mid-run it needs something outside the granted scope cannot quietly acquire it — the step
+refuses, and widening requires new consent. That is the correct behaviour and it is also a
+constraint on how dynamic a run may be, which lands directly on
+[ADR-0054](0054-model-written-orchestration-parity.md)'s model-written call graphs: the model
+may choose the *shape* of the work freely, and may not choose authority it was not granted.
+Whoever implements this owns the question of how a task's entailed scope is computed at launch
+without over-granting to be safe, because over-granting to be safe is how a ceiling becomes
+decorative.
+
+**One question this record leaves open deliberately, because it decides what kind of control
+this is and should not be settled by whoever implements it first:**
 
 **What signs the Tier 2 token, and how that avoids being a second standing credential.** The
 platform's issuer signs tokens Vault will honour, so its key is as load-bearing as anything in
 the trust fabric — and a signing key held by a long-lived service is the shape of a standing
 credential, which Principle IV permits exactly once and has already spent. The obvious answer
 is a Vault-managed key (transit, or short-lived PKI) so the issuer holds no durable secret of
-its own; the obvious answer deserves to be checked rather than assumed. Tier 1 does not have
-this problem at all, which is an argument for treating Tier 1 as the target rather than the
-bonus.
-
-**Per step, or per phase.** Principle IV's wording is per *task*, and ADR-0026's per-step
-tokens read as per step. An exchange on every tool call is the strictest reading and puts a
-network round trip in the hot path of every governed action — against a customer's IdP, in
-Tier 1, whose latency and rate limits the platform does not control. A coarser grain — one
-exchange per step, or per contiguous run of steps sharing a scope — may buy most of the
-narrowing for a fraction of the cost. That is a measurement, not a preference, and in Tier 1
-it is also a conversation with somebody else's capacity planning.
+its own; the obvious answer deserves to be checked rather than assumed. **Tier 1 does not have
+this problem at all**, which — now that the exchange is per run rather than per action — is a
+stronger argument for treating Tier 1 as the target than it was when the cost was a round trip
+per tool call.
 
 ## Consequences
 
@@ -134,7 +163,11 @@ the definition's ceiling — which is the difference between a ceiling that boun
 may *ever* do and one that bounds what it may do *now*.
 
 **The honest limit, stated because it is easy to oversell**: the hook layer already enforces
-task scope in-process (Principle II), and this does not replace it. What RAR adds is that the
+policy per action, in-process (Principle II), and this does not replace it — the two operate
+at different moments and both are needed. Authority is decided once, at launch, for the task
+and everything it entails; every individual action is still checked against it as it happens.
+What changes is that the check now runs against a token narrowed to the task rather than one
+carrying the definition's entire ceiling. What RAR adds is that the
 enforcement survives the process being wrong — a compromised or buggy allocation cannot exceed
 its step by simply not asking the hooks. That is defence in depth, and it is worth having
 precisely because the in-process check is the one an attacker is already inside of. Anyone
@@ -144,8 +177,10 @@ describing this as "now we enforce task scope" would be overstating it; the accu
 **Costs, and they are not small.** Tier 2 means a component that mints tokens — one more
 thing to attest, monitor, rotate, and reason about, sitting in the credential path of every
 governed action, so its availability becomes the platform's. Tier 1 trades that for a
-dependency on a customer's IdP being reachable and correctly configured, which is a different
-failure mode and not obviously a smaller one. `oauth-resource-server` must be activated on the
+dependency on a customer's IdP being reachable and correctly configured at launch — a
+different failure mode, and a smaller one now that it is not in the path of every action: a
+run that cannot start is a clear refusal, where a run that cannot take its next step is a
+partial failure mid-flight. `oauth-resource-server` must be activated on the
 trust store either way, which is a Vault-wide change to how requests are authorized and
 deserves its own verification before it is switched on anywhere real. And RAR's exact-match
 paths mean the scope has to be computed precisely: a step whose path set is wrong fails
@@ -171,8 +206,9 @@ above is left open rather than answered casually.
 authorization server is configured, and neither tier exists. What is settled here is the
 *shape*: Vault is the resource server, RAR is the mechanism, attribution federates to the
 customer's IdP, task scope is computed by the platform because the inputs live nowhere else,
-and who mints the final token is a tier chosen by what the customer's IdP can do. The two open
-questions above are the implementing feature's to answer rather than to resolve by accident.
+who mints the final token is a tier chosen by what the customer's IdP can do, and the exchange
+happens once per run rather than per action. The one open question above is the implementing
+feature's to answer rather than to resolve by accident.
 
 **What this record's research did and did not establish.** Verified directly against the
 running enclave: Vault's supported grant types, the RAR structure and its intersection
