@@ -60,50 +60,71 @@ assumed away by naming Vault as though it were both parties.
 
 ## Decision
 
-**Adopt Vault's `vault:path_access` RAR as the mechanism for `task scope`, and accept that
-the platform must operate the authorization server that mints it.**
+**Attribution federates to the customer's OIDC provider. Task scope is computed by the
+platform. Who mints the final token is a tier, not a fixed answer.**
 
-- **Vault stays the resource server, and the ceiling stays where ADR-0050 put it.** The
-  agent-registry record and its `ceiling_policies` are already the ceiling's home; the
-  resource-server path evaluates exactly that record. Nothing about ADR-0050 is reopened.
-- **The task-scoped token is minted by the platform, not by the organization's IdP.** Only
-  the platform knows what a step is about to do at the moment it does it. An enterprise IdP
-  will not mint per-step `vault:path_access` details, and asking it to would put this
-  platform's step boundary inside somebody else's release cycle. This is the same reasoning
-  ADR-0044 uses to federate where the product validates external identity and broker only
-  where it cannot — except that here the thing being asserted is *our* concept, so nobody
-  else can assert it.
-- **The exchange is RFC 8693 in shape and the platform's own in implementation**: the
-  attested workload identity goes in, a short-lived JWT carrying `authorization_details`
-  narrowed to the step comes out, and Vault validates it against the ceiling. The
-  constitution's chain survives intact; what changes is that "control-plane Vault" names the
-  resource server rather than the exchange point, and this record says so plainly rather than
-  letting the sentence continue to imply otherwise.
-- **It lands beside the JWT auth path, not on top of it.** The existing path keeps issuing
-  the credentials it issues today. The RAR path is introduced where the narrowing is worth
-  the most first — tool credential issuance, where a step holding the definition's whole
-  ceiling is the actual exposure — and the two are reconciled only once the second is proven.
-  A big-bang replacement of the authority chain is how a platform loses the property it was
-  trying to strengthen.
+The product direction is that a customer plugs in their own OIDC provider — Okta, Ping, IBM
+Verify, or another. That settles one half of this immediately and, on inspection, cannot
+settle the other.
+
+- **The customer's IdP is the identity anchor, always.** It is the only party that can say
+  who the human is, and the platform already authenticates humans against it. Nothing here
+  changes that, and no design below moves subject authority anywhere else.
+- **Task scope is computed by the platform, always.** It derives from the agent registry
+  record, the ceiling policy, and what the step is about to do — none of which the customer's
+  IdP can see, and none of which it should be asked to model. An IdP that computed our step
+  boundaries would be an IdP that had to be redeployed when our step semantics changed. This
+  is not a preference about where code lives; it is that the input does not exist on that
+  side of the boundary.
+- **Vault trusts an issuer, and which issuer is the tier.** `sys/config/oauth-resource-server`
+  names *trusted authorization servers*. That is the seam, and it accepts either answer below
+  without the rest of the design changing.
+
+**Tier 1 — federated mint, where the IdP supports it.** The platform computes the
+`vault:path_access` details and presents them on an RFC 8693 exchange; the customer's IdP
+mints the task-scoped token and Vault trusts the customer's IdP directly. **The platform holds
+no signing key at all**, which is the strongest form of this and the reason the tier exists.
+PingFederate documents the token-exchange grant explicitly, and so does PingAM.
+
+**Tier 2 — platform-minted, where it does not.** The platform performs the second-stage
+exchange itself: the customer's IdP token goes in as the subject token, proving who this is
+acting for; a short-lived token carrying the task-scoped details comes out; Vault trusts the
+platform's issuer. Attribution still comes from the customer's IdP — what the platform adds
+is the narrowing, which is the part only it can compute.
+
+**Tier 2 is the default, and saying so is the honest part.** RFC 8693 support is reasonably
+available — PingFederate confirmed, others plausible. **RFC 9396 RAR carrying a custom type is
+not.** RFC 9396 explicitly permits custom `type` values, so `vault:path_access` is a
+legitimate one, but the vendors with documented RAR support are the standards-forward
+specialists rather than the enterprise IdPs a customer is most likely to already run. Support
+for `authorization_details` in Okta, PingFederate, and IBM Verify was **not established by
+this record's research, in either direction** — which is precisely why the shape has to work
+without it and improve when it is there.
+
+This is [ADR-0044](0044-authz-doctrine-and-credential-translation.md)'s doctrine applied one
+layer in: federate where the other side can validate the claim, and do it ourselves only
+where it cannot. The difference from that record is which half is which — here the customer's
+IdP owns the *subject* and can never own the *scope*.
 
 **Two questions this record leaves open deliberately, because each decides what kind of
 control this is and neither should be settled by whoever implements it first:**
 
-**Where the authorization server lives, and what makes it trustworthy.** It signs tokens that
-Vault will honour, so its signing key is as load-bearing as anything in the trust fabric — and
-a signing key held by a long-lived service is the shape of a standing credential, which
-Principle IV permits exactly once and has already spent. The obvious answer is that the key
-is Vault-managed (transit, or PKI-issued and short-lived) so the STS holds no durable secret
-of its own, and the obvious answer deserves to be checked rather than assumed. The wrong
-answer here gives the platform a second blast radius while it is trying to remove one.
+**What signs the Tier 2 token, and how that avoids being a second standing credential.** The
+platform's issuer signs tokens Vault will honour, so its key is as load-bearing as anything in
+the trust fabric — and a signing key held by a long-lived service is the shape of a standing
+credential, which Principle IV permits exactly once and has already spent. The obvious answer
+is a Vault-managed key (transit, or short-lived PKI) so the issuer holds no durable secret of
+its own; the obvious answer deserves to be checked rather than assumed. Tier 1 does not have
+this problem at all, which is an argument for treating Tier 1 as the target rather than the
+bonus.
 
 **Per step, or per phase.** Principle IV's wording is per *task*, and ADR-0026's per-step
-tokens read as per step. An exchange on every tool call is the strictest reading and has a
-cost profile nobody has measured — a network round trip inside the hot path of every
-governed action, on a platform that already refuses to let delivery gate availability
-(ADR-0055). A coarser grain — one exchange per step, or per contiguous run of steps sharing a
-scope — may buy most of the narrowing for a fraction of the cost. That is a measurement, not
-a preference, and it should be made with numbers.
+tokens read as per step. An exchange on every tool call is the strictest reading and puts a
+network round trip in the hot path of every governed action — against a customer's IdP, in
+Tier 1, whose latency and rate limits the platform does not control. A coarser grain — one
+exchange per step, or per contiguous run of steps sharing a scope — may buy most of the
+narrowing for a fraction of the cost. That is a measurement, not a preference, and in Tier 1
+it is also a conversation with somebody else's capacity planning.
 
 ## Consequences
 
@@ -120,13 +141,23 @@ precisely because the in-process check is the one an attacker is already inside 
 describing this as "now we enforce task scope" would be overstating it; the accurate claim is
 "task scope is now enforced somewhere the workload cannot reach."
 
-**Costs, and they are not small.** A new component that mints tokens is a new component to
-attest, monitor, rotate, and reason about — and it sits in the credential path of every
-governed action, so its availability becomes the platform's. `oauth-resource-server` must be
-activated on the trust store, which is a Vault-wide change to how requests are authorized and
+**Costs, and they are not small.** Tier 2 means a component that mints tokens — one more
+thing to attest, monitor, rotate, and reason about, sitting in the credential path of every
+governed action, so its availability becomes the platform's. Tier 1 trades that for a
+dependency on a customer's IdP being reachable and correctly configured, which is a different
+failure mode and not obviously a smaller one. `oauth-resource-server` must be activated on the
+trust store either way, which is a Vault-wide change to how requests are authorized and
 deserves its own verification before it is switched on anywhere real. And RAR's exact-match
 paths mean the scope has to be computed precisely: a step whose path set is wrong fails
 closed, which is correct and will be the first operational surprise.
+
+**A deployment question this creates and does not answer**: two tiers mean two configurations
+to support, and the tier a customer lands in depends on their IdP's capabilities rather than
+on anything the platform chooses. Detecting that — reading the IdP's discovery document for
+token-exchange and RAR support, and saying plainly which tier an estate is in — is work the
+implementing feature owns, because an estate that silently fell back to Tier 2 while its
+operator believed it was federated would be exactly the kind of unstated posture this platform
+legislates against elsewhere.
 
 **What this does not touch.** ADR-0044's federate-or-broker rule is unchanged: this is about
 how the harness's own authority is manufactured, not about how product credentials are
@@ -136,11 +167,22 @@ above is left open rather than answered casually.
 
 ## Notes
 
-**Proposed, and nothing is built.** No authorization server exists, `oauth-resource-server` is
-unactivated, and no trusted authorization server is configured. What is settled here is the
-*shape*: Vault is the resource server, RAR is the mechanism, the platform mints the
-task-scoped token, and the two open questions above are the implementing feature's to answer
-rather than to resolve by accident.
+**Proposed, and nothing is built.** `oauth-resource-server` is unactivated, no trusted
+authorization server is configured, and neither tier exists. What is settled here is the
+*shape*: Vault is the resource server, RAR is the mechanism, attribution federates to the
+customer's IdP, task scope is computed by the platform because the inputs live nowhere else,
+and who mints the final token is a tier chosen by what the customer's IdP can do. The two open
+questions above are the implementing feature's to answer rather than to resolve by accident.
+
+**What this record's research did and did not establish.** Verified directly against the
+running enclave: Vault's supported grant types, the RAR structure and its intersection
+semantics, the resource-server configuration path, the activation state, and the live
+registrations' flags. Verified from vendor documentation: PingFederate's and PingAM's
+token-exchange grant. **Not established, in either direction**: whether Okta, PingFederate, or
+IBM Verify support RFC 9396 `authorization_details`, and whether Okta or IBM Verify support
+RFC 8693 at all. Those are the questions that decide how often Tier 1 is reachable, and the
+implementing feature should answer them against the specific IdPs a first customer actually
+runs rather than against the market in general.
 
 **Externally backed.** HashiCorp's own validated pattern
 [`ai-agent-identity-with-hashicorp-vault`](https://developer.hashicorp.com/validated-patterns/vault/ai-agent-identity-with-hashicorp-vault)
