@@ -106,48 +106,62 @@ reason on a malformed token.
 
 ---
 
-## F5 — Entity resolution is the open integration detail, and it blocks everything
+## F5 — Entity resolution: the subject binds through an alias on the agent-registry mount
 
-**Decision**: **Unresolved.** The implementing feature's first task is to establish how a
-grant's subject binds to a Vault Identity entity.
+**Decision**: **RESOLVED 2026-07-31.** A grant's `sub` resolves to a Vault Identity entity
+through an entity alias whose `mount_accessor` is the **agent-registry mount's** accessor.
 
-**What the enclave says**: With a valid signature, a well-formed schema, and RAR details
-present, Vault refuses with two errors in its log:
+**What the enclave says.** The alias is created with the classic pair plus two OAuth fields:
 
-```text
-2 errors occurred:
-  * no alias found
-  * error looking up entity
+```bash
+vault write identity/entity-alias \
+  canonical_id="<the registration's entity_id>" \
+  name="planner-agent" \
+  mount_accessor="agent-registry_xxxxxxxx" \
+  external_id="planner-agent" \
+  issuer="https://harness.internal/task-authority"
 ```
 
-So the JWT's subject must resolve to an Identity **entity** through an **alias**, and none of
-the obvious candidates worked: `sub` as the agent-registry entity UUID, `sub` as the
-registration's display name, and both with a matching `client_id` claim. The registered
-entity carries no aliases (`aliases: []`), and `identity/entity-alias` refused creation with
-the resource-server profile's `config_id` as `mount_accessor` — so the profile is not an auth
-mount and its accessor is not the binding key.
+`name` and `mount_accessor` remain **mandatory** — `identity/entity-alias` refuses with
+`'id' or 'mount_accessor' and 'name' must be provided` when given only `external_id` and
+`issuer`. The accessor must be the agent registry's; `identity`'s is rejected. The JWT's
+`sub` matches the alias `name`.
 
-**What would settle it**, in the order worth trying:
+**How it was found, because the route matters for the next one of these.** Three attempts
+failed on the wrong shape — `sub` as entity UUID, as display name, and with a matching
+`client_id`, all against a `mount_accessor` of the resource-server profile's `config_id`.
+The answer came from `vault path-help identity/entity-alias`, which lists `external_id`
+("Unique external identifier from external IdP") and `issuer` — fields that exist only for
+this purpose and are absent from the auth-mount alias shape. HashiCorp's
+`learn-vault-agentic-iam` repository does **not** contain it: its README explicitly leaves
+"the OAuth resource server profile, the subject/actor identity entities and aliases, and the
+Agent Registry registration" as tutorial exercises.
 
-1. HashiCorp's own agent-identity tutorial repository
-   (`hashicorp-education/learn-vault-agentic-iam`), which is the only public artifact found
-   that exercises this path end to end.
-2. `vault path-help identity/entity-alias` against the enclave, to enumerate what accessors it
-   will accept, and whether a synthetic accessor exists for resource-server profiles.
-3. Vault's audit device, enabled temporarily, which records the resolution attempt with more
-   structure than the server log's summary.
+**Verified end to end.** With the alias in place, the entity carrying `agent-ceiling-planner`
+(`secret/data/planner/*`), and a grant naming one path, all three cases behave as specified:
 
-**Why this is a first task rather than a risk to monitor**: nothing else in the feature can be
-demonstrated until a grant validates. Every conformance row, the whole of US1, and the tier
-detection in US4 all sit behind it. A plan that scheduled it later would discover in week two
-that it was week one's work.
+| Grant | Path requested | Result |
+| --- | --- | --- |
+| `secret/data/planner/greeting` | `secret/data/planner/greeting` | **ALLOWED** — in ceiling ∩ in task |
+| `secret/data/planner/greeting` | `secret/data/planner/other` | **REFUSED** — in ceiling, **not in task** |
+| `secret/data/applier/deploy` | `secret/data/applier/deploy` | **REFUSED** — in task, **not in ceiling** |
 
-**Rationale for not guessing**: the wrong guess here is invisible — a design built on an
-assumed resolution mechanism looks complete and fails at the first live row. ADR-0056 was
-written by checking the substrate rather than inferring it, and this feature inherits that
-standard.
+The middle row is the feature. The refusal is Vault's, issued against a path the agent
+definition's ceiling permits, because this run's task did not entail it.
 
----
+**Consequences for the plan, and none of them are structural.** ADR-0056's tier analysis is
+unchanged: Vault is still the resource server, the platform still computes scope, the static
+public-key profile still works, and no signing key leaves Vault. What changes is one task's
+content — provisioning now includes an entity alias per registered agent, keyed on the
+`sub` the issuer will mint. That belongs beside the registration in `registry.tf`, since the
+alias is meaningless without it.
+
+**A second finding, previously invisible.** The entity must also carry its ceiling policy as
+a **baseline policy** (`identity/entity/id/<id> policies=...`). Vault's RAR evaluation is a
+restrictive intersection of the grant *and* the entity's own ACL, so an entity with no
+policies is refused everything regardless of what the grant says. Today's registrations set
+`ceiling_policies` on the agent-registry record and leave the entity's `policies` empty —
+which is correct for the JWT-auth path in use now, and insufficient for this one.
 
 ## F6 — The intersection is real, and the ceiling's two halves stay disjoint
 
