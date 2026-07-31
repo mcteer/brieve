@@ -15,6 +15,28 @@
 # contributor started — and both guesses are wrong. Stop everything and you take someone's
 # work with it; stop nothing and the leftovers starve the merge-blocking checks.
 
+#: Where `portal-up` records the development identity provider it started, so the lane can
+#: stop a HOST process the same way it stops a scheduled one.
+#:
+#: That provider runs as `nohup uv run ... &` on the host and never exits. Left behind, it
+#: holds the runner's uv cache lock, and the post-job `uv cache prune --ci` waits five
+#: minutes and fails the whole lane — with a documentation-only change under review and no
+#: test having failed. Observed on 2026-07-31; the lane took 18m15s instead of 12.
+#:
+#: FR-007a already required the lane to stop what it started. A host process is something it
+#: started; the requirement did not distinguish, and the implementation did.
+DEV_IDP_PIDFILE="${TMPDIR:-/tmp}/brieve-dev-idp.pid"
+
+stop_dev_idp() {
+  [ -r "$DEV_IDP_PIDFILE" ] || return 0
+  local pid
+  pid="$(cat "$DEV_IDP_PIDFILE" 2>/dev/null || true)"
+  rm -f "$DEV_IDP_PIDFILE"
+  [ -n "$pid" ] || return 0
+  kill "$pid" 2>/dev/null || return 0
+  printf '    stopped the development identity provider (pid %s)\n' "$pid"
+}
+
 #: What the lane writes into `Meta.harness_started_by`. Read back to decide what may be
 #: stopped; a surface without it was started by someone else and is not ours to touch.
 MARK="deployment-conformance"
