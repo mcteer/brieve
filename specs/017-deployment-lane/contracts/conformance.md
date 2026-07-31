@@ -6,8 +6,9 @@ What these rows assert, what they refuse to assert, and who runs them.
 
 ## Who runs these rows
 
-**Every row here is executed by an automated check** — the enclave lane, extended with one
-step after `make conformance`. **No named human runner is owed** (constitution v1.1.0,
+**Every row here is executed by an automated check** — `infra/bin/deployment-conformance`,
+which is the final line of `make conformance` and therefore runs in the enclave lane without
+the lane needing its own step. **No named human runner is owed** (constitution v1.1.0,
 Quality Gates).
 
 Recorded explicitly because "no runner named" and "no runner needed" look identical in a
@@ -20,9 +21,12 @@ runner has no macOS half to compare against, so nothing automated can re-check t
 at implementation on both substrates and recorded here.
 
 **SC-008** — repeated runs against an unchanged tree agree. Checked by
-`infra/bin/deployment-conformance --repeat`, run at implementation. Running it on every
-invocation would double the lane for a property that changes only when the gate itself
-changes.
+`infra/bin/deployment-conformance --repeat`, run at implementation. It stands the surfaces up
+**once** and repeats the assertions: SC-008 is about the gate's determinism, and re-deploying
+each pass would measure the scheduler instead while costing minutes per iteration. **Bring-up
+determinism is therefore not covered** — a scheduler that placed a surface unreliably would
+show up as a flaky gate, and the reading of that would be wrong. Running the repeat on every
+invocation would double the lane for a property that changes only when the gate does.
 
 **Neither is a row, and neither is silently unverified.** Re-verify both when the gate's
 reach mechanism or its waits change — those are the two things that would break them. The
@@ -80,6 +84,13 @@ to tell the difference in one reading rather than three.
 **A definition present in the tree but never deployed reads as uncovered, not absent.** Also
 the correct failure — a surface nobody deployed is not a surface that works — and the
 resolution is the same: declare it, or exclude it with a reason.
+
+**These rows are enumerated by the runner script, not by a pytest line in
+`make conformance`.** Analysis pass 3 found that a pytest line runs before the surfaces are
+stood up, so rows there would assert against an API and a portal that do not exist and fail
+on every invocation. The 010/014 lesson is "named by a lane that **will run it**", and the
+runner is that lane; a row asserts the runner names this directory, so the wiring cannot be
+lost the way 010's was.
 
 **Two processes are covered by rows that live elsewhere.** The dispatched entrypoint by
 014's durability rows; the mcp service by 015's shipping row. Those rows are stronger than a

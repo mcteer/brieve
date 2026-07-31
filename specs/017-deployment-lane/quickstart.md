@@ -16,15 +16,23 @@ see [contracts/conformance.md](contracts/conformance.md).
 
 ```bash
 make dev-up                 # if the enclave is not already up
+make conformance            # the runner is its final line
+```
+
+or, to run only this gate against surfaces you already have up:
+
+```bash
 bash infra/bin/deployment-conformance
 ```
 
 Expected: each declared process reaches a working state within its own wait, and each
 assertion reports what it observed rather than only that it passed.
 
-The same script is what the CI lane invokes after `make conformance`. There is one way to
-run this gate (Principle VII); if the two ever diverge, the one nobody runs locally is the
-one that rots.
+The same script is the final line of `make conformance`, so the CI lane and a contributor
+run identical code (Principle VII). It is deliberately **not** a pytest line in that recipe:
+those lines run before the surfaces are stood up, and rows there would assert against an API
+and a portal that do not exist yet — failing on every invocation. Ordering is guaranteed by
+recipe position.
 
 ## Prove it can fail — the part that is not optional
 
@@ -95,8 +103,10 @@ durability rows never ran."* The design avoids this by sequencing — the surfac
 the conformance batch job releases its reservation — so the check is that the durability
 rows still execute, not merely that the gate is green.
 
-Confirm the row count did not drop. A lane that silently stopped collecting a directory is
-the failure 010 paid for, and it looks exactly like a pass.
+Compare against the **pre-existing** set, recorded from `main` before merging — not against
+the total, which necessarily rises because this feature adds rows. A lane that silently
+stopped collecting a directory is the failure 010 paid for, and it looks exactly like a
+pass.
 
 ## Confirm the waits are measured, not guessed
 

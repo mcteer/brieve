@@ -60,6 +60,21 @@
   row on a branch whose lane is merge-blocking blocks every push until someone removes it.
   The probe now lives and dies inside one working session.
 
+### Analysis pass 3 — 2026-07-31
+
+- **The rows would have been collected before the surfaces existed.** Two individually
+  correct decisions collided: name the directory in a lane at birth, and stand the surfaces
+  up only after the batch job releases its reservation. Together they put the rows in a
+  pytest line that runs before anything is deployed, so the gate would have failed on
+  **every** invocation — an always-red gate being as useless as an always-green one, and
+  quicker to get disabled. The runner script is now the lane that enumerates these rows, and
+  it is the final line of `make conformance`, so ordering is a property of recipe position
+  rather than of a workflow file nobody runs locally.
+- **`--repeat` repeats the assertions, not bring-up.** SC-008 is about the gate's
+  determinism; re-deploying each pass would measure the scheduler instead.
+- Two wordings that named no referent: "the same verdict" as what, and "count rows" against
+  which baseline. Both now say.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A deployed process that cannot start fails the merge (Priority: P1)

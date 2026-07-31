@@ -19,10 +19,13 @@ credential. The API and the portal are covered by nothing, because no lane invok
 
 The approach is therefore composition, not construction:
 
-1. **Sequence, don't parallelise.** Extend the existing enclave lane: after
-   `make conformance` completes and the batch job releases its reservation, stand the two
-   uncovered surfaces up and assert against them. FR-007 is satisfied structurally — nothing
-   competes — rather than by tuning resource numbers that have already failed once (R4).
+1. **Sequence, don't parallelise.** `make conformance` gains a final line that stands the
+   two uncovered surfaces up and asserts against them, after its batch job has completed and
+   released its reservation. FR-007 is satisfied structurally — nothing competes — rather
+   than by tuning resource numbers that have already failed once (R4). Ordering is a property
+   of recipe position, not of a workflow file: analysis pass 3 found that collecting these
+   rows in a pytest line and standing the surfaces up in a later CI step would have run them
+   before the surfaces existed, failing on every invocation.
 2. **Assert a refusal, not a health check.** The API's assembly migrates three stores under
    its attested identity *before* uvicorn binds, so answering at all entails reaching Vault
    and Postgres. An unauthenticated request returning the surface's own reason code is
@@ -150,8 +153,10 @@ tests/
     # inside the set the runner invokes, so it would recurse without bound. The repeat
     # check lives in infra/bin/deployment-conformance, one level out.
 
-Makefile                          # `conformance` gains the new directory
-.github/workflows/enclave.yml     # one step after `make conformance`
+Makefile                          # `conformance` gains a FINAL line invoking the runner.
+                                  #   NOT a pytest line — those run before the surfaces
+                                  #   are up, so rows there would fail on every invocation.
+.github/workflows/enclave.yml     # unchanged — the lane already runs `make conformance`
 ```
 
 **Structure Decision**: A new `tests/conformance/deployment/` package, named by the
@@ -162,7 +167,10 @@ deselected the rows. Both failures are the shape this feature exists to close, a
 one inside it would be its own indictment.
 
 `infra/bin/deployment-conformance` mirrors `infra/bin/enclave-conformance`: a script the CI
-lane and a developer both invoke, so there is one way to run the gate (Principle VII).
+lane and a developer both invoke, so there is one way to run the gate (Principle VII). **It
+is also the lane that enumerates these rows** — the 010/014 lesson is "named by a lane that
+will run it", and `make conformance`'s pytest lines run too early to be that lane. A row
+asserts the script names the directory, so the wiring cannot be lost the way 010's was.
 
 ## Complexity Tracking
 
