@@ -173,10 +173,23 @@ every row not in force, which of the two states it is in and where the reason is
   using authority a run actually holds, and MUST observe the control plane refusing it.
 - **FR-002**: The refusal MUST come from the control plane. A refusal produced by the
   platform's own code, or the absence of an attempt, MUST NOT satisfy the gate.
-- **FR-003**: The authority used MUST carry **only** the bound under test, so a refusal
-  cannot be caused by the absence of an unrelated grant.
+- **FR-003**: The authority used MUST be **the authority a run actually holds** — all of it,
+  as deployed. The claim is that a run cannot write its own bounds; stripping its authority
+  to a single grant would prove something narrower, leaving open whether some combination
+  permits the write.
+
+  *Corrected during planning.* This originally required the opposite — an authority carrying
+  only the bound under test — to stop a refusal being caused by the absence of an unrelated
+  grant. That concern was real and is met better by FR-004a: discriminating on whether the
+  **path** is readable, rather than on which grants are present.
 - **FR-004**: The gate MUST distinguish "refused" from "never attempted", "unreachable", and
   "refused for an unrelated reason" — and MUST treat only a genuine refusal as evidence.
+- **FR-004aa**: A refusal counts **only when the same authority can read the path**. The
+  control plane deliberately answers identically for *forbidden* and *absent* — it will not
+  disclose which, because that would leak the shape of the tree to an unauthorized caller.
+  Verified during planning: a mount that does not exist is refused in exactly the same words
+  as a real bounding record. So a row with a typo in its path passes while asserting nothing,
+  and only a successful read proves the refusal was about the capability.
 - **FR-004a**: A write that **succeeds** MUST be reported as its own outcome, distinct from
   an assertion that could not be made. A red check is something someone reruns; a bounding
   record that was actually changed is a live condition the platform claims cannot exist.
@@ -260,8 +273,11 @@ every row not in force, which of the two states it is in and where the reason is
 - **The gate asserts the denial, not the contents.** A bounding record that is wrong in a way
   the reviewed configuration wrote is invisible here. Anyone describing this as proving the
   bounds correct would be overstating it.
-- **Three kinds of bounding record exist today.** Being covered when a fourth is added is in
-  scope (FR-006); enumerating a fourth now is not.
+- **More kinds of bounding record exist than the three this spec named.** Planning found at
+  least six readable bounding paths, one of which was added the same day this spec was
+  written. The set must therefore be derived from the deployed configuration rather than
+  listed here — a list would have been stale before the feature landed, which is the failure
+  mode FR-006 exists to prevent.
 - **Proving the gate can fail requires temporarily widening real authority**, and that is
   why it happens once, by hand, and is recorded — rather than on every merge. 017's break
   fixture set the precedent for a one-time recorded demonstration; here the stakes are higher,
