@@ -18,9 +18,21 @@
 # What IS real, and what the rows demonstrate, is the credential separation: the platform's
 # own credential cannot alter what it has shipped.
 #
-# NOTE: `cores` rather than `cpu`, for the same reason as `postgres.nomad.hcl` — Nomad's
-# CPU fingerprint on Apple Silicon reports ~24 MHz total while correctly detecting the core
-# count, so any MHz-based request is unschedulable.
+# NOTE: `cpu`, NOT `cores` — and this is the one job in the tree where that is right.
+#
+# Every other job here uses `cores` because Nomad's CPU fingerprint on Apple Silicon reports
+# ~24 MHz total while correctly detecting the core count, so an MHz-based request sized for a
+# real machine is unschedulable locally. This job started that way too, and it broke CI.
+#
+# `cores` reserves cores EXCLUSIVELY. On a 4-core runner the budget is postgres(1) + mcp(1)
+# + this(1) = 3, leaving one for a conformance job that asks for 2 — so the conformance job
+# could not be placed and `nomad job run` exited 2 on every push to this branch, while every
+# local run passed on a machine with eighteen cores. A second exclusive core is not something
+# a second copy under a trickle of inserts has any claim to.
+#
+# The value is small enough to fit the bogus 24 MHz local total and irrelevant on a real one,
+# which is the property that makes an MHz request workable HERE and nowhere else: this task
+# is idle almost always, so it never needs a share worth reserving.
 
 job "collector-postgres" {
   type = "service"
@@ -78,7 +90,7 @@ job "collector-postgres" {
       }
 
       resources {
-        cores  = 1
+        cpu    = 4
         memory = 256
       }
     }
