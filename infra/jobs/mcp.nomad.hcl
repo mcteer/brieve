@@ -67,6 +67,24 @@ variable "repo" {
   description = "Working tree to mount, as for the conformance and agent-run jobs."
 }
 
+variable "sweep_interval_seconds" {
+  type        = string
+  default     = "5"
+  description = <<-DESC
+    How often the supervisory loop sweeps for suspended runs and dependency health.
+
+    Five seconds in the enclave, thirty in the code's own default, and the difference is
+    deliberate. The durability rows wait for a REAL sweeper pass — that is the assertion, and
+    ADR-0049's whole claim that consent to start a run is consent to finish it rests on
+    nobody pressing anything. What those rows do not assert is the cadence.
+
+    Measured 2026-07-31: one row spent 184 seconds waiting for passes at the thirty-second
+    default, which was 26% of the entire enclave lane spent idle. The row still waits for a
+    genuine pass; it waits less long for one. A production deployment sets whatever its
+    operators choose and the code default is unchanged.
+  DESC
+}
+
 job "mcp" {
   # 017's deployment lane. Every job definition must be a declared subject or an
   # explicitly excluded one — coverage that a process opts into is fail-open, and the
@@ -166,6 +184,8 @@ job "mcp" {
       }
 
       env {
+        MCP_INTERVAL_SECONDS = var.sweep_interval_seconds
+
         VAULT_ADDR   = var.vault_addr
         # WHERE THE SCHEDULER IS, from in here. Not `127.0.0.1`, which is what the dispatcher
         # defaults to and what a host process would want: this task runs inside an allocation,
