@@ -8,7 +8,22 @@ What these rows assert, what they refuse to assert, and who runs them.
 ## Who runs these rows
 
 **Every row here is executed by an automated check** — `make conformance`'s `host_enclave`
-line, which already enumerates `tests/conformance/authority/`. **No named human runner is
+line, which this feature had to ADD `tests/conformance/authority/` to.
+
+An earlier draft of this paragraph said the line "already enumerates" the directory. It did
+not, and nothing would have contradicted it: the rows pass when run by hand, and the only
+other lane that could have seen them runs `-m "not enclave"`, which deselects every one.
+Twelve rows asserting a run cannot widen its own authority, green on demand and invisible to
+the gate — in the feature built to end exactly that gap. The Makefile carries the same warning
+twice already, from 010 and 014; reading it is what caught this.
+
+**Three occurrences is where a comment stops being the mechanism.**
+`tests/unit/test_every_conformance_directory_is_run.py` now checks both shapes: a directory no
+lane enumerates (010's), and a directory named only by lanes that deselect its markers
+(014's, and the one this feature nearly shipped). It runs in `make check` rather than in a
+conformance lane, because a check on whether the conformance lanes are complete cannot live
+inside one of them. Both shapes were demonstrated by removing the wiring and watching it go
+red. **No named human runner is
 owed for the rows** (constitution v1.1.0, Quality Gates).
 
 **The demonstration that the gate can fail is NOT a row.** It is a documented act, performed
