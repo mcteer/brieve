@@ -197,8 +197,26 @@ job "mcp" {
       # the default MHz-based reservation exceeds the whole node and the allocation sits
       # queued with "Resources exhausted" — a placement failure that looks nothing like a
       # resource declaration problem. 008 paid for this at T030.
+      # `cpu`, not `cores`, and this service is the clearest case for it in the tree.
+      #
+      # It is a supervisory loop: it wakes, runs six short passes, and sleeps thirty
+      # seconds. It held an exclusive core for the 0.1% of the time it is awake, and on a
+      # 4-core CI runner that core was the difference between the fencing row placing its
+      # two concurrent allocations and not placing them.
+      #
+      # The enclave was sized to consume exactly 100% of such a runner in two separate
+      # phases — postgres + mcp + conformance during the in-allocation lane, postgres + mcp
+      # + two agent-runs during the host lane, both landing on 9200 of 9200 MHz. Zero
+      # headroom is not a budget, it is a coincidence that holds until anything is added,
+      # and 015 added four megahertz.
+      #
+      # A small `cpu` is a scheduling WEIGHT, not a cap — Nomad only enforces a hard limit
+      # when asked to — so this loop still gets what it needs on an idle node and yields
+      # first under contention, which is the correct priority for a supervisor next to the
+      # work it supervises. The value is small enough to fit the bogus ~24 MHz total that
+      # Apple Silicon fingerprints locally, which is what keeps `cores` everywhere else.
       resources {
-        cores  = 1
+        cpu    = 4
         memory = 512
       }
     }
