@@ -64,3 +64,32 @@ def test_the_api_assembly_does_not_pin_its_grants_in_code() -> None:
         "behind the Control Group that governs them; read them from the trust fabric "
         "instead (`VaultClaimMappings`)."
     )
+
+
+def test_the_api_assembly_tries_the_human_verifier_first() -> None:
+    """Order is load-bearing when one issuer serves both kinds, which is the common case.
+
+    A workload verifier admits a person's token — it must, because a bare Nomad workload
+    identity carries no machine marker either, so demanding one would refuse every genuine
+    federated workload. With Auth0, Okta, Ping or Entra all serving `client_credentials`
+    and `authorization_code` from one issuer, a person's token therefore satisfies both
+    members and the first one tried wins.
+
+    Built the other way round the surface still authenticates everyone correctly and
+    records every person as a machine, which is the failure that leaves no symptom.
+    """
+    tree = ast.parse(SERVICE.read_text())
+    kinds = [
+        node.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "SubjectKind"
+    ]
+
+    assert kinds, "the assembly names no SubjectKind, so nothing decides what a token is"
+    assert kinds[0] == "HUMAN", (
+        f"the API assembly reaches for {kinds[0]} before HUMAN. With a shared issuer the "
+        f"first verifier that accepts a token wins, and a workload verifier accepts a "
+        f"person's — so this order records people as machines."
+    )

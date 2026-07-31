@@ -102,6 +102,44 @@ Auth0's `iss` claim is `https://TENANT.auth0.com/` **with** a trailing slash. A 
 configured without it refuses every token as `unverifiable_identity` — the same error as a
 bad signature, for one character of configuration.
 
+## Machine credentials are refused unless you say otherwise
+
+A `client_credentials` token and an `authorization_code` token come from the **same
+issuer**, with the same JWKS and the same audience. Auth0, Okta, Ping and Entra all work
+this way, so nothing about where a token came from says whether a person was involved.
+
+The surface used to declare the answer at construction and assert it for every token,
+which meant a machine's credential was recorded as a person — and, worse, **admitted**. A
+leaked client secret was a working operator login that the evidence trail showed as
+somebody signing in.
+
+Now a token carrying positive evidence that no person was present is refused with
+`subject_kind_mismatch`. The evidence is `gty: client-credentials`, or a `sub` that names
+the same client as `azp` — RFC 9068 §2.2, which says that for grants with no resource
+owner `sub` SHOULD identify the client application. Auth0 emits both.
+
+To accept machine identities, name the issuer they come from:
+
+```
+OIDC_WORKLOAD_ISSUER=https://your-tenant.us.auth0.com/    # usually the same as OIDC_ISSUER
+```
+
+Empty by default, so the fail-closed posture is what a deployment gets without deciding
+anything. Naming the issuer is how "this surface accepts machine credentials" becomes a
+decision somebody made rather than one they discovered.
+
+**The check is asymmetric, and that is deliberate.** Evidence of a machine contradicts a
+human declaration, so it is refused; the absence of evidence is *not* taken as proof of a
+person. A Nomad workload identity carries `sub = <job id>` and no `azp`, no `gty`, nothing
+marking it as a machine — because it comes from an issuer that serves nothing else, where
+the configuration is the evidence. Demanding a marker would refuse every genuine federated
+workload.
+
+What that leaves is an ordering dependency: where one issuer serves both kinds, a person's
+token satisfies both verifiers and the first is used. The assembly puts the human verifier
+first, and a unit gate asserts it — built the other way round, the surface authenticates
+everyone correctly and records every person as a machine.
+
 ## Configuring the enclave
 
 `portal-up` reads `.env`. Name an `AUTH0_DOMAIN` and it uses the real provider; leave it
