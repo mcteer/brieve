@@ -100,6 +100,7 @@ if [ "$ROWS" -eq 0 ]; then
   # records, invisible on a fresh CI runner and fatal on a reused local enclave.
   if [ ${#STARTED[@]} -gt 0 ]; then
     stop_marked || die "could not stop the surfaces this run started — the next run will be starved (FR-007a clause 5)"
+    stop_dev_idp
     ok "stopped what this run started; spare capacity is as it was found"
   fi
   ok "deployment lane passed"
@@ -110,6 +111,10 @@ fi
 # diagnose this, and a captured log tail is often not enough — the credential refusal that
 # motivated this feature appeared mid-log, not at its end.
 if [ ${#STARTED[@]} -gt 0 ]; then
+  # The scheduled surfaces stay for inspection; the host-side identity provider does not.
+  # It carries no diagnostic value and holds the uv cache lock, which fails an automated
+  # lane's cleanup for reasons unrelated to anything under review.
+  stop_dev_idp
   warn "left ${STARTED[*]} running for inspection"
   warn "the next \`make conformance\` clears it automatically, or run \`make deployment-down\` now"
 fi

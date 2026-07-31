@@ -90,6 +90,10 @@ else
   else
     nohup uv run --extra adapters --extra surfaces --extra portal \
       python -m tests.harness.dev_idp >/tmp/brieve-dev-idp.log 2>&1 &
+    # Recorded so whoever started it can stop it. This is a HOST process that outlives the
+    # script, and left running it holds the uv cache lock — which fails an automated lane in
+    # its post-job cleanup, with no test having failed and nothing in the diff to blame.
+    printf '%s\n' "$!" > "${TMPDIR:-/tmp}/brieve-dev-idp.pid"
     for _ in $(seq 1 120); do
       curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 && break
       sleep 0.5
