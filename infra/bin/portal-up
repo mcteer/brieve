@@ -27,19 +27,73 @@ nomad node status >/dev/null 2>&1 || die "the enclave is not up — run \`make d
 
 DEV_IDP_PORT="${DEV_IDP_PORT:-8090}"
 
-say "Development identity provider (DEV ONLY — authenticates nobody)"
-if curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1; then
-  ok "already listening on ${DEV_IDP_PORT}"
+# Which identity provider these surfaces authenticate against.
+#
+# A real one when `.env` names an AUTH0_DOMAIN, the development double otherwise. The
+# fallback is deliberate and so is its noisiness: the double AUTHENTICATES NOBODY, and an
+# operator who believed they were federated when they were not is the unstated posture
+# this platform legislates against everywhere else. It says which one it is, every time,
+# rather than leaving it to be inferred from whether a sign-in page looks familiar.
+env_val() {
+  [ -f "$REPO/.env" ] || return 0
+  grep "^$1=" "$REPO/.env" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'
+}
+
+AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"
+
+if [ -n "$AUTH0_DOMAIN" ]; then
+  say "Identity provider: Auth0 (${AUTH0_DOMAIN})"
+
+  # The trailing slash is Auth0's, and it is not cosmetic: the `iss` claim carries it, and
+  # a verifier configured without it refuses every token as `unverifiable_identity` —
+  # naming the token rather than the one character of configuration that is wrong.
+  OIDC_ISSUER="https://${AUTH0_DOMAIN}/"
+  OIDC_JWKS_URI="https://${AUTH0_DOMAIN}/.well-known/jwks.json"
+  OIDC_AUTHORIZE="https://${AUTH0_DOMAIN}/authorize"
+  OIDC_TOKEN="https://${AUTH0_DOMAIN}/oauth/token"
+
+  # The API identifier, NOT the client id. Auth0 issues an opaque token — not a JWT at all
+  # — when no audience is requested, and the failure surfaces as a malformed token.
+  OIDC_AUDIENCE="$(env_val AUTH0_API_AUDIENCE)"
+  [ -n "$OIDC_AUDIENCE" ] \
+    || die "AUTH0_API_AUDIENCE is not set in .env. Without an audience Auth0 issues an opaque token rather than a JWT, and the surface refuses it as malformed."
+
+  PORTAL_CLIENT_ID="$(env_val AUTH0_PORTAL_CLIENT_ID)"
+  [ -n "$PORTAL_CLIENT_ID" ] || die "AUTH0_PORTAL_CLIENT_ID is not set in .env"
+
+  # Namespaced because Auth0 — and Okta, and Ping — refuse to mint a bare custom claim.
+  # There is no provider-neutral name for this, which is why it is configuration.
+  OIDC_TENANT_CLAIM="$(env_val OIDC_TENANT_CLAIM)"
+  [ -n "$OIDC_TENANT_CLAIM" ] \
+    || die "OIDC_TENANT_CLAIM is not set in .env. Auth0 emits no bare \`tenant\` claim, so the surface refuses every token as \`no_tenant\` without this."
+
+  ok "issuer ${OIDC_ISSUER}"
+  ok "audience ${OIDC_AUDIENCE}"
+  ok "tenant claim ${OIDC_TENANT_CLAIM}"
+  ok "portal client ${PORTAL_CLIENT_ID} (public — PKCE, no secret)"
 else
-  nohup uv run --extra adapters --extra surfaces --extra portal \
-    python -m tests.harness.dev_idp >/tmp/brieve-dev-idp.log 2>&1 &
-  for _ in $(seq 1 120); do
-    curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 && break
-    sleep 0.5
-  done
-  curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 \
-    || die "the development identity provider did not come up — see /tmp/brieve-dev-idp.log"
-  ok "listening on ${DEV_IDP_PORT}"
+  say "Development identity provider (DEV ONLY — authenticates nobody)"
+  if curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1; then
+    ok "already listening on ${DEV_IDP_PORT}"
+  else
+    nohup uv run --extra adapters --extra surfaces --extra portal \
+      python -m tests.harness.dev_idp >/tmp/brieve-dev-idp.log 2>&1 &
+    for _ in $(seq 1 120); do
+      curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 && break
+      sleep 0.5
+    done
+    curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1 \
+      || die "the development identity provider did not come up — see /tmp/brieve-dev-idp.log"
+    ok "listening on ${DEV_IDP_PORT}"
+  fi
+
+  OIDC_ISSUER="http://127.0.0.1:${DEV_IDP_PORT}"
+  OIDC_JWKS_URI="http://127.0.0.1:${DEV_IDP_PORT}/jwks"
+  OIDC_AUTHORIZE="http://127.0.0.1:${DEV_IDP_PORT}/authorize"
+  OIDC_TOKEN="http://127.0.0.1:${DEV_IDP_PORT}/token"
+  OIDC_AUDIENCE="harness-api"
+  OIDC_TENANT_CLAIM="tenant"
+  PORTAL_CLIENT_ID="harness-portal"
 fi
 
 # `-detach`, because `nomad job run` on a SERVICE job blocks until its deployment settles.
@@ -47,8 +101,10 @@ fi
 # trying, and the failure reads as a hang rather than as a failure.
 say "API service"
 nomad job run -detach -var="repo=$REPO" \
-  -var="oidc_issuer=http://127.0.0.1:${DEV_IDP_PORT}" \
-  -var="oidc_jwks_uri=http://127.0.0.1:${DEV_IDP_PORT}/jwks" \
+  -var="oidc_issuer=${OIDC_ISSUER}" \
+  -var="oidc_jwks_uri=${OIDC_JWKS_URI}" \
+  -var="oidc_audience=${OIDC_AUDIENCE}" \
+  -var="oidc_tenant_claim=${OIDC_TENANT_CLAIM}" \
   "$REPO/infra/jobs/api.nomad.hcl" >/dev/null \
   && ok "api submitted (the northbound surface, served for the first time in 012)" \
   || die "could not submit the api service"
@@ -56,9 +112,11 @@ nomad job run -detach -var="repo=$REPO" \
 say "Portal"
 nomad job run -detach -var="repo=$REPO" \
   -var="api_base_url=http://127.0.0.1:8081" \
-  -var="oidc_issuer=http://127.0.0.1:${DEV_IDP_PORT}" \
-  -var="oidc_authorize_endpoint=http://127.0.0.1:${DEV_IDP_PORT}/authorize" \
-  -var="oidc_token_endpoint=http://127.0.0.1:${DEV_IDP_PORT}/token" \
+  -var="oidc_issuer=${OIDC_ISSUER}" \
+  -var="oidc_authorize_endpoint=${OIDC_AUTHORIZE}" \
+  -var="oidc_token_endpoint=${OIDC_TOKEN}" \
+  -var="oidc_audience=${OIDC_AUDIENCE}" \
+  -var="portal_client_id=${PORTAL_CLIENT_ID}" \
   -var="portal_redirect_uri=http://127.0.0.1:8082/callback" \
   "$REPO/infra/jobs/portal.nomad.hcl" >/dev/null \
   && ok "portal submitted (thin client; holds no credential of any kind)" \
@@ -71,7 +129,29 @@ cat <<MSG
         nomad job status api
         nomad job status portal
 
-    Then open http://127.0.0.1:8082/ and sign in. The identity provider will accept
-    whoever you say you are, because it is a development double and authenticates nobody.
+    Then open http://127.0.0.1:8082/ and sign in.
 
 MSG
+
+# Which provider is answering, said rather than implied. The two cases differ in whether
+# anyone was authenticated at all, and a sign-in page looks much the same either way.
+if [ -n "$AUTH0_DOMAIN" ]; then
+  cat <<MSG
+    You are signing in against ${AUTH0_DOMAIN} — a REAL identity provider. Credentials
+    are checked.
+
+    A person still reaches nothing until their claims map to a role. Auth0 carries the
+    role in \`permissions\` and the tenant in ${OIDC_TENANT_CLAIM}; the platform grants
+    nothing for either until a mapping clears the Control Group. Until then, sign-in
+    succeeds and the API answers 403 \`unmapped_claim\` — which is the mechanism working,
+    not a misconfiguration.
+
+MSG
+else
+  cat <<MSG
+    The identity provider will accept whoever you say you are, because it is a
+    development double and AUTHENTICATES NOBODY. Set AUTH0_DOMAIN in .env to sign in
+    against a real one.
+
+MSG
+fi

@@ -71,6 +71,15 @@ class OidcClient:
     redirect_uri: str
     authorize_endpoint: str
     token_endpoint: str
+    #: Which API the returned access token is FOR.
+    #:
+    #: Optional because OIDC does not require it and the development provider does not
+    #: want it. Necessary against a real one: Auth0 issues an **opaque** token when no
+    #: audience is requested — not a JWT at all — and the API then refuses it as
+    #: `unverifiable_identity`, which names the token rather than the missing parameter.
+    #: Okta and Ping behave the same way for the same reason: without an audience there is
+    #: no resource server whose keys and claims the token should be shaped for.
+    audience: str | None = None
     #: Injected in tests so the flow runs against the fake provider without HTTP.
     exchange: Any | None = None
     _pending: dict[str, PendingLogin] = field(default_factory=dict)
@@ -100,6 +109,10 @@ class OidcClient:
                 "state": state,
                 "code_challenge": code_challenge_for(verifier),
                 "code_challenge_method": "S256",
+                # Omitted entirely rather than sent empty: a provider that does not use
+                # this parameter must not receive it, and `audience=` reads as a request
+                # for an audience named "" rather than as no request at all.
+                **({"audience": self.audience} if self.audience else {}),
             }
         )
         return state, f"{self.authorize_endpoint}?{query}"

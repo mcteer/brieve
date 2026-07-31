@@ -29,6 +29,19 @@ variable "oidc_issuer" {
   type = string
 }
 
+variable "oidc_audience" {
+  type        = string
+  default     = ""
+  description = <<-DESC
+    Which API the access token is FOR, forwarded on the authorization request.
+
+    Empty for the development provider, which does not use it. Required against a real
+    one: Auth0 issues an opaque token rather than a JWT when no audience is asked for, and
+    the API then refuses it as unverifiable — an error naming the token rather than the
+    missing parameter.
+  DESC
+}
+
 variable "portal_client_id" {
   type    = string
   default = "harness-portal"
@@ -108,6 +121,7 @@ job "portal" {
         OIDC_ISSUER             = var.oidc_issuer
         OIDC_AUTHORIZE_ENDPOINT = var.oidc_authorize_endpoint
         OIDC_TOKEN_ENDPOINT     = var.oidc_token_endpoint
+        OIDC_AUDIENCE           = var.oidc_audience
         PORTAL_CLIENT_ID        = var.portal_client_id
         PORTAL_REDIRECT_URI     = var.portal_redirect_uri
         PORTAL_BIND             = "0.0.0.0:8082"
