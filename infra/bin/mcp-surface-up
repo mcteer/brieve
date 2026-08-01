@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Bring up the SERVED MCP surface — 019.
+#
+# Separate from the supervisory loop `enclave-up` registers. FR-015a requires the two be
+# independently available, and two jobs give that structurally: stopping this one leaves
+# the sweeper resuming suspended runs, and stopping the sweeper leaves this one answering.
+
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+ok() { printf '    \033[32mok\033[0m %s\n' "$*"; }
+die() {
+  printf '\033[31mthe MCP surface could not start:\033[0m %s\n' "$*" >&2
+  exit 1
+}
+
+# READS `.env` THE WAY EVERY OTHER SCRIPT HERE DOES, and tolerates a missing key.
+#
+# `grep` matching nothing exits 1, `pipefail` propagates it, and `VAR="$(env_val KEY)"` then
+# kills the script under `set -e` — which is how `portal-up` died on its first line in any
+# environment whose `.env` lacked a key it asked for. Locally that never happened, because
+# the key was always there.
+env_val() {
+  [ -f "$REPO/.env" ] || return 0
+  grep "^$1=" "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true
+}
+
+say "MCP surface"
+
+# THE COORDINATES, AND THEIR FALLBACKS, WHICH ARE THE PART THAT MATTERS.
+#
+# `enclave-up` writes VAULT_ROOT_TOKEN into `.env` but only EXPORTS the address and the CA
+# path — so a developer's `.env` has all three and CI's has one. Reading all three from
+# `.env` works perfectly on a laptop and fails in CI. That exact defect shipped in
+# `portal-up` and was caught only by running it against a deliberately minimal `.env`.
+#
+# The defaults are `enclave-up`'s own, copied rather than invented: if it moves the CA, this
+# is wrong in the same direction, which is easier to find than being wrong in a new one.
+VAULT_ADDR_VAL="$(env_val VAULT_ADDR)"; VAULT_ADDR_VAL="${VAULT_ADDR_VAL:-https://127.0.0.1:8200}"
+VAULT_CACERT_VAL="$(env_val VAULT_CACERT)"; VAULT_CACERT_VAL="${VAULT_CACERT_VAL:-$REPO/.enclave/ca.pem}"
+
+AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"
+[ -n "$AUTH0_DOMAIN" ] || die "AUTH0_DOMAIN is not in .env — this surface verifies CALLERS and will not start without an issuer"
+
+# The trailing slash is not optional and not cosmetic: Auth0's `iss` carries one, and a
+# verifier configured without it rejects every token with an issuer mismatch that names the
+# issuer rather than the slash.
+OIDC_ISSUER="https://${AUTH0_DOMAIN}/"
+OIDC_JWKS_URI="https://${AUTH0_DOMAIN}/.well-known/jwks.json"
+OIDC_AUDIENCE="$(env_val AUTH0_API_AUDIENCE)"
+OIDC_TENANT_CLAIM="$(env_val OIDC_TENANT_CLAIM)"
+OIDC_TENANT_CLAIM="${OIDC_TENANT_CLAIM:-tenant}"
+HARNESS_STARTED_BY="${HARNESS_STARTED_BY:-}"
+
+ok "issuer ${OIDC_ISSUER}"
+
+nomad job run -detach -var="repo=$REPO" \
+  -var="oidc_issuer=${OIDC_ISSUER}" \
+  -var="oidc_jwks_uri=${OIDC_JWKS_URI}" \
+  -var="oidc_audience=${OIDC_AUDIENCE}" \
+  -var="oidc_tenant_claim=${OIDC_TENANT_CLAIM}" \
+  -var="harness_started_by=${HARNESS_STARTED_BY}" \
+  "$REPO/infra/jobs/mcp-surface.nomad.hcl" >/dev/null \
+  && ok "mcp-surface submitted (bridge mode; the port is published to this machine)" \
+  || die "could not submit the mcp-surface job"
+
+cat <<NOTE
+
+    The surface answers on http://127.0.0.1:8083/mcp once its allocation is healthy.
+
+    It acts AS THE CALLING USER and never as itself, so a client presents its own bearer
+    token from the same identity provider the portal signs people in against. A token that
+    maps to no role is refused — which is the mechanism working, not a misconfiguration.
+
+    IT SERVES THE TRANSPORT. IT DOES NOT PUT A MODEL IN THE RUN LOOP. A dispatched run
+    still selects tools by a scripted sequence (ROADMAP gap 0e). What a client sees here is
+    governance running, refusals refusing, and evidence being written — which is the
+    platform working, and is not an agent deciding anything.
+
+NOTE

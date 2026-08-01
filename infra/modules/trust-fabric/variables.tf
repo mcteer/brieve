@@ -134,6 +134,19 @@ variable "mcp_job_id" {
   default     = "mcp"
 }
 
+variable "mcp_surface_job_id" {
+  description = <<-DESC
+    Scheduler job id of the SERVED MCP surface — 019.
+
+    Distinct from `mcp_job_id`, which is the supervisory loop. FR-015a requires the two be
+    independently available, so they are two jobs, two identities, and two roles. A single
+    role covering both would make a protocol crash and a sweeper crash the same event to
+    everything downstream.
+  DESC
+  type        = string
+  default     = "mcp-surface"
+}
+
 variable "agent_run_job_id_patterns" {
   description = <<-DESC
     Scheduler job ids a dispatched agent run may present.

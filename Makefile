@@ -33,6 +33,9 @@ check:
 # enclave-marked API rows both hold their OWN workload identity, so running them here
 # would fail for the right reason and the wrong purpose — a host process has no attested
 # identity and should not be able to reach the state store. They run in the allocation.
+mcp-surface-up:
+	@bash infra/bin/mcp-surface-up
+
 conformance:
 	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
 	@bash infra/bin/enclave-conformance

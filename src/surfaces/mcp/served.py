@@ -20,6 +20,12 @@ import os
 from typing import Any
 from weakref import WeakKeyDictionary
 
+from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.provider import AccessToken
+from mcp.server.auth.settings import AuthSettings
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import AnyHttpUrl
+
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
@@ -255,8 +261,6 @@ class HarnessTokenVerifier:
         self._subjects: dict[str, AuthenticatedSubject] = {}
 
     async def verify_token(self, token: str) -> Any:
-        from mcp.server.auth.provider import AccessToken
-
         try:
             subject = self._verifier.verify(token)
         except AuthenticationRefused:
@@ -286,9 +290,6 @@ def build_server(
     protocol frame and a governed call, and the refusal a client receives is always one the
     core authored (FR-006).
     """
-    from mcp.server.auth.middleware.auth_context import get_access_token
-    from mcp.server.fastmcp import Context, FastMCP
-
     server = FastMCP(
         name="brieve",
         instructions=(
@@ -298,14 +299,40 @@ def build_server(
             "selects tools by a scripted sequence."
         ),
         token_verifier=verifier,
+        # THE SDK REFUSES A VERIFIER WITHOUT THESE, and the refusal is correct: a token
+        # verifier with no declared issuer or resource would accept tokens minted for
+        # somewhere else entirely. `issuer_url` is who we trust to have minted the caller's
+        # credential; `resource_server_url` is what the token must have been minted FOR.
+        #
+        # Both come from the same environment the API reads, so the two surfaces cannot
+        # drift into trusting different issuers — which would make ADR-0033's parity
+        # guarantee a claim about two differently-trusting services.
+        auth=AuthSettings(
+            issuer_url=AnyHttpUrl(_required("OIDC_ISSUER")),
+            resource_server_url=AnyHttpUrl(
+                os.environ.get("MCP_SURFACE_RESOURCE_URL")
+                or f"http://127.0.0.1:{os.environ.get('MCP_SURFACE_PORT', '8083')}"
+            ),
+        ),
         host=os.environ.get("MCP_SURFACE_HOST", "0.0.0.0"),  # noqa: S104 — a served surface
         port=int(os.environ.get("MCP_SURFACE_PORT", "8083")),
     )
 
     def make_handler(tool_name: str) -> Any:
-        async def handler(
-            ctx: Context[Any, Any], arguments: dict[str, Any] | None = None
-        ) -> dict[str, Any]:
+        # ANNOTATIONS THE SDK CAN ACTUALLY EVALUATE, which is why they are bare.
+        #
+        # `func_metadata` calls `get_type_hints` on this handler to build the tool's input
+        # schema. Under `from __future__ import annotations` every annotation is a string,
+        # so each name must be resolvable in the MODULE's globals — which is why the SDK
+        # imports moved to the top of this file rather than staying inside `build_server`,
+        # where they were locals and the server died with "Unable to evaluate type
+        # annotations for callable 'start_run'".
+        #
+        # `Context` and `dict` are left unsubscripted because mypy's preferred
+        # `Context[Any, Any]` and `dict[str, Any]` are what the SDK must evaluate, and the
+        # generics resolve differently there. The `type: ignore` is narrow and deliberate:
+        # this signature answers to the SDK first.
+        async def handler(ctx: Context, arguments: dict | None = None) -> dict:  # type: ignore[type-arg]
             access = get_access_token()
             if access is None:
                 # FR-012: refused BEFORE the governed operation is entered.
