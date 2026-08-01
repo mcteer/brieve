@@ -76,7 +76,19 @@ def test_it_still_says_it_is_not_deployable() -> None:
 
 @pytest.mark.parametrize(
     "param",
-    ["resource", "scope", "nonce", "prompt", "login_hint", "audience", "response_mode"],
+    [
+        "resource",
+        "scope",
+        "nonce",
+        "prompt",
+        "login_hint",
+        "audience",
+        "response_mode",
+        # NOT A PROTOCOL PARAMETER — invented here, and that is the point. Under the denylist
+        # this replaced, a parameter nobody had thought of became an identity claim. Under an
+        # allowlist it cannot, whether or not anyone anticipated it.
+        "a_parameter_invented_after_this_was_written",
+    ],
 )
 def test_a_protocol_parameter_never_becomes_an_identity_claim(param: str) -> None:
     """**The defect that took five attempts to find.**
@@ -93,6 +105,21 @@ def test_a_protocol_parameter_never_becomes_an_identity_claim(param: str) -> Non
         f"{param!r} is a protocol parameter and became an identity claim; a client sending it "
         "by specification would carry it in its token and fall through its default claims"
     )
+
+
+def test_the_claim_list_is_an_allowlist_not_a_denylist() -> None:
+    """The direction this fails in is the whole fix.
+
+    A denylist that forgets a protocol parameter turns it into an identity claim — silently, and
+    in the direction that changes who someone is. An allowlist that forgets a claim simply does
+    not carry it, which shows up as a row failing. Same class of omission, opposite blast radius.
+    """
+    from tests.harness.dev_idp import CLAIM_PARAMETERS
+
+    assert "resource" not in CLAIM_PARAMETERS
+    assert "permissions" in CLAIM_PARAMETERS
+    # Everything outside the set is ignored, without the set needing to know it exists.
+    assert _claims({"anything-at-all": ["x"], "permissions": ['["p"]']}) == {"permissions": ["p"]}
 
 
 def test_a_genuine_claim_still_gets_through() -> None:

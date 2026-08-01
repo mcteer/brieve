@@ -278,47 +278,31 @@ def _is_allowed_redirect(redirect_uri: str) -> bool:
     return (parsed.hostname or "") in _LOOPBACK_HOSTS
 
 
+#: The ONLY query parameters that become identity claims.
+#:
+#: **An allowlist, because the denylist this replaced failed in the dangerous direction.** It
+#: named the protocol's own parameters and embedded everything else, so a parameter it had not
+#: heard of became a claim. `resource` was such a parameter — MCP requires clients to send it —
+#: and its presence made the claim dict truthy, which meant the caller's default claims were never
+#: applied. Every token from a real editor then carried no role, and the surface refused
+#: `unmapped_claim` after a login that appeared to succeed. It took five attempts to find, because
+#: every test written against it sent only parameters the list already knew.
+#:
+#: Inverted, an omission fails the other way: a claim nobody listed here is simply not carried,
+#: which shows up as a row failing rather than as an identity quietly changing shape. That is the
+#: direction this should fail in.
+CLAIM_PARAMETERS: frozenset[str] = frozenset({"permissions", "groups", "roles", "email"})
+
+
 def _claims(query: dict[str, list[str]]) -> dict[str, Any]:
-    """Everything the caller asked to carry, minus the protocol's own parameters."""
-    # A DENYLIST, and its gaps are silent — which is how this went wrong.
-    #
-    # `resource` was missing. MCP requires a client to send it (RFC 8707), so every real editor
-    # did, `_claims` returned `{"resource": ...}`, that was truthy, and the caller in `_authorize`
-    # therefore never fell back to its default claims. The token carried `resource` and nothing
-    # that maps to a role, and every call was refused `unmapped_claim` — after a browser login
-    # that appeared to succeed. A hand-driven flow that sent only the parameters this list already
-    # knew about worked perfectly, which is why it survived being tested.
-    #
-    # Everything the authorization request may legitimately carry, so that a parameter a client
-    # sends by specification never becomes an identity claim by accident.
-    protocol = {
-        "response_type",
-        "response_mode",
-        "client_id",
-        "redirect_uri",
-        "state",
-        "code_challenge",
-        "code_challenge_method",
-        "subject",
-        "tenant",
-        "scope",
-        "nonce",
-        # RFC 8707, and required by the MCP authorization specification.
-        "resource",
-        "audience",
-        "prompt",
-        "display",
-        "login_hint",
-        "max_age",
-        "acr_values",
-        "ui_locales",
-        "id_token_hint",
-        "request",
-        "request_uri",
-    }
+    """The claims a caller asked to carry — and nothing else.
+
+    JSON values so a list survives the query string; a bare word is taken as itself, which keeps
+    the common case readable.
+    """
     out: dict[str, Any] = {}
     for key, values in query.items():
-        if key in protocol or not values:
+        if key not in CLAIM_PARAMETERS or not values:
             continue
         raw = values[0]
         try:
