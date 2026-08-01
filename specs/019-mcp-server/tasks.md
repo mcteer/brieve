@@ -27,11 +27,11 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `tests/conformance/mcp_served/__init__.py` — the directory only, no rows yet.
+- [X] T001 Create `tests/conformance/mcp_served/__init__.py` — the directory only, no rows yet.
 
   **Deliberately NOT the `host_enclave` pytest line in `Makefile`**, which is where an earlier draft of this task sent it. These rows need the served process standing; 017's `tests/conformance/deployment` is likewise absent from that line and runs through `infra/bin/deployment-conformance`, which brings its surfaces up first. Rows on the pytest line would execute against nothing and fail. The lane wiring lives in T015, and it must land before T016 adds the first `test_*.py` — that is when `tests/unit/test_every_conformance_directory_is_run.py` starts checking this directory, since it only considers directories that contain rows.
-- [ ] T002 Record the per-directory `pytest --collect-only -q` counts from `main` in `specs/019-mcp-server/contracts/conformance.md`, as the baseline SC-007 compares against.
-- [ ] T003 [P] Record in `specs/019-mcp-server/research.md` which server and client APIs `mcp==1.28.1` actually provides, and confirm it resolves — the SDK is a declared dependency that nothing has ever imported, so its surface is unverified in this repository.
+- [X] T002 Record the per-directory `pytest --collect-only -q` counts from `main` in `specs/019-mcp-server/contracts/conformance.md`, as the baseline SC-007 compares against.
+- [X] T003 [P] Record in `specs/019-mcp-server/research.md` which server and client APIs `mcp==1.28.1` actually provides, and confirm it resolves — the SDK is a declared dependency that nothing has ever imported, so its surface is unverified in this repository.
 
 ---
 
@@ -43,7 +43,7 @@
 
 Today's portal fix cost three deploy cycles to learn this. It is a task now rather than a surprise.
 
-- [ ] T004 Read the database host from the environment in `src/surfaces/mcp/served.py` and **pass it at construction** to the durability provider, the audit sink, the audit query, and the dependency store.
+- [X] T004 Read the database host from the environment in `src/surfaces/mcp/served.py` and **pass it at construction** to the durability provider, the audit sink, the audit query, and the dependency store.
 
   **Not a core change, and the first draft of this task got that wrong.** All four already accept `host` as a keyword argument — `src/surfaces/api/service.py` passes one on line 184 — so the seam exists and is merely unused from an assembly. An earlier version of this task proposed editing the four `src/core/` modules, which would have made the plan's Principle V verdict ("the core is untouched") false, and Principle V names *audit schema* and *durability* as sealed core requiring security-maintainer review. Analysis pass 1 caught it. **The default stays `127.0.0.1`** so nothing outside an allocation changes, which is the pattern `surfaces/mcp/server.py` documents for `NOMAD_ADDR`.
 - [ ] T005 Verify from inside a **bridge-mode** container which address reaches the trust store, the database, and the scheduler, and record each in `research.md`. **`host.docker.internal` is not automatically the answer**: measured 2026-07-31 it resolves to Docker Desktop's macOS-facing address, which reaches services *published to macOS* (the trust store, the databases) and **not** services in host mode (the API). Getting this wrong produces a service that starts and reaches nothing.
@@ -51,9 +51,9 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 
 ### The server itself
 
-- [ ] T007 Create `src/surfaces/mcp/served.py` with the protocol server: handshake, operation listing, and operation dispatch into `McpTransport` (FR-001).
-- [ ] T008 Implement the assembly in `served.py` — construct `McpTransport` with the **real** collaborators the API constructs, no in-memory or test doubles (FR-002). Mirror `src/surfaces/api/service.py`'s `build()`; it is the only other assembly of this kind in the tree.
-- [ ] T009 [GATE:fail-closed] In `src/surfaces/mcp/served.py`, make the process **refuse to start** when it cannot obtain what it needs, naming the missing thing (FR-003). A surface that starts degraded and accepts connections while unable to record evidence is worse than one plainly down.
+- [X] T007 Create `src/surfaces/mcp/served.py` with the protocol server: handshake, operation listing, and operation dispatch into `McpTransport` (FR-001).
+- [X] T008 Implement the assembly in `served.py` — construct `McpTransport` with the **real** collaborators the API constructs, no in-memory or test doubles (FR-002). Mirror `src/surfaces/api/service.py`'s `build()`; it is the only other assembly of this kind in the tree.
+- [X] T009 [GATE:fail-closed] In `src/surfaces/mcp/served.py`, make the process **refuse to start** when it cannot obtain what it needs, naming the missing thing (FR-003). A surface that starts degraded and accepts connections while unable to record evidence is worse than one plainly down.
 - [ ] T010 Add `infra/jobs/mcp-surface.nomad.hcl` — **bridge mode with a mapped port**, copying `postgres.nomad.hcl`'s shape rather than the API's host-mode jobspec. Born reachable; see [research.md](./research.md) F1.
 - [ ] T011 Add `infra/bin/mcp-surface-up` **and the `mcp-surface-up` target in `Makefile` that invokes it** — [quickstart.md](./quickstart.md) documents `make mcp-surface-up` as step 1, and FR-015 requires someone connect by following those instructions without reading source, so a script with no target makes step 1 fail. Have it read Vault's coordinates through the script's own `.env` reader with `enclave-up`'s defaults as fallbacks. `enclave-up` writes `VAULT_ROOT_TOKEN` to `.env` but only *exports* the address and CA path — reading all three from `.env` works locally and fails in CI, which is a defect that shipped in `portal-up` and was caught only by running it against a deliberately minimal `.env`.
 - [ ] T012 Declare `mcp-surface` a deployment subject via the `meta` block in `infra/jobs/mcp-surface.nomad.hcl` — `harness_surface`, `harness_shape`, `harness_covered_by` — which is what `tests/conformance/deployment/surfaces.py` enumerates, so it is a declared surface rather than an unenrolled one (017's rule: coverage a process opts into is fail-open).
@@ -86,7 +86,7 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 
 **Independent test**: call an operation that must be refused and one that must not; confirm both outcomes and where the refusal originated.
 
-- [ ] T019 [US2] Route every operation through `McpTransport` in `src/surfaces/mcp/served.py`, with no protocol-layer path reaching a capability directly (FR-005).
+- [X] T019 [US2] Route every operation through `McpTransport` in `src/surfaces/mcp/served.py`, with no protocol-layer path reaching a capability directly (FR-005).
 - [ ] T020 [US2] Map the core's outcomes onto protocol responses in `served.py` so **refused**, **unknown operation**, **malformed request**, and **transport failure** are four distinguishable answers (FR-007). The fourth was missing: FR-007 names four and an earlier `data-model.md` table listed three, so a requirement and its edge case would have gone unimplemented behind a task that looked complete. Collapsing them tells a caller which operations exist by which error they get, and tells an honest caller nothing.
 - [ ] T021 [GATE:fail-closed] [US2] Assert in `tests/conformance/mcp_served/test_the_refusal_is_the_cores.py` that the protocol layer **authors no refusals** — it may report the core's decision and never make one (FR-006).
 - [ ] T022 [P] [US2] Add `test_an_operation_is_governed` in `tests/conformance/mcp_served/test_the_refusal_is_the_cores.py` (FR-005).
@@ -101,9 +101,9 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 
 **Independent test**: two callers perform the same operation; the trail distinguishes them.
 
-- [ ] T025 [US3] Carry the caller's credential across the protocol boundary in `src/surfaces/mcp/served.py` and resolve it through the API's existing federated verification (`src/surfaces/api/verification.py`). **Reuse, never rebuild** — a second path to a subject is a second place for the subject to be wrong, and that failure is silent by construction (FR-009).
-- [ ] T026 [US3] Bind exactly one subject per session, fixed at the handshake, in `served.py` (FR-013a). The subject comes from the session and **never from the request** — a client-supplied subject is an impersonation surface.
-- [ ] T027 [GATE:fail-closed] [US3] Refuse an operation whose credential is no longer valid, **without changing or clearing the session's subject** (FR-013). See the state diagram in [data-model.md](./data-model.md): both arrows leave ESTABLISHED and the subject never moves on either. The misreading this guards — *verified at the handshake* rather than *fixed at the handshake* — produces a session that outlives its credential.
+- [X] T025 [US3] Carry the caller's credential across the protocol boundary in `src/surfaces/mcp/served.py` and resolve it through the API's existing federated verification (`src/surfaces/api/verification.py`). **Reuse, never rebuild** — a second path to a subject is a second place for the subject to be wrong, and that failure is silent by construction (FR-009).
+- [X] T026 [US3] Bind exactly one subject per session, fixed at the handshake, in `served.py` (FR-013a). The subject comes from the session and **never from the request** — a client-supplied subject is an impersonation surface.
+- [X] T027 [GATE:fail-closed] [US3] Refuse an operation whose credential is no longer valid, **without changing or clearing the session's subject** (FR-013). See the state diagram in [data-model.md](./data-model.md): both arrows leave ESTABLISHED and the subject never moves on either. The misreading this guards — *verified at the handshake* rather than *fixed at the handshake* — produces a session that outlives its credential.
 - [ ] T028 [US3] Add `test_the_trail_names_the_caller` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-009, FR-010, SC-003).
 - [ ] T028a [GATE:correlation] [US3] Add `test_a_correlation_id_propagates` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` — a correlation ID supplied by the client reaches the trail, and the audit join is walkable from it.
 

@@ -101,9 +101,25 @@ than patched after.
 
 ## SC-007: did anything stop running?
 
-To be completed when the feature lands: per-directory `pytest --collect-only -q` counts
-compared against the prior state, confirming no pre-existing directory lost rows. The total
-rises because this feature adds rows, so only the pre-existing directories are the comparison.
+Per-directory `pytest --collect-only -q`, taken on `main` at `a95fc97` before any 019 source
+change (T002). The total rises because this feature adds rows, so **only the pre-existing
+directories are the comparison** — a rising total proves nothing.
+
+| Directory | Baseline on `main` | With 019 |
+| --- | --- | --- |
+| `adapter/` | 12 | *(pending)* |
+| `api/` | 46 | *(pending)* |
+| `authority/` | 12 | *(pending)* |
+| `deployment/` | 22 | *(pending)* |
+| `durability/` | 48 | *(pending)* |
+| `evidence/` | 17 | *(pending)* |
+| `identity/` | 28 | *(pending)* |
+| `mcp/` | 56 | *(pending)* |
+| `mcp_served/` | — | *(pending)* |
+| `packs/` | 30 | *(pending)* |
+| `portal/` | 8 | *(pending)* |
+
+Completed by T041.
 
 ---
 
