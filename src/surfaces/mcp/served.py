@@ -333,6 +333,12 @@ def build_server(
         port=int(os.environ.get("MCP_SURFACE_PORT", "8083")),
     )
 
+    # What each operation cannot do without, taken from the operation's own schema rather
+    # than a second list here — a list would drift from the schema silently.
+    required_fields = {
+        op.tool_name: tuple(op.input_schema.get("required", ())) for op in operations()
+    }
+
     def make_handler(tool_name: str) -> Any:
         # ANNOTATIONS THE SDK CAN ACTUALLY EVALUATE, which is why they are bare.
         #
@@ -362,7 +368,25 @@ def build_server(
             except AuthenticationRefused as refused:
                 return {"ok": False, "status": 403, "reason": refused.reason_code}
 
-            return result_payload(transport.call(tool_name, arguments or {}, subject=subject))
+            # MALFORMED INPUT IS REFUSED AT THE BOUNDARY, NAMING WHAT WAS WRONG (FR-007).
+            #
+            # Without this the transport raises `KeyError('run_id')` and the SDK reports
+            # "Error executing tool get_run: 'run_id'" — a bare key repr, indistinguishable
+            # from a platform fault, telling the caller nothing about what to fix. Observed
+            # against the running surface before this existed.
+            supplied = arguments or {}
+            missing = [
+                field for field in required_fields.get(tool_name, ()) if field not in supplied
+            ]
+            if missing:
+                return {
+                    "ok": False,
+                    "status": 400,
+                    "reason": "malformed request",
+                    "missing": missing,
+                }
+
+            return result_payload(transport.call(tool_name, supplied, subject=subject))
 
         handler.__name__ = tool_name
         return handler
