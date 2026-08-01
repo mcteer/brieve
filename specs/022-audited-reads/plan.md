@@ -161,6 +161,13 @@ outcome:
 **No new principle became implicated.** Phase 1 added no dependency, no table, no credential, and
 no authorization change.
 
+**Analysis pass 2 added one measured fact the gate should hold against** (research F9a): the new
+stream is reconciled like every other, and reconciliation writes its summary to a third stream
+under `__platform__`, so sweeping `record-access` does not grow it. This matters to **Principle IX**
+— a record of who looked, exempt from the check that its two copies agree, would be the one stream
+nobody verifies. No verdict moves; the row is simply now covered by argument as well as by default
+behavior.
+
 **One thing the design surfaced that the gate should hold against, recorded here so it is not
 lost in tasks**: `tests/component/test_operations_audited.py` keeps its job and must stop implying
 coverage it never had. Leaving a file named for the check this feature adds, next to the feature

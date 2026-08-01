@@ -165,6 +165,37 @@ failed.
 
 ---
 
+## F9a — Reconciliation over the new stream terminates, and the safeguard is one layer up
+
+**Added by analysis pass 2.** The spec listed the reconciler as an open edge case — *"a meta-audit
+record is itself a record; whether that terminates needs stating"* — and it was resolved against the
+code rather than by argument. Recording it here because research is where measured findings belong,
+and a resolution living only in an edge-case bullet is one nobody reading the research will find.
+
+**Measured**: `core/audit/reconcile.py::emit_reconciled` appends to
+`correlation_id=f"audit-reconcile-{basis}"` under `tenant_id="__platform__"` — a **third** stream,
+never the one it just compared.
+
+**Therefore**: reconciling `record-access:{tenant}` does not grow `record-access:{tenant}`. The
+recursion terminates for the same structural reason FR-005a relies on, applied one layer up — the
+platform had already made this decision for the evidence plane and it transfers unchanged.
+
+**Two consequences, stated rather than left to inference:**
+
+- **The reconciler's read of the record-access stream writes no read record.** It touches neither a
+  run nor a thread under FR-001, and it is platform machinery rather than a caller-facing
+  operation. Recording it would be recording the platform reading itself.
+- **The record-access stream is reconciled like any other.** That matters more than it sounds: a
+  record of who looked, exempted from the check that its two copies agree, would be the one stream
+  nobody verifies — which is precisely the property an adversary would want from it.
+
+**Observable now, before this feature ships**: the scheduled loop's backlog climbs by one per pass
+(264 → 271 over the session in which this was measured). That is existing behavior of the
+reconcile stream itself and is not introduced here — noted so it is not later mistaken for
+something 022 caused.
+
+---
+
 ## F10 — What must not change
 
 **Measured constraints carried into design:**

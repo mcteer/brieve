@@ -18,6 +18,8 @@ Three groups, and only the second needs a served surface:
 | Group | Where | Needs |
 | --- | --- | --- |
 | Recording, exclusion, refusal, fail-closed | `tests/component/test_record_access.py` | Nothing |
+| **The reader stream is reachable through the governed path** | `tests/component/test_record_access.py` (T023a) | Nothing |
+| **Authorization unchanged by recording** | `tests/component/test_record_access.py` (T023b) | Nothing |
 | Both surfaces answering identically, including the failure path | `tests/conformance/mcp`, `tests/conformance/api` | The enclave — both transports served |
 | The claim matches behavior | `tests/component/`, derived from the catalogue | Nothing |
 | Sealed-core digest unmoved | `tests/unit/test_audit_chain.py` | Nothing |
@@ -54,6 +56,12 @@ them is visibly a gate regression rather than an oversight.
 `record-access:{tenant}` naming the caller, the operation, and the target's correlation id where
 one exists.
 
+**The record is reachable.** A `record_read` entry is returned by the governed evidence read for
+its own tenant and refused for another. FR-005b ends *"a record nobody can query is not a record"*,
+and this row is what makes that checkable rather than assumed — it was missing from the first draft
+of this contract, and the served demonstration that should have exposed the gap was querying
+Postgres directly and skipping the governed path entirely.
+
 **A record carries no content.** A credential-shaped value planted in a payload the reader is not
 asked for reaches no entry (SC-006). This is asserted by planting, not by reading the code.
 
@@ -81,10 +89,18 @@ present (SC-005).
 
 ## What these rows refuse to assert
 
-**They do not assert that reads are authorized correctly.** Authorization is unchanged (FR-015)
-and is covered by the rows that already exist. A row here passing says a read was *recorded*, not
-that it was *permitted rightly* — and conflating the two would let a scoping regression hide
-behind a green audit row.
+**They do not assert that reads are authorized correctly.** A row here passing says a read was
+*recorded*, not that it was *permitted rightly* — and conflating the two would let a scoping
+regression hide behind a green audit row.
+
+**They do assert that authorization did not change** (T023b, SC-004a): the six operations answer
+identically to before this feature for the same caller — same records, same refusals, same status.
+That is a narrower claim than "authorized correctly", and the distinction is the point.
+
+*An earlier draft of this section said FR-015 "is covered by the rows that already exist" and left
+it there. Analysis rejected that: existing rows covering something incidentally is not the same as
+covering it, and a negative requirement with no check is a hope. The disclaimer is kept because it
+is still true of correctness; the added paragraph is what the feature actually proves.*
 
 **They do not assert that the trail is complete for anything outside the six.** Seven operations
 already audited before this feature and are not re-proved here; two are pinned as recording

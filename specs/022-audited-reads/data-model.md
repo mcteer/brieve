@@ -94,7 +94,13 @@ new read surface.
 ## State transitions
 
 None. A read record is written once and never updated — the trail is append-only. There is no
-lifecycle, no reconciliation state, and no field that changes after the append.
+lifecycle and no field that changes after the append.
+
+**The record carries no reconciliation state**, which is not the same as being exempt from
+reconciliation. The record-access stream is swept like any other, and must be: a record of who
+looked, excused from the check that its two copies agree, would be the one stream nobody verifies.
+Reconciliation writes its summary to `audit-reconcile-{basis}` under `__platform__`, so sweeping
+this stream does not grow it (research F9a).
 
 The only ordering constraint: **the record is written before the records are returned.** A read
 that answered first and recorded second would, on a failure between the two, be exactly the
