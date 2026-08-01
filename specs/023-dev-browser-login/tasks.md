@@ -24,7 +24,7 @@ worth having.
 
 | Gate type | Required? | Where |
 | --- | --- | --- |
-| **Fail-closed** | **Yes** — the provider refuses a missing PKCE challenge and an unconstrained redirect target, and this feature's direction is making the flow *easier* | T014, T015 |
+| **Fail-closed** | **Yes** — the provider refuses a missing PKCE challenge and an unconstrained redirect target, and this feature's direction is making the flow *easier* | T014, T015a |
 | **Conformance** | **Yes** — the served-surface lane must still pass, and both discovery paths must agree | T008, T016, T020 |
 | **No-secret-leak** | **Yes** — the rejected design wrote a private key to disk; a row asserts none is written | T013 |
 | **Correlation / evidence** | **No.** No run, no audit entry, no governed decision. Nothing here participates in a correlation walk. Stated rather than omitted. | — |
@@ -118,9 +118,22 @@ each.
       still refuses a missing or non-`S256` challenge (FR-010). Asserted rather than assumed
       **because this feature's direction is making the flow easier**, and "just for dev" is how a
       requirement becomes optional.
-- [ ] T015 [US2] [GATE:fail-closed] Constrain the redirect target in `tests/harness/dev_idp.py` and
-      assert a non-loopback target is refused (FR-011). Authenticating nobody is not a reason to
-      hand an authorization code to any address it is given.
+- [ ] T015 [US2] (FR-011a) **Observe a real client's `redirect_uri` before writing any constraint.**
+      Log what arrives at `/authorize` from an editor doing a genuine discovery-and-sign-in, and
+      record the value in this feature's research. **Nothing has ever measured this** — the one
+      client watched never reached `/authorize` because discovery broke first, so no `redirect_uri`
+      appears in any log. Editors commonly use `http://localhost:PORT/...`, a name rather than the
+      IP literal, or a private scheme like `cursor://`.
+- [ ] T015a [US2] [GATE:fail-closed] (FR-011, FR-011b) Constrain the redirect target in
+      `tests/harness/dev_idp.py` using what T015 observed, and assert a clearly-remote target is
+      refused. **Check the host only** — scheme, port, and path stay free, because the portal
+      already uses `https://127.0.0.1:8082/callback` and the harness uses
+      `http://127.0.0.1:0/callback`, and a narrower rule breaks the portal, which lives in `src/`
+      where FR-012 forbids a compensating change.
+- [ ] T015b [US2] Assert in `tests/conformance/mcp_served/` that both existing callers' redirect
+      shapes still pass — the portal's `https` loopback and the harness's port-`0` loopback. **This
+      row exists because the constraint is the one change here that can break something that
+      already works**, and it would break it in `src/`, where this feature may not follow.
 - [ ] T016 [US2] [GATE:conformance] (FR-008, SC-003) Assert that a token obtained through the flow and one obtained
       by the existing `caller_token` path resolve to the **same** subject, tenant, and roles
       (FR-008). Note that `surfaces.caller_token` already walks the real flow rather than signing
@@ -212,7 +225,8 @@ flow to complete.
 
 - **US2 and US3 run in parallel with US1** once Phase 1 lands — three of the four files involved are
   different.
-- **T014, T015, T017** all touch `dev_idp.py` and must be sequential with each other.
+- **T014, T015a, T017** all touch `dev_idp.py` and must be sequential with each other. **T015 is
+  not one of them** — it is an observation, and it must complete before T015a is written at all.
 - **T018–T019** touch `fake_oidc_provider.py` and are independent of everything in US1 and US2.
 - **T011 and T012** touch different scripts and are independent.
 
@@ -235,7 +249,7 @@ be noticed.
 
 ## Notes
 
-**27 tasks**, of which 9 are rows. Small, and the smallness is the finding: the surface's OAuth half
+**29 tasks**, of which 10 are rows. Small, and the smallness is the finding: the surface's OAuth half
 already worked, `/authorize` already redirected, `/token` already exchanged. What was missing was
 two routes, one constant, and one deleted line.
 

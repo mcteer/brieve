@@ -157,7 +157,10 @@ fetch its keys.
 - **A pasted token is still supplied.** Configurations exist with one in them. Whether it keeps
   working, or is refused, or is ignored in favour of the flow.
 - **A redirect target that is not the client's.** The provider authenticates nobody by design; it
-  must still not redirect a code to an arbitrary address supplied by whoever asked.
+  must still not redirect a code to an arbitrary address supplied by whoever asked. **The tension
+  this creates is real and is named rather than resolved by assertion**: too loose and the provider
+  is an open redirector; too tight and it refuses the editors the feature is for. FR-011a settles it
+  by measuring before deciding.
 
 ## Requirements *(mandatory)*
 
@@ -220,6 +223,19 @@ fetch its keys.
 - **FR-011**: The provider MUST NOT redirect an authorization code to a target it was simply handed
   by the requester without constraint. It authenticates nobody; that is not a reason for it to hand
   credentials anywhere it is pointed.
+- **FR-011a**: The constraint MUST be written from an **observed** redirect, not an assumed one, and
+  MUST admit every target a real client sends. **No redirect from an MCP editor has ever been
+  measured here** — the one client that was watched never reached `/authorize`, because the
+  discovery chain broke before it got there, so no `redirect_uri` appears in any log. Editors
+  commonly use `http://localhost:PORT/...` — a *name*, not the IP literal — or a private scheme such
+  as `cursor://`. **A constraint admitting only the loopback literal would refuse exactly the
+  clients this feature exists for**, and US1 would fail with a refusal indistinguishable from the
+  platform working correctly.
+- **FR-011b**: Whatever is admitted, **scheme, port, and path MUST remain unconstrained**. Measured:
+  the portal already uses `https://127.0.0.1:8082/callback` and the conformance harness uses
+  `http://127.0.0.1:0/callback`. A rule narrower than "check the host" breaks the portal — which
+  lives in `src/`, where FR-012 forbids a compensating change, so the provider would have to absorb
+  it anyway.
 
 **Boundaries**
 

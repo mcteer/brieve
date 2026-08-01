@@ -46,9 +46,14 @@ curl -s -X POST http://127.0.0.1:8090/register \
 **Expect**: a `client_id`. **Run it twice** — the second must succeed too, because editors
 re-register on reconnect.
 
-**Then try to break it**: register a redirect target that is not a loopback address. It must be
-refused. The provider authenticates nobody, and that is not a reason to hand an authorization code
-to any address it is given.
+**Then try to break it**: register a clearly-remote redirect target — something on another host. It
+must be refused. The provider authenticates nobody, and that is not a reason to hand an
+authorization code to any address it is given.
+
+**The example above is `http://127.0.0.1:...` for concreteness, not as the rule.** The constraint
+checks the **host only**: the portal already uses `https` loopback and the harness uses port `0`,
+and a real editor may use `localhost` by name or a private scheme. What is admitted comes from
+T015's observation of a real client, not from this example.
 
 ---
 
