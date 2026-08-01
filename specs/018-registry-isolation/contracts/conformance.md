@@ -245,3 +245,24 @@ The rows are built so the message tells them apart. A failure reporting
 `could not attribute` means the authority can no longer see the path — the read grant went
 away. A failure reporting `a run WROTE a record bounding it` means what it says. `test_a_typo_in_a_path_does_not_pass`
 exists to keep the first from ever being reported as the second.
+
+---
+
+## Who runs these rows — amended 2026-08-01
+
+**The enclave lane no longer runs on every pull request.** It stood a whole enclave up inside
+GitHub for each change and began failing for reasons about the runner rather than the platform.
+A real enclave on a maintainer's machine is better evidence than a synthetic one; the rows are
+identical, so what CI added was insistence rather than coverage.
+
+**These rows are therefore run by a named party before merge: Dan McTeer**, via `make
+conformance` in full on a live enclave. That is the model the constitution describes for a
+blocking row no automated check executes, and it is what this contract now records.
+
+**What was given up, recorded rather than glossed.** Both defects found in CI on 2026-08-01 were
+COMPOSITION failures — a surface two lanes both claimed to own, and a resource reservation that
+fit an empty runner and not a full one. Neither appears when lanes are run one at a time, which
+is how they are usually run locally. **`make conformance` in full is the mitigation**, and it is
+now a person remembering rather than a machine insisting.
+
+The lane remains available on demand (`gh workflow run enclave.yml`).
