@@ -470,3 +470,36 @@ reading one discloses how the platform is set up, not what anyone did with it.
 `records_elsewhere` must **name where**. That requirement earned itself immediately: an early
 draft of 022 classified `stop_run` that way, and applying the rule revealed there was no where.
 It wrote nothing at all.
+
+## Answer
+
+What the platform returns to a question about the guidance corpus: claims, each carrying citations
+that resolve, or a **decline**. Two dispositions and no third — a provider failure is not an answer
+and does not arrive in this shape, because a reader cannot tell *"the corpus does not say"* from
+*"we could not reach the model"*, and those send them to different people.
+
+**Never persisted.** Like a `RunReport`, it has no identity between requests.
+
+## Citation
+
+A pointer from a claim to the section supporting it — a document and an anchor, resolved against
+the pinned corpus **before the answer ships**.
+
+**An unresolvable citation is worse than no citation.** It reads as evidence, and a reader who
+follows it and finds nothing has been told something false about what this platform knows. So a
+claim whose citation does not resolve is dropped, and an answer with nothing left is a decline.
+
+## Corpus pin
+
+The identity of the guidance content an answer was produced from — a SHA-256 of each upstream
+document, recorded in `corpus/manifest.json`.
+
+**A digest rather than a version, because the corpus has no version metadata anywhere.** Change can
+only be detected by content. The digest also does something a copy cannot: a vendored copy drifts
+from upstream silently, while a digest mismatch is loud.
+
+## Decline
+
+Saying the corpus does not support an answer. **A first-class outcome, not an error** — the
+required behaviour rather than the polite one, since an answer that cannot be traced is the failure
+this platform is built against.

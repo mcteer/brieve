@@ -182,19 +182,19 @@ scoring authored strings.
 
 ## Phase 6: The surface
 
-- [ ] T028 [GATE:conformance] (FR-013, SC-001) Add the ask operation to the API, and to MCP for
+- [X] T028 [GATE:conformance] (FR-013, SC-001) Add the ask operation to the API, and to MCP for
       parity (ADR-0033). **Nothing under `src/surfaces/portal/` changes** — the portal's answering
       surface is its own feature. Analysis pass 3 found SC-001 reading "through the portal" while no
       task touched it; narrowed rather than widened.
-- [ ] T028a [GATE:conformance] Register `tests/conformance/answering` in the `Makefile`'s
+- [X] T028a [GATE:conformance] Register `tests/conformance/answering` in the `Makefile`'s
       `host_enclave` line, which names directories **individually**. **A new directory is invisible
       to it otherwise**, and the Makefile records that trap three times in its own comments —
       *"`tests/conformance/identity` was invisible to this line"*, *"014 adds durability, and the
       trap there is subtler"*, *"018 … very nearly repeated 010's mistake"*. T023's rows would be
       the fourth: green because nothing collected them.
-- [ ] T029 [GATE:conformance] Extend the surface-parity rows so both surfaces return the same
+- [X] T029 [GATE:conformance] Extend the surface-parity rows so both surfaces return the same
       verdict for the same question, including the decline and the provider-failure cases.
-- [ ] T030 (FR-012a) Give the operation the `records` disposition in
+- [X] T030 (FR-012a) Give the operation the `records` disposition in
       `src/surfaces/mcp/operations.py` — 022 made that a required field with no default, so it
       cannot be skipped. `records` is right because an ask **writes its own entry**; 022's rule that
       an operation touching neither a run nor a thread need not record says *need not*, not *must
@@ -204,18 +204,18 @@ scoring authored strings.
 
 ## Phase 7: Polish
 
-- [ ] T031 Update `docs/glossary.md` — *answer*, *citation*, *corpus pin*, *decline*.
-- [ ] T031a Record in the ROADMAP entry and in this feature's directory that **the name predates
+- [X] T031 Update `docs/glossary.md` — *answer*, *citation*, *corpus pin*, *decline*.
+- [X] T031a Record in the ROADMAP entry and in this feature's directory that **the name predates
       the split**: `024-portal-answering` builds answering through the API and MCP, and the portal's
       answering surface is a separate feature. A planning document that misdescribes what exists has
       already cost this repository twice in two days; the directory name is not worth renaming
       mid-feature, but it is worth not being read as a claim.
-- [ ] T032 Record 024 in `ROADMAP.md`, including **both** splits and their reasons — estate-state
+- [X] T032 Record 024 in `ROADMAP.md`, including **both** splits and their reasons — estate-state
       answering, and the portal's answering surface. Two deferrals from one feature is worth the
       next planner seeing plainly.
-- [ ] T032a Assert that **no file under `src/surfaces/portal/` differs**, the way 023 asserted
+- [X] T032a Assert that **no file under `src/surfaces/portal/` differs**, the way 023 asserted
       nothing under `src/` did. A scope boundary nobody checks is a scope boundary that moves.
-- [ ] T033 Run `make check` and `make evals`.
+- [X] T033 Run `make check` and `make evals`.
 - [ ] T034 Run `make conformance` on a live enclave. **Owed by name** — the enclave lane is
       `workflow_dispatch` only.
 - [ ] T035 Qualify the `ask` cell via `make evals-live` against a real model. **Owed by name** —

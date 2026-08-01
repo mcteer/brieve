@@ -70,6 +70,10 @@ class McpTransport:
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
+        # 024. Absent by default: a surface with no model answers 503 rather than answering from
+        # the corpus alone, which FR-011a forbids.
+        self._ask_provider: Any = None
+        self._ask_model: str = "unconfigured"
         self._evidence = evidence_query
         self._submitter = authority_submitter
         # Mirrors `create_app`'s collaborators exactly, and the mirroring is the point: the
@@ -109,6 +113,7 @@ class McpTransport:
             "list_runs": self._list_runs,
             "get_run_result": self._get_run_result,
             "get_run_report": self._get_run_report,
+            "ask": self._ask,
             "stop_run": self._stop_run,
             "list_agent_definitions": self._list_agent_definitions,
             "get_agent_definition": self._get_agent_definition,
@@ -175,6 +180,49 @@ class McpTransport:
         if handle is None:
             return McpResult(ok=False, status=404, payload={"reason": "no such run"})
         return McpResult(ok=True, status=200, payload=handle.model_dump(mode="json"))
+
+    def _ask(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        """The same verdict the API gives, from the same implementation (ADR-0033).
+
+        A surface with no model configured answers 503 here exactly as the API does — including
+        that a provider failure is not delivered as a decline.
+        """
+        from core.answering.answer import ProviderUnavailable
+        from core.answering.corpus import CorpusUnavailable, load_corpus
+        from surfaces.api.ask import ask_for
+
+        try:
+            corpus = load_corpus()
+        except CorpusUnavailable as unavailable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
+
+        if self._ask_provider is None:
+            # Recorded anyway — see the API's note. Someone asked and the platform could not
+            # attempt it, which is a fact about this surface worth having in the trail.
+            from core.answering.record import record_ask
+
+            record_ask(
+                audit=self._audit,
+                subject=subject,
+                corpus_digest=corpus.digest,
+                model="unconfigured",
+                disposition="provider_unavailable",
+            )
+            return McpResult(
+                ok=False, status=503, payload={"reason": "no model is configured for `ask`"}
+            )
+        try:
+            payload = ask_for(
+                question=str(args["question"]),
+                subject=subject,
+                corpus=corpus,
+                provider=self._ask_provider,
+                audit=self._audit,
+                model=self._ask_model,
+            )
+        except (CorpusUnavailable, ProviderUnavailable) as unavailable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
+        return McpResult(ok=True, status=200, payload=payload)
 
     def _get_run_report(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         """021. Reaches the same `report_for` the API route does.
