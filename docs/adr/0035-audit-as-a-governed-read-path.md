@@ -3,6 +3,7 @@
 - **Status**: Accepted
 - **Date**: 2026-07-01
 - **Relates to**: [ADR-0009](0009-adlc-stages-and-observability-planes.md), [ADR-0018](0018-grounded-reporting.md), [ADR-0034](0034-conversational-web-ui.md), [ADR-0036](0036-cost-estimation-boundaries.md)
+- **Amended**: 2026-08-01 (022) — the governed-read discipline extends past the audit plane
 
 ## Context
 
@@ -56,6 +57,48 @@ a visible wrong answer rather than as a silent leak.
 Meta-auditing evidence access closes a genuine gap. In an investigation, who looked at
 what and when is itself material, and an audit trail nobody can review the reviewing of is
 incomplete.
+
+## Amendment, 2026-08-01 (022): the discipline extends past the audit plane
+
+**"Evidence access is itself audited" was implemented exactly as written, and the scope turned
+out to be too narrow.** It bound the audit plane, and nothing else. Measured against the running
+service, nine of seventeen operations returned records about runs and threads and wrote nothing —
+while both surfaces told every connecting client that every operation was recorded in a
+tamper-evident trail.
+
+**The sharpest case shows why the narrow scope was wrong.** ADR-0018's `RunReport` deliberately
+omits a run's result so a tenant-scoped report cannot route around the subject-only restriction on
+`get_run_result`. That reasoning is sound and the code holds it — and `get_run_result` itself
+recorded nothing about who read it. The artifact that could not leak the result was audited; the
+one that served it was not. The discipline was protecting the derived thing and not the source.
+
+**Amended scope**: an operation that touches a **run or a thread** records. One that touches
+neither does not. Runs and threads are records of *activity*; agent definitions are
+*configuration*, and reading one discloses how the platform is set up rather than what anyone did
+with it. That boundary is drawn on volume as much as principle — the two catalogue reads are the
+highest-frequency calls a connected client makes, and the trail is never sampled, so recording
+them would be a permanent cost for the least informative entries.
+
+**The original decision's structural safeguard is kept, and is now load-bearing twice.** This ADR
+already required the meta-audit to be written to a stream *separate from the one being read*,
+because appending to the queried run's chain would mean reading evidence writes into the evidence
+being read. ADR-0018 made that stronger than it was when written: `RunReport` compiles from a run's
+chain, so a read appended there would put "who read this run" inside the report of that run —
+including reads of the report — growing every time anyone looked. Read records therefore live in
+`record-access:{tenant}` and carry the read object's correlation id as a **field**, so an auditor
+holding a run id can still find its readers through the same governed query.
+
+**A second stream, not the existing one**, and the cost is stated rather than discovered: an
+auditor asking who looked at anything in a tenant now queries two. Merging them was the simpler
+option and was rejected on volume profile — an evidence read is a deliberate act during a review,
+`list_runs` is what an idle editor calls, and merged the second would permanently bury the first
+in the stream an auditor opens first.
+
+**Reconciliation is unaffected and terminates**: `emit_reconciled` writes to
+`audit-reconcile-{basis}` under the platform tenant, a third stream, never the one it compared. So
+sweeping `record-access` does not grow it — and `record-access` *is* swept like any other stream,
+because a record of who looked that is exempt from the check that its two copies agree would be
+the one stream nobody verifies.
 
 Refusing to issue verdicts is the right posture for both legal and practical reasons: the
 platform lacks the standing and the context to determine compliance, and a confident wrong

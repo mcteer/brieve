@@ -1,5 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Every operation is attributable, and unauthenticated callers reach none of them.
+"""Every operation is ATTRIBUTABLE, and unauthenticated callers reach none of them.
+
+**This file does not check that any operation writes an audit entry, and its name once implied
+that it did.** 022 renamed it for that reason: eight operations shipped unrecorded across
+thirteen additions while this file sat beside them looking like the guard against exactly that.
+A test named for a check it does not perform is worse than no test, because the next reader
+concludes the question is covered.
+
+What *does* check recording is `test_the_claim_matches_behaviour.py`. This file checks
+authentication, and always did.
 
 Two halves of FR-016/FR-017 that are easy to assume rather than assert. 008's structural
 argument — a route without a subject dependency has no subject to thread onward, so it
@@ -121,11 +130,16 @@ def test_every_reason_code_says_what_it_means() -> None:
 def test_the_operation_list_here_matches_what_shipped() -> None:
     """Guards this file against the feature growing past it.
 
-    Eleven operations have been added since 008. If a twelfth lands and is not listed
-    here, the authentication rows above silently stop covering it — which is how a
-    coverage check becomes decorative. It has already caught this once: 012's five thread
-    operations were added to the catalogue before they were added here, and this row is
-    what noticed.
+    If an operation lands and is not listed here, the authentication rows above silently stop
+    covering it — which is how a coverage check becomes decorative. It has already caught this
+    once: 012's five thread operations were added to the catalogue before they were added here,
+    and this row is what noticed.
+
+    **The count is derived, not restated.** This docstring used to say *"eleven operations have
+    been added since 008"* and *"if a twelfth lands"*; by 022 the real number was thirteen. The
+    LIST below is enforced by the assertion at the bottom and stayed correct the whole time,
+    while the PROSE COUNT beside it drifted two behind — a second copy of a fact, maintained by
+    hand, going stale exactly as this repository keeps finding they do.
     """
     from surfaces.mcp.operations import operations
 
@@ -133,4 +147,6 @@ def test_the_operation_list_here_matches_what_shipped() -> None:
     listed = {tool for _m, _p, tool, _a in NEW_OPERATIONS}
     original = {"start_run", "get_run", "read_evidence", "request_mapping_change"}
 
-    assert listed == shipped - original
+    assert listed == shipped - original, (
+        f"{len(NEW_OPERATIONS)} listed here, {len(shipped - original)} shipped since 008"
+    )

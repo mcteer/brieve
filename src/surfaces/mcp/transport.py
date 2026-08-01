@@ -202,14 +202,18 @@ class McpTransport:
 
         from surfaces.api.evidence import read_evidence_for
 
-        entries, disposition = read_evidence_for(
-            query=self._evidence,
-            audit=self._audit,
-            subject=subject,
-            correlation_id=args.get("correlation_id"),
-            run_id=args.get("run_id"),
-            limit=int(args.get("limit") or 1000),
-        )
+        try:
+            entries, disposition = read_evidence_for(
+                query=self._evidence,
+                audit=self._audit,
+                subject=subject,
+                correlation_id=args.get("correlation_id"),
+                run_id=args.get("run_id"),
+                limit=int(args.get("limit") or 1000),
+            )
+        except RecordAccessUnavailable as unrecordable:
+            # The same 503 the API returns. Before 022 this escaped uncaught.
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         return McpResult(
             ok=True,
             status=200,

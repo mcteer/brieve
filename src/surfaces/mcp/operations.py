@@ -111,6 +111,30 @@ class McpOperation:
             )
 
 
+def governance_sentence() -> str:
+    """What a client is told about recording — **derived from the dispositions, never written**.
+
+    022's FR-011 asks for a check that fails when the surface's self-description asserts coverage
+    the service does not provide. A row comparing this sentence to a second hand-written
+    expectation would have passed every day the gap existed, because keeping the two in sync is
+    exactly the thing that failed: the sentence said *every operation* is recorded while nine of
+    seventeen wrote nothing.
+
+    So the sentence cannot overclaim without the catalogue lying first, and the catalogue is
+    checked against measured behaviour by its own rows. This is the same argument the feature
+    makes about reports — presentation derived from records, never composed beside them.
+    """
+    recorded = sorted(o.tool_name for o in operations() if o.audit_disposition == RECORDS)
+    unrecorded = sorted(o.tool_name for o in operations() if o.audit_disposition == NO_RECORD)
+    return (
+        f"Every operation executes as the calling user. {len(recorded)} of {len(operations())} "
+        "write their own entry to the tamper-evident trail — every operation that touches a run "
+        f"or a thread ({', '.join(recorded)}) — and the rest are recorded by the machinery they "
+        f"start. {' and '.join(unrecorded)} return configuration rather than activity and are "
+        "deliberately not recorded."
+    )
+
+
 def operations() -> list[McpOperation]:
     """Every operation, in the order a client would see them listed."""
     return [

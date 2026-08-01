@@ -226,16 +226,23 @@ def run_result_for(
         )
         raise OperationRefused("this run belongs to someone else", reason_code="not_permitted")
 
-    record_access(
-        audit=audit,
-        subject=subject,
-        operation="get_run_result",
-        target_correlation_id=entry.correlation_id,
-        target_id=run_id,
-        result_count=1,
-    )
+    # RECORDED AGAINST WHAT WAS ACTUALLY DISCLOSED, which is why this is not written here.
+    # An entry saying "read, one result" when the answer was `running`, or when the result was
+    # refused for size, would describe a disclosure that did not happen — and a record that
+    # overstates what someone saw is the same class of defect as no record at all.
+    def _shown(count: int) -> None:
+        record_access(
+            audit=audit,
+            subject=subject,
+            operation="get_run_result",
+            target_correlation_id=entry.correlation_id,
+            target_id=run_id,
+            result_count=count,
+        )
+
     blob = durability.load(run_id) if durability is not None else None
     if blob is None or blob.outcome is None:
+        _shown(0)
         return RunResultResponse(run_id=run_id, disposition="running")
 
     payload = blob.payload or {}
@@ -243,6 +250,7 @@ def run_result_for(
         # Terminal with nothing to show — stopped, refused, or simply produced nothing.
         # The reason is what makes this actionable: a run that failed is not a run that
         # returned nothing, and an empty response would say the second about the first.
+        _shown(0)
         return RunResultResponse(
             run_id=run_id,
             disposition="ended_without_result",
@@ -251,7 +259,21 @@ def run_result_for(
 
     result = payload[RESULT_KEY]
     if _too_large(result):
-        raise OperationRefused("result too large to return", reason_code="not_permitted")
+        # A refusal, and recorded as one — with a code that is TRUE of why. This raised
+        # `not_permitted` until 022, meaning "the record is visible and this action is not
+        # yours": a 403 for something that merely did not fit, and, once refusals began being
+        # recorded, a permission denial written into the trail that never happened.
+        record_access_refused(
+            audit=audit,
+            subject=subject,
+            operation="get_run_result",
+            reason_code="result_too_large",
+            target_correlation_id=entry.correlation_id,
+            target_id=run_id,
+        )
+        raise OperationRefused("result too large to return", reason_code="result_too_large")
+
+    _shown(1)
 
     return RunResultResponse(run_id=run_id, disposition="complete", result=result)
 
@@ -395,7 +417,7 @@ def run_state_for(
 
     Authorization is unchanged (FR-015): this reads the dispatcher exactly as both callers did.
     """
-    handle = dispatcher.state_of(run_id)
+    handle: RunHandle | None = dispatcher.state_of(run_id)
     if handle is None:
         record_access_refused(
             audit=audit,

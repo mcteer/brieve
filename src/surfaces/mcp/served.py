@@ -47,7 +47,7 @@ from surfaces.api.verification import (
     TokenVerifier,
 )
 from surfaces.dispatch.nomad import NomadDispatcher
-from surfaces.mcp.operations import operations
+from surfaces.mcp.operations import governance_sentence, operations
 from surfaces.mcp.transport import McpResult, McpTransport
 from surfaces.toolset import build_registry, known_actions, known_tools
 
@@ -326,13 +326,20 @@ def build_server(
         # being true when 020 landed: a model now chooses each step's tool and the choice goes
         # through the same governed entry. A surface describing itself as less capable than it
         # is, to every client that connects, is a defect nobody inside the tree can see.
+        # THE RECORDING CLAIM IS GENERATED, not written here. It read "every operation ... is
+        # recorded in a tamper-evident trail" while nine of seventeen wrote nothing — the third
+        # self-description in two days measured against the running service and found false, and
+        # the first where the overclaim was about governance rather than capability. A test
+        # comparing this text to a second hand-written copy would have passed every one of those
+        # days, so the text is derived from the catalogue's dispositions instead.
         instructions=(
-            "The governed agent runtime. Every operation executes as the calling user and is "
-            "recorded in a tamper-evident trail. A dispatched run consults the model its "
-            "definition binds, and every tool that model chooses passes the same governed "
-            "entry a scripted one would — refused when it must be, recorded either way. "
-            "`get_run_report` compiles what a run did from those records; it composes "
-            "nothing, and states what it could not verify rather than smoothing it over."
+            "The governed agent runtime. "
+            + governance_sentence()
+            + " A dispatched run consults the model its definition binds, and every tool that "
+            "model chooses passes the same governed entry a scripted one would — refused when "
+            "it must be, recorded either way. `get_run_report` compiles what a run did from "
+            "those records; it composes nothing, and states what it could not verify rather "
+            "than smoothing it over."
         ),
         token_verifier=verifier,
         # THE SDK REFUSES A VERIFIER WITHOUT THESE, and the refusal is correct: a token

@@ -119,7 +119,7 @@ find a record naming the reader.
 - [X] T014 [US1] [GATE:correlation] Populate `target_correlation_id` from the run's own
       correlation id in `src/surfaces/api/runs.py`, so holding a run id is enough to find its
       readers through the existing governed query.
-- [ ] T015 [US1] [GATE:no-secret-leak] (FR-006, SC-006) Assert in `tests/component/test_record_access.py` that a
+- [X] T015 [US1] [GATE:no-secret-leak] (FR-006, SC-006) Assert in `tests/component/test_record_access.py` that a
       credential-shaped value planted in a run's result payload reaches no audit entry. Plant it;
       do not reason about it.
 - [X] T016 [P] [US1] Record in `list_runs_for` in `src/surfaces/api/runs.py`, with
@@ -135,7 +135,7 @@ find a record naming the reader.
       terminal `CheckpointBlob` is saved, so a stop that cannot be recorded does not happen.
       Symmetric with `THREAD_DELETED`; this is an act on the run, not a read of it, so FR-005a does
       not apply.
-- [ ] T020b [US1] [GATE:fail-closed] (FR-007a, SC-009) Assert in
+- [X] T020b [US1] [GATE:fail-closed] (FR-007a, SC-009) Assert in
       `tests/component/test_record_access.py` that when the entry cannot be written the stop fails
       **and the run keeps running** — a run silently terminated with no record is strictly worse
       than a stop that refuses, because the caller believes it worked.
@@ -145,36 +145,36 @@ find a record naming the reader.
 - [X] T022 [US1] Map `RecordAccessUnavailable` to the **same** 503 verdict in the six MCP handlers
       in `src/surfaces/mcp/transport.py`. This is what makes FR-008's parity hold on the failure
       path, which research F7 measured the existing evidence path does not have.
-- [ ] T023 [US1] Assert in `tests/component/test_record_access.py` that each of the six writes
+- [X] T023 [US1] Assert in `tests/component/test_record_access.py` that each of the six writes
       exactly one entry per call, naming caller, operation, and target.
-- [ ] T023a [US1] [GATE:correlation] Assert in `tests/component/test_record_access.py` that a
+- [X] T023a [US1] [GATE:correlation] Assert in `tests/component/test_record_access.py` that a
       `record_read` entry is **returned by the governed evidence read** — call `read_evidence_for`
       with `correlation_id=record_stream_for(tenant)` and find the entry — and that a caller from
       another tenant is refused. FR-005b ends *"a record nobody can query is not a record"*, and
       without this row the stream is written and never proven reachable. **Analysis found nothing
       else covering this**, because the one artifact that would have shown it (quickstart §5) was
       querying Postgres directly and skipping the governed path entirely.
-- [ ] T023b [US1] Assert in `tests/component/test_record_access.py` that the seven operations answer
+- [X] T023b [US1] Assert in `tests/component/test_record_access.py` that the seven operations answer
       identically to before this feature for the same caller — same records, same refusals, same
       status (SC-004a, FR-015). Six operations are being edited and nothing else checks that
       recording a read did not change who may perform it.
-- [ ] T024 [US1] [GATE:correlation] (FR-005a, SC-010) Assert in `tests/component/test_record_access.py` that a read
+- [X] T024 [US1] [GATE:correlation] (FR-005a, SC-010) Assert in `tests/component/test_record_access.py` that a read
       leaves the read object's chain **byte-identical** — the entry count and the head hash of the
       run's own stream are unchanged after reading it.
-- [ ] T025 [US1] [GATE:correlation] (SC-010) Assert in `tests/conformance/reports/` that a report compiled
+- [X] T025 [US1] [GATE:correlation] (SC-010) Assert in `tests/conformance/reports/` that a report compiled
       for a run after that run has been read carries **no claim about who read it**. This is the
       row protecting 021, and it is the guard against the first draft's reasoning returning.
-- [ ] T026 [US1] [GATE:fail-closed] (FR-007a, SC-009) Assert in `tests/component/test_record_access.py` that with
+- [X] T026 [US1] [GATE:fail-closed] (FR-007a, SC-009) Assert in `tests/component/test_record_access.py` that with
       the sink made to fail, **all six reads** refuse and return no records — listings
       included. Listings are the case with no precedent and the one most likely to be softened
       later for convenience.
-- [ ] T027 [US1] (FR-007, SC-007) Assert in `tests/component/test_record_access.py` that a refused read records,
+- [X] T027 [US1] (FR-007, SC-007) Assert in `tests/component/test_record_access.py` that a refused read records,
       and that `no_such_record` and `outside_tenant` stay distinct in the entry while remaining
       indistinguishable in the response.
-- [ ] T028 [US1] (FR-007b) Assert in `tests/component/test_record_access.py` that a read returning nothing
+- [X] T028 [US1] (FR-007b) Assert in `tests/component/test_record_access.py` that a read returning nothing
       still records — an empty listing discloses that the caller asked, and a trail omitting
       fruitless reads cannot show probing.
-- [ ] T029 [US1] [GATE:conformance] Extend `tests/conformance/mcp/test_surface_parity.py` so the
+- [X] T029 [US1] [GATE:conformance] Extend `tests/conformance/mcp/test_surface_parity.py` so the
       seven operations are compared across both transports on the success path, the refusal path,
       **and** the unrecordable path.
 
@@ -188,17 +188,17 @@ find a record naming the reader.
 
 **Independent test**: change one operation's disposition; the surface's sentence changes with it.
 
-- [ ] T030 [US2] (FR-010) Replace the hand-written governance sentence in `src/surfaces/mcp/served.py`
+- [X] T030 [US2] (FR-010) Replace the hand-written governance sentence in `src/surfaces/mcp/served.py`
       (currently *"Every operation executes as the calling user and is recorded in a tamper-evident
       trail"*) with text **generated** from the operation catalogue's dispositions.
-- [ ] T031 [US2] (FR-011, SC-003) Assert in `tests/component/` that the generated sentence names the recorded
+- [X] T031 [US2] (FR-011, SC-003) Assert in `tests/component/` that the generated sentence names the recorded
       operations accurately, by flipping one disposition and observing the sentence change.
       A row comparing the sentence to a second hand-written expectation would have passed every
       day this gap existed — research F9.
-- [ ] T032 [US2] (FR-011, SC-003) Assert in `tests/component/` that every operation whose disposition is `records`
+- [X] T032 [US2] (FR-011, SC-003) Assert in `tests/component/` that every operation whose disposition is `records`
       actually writes an entry, and every `no_record` operation writes none. This is the row that
       would have failed on 2026-08-01, and the contract names it as such.
-- [ ] T033 [US2] (FR-010) Check the API surface for any equivalent governance claim in its title,
+- [X] T033 [US2] (FR-010) Check the API surface for any equivalent governance claim in its title,
       description, or docs, and bring it into line or confirm in writing that it makes none.
       Parity of claims, not only of behavior.
 
@@ -211,25 +211,25 @@ lying about what it records.
 
 **Goal**: the next operation cannot repeat this.
 
-- [ ] T034 [US3] (FR-001, FR-001a) Write the rule where someone adding an operation will meet it — in
+- [X] T034 [US3] (FR-001, FR-001a) Write the rule where someone adding an operation will meet it — in
       `src/surfaces/mcp/operations.py` beside the field — stating the boundary and its
       justification: runs and threads are records of *activity*; agent definitions are
       *configuration*, and reading one discloses how the platform is set up rather than what
       anyone did with it.
-- [ ] T034a [US3] Assert in `tests/component/` that **every** shipped operation carries a
+- [X] T034a [US3] Assert in `tests/component/` that **every** shipped operation carries a
       disposition and that the catalogue is complete against the operation set (SC-004). A required
       dataclass field makes omission a constructor `TypeError`, which names an argument rather than
       an operation — this row is what makes the failure name the thing a person has to fix.
-- [ ] T035 [US3] Assert in `tests/component/` that `SC-011` holds — the two catalogue operations
+- [X] T035 [US3] Assert in `tests/component/` that `SC-011` holds — the two catalogue operations
       record nothing, pinned deliberately so a later widening is a visible decision rather than a
       drift nobody notices. **Do not delete this row for looking like dead weight; that is what it
       is for.**
-- [ ] T036a [US3] Correct the stale count in `tests/component/test_operations_audited.py`'s
+- [X] T036a [US3] Correct the stale count in `tests/component/test_operations_audited.py`'s
       docstring — it says *eleven operations have been added since 008* and *"if a twelfth lands"*;
       the real count is thirteen. The **list** in that file is test-enforced and stayed right; the
       **prose count** beside it is not and drifted two behind. Prefer deriving the number from
       `len(NEW_OPERATIONS)` in the message over restating it, so it cannot drift again.
-- [ ] T036 [US3] Rename or re-docstring `tests/component/test_operations_audited.py` so it stops
+- [X] T036 [US3] Rename or re-docstring `tests/component/test_operations_audited.py` so it stops
       implying coverage it never had. It asserts unauthenticated refusal and always did; leaving a
       file named for this feature's check, beside this feature, is how the next reader concludes
       the question is already covered.
@@ -238,15 +238,15 @@ lying about what it records.
 
 ## Phase 6: The decision record
 
-- [ ] T037 Amend `docs/adr/0035-estate-state-queries-and-audit-read-path.md` to state that the
+- [X] T037 Amend `docs/adr/0035-estate-state-queries-and-audit-read-path.md` to state that the
       governed-read discipline extends past the audit plane to records about runs and threads
       (FR-012). **Same change, not a follow-up** — shipping the extension while the ADR describes
       the narrower scope puts the decision record behind the system.
-- [ ] T038 In the same amendment, carry forward the separate-stream safeguard the ADR already got
+- [X] T038 In the same amendment, carry forward the separate-stream safeguard the ADR already got
       right, now load-bearing for a second reason (FR-005a): a read appended to the chain being
       read would put "who read this run" inside 021's report of that run, including reads of the
       report, growing every time anyone looked.
-- [ ] T039 In the same amendment, name the consequence research F3 accepted: an auditor asking who
+- [X] T039 In the same amendment, name the consequence research F3 accepted: an auditor asking who
       looked at anything in a tenant now queries two streams.
 
 ---
@@ -257,19 +257,19 @@ lying about what it records.
 one of the seven covered operations. It is listed separately so that including it is a decision and
 cutting it is also a decision.
 
-- [ ] T040 Convert `_record_access` in `src/surfaces/api/evidence.py` to raise the core error
+- [X] T040 Convert `_record_access` in `src/surfaces/api/evidence.py` to raise the core error
       from T008 rather than `fastapi.HTTPException`, so its failure path gains the parity its own
       docstring argues for.
-- [ ] T041 Catch it in `src/surfaces/mcp/transport.py::_read_evidence` and return the same 503
+- [X] T041 Catch it in `src/surfaces/mcp/transport.py::_read_evidence` and return the same 503
       verdict the API returns, then extend the parity row to cover the evidence path's failure
       case.
 
-- [ ] T041a Add a reason code meaning *the result exists and is too large to return* to
+- [X] T041a Add a reason code meaning *the result exists and is too large to return* to
       `OPERATION_REASONS` in `src/core/runs/refusals.py`, and use it in `run_result_for`'s
       `_too_large` branch in `src/surfaces/api/runs.py` in place of `not_permitted` (FR-007c).
       Additive to the vocabulary; removes a 403 that misstates why, and stops 022 from writing a
       permission denial into the trail for a refusal that was about size.
-- [ ] T041b Assert in `tests/component/` that an oversized result is refused with the new code and
+- [X] T041b Assert in `tests/component/` that an oversized result is refused with the new code and
       that the recorded entry carries it — the point is the entry, not the status.
 
 **If Phase 7 is cut**, T008 still stands: the six new call sites must not copy the HTTPException
@@ -279,11 +279,11 @@ shape into transport-independent code.
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T042 Update `docs/glossary.md` with *read record*, *record-access stream*, and *audit
+- [X] T042 Update `docs/glossary.md` with *read record*, *record-access stream*, and *audit
       disposition*.
-- [ ] T043 Update `ROADMAP.md` recording 022 shipped, and that the gap was found by connecting an
+- [X] T043 Update `ROADMAP.md` recording 022 shipped, and that the gap was found by connecting an
       editor rather than by any check.
-- [ ] T044 (FR-014, SC-005, SC-008) Run `make check` and confirm the pinned digest is unmoved and no operation lost an
+- [X] T044 (FR-014, SC-005, SC-008) Run `make check` and confirm the pinned digest is unmoved and no operation lost an
       entry it wrote before this feature (SC-008).
 - [ ] T045 Run `make conformance` in full on a live enclave. **Owed by name** — the enclave lane is
       `workflow_dispatch` only and will not run on the PR.
