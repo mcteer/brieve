@@ -65,6 +65,18 @@ a deliberately-broken state, not a passing row. That is the right shape for a gu
 existing `test_the_operation_list_here_matches_what_shipped`, but it should be confirmed achievable
 as a standing check rather than assumed.
 
+**Three analysis passes found the same defect three times, and it generalises.** Every artifact in
+this feature that *enumerates rows* went stale the moment rows were added: the tasks gate table
+(pass 1, F1), the conformance contract's row groups (pass 2, G2), and the quickstart's expectation
+list (pass 3, H1). None was caught by the pass that added the rows, because the pass that adds a
+row is looking at the requirement it covers, not at the three places that list it.
+
+The lesson is not "check the lists" — it is that **a list of rows maintained beside the rows is a
+second copy**, and this feature's whole subject is what happens when a claim is a second copy of
+behavior rather than derived from it. FR-011 makes exactly that argument about the surface's
+governance sentence, and the spec's own artifacts committed the same error three times while
+saying so. Worth remembering when the next feature adds a fourth enumeration.
+
 **SC-011 is a deliberate negative and should not be quietly deleted at plan.** It asserts the two
 catalogue operations *remain* unrecorded. A check that pins a non-behavior looks like dead weight
 until someone widens coverage by accident; this is what makes that a visible decision instead of a

@@ -340,9 +340,12 @@ follows rather than leads.
 - **Parity holds today.** Neither surface audits these operations, so this is a coverage gap on
   both rather than a divergence between them. Confirmed by reading the shared implementation both
   transports call.
-- **The existing refusal vocabulary suffices** for refused reads. `INDISTINGUISHABLE_TO_CALLER`
-  already carries the distinction FR-007 needs; this feature is assumed to consume it rather than
-  extend it.
+- **The existing refusal *reason codes* suffice** for refused reads. `INDISTINGUISHABLE_TO_CALLER`
+  already carries the distinction FR-007 needs, and this feature consumes it rather than extending
+  it. **This is not a claim that no vocabulary grows**: the feature does add a
+  `RECORD_READ_REFUSED` *event type*, because the refusal of a read is a different kind of event
+  from the refusal of a tool call. Reason codes are reused; event types are extended. The two were
+  conflated in an earlier draft of this line.
 - **No new persona or entitlement.** Read records are readable through the governed evidence path
   under the entitlements that already exist. Who may review them is ADR-0035's scope algebra, not
   a new question.

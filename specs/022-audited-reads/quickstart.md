@@ -25,9 +25,15 @@ you intend to drive the surface from an editor rather than curl.
 make check
 ```
 
-**Expect**: the new component rows pass — a covered read appends to `record-access:{tenant}`, a
-refused read appends a refusal, a planted credential-shaped value reaches no entry, and every
-covered operation refuses when the sink is made to fail.
+**Expect**: the new component rows pass —
+
+- a covered read appends to `record-access:{tenant}`, and a read returning nothing appends too
+- a refused read appends a refusal, keeping the distinction the caller cannot see
+- **the entry comes back through the governed evidence read**, and is refused to another tenant
+- **the six operations answer exactly as they did before** — same records, same refusals, same status
+- a planted credential-shaped value reaches no entry
+- every covered operation refuses when the sink is made to fail, listings included
+- reading a run leaves that run's own chain byte-identical
 
 **Expect also**: `tests/unit/test_audit_chain.py` passes with the pinned digest **unchanged**. If
 that literal moved, stop. The encoding changed and every entry ever written is at risk; nothing
