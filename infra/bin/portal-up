@@ -146,10 +146,20 @@ PORTAL_KEY="$REPO/.enclave/portal.key"
 # address and failed producing NO OUTPUT AT ALL — and the die message discarded what little
 # there was. Both halves are fixed: the values are read the way every other value here is
 # read, and the message carries the cause.
-_vault_addr="$(env_val VAULT_ADDR)"
-_vault_cacert="$(env_val VAULT_CACERT)"
+# THE COORDINATES, AND THEIR FALLBACKS, WHICH ARE THE PART THAT MATTERS.
+#
+# `enclave-up` writes VAULT_ROOT_TOKEN into `.env` but only EXPORTS the address and the CA
+# path — so a developer's `.env` has all three and CI's has one. Reading all three from
+# `.env` worked perfectly here and would have failed in CI with a TLS error naming the
+# certificate rather than the missing setting.
+#
+# The defaults are `enclave-up`'s own, copied deliberately rather than invented: if it moves
+# the CA, this follows by being wrong in the same direction, which is easier to find than
+# being wrong in a new one.
+_vault_addr="$(env_val VAULT_ADDR)"; _vault_addr="${_vault_addr:-https://127.0.0.1:8200}"
+_vault_cacert="$(env_val VAULT_CACERT)"; _vault_cacert="${_vault_cacert:-$REPO/.enclave/ca.pem}"
 _vault_token="$(env_val VAULT_ROOT_TOKEN)"
-[ -n "$_vault_token" ] || die "VAULT_ROOT_TOKEN is not in .env — the portal's certificate cannot be issued"
+[ -n "$_vault_token" ] || die "VAULT_ROOT_TOKEN is not in .env — the portal's certificate cannot be issued. Has enclave-up run?"
 
 if ! _cert=$(VAULT_ADDR="$_vault_addr" VAULT_CACERT="$_vault_cacert" VAULT_TOKEN="$_vault_token" \
       vault write -format=json \

@@ -24,7 +24,11 @@ from tests.conformance.deployment.conftest import exec_request, require_running
 pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
 PORTAL = "portal"
-LOGIN = "http://127.0.0.1:8082/login"
+# https, because the portal serves TLS. Its session cookie is `__Host-` prefixed and so
+# always `Secure`, and Safari refuses a Secure cookie over plain HTTP — sign-in succeeded and
+# then silently looped forever. The certificate comes from the control plane's own CA, which
+# this probe verifies against rather than skipping.
+LOGIN = "https://127.0.0.1:8082/login"
 
 
 def test_the_portal_reaches_a_working_state() -> None:
