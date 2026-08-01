@@ -41,7 +41,27 @@ being re-derived at the start of every spec.
 
 ## In progress
 
-*Nothing in progress.*
+**021 grounded run reports** (`specs/021-grounded-run-reports`, branch
+`spec/021-grounded-run-reports`) — specified and clarified; plan not yet run.
+
+**The last owed Quality Gate row.** ADR-0018 has been Accepted since 2026-04-08 and implemented
+by nothing: `RunReport` appears nowhere in `src/`, and `core/evals/suites.py` carries report
+fidelity in an `OWED` dictionary whose value says a gate over it "would assert something about a
+thing that is not there".
+
+020 is what makes it worth doing now rather than earlier. Before it, a report would have
+described a scripted sequence — every tool the same, chosen by nobody, refused never. The first
+run whose account is genuinely uncertain is the first run a report can get *wrong* in the way
+ADR-0018 is about.
+
+Three clarifications settled it, and the third was a correction: a report is scoped **as an
+evidence read is** — by tenant, not to the run's subject — because many personas read these, and
+because `EvidenceQueryRequest` carries no subject field at all. That measurement found a leak
+worth naming here: `get_run_result` *is* subject-restricted, so a report carrying the run's result
+payload would route around it. Forbidden by FR-008a before a line was written.
+
+**Known consequence for the parity row**: a requestable report is an operation, so ADR-0033's
+surface-parity row grows across API and MCP. Inherited work, not a discovery.
 
 **016 task-scoped authority is PARKED** (`specs/016-task-scoped-authority`, branch
 `feat/016-task-scoped-authority`, 19 of 51 tasks). Specified, planned, and the substrate built
