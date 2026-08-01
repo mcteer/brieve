@@ -42,7 +42,7 @@ the second group is executed by **no automated check**, and the constitution is 
 | --- | --- | --- | --- |
 | The enclave rows | `make conformance` in full, on a live enclave, before merge | **Dan McTeer** | **Owed** |
 | SC-002 served demonstration | Read a run's result through a served surface; find the reader in the trail | **Dan McTeer** | **Owed** |
-| Principle V review | Security-maintainer review of three additive `AuditEventType` members | **Dan McTeer** | **Owed — requested on the PR** |
+| Principle V review | Security-maintainer review of four additive `AuditEventType` members | **Dan McTeer** | **Owed — requested on the PR** |
 | Principle X amendment | ADR-0035 amended in **this** change, not a follow-up (FR-012, T037–T039) | **Dan McTeer** | **Owed** |
 
 *The last row is not a conformance row and no check executes it — which is exactly why it belongs
@@ -62,6 +62,11 @@ them is visibly a gate regression rather than an oversight.
 `record-access:{tenant}` naming the caller, the operation, and the target's correlation id where
 one exists.
 
+**A stop leaves a record naming who stopped it.** `stop_run` appends `RUN_STOPPED` to the **run's
+own stream**, not the reader stream — it is an act performed on the run rather than a read of it,
+so FR-005a does not apply and the symmetry with `THREAD_DELETED` holds. This is the seventh covered
+operation and the only write among them.
+
 **The record is reachable.** A `record_read` entry is returned by the governed evidence read for
 its own tenant and refused for another. FR-005b ends *"a record nobody can query is not a record"*,
 and this row is what makes that checkable rather than assumed — it was missing from the first draft
@@ -74,7 +79,7 @@ asked for reaches no entry (SC-006). This is asserted by planting, not by readin
 **A refused read is recorded, and the trail keeps what the caller cannot see.** `no_such_record`
 and `outside_tenant` remain indistinguishable in the response and distinct in the entry (SC-007).
 
-**An unrecordable read fails.** With the sink made to fail, all six refuse and return nothing
+**An unrecordable act fails.** With the sink made to fail, all six reads refuse and return nothing, and `stop_run` refuses and leaves the run running
 (SC-009) — including listings, which is the case with no precedent and the one most likely to be
 softened later for convenience.
 
@@ -88,7 +93,7 @@ decision someone makes rather than a drift nobody notices.
 **The claim matches behavior.** The surface's governance sentence is derived from the catalogue's
 dispositions, so it cannot assert coverage the catalogue does not declare (SC-003).
 
-**No prior entry's hash moves.** The pinned digest is unchanged and the three new members are
+**No prior entry's hash moves.** The pinned digest is unchanged and the four new members are
 present (SC-005).
 
 ---
@@ -99,7 +104,7 @@ present (SC-005).
 *recorded*, not that it was *permitted rightly* — and conflating the two would let a scoping
 regression hide behind a green audit row.
 
-**They do assert that authorization did not change** (T023b, SC-004a): the six operations answer
+**They do assert that authorization did not change** (T023b, SC-004a): the seven operations answer
 identically to before this feature for the same caller — same records, same refusals, same status.
 That is a narrower claim than "authorized correctly", and the distinction is the point.
 
@@ -108,10 +113,10 @@ it there. Analysis rejected that: existing rows covering something incidentally 
 covering it, and a negative requirement with no check is a hope. The disclaimer is kept because it
 is still true of correctness; the added paragraph is what the feature actually proves.*
 
-**They do not assert that the trail is complete for anything outside the six.** Seven operations
-already audited before this feature and are not re-proved here; two are pinned as recording
-nothing. A reader of these rows learns about eight operations' coverage and must not infer the
-rest.
+**They do not assert that the trail is complete for anything outside the seven.** Seven operations
+already audited before this feature and are not re-proved here; `start_run` is covered downstream
+and is not re-proved either; two are pinned as recording nothing. A reader of these rows learns
+about nine operations' coverage and must not infer the rest.
 
 **They do not assert present-tense truth about a reader.** A record says someone read something at
 a time. It does not say they still hold it, still have access, or have not shared it. That limit

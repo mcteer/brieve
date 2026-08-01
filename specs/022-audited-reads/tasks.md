@@ -23,7 +23,7 @@ so the rows are the deliverable rather than a supplement to it.
 
 | Gate type | Required? | Where |
 | --- | --- | --- |
-| **Fail-closed** | **Yes** — FR-007a makes a read's audit write enforcement | **T010, T026** |
+| **Fail-closed** | **Yes** — FR-007a makes a read's audit write enforcement, and a stop's | **T010, T020b, T026** |
 | **Conformance** | **Yes** — sealed-core seam and both transport surfaces | **T005, T029** |
 | **Correlation / evidence** | **Yes** — read records join runs by correlation id, and must not join *into* them | T014, **T023a**, T024, T025 |
 | **No-secret-leak** | **Yes** — a record must carry no content it was shown | T015 |
@@ -57,9 +57,13 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
 - [ ] T004 (FR-002a, FR-013) Add `THREAD_CREATED = "thread_created"` to `AuditEventType` in
       `src/core/audit/schema.py`, with a docstring pointing at its existing counterpart: the trail
       can prove a thread was deleted and what was said in it, and cannot prove it began.
+- [ ] T004a (FR-002b, FR-013) Add `RUN_STOPPED = "run_stopped"` to `AuditEventType` in
+      `src/core/audit/schema.py`. **Added by analysis pass 8**, which found `stop_run` writes no
+      audit entry at all — the only attribution is `written_by="stop:{user}"` on a durability blob,
+      which is not hash-chained and not reachable through the governed evidence path.
 - [ ] T005 [GATE:conformance] (FR-013, SC-005) Extend
       `tests/unit/test_audit_chain.py::test_widening_the_event_vocabulary_moves_no_existing_hash`
-      with the three new members, asserting each `.value` individually rather than counting the
+      with the four new members, asserting each `.value` individually rather than counting the
       enum — a count passes when one member is removed and another added, which is the change this
       row would most want to notice. **The pinned literal must not move.**
 
@@ -92,7 +96,7 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
       `src/surfaces/mcp/operations.py` — no default. An operation added without deciding must be a
       construction error, not a missed edit to a list someone has to remember (FR-009).
 - [ ] T012 (FR-002, SC-001) Set the disposition on all seventeen operations in
-      `src/surfaces/mcp/operations.py`: `records` for the six covered, `no_record` for
+      `src/surfaces/mcp/operations.py`: `records` for the seven covered, `no_record` for
       `list_agent_definitions` and `get_agent_definition`, `records_elsewhere` for the rest —
       and for each `records_elsewhere`, name where, because a disposition that says "recorded
       somewhere" without saying where is indistinguishable from a wrong one.
@@ -103,7 +107,7 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
 
 ## Phase 3: US1 — an auditor asks who read a run's output (P1)
 
-**Goal**: the six covered operations record, with `get_run_result` the one that must work under
+**Goal**: the seven covered operations record, with `get_run_result` the one that must work under
 any reading of the rule.
 
 **Independent test**: start a run, read its result, query the trail by that run's correlation id,
@@ -126,6 +130,15 @@ find a record naming the reader.
 - [ ] T020 [US1] (FR-002a) Write `THREAD_CREATED` in `create_thread_for` in `src/surfaces/api/threads.py`,
       to **the thread's own stream** (`record.correlation_id`) — matching where `THREAD_DELETED`
       is written, not the reader stream. This is a creation, not a read.
+- [ ] T020a [US1] (FR-002b) Write `RUN_STOPPED` in `stop_run_for` in `src/surfaces/api/runs.py`,
+      to **the run's own stream** (`entry.correlation_id`), naming who stopped it — before the
+      terminal `CheckpointBlob` is saved, so a stop that cannot be recorded does not happen.
+      Symmetric with `THREAD_DELETED`; this is an act on the run, not a read of it, so FR-005a does
+      not apply.
+- [ ] T020b [US1] [GATE:fail-closed] (FR-007a, SC-009) Assert in
+      `tests/component/test_record_access.py` that when the entry cannot be written the stop fails
+      **and the run keeps running** — a run silently terminated with no record is strictly worse
+      than a stop that refuses, because the caller believes it worked.
 - [ ] T021 [US1] Map `RecordAccessUnavailable` to a 503 in the API routes in
       `src/surfaces/api/runs.py` and `src/surfaces/api/threads.py`, with a reason naming that the
       read was refused because it could not be recorded.
@@ -141,7 +154,7 @@ find a record naming the reader.
       without this row the stream is written and never proven reachable. **Analysis found nothing
       else covering this**, because the one artifact that would have shown it (quickstart §5) was
       querying Postgres directly and skipping the governed path entirely.
-- [ ] T023b [US1] Assert in `tests/component/test_record_access.py` that the six operations answer
+- [ ] T023b [US1] Assert in `tests/component/test_record_access.py` that the seven operations answer
       identically to before this feature for the same caller — same records, same refusals, same
       status (SC-004a, FR-015). Six operations are being edited and nothing else checks that
       recording a read did not change who may perform it.
@@ -152,7 +165,7 @@ find a record naming the reader.
       for a run after that run has been read carries **no claim about who read it**. This is the
       row protecting 021, and it is the guard against the first draft's reasoning returning.
 - [ ] T026 [US1] [GATE:fail-closed] (FR-007a, SC-009) Assert in `tests/component/test_record_access.py` that with
-      the sink made to fail, **all six** operations refuse and return no records — listings
+      the sink made to fail, **all six reads** refuse and return no records — listings
       included. Listings are the case with no precedent and the one most likely to be softened
       later for convenience.
 - [ ] T027 [US1] (FR-007, SC-007) Assert in `tests/component/test_record_access.py` that a refused read records,
@@ -162,7 +175,7 @@ find a record naming the reader.
       still records — an empty listing discloses that the caller asked, and a trail omitting
       fruitless reads cannot show probing.
 - [ ] T029 [US1] [GATE:conformance] Extend `tests/conformance/mcp/test_surface_parity.py` so the
-      six operations are compared across both transports on the success path, the refusal path,
+      seven operations are compared across both transports on the success path, the refusal path,
       **and** the unrecordable path.
 
 **Checkpoint**: US1 is independently shippable. The trail answers "who read this run's output".
@@ -236,7 +249,7 @@ lying about what it records.
 ## Phase 7: The adjacent fix (recommended, flagged)
 
 **Research F7 found a live defect in the code this feature copies.** It is pre-existing and is not
-one of the six covered operations. It is listed separately so that including it is a decision and
+one of the seven covered operations. It is listed separately so that including it is a decision and
 cutting it is also a decision.
 
 - [ ] T040 Convert `_record_access` in `src/surfaces/api/evidence.py` to raise the core error
@@ -264,7 +277,7 @@ shape into transport-independent code.
 - [ ] T046 (SC-002) Perform quickstart scenario 5 against a **served** surface: read a run's result through
       the running service, then find the reader in the trail. SC-002 is written not to be hermetic
       on purpose — this defect survived a green suite and was found by connecting a real editor.
-- [ ] T047 (FR-013) Request the Principle V security review on the PR for the three additive members, and
+- [ ] T047 (FR-013) Request the Principle V security review on the PR for the four additive members, and
       record its discharge in `specs/022-audited-reads/contracts/conformance.md` — sealed core is
       not dischargeable by the author alone.
 
@@ -277,7 +290,7 @@ Phase 1 (T001–T002)
    ↓
 Phase 2 (T003–T012)  ← blocks everything; vocabulary + seam + classification
    ↓
-   ├── Phase 3 US1 (T013–T029, incl. T023a/T023b)  ← the six record
+   ├── Phase 3 US1 (T013–T029, incl. T020a/T020b/T023a/T023b)  ← the seven record
    ├── Phase 4 US2 (T030–T033)  ← needs T011–T012 only, NOT Phase 3
    └── Phase 5 US3 (T034–T036, incl. T034a)  ← needs T011–T012 only
    ↓
@@ -323,7 +336,7 @@ understood.
 
 ## Notes
 
-**50 tasks**, after analysis added three. The largest phase is US1 at nineteen, and ten of those are rows rather than
+**53 tasks**, after analysis added six. The largest phase is US1 at 21, and 10 of those are rows rather than
 implementation — which is the right ratio for a feature whose entire subject is that a green suite
 proved nothing.
 
@@ -337,9 +350,12 @@ about a misleading test name; T040–T041 are the adjacent defect research F7 fo
 decision rather than folded in. Noted here so a reader mapping tasks to requirements finds them
 accounted for rather than orphaned.
 
-**Four tasks were added by analysis**: T023a (the governed-path read — nothing covered it, and the
+**Six tasks were added by analysis**: T023a (the governed-path read — nothing covered it, and the
 artifact that should have shown that was itself taking a shortcut), T023b (FR-015, a negative
-requirement with no check), T034a (SC-004's named failure), and the gate-table corrections above.
+requirement with no check), T034a (SC-004's named failure), and — from pass 8, which checked the
+spec's factual claims against the code rather than checking artifacts against each other — T004a,
+T020a and T020b for `stop_run`, which writes no audit entry at all and which this spec had
+asserted was covered, marked *measured*, without measuring it.
 
 **One task exists to delete a trap** (T036). `test_operations_audited.py` is a good file whose name
 promises this feature's check and delivers a different one. That misdirection is a measurable

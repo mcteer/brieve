@@ -54,8 +54,8 @@ new read surface.
 
 | Value | Meaning | Operations |
 | --- | --- | --- |
-| `records` | Touches a run or thread; writes a read record | `list_runs`, `get_run`, `get_run_result`, `list_threads`, `get_thread`, `create_thread` |
-| `records_elsewhere` | The act is recorded, but by the machinery it starts rather than by the operation | `start_run`, `stop_run` (`authority_issued` / `run_start`), and the seven that already audit |
+| `records` | Touches a run or thread; writes its own entry | `list_runs`, `get_run`, `get_run_result`, `list_threads`, `get_thread`, `create_thread`, **`stop_run`** |
+| `records_elsewhere` | The act is recorded, but by the machinery it starts rather than by the operation | `start_run` (`authority_issued` / `run_start`), and the seven that already audit |
 | `no_record` | Touches neither a run nor a thread; configuration rather than activity | `list_agent_definitions`, `get_agent_definition` |
 
 ### Validation rules
@@ -65,14 +65,16 @@ new read surface.
   existing hand-kept guard, which requires a human to notice.
 - **`records_elsewhere` must name where.** A disposition that says "recorded somewhere" without
   saying where is indistinguishable from a wrong one, and is how `start_run` would quietly become
-  unrecorded if its run path changed.
+  unrecorded if its run path changed. **This rule earned itself before implementation began**: an
+  earlier draft classified `stop_run` as `records_elsewhere`, and applying the rule — name where —
+  revealed there was no where. It writes nothing.
 - **Every value is checkable against measured behavior** (FR-002). `records` and `no_record` are
   both asserted — the second is why SC-011 exists, so widening coverage later is a decision rather
   than a drift.
 
 ---
 
-## 3. `AuditEventType` — three additive members
+## 3. `AuditEventType` — four additive members
 
 **Sealed core** (Principle V). Additive only; no member removed, renamed, or repurposed.
 
@@ -81,6 +83,7 @@ new read surface.
 | `RECORD_READ` | `record_read` | `record-access:{tenant}` | `EVIDENCE_READ` means *someone read the audit plane*. Reusing it would make an operator asking who read the trail receive run listings, and would silently change what already-written entries appear to mean. |
 | `RECORD_READ_REFUSED` | `record_read_refused` | `record-access:{tenant}` | Mirrors the existing `EVIDENCE_READ_REFUSED`. A separate member rather than a payload flag, so FR-007's distinction is queryable rather than filterable. |
 | `THREAD_CREATED` | `thread_created` | the thread's own stream | **Not a read.** `THREAD_DELETED` already exists and writes to `record.correlation_id`; this is its missing counterpart. Today the trail can prove a thread ended and what was said in it, and cannot prove it began. |
+| `RUN_STOPPED` | `run_stopped` | the run's own stream | **Not a read either — the only write this feature covers.** Added by analysis pass 8: `stop_run_for` writes a durability blob carrying `written_by="stop:{user}"` and no audit entry at all, so a person withdrawing consent and ending a run leaves nothing hash-chained. On the run's own stream for the same reason `THREAD_DELETED` is on the thread's. |
 
 ### Invariants
 

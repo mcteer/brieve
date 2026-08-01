@@ -15,7 +15,7 @@ done. The answer came back. The question left no trace.
 | --- | --- |
 | **Requirements (R1–R17)** | **R4** (evidence over claims — the subject here is the trail's own completeness, and a gap in it is invisible to everyone who trusts the trail). **R10** (observability and attestation — a record of who read what is an attestation input, not a convenience). |
 | **ADRs touched** | **ADR-0035** (the load-bearing one: *"evidence access is itself audited — who reviewed which evidence, when. A meta-audit record, because the integrity of an audit trail includes knowing who read it"*. **Amended, not merely consumed.** Clarification extended that discipline past the audit plane to records **about** runs and threads, while keeping the ADR's own structural safeguard: the meta-audit goes to a separate stream, never into the chain being read — see FR-005a and FR-012). **ADR-0009** (one correlation ID joins prompt → hooks → call → run → audit entry, walkable both directions; a read that writes nothing is a step in that walk with no entry). **ADR-0033** (four transports over one authorization core — whatever is decided binds on API and MCP identically; parity currently *holds*, at zero). **ADR-0018 / ADR-0032** (the shape of the get_run_result asymmetry: the report is governed and audited, the payload it deliberately excludes is neither). **ADR-0047** (whether a new gate row binds now). |
-| **Evidence class** | **Attestation-relevant, and about attestation itself.** Every prior feature added records. This one asks whether the record of *reading* those records exists — the question an auditor asks second, after "what happened", and the one this platform currently cannot answer for eight of its seventeen operations. |
+| **Evidence class** | **Attestation-relevant, and about attestation itself.** Every prior feature added records. This one asks whether the record of *reading* those records exists — the question an auditor asks second, after "what happened", and the one this platform currently cannot answer for nine of its seventeen operations. |
 
 ## Clarifications
 
@@ -40,9 +40,9 @@ done. The answer came back. The question left no trace.
 is kept for the evidence plane, and 021 kept it for reports. Reconciliation, mapping collection,
 mapping requests, turns, and thread deletion all leave records.
 
-**Does not hold, and was found by using the platform rather than by reading it.** Eight
-operations return records about runs, threads, and agent definitions and write nothing at all.
-Measured against the running service on 2026-08-01, not inferred from the source:
+**Does not hold, and was found by using the platform rather than by reading it.** Nine
+operations touch runs, threads, and agent definitions and write nothing at all. Measured against
+the running service on 2026-08-01, not inferred from the source:
 
 | Operation | Returns | Trail entry |
 | --- | --- | --- |
@@ -54,16 +54,30 @@ Measured against the running service on 2026-08-01, not inferred from the source
 | `create_thread` | a new thread | **none** |
 | `list_agent_definitions` | the definitions available to the caller | **none** |
 | `get_agent_definition` | one definition, including its bound model and tool scope | **none** |
+| **`stop_run`** | **terminates a run — a write, not a read** | **none** |
 
-`start_run` and `stop_run` are **not** in this table. They write nothing at the transport layer,
-but the run itself writes `authority_issued` and `run_start`, so the act is recorded. They are
-covered, and naming them as gaps would be wrong.
+`start_run` is **not** in this table. It writes nothing at the transport layer, but
+`start_governed_run` writes `authority_issued` and `run_start`, so the act is recorded. Naming it
+as a gap would be wrong.
+
+**`stop_run` is in the table, and an earlier draft of this spec wrongly exempted it alongside
+`start_run` — asserting coverage it called "measured" and had not measured.** The correction is
+recorded rather than quietly applied, because the error is the same one the feature exists to
+close, committed inside the feature that closes it. `stop_run_for` writes a `CheckpointBlob`
+carrying `written_by=f"stop:{subject_user_id}"` and returns. There is no `append_event` in the stop
+path and no `STOP`, `CANCEL`, or `WITHDRAW` member in `AuditEventType`. The only attribution lives
+in a durability field — not hash-chained, not reachable through the governed evidence path.
+
+**This is the worst of the nine, not one more of them.** The other eight are reads: no trace of who
+looked. This is a person deliberately withdrawing consent and ending a run — the operation whose
+own implementation says *"only the person who gave consent may withdraw it"* — leaving nothing a
+reviewer can find.
 
 **Three things make this worse than a missing feature.**
 
 **The surfaces claim otherwise.** Every client that connects to the MCP surface is told, in the
 instructions it receives at initialize: *"Every operation executes as the calling user and is
-recorded in a tamper-evident trail."* Eight operations do not. This is the third self-description
+recorded in a tamper-evident trail."* Nine operations do not. This is the third self-description
 in two days measured against the running service and found false, and the first where the
 overclaim is about governance rather than capability.
 
@@ -203,12 +217,17 @@ follows rather than leads.
   anyone did with it. A future operation is classified by which of those two it touches.
 - **FR-002**: The rule MUST classify every one of the seventeen operations shipped as of this
   feature, and every classification MUST be checkable against measured behavior rather than
-  asserted in prose. Under FR-001 that means six operations gain records — `list_runs`, `get_run`,
-  `get_run_result`, `list_threads`, `get_thread`, `create_thread` — and two remain without:
-  `list_agent_definitions` and `get_agent_definition`.
+  asserted in prose. Under FR-001 that means **seven** operations gain records — `list_runs`,
+  `get_run`, `get_run_result`, `list_threads`, `get_thread`, `create_thread`, `stop_run` — and two
+  remain without: `list_agent_definitions` and `get_agent_definition`.
 - **FR-002a**: `create_thread` MUST record. The trail can currently prove a thread was deleted and
   what was said in it, and cannot prove it began; a lifecycle recorded only at its end is a
   narrative with no first page.
+- **FR-002b**: `stop_run` MUST record, and the entry MUST name **who** stopped the run. It touches a
+  run, so FR-001 already requires it; it is stated separately because an earlier draft exempted it
+  on a false premise and because it is the only **write** among the operations this feature covers.
+  The record MUST go to the run's own stream — this is an act performed on the run, not a read of
+  it, so FR-005a does not apply and the symmetry with `THREAD_DELETED` holds.
 - **FR-003**: Reading a run's result payload MUST record who read it, which run, and when. This is
   the one operation the feature MUST cover under any rule chosen; a rule that leaves it uncovered
   MUST be rejected rather than accommodated.
@@ -237,8 +256,10 @@ follows rather than leads.
   per the existing vocabulary). A refused read MUST record — a boundary a caller can probe without
   trace is the case `EVIDENCE_READ_REFUSED` already exists to prevent on the evidence plane.
 - **FR-007a**: A covered read whose own record cannot be written MUST fail, and MUST NOT return the
-  records it was asked for. This holds for all six covered operations, with no exception for
-  listings. **Accepted cost, stated rather than discovered**: a trail outage makes runs and threads
+  records it was asked for. This holds for all six covered **reads**, with no exception for
+  listings — and a `stop_run` whose entry cannot be written MUST NOT stop the run, on the same
+  grounds and matching `start_governed_run`, which already refuses when its own audit write fails.
+  Seven operations, one posture. **Accepted cost, stated rather than discovered**: a trail outage makes runs and threads
   unreadable through both surfaces. An unrecorded answer is the state this feature exists to end,
   so serving one during an outage would reintroduce it at exactly the moment someone will later
   investigate.
@@ -247,7 +268,7 @@ follows rather than leads.
 
 **Where it binds**
 
-- **FR-008**: All six covered operations MUST record identically on the API and MCP surfaces, and
+- **FR-008**: All seven covered operations MUST record identically on the API and MCP surfaces, and
   the two catalogue operations MUST record on neither (ADR-0033). Parity holds today at zero
   coverage; it MUST hold at this one.
 - **FR-009**: An operation added after this feature MUST NOT be able to ship without an audit
@@ -308,7 +329,7 @@ follows rather than leads.
   cannot be constructed. Verified two ways, because a required field alone is not a *named* check:
   the catalogue is asserted complete against the shipped operation set, and the failure a caller
   sees when a disposition is missing names the operation rather than a constructor argument.
-- **SC-004a**: The six covered operations answer exactly as they did before this feature to the
+- **SC-004a**: The seven covered operations answer exactly as they did before this feature to the
   same caller with the same authority — same records returned, same refusals, same status. FR-015
   is a negative requirement, and a negative requirement with no check is a hope.
 - **SC-005**: The pinned entry digest is unchanged, and every entry written before this feature
@@ -318,8 +339,9 @@ follows rather than leads.
 - **SC-007**: A read refused for being outside the caller's tenant is distinguishable in the trail
   from one refused for not existing, while remaining indistinguishable to the caller.
 - **SC-008**: No operation loses an audit entry it wrote before this feature.
-- **SC-009**: With the trail unwritable, every one of the six covered operations refuses and
-  returns no records — verified by making the write fail, not by reasoning about it.
+- **SC-009**: With the trail unwritable, every one of the six covered reads refuses and returns no
+  records, and `stop_run` refuses and leaves the run running — verified by making the write fail,
+  not by reasoning about it.
 - **SC-010**: Reading a run leaves that run's own chain byte-identical, and a report compiled for
   that run afterward carries no claim about who read it.
 - **SC-011**: The two catalogue operations remain unrecorded, and a check says so deliberately —
@@ -334,9 +356,13 @@ follows rather than leads.
   connected client fetches the agent-definition list, which for an editor is every connect. The
   trail is append-only and never sampled (Principle IX), so that cost is permanent and cannot be
   tuned away later. Configuration reads were judged not worth it; activity reads were.
-- **`start_run` and `stop_run` are covered** by the run's own `authority_issued` and `run_start`
-  entries. Measured, not assumed — but if a run refuses before writing either, the coverage claim
-  needs rechecking.
+- **`start_run` is covered** by `start_governed_run`'s `authority_issued` and `run_start` entries.
+  Measured against the code, and confirmed present in a live trail.
+- **`stop_run` is NOT covered, and an earlier version of this line said it was** — pairing it with
+  `start_run` and calling the pair "measured" when only `start_run` had been checked. There is no
+  audit write in the stop path at all. The correction is left visible because an assumption
+  labelled *measured* that was not measured is more dangerous than an open question, and this spec
+  is the wrong place to hide one. `stop_run` is now covered by FR-002b.
 - **Parity holds today.** Neither surface audits these operations, so this is a coverage gap on
   both rather than a divergence between them. Confirmed by reading the shared implementation both
   transports call.

@@ -70,6 +70,13 @@ worth naming in the ADR-0035 amendment rather than discovering.
   the refusal-vs-permitted split is exactly the distinction FR-007 needs to be queryable rather
   than filterable.
 
+**`RUN_STOPPED` is the fourth, and analysis pass 8 found it.** Measured: `stop_run_for`
+(`src/surfaces/api/runs.py`) writes a `CheckpointBlob` with `written_by=f"stop:{subject_user_id}"`
+and returns. No `append_event` anywhere in the stop path; no `STOP`, `CANCEL`, or `WITHDRAW` member
+in the vocabulary. An earlier draft of this feature asserted `stop_run` was covered alongside
+`start_run` and called the pair *measured* — only `start_run` had been checked. It goes to the
+run's own stream, for the same reason `THREAD_DELETED` goes to the thread's.
+
 **`THREAD_CREATED` is not a read** and does not belong in the reader stream. **Measured**:
 `THREAD_DELETED` writes to `record.correlation_id` — the thread's own stream. `THREAD_CREATED`
 goes to the same place, which is what makes the pair symmetric and closes FR-002a's
@@ -86,7 +93,7 @@ pins one entry's digest as a literal and asserts each feature's new members are 
 020 established it; 021 reused it. The hash covers an entry's *own* `event_type` value, not the
 set of possible values, so an additive member moves nothing.
 
-**Obligation**: the row's assertion list grows by the three new members, and the pinned literal
+**Obligation**: the row's assertion list grows by the four new members, and the pinned literal
 must remain byte-identical. If it moves, the encoding moved and every prior entry is at risk —
 which is the whole reason the literal is not recomputed.
 

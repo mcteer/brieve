@@ -6,15 +6,16 @@
 
 ## Summary
 
-Six operations that return records about runs and threads currently write nothing to the audit
-trail, while both surfaces tell every client that every operation is recorded. This feature makes
-the six record, states the rule that decides which operations must, and derives the surfaces'
+Seven operations touching runs and threads currently write nothing to the audit trail, while both
+surfaces tell every client that every operation is recorded. Six are reads; the seventh, `stop_run`,
+is a person terminating a run and was found by analysis pass 8 after this plan's first draft had
+wrongly recorded it as covered. This feature makes all seven record, states the rule that decides which operations must, and derives the surfaces'
 governance claim from that rule so it cannot overclaim again.
 
 The approach is almost entirely **adoption rather than invention**. The evidence path already
 records who read the audit plane: a stable per-tenant stream, a payload carrying query shape and
 never rows, and a write whose failure fails the read. 022 applies that same shape to a second
-stream for run and thread records, adds three additive audit event types, and moves the audit
+stream for run and thread records, adds four additive audit event types, and moves the audit
 disposition onto the operation catalogue as a required field so a future operation cannot ship
 without deciding.
 
@@ -39,7 +40,7 @@ the served-surface check that this feature's own finding was made with.
 
 **Project Type**: Governed agent runtime — sealed core plus transport surfaces.
 
-**Performance Goals**: No latency target changes. The relevant constraint is **write volume**: six
+**Performance Goals**: No latency target changes. The relevant constraint is **write volume**: seven
 operations gain one append each. `list_runs` is the highest-frequency of them, and the coverage
 rule was drawn (clarify Q1) specifically to keep the two highest-frequency catalogue reads out.
 
@@ -47,8 +48,8 @@ rule was drawn (clarify Q1) specifically to keep the two highest-frequency catal
 is permanent and cannot be tuned down later. The pinned entry digest in `test_audit_chain.py` must
 not move. `get_run_result`'s subject-only restriction must not change (FR-015).
 
-**Scale/Scope**: 17 operations classified; 6 gain records; 2 pinned as deliberately unrecorded;
-3 new audit event types; 1 ADR amended.
+**Scale/Scope**: 17 operations classified; **7** gain records; 2 pinned as deliberately unrecorded;
+**4** new audit event types; 1 ADR amended.
 
 ## Constitution Check
 
@@ -57,10 +58,10 @@ not move. `get_run_result`'s subject-only restriction must not change (FR-015).
 | Principle | Verdict | Notes |
 | --- | --- | --- |
 | I — Build Glue Only | **Pass** | No framework enters core. The new members live in `core/audit/schema.py`, which imports nothing new; recording happens in the shared surface functions both transports already call. |
-| II — Total Interception; One Governed Tool Layer | **Pass** | No tool, registry, or hook path is touched. The six operations are already fully intercepted for *authorization*; this adds a record, not a decision. |
-| III — Fail-Closed, In-Process Enforcement | **Pass, and implicated.** | FR-007a makes a read's own audit write **enforcement rather than observation**: an unrecordable read fails and returns nothing. This matches both existing precedents (`start_governed_run`, `_record_access`). **Research F7 found the existing precedent's raise has no transport parity** — it raises `HTTPException` from shared code that MCP does not catch. 022 introduces a core error instead, so the six new sites fail identically on both surfaces. |
+| II — Total Interception; One Governed Tool Layer | **Pass** | No tool, registry, or hook path is touched. The seven operations are already fully intercepted for *authorization*; this adds a record, not a decision. |
+| III — Fail-Closed, In-Process Enforcement | **Pass, and implicated.** | FR-007a makes a read's own audit write **enforcement rather than observation**: an unrecordable read fails and returns nothing. This matches both existing precedents (`start_governed_run`, `_record_access`). **Research F7 found the existing precedent's raise has no transport parity** — it raises `HTTPException` from shared code that MCP does not catch. 022 introduces a core error instead, so the new sites fail identically on both surfaces. **The same posture binds `stop_run`**: a stop whose entry cannot be written must not stop the run, matching `start_governed_run`, which already refuses when its own audit write fails. |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass** | No new credential, no new authority, no widening. A read record is written under the same sink the operation's surface already holds; the read itself is authorized exactly as it is today (FR-015 forbids re-scoping). Nothing here lets an agent — or a reader — exceed what they could already do. |
-| V — Sealed Core, Versioned Seams | **Pass, review required.** | Three additive `AuditEventType` members: `RECORD_READ`, `RECORD_READ_REFUSED`, `THREAD_CREATED`. Additive-only, no member removed or renamed, no existing payload shape changed. The pinned digest proves no written entry's hash moves (F5). **This PR must carry a security review request** — sealed core is not dischargeable by the author alone. |
+| V — Sealed Core, Versioned Seams | **Pass, review required.** | **Four** additive `AuditEventType` members: `RECORD_READ`, `RECORD_READ_REFUSED`, `THREAD_CREATED`, `RUN_STOPPED`. The fourth was added by analysis pass 8, which found `stop_run` writes nothing at all — a person terminating a run left no trail entry, and the spec had asserted the opposite as measured. Additive-only, no member removed or renamed, no existing payload shape changed. The pinned digest proves no written entry's hash moves (F5). **This PR must carry a security review request** — sealed core is not dischargeable by the author alone. |
 | VI — Lean by Default | **Pass** | No new dependency, service, table, or migration. A new stream is a new `correlation_id` value. |
 | VII — Anti-Fragmentation | **Pass, and it is the design.** | The recording shape, the stable-per-tenant stream, the shape-not-rows payload, and the fail-closed write are all adopted from `surfaces/api/evidence.py` rather than reinvented. The one deliberate divergence — a *separate* stream — is argued in research F3 on volume profile, not convenience. |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **N/A** | No model, no judge, no suite. Nothing is promoted. `OWED` stays empty; no eval gate row is added or moved. |
@@ -102,11 +103,11 @@ specs/022-audited-reads/
 src/
 ├── core/
 │   └── audit/
-│       └── schema.py            # +3 additive AuditEventType members (SEALED CORE)
+│       └── schema.py            # +4 additive AuditEventType members (SEALED CORE)
 ├── surfaces/
 │   ├── api/
 │   │   ├── record_access.py     # NEW — the reader stream, the write, the core error
-│   │   ├── runs.py              # list_runs_for / run detail / result: record before returning
+│   │   ├── runs.py              # list/detail/result record before returning; stop_run_for writes RUN_STOPPED
 │   │   ├── threads.py           # create/list/detail: record; THREAD_CREATED alongside THREAD_DELETED
 │   │   └── evidence.py          # adjacent (F7): raise the core error, not HTTPException
 │   └── mcp/

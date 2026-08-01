@@ -30,7 +30,7 @@ make check
 - a covered read appends to `record-access:{tenant}`, and a read returning nothing appends too
 - a refused read appends a refusal, keeping the distinction the caller cannot see
 - **the entry comes back through the governed evidence read**, and is refused to another tenant
-- **the six operations answer exactly as they did before** — same records, same refusals, same status
+- **the seven operations answer exactly as they did before** — same records, same refusals, same status
 - a planted credential-shaped value reaches no entry
 - every covered operation refuses when the sink is made to fail, listings included
 - reading a run leaves that run's own chain byte-identical
@@ -62,7 +62,7 @@ operation no longer records what it declares.
 make conformance
 ```
 
-**Expect**: `EXIT=0`, with the parity rows covering all six operations on both transports — and
+**Expect**: `EXIT=0`, with the parity rows covering all seven operations on both transports — and
 covering the **failure** path, not only the happy one. Research F7 found the existing evidence
 path has no parity there: it raises an HTTPException that the MCP transport does not catch. If the
 six new sites are correct and the adjacent fix landed, both surfaces now return the same verdict
@@ -134,7 +134,7 @@ read did not become part of what the report describes.
 - `make conformance` `EXIT=0` on a live enclave — **owed, named in the contract**
 - Scenario 5 performed against a served surface — **owed, named in the contract**
 - ADR-0035 amended in the same change (Principle X)
-- Security review requested on the PR for the three additive members (Principle V)
+- Security review requested on the PR for the four additive members (Principle V)
 
 The last two are not test rows and cannot go green on their own. They are recorded in the
 conformance contract by name so that merging without them is visibly a gate regression.
