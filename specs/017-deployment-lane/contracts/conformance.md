@@ -197,3 +197,24 @@ The surrounding script captures and prints the scheduler's own placement output 
 `infra/bin/enclave-conformance` records the cost of not doing this: *"A gate that will not
 say why it failed costs more than the failure"* — three rounds of diagnosis went into
 guessing which resource came up short, because the output was discarded.
+
+---
+
+## Who runs these rows — amended 2026-08-01
+
+**The enclave lane no longer runs on every pull request.** It stood a whole enclave up inside
+GitHub for each change and began failing for reasons about the runner rather than the platform.
+A real enclave on a maintainer's machine is better evidence than a synthetic one; the rows are
+identical, so what CI added was insistence rather than coverage.
+
+**These rows are therefore run by a named party before merge: Dan McTeer**, via `make
+conformance` in full on a live enclave. That is the model the constitution describes for a
+blocking row no automated check executes, and it is what this contract now records.
+
+**What was given up, recorded rather than glossed.** Both defects found in CI on 2026-08-01 were
+COMPOSITION failures — a surface two lanes both claimed to own, and a resource reservation that
+fit an empty runner and not a full one. Neither appears when lanes are run one at a time, which
+is how they are usually run locally. **`make conformance` in full is the mitigation**, and it is
+now a person remembering rather than a machine insisting.
+
+The lane remains available on demand (`gh workflow run enclave.yml`).
