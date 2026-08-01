@@ -183,7 +183,17 @@ def call(tool: str, arguments: dict[str, Any], *, token: str) -> dict[str, Any]:
     import anyio
 
     async def work(session: Any) -> dict[str, Any]:
-        outcome = await session.call_tool(tool, {"arguments": arguments})
+        # ARGUMENTS AS A CLIENT ACTUALLY SENDS THEM — flat, not wrapped.
+        #
+        # This read `{"arguments": arguments}` until 022, wrapping its own arguments in a key
+        # named `arguments` because that is what the served surface published: every tool was
+        # advertised as taking one object property of that name, since `add_tool` derives the
+        # schema from the handler signature and the handler took `arguments: dict`.
+        #
+        # So these rows passed while 13 of 17 operations were uncallable by any conforming
+        # client — a harness shaped to agree with the implementation rather than with what a
+        # client sends. Found by driving the served process by hand.
+        outcome = await session.call_tool(tool, arguments)
         if outcome.structuredContent is not None:
             return dict(outcome.structuredContent)
         text = "".join(block.text for block in outcome.content if hasattr(block, "text"))

@@ -285,9 +285,9 @@ shape into transport-independent code.
       editor rather than by any check.
 - [X] T044 (FR-014, SC-005, SC-008) Run `make check` and confirm the pinned digest is unmoved and no operation lost an
       entry it wrote before this feature (SC-008).
-- [ ] T045 Run `make conformance` in full on a live enclave. **Owed by name** — the enclave lane is
+- [X] T045 Run `make conformance` in full on a live enclave. **Owed by name** — the enclave lane is
       `workflow_dispatch` only and will not run on the PR.
-- [ ] T046 (SC-002) Perform quickstart scenario 5 against a **served** surface: read a run's result through
+- [X] T046 (SC-002) Perform quickstart scenario 5 against a **served** surface: read a run's result through
       the running service, then find the reader in the trail. SC-002 is written not to be hermetic
       on purpose — this defect survived a green suite and was found by connecting a real editor.
 - [ ] T047 (FR-013) Request the Principle V security review on the PR for the four additive members, and
