@@ -17,6 +17,24 @@ into a config file by hand, and reminting it when it expired.
 | **ADRs touched** | **ADR-0033** (four transports over one authorization core — this changes neither; the surface's OAuth half already exists and is untouched). **ADR-0016 / ADR-0057** (claim mappings and the phrasing around them — a browser login produces the same claims the pasted token carried, and must not produce different ones). **None amended.** |
 | **Evidence class** | **None.** No audit entry, no attestation input, no governed decision. This is development tooling: `tests/harness/dev_idp.py` and the scripts that start it. It ships in no deployment and appears in no trail. |
 
+## Clarifications
+
+### Session 2026-08-01
+
+- Q: How does the advertised issuer become reachable from both the host and the container? → A:
+  **C** — advertise `http://127.0.0.1:8090` as the **issuer**, keep the container-reachable name as
+  the **JWKS URI**. Measured first: `served.py` reads `OIDC_ISSUER` and `OIDC_JWKS_URI` separately,
+  and the surface *compares* the issuer string while *fetching* keys from the JWKS location. It
+  never resolves the issuer, so the two consumers need the same **identity**, not the same name.
+  Nothing outside the repository changes.
+- Q: How is the signing-key restart trap addressed (SC-009)? → A: **B** — mint a fresh key **id**
+  per provider process, which removes the condition rather than describing it. Measured first, and
+  it corrected a claim made twice in this repository: the surface does **not** cache keys at
+  startup. `verification.py` caches with a 600-second TTL and **refetches immediately on an unknown
+  `kid`**. The trap exists only because the provider reuses `test-key-1`, so a still-fresh cache
+  returns the old modulus and the signature fails for up to ten minutes. A per-process key id makes
+  the surface refetch on the spot.
+
 ## What already holds, and what does not
 
 **Holds, and more of it than expected.** Measured against the running service on 2026-08-01:
@@ -121,12 +139,18 @@ fetch its keys.
 
 ### Edge Cases
 
-- **The provider restarts.** It mints a new signing key per process while keeping the same key
-  identifier, so every outstanding token becomes unverifiable and the surface — which reads keys at
-  startup — must also restart. The refusal names the symptom (`unverifiable_identity`) and not the
-  cause. This cost several minutes on 2026-08-01, and a browser login makes it *more* likely to be
-  hit, because tokens will be longer-lived and used across restarts.
-- **A client registers more than once.** Editors re-register on reconnect. Whether that is idempotent, or accumulates registrations, or refuses, must be stated rather than discovered.
+- **The provider restarts.** *Resolved — see Clarifications.* It mints a new key per process while
+  reusing the key **id**, so the surface's still-fresh cache returns the old modulus and every token
+  fails as `unverifiable_identity` for up to ten minutes. **The widely-repeated explanation for this
+  — that the surface caches keys at startup and must be restarted — was wrong**, and is corrected
+  here because it was stated twice, once in a merged pull request. The verifier caches with a
+  600-second TTL and refetches immediately on an unknown key id. A fresh key id per process
+  therefore removes the condition entirely, with no change under `src/`.
+- **A client registers more than once.** *Assumed, not asked.* Editors re-register on reconnect, and
+  a provider that authenticates nobody has nothing to protect by refusing: it accepts each
+  registration and answers with an identifier, holding no state that could accumulate or conflict.
+  Recorded as an assumption because a reasonable default exists; revisit if a client depends on
+  getting the same identifier back.
 - **Two developers, or two editors, at once.** Whether concurrent logins interfere.
 - **The browser flow is abandoned.** Someone opens the sign-in and closes the tab. Whether the
   client can retry, and whether anything is left behind.
@@ -154,13 +178,24 @@ fetch its keys.
   addition to the one it already serves. The set MUST be determined by what clients request, not by
   what the specification permits — the 404 that motivated this was observed in a log, not inferred.
 - **FR-005**: The provider MUST offer client registration, so a client holding no pre-configured
-  identifier can obtain one.
+  identifier can obtain one. Registration MUST be repeatable without error and MUST NOT require the
+  provider to hold state that grows with use.
+- **FR-005a**: The provider MUST mint a distinct signing key **identifier** per process. Reusing one
+  across processes is what makes a restart present as an unverifiable identity for the length of the
+  surface's key cache, and the surface already refetches correctly when it meets an id it does not
+  know.
 
 **Reachability**
 
 - **FR-006**: The authorization server named in the surface's discovery document MUST be reachable
-  **both** from the host and from inside the surface's container, using the single name that
-  document publishes.
+  by the **client**, from the host, without any change to the developer's machine. The surface MUST
+  reach the provider's keys by a name resolvable from **inside its container**. These are two
+  different names for one provider, and that is permitted precisely because the surface treats the
+  issuer as an identity to compare rather than an address to resolve.
+- **FR-006a**: The issuer string the provider mints into a token MUST equal the one the surface is
+  configured to expect. **This is the whole safety of FR-006**: the two names are allowed to differ
+  only because the identity does not. A change that made the surface *resolve* the issuer would
+  break this silently, so the split MUST be stated where a reader of either value will see it.
 - **FR-007**: The surface MUST continue to verify tokens against that provider from inside its
   container. **A change that makes the client's path work by breaking the surface's is a
   regression**, and both directions MUST be checked rather than one asserted from the other.
@@ -210,15 +245,17 @@ fetch its keys.
   tenant, and roles.
 - **SC-004**: Claims that map to no role are still producible through the login, and the surface
   still refuses them.
-- **SC-005**: The advertised issuer resolves and answers from **both** the host and inside the
-  surface's container — both checked, neither inferred.
+- **SC-005**: A client on the host resolves and reaches the advertised authorization server, and
+  the surface inside its container reaches the provider's keys — **both checked, neither inferred
+  from the other**.
 - **SC-006**: Every existing conformance row that used a directly minted token still passes,
   unchanged.
 - **SC-007**: No file under `src/` differs.
 - **SC-008**: A session survives token renewal without developer involvement.
-- **SC-009**: The signing-key restart trap either no longer occurs, or produces a message naming the
-  cause rather than the symptom. **Silence is not an acceptable outcome here** — it is the failure
-  this feature makes more likely.
+- **SC-009**: Restarting the provider does **not** require restarting the surface, and a client
+  presenting a token from the previous process is refused promptly rather than after a cache
+  window. Verified by restarting the provider and calling an operation immediately — not by
+  reasoning about cache behaviour, which is how the wrong explanation survived twice.
 
 ## Assumptions
 
