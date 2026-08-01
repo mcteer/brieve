@@ -60,6 +60,11 @@ variable "agent_definitions" {
       allowed_paths   = ["secret/data/planner/*"]
       tool_names      = ["echo", "plan"]
       product_actions = ["product.workspace.read"]
+      # 020. THE FIXTURE A CHOICE CAN BE REFUSED IN. Its ceiling holds `echo` and `plan` and
+      # not `apply`, while `apply` is a registered tool — so a recording that names `apply`
+      # produces a real over-reach refused by the existing enforcement, not a malformed
+      # answer. A definition permitting everything could not show a refusal at all.
+      binding_map = { plan = "fixture:fixture/scripted@1:plan" }
     }
     "applier-agent" = {
       description     = "Plans and applies — the wide half"
@@ -68,6 +73,11 @@ variable "agent_definitions" {
       allowed_paths   = ["secret/data/applier/*"]
       tool_names      = ["echo", "plan", "apply"]
       product_actions = ["product.workspace.read", "product.workspace.write"]
+      # 020. Bound to the OTHER cell, which is what makes SC-004 assertable: two definitions
+      # naming different models must produce runs evidenced as having used different models.
+      # With one cell in the estate that assertion would pass against an implementation that
+      # never read a binding map.
+      binding_map = { plan = "fixture:fixture/scripted@2:plan" }
     }
 
     # 013: the definition whose pack tools reach a product that actually answers. A NEW
@@ -100,8 +110,62 @@ variable "agent_definitions" {
       product_actions = []
       packs           = ["vault"]
       tier            = 1
+      # 020. The resume rows drive this definition, and a model-driven run needs a bound
+      # model before its first step. Same cell as `planner-agent`, because what US3 asserts
+      # is durability under a chooser rather than anything about which model.
+      binding_map = { plan = "fixture:fixture/scripted@1:plan" }
     }
   }
+}
+
+# The Qualified Model Matrix for the dev enclave.
+#
+# **These are the first cells this repository has ever authored.** 013 built the matrix
+# reader, the policy grant, and the run-start validation, and every definition bound nothing
+# — so `_resolve_binding_map` returned before touching the matrix on every run for seven
+# features. The vocabulary was correct and load-bearing for nothing, which is 020's own thesis
+# one level up from the tool choice.
+#
+# BOTH CELLS NAME THE `fixture` PROVIDER, and that is the merge lane's whole posture (FR-011).
+# A gate that cannot run without a vendor is a gate that stops running, so the models a
+# dispatched conformance run reaches replay a recording rather than calling out.
+# `qualified_by = "fixture"` is the matrix's own word for exactly that, and it existed before
+# this feature needed it.
+#
+# TWO of them, because one cannot fail. SC-004 asks that two definitions bound to different
+# models produce runs evidenced as using different models, and a single cell would make that
+# assertion pass against an implementation that ignored the binding map entirely.
+#
+# **This is not eval-gated promotion, and it must not be mistaken for it.** A `fixture` cell
+# says a model was qualified against a recording; qualifying a *live* model for `write` is
+# Principle VIII's gate and is human work that happens elsewhere. 020 consumes the matrix; it
+# promotes nothing.
+variable "model_matrix_cells" {
+  type = list(object({
+    pack         = string
+    model        = string
+    role         = string
+    qualified_by = string
+    judge        = optional(string, "")
+    withdrawn    = optional(bool, false)
+  }))
+  default = [
+    {
+      pack         = "fixture"
+      model        = "fixture/scripted@1"
+      role         = "plan"
+      qualified_by = "fixture"
+      # The seed judge, which is the one case a cell may name none: nothing exists above it.
+      judge = "seed"
+    },
+    {
+      pack         = "fixture"
+      model        = "fixture/scripted@2"
+      role         = "plan"
+      qualified_by = "fixture"
+      judge        = "seed"
+    },
+  ]
 }
 
 # Supplied by the second phase of bring-up, not by a human.

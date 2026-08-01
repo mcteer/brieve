@@ -115,3 +115,48 @@ def test_tenant_is_inside_the_hash() -> None:
     moved = entry.model_copy(update={"tenant_id": "tenant-someone-else"})
     with pytest.raises(ValueError, match="entry_hash mismatch"):
         verify_chain([moved])
+
+
+#: The digest of one fully-specified entry, pinned. Every field the hash covers is written
+#: out beside it in :func:`test_widening_the_event_vocabulary_moves_no_existing_hash`, so a
+#: failure here says the *encoding* moved rather than that a value did.
+_PINNED_RUN_START_HASH = "b8a0f39dae957f49ba7d7e0b865cddba35048f321d5862cf375c67a37aa5d497"
+
+
+def test_widening_the_event_vocabulary_moves_no_existing_hash() -> None:
+    """020 T005: adding an `AuditEventType` member rewrites no entry already in the chain.
+
+    **The assumption everything else in 020 rests on.** FR-009 needs a new event type, the
+    audit schema is sealed core (Principle V), and the whole case for that change being
+    *small* is research F1's finding that the enum is unversioned and the hash covers an
+    entry's own ``event_type`` value rather than the set of possible values. If that were
+    wrong, one additive member would invalidate every entry ever written and the trail's
+    append-only guarantee would break silently — the entries would still be there, and only
+    a verification nobody runs would notice.
+
+    So it is pinned rather than reasoned about. The digest below was computed before
+    ``TOOL_CHOSEN`` was added; this asserts it is unchanged after.
+
+    **It can fail**, which is the point (`AGENTS.md`: every assertion must be able to fail).
+    A literal, not a value recomputed by the code under test — recomputing would assert
+    ``compute_entry_hash`` agrees with itself, which it does no matter what it hashes. Any
+    change to the canonical field set, the encoding, or the ordering breaks this line, and
+    that is exactly the class of change that must never happen quietly.
+    """
+    recomputed = compute_entry_hash(
+        correlation_id="c-020",
+        tenant_id="tenant-test",
+        seq=0,
+        event_type="run_start",
+        timestamp=datetime(2026, 1, 1, tzinfo=UTC),
+        payload={"k": 1},
+        prev_hash=GENESIS_PREV_HASH,
+    )
+    assert recomputed == _PINNED_RUN_START_HASH, (
+        "the canonical encoding of an audit entry moved; an entry written before this "
+        "change no longer verifies against the chain that holds it"
+    )
+
+    # And the new member is genuinely present, so the test above is being run against the
+    # widened vocabulary rather than passing because the addition never landed.
+    assert AuditEventType.TOOL_CHOSEN.value == "tool_chosen"

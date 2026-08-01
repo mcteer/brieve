@@ -49,4 +49,5 @@ module "trust_fabric" {
   agent_definitions   = var.agent_definitions
   role_bindings       = var.role_bindings
   definition_policies = var.definition_policies
+  model_matrix_cells  = var.model_matrix_cells
 }

@@ -169,6 +169,22 @@ resource "vault_policy" "harness_authority_read" {
     path "${vault_mount.harness_authority.path}/data/model-matrix/*" {
       capabilities = ["read"]
     }
+    # THE EXACT PATH, and its absence was a latent defect 020 tripped over.
+    #
+    # `SubjectScopedVaultFabric.MATRIX_PATH` is `harness-authority/data/model-matrix` — one
+    # record, no subpath — while the glob above matches only `model-matrix/<something>`. Vault
+    # globs do not match the empty remainder, so the grant that exists covers every path
+    # except the one that is read.
+    #
+    # Nothing noticed for seven features because no matrix record existed to read: 013 wrote
+    # the policy and the reader, and `manufacture._resolve_binding_map` returns before
+    # touching the matrix whenever a definition binds nothing — which every definition did.
+    # 020 is the first feature to author a cell, and the grant would have failed the first
+    # real read as a 403 that the 403-not-404 trap above turns into "trust fabric
+    # unreachable".
+    path "${vault_mount.harness_authority.path}/data/model-matrix" {
+      capabilities = ["read"]
+    }
     # Which packs a definition reaches, its binding map, and its tier (013). The record the
     # whole feature reads: isolation, binding-map validation, and tier resolution all
     # consume these three fields. Beside the ceiling and granted in the same policy,

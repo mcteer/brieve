@@ -35,6 +35,34 @@ variable "agent_definitions" {
   }))
 }
 
+variable "model_matrix_cells" {
+  description = "Qualified Model Matrix cells (pack × model × role), the only models a binding map may name (ADR-0022/0039, Principle VIII)."
+  type = list(object({
+    pack = string
+    # `provider/model@version`. `MODEL_IDENTIFIER` refuses an alias or a bare name at parse,
+    # because "latest" resolving differently next week is auto-tracking under another name.
+    model = string
+    # One of ask / plan / write / judge / summarize — ADR-0039's closed vocabulary. A cell
+    # qualified to summarize does not qualify a model to write.
+    role = string
+    # `fixture` (qualified against a recording) or `live` (a real model answered). Carried
+    # per cell because the difference is invisible otherwise, and it matters most for
+    # `write` — a model permitted to make changes.
+    qualified_by = string
+    # Which judge scored it. Empty only for the seed-qualified first judge.
+    judge = optional(string, "")
+    # A cell qualified once and since pulled. Withdrawal is the case run-start validation
+    # exists for: the definition pinning it sits unchanged in the registry, so validating
+    # only at registration would let a withdrawn cell keep running because nothing re-asked.
+    withdrawn = optional(bool, false)
+  }))
+  # EMPTY BY DEFAULT, and deliberately not "a sensible starter cell". An empty matrix
+  # refuses every binding map, which is the correct posture for an estate that has not run
+  # its eval gates: a default cell would qualify a model by omission, which is exactly the
+  # ungated promotion Principle VIII forbids. Environments author their own.
+  default = []
+}
+
 variable "role_bindings" {
   description = <<-DESC
     What a claim-derived role means in the harness domain.

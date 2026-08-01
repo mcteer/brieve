@@ -112,6 +112,83 @@ written to an allocation's environment where scheduler access would expose it.
 
 ---
 
+## F7. The seam is `Chooser`, not `pydantic_ai.models.Model` (T003)
+
+T003 asked which `pydantic-ai` model interface a provider and a double must both satisfy.
+Measured against `pydantic-ai-slim==2.18.0`: `pydantic_ai.models.Model` is the abstract
+provider interface, with seventeen public members — `request`, `request_stream`,
+`prepare_messages`, `customize_request_parameters`, `count_tokens`, `profile`, `system`,
+`model_name`, and so on.
+
+**Decision: neither the provider-backed chooser nor the double satisfies `Model`. The seam is
+`core.choice.Chooser`** — one method, taking the task, the permitted tools, and the refusals
+so far at this step, returning a tool name or the empty string.
+
+**Rationale, and it is F5 restated with a measurement behind it.** A double satisfying `Model`
+would have to construct `ModelResponse` objects and imitate the framework's message protocol —
+so the thing under test would be our fake's fidelity to `pydantic-ai`'s internals, which is not
+a governance property and would drift with every framework bump. Worse, it would place the
+double *inside the adapter*, one layer below the binding, which is precisely where F5 says it
+must not go: everything between "the run needs a choice" and "a choice came back" would still
+be exercised, but the binding that selects a model would not be.
+
+`Chooser` puts the substitution exactly at the binding. `build_chooser(model_identifier)`
+dispatches on the provider segment of `provider/model@version`, so the lane and production run
+the *same* resolution — read the definition's binding map, validate the cell against the
+matrix, resolve an identifier, build a chooser for it — and differ only in which provider sits
+behind the identifier. A `fixture/…` cell must still be qualified in the matrix and bound by a
+definition, so the double cannot be reached by an operator who merely forgot something.
+
+## F8. The provider-backed chooser is an ADAPTER, not core — T007's path is reconciled
+
+T007 says "implement the provider-backed chooser in `src/core/choice/chooser.py`, calling the
+model through `build_governed_agent`". **Measured against the tree, that path violates
+Principle I**: "The core never imports an agent framework; adapters import the core."
+`build_governed_agent` lives in `src/adapters/pydantic_ai/agent.py` and imports `pydantic_ai`
+at module scope, so a call from `src/core/` pulls the framework into core's import graph.
+
+`tests/unit/test_core_import.py` guards this in two ways, and the second is the one that
+matters here: `test_adapter_is_the_only_framework_importer` scans for the literal
+`import pydantic_ai` outside `src/adapters/`, which an indirect import would slip — while still
+being exactly the layering inversion the guard exists to prevent. A deferred import does not
+help; `adapters/anthropic_scorer.py`'s own docstring records that lesson from 002, where
+`core/evals/scoring.py` imported `anthropic` inside a function body and the guard caught it.
+
+**Decision, and it follows a pattern already in the tree rather than inventing one.**
+
+| Lives in | What it holds |
+| --- | --- |
+| `src/core/choice/chooser.py` | The `Chooser` protocol, the `Choice` record, `resolve_bound_model`, and the `TOOL_CHOSEN` emit. No framework import. |
+| `src/core/choice/bounded.py` | The per-step re-choice budget and the refusal loop. No framework import. |
+| `src/core/choice/recorded.py` | The fixture chooser — replays a recording, calls no provider. |
+| `src/adapters/model_chooser.py` | `ModelChooser`, which calls `build_governed_agent`, and `build_chooser`, which maps a model identifier to one of the above. |
+
+**`src/adapters/`, not `src/adapters/pydantic_ai/`, and the tree decided that too.** The first
+draft put it in the framework package and `tests/unit/test_adapter_mappings.py` refused it:
+`test_adapter_modules_are_exactly_the_four_mappings` pins that directory to Principle I's four
+concepts plus the two modules binding them, and says in as many words that *a fifth behavioural
+module is a scope breach, not a refactor*. A chooser is not one of the four — it is a provider
+call, and the tree already has a place for those. `adapters/anthropic_scorer.py` sits at the
+top level of `adapters/` for exactly this reason and has since 013.
+
+So the division is finer than "core versus adapter": **framework mappings live in
+`adapters/pydantic_ai/`; provider calls live in `adapters/`.** Both were found by a guard
+rather than by reading, which is the argument for the guards.
+
+This is the **`Scorer` shape, exactly**: the protocol lives in `core.evals.scoring`, the
+provider implementation in `adapters/anthropic_scorer.py`, and the suites cannot tell the two
+apart. That module's docstring argues the case in its own words — *"In `adapters`, not
+`core/evals`, because 002's layering guard forbids a provider import anywhere else and is right
+to."* The same sentence applies here with `choice` substituted for `evals`.
+
+**What T007's substance survives intact**: `build_governed_agent` is still the call, it is still
+unchanged, and this feature is still its first production caller. Only the file the call is
+written in moves — from a package the constitution forbids it in, to the package that exists
+for it. Recorded here rather than improvised, per the named-contracts rule, and `tasks.md` T007
+is amended to the reconciled path in the same change.
+
+---
+
 ## Unknowns remaining after Phase 0
 
 **One, carried deliberately.** Whether a model's choice needs its own hook capability kind, or

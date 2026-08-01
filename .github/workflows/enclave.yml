@@ -43,11 +43,20 @@ name: enclave
 # describes, with the lane kept available on demand.
 on:
   # Still runnable, deliberately: `gh workflow run enclave.yml` when a change warrants a clean
-  # substrate, and the capability is worth keeping even when it is not compulsory.
-  workflow_dispatch:
-  # Manual runs, so a maintainer can exercise the lane without opening a pull request —
-  # and so its first run could answer T002 (does the enclave come up on a Linux runner at
-  # all) before anything was built on the assumption that it does.
+  # substrate, and so a maintainer can exercise the lane without opening a pull request. The
+  # capability is worth keeping even when it is not compulsory.
+  #
+  # DECLARED ONCE. It was declared twice between #95 and this change — two comments, each
+  # correct, each followed by the same key — and GitHub rejects a duplicate mapping key
+  # outright: every push since #95 produced a run with **zero jobs** and a red cross reading
+  # "This run likely failed because of a workflow file issue", on `main` as well as on
+  # branches. The lane could not be dispatched at all during that window, which is the worst
+  # version of this failure: the workflow said in its own comments that it remained available
+  # on demand, and it did not.
+  #
+  # PyYAML does not catch this — `safe_load` takes the last key and returns a valid document —
+  # so `python -c "yaml.safe_load(...)"` reports the file as fine. `tests/unit/test_workflow_files_are_valid.py`
+  # checks for the duplicate directly.
   workflow_dispatch:
 
 permissions:

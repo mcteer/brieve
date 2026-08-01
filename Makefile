@@ -37,7 +37,12 @@ mcp-surface-up:
 	@bash infra/bin/mcp-surface-up
 
 conformance:
-	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
+	# `not live_model` is 020's, and it is FR-011 at the lane rather than in a row: the
+	# merge gate never calls a vendor. 020's fidelity row (FR-011a) is deliberately outside
+	# it, behind a named runner, because a stand-in nobody checks is what this feature
+	# exists to end — and it fails loudly rather than skipping, which would fail this lane
+	# on every machine without a provider credential.
+	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave and not live_model" -q
 	@bash infra/bin/enclave-conformance
 	$(UV_RUN) pytest -m enclave -q
 	# The rows that must run HERE rather than in the allocation: they drive the
@@ -106,6 +111,17 @@ conformance:
 	# running process, and a directory named there would be collected with nothing serving —
 	# which is why `tests/conformance/deployment` is absent from it too.
 	@bash infra/bin/mcp-surface-conformance
+	#
+	# 020's choice lane. Its own runner rather than another directory on the host_enclave
+	# pytest line above, because its preconditions fail SILENTLY: a dispatched choice row
+	# against an enclave with no `model-matrix` record refuses every run for
+	# `unqualified_cell`, which is indistinguishable from FR-006 working correctly. The
+	# script checks the record exists and says so in one sentence.
+	#
+	# The hermetic half of `tests/conformance/choice` needs no wiring — the first line of
+	# this recipe collects the tree — which is what makes `make conformance-hermetic` pass
+	# with no provider and no enclave (FR-011, SC-006).
+	@bash infra/bin/choice-conformance
 
 # The accessibility gate (012, FR-020a). Its own target because it is its own DISCIPLINE:
 # every other gate here asserts something about a process, and this one asserts something
@@ -180,8 +196,14 @@ evals-live: evals-smoke
 # one directory. Ignoring that path would drop the hermetic ones; collecting the enclave
 # ones fails the lane, since they fail loudly rather than skipping when the enclave is
 # absent. Neither exclusion alone is sufficient (specs/008-northbound-api T057a).
+#
+# The `live_model` exclusion is 020's, and it is FR-011 stated at the lane rather than in a
+# row: a gate that cannot run without a vendor is a gate that stops running. The fidelity row
+# that keeps 020's double honest (FR-011a) costs a real provider call and fails loudly rather
+# than skipping when the credential is absent — which is right for a row with a named runner
+# and wrong for a blocking lane, where it would turn every fork PR red for having no API key.
 conformance-hermetic:
-	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
+	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave and not live_model" -q
 
 test-full:
 	@echo "make test-full: stub — PR-tier suites not implemented yet" >&2

@@ -38,6 +38,13 @@ def test_core_has_no_agent_framework_deps() -> None:
         "import sys\n"
         "import core\n"
         "import core.run, core.tools.invoke, core.durability, core.approvals\n"
+        # 020. `core.choice` is the package that asks a model what to do next, so it is the
+        # one most likely to acquire a framework import by looking like it needs one — and
+        # research F8 records that T007 as written would have put a `build_governed_agent`
+        # call inside it. Named explicitly rather than trusted to the file scan below, which
+        # matches literal `import pydantic_ai` and would miss an indirect pull through the
+        # adapter package.
+        "import core.choice\n"
         f"forbidden = {{{forbidden}}}\n"
         "loaded = forbidden & set(sys.modules)\n"
         "print(','.join(sorted(loaded)))\n"

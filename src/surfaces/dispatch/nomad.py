@@ -105,6 +105,7 @@ class NomadDispatcher:
         packs: frozenset[str] = frozenset(),
         invoke_tools: bool = False,
         resume: bool = False,
+        choice_recording: str = "",
     ) -> RunHandle:
         """Schedule the run and return immediately.
 
@@ -147,6 +148,17 @@ class NomadDispatcher:
                 # data rather than being reconstructed downstream from evidence that is
                 # consistent with two different histories.
                 "resume": "1" if resume else "",
+                # 020. The answers a `fixture/...` model replays instead of calling a
+                # provider, so the merge lane's dispatched rows need no vendor (FR-011).
+                #
+                # **It grants nothing on its own**, which is the property that keeps this
+                # from being a scripted sequence reachable in production. The branch that
+                # reads it is chosen by the MATRIX — a cell whose model names the `fixture`
+                # provider — so a recording travelling beside an `anthropic/...` binding is
+                # ignored entirely. Two operator-authored records have to say so before any
+                # of this is reachable, which is the difference between a stand-in and the
+                # `_tool_for_step` fallback FR-002 removed.
+                "choice_recording": choice_recording,
                 "run_id": run_id or correlation_id,
                 "step_index": str(step_index if step_index is not None else 0),
             },

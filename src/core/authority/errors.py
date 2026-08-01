@@ -48,6 +48,19 @@ RESOLUTION_REASONS: Final[dict[str, str]] = {
     "cell_withdrawn": "the pinned cell was qualified once and has since been withdrawn",
     "no_qualified_fallback": "the pinned cell is unavailable and no other qualified cell "
     "exists for that role; the run stops rather than proceeding unqualified",
+    # --- 020: the definition binds NO model for a role a run is about to consult one for
+    #
+    # Distinct from `unqualified_cell`, and the difference decides where somebody goes to fix
+    # it: that one means the matrix has not qualified what the definition asked for, and sends
+    # them to the matrix; this one means the definition asked for nothing at all, and sends
+    # them to the definition.
+    #
+    # It exists because the alternative is defaulting, and a default model is an ungoverned
+    # model choice — the same defect as an ungoverned tool choice, one level up. 013 built the
+    # binding map and nothing consumed it, so until a run actually resolved a model there was
+    # no path on which "bound to nothing" could be refused rather than shrugged at.
+    "no_binding_for_role": "the definition binds no model for the role a run needs one for; "
+    "refused rather than defaulted, because a defaulted model is an ungoverned model choice",
     # --- 013: the pack a definition names cannot supply what it is being asked for
     "pack_exceeds_ceiling": "a named pack declares a tool the ceiling does not permit; a "
     "pack narrows what a definition may do and never widens it",
