@@ -40,8 +40,8 @@ the second group is executed by **no automated check**, and the constitution is 
 
 | | What it is | Who | Status |
 | --- | --- | --- | --- |
-| The enclave rows | `make conformance` in full, on a live enclave, before merge | **Dan McTeer** | **Owed** |
-| SC-002 served demonstration | Read a run's result through a served surface; find the reader in the trail | **Dan McTeer** | **Owed** |
+| The enclave rows | `make conformance` in full, on a live enclave, before merge | **Dan McTeer** | **Owed** — the served-surface lane (`infra/bin/mcp-surface-conformance`) was run and passed, 19 rows; the rest of `make conformance` is not discharged |
+| SC-002 served demonstration | Read a run's result through a served surface; find the reader in the trail | **Dan McTeer** | **Performed 2026-08-01** — see below. Confirm rather than repeat |
 | Principle V review | Security-maintainer review of four additive `AuditEventType` members | **Dan McTeer** | **Owed — requested on the PR** |
 | Principle X amendment | ADR-0035 amended in **this** change, not a follow-up (FR-012, T037–T039) | **Dan McTeer** | **Owed** |
 
@@ -141,3 +141,26 @@ and nine were not, so it fails immediately. Nothing else in the existing 857-tes
 what the platform *says* to what it *does* — including
 `tests/component/test_operations_audited.py`, whose name promises exactly that and whose rows
 assert unauthenticated refusal instead.
+
+
+---
+
+## SC-002, performed 2026-08-01
+
+Against the served surface, with `read_evidence` through the **governed path** rather than
+`psql` — the distinction the quickstart now insists on, because an earlier draft took the
+shortcut and that is what hid the reachability gap.
+
+```
+read_evidence  correlation_id=record-access:tenant-local
+  record_read  who=caller-1  op=list_runs      disposition=permitted
+  record_read  who=caller-1  op=list_threads   disposition=permitted
+```
+
+**The same query returned nothing this morning.**
+
+**It could not be performed at all until a second defect was fixed.** The served surface
+published every tool as taking one object property named `arguments`, because `add_tool`
+derives the schema from the handler signature. Thirteen of seventeen operations were uncallable
+by any conforming client, and the served rows passed anyway — the harness wrapped its own
+arguments to match. Driving the surface by hand is what found it; nothing else could have.
