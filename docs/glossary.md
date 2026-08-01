@@ -267,6 +267,26 @@ combinations; the only cells a definition's **binding map** (ask / plan / write 
 → model) may reference (ADR-0022, ADR-0039). Fallback occurs only within qualified
 cells, recorded — never to an unqualified model.
 
+**Choice** — what a model named as the next tool at a step, recorded in the trail as a
+`tool_chosen` event whether or not it was permitted (020). A choice is not a permission
+decision: it says who named a tool and why it was on the table, while `pre_decision` says
+what governance decided about it. The two are separate events on purpose — a reader must be
+able to tell a *chosen* tool from a *scheduled* one, and a refused choice never opens a tool
+bracket, so it would otherwise have nowhere to live.
+
+**Chooser** — the seam a model provider or a recording satisfies: given the task, the tools
+a definition permits, and any refusals already made at this step, it returns a tool name or
+nothing. It never decides permission — the name it returns goes to `invoke_tool`, the same
+governed entry a scripted name went to. Substitution happens where the **binding map**
+resolves a model, never at the run loop, so every line between "the run needs a choice" and
+"a choice came back" is production code in both lanes.
+
+**Re-choice bound** — how many times a model may name a tool at one step before the run ends
+terminally (020, FR-004b). Refusals are returned to the model as context, so governance is a
+signal and not only a wall; the bound is what keeps that from becoming a suggestion an agent
+grinds against. **Per step, not per run** — a run needing several tools must not inherit a
+smaller budget because an earlier step took two attempts.
+
 **Prompt bundle / policy bundle** — the pinned prompt/skill set and the composed
 policy set referenced by a definition; versioned independently, pinned together.
 

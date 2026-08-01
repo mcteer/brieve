@@ -65,7 +65,7 @@ def choice_args(
     roles: str = "vault-operator",
     packs: frozenset[str] = frozenset({"vault"}),
     **overrides: Any,
-):
+) -> dict[str, Any]:
     """A dispatch whose model is a recording, for a definition that can refuse a choice.
 
     `steps` defaults to the number of answers — these rows watch what a run *chose*, not how
