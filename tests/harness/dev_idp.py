@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.parse
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
@@ -81,6 +82,7 @@ class _Handler(BaseHTTPRequestHandler):
                 code=_one(form, "code"),
                 code_verifier=_one(form, "code_verifier"),
                 redirect_uri=_one(form, "redirect_uri"),
+                lifetime=_token_lifetime(),
             )
         except AuthorizationRefused as refused:
             # The same refusals the hermetic rows assert on, over the wire — so a browser
@@ -161,6 +163,42 @@ def _claims(query: dict[str, list[str]]) -> dict[str, Any]:
 def _one(values: dict[str, list[str]], key: str) -> str:
     found = values.get(key) or [""]
     return found[0]
+
+
+#: How long a token this provider mints stays valid, in minutes.
+#:
+#: **Five is right for a test and wrong for a person.** The rows walk the flow and present the
+#: result in the same breath, so five minutes is generous. A developer pasting the token into an
+#: editor's MCP config has to open a file, save it, and reconnect — and the token is dead before
+#: the editor finishes starting, which presents as `HTTP 401 ... while using configured
+#: Authorization header` with nothing in the surface's log, because the refusal happens in the
+#: SDK's auth middleware before any of our code runs.
+#:
+#: Observed exactly that way on 2026-08-01, the first time anyone connected an editor.
+#:
+#: The default is unchanged, so no row moves. `DEV_IDP_TOKEN_MINUTES=480` is what a person
+#: setting up an editor wants.
+TOKEN_MINUTES_ENV = "DEV_IDP_TOKEN_MINUTES"
+DEFAULT_TOKEN_MINUTES = 5
+
+
+def _token_lifetime() -> timedelta:
+    """The configured lifetime, or the five minutes every row already assumes.
+
+    **A bad value fails loudly rather than falling back.** A silent default here would hand
+    someone who typed `DEV_IDP_TOKEN_MINUTES=8h` a five-minute token and let them spend the
+    afternoon debugging an editor.
+    """
+    raw = os.environ.get(TOKEN_MINUTES_ENV, "").strip()
+    if not raw:
+        return timedelta(minutes=DEFAULT_TOKEN_MINUTES)
+    try:
+        minutes = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{TOKEN_MINUTES_ENV}={raw!r} is not a whole number of minutes") from exc
+    if minutes < 1:
+        raise ValueError(f"{TOKEN_MINUTES_ENV}={raw!r} must be at least 1")
+    return timedelta(minutes=minutes)
 
 
 def serve(*, host: str = "127.0.0.1", port: int = 8090) -> None:  # pragma: no cover
