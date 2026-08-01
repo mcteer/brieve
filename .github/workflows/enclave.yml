@@ -54,8 +54,54 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The scope step below diffs against the base, which depth-1 cannot reach.
+          fetch-depth: 0
+
+      # WHETHER THIS CHANGE COULD POSSIBLY AFFECT THE STACK — decided by asking the tests.
+      #
+      # The obvious version is `paths-ignore: [specs/**, docs/**]`, and it is wrong here.
+      # Twelve test files read `specs/`, several of them enclave rows: 018's
+      # `test_a_run_cannot_move_its_own_bounds.py` asserts that its conformance contract
+      # still records the limits its rows depend on, so editing that markdown turns an
+      # enclave row red. A path allowlist would skip exactly the lane that catches
+      # documentation regressions.
+      #
+      # `paths-the-tests-read` derives the answer instead, and fails closed everywhere: a
+      # code path, an unrecognised root, a path any test so much as names, an unreadable
+      # source, a crash, or no diff at all — all mean RUN. Only a positively established
+      # `skip` skips.
+      #
+      # **The job still runs and still reports.** A skipped GitHub job reports as skipped,
+      # which branch protection treats differently from a pass and which reads to a human
+      # as "did not happen". This short-circuits inside the job instead, so the check is
+      # green, present, and says why in its own log.
+      - name: Scope — can this change reach the stack?
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "verdict=run" >> "$GITHUB_OUTPUT"
+            echo "not a pull request — running"
+            exit 0
+          fi
+          if ! changed=$(git diff --name-only "$BASE" "$HEAD"); then
+            echo "verdict=run" >> "$GITHUB_OUTPUT"
+            echo "could not diff $BASE..$HEAD — failing closed and running"
+            exit 0
+          fi
+          echo "changed files:"; printf '  %s\n' $changed
+          # Unquoted on purpose: one path per argument is what the script requires, and it
+          # refuses an argument containing whitespace rather than trusting it.
+          verdict=$(python3 infra/bin/paths-the-tests-read $changed 2>/tmp/why || echo run)
+          echo "verdict=${verdict}" >> "$GITHUB_OUTPUT"
+          echo "verdict: ${verdict} — $(cat /tmp/why)"
 
       - name: Install uv
+        if: steps.scope.outputs.verdict != 'skip'
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
@@ -63,6 +109,7 @@ jobs:
       # Docker is already on the runner. Nomad, Vault, and Terraform are not, and
       # `enclave-up` refuses without all three on PATH.
       - name: Install HashiCorp tooling
+        if: steps.scope.outputs.verdict != 'skip'
         run: |
           set -euo pipefail
           install_hashicorp() {
@@ -96,6 +143,7 @@ jobs:
       # on a Linux runner, and the reason is a Docker Desktop convenience baked into how
       # containers address the host.
       - name: Make host.docker.internal resolvable
+        if: steps.scope.outputs.verdict != 'skip'
         run: |
           set -euo pipefail
           echo '127.0.0.1 host.docker.internal' | sudo tee -a /etc/hosts >/dev/null
@@ -107,6 +155,7 @@ jobs:
       # "error decoding version: expected integer", which names the version and not the
       # quoting that caused it.
       - name: Write the environment file
+        if: steps.scope.outputs.verdict != 'skip'
         env:
           VAULT_ENT_LICENSE: ${{ secrets.VAULT_ENT_LICENSE }}
         run: |
@@ -129,11 +178,13 @@ jobs:
       # See infra/modules/substrate-docker/variables.tf for why this is a substrate
       # difference — Principle VII's only permitted kind — and not a fix applied everywhere.
       - name: Stand up the enclave
+        if: steps.scope.outputs.verdict != 'skip'
         env:
           ENCLAVE_VAULT_HOST_NETWORK: "true"
         run: make dev-up
 
       - name: Conformance (all rows)
+        if: steps.scope.outputs.verdict != 'skip'
         run: make conformance
 
       # A failure to bring the enclave up must read as a failure, never a pass or a skip
@@ -146,5 +197,16 @@ jobs:
             echo "::error::enclave lane failed — this blocks the merge. A lane that cannot" \
                  "stand the stack up reports failure; it never reports a pass."
             exit 1
+          fi
+          # A SKIPPED LANE MUST NOT REPORT THAT ROWS PASSED. It said exactly that before this
+          # step learned about scoping, which would have been a false green of the precise
+          # kind the rest of this file exists to prevent — worse than the lane not running,
+          # because it asserts something no runner established.
+          if [ "${{ steps.scope.outputs.verdict }}" = "skip" ]; then
+            echo "::notice::enclave lane SKIPPED — every changed path is documentation that" \
+                 "no test reads. NO ROWS RAN. Derived by infra/bin/paths-the-tests-read," \
+                 "which fails closed: any code path, any path a test so much as names, or" \
+                 "any error means the lane runs."
+            exit 0
           fi
           echo "enclave rows passed under an automated runner"

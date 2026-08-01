@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+"""Decide whether a change can skip the enclave lane — by asking the tests, not a list.
+
+**Why this is derived rather than an allowlist.** The obvious implementation is
+`paths-ignore: [specs/**, docs/**, "*.md"]` in the workflow. It is wrong here, and not
+subtly: twelve test files read `specs/`, and several are enclave-lane rows. 018's
+`test_a_run_cannot_move_its_own_bounds.py` asserts that its conformance contract still
+records the limits its rows depend on — edit that markdown and the row goes red, which is
+the whole point of it. A path allowlist would skip exactly the lane that catches
+documentation regressions.
+
+So the question "is this change inert?" is answered by reading what the tests reference,
+which cannot go stale, instead of by a list somebody has to remember to update.
+
+**It fails closed, deliberately and in every direction.** Any error, any unreadable file,
+any changed path under a code root, any changed path a test mentions — the lane runs. The
+only outcome that skips is one this script positively established. A CI gate whose failure
+mode is "skip the expensive check" would be worse than no gate at all, and this repository
+has already paid for coverage that a process opted into.
+
+**A limitation, recorded because it shapes the answer.** This cannot tell a path a test
+*opens* from a path a test merely *names* — a fixture literal, an example in a docstring.
+Both count as "read". That is deliberately the conservative direction: the cost is a lane
+that runs when it need not, and the alternative is parsing intent out of source, which would
+be wrong in the expensive direction.
+
+Usage:  paths-the-tests-read <changed-file> [<changed-file> ...]
+Prints `run` or `skip` on stdout, with the reasoning on stderr.
+Exit status is 0 either way; a crash means `run`, which the caller must honour.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+
+#: Anything here changes behaviour by definition. Not exhaustive, and it does not need to
+#: be: a path outside both this list and the documentation roots below also means `run`.
+CODE_ROOTS = (
+    "src/",
+    "tests/",
+    "infra/",
+    ".github/",
+    "Makefile",
+    "pyproject.toml",
+    "uv.lock",
+    ".specify/",
+)
+
+#: The only roots a change may live under and still be considered for skipping. Being here
+#: is necessary and NOT sufficient — every path is still checked against what tests read.
+DOC_ROOTS = ("specs/", "docs/", "README.md", "ROADMAP.md", "AGENTS.md", "CLAUDE.md")
+
+#: Where to look for references. Test sources, plus the conformance helper modules they
+#: import, which is where most of the path literals actually live.
+TEST_GLOBS = ("tests/**/*.py",)
+
+
+def _test_sources() -> list[str]:
+    out: list[str] = []
+    for pattern in TEST_GLOBS:
+        for path in ROOT.glob(pattern):
+            try:
+                out.append(path.read_text(errors="ignore"))
+            except OSError:
+                # Unreadable test file: we cannot know what it references, so we must not
+                # claim anything is unreferenced.
+                raise
+    return out
+
+
+def _candidate_references(changed: str) -> list[str]:
+    """The strings that would indicate a test reads this file.
+
+    The full path, and each ancestor **below the top-level directory**. A test naming
+    `specs/018-registry-isolation/contracts/` reads a file inside it even though it never
+    names the file. The top-level root itself is excluded: bare `specs/` appears in almost
+    every test module and would make everything look referenced, which is fail-closed but
+    useless — the lane would never skip and the script would be theatre.
+    """
+    parts = Path(changed).parts
+    refs = [changed]
+    for i in range(len(parts) - 1, 1, -1):
+        refs.append("/".join(parts[:i]))
+    return refs
+
+
+def decide(changed: list[str]) -> tuple[str, str]:
+    if not changed:
+        return "run", "no changed files were reported — cannot establish that anything is inert"
+
+    # ONE PATH PER ARGUMENT, AND THIS GUARD CAUGHT A REAL FAIL-OPEN.
+    #
+    # While testing this script, a harness written in zsh passed several paths as a single
+    # argument — zsh does not word-split unquoted parameter expansions the way bash does.
+    # The script saw one "path" containing spaces, matched it against nothing, and answered
+    # `skip` for a changed set that included `src/core/identity/kind.py`.
+    #
+    # The verdict was wrong in the only direction that matters. A caller that mis-passes its
+    # arguments must get `run`, not a confident skip over unexamined code.
+    for path in changed:
+        if any(c.isspace() for c in path):
+            return (
+                "run",
+                f"argument {path!r} has whitespace — one path per argument, and this is not one",
+            )
+
+    for path in changed:
+        if any(path == root or path.startswith(root) for root in CODE_ROOTS):
+            return "run", f"{path} is under a code root"
+        if not any(path == root or path.startswith(root) for root in DOC_ROOTS):
+            return "run", f"{path} is outside every known documentation root"
+
+    sources = _test_sources()
+    if not sources:
+        return (
+            "run",
+            "no test sources found — the reference set would be empty and everything look inert",
+        )
+
+    for path in changed:
+        for ref in _candidate_references(path):
+            for source in sources:
+                if ref in source:
+                    return "run", f"{path} is read by tests (matched on {ref!r})"
+
+    return "skip", f"all {len(changed)} changed paths are documentation that no test reads"
+
+
+def main(argv: list[str]) -> int:
+    try:
+        verdict, why = decide([a.strip() for a in argv[1:] if a.strip()])
+    except Exception as exc:  # noqa: BLE001 — any failure must mean `run`
+        print("run")
+        print(f"failed closed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 0
+    print(verdict)
+    print(why, file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
