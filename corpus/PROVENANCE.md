@@ -6,47 +6,35 @@ Terraform and Vault, under `https://developer.hashicorp.com/validated-patterns/`
 
 **Pinned on**: 2026-08-01. Corpus digest recorded in `manifest.json`.
 
-## Why there is no content here
+## Vendored, and why
 
-024's plan said to vendor the corpus the way `packs/terraform/skills/` vendors upstream skills.
-That precedent works because those skills come from a repository whose licence permits it.
+The content is here — 33 documents, as extracted sections under `documents/`.
 
-**Not because redistribution is prohibited — because it could not be established that it is
-permitted, and this repository's own standard is higher than that.**
+**An earlier version of this file pinned by digest only and left the content out**, on the grounds
+that the pages state no licence and this repository's precedent (`packs/terraform/skills/`, MPL-2.0
+copied verbatim) is to vendor only with a licence in hand. The maintainer's call was that these are
+publicly accessible pages and this is a HashiCorp-endorsed project — context the caution did not
+have. Recorded rather than quietly reversed, because the reasoning is worth finding if the question
+comes up again.
 
-What was checked: the validated-patterns index and a product page carry **no statement about reuse
-or redistribution**. Under default copyright, absence of a grant means no redistribution right —
-but silence is not proof of prohibition, and saying "cannot be vendored" would overstate what was
-found.
+**Sections, not markup.** Thirty-three pages of raw HTML is roughly fourteen megabytes of
+navigation, scripts and styling, none of which an answer cites. What a citation points at is a
+section, so a section is what is stored: anchor, heading, and text.
 
-What could not be checked: whether the tutorials live in a public repository with a licence. The
-GitHub API returns 403 for the whole `hashicorp` organisation under SAML enforcement, so the one
-check that would settle it was closed.
+## The manifest is still the pin
 
-**The deciding factor is the precedent already in this tree.** `packs/terraform/skills/` vendors
-upstream content and carries **MPL-2.0 copied verbatim**, with the licence named in its provenance.
-That is the bar: vendor when you hold a licence. No licence was in hand here, so the bar was not
-met — which is a different and smaller claim than "it is not allowed".
+Two different questions, kept separate:
 
-**If the licence question later resolves in favour of vendoring, that is an addition rather than a
-correction.** The digest pin stands on its own merits either way: FR-014 asks for content-based
-change detection because the corpus carries no version metadata, a digest *is* exactly that, and it
-is a stronger pin than a copy — a vendored copy drifts from upstream silently, a digest mismatch is
-loud.
+- **`manifest.json` digests the upstream page.** It answers *did HashiCorp change this* — the only
+  way to ask, since the corpus carries **no version metadata anywhere**. This is what FR-014 wants,
+  and it is a stronger signal than a copy on its own: a vendored copy drifts from upstream
+  silently, a digest mismatch is loud.
+- **Loading verifies the vendored content.** Every anchor the manifest names must exist in the
+  document committed beside it. A citation resolving against a pin whose content is absent would be
+  a citation to nothing.
 
-## What replaces it
-
-**A manifest, and the manifest is the pin.** For each document: its URL, a SHA-256 of its content,
-and the section anchors a citation can resolve to. The content itself is fetched into
-`.corpus-cache/` — gitignored — by `infra/bin/corpus-sync`.
-
-**This satisfies FR-014 exactly.** The requirement was content-based change detection, because the
-corpus carries no version metadata anywhere. A digest *is* that, and it is a stronger pin than a
-copy: a copy can drift from upstream silently, while a digest mismatch is loud.
-
-**Nothing is fetched at answer time.** That is what the plan rejected, and it stands — answering
-reads the local cache and verifies it against this manifest. A cache that does not match is a
-refusal, not a silent fallback.
+**Nothing is fetched at answer time.** `infra/bin/corpus-sync` refreshes both; answering reads only
+what is committed.
 
 ## Verified on arrival (T004a)
 

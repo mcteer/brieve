@@ -1,0 +1,146 @@
+{
+  "path": "/validated-patterns/vault/extend-vault-enterprise-for-hybrid-and-multi-cloud-deployments",
+  "url": "https://developer.hashicorp.com/validated-patterns/vault/extend-vault-enterprise-for-hybrid-and-multi-cloud-deployments",
+  "sections": [
+    {
+      "anchor": "target-audience",
+      "title": "Target audience",
+      "text": "The target audiences for this validated pattern include but are not limited to Vault architects, system administrators, and site reliability engineering (SRE) teams. As the guidance in this document requires the involvement of multiple cloud service providers or datacenters, architecture review boards (ARBs) and change management committees (CMCs) must also review the documentation where appropriate."
+    },
+    {
+      "anchor": "roles-and-responsibilities",
+      "title": "Roles and responsibilities",
+      "text": "Cloud architects: responsible for planning the deployment of infrastructure into cloud environments. Ensures that multi cloud designs align with cloud resource availability and operational standards. Network architects: responsible for managing the organization\u2019s shared network fabric to ensure performance and reliability as usage scales. Works with Vault architects to define multi cloud network connectivity and help validate network performance. Security architects: responsible for ensuring that multi cloud designs adhere to organizational or regulatory requirements for data handling and encryption. Vault architects: responsible for defining the Vault multi cloud design such as cluster/node distribution, replication topology, namespaces hierarchy, and observability strategy. SRE teams: responsible for provisioning infrastructure in each cloud to support individual cluster deployments, as well as provisioning and configuring network infrastructure such as dedicated cloud connectivity, gateways, route tables, and firewall rules. System administrators: also known as Vault admins. Responsible for deploying and managing Vault. Tasks include configuring namespaces, deploying policies, enabling replication, and delegating permissions to DevOps teams."
+    },
+    {
+      "anchor": "benefits",
+      "title": "Benefits",
+      "text": "The primary advantage to deploying Vault in a multi cloud topology is the centralization of secrets and simplification of management, enabling the operation of one Vault environment instead of two or more. Multi cloud Vault also enables robust data locality strategies by leveraging namespaces and paths filtering, giving administrators the choice of what Vault data to replicate to each cluster that serves traffic. Vault Enterprise relies on performance replication (PR) secondary clusters to extend service into multi cloud environments. PR secondary clusters manage their own tokens and leases, respond to read traffic from clients, and forward write traffic for replicated mounts to the primary cluster. Extending a unified architecture helps reduce effort and cognitive load for Vault teams that need to deliver secrets management across multiple clouds."
+    },
+    {
+      "anchor": "limitations",
+      "title": "Limitations",
+      "text": "Running a single, multi cloud Vault environment is best suited for teams proficient in managing applications and platforms through infrastructure as code (IaC). Because you deploy multiple clusters across cloud providers, standardized management and observability practices are essential for ensuring the health and performance of Vault. HashiCorp strongly recommends that customers localize their disaster recovery (DR) strategy for multi cloud Vault Enterprise by deploying DR secondary clusters into regions of the same cloud. Localizing DR in each cloud provides consistent, optimal network conditions for potential failover traffic. This ensures that the same cloud protects cluster data during service interruptions."
+    },
+    {
+      "anchor": "prerequisites-for-planning",
+      "title": "Prerequisites for planning",
+      "text": "Any Vault Enterprise cluster that serves traffic to clients in a multi cloud environment must replicate its traffic to a DR secondary cluster for fault tolerance. This is inclusive of the PR primary cluster and all PR secondary clusters. Any cluster participating in PR replication also functions as the DR primary cluster to its own DR secondary cluster. When extending Vault Enterprise in multi cloud environments, architects must plan to deploy clusters in pairs. Multi cloud Vault environments start with a minimum of four clusters, deployed across two clouds with one region from each cloud serving traffic. Checklist A minimum of four Vault Enterprise clusters: two deployed across two regions of one cloud provider (for example, CloudA); two deployed across two regions of another cloud provider (for example, CloudB). Designate the four clusters as Vault primary cluster (CloudA), DR secondary cluster (CloudA), PR secondary cluster (CloudB), DR secondary cluster (CloudB). Important: configure DR replication for the Vault primary cluster. Enable replication from the primary cluster to a DR secondary cluster in the same cloud or datacenter. This pattern addresses configuring DR replication for non-primary clusters later in connect the multi cloud environment with replication . A minimum of two DNS alias records or global service load balancers (GSLBs): one configured to route traffic to the FQDN of the primary cluster, the other configured to route traffic to the FQDN of the PR secondary cluster. The diagram below is a high level illustration of the minimum prerequisite architecture."
+    },
+    {
+      "anchor": "best-practices",
+      "title": "Best practices",
+      "text": "Cluster architecture Customers must define a baseline Vault Enterprise cluster architecture to deploy across multiple clouds. Architects, administrators, and SRE teams can align with HashiCorp best practices by ensuring that: Supporting infrastructure meets the minimum system requirements as defined in Vault reference architecture ; and All Vault design patterns include six node Vault clusters to support fault tolerance with redundancy zones . Baseline performance testing Vault admins must thoroughly test multi cloud performance replication in lower environments before deploying to production. HashiCorp strongly recommends that Vault teams establish baseline measurements of bandwidth and request rates for replication traffic. Use tools like vault-benchmark to simulate Vault traffic under various load conditions."
+    },
+    {
+      "anchor": "prerequisites-resources",
+      "title": "Prerequisites resources",
+      "text": "Enable disaster recovery replication | Vault | HashiCorp Developer Vault with integrated storage reference architecture | Vault | HashiCorp Developer Use redundancy zones | Vault | HashiCorp Developer Set up fault tolerance with Vault redundancy zones | Vault | HashiCorp Developer GitHub - hashicorp/vault-benchmark: A tool for benchmarking usage of Vault"
+    },
+    {
+      "anchor": "networking-considerations",
+      "title": "Networking considerations",
+      "text": "Audience: All architects, SRE teams, and system administrators Extending Vault Enterprise with multi cloud or hybrid cloud interconnectivity requires consideration of a number of networking factors."
+    },
+    {
+      "anchor": "connections",
+      "title": "Connections",
+      "text": "Enabling multi cloud Vault Enterprise requires the selection and implementation of the appropriate type of network connections. Choosing the right type of connection depends on thorough baseline testing to estimate the amount of traffic sent to and from the PR secondary clusters. Dedicated cloud network connections Dedicated cloud network connections such as AWS DirectConnect , Azure ExpressRoute , or GCP Dedicated Interconnect , are robust, private network interfaces designed for connecting cloud resources to customer networks. These connections require additional hardware, such as on-premises routers or specialized service providers, to bridge the network routes. Dedicated connections typically start with a minimum bandwidth of 10Gbps and offer other enhancements to performance and reliability. Note Enabling public cloud to public cloud traffic with dedicated network connections requires cross-linking at physical colocation sites approved by your cloud providers. Not all cloud providers support the same colocation sites. Refer to cloud provider documentation for more details. Virtual private network connections Site-to-site virtual private network (VPN) connections are directly created between clouds, avoiding the need to manage on-premises networking hardware or rely on external service providers. Although they can be more affordable than dedicated network connections, VPN connections are more complex to set up and manage. They are also slower, with bandwidth per VPN tunnel typically limited to around 1.25Gbps. Note Your cloud providers\u2019 well-architected guidance may advise implementing redundant VPN connections in addition to dedicated network connections. Architects must thoroughly review this guidance with the relevant change management committees (CMCs) and architecture review boards (ARBs) before committing to any design decisions."
+    },
+    {
+      "anchor": "latency",
+      "title": "Latency",
+      "text": "SRE teams and system administrators can deploy PR secondary clusters in any geographic region, provided the intended Vault use case tolerates the latency and bandwidth constraints of the connection. All write requests sent by clients to a PR secondary cluster forward to the primary cluster, where Vault writes and replicates them back to the PR secondary. Vault use cases that anticipate high amounts of write traffic to a PR secondary cluster may be sensitive to available bandwidth and round trip time (RTT) latency. On the other hand, Vault use cases that only anticipate read traffic from a PR secondary cluster may tolerate RTT latency as high as 300 ms to 400 ms to the primary cluster."
+    },
+    {
+      "anchor": "routing",
+      "title": "Routing",
+      "text": "Network architects and SRE teams must assign unique, non-overlapping private IP addresses to the network load balancers for each Vault cluster. A common way to achieve this requirement is by ensuring that the virtual private clouds (VPCs) of each Vault cluster have unique, non-overlapping classless inter-domain routing (CIDR) blocks. However, the nodes comprising each Vault cluster can technically have overlapping IPs. This is sometimes seen in advanced Kubernetes use cases where load balancing masks the overlapping IPs of individual pods. To simplify network routing, network architects and SRE teams may consider using virtual routers like AWS Transit Gateway or Azure Virtual Wide Area Network (WAN). Virtual routers can connect the VPCs of Vault clusters and other services in regional hub-and-spoke configurations to VPN or dedicated cloud network connections. Each network must configure their route tables, firewalls, or security groups to permit Vault replication traffic from a cluster serving traffic to its DR secondary cluster, as well as the primary cluster and the primary\u2019s DR secondary cluster, on TCP ports 8200 and 8201 ."
+    },
+    {
+      "anchor": "domain-name-system",
+      "title": "Domain name system",
+      "text": "Vault depends on DNS to resolve cluster hostnames to load balancer IPs, which is necessary to validate server identities written to the TLS certificates securing the end-to-end connection. SRE teams and system administrators must ensure that each cluster serving traffic can resolve the fully qualified domain names (FQDNs) of their respective DR secondary clusters, as well as the primary cluster and its DR secondary cluster. Network architects must leverage global load balancing to route client traffic to the appropriate Vault cluster. Multi cloud Vault network designs must at least include alias records for PR cluster or DR secondary cluster pairs. This simplifies Vault client configuration by ensuring that in the event of DR failover, clients do not need to reconfigure the Vault cluster hostname."
+    },
+    {
+      "anchor": "disaster-recovery-for-pr-secondary-clusters",
+      "title": "Disaster recovery for PR secondary clusters",
+      "text": "Planning disaster recovery for PR secondary clusters is imperative to maintaining the integrity and security of leases and secrets data in failover scenarios. Any customers deploying Vault Enterprise in multi cloud environments must deploy DR secondary clusters for each PR secondary cluster within the same cloud before certifying the environment for production usage. To ensure that the multi region, multi cloud Vault environment can operate in all failover scenarios, each cluster needs its own network routes to the primary cluster and the primary\u2019s DR secondary cluster(s). Multi cloud Vault environments could possibly see three different types of failover scenarios: Vault primary fails to DR secondary, requiring all PR secondary clusters to replicate with the promoted primary; One or more PR secondary clusters fails over to its DR secondary cluster(s), requiring each promoted PR secondary to replicate with the primary; A combination of the preceding scenarios, where all PR secondary clusters, including newly promoted PR secondary clusters, need to replicate with a promoted Vault primary cluster after a failover."
+    },
+    {
+      "anchor": "examples-of-multi-cloud-networking",
+      "title": "Examples of multi cloud networking",
+      "text": "The following examples illustrate multi cloud network connectivity for two clouds that each provide Vault service in one active region. Since you can consume Vault across multiple clouds and regions, these patterns represent a single spoke in a hub-and-spoke architecture. Example scenario 1 - dedicated network connections In the preceding example, the primary Vault cluster's network in AWS us-east-1 establishes a DirectConnect through a service provider. Azure ExpressRoutes establish the other side of the connection to the PR secondary cluster in ukwest and the PR secondary cluster's DR secondary in uksouth. The primary Vault cluster replicates data to its DR secondary Vault cluster in us-west-2 through cross-region VPC connections. The DR secondary cluster\u2019s network in us-west-2 also has an established DirectConnect to the same service provider, thereby connecting to the Azure ExpressRoutes for the PR and DR secondary cluster\u2019s networks in ukwest and uksouth. Example scenario 2 - dedicated network connections In this example, the primary Vault cluster resides on-premises in DC west. The DR secondary cluster it replicates to resides in DC east. The primary Vault cluster in DC west uses an AWS DirectConnect connection to us-west-2, allowing it to connect to the cloud PR secondary cluster's network. The DirectConnect in us-west-2 also uses a secondary route to a network gateway for the PR secondary's DR cluster in us-east-1. The DR secondary cluster's on-premises region in DC east uses an AWS DirectConnect connection to us-east-1, with a secondary route from the DirectConnect to the cloud PR secondary cluster in us-west-2. Example scenario 3 - VPN connections In this final example, the primary Vault cluster located in AWS us-east-1 connects its network to the other cloud regions through two separate site-to-site VPN connections - one to eastus2 and the other to westus3. The network for the DR secondary cluster located in AWS us-west-2 also connects through two site-to-site VPN connections to the Azure regions in eastus2 and westus3."
+    },
+    {
+      "anchor": "networking-resources",
+      "title": "Networking resources",
+      "text": "Designing private network connectivity between AWS and Microsoft Azure | Microsoft Workloads on AWS Centralized DNS management of hybrid cloud with Amazon Route 53 and AWS Transit Gateway | Networking & Content Delivery AWS Transit Gateway + AWS Site-to-Site VPN - Amazon Virtual Private Cloud Connectivity Options Create HA VPN connections between Google Cloud and Azure Create HA VPN connections between Google Cloud and AWS"
+    },
+    {
+      "anchor": "multi-cloud-consumption-patterns",
+      "title": "Multi cloud consumption patterns",
+      "text": "Audience: Vault architects, security architects, and system administrators Multi cloud Vault enables cloud agnostic secrets management, which further centralizes and simplifies consumption of the service. Customers can consume Vault in a variety of ways, combining multiple consumption patterns in one environment. Before proceeding, review the best practices for namespaces and mount paths ."
+    },
+    {
+      "anchor": "cloud-agnostic-consumption",
+      "title": "Cloud agnostic consumption",
+      "text": "With cloud agnostic consumption, a Vault client's origin does not impact its ability to consume Vault. Policy and access governance unifies all clouds and regions. Use namespaces for cloud agnostic Vault consumption. Namespaces Vault namespaces , organized by country or regional boundary, can scale with many businesses. Well-defined namespace hierarchies streamline the management of path filters, which you use when scaling consumption with regional use cases. Namespaces also help simplify the definition of ACL and Sentinel policies for fine-grained access control. The diagram below visualizes how Vault can replicate a basic namespaces hierarchy to clusters serving traffic. The primary and PR secondary clusters replicate their data to downstream DR secondary clusters."
+    },
+    {
+      "anchor": "scaling-with-regional-use-cases",
+      "title": "Scaling with regional use cases",
+      "text": "Vault architects and administrators may determine that not all regions need to replicate the same secrets. This is sometimes seen in larger multi cloud Vault environments that onboard workloads for only some regions. Administrators can optimize the amount of replication traffic flowing to PR secondary clusters with namespaces and path filters. Path filters You can configure each PR secondary cluster to use path filters , which limit replication to specified mounts or namespaces. Vault admins can configure path filters to replicate the portion of a namespaces hierarchy that is relevant to the cloud region needing service. The diagram below visualizes how Vault can use path filters to replicate different namespaces to clusters based on their cloud region. The primary cluster replicates the entire namespace hierarchy, while PR secondary clusters replicate the child namespaces needed per region."
+    },
+    {
+      "anchor": "extending-data-sovereignty",
+      "title": "Extending data sovereignty",
+      "text": "Vault supports multi cloud data sovereignty in the country where the customer deploys the primary cluster. Admins can configure the primary cluster to use replicated mounts and namespaces, which enables Vault to replicate data to other clouds and regions. Customers that require data sovereignty in additional countries must be judicious in their use of namespaces, since Vault replicates the data stored in namespaces back to the primary cluster. To circumvent this, Vault admins can use local mounts to store secrets in paths configured on an individual cluster. Local mounts Clusters perform read and write requests for local mounts locally and avoid replication altogether. This prevents certain secret data from leaving the national boundary and can limit the overall amount of replication traffic. However, you directly manage local mounts on the cluster where you configure them. Vault admins can choose to configure new auth methods and secrets engines as local mounts at the time of mount creation. It is not possible to change the mount type later. The diagram below visualizes how Vault can use local mounts to isolate secrets to single cloud regions. While Vault still replicates namespaces to PR secondary clusters based on paths filter criteria, one of the PR secondary clusters in this example has also created local mounts for preventing certain data from replicating outside the cluster. Local mount considerations Vault Enterprise supports cloud agnostic, multi cloud environments with data sovereignty for the country where you deploy the primary cluster. Through the use of local mounts, multi cloud Vault admins can extend data sovereignty to individual cluster(s) residing in other countries. Because local mounts do not replicate to other clusters, the secrets they provide are only accessible from a single region within a single cloud. Customers that require Vault to provide cloud agnostic service with data sovereignty in multiple countries must plan to deploy multi cloud Vault environments exclusive for each country."
+    },
+    {
+      "anchor": "consumption-pattern-resources",
+      "title": "Consumption pattern resources",
+      "text": "Enable performance replication | Vault | HashiCorp Developer Replication support in Vault | Vault | HashiCorp Developer Secure multi-tenancy with namespaces | Vault | HashiCorp Developer Best practices for namespaces and mount paths | Vault | HashiCorp Developer"
+    },
+    {
+      "anchor": "plan-the-multi-cloud-deployment",
+      "title": "Plan the multi cloud deployment",
+      "text": "Audience: All architects, system administrators, and SRE teams Once architects and administrators have thoroughly reviewed the deployment considerations and consumption patterns, they can formulate their design decisions into a deployment plan. The deployment plan requires stakeholders to complete processes (like testing and network selection) and create resources (like network fabric and Vault policies). Below, the workflows outline processes that architects, admins, and SRE teams execute as part of a deployment plan. The checklist identifies resources that you create at the conclusion of the workflows."
+    },
+    {
+      "anchor": "workflows",
+      "title": "Workflows",
+      "text": "Validation of non-overlapping IP addresses for load balancers in multi cloud Vault network. Baseline performance testing of Vault to estimate network replication requirements. Selection of multi cloud connection type. Creation of multi cloud connections (VPN or dedicated). Configuration of all necessary network devices to permit Vault cluster routes and ports. Configuration of DNS resolution for Vault clusters. Configuration of alias records or GSLB routing to redirect Vault traffic. Design the namespaces hierarchy, including any paths filtering. Write governing policies to enforce namespaces usage. Define the local mounts strategy for additional data sovereignties, if needed. Write policies to govern creation of mounts."
+    },
+    {
+      "anchor": "checklist",
+      "title": "Checklist",
+      "text": "Configured cloud dedicated network connections or site-to-site VPN connections. Validated routes among PR secondary clusters, the primary cluster, and its DR secondary. Confirmed that all Vault clusters trust the TLS certificates for all other Vault clusters in the multi cloud environment. Documented Vault namespace strategy (and path filter rules, if applicable). Created Vault ACL and Sentinel policies governing the creation of namespaces and mounts."
+    },
+    {
+      "anchor": "connect-the-multi-cloud-environment-with-replication",
+      "title": "Connect the multi cloud environment with replication",
+      "text": "After stakeholders execute the deployment plan, the multi cloud network forms, and the primary Vault cluster has the necessary policies for managing namespaces. Vault admins can now proceed to establish performance replication. Afterward, configure in-cloud disaster replication for all PR secondary clusters."
+    },
+    {
+      "anchor": "configure-performance-replication-to-pr-secondary-clusters",
+      "title": "Configure performance replication to PR secondary clusters",
+      "text": "Vault admins navigate between both clouds to fully enable performance replication. From the primary cluster, Vault admins enable the performance replication primary endpoint and generate a secondary token. The secondary cluster enables the performance replication secondary endpoint using the secondary token, and connects to the primary cluster. Performance replication resources Replication support in Vault | Vault | HashiCorp Developer Enable performance replication | Vault | HashiCorp Developer Troubleshoot and tune enterprise replication | Vault | HashiCorp Developer"
+    },
+    {
+      "anchor": "configure-disaster-replication-for-pr-secondary-clusters",
+      "title": "Configure disaster replication for PR secondary clusters",
+      "text": "The last step in solidifying the multi cloud Vault environment is to configure disaster recovery replication for the PR secondary clusters. From each PR secondary cluster, Vault admins enable the DR replication primary endpoint and generate a secondary token. The admins log into the unused Vault cluster in the same cloud as the PR secondary cluster, and use the secondary token to enable the DR replication secondary endpoint. Important: Vault admins must simulate failover events in lower environments to validate that DR replication is properly configured and operational. Disaster recovery resources Enable disaster recovery replication | Vault | HashiCorp Developer Recover from catastrophic failure with disaster recovery replication | Vault | HashiCorp Developer"
+    },
+    {
+      "anchor": "next-steps",
+      "title": "Next steps",
+      "text": "After you enable replication across all Vault clusters in the multi cloud environment, system administrators can take additional steps like production hardening to ready the service for consumption. Vault architects and administrators can then turn their focus to planning secure, efficient client integrations for users and workloads."
+    },
+    {
+      "anchor": "additional-reading",
+      "title": "Additional reading",
+      "text": "Production hardening | Vault | HashiCorp Developer Previous Vault identity brokering Next Vault Agent AppRole integration"
+    }
+  ]
+}

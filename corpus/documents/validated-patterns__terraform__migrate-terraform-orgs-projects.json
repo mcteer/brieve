@@ -1,0 +1,136 @@
+{
+  "path": "/validated-patterns/terraform/migrate-terraform-orgs-projects",
+  "url": "https://developer.hashicorp.com/validated-patterns/terraform/migrate-terraform-orgs-projects",
+  "sections": [
+    {
+      "anchor": "target-audience",
+      "title": "Target audience",
+      "text": "This guide is for existing HCP Terraform or Terraform Enterprise customers that have a complex, multi-organization Terraform setup that want to collapse to a single organization. Given the multitude of ways that customers can organize their HCP Terraform deployments, this guide only will consider a single pattern: organization per application."
+    },
+    {
+      "anchor": "prerequisites-and-limitations",
+      "title": "Prerequisites and limitations",
+      "text": "To complete this guide, you will need the following: Review Terraform Solution Design Guide and Operating Guide An active HCP Terraform account or Terraform Enterprise deployment with a multi-organization setup Install tfm on a workstation that will have network access to both instances of HCP Terraform or Terraform Enterprise. Access to a bash environment where tfm (a specialized utility written by HashiCorp Services) can be executed. tfm is not strictly required, but it simplifies a lot of the necessary steps and will be used in this guide. Generate a user API token with for a member of the owners group in the central organization Generate a user API token with for a member of the owners group of all source organizations In addition, the following limitations apply: The tool referenced in this integration pattern ( tfm ) was developed by HashiCorp Services and is used regularly in professional services engagements. It is provided as OSS for use by anyone, though HashiCorp does not officially support tfm . Project names will be created using existing organization names. If using a version of Terraform Enterprise prior to v202405-1, additional code may be required to prevent an organization name from overflowing the project name . This guide assumes that existing organizations do not utilize projects and that all workspaces are in the Default Project . If projects are currently used, additional planning will be needed to map those projects to the new structure. Workspace names must be unique per organization, which may introduce naming conflicts that must be addressed prior to the migration. For example, if organization ApplicationA and organization ApplicationB each have workspaces named test-workspace , at least one workspace must be renamed within the central organization. This is most easily solved by adding a prefix or suffix to the workspace name (note that tfm can perform this renaming ). Example mapping: ApplicationA\\test-workspace -> CentralOrganization\\ApplicationA-test-workspace ApplicationB\\test-workspace -> CentralOrganization\\ApplicationB-test-workspace Run history cannot be migrated between workspaces"
+    },
+    {
+      "anchor": "background-and-best-practices",
+      "title": "Background and best practices",
+      "text": "Organizations in HCP Terraform and Terraform Enterprise were the original way to segregate workspaces. While they served this critical purpose, they have often been used in ways that the original architecture was not designed for. The original design principle for organizations was to allow a single platform team to run a multi-tenant platform for discrete groups to operate within a Terraform Enterprise deployment. Organizations could be created for each discrete line of business (LoB), with administrators having full control over their LoB and no access to other LoBs. To realize these requirements, several things were set at the organization level, including identity and access management (IAM), version control system (VCS) integration, policy sets, and the private module registry. Furthermore, role based access control (RBAC) was assigned at the workspace level. Given these foundational design principles, organizations were not intended to scale into the thousands. Doing so creates a significant maintenance burden on the platform team and introduces negative performance impacts on the platform. As more customers used Terraform Enterprise, it became apparent that a new level of organization was needed to handle concerns such as RBAC delegation within a single LoB. Organizations were too broad to give scoped access to individual teams, and yet teams would often work with many workspaces. Managing granular access to each workspace became problematic. Throughout 2023, HashiCorp introduced and matured a new way to organize and segregate workspaces: projects. Projects exist within organizations and allow organization administrators to delegate roles and associate objects (policy sets, variable sets, version control, etc.) to specific projects. This enables users to adhere to the principle of least-privilege access without needing to create a multi-organization setup. HashiCorp recommends minimizing organizations and leveraging projects to isolate RBAC, assign policy sets and variable sets, isolate VCS integrations and other features. General guidance: Limit organizations to the minimum number required Some situations where organizations are useful Audit and regulatory requirements requiring strict segregation of administrative access VCS repository webhook limitations imposed by some VCS tools Truly distributed platform teams where a multi-tenant approach aligns with the business structure Avoid adopting an architecture where organizations can grow unbounded"
+    },
+    {
+      "anchor": "validated-architecture",
+      "title": "Validated architecture",
+      "text": "The following diagram illustrates the validated architecture for this integration pattern."
+    },
+    {
+      "anchor": "people-and-process-considerations",
+      "title": "People and process considerations",
+      "text": "For a more in-depth view of HashiCorp's team and process structure recommendations, refer to the Terraform: Operating Guide for Adoption ."
+    },
+    {
+      "anchor": "teams-and-roles",
+      "title": "Teams and roles",
+      "text": "Platform team Responsible for planning and executing the migration Does the discovery work as well as the communication with all stakeholder teams Responsible for updating Vault policies to enable continued workspace access to secrets If using an API-driven workflow with a platform triggering Terraform runs (e.g. Jenkins), updates the tool executing the runs to point to the new organization/project structure Additional responsibilities detailed in the following section Application teams Responsible for updating the code to reflect the new organization as well as module references (if necessary) Process Education for the end users on the new hierarchy and where to find workspaces that have migrated"
+    },
+    {
+      "anchor": "migration-process-overview",
+      "title": "Migration process overview",
+      "text": "Evaluate the following (if they are in use) and note if/how they are used in the workspace. The platform team will typically conduct these evaluations. Dynamic credentials and Vault integrations Update the OIDC provider configuration to appropriately map the JWT claims to the new organization / project / workspace values. If an exact OIDC subject identifier is required (such as with Microsoft Azure, which does not support wildcards), be sure to update/recreate the appropriate configurations within the cloud provider Sensitive variables If sensitive variables are used in either the workspace variables or variable sets, they will need to be manually tracked and updated after the migration. The tool used in this guide will migrate the variables by name, but due to the secure nature of the variables, their values must be left blank IAM planning SSO-mapped teams will be mapped to each project based on their previous organization permissions and then granted workspace permissions according to their previous permissions. The sample code provided in this guide demonstrates an option for handling this mapping programmatically If team names overlap across organizations, additional planning is necessary to map the old teams to new teams Team-level permissions must be mapped between their old organizational roles and the new project roles. The example code provided takes a simplified approach to mapping these permissions; the platform team will need to evaluate their specific business needs Simplified Mapping: Organization \u201cManage Projects\u201d -> Project \u201cAdmin\u201d Organization \u201cManage Workspaces\u201d -> Project \u201cMaintain\u201d Organization \u201cRead\u201d -> Project \u201cRead\u201d Tip While the `tfm` tool can perform a direct team migration, there are additional IAM considerations when collapsing multiple organizations into one VCS planning Recreate any organization-level VCS sources tfm will migrate the workspace-level VCS settings Agent pools Setup agent pools in the new organization tfm can reassign workspaces using old agent pool to new agent pools Run tasks Run tasks must be configured in the central organization and associated with workspaces after the migration Policy-as-code All policy sets (or individual policies, if still in use) must be migrated to the new organization and mapped to the appropriate projects HashiCorp recommends completing this step before the workspaces migration to avoid any runs executing without policy checks Variables / variable sets tfm will migrate the variable set assignments and the non-sensitive variables as well as sensitive variable names Sensitive variable values must be manually populated by the platform team or application teams Run triggers Run triggers must be configured after the migration Private module registries (PMRs) Share PMRs from existing organizations to the central organization (Terraform Enterprise only), or Republish modules to the central organization PMR and update all module source references (required for HCP Terraform)"
+    },
+    {
+      "anchor": "modify-dynamic-provider-credential-configuration",
+      "title": "Modify dynamic provider credential configuration",
+      "text": "The platform operator needs to update the OIDC trust relationships associated with Terraform workload identity (if in use) to ensure continuity of dynamic provider credentials. While this guide is scoped for the workspace migration, it is important to highlight that the subject claim will change as the workspace moves between organizations and projects. Completing these changes prior to migrating existing workspaces allows for the new configuration to be tested and validated."
+    },
+    {
+      "anchor": "aws-dynamic-provider-credentials",
+      "title": "AWS dynamic provider credentials",
+      "text": "Dynamic provider credentials for AWS are likely using trust policies bound to the organization: { \"Version\" : \"2012-10-17\" , \"Statement\" : [ { \"Effect\" : \"Allow\" , \"Principal\" : { \"Federated\" : \"OIDC_PROVIDER_ARN\" } , \"Action\" : \"sts:AssumeRoleWithWebIdentity\" , \"Condition\" : { \"StringEquals\" : { \"SITE_ADDRESS:aud\" : \"AUDIENCE_VALUE\" , \"SITE_ADDRESS:sub\" : \"organization:ApplicationA:project:*:workspace:*:run_phase:*\" } } } ] } In this case, either the statement needs to be modified to only allow for the new organization and project, or to accept both the old and new subjects (as shown here): { \"Version\" : \"2012-10-17\" , \"Statement\" : [ { \"Effect\" : \"Allow\" , \"Principal\" : { \"Federated\" : \"OIDC_PROVIDER_ARN\" } , \"Action\" : \"sts:AssumeRoleWithWebIdentity\" , \"Condition\" : { \"StringEquals\" : { \"SITE_ADDRESS:aud\" : \"AUDIENCE_VALUE\" , \"SITE_ADDRESS:sub\" : \"organization:ApplicationA:project:*:workspace:*:run_phase:*\" } } } , { \"Effect\" : \"Allow\" , \"Principal\" : { \"Federated\" : \"OIDC_PROVIDER_ARN\" } , \"Action\" : \"sts:AssumeRoleWithWebIdentity\" , \"Condition\" : { \"StringEquals\" : { \"SITE_ADDRESS:aud\" : \"AUDIENCE_VALUE\" , \"SITE_ADDRESS:sub\" : \"organization:ACMECorp:project:ApplicationA:workspace:*:run_phase:*\" } } } ] } Refer to Dynamic Credentials with the AWS Provider for more information."
+    },
+    {
+      "anchor": "vault-policy",
+      "title": "Vault policy",
+      "text": "Similarly, existing Vault roles may be bound to the organization and workspace: { \"policies\" : [ \"tfc-policy\" ] , \"bound_audiences\" : [ \"vault.workload.identity\" ] , \"bound_claims_type\" : \"glob\" , \"bound_claims\" : { \"sub\" : \"organization:ApplicationA:project:*:workspace:workspace1:run_phase:*\" } , \"user_claim\" : \"terraform_full_workspace\" , \"role_type\" : \"jwt\" , \"token_ttl\" : \"20m\" } This will be updated to authorize the new organization and workspace, or the organization, project, and workspace: { \"policies\" : [ \"tfc-policy\" ] , \"bound_audiences\" : [ \"vault.workload.identity\" ] , \"bound_claims_type\" : \"glob\" , \"bound_claims\" : { \"sub\" : \"organization:ACMECorp:project:ApplicationA:workspace:workspace1:run_phase:*\" } , \"user_claim\" : \"terraform_full_workspace\" , \"role_type\" : \"jwt\" , \"token_ttl\" : \"20m\" } For detailed information and instructions related to creating and modifying JWT Auth Roles, refer to Dynamic Credentials with the Vault Provider and Vault JWT Authentication ."
+    },
+    {
+      "anchor": "review-sensitive-variable-usage",
+      "title": "Review sensitive variable usage",
+      "text": "The platform and application teams needs check if sensitive variables are in use, and identify sources for values. Sensitive variable values cannot be retrieved via the UI or API by design, making it effectively impossible to programmatically migrate them via tfm . The platform team should work with application teams to identify workspaces and variable sets using sensitive variables. Once identified, each application team will then need to determine how to provide new values for their sensitive variables, once the migration is complete."
+    },
+    {
+      "anchor": "create-the-central-organization",
+      "title": "Create the central organization",
+      "text": "The platform team needs create a new organization that will centrally host all projects. This can be done via the TFE Provider , the API , or the UI"
+    },
+    {
+      "anchor": "configure-vcs-providers",
+      "title": "Configure VCS providers",
+      "text": "The platform team needs to create VCS providers in the new central organization. The majority of VCS providers are configured at the organization level, with the exception of the GitHub App Integration . If this is the only VCS integration used, it is configured at the Site Admin level within Terraform Enterprise, and should not require any changes. Review each existing organizations' VCS Providers , and recreate all necessary providers within the central organization. VCS providers can be scoped to the project level , which allows for the same level of restriction that was previously available at the organization level. Tip When migrating from multiple organizations in Terraform Enterprise to a single organization in HCP Terraform, VCS Providers will need to be configured in HCP Terraform."
+    },
+    {
+      "anchor": "private-module-registry",
+      "title": "Private module registry",
+      "text": "The platform team needs to configure private module registries for sharing or republish existing modules to the central organization's private module registry. If modules had previously been shared from the private module registry in a single organization to all others, you need to share that organization's module registry to the new central organization. This avoids the need for any module source references in Terraform code to be modified by application teams, and maintaining a secondary organization specifically for the private module registry does not typical introduce any significant maintenance burden. Warning If migrating from Terraform Enterprise to HCP Terraform, it is not possible to share module registries and will be necessary to republish all modules within the new HCP Terraform organization and update all module source references in Terraform configurations. However, if each previous organization maintained separate private module registries, it is ideal to eventually republish all existing modules from each separate organization into the new organization. This requires all module references in Terraform code to have their source organization modified. While this presents an initial burden on application teams, it simplifies long-term management and permits eventual deletion of old organizations. In this scenario, consider sharing the private registry from all old organizations to the new - this allows the migration to proceed without requiring application teams"
+    },
+    {
+      "anchor": "optional-setup-agent-pools",
+      "title": "(Optional) Setup agent pools",
+      "text": "The platform team should setup agent pools in the new central organization. If the existing organizations have agent pools configured, these will need to be recreated in the new central organization. If using tfm to migrate the agent pool assignments to workspaces, create a mapping of the old agent pool IDs to the new agent pool IDs. Use the mapping when executing tfm in step 9."
+    },
+    {
+      "anchor": "optional-setup-run-tasks",
+      "title": "(Optional) Setup run tasks",
+      "text": "The platform team should setup run tasks in the new central organization. If the existing organizations have run tasks configured, these will need to be set up in the new central organization. See the run task documentation for more information."
+    },
+    {
+      "anchor": "create-projects",
+      "title": "Create projects",
+      "text": "The platform team needs to create projects within the new central organization, based on existing organizations. For each existing organization, create a project within the new central organization. While there are multiple ways this can be done ( manually , using the tfe Terraform provider, or via tfm during the migration process), for the purposes of this guide, a sample script is provided for reference: create-projects.sh . Tip By creating projects at this point in the process, additional configuration (such as VCS integration/scoping and setting team permissions) can be applied prior to executing the workspace migration process."
+    },
+    {
+      "anchor": "configure-policies-and-policy-sets-in-the-central-organization",
+      "title": "Configure policies and policy sets in the central organization",
+      "text": "The platform team needs to setup and configure all needed policy sets in the new organization. Policy sets (both Sentinel and OPA) are created per-organization. Review each existing organization and identify any policy sets that have been created, and then determine which policy sets should be used within the new central organization. Tip Policy sets can be assigned and enforced at the project level. If there are existing policy sets for specific organizations that should not be applied to the entire new organization, create the policy set within the new organization and assign it only to the appropriate project(s). Policy sets are most commonly managed via VCS integration , and recreating them within the central organization should be fairly straightforward unless there are a large number of policy sets. For detailed instructions on managing policy sets, refer to the documentation for Managing Policy Sets ."
+    },
+    {
+      "anchor": "create-teams",
+      "title": "Create teams",
+      "text": "The platform team needs to create teams in the central organization and assign them to new projects. Inspect each organization to identify existing teams and the access they have. Create new teams in the central organization and map the existing organization level permissions to the new projects based on the desired RBAC model. This can be done manually , using the tfe provider, or via the API . A sample script ( create-teams.sh ) uses the API to create teams and map them to projects. The following pseudo-code demonstrates the process: for each organization for each team in organization create team in central organization (if it does not exist) create team access for project in central organization Warning Not all organization-level permissions map directly to project-level permissions. Ensure that you thoroughly evaluate existing permissions and determine the appropriate permission mappings."
+    },
+    {
+      "anchor": "scaffold-and-execute-tfm",
+      "title": "Scaffold and execute tfm",
+      "text": "The platform team needs to create supporting scripts that execute tfm to migrate workspaces and associated objects. Write scripts to iterate through the list of workspaces, calling the appropriate tfm commands for each. The example code provided migrates all the workspaces and their associated states, variables, and team access, as well as variable sets from old organizations to the central organization. Variable sets must then be assigned to projects. The example script ( execute-migration.sh ) migrates workspaces, variables, and team access. The following pseudo-code demonstrates the process: for each organization set tfm variables for source and destination organizations / projects execute needed tfm copy commands"
+    },
+    {
+      "anchor": "optional-populate-sensitive-variables",
+      "title": "(Optional) Populate sensitive variables",
+      "text": "The platform and application teams should populate sensitive variables in workspace variables and variable sets. Sensitive variables cannot be retrieved from the platform and will need to be manually populated. Refer to the documentation on managing variables for additional information."
+    },
+    {
+      "anchor": "optional-setup-run-triggers",
+      "title": "(Optional) Setup run triggers",
+      "text": "The platform team should configure workspace run triggers in the new organization. If run triggers were used for any workspaces prior to migration, these will need to be recreated. This can be done manually, or via the Run Triggers API ."
+    },
+    {
+      "anchor": "optional-assign-workspace-specific-items",
+      "title": "(Optional) Assign workspace-specific items",
+      "text": "The platform team should assign any additional items that had workspace-specific configurations (policy sets, variable sets, run tasks, agent pools, etc.). Some items, such as policy sets , are assigned to individual workspaces at the organization level. Those assignments must be updated after the migration. The example scripts demonstrate mapping the existing organization-assigned items to the new projects, but do not address individual workspace assignments. tfm does not migrate these settings either. They will either need to be configured via the UI or additional scripting created for the migration."
+    },
+    {
+      "anchor": "optional-modify-workspace-code",
+      "title": "(Optional) Modify workspace code",
+      "text": "The application teams should modify the Terraform configurations to use the new organization and workspace references. The Terraform configuration will need to modified under two circumstances: The modules were republished to a different organization. Each module reference must be updated to the new PMR The Terraform configuration contained a cloud block for local runs. Each block must be updated with the new organization reference"
+    },
+    {
+      "anchor": "clean-up-resources",
+      "title": "Clean up resources",
+      "text": "The platform team should lock the old workspaces and update the RBAC settings to enforce read-only access. In addition, the platform team should update the upstream tools to call the new workspace IDs. For API-driven workflows , the upstream system (typically a CI tool like Jenkins) is pushing the Terraform configurations to the workspace. That system must have its mapping updated to reflect the new organization and the new workspace ID. Given that this varies significantly between customers, no specific example is given in this guide. Finally, the platform team should delete the old workspaces and organizations. Delete the old workspaces after the old run history data is no longer needed. If the PMRs were shared, then the modules and providers will need to be migrated before the organizations can be deleted. See step 3 for additional information on migrating modules and providers."
+    },
+    {
+      "anchor": "conclusion",
+      "title": "Conclusion",
+      "text": "In this guide, you learned how to migrate from a multi-organization setup to a single organization, aligning with current HashiCorp best practices. For more information on HCP Terraform, refer to the following resources: Terraform installation Terraform backend configuration Terraform AWS Provider documentation Getting started with a Terraform product Previous Migrate from CloudFormation Next Terraform and Cortex Cloud"
+    }
+  ]
+}

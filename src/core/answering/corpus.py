@@ -12,14 +12,13 @@ party being reachable, and would make "pinned" untrue.
 
 from __future__ import annotations
 
-import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
 DEFAULT_MANIFEST: Final[Path] = Path(__file__).resolve().parents[3] / "corpus" / "manifest.json"
-DEFAULT_CACHE: Final[Path] = Path(__file__).resolve().parents[3] / ".corpus-cache"
+DEFAULT_DOCUMENTS: Final[Path] = Path(__file__).resolve().parents[3] / "corpus" / "documents"
 
 
 class CorpusUnavailable(Exception):
@@ -35,8 +34,14 @@ class CorpusUnavailable(Exception):
 class Document:
     path: str
     url: str
+    #: SHA-256 of the UPSTREAM page. Detects that HashiCorp changed the document — which is the
+    #: only way to detect it, since the corpus carries no version metadata anywhere.
     digest: str
     anchors: frozenset[str]
+    sections: dict[str, str] = field(default_factory=dict)
+
+    def text_at(self, anchor: str) -> str:
+        return self.sections.get(anchor, "")
 
 
 @dataclass(frozen=True)
@@ -61,9 +66,19 @@ class Corpus:
 
 
 def load_corpus(
-    *, manifest: Path = DEFAULT_MANIFEST, cache: Path = DEFAULT_CACHE, verify: bool = True
+    *,
+    manifest: Path = DEFAULT_MANIFEST,
+    documents_dir: Path = DEFAULT_DOCUMENTS,
+    verify: bool = True,
 ) -> Corpus:
-    """Read the pin, and refuse a cache that does not match it."""
+    """Read the pin and the vendored sections, and refuse what does not line up.
+
+    **Two different questions, kept separate.** The manifest's per-document digest is of the
+    *upstream page* and answers "did HashiCorp change this" — the only way to ask, since the corpus
+    carries no version metadata. `verify` here answers the narrower one: does every anchor the pin
+    names actually exist in the content committed beside it. A citation resolving against a pin
+    whose content is absent would be a citation to nothing.
+    """
     if not manifest.exists():
         raise CorpusUnavailable(
             f"no corpus manifest at {manifest}; run `bash infra/bin/corpus-sync`"
@@ -72,23 +87,29 @@ def load_corpus(
     documents: dict[str, Document] = {}
     for entry in data["documents"]:
         path = str(entry["path"])
+        sections: dict[str, str] = {}
+        vendored = documents_dir / (path.strip("/").replace("/", "__") + ".json")
         if verify:
-            cached = cache / (path.strip("/").replace("/", "__") + ".html")
-            if not cached.exists():
+            if not vendored.exists():
                 raise CorpusUnavailable(
-                    f"{path} is pinned but not cached; run `bash infra/bin/corpus-sync`"
+                    f"{path} is pinned but its content is not vendored; run "
+                    f"`bash infra/bin/corpus-sync`"
                 )
-            actual = hashlib.sha256(cached.read_bytes()).hexdigest()
-            if actual != entry["digest"]:
+            body = json.loads(vendored.read_text())
+            sections = {str(s["anchor"]): str(s.get("text", "")) for s in body["sections"]}
+            missing = set(entry["anchors"]) - set(sections)
+            if missing:
                 raise CorpusUnavailable(
-                    f"{path} does not match its pin — the corpus changed, and every citation "
-                    f"against it must be re-verified rather than trusted"
+                    f"{path} is pinned with anchors that its vendored content does not contain "
+                    f"({sorted(missing)[:3]}) — a citation resolving against this would point at "
+                    f"nothing"
                 )
         documents[path] = Document(
             path=path,
             url=str(entry["url"]),
             digest=str(entry["digest"]),
             anchors=frozenset(entry["anchors"]),
+            sections=sections,
         )
     return Corpus(digest=str(data["corpus_digest"]), documents=documents)
 

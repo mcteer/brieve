@@ -14,8 +14,70 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 CACHE = REPO / ".corpus-cache"
 MANIFEST = REPO / "corpus" / "manifest.json"
+DOCS = REPO / "corpus" / "documents"
 BASE = "https://developer.hashicorp.com"
 INDEXES = ("boundary", "nomad", "packer", "terraform", "vault")
+
+
+class _Content(HTMLParser):
+    """Section text, keyed by the anchor a citation resolves to.
+
+    Extracted rather than stored as raw markup: 33 pages of HTML is fourteen megabytes of
+    navigation and script tags, and none of it is what an answer cites. What a citation points at
+    is a section, so a section is what gets vendored.
+    """
+
+    _SKIP = {"script", "style", "nav", "header", "footer", "svg", "button"}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.sections: list[dict[str, str]] = []
+        self._in_main = 0
+        self._skip = 0
+        self._heading: str | None = None
+        self._anchor: str | None = None
+        self._buf: list[str] = []
+        self._body: list[str] = []
+
+    def _flush(self) -> None:
+        if self._anchor and self._heading:
+            text = " ".join(" ".join(self._body).split())
+            self.sections.append(
+                {"anchor": self._anchor, "title": self._heading, "text": text[:4000]}
+            )
+        self._anchor = self._heading = None
+        self._body = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "main":
+            self._in_main += 1
+            return
+        if tag in self._SKIP:
+            self._skip += 1
+            return
+        if self._in_main and tag in {"h1", "h2", "h3"}:
+            self._flush()
+            self._anchor = dict(attrs).get("id")
+            self._buf = []
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "main":
+            self._flush()
+            self._in_main = max(0, self._in_main - 1)
+            return
+        if tag in self._SKIP:
+            self._skip = max(0, self._skip - 1)
+            return
+        if tag in {"h1", "h2", "h3"} and self._anchor is not None and self._heading is None:
+            self._heading = " ".join("".join(self._buf).split())
+
+    def handle_data(self, data: str) -> None:
+        if self._skip or not self._in_main:
+            return
+        if self._anchor is not None and self._heading is None:
+            self._buf.append(data)
+        elif self._heading is not None:
+            self._body.append(data)
 
 
 class _Sections(HTMLParser):
@@ -80,6 +142,7 @@ def _discover() -> list[str]:
 def main() -> int:
     CACHE.mkdir(exist_ok=True)
     MANIFEST.parent.mkdir(exist_ok=True)
+    DOCS.mkdir(exist_ok=True)
     documents = []
     for path in _discover():
         try:
@@ -87,19 +150,25 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 — one unreachable document must not lose the rest
             print(f"  SKIP {path}: {type(exc).__name__}", file=sys.stderr)
             continue
-        parser = _Sections()
+        parser = _Content()
         parser.feed(html)
+        sections = [s for s in parser.sections if s["anchor"] and s["title"]]
         digest = hashlib.sha256(html.encode()).hexdigest()
-        (CACHE / (path.strip("/").replace("/", "__") + ".html")).write_text(html)
+        name = path.strip("/").replace("/", "__")
+        (CACHE / (name + ".html")).write_text(html)
+        # VENDORED, as sections rather than markup. See corpus/PROVENANCE.md.
+        (DOCS / (name + ".json")).write_text(
+            json.dumps({"path": path, "url": BASE + path, "sections": sections}, indent=2) + "\n"
+        )
         documents.append(
             {
                 "path": path,
                 "url": BASE + path,
                 "digest": digest,
-                "anchors": [s["anchor"] for s in parser.sections],
+                "anchors": [s["anchor"] for s in sections],
             }
         )
-        print(f"  {path}  {len(parser.sections)} sections")
+        print(f"  {path}  {len(sections)} sections")
     corpus_digest = hashlib.sha256("".join(d["digest"] for d in documents).encode()).hexdigest()
     MANIFEST.write_text(
         json.dumps(

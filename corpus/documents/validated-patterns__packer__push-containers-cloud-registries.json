@@ -1,0 +1,36 @@
+{
+  "path": "/validated-patterns/packer/push-containers-cloud-registries",
+  "url": "https://developer.hashicorp.com/validated-patterns/packer/push-containers-cloud-registries",
+  "sections": [
+    {
+      "anchor": "target-audience",
+      "title": "Target audience",
+      "text": "This guide references the following roles: Platform operator: Someone responsible for setting up the image repositories, building the containers, and pushing them to the respective cloud provider container registries."
+    },
+    {
+      "anchor": "validated-architecture",
+      "title": "Validated architecture",
+      "text": "The following diagram shows the process of pushing a container to a cloud provider's container registry using HCP Packer. This document focuses on running this process from a local machine, but the same concepts could easily be applied to a CI/CD mechanism such as Github Actions or Gitlab Runners. We recommend using Terraform to provision the underlying infrastructure. Due to the way Packer post-processors and docker login works, if you plan on pushing images to multiple cloud providers, you should run each build in an isolated context. Attempting to push multiple images in parallel from a single context can cause transient failures since they all compete for docker login access. Packer offers a docker-push post processor, but this guide does not cover this post-processor. The post-processor is inherently inflexible, and causes wide divergence in container push processes across cloud providers. Instead, you will be manually logging into registries and pushing the containers. This method is broadly applicable to CI/CD scenarios as well. Every cloud provider has unique constraints on how credentials are handled. This guide uses long-lived credentials for brevity, but this may not work for all organizations. Platform operators should consult with their internal security teams to ensure that the cloud providers authentication method aligns with company policies and practices."
+    },
+    {
+      "anchor": "prerequisites",
+      "title": "Prerequisites",
+      "text": "An active HCP service principal . An existing HCP Packer Account ( HCP Platform ). Packer OSS CLI >=v1.11.0 installed . Have a working Packer HCL file configured for building a Docker container. Git CLI installed. For your desired cloud provider, ensure you have the following: Necessary permissions to create resources within your chosen cloud provider. AWS CLI installed locally and configured with your AWS credentials"
+    },
+    {
+      "anchor": "create-image-repository",
+      "title": "Create image repository",
+      "text": "You can create an image repository using either Terraform or the AWS CLI. Use the following Terraform configuration to deploy an AWS Container Repository. This configuration uses the aws_ecr_repository resource. Update the <repository-name> with the name of the repository you want to create. resource \"aws_ecr_repository\" \"demo\" { name = \"<repository-name>\" image_tag_mutability = \"IMMUTABLE\" image_scanning_configuration { scan_on_push = true } } output \"repository_url\" { value = aws_ecr_repository.demo.repository_url } After you create the AWS image repository, store the repository_url value from the output. This value will be the Docker tag you apply to images you wish to send to AWS ECR. When you push a container to the repository, your local AWS credentials will be used for authorization. Using the AWS CLI, create an ECR. Update <repository-name> with the name of the container image you want to create. $ aws ecr create-repository --repository-name < repository-name > After you create the AWS image repository, store the repositoryUri value from the output. This value will be the Docker tag you apply to images you wish to send to AWS ECR. When you push a container to the repository, your local AWS credentials will be used for authorization."
+    },
+    {
+      "anchor": "push-container-to-registry",
+      "title": "Push container to registry",
+      "text": "Locate your HCP service principal credentials and export them as environment variables. $ export HCP_CLIENT_ID = $ export HCP_CLIENT_SECRET = In your Packer template, update the following fields: Replace <region> with the region you deployed your image repository. Replace <aws-account-number> with the account number you deployed your image repository. Replace <repository-name> with the name of the image repository you created. Build the container. $ packer build docker-debian-aws.pkr.hcl Login to ECR via AWS CLI. Update <region> with the region you deployed your image repository. Update <aws-account-number> with the account number you deployed your image repository. $ aws ecr get-login-password --region < region > | \\ docker login --username AWS --password-stdin <aws-account-number>.dkr.ecr.<region>.amazonaws.com Push the container to ECR. Update <repository-name> with the name of the image repository you created. $ docker push < aws-account-number > .dkr.ecr. < region > .amazonaws.com/ < repository-name > :latest You have pushed your image to the AWS Repository. It is now available to be consumed by services with permission to pull it ."
+    },
+    {
+      "anchor": "conclusion",
+      "title": "Conclusion",
+      "text": "In this guide, you learned how to push containers to cloud provider container registries using Packer CE and HCP Packer. To learn more, check out the following resources: Packer installation instructions Packer docker-push Post Processor HCP Packer Registry metadata block Push metadata to HCP Packer Collection Overview Packer Next Manage base images with Packer"
+    }
+  ]
+}

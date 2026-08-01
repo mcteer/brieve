@@ -7,7 +7,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/boundary/hcp-boundary-secure-access-dynamic-secrets",
       "digest": "7b887163681727859a807e259380a92b7d4fd6bf84ece2e7285f564edb40afda",
       "anchors": [
-        "hcp-boundary-secure-access-dynamic-secrets",
         "target-audience",
         "prerequisites",
         "validated-architecture",
@@ -31,7 +30,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/nomad/nomad-workload-modernization-with-traefik",
       "digest": "cbc738f85daf175c3f92726a2c301ff774b87d3c326985a66e69846af6f8ce6f",
       "anchors": [
-        "nomad-workload-modernization-with-traefik",
         "target-audience",
         "prerequisites",
         "validated-architecture",
@@ -50,7 +48,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/packer/integrate-hcp-packer-with-ansible-automation-platform",
       "digest": "15566eda8cfb331bef0d738e9457ae78519e51d5db346957b6680db2c77e6076",
       "anchors": [
-        "integrate-hcp-packer-with-ansible-automation-platform",
         "overview",
         "target-audience",
         "benefits-of-using-ansible-automation-platform",
@@ -77,7 +74,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/packer/push-containers-cloud-registries",
       "digest": "873bc950178cc8e336132b138049e03ff183f726cc9631365a17f2308cd0f8b1",
       "anchors": [
-        "push-containers-cloud-registries",
         "target-audience",
         "validated-architecture",
         "prerequisites",
@@ -91,7 +87,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/packer/terraform-integrate-hcp-packer",
       "digest": "cc765c1e0c41ba9fe7ab6b372bc8f06f415f66ae7d3146c8ed754d0b27ebdd1e",
       "anchors": [
-        "terraform-integrate-hcp-packer",
         "target-audience",
         "background-and-best-practices",
         "workflows",
@@ -112,7 +107,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/packer/vulnerability-and-patch-management",
       "digest": "de16164228eaa6f4be8220c0db92a09c6b9f42f9fa5794a93704ec75314435de",
       "anchors": [
-        "vulnerability-and-patch-management",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -149,7 +143,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/automate-deployments-with-hcp-terraform-and-servicenow-catalog",
       "digest": "ae4b0ccdbf45bf18c4cfcbbd6da5a286131a74a103f1be5977cd704f7b0abf83",
       "anchors": [
-        "automate-deployments-with-hcp-terraform-and-servicenow-catalog",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -167,7 +160,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/build-aws-lz-with-terraform",
       "digest": "2e0d9e414553fcc0ddc665c70da6608641daa40d4c87c29943bd820d2c505c21",
       "anchors": [
-        "build-aws-lz-with-terraform",
         "scope",
         "audience",
         "definitions",
@@ -207,7 +199,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/build-azure-lz-with-terraform",
       "digest": "d8210994c49e510a2ef2c28b8daa3d7f536d3aeca2ee26a51fb1dac2e2c9cabe",
       "anchors": [
-        "build-azure-lz-with-terraform",
         "scope",
         "design",
         "deployment",
@@ -263,7 +254,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/migrate-from-cloudformation",
       "digest": "21d96cf4c1ba2ff0eda5730fd896a1b16f8ade198db61a8df39cec20900a3069",
       "anchors": [
-        "migrate-from-cloudformation",
         "understand-the-differences",
         "target-audience",
         "prerequisites",
@@ -285,7 +275,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/migrate-terraform-orgs-projects",
       "digest": "a6d903aa08270975d395772bd0d99e0545362c5f93951502c2aaee4262ba56bb",
       "anchors": [
-        "migrate-terraform-orgs-projects",
         "target-audience",
         "prerequisites-and-limitations",
         "background-and-best-practices",
@@ -319,7 +308,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/terraform-integrate-ansible-automation-platform",
       "digest": "f4d068eb6b42d67f61831730ab1ad22c6b9f48bfe8ed8cd93603866d518ba8b6",
       "anchors": [
-        "terraform-integrate-ansible-automation-platform",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -348,7 +336,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/terraform-integrate-vault",
       "digest": "3cfb7c02d3b8ccdc2aca5e29c5bbc9ac5609d8b1ee04351e6517ae018b1beb6a",
       "anchors": [
-        "terraform-integrate-vault",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -366,7 +353,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/terraform-palo-alto-cortex-cloud-integration",
       "digest": "3c4aa1d9a15e699fb5b75c9cc6f09b66d19b8b09d16612ad3165510ea13d673b",
       "anchors": [
-        "terraform-palo-alto-cortex-cloud-integration",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -390,7 +376,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/terraform-vault-backed-dynamic-credentials-aws",
       "digest": "623256a726c9953cc33690310b663b7dc609e035f5f191d8ac393f537f784613",
       "anchors": [
-        "terraform-vault-backed-dynamic-credentials-aws",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -431,7 +416,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/upgrade-and-refactor-terraform-modules",
       "digest": "5d88c232148f8b5ea4c86a08d94fbb7b30a92d02cc5643d3cf261b5f0f46341b",
       "anchors": [
-        "upgrade-and-refactor-terraform-modules",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -460,7 +444,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/upgrade-terraform-provider",
       "digest": "70ae0c4282a0a2cfdb6685acec69355da9ad9a2cdad296ed28f2028d45cb9142",
       "anchors": [
-        "upgrade-terraform-provider",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -491,7 +474,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/terraform/vulnerability-and-patch-management",
       "digest": "72c2a7cf40079e660462a64724d8eda5d774d9dc69bbc6be647aac7eea15d891",
       "anchors": [
-        "vulnerability-and-patch-management",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -528,7 +510,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/ai-agent-identity-with-hashicorp-vault",
       "digest": "9c02ff346bb19f7a1ed83908daefcd10e25d18c21c7f4b3106012f775d4cfbe9",
       "anchors": [
-        "ai-agent-identity-with-hashicorp-vault",
         "target-audience",
         "prerequisites",
         "limitations",
@@ -557,7 +538,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/extend-vault-enterprise-for-hybrid-and-multi-cloud-deployments",
       "digest": "4c60f2609148a2b0409bccabad813994f4c21bdeaa9d68f933467de704e57a57",
       "anchors": [
-        "extend-vault-enterprise-for-hybrid-and-multi-cloud-deployments",
         "target-audience",
         "roles-and-responsibilities",
         "benefits",
@@ -593,7 +573,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/integrate-vault-ssh-with-ansible-automation-platform",
       "digest": "ee293d6653f4e935780437e9c734ba702427c2bb97ad1d1b556b94d644775cbd",
       "anchors": [
-        "integrate-vault-ssh-with-ansible-automation-platform",
         "target-audience",
         "prerequisites",
         "limitations",
@@ -618,7 +597,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/integrate-vault-with-backstage-and-okta",
       "digest": "1cb462bafa24f6d7fd1bc0c819ccfd77b004a1cc6356e10a08409e74575cdd13",
       "anchors": [
-        "integrate-vault-with-backstage-and-okta",
         "target-audience",
         "prerequisites",
         "limitations",
@@ -640,7 +618,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/manage-vault-with-terraform",
       "digest": "59a2c8f7c7cc8e7872473f3b46f14470b285c408bcb222811b48e8d2b8106510",
       "anchors": [
-        "manage-vault-with-terraform",
         "prerequisites",
         "validated-architecture",
         "background-and-best-practices",
@@ -663,7 +640,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/retrieve-vault-secrets-from-github-actions",
       "digest": "aae3993258eb0e5e5320579901ee9730886f7c2b626e327a49202ff4fe34140a",
       "anchors": [
-        "retrieve-vault-secrets-from-github-actions",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -684,7 +660,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/terraform-integrate-vault",
       "digest": "f272cdf8d52c970f564c51e8bbd68be0be6cbba73e0c4abde7f713570676b0f9",
       "anchors": [
-        "terraform-integrate-vault",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -702,7 +677,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-agent-approle",
       "digest": "603cc4cb76c293ec5702ff73d6220725df470cd384cfe08b456e7eebd37dd5c0",
       "anchors": [
-        "vault-agent-approle",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -729,7 +703,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-kubernetes-auth",
       "digest": "46d13a12b03df977a9419eb8685b57f24bcb19617fcc74ecc6895e5e546d0258",
       "anchors": [
-        "vault-kubernetes-auth",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -749,7 +722,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-migrate-storage-raft",
       "digest": "ecc05952c5696926baca4f91b7c63738660fb5a46808473c2f5b2bc543c34028",
       "anchors": [
-        "vault-migrate-storage-raft",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -771,7 +743,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-pki-with-vso-and-openshift",
       "digest": "2588eb229a81d4e6b57b9983f2112c0e6985fe8e4d77e7c9d1f2a3bc0c8a3b17",
       "anchors": [
-        "vault-pki-with-vso-and-openshift",
         "background-and-best-practices",
         "validated-architecture",
         "people-and-process-considerations",
@@ -792,7 +763,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-secrets-queried-with-chef",
       "digest": "fc42176c9689bf868e4fadeeacaa30306e7a21b31496d93bb816544241358654",
       "anchors": [
-        "vault-secrets-queried-with-chef",
         "target-audience",
         "prerequisites",
         "limitations",
@@ -813,7 +783,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-secrets-racf-integration",
       "digest": "d838b7d3be4bfb30a625751171392d30a8799903ccc55ba7e7c1cbddbb185cd2",
       "anchors": [
-        "vault-secrets-racf-integration",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -846,7 +815,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-securing-kafka",
       "digest": "b5979e3f79e37905cc2f331afc7b9f0ad3ecb13062a72b7f99e67296c49b449e",
       "anchors": [
-        "vault-securing-kafka",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",
@@ -866,7 +834,6 @@
       "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-trusted-identity-brokering",
       "digest": "e343e5f9d388a6820aa75bd782cb6ca4a2352e41520335e42316fde5561ec393",
       "anchors": [
-        "vault-trusted-identity-brokering",
         "target-audience",
         "prerequisites",
         "background-and-best-practices",

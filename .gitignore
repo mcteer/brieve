@@ -56,7 +56,7 @@ crash.log
 *.iml
 .enclave/
 
-# 024: the guidance corpus is PINNED BY DIGEST, not vendored — the upstream pages carry no
-# statement permitting redistribution. `corpus/manifest.json` is the pin; this is the cache it
-# verifies against, refreshed by `infra/bin/corpus-sync`.
+# 024: raw upstream HTML, kept only so `corpus-sync` can recompute digests. The corpus itself is
+# VENDORED as extracted sections under `corpus/documents/` and is committed; this is the markup
+# those were extracted from, which is fourteen megabytes of navigation nobody reads.
 .corpus-cache/
