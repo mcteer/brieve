@@ -54,17 +54,20 @@ as a correctness requirement.
 | I — Build Glue Only | **Pass** | Compiling records into a typed object is this codebase's own domain work, not a duplication of anything upstream ships. No model is asked anything (FR-001). |
 | II — Total Interception; One Governed Tool Layer | **Pass** | A report issues no tool call. It becomes a northbound operation, so ADR-0033's parity obligation applies and FR-015b treats the row's growth as inherited work. |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | Unreconcilable claims are flagged, never softened (FR-005). The meta-audit write already fails the read rather than proceeding (`_record_access`). No observer yields `unverified`, never `confirmed` (FR-016a). |
-| IV — Zero Standing Credentials; Authority Per Task | **FAIL — see below** | **Read-back at report time has no authority to run under.** |
-| V — Sealed Core, Versioned Seams | **Pass, conditionally** | Nothing sealed changes *as specified*. One candidate resolution to the Principle IV failure would change the `Observer` protocol, which is core — that would make this a sealed-core change needing security-maintainer review, and it is called out below rather than discovered later. |
+| IV — Zero Standing Credentials; Authority Per Task | **Pass — after redesign** | Failed on first pass; see below. Read-back now happens in the allocation, under its own attested identity bounded by the run's ceiling (FR-006b). Nothing acts on a reader's behalf, so a report cannot exceed its reader. |
+| V — Sealed Core, Versioned Seams | **Pass, WITH REVIEW OWED** | **The audit schema is touched.** One additive `AuditEventType` member carries the observation. Principle V names the audit schema sealed core and requires an approved spec plus security-maintainer review; the spec is approved, the review is owed before merge. Recorded in Complexity Tracking as a real obligation, exactly as 020 recorded its own. |
 | VI — Lean by Default | **Pass** | No new dependency, no new operated component, no new store. |
 | VII — Anti-Fragmentation | **Pass** | The compiler consumes `read_evidence_for` rather than reaching `EvidenceQuery.search`, so there is no second answer to "who may see this" (research F1). |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass** | Turns the fifth gate on. Promotes nothing. |
 | IX — Evidence Over Claims | **Pass** | The whole feature. FR-010 additionally requires a report to state whether its own basis verified. |
 | X — The Decision Record Governs | **Pass** | ADR-0018 implemented, ADR-0035/0032/0055/0033/0034 consumed. None amended. |
 
-**Gate result**: **FAIL — planning stops at Principle IV.**
+**Gate result**: **PASS — proceed to Phase 1**, with the Principle V review recorded as owed.
 
-### The failure, measured
+**Re-check after Phase 1 design**: **PASS**, unchanged. The sealed-core obligation is the only
+item in Complexity Tracking that survived, and it did not grow.
+
+### The failure, measured — kept because the redesign is only legible beside it
 
 FR-006 requires re-reading authoritative state before claiming an effect completed, and
 clarification put that read-back **at report time** (compiled on demand) **wherever an observer
@@ -97,14 +100,28 @@ wherever an observer exists.
 | **B** | **Read-back under manufactured requester authority.** `manufacture_authority` for the requester, threaded into `observe()`. | Changes the `Observer` protocol — **sealed core** (`core.observation`), plus the pinned call-shape test and both shipped observers. | Compliant, but converts this into a sealed-core feature with the review that entails. |
 | **C** | **Read-back at run end, recorded as evidence.** The allocation — which already holds the right attested identity and already re-observes — records an `Observation` for each effect before it exits. The report compiles that record like any other. | The observation is a fact about run-end, not report-time, so "the world changed since" stops being detectable. Adds work to the run loop. | Clean, and arguably the most faithful: ADR-0018 says read-back happens *before asserting completion*, and run-end is when the run asserts it. |
 
-**My reading is C**, because it puts the read-back where the authority already exists rather than
-manufacturing a new one, and because it needs no sealed-core change. It does partly walk back the
-on-demand rationale — a report would no longer detect drift after the run ended — which is a real
-loss and is exactly why this is not mine to decide.
+### Resolved: **C**, and one part of the recommendation was wrong
 
-**This is a spec-level question, not an implementation detail.** Whichever answer holds, US3 and
-FR-006/FR-016 change, and per the pipeline rule that invalidates the clarification below them:
-`/speckit-clarify` needs to record it, and this plan needs re-running against the result.
+The maintainer chose C. Read-back moves into the allocation, which already holds an attested
+identity bounded by the run's ceiling, and the observation is recorded as evidence for the report
+to compile like anything else. The compiler stays pure — it still reads nothing itself, which is
+what keeps FR-008b structural.
+
+**Correction to the recommendation above**: it said C "needs no sealed-core change". That was
+wrong. C does not touch the `Observer` **protocol** — which is what B would have done, and which
+is the larger change — but the observation has to be recorded somewhere, and the honest home is
+the hash-chained trail. That is one additive `AuditEventType` member, which is a Principle V
+change requiring security-maintainer review. Smaller than B, not free, and the plan now says so in
+the gate table rather than carrying a claim that would have been discovered at implementation.
+
+**What C costs, carried forward rather than left in the clarification log**: a report no longer
+detects drift after the run ended. An observation is a fact about run-end — which is when
+ADR-0018 says the claim is made, "before asserting that something completed" — so a product
+changed a week later reads identically to one that never changed. Accepted deliberately.
+
+**What C buys beyond compliance**: two reports of the same run now agree on *every* claim, not
+merely on the record-derived ones, because nothing is re-derived at request time. That is a
+stronger guarantee than the on-demand clarification originally anticipated.
 
 ## Project Structure
 
@@ -112,41 +129,51 @@ FR-006/FR-016 change, and per the pipeline rule that invalidates the clarificati
 
 ```text
 specs/021-grounded-run-reports/
-├── plan.md              # This file — HALTED at the Constitution Check
+├── plan.md              # This file
 ├── research.md          # Phase 0 — seven findings, one unknown carried
-├── spec.md
+├── data-model.md        # Phase 1
+├── quickstart.md        # Phase 1
+├── contracts/
+│   ├── report.md        # What a report contains, and what each claim's status means
+│   └── conformance.md   # The rows, who runs them, what they refuse to assert
 ├── checklists/
 │   └── requirements.md
-└── tasks.md             # NOT created — blocked on the gate
+└── tasks.md             # /speckit-tasks
 ```
-
-Phase 1 artifacts (`data-model.md`, `contracts/`, `quickstart.md`) are **not** written. The gate
-failed, and the plan template is explicit that a failing gate stops planning rather than
-proceeding into design that a resolution would invalidate.
 
 ### Source Code (repository root)
 
-Recorded from research F6 so the shape is not re-derived, and marked provisional because
-resolution B or C would move part of it:
-
 ```text
-src/core/reports/                # NEW — typed RunReport, Claim, the compiler.
-│                                # Pure: records in, report out. No surface import.
+src/core/audit/schema.py         # +1 AuditEventType member. SEALED CORE — see Principle V
+src/core/reports/                # NEW — the typed object and the compiler
+│   ├── __init__.py
+│   ├── report.py                # RunReport, Claim, ClaimStatus
+│   └── compile.py               # records in, report out. Reads nothing itself
+src/core/observation/            # UNCHANGED — the protocol is not touched (that was option B)
+src/surfaces/dispatch/entrypoint.py  # observes each effect before a terminal state, under the
+│                                    # allocation's own attested identity (FR-006b)
 src/surfaces/api/reports.py      # NEW — the governed read + the route
 src/surfaces/mcp/operations.py   # +1 operation map entry
 src/surfaces/mcp/transport.py    # +1 dispatch entry
-src/core/evals/suites.py         # report_fidelity moves OWED → SUITES
+src/core/evals/suites.py         # report_fidelity moves OWED → SUITES; a fifth case shape
 packs/*/evals/report_fidelity.toml  # NEW — recorded runs, labelled material events
-specs/008-northbound-api/contracts/operations.snapshot.json  # regenerated
+specs/008-northbound-api/contracts/operations.snapshot.json  # regenerated — parity grows
+tests/conformance/reports/       # NEW — rows against a compiled report
 ```
 
 **Structure Decision**: the compiler is core and takes already-read entries; the governed read
-stays where governed reads live. Core importing `surfaces` would be the layering inversion 020
-found one package over.
+stays where governed reads live; the **observation is made by the allocation**, which is the only
+process holding an identity bounded by the run's ceiling.
+
+That last point is the whole of the Principle IV redesign, and it is a structural property rather
+than a rule to follow: `compile_report` receives entries and never queries, so it cannot widen
+scope, and it holds no credential, so it cannot observe. **A future change that gave the compiler
+a way to read a product would have to add both** — which is a visible thing to review rather than
+a silent regression.
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 | --- | --- | --- |
-| **Principle IV, unresolved** | Read-back at report time has no bounded authority available to it. | Not yet justified — three candidate resolutions are recorded above and the choice belongs to the maintainer. **This row must be empty or the violation withdrawn before implementation begins.** |
+| **A sealed-core change: one `AuditEventType` member** | The observation must be recorded somewhere, and the trail is the only store that is hash-chained, tenant-scoped, readable through the governed evidence path the report already uses, and append-only. Recording it anywhere else would give the report a second source to reconcile. | **On the checkpoint payload**: rejected — checkpoints hold resume state, and `run_result_for` already argues that returning their contents makes their shape a compatibility surface. **A new durability record type**: rejected — it would be a second store for evidence, reachable outside the audited read path, which is FR-007's whole objection. **The obligation stands regardless**: Principle V requires security-maintainer review of an audit-schema change, and "additive" is the word that precedes most sealed-core regressions. |
 | **A fifth eval-case shape** (if the feature proceeds) | Report fidelity scores a compiled report against labelled material events, measured by precision and recall. The existing `EvalCase` is `(prompt, expected, recorded)` scoring a model's answer, and `EXPECTED_OUTCOMES` has no entry for it (research F3). | **Forcing it into `expected: str`**: rejected — it reduces fidelity to a boolean, losing the precision and recall FR-013a requires, or smuggles a structure into a string. **A gate outside `suites.py`**: rejected — the constitution names five suites in one place, and moving one out leaves `SUITES` a list of four forever. |

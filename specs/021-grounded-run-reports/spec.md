@@ -47,12 +47,16 @@ again — is the first run a report can get *wrong* in the way ADR-0018 is about
 ### Session 2026-08-01
 
 - Q: Is a report a stored snapshot or compiled on demand? → A: **Compiled on demand, never
-  stored.** Every request recompiles from the records. Two reports of the same run agree because
-  the records are append-only — and when a read-back differs, **the world changed, and that is
-  the finding rather than an inconsistency to hide.** The rejected alternative, compiling once at
+  stored.** Every request recompiles from the records. The rejected alternative, compiling once at
   run end and storing it, would make a report a second store that can drift from the evidence it
   claims to summarise, and would quietly make "reports are presentation" false: something
   persisted is something another component can eventually read as a source.
+
+  **Amended by the fourth clarification below.** This answer originally added that a read-back
+  differing between two reports would mean *the world changed*, and that this was the finding
+  rather than an inconsistency. Read-back has since moved to run end, so nothing is re-derived at
+  request time and two reports now agree on **every** claim. Corrected here rather than left to
+  contradict, because a superseded sentence in a clarification log is read as current.
 - Q: Does read-back apply to every effect claim, or only non-repeatable ones? → A: **Wherever an
   observer exists; flagged as `unverified: no observer` where none does.** The two rejected
   answers both decide silently. Restricting to non-repeatable effects leaves every other claim
@@ -73,6 +77,30 @@ again — is the first run a report can get *wrong* in the way ADR-0018 is about
   `not_permitted` when the caller is not the run's subject) because a run's **output** is a work
   product rather than a governance record. A report carrying that payload would route around the
   restriction and become precisely what FR-009 forbids. See FR-008a.
+- Q: Read-back at report time has no authority to run under. Where does it go? → A: **The
+  allocation observes at run end, and the observation is recorded as evidence.** Raised by the
+  plan's Constitution Check, which failed on Principle IV: `Observer.observe` takes no credential
+  and `VaultWriteObserver` reads under *ambient* identity, which in a resume is the allocation's —
+  attested and bounded by the run's ceiling. **At report time there is no allocation**, so a
+  read-back would run under the API surface's own workload identity and hand a reader an
+  observation they may hold no authority to make. An agent never exceeds its human; a report must
+  not exceed its reader.
+
+  So read-back moves to where the authority already exists. Before a run reaches a terminal state,
+  the allocation asks each effect's observer and records the answer. The report then compiles that
+  record like any other, and **the compiler stays pure** — it still reads nothing itself.
+
+  **What this costs, stated rather than buried**: a report no longer detects drift *after* the run
+  ended. The observation is a fact about run-end, which is when ADR-0018 says the claim is made
+  ("before asserting that something completed"), but it means a product changed a week later reads
+  the same as one that never changed. That is a real loss against the on-demand rationale above,
+  accepted deliberately.
+
+  **And it is still a sealed-core change** — an earlier recommendation said otherwise and was
+  wrong. It does not touch the `Observer` protocol, which is what option B would have done, but
+  the observation has to live somewhere, and the honest home is the hash-chained trail: one
+  additive `AuditEventType` member, exactly the shape 020 added and had reviewed. Principle V
+  applies.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -130,10 +158,11 @@ intent with no result and no observer answer — and find the gap stated rather 
 
 ---
 
-### User Story 3 - Read-back before a terminal claim (Priority: P2)
+### User Story 3 - Read-back before a terminal claim, performed by the run (Priority: P2)
 
-Before the report asserts that something *completed*, the platform re-reads the authoritative
-state rather than trusting its own last observation.
+Before a run reaches a terminal state, it re-reads the authoritative state for each effect it
+produced and records what it found. The report compiles those observations; it performs none
+itself.
 
 **Why this priority**: it is the specific failure ADR-0018 opens with — "applied successfully to
 three workspaces" when a fourth silently failed. P2 rather than P1 because it applies only to
@@ -145,14 +174,19 @@ observe the report decline to claim completion.
 
 **Acceptance Scenarios**:
 
-1. **Given** a step recorded as allowed **and a tool with an observer**, **When** the report is
-   about to claim it completed, **Then** the authoritative state is re-read and the claim
-   reflects what was found.
-2. **Given** the authoritative state cannot be re-read, **When** the report is compiled, **Then**
+1. **Given** a step recorded as allowed **and a tool with an observer**, **When** the run reaches
+   a terminal state, **Then** the observer is asked under the **allocation's own attested
+   identity** and the answer is recorded as evidence.
+2. **Given** such an observation exists, **When** a report is compiled, **Then** the claim
+   reflects what was observed rather than what the tool outcome asserted.
+3. **Given** the product could not be reached at run end, **When** a report is compiled, **Then**
    the claim is flagged as unverified rather than asserted or dropped.
-3. **Given** a step recorded as allowed **and a tool with no observer**, **When** the report is
+4. **Given** a step recorded as allowed **and a tool with no observer**, **When** a report is
    compiled, **Then** the claim carries `unverified: no observer` — visibly a record-only claim,
    never presented as product-confirmed.
+5. **Given** a run that was killed and never reached a terminal state, **When** a report is
+   compiled, **Then** its effect claims carry `unverified: not observed` rather than being
+   asserted from the tool outcome alone.
 
 ---
 
@@ -169,10 +203,10 @@ observe the report decline to claim completion.
   introduced, and a reader will want them distinguished from a crash.
 - **The report would contain a secret.** Tool arguments are hashed and secret values never enter
   the trail; a report that re-derived anything from a live product must hold the same line.
-- **Two reports of the same run.** They agree on what the records say, because the records are
-  append-only and nothing recompiles them differently. They may differ on a **read-back**, and
-  that is not an inconsistency to smooth over: it means the product's state changed after the run
-  ended, which is exactly the thing a report exists to surface.
+- **Two reports of the same run.** They agree, always — every claim including the observations
+  compiles from append-only records, and nothing is re-read at report time. This is a stronger
+  guarantee than the first clarification anticipated, and it is the deliberate cost of moving
+  read-back to run end: **drift after the run ended is no longer detectable.**
 
 ## Requirements *(mandatory)*
 
@@ -186,11 +220,19 @@ observe the report decline to claim completion.
 - **FR-004**: Every claim MUST be validated against the record before the report is emitted.
 - **FR-005**: A claim that cannot be reconciled MUST be **flagged in place** — not omitted, not
   softened, and not fatal to the rest of the report.
-- **FR-006**: Before asserting that an effect completed, the platform MUST re-read the
-  authoritative state rather than trusting its last observation.
-- **FR-006a**: When the authoritative state cannot be re-read, the claim MUST be flagged as
-  unverified. **An unreachable product is not evidence of success**, and it is not evidence of
-  failure either.
+- **FR-006**: Before a run reaches a terminal state, it MUST re-read the authoritative state for
+  each effect it produced and **record the observation as evidence**. The report compiles those
+  records and performs no read-back of its own.
+- **FR-006a**: When the authoritative state cannot be reached, the recorded observation MUST say
+  so, and the claim MUST be flagged as unverified. **An unreachable product is not evidence of
+  success**, and it is not evidence of failure either.
+- **FR-006b**: The observation MUST be made under the **allocation's own attested identity**,
+  bounded by the run's ceiling. It MUST NOT be made by any process acting on a reader's behalf:
+  a report that re-read a product would run under the surface's authority rather than the
+  requester's, which is amplification and the reason this moved (Principle IV).
+- **FR-006c**: A run that never reaches a terminal state records no observation, and its effect
+  claims MUST carry `unverified: not observed` — distinct from both "unreachable" and "no
+  observer", because a killed run and an unreachable product are different facts.
 - **FR-007**: Compiling a report MUST go through the governed, tenant-scoped evidence read path,
   and the read MUST itself be audited (ADR-0035). A second, unaudited route to the same records
   would be an ungoverned read path wearing a report's clothes.
@@ -228,9 +270,10 @@ observe the report decline to claim completion.
   report identity, no retention policy — because a stored report is a second copy of the evidence
   that can drift from it, and anything persisted is eventually read as a source, which is
   precisely what FR-014 forbids.
-- **FR-014b**: Two reports of the same run MUST agree on every claim drawn from the records.
-  They MAY differ on a **read-back** claim, and where they do, the report MUST make clear that
-  the difference is a change in the product's state rather than an inconsistency in the report.
+- **FR-014b**: Two reports of the same run MUST agree on **every** claim. Observations are
+  records like any other, so nothing a report says is re-derived at request time. Detecting drift
+  after a run ended is explicitly **not** a property of this feature — see the third clarification
+  for what that costs and why it was accepted.
 - **FR-015**: A report serves **two consumers, with different purposes and the same data**: a
   person reads it as the account of what a run did, and the fidelity gate scores it. Both MUST
   consume the **same compiled object**.
@@ -247,11 +290,15 @@ observe the report decline to claim completion.
 - **FR-015c**: The two purposes MAY differ in what they *emphasise* — a person wants what needs
   attention first, the gate wants every claim with its provenance — but neither may see a claim
   the other cannot. Prioritisation and ordering are presentation; the set of claims is not.
-- **FR-016**: Read-back MUST be performed for every effect claim **for which an observer exists**.
+- **FR-016**: A run MUST observe every effect **for which an observer exists**, at run end.
 - **FR-016a**: Where no observer exists, the claim MUST carry `unverified: no observer` rather
   than being asserted as complete. **The absence of a read-back is a fact about the claim**, and
   a report that omitted it would present a record-only claim and a product-confirmed one as the
   same kind of statement.
+- **FR-016c**: Recording an observation MUST NOT change the run's outcome. A run that completed
+  its work and then found an effect missing is a run that completed and produced a finding; making
+  the observation retroactively fail the run would give a *reporting* mechanism the power to
+  change what is being reported, which is FR-014 in the other direction.
 - **FR-016b**: This feature MUST NOT add observers to satisfy FR-016. An observer written to
   make a claim verifiable, rather than because the product can genuinely be asked, is a stub that
   returns success — which converts an honest `unverified` into a false `confirmed` and is worse
@@ -279,10 +326,15 @@ observe the report decline to claim completion.
 - **SC-002**: A run containing a denial produces a report mentioning it in 100% of cases.
 - **SC-003**: An unreconcilable claim is flagged in 100% of cases, and **0** are omitted or
   softened.
-- **SC-004**: Every effect claim whose tool has an observer is preceded by a read-back, in 100% of
-  cases; a failed read-back yields a flag rather than an assertion.
-- **SC-004a**: **0** effect claims are asserted as complete without either a read-back or an
-  explicit `unverified: no observer` — the two together must account for every one of them.
+- **SC-004**: Every effect whose tool has an observer is observed before the run reaches a terminal
+  state, in 100% of cases; an unreachable product yields a recorded `cannot determine` rather than
+  an assertion.
+- **SC-004a**: **0** effect claims are asserted as complete without either a recorded observation
+  or an explicit `unverified` reason — observed, unreachable, no observer, and not observed must
+  together account for every one of them.
+- **SC-004b**: **0** observations are performed by a report. Every one is made by the allocation
+  that produced the effect, under its own attested identity — demonstrated from the trail, not
+  asserted.
 - **SC-005**: A report request for another tenant's run is indistinguishable from one for a
   nonexistent run — **0** discriminating signals, including message text and reason code.
 - **SC-005a**: A caller who is not the run's subject can obtain its report, and **0** run result
