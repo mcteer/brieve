@@ -235,7 +235,10 @@ def _run_steps(
                         "attempt": 0,
                         "model": model,
                         "named": "",
-                        "outcome": str(ChoiceOutcome.EMPTY),
+                        # NOT `empty`. A model that declined to act and a provider that did
+                        # not answer are different events, and the first dispatched run of
+                        # this feature recorded the second as the first.
+                        "outcome": str(ChoiceOutcome.PROVIDER_UNAVAILABLE),
                         "reason": exc.reason_code,
                     },
                 )
@@ -258,9 +261,12 @@ def _run_steps(
                 )
                 return 0, executed, skipped
 
+            # `resolution.executed` rather than `resolution.tool`, because a named tool is
+            # not a permitted one — the verdict belongs to `invoke_tool` and only the loop
+            # that consulted it knows the answer. The only way to reach here without having
+            # executed is a suspension, which returned above.
             tool_name = resolution.tool
-            result = resolution.result
-            print(f"tool {tool_name}: allowed={result.allowed if result else False}", flush=True)
+            print(f"tool {tool_name}: allowed={resolution.executed}", flush=True)
 
         # WHO OWNS THE BRACKET (T018), and the task's premise needed correcting here.
         #

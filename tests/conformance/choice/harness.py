@@ -19,37 +19,70 @@ from typing import Any
 from tests.conformance.durability import dispatch_harness as h
 from tests.harness.scripted_chooser import NOTHING, recording
 
-#: The definition whose ceiling can refuse a choice: `echo` and `plan`, never `apply`.
+#: The definition the choice rows drive: the vault pack's two tools, and nothing else.
 #:
-#: A definition permitting everything cannot demonstrate a refusal, and one permitting a
-#: single tool cannot demonstrate a choice — so the fixture has to be exactly this shape or
-#: the rows below pass against an implementation that never consults anything.
-PLANNER = "planner-agent"
+#: **`vault-agent` rather than the ceiling pair, and the first dispatched run of this feature
+#: is what decided it.** `planner-agent` looked ideal — two permitted tools and a third it may
+#: not have — and its `plan` tool carries a product action, so the entitlement-mirroring hook
+#: refuses every invocation with `identity_unavailable`. That is the platform working: mirroring
+#: resolves the requester's product entitlements before a shared-grain credential is wielded,
+#: and this enclave federates no user into a product. But it leaves `planner-agent` with one
+#: usable tool, and one tool cannot demonstrate a *choice*.
+#:
+#: The vault pack's tools declare `product_mode` none — they run on the allocation's own
+#: platform identity — so mirroring passes and both are genuinely invocable. Two of them, which
+#: is the minimum for "the model picked the one an index would not have" to mean anything.
+VAULT = "vault-agent"
 
-#: The wide half of the ceiling pair, bound to the OTHER matrix cell. What SC-004 compares.
-APPLIER = "applier-agent"
+#: The two tools a choice is made between. Sorted, `_tool_for_step` would have given step 0
+#: `vault_read` and step 1 `vault_write`; a recording that inverts that is how these rows
+#: prove the answer did not come from arithmetic.
+PERMITTED = ("vault_read", "vault_write")
 
-#: A registered tool that `planner-agent` may not have. **Real, not invented**: the
-#: distinction between a tool named and denied and a name that is not a tool at all is
-#: FR-004's, and a fictional name would exercise the malformed path instead.
-FORBIDDEN = "apply"
+#: A registered tool `vault-agent` may not have. **Real, not invented**: the distinction
+#: between a tool named and denied and a name that is not a tool at all is FR-004's, and a
+#: fictional name would exercise the malformed path instead. `plan` is a fixture tool the
+#: registry always holds, and it is outside both this definition's ceiling and its run scope,
+#: so the authority hook refuses it before mirroring is ever consulted.
+FORBIDDEN = "plan"
 
 #: A name no registry holds. The malformed case, and it must never be a real tool.
 NOT_A_TOOL = "definitely-not-a-registered-tool"
 
+#: The narrow and wide halves of the ceiling pair, bound to DIFFERENT matrix cells. Used only
+#: by SC-004, which compares which model two definitions used rather than what they chose —
+#: so `echo`, the one tool both can actually invoke, is all either needs.
+PLANNER = "planner-agent"
+APPLIER = "applier-agent"
 
-def choice_args(run_id: str, *, answers: list[str], definition: str = PLANNER, **overrides: Any):
+
+def choice_args(
+    run_id: str,
+    *,
+    answers: list[str],
+    definition: str = VAULT,
+    permitted: tuple[str, ...] = PERMITTED,
+    roles: str = "vault-operator",
+    packs: frozenset[str] = frozenset({"vault"}),
+    **overrides: Any,
+):
     """A dispatch whose model is a recording, for a definition that can refuse a choice.
 
-    `steps` is small — these rows watch what a run *chose*, not how it survives disruption,
-    and a four-hundred-step run would spend minutes proving the same thing four hundred times.
+    `steps` defaults to the number of answers — these rows watch what a run *chose*, not how
+    it survives disruption, and a four-hundred-step run would spend minutes proving the same
+    thing four hundred times.
+
+    **The count is answers, not steps, and the two differ whenever a choice is refused.** The
+    recording is consumed per *ask*, which is what lets it exercise the re-choice loop at all:
+    a refusal at step 0 spends an answer and asks again at the same step. A row that wants two
+    steps after a refusal passes `steps=` explicitly.
     """
     args = h.dispatch_args(
         run_id,
         agent_definition_id=definition,
-        requested_tools=frozenset({"echo", "plan"}),
-        subject_roles=frozenset({"operator"}),
-        packs=frozenset(),
+        requested_tools=frozenset(permitted),
+        subject_roles=frozenset({roles}),
+        packs=packs,
         invoke_tools=True,
         steps=len(answers),
         choice_recording=recording(*answers),
@@ -91,7 +124,9 @@ __all__ = [
     "FORBIDDEN",
     "NOTHING",
     "NOT_A_TOOL",
+    "PERMITTED",
     "PLANNER",
+    "VAULT",
     "choice_args",
     "choices",
     "named",

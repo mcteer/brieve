@@ -81,6 +81,16 @@ class StepResolution:
             ChoiceOutcome.EXHAUSTED,
         }
 
+    @property
+    def executed(self) -> bool:
+        """A tool was named AND the governed pipeline allowed it.
+
+        Two conditions, because `NAMED` says only that a real tool went to `invoke_tool` —
+        the verdict is the pipeline's and lives on ``result``. Collapsing them would put the
+        permission decision back in the choosing code by the back door.
+        """
+        return bool(self.tool) and self.result is not None and self.result.allowed
+
 
 def _record(
     run: Any, step_index: int, attempt: int, model: str, named: str, outcome: ChoiceOutcome
@@ -164,12 +174,23 @@ def resolve_step_tool(
             refused.append((named, "not_a_tool"))
             continue
 
+        # RECORDED BEFORE IT RUNS, and both halves of that matter.
+        #
+        # Ordering: every other causal record in this trail precedes its consequences, and the
+        # first dispatched run of this feature wrote a tool's outcome BEFORE the choice that
+        # caused it — an investigator reading in order saw an effect before its reason.
+        #
+        # Fail-closed: `record_choice` does not swallow, so a choice that cannot be recorded
+        # never reaches `invoke_tool`. Recording afterwards would let a tool execute and the
+        # append fail, leaving an effect with nothing saying who chose it. The hook engine
+        # denies on exactly this condition for exactly this reason.
+        choices.append(_record(run, step_index, attempt, model, named, ChoiceOutcome.NAMED))
+
         result = invoke_tool(run, named, arguments)
 
         if result.allowed:
-            choices.append(_record(run, step_index, attempt, model, named, ChoiceOutcome.CHOSEN))
             return StepResolution(
-                outcome=ChoiceOutcome.CHOSEN,
+                outcome=ChoiceOutcome.NAMED,
                 tool=named,
                 result=result,
                 attempts=attempt + 1,
@@ -179,13 +200,10 @@ def resolve_step_tool(
         # A SUSPENSION IS NOT A REFUSAL, and re-choosing past one would be worse than the
         # bug 014 fixed at the entrypoint: the dependency gate suspends a run whose product is
         # unreachable, so a second choice would either hit the same unreachable product or
-        # reach a different one while the run is already waiting. Recorded as `refused`
-        # because the choice was in fact refused by the built-in governance set; *which* hook
-        # refused it, and why, is one correlation-joined `PRE_DECISION` entry away.
-        choices.append(_record(run, step_index, attempt, model, named, ChoiceOutcome.REFUSED))
+        # reach a different one while the run is already waiting.
         if run.state is RunState.SUSPENDED:
             return StepResolution(
-                outcome=ChoiceOutcome.REFUSED,
+                outcome=ChoiceOutcome.NAMED,
                 tool=named,
                 result=result,
                 attempts=attempt + 1,
@@ -193,9 +211,13 @@ def resolve_step_tool(
                 choices=tuple(choices),
             )
 
-        # FR-004a: the denial becomes context. FR-004c: this entry stays in the trail whether
-        # or not a later attempt succeeds — a run denied four times and permitted on the fifth
-        # is a different event from one permitted immediately.
+        # FR-004a: the denial becomes context, so the next ask carries it.
+        #
+        # FR-004c is satisfied by the entry written above rather than by one written here: a
+        # run denied four times and permitted on the fifth leaves FIVE `tool_chosen` entries
+        # at this step, each with the `PRE_DECISION` its invocation produced. A trail showing
+        # only the success would describe the wrong run, and this one cannot — the record is
+        # written before the pipeline is consulted, so it exists whatever the pipeline says.
         refused.append((named, result.reason_code))
 
     # FR-004b. The bound is what keeps governance-as-a-signal from becoming

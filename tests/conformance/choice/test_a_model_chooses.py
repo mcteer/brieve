@@ -34,29 +34,36 @@ def conn() -> Any:
 def test_a_model_choice_is_executed(conn: Any) -> None:
     """FR-001, SC-001 — the tool invoked is the one a model named, evidenced from the trail.
 
-    **The recording names the tool round-robin would not have picked.** `planner-agent`
-    requests `echo` and `plan`; sorted, `_tool_for_step` would have given step 0 `echo` and
-    step 1 `plan`. This run chooses `plan` then `echo` — the reverse — so a trail showing that
-    order cannot have come from the arithmetic this feature deleted.
+    **The recording names the tools in the order round-robin would not have.** `vault-agent`
+    requests `vault_read` and `vault_write`; sorted, `_tool_for_step` would have given step 0
+    `vault_read` and step 1 `vault_write`. This run chooses the reverse, so a trail showing
+    that order cannot have come from the arithmetic this feature deleted.
 
     That inversion is what makes the row non-vacuous. Asserting only "a tool ran" would pass
     against the code as it stood before 020.
     """
     run_id = h.unique("choice-executed")
-    c.run_to_completion(run_id, answers=["plan", "echo"])
+    c.run_to_completion(run_id, answers=["vault_write", "vault_read"])
 
-    assert c.named(conn, run_id) == ["plan", "echo"], (
+    assert c.named(conn, run_id) == ["vault_write", "vault_read"], (
         "the tools recorded as chosen are not the ones the model named, in order — "
         f"got {c.named(conn, run_id)}"
     )
-    assert c.outcomes(conn, run_id) == ["chosen", "chosen"], (
+    assert c.outcomes(conn, run_id) == ["named", "named"], (
         f"a choice did not reach the governed entry cleanly: {c.choices(conn, run_id)}"
     )
     assert h.tool_invocations(conn, run_id) == 2, (
         "the trail records two chosen tools but a different number of invocations — the "
         "choice and the execution have come apart"
     )
-    # The join Principle IX requires: a chosen tool and its bracket are the same run's story.
+    # REASON BEFORE EFFECT, and this assertion is why the design changed.
+    #
+    # The first dispatched run of this feature recorded the choice AFTER the invocation,
+    # because the entry carried a verdict and a verdict is not knowable until the pipeline has
+    # answered. So a reader walking the trail in order met a tool's outcome before anything
+    # said who had chosen it. The fix was to stop carrying the verdict — `PRE_DECISION` owns
+    # that, and research F2 said so before a line was written — which also made the record
+    # fail-closed: a choice that cannot be written now cannot execute.
     order = h.event_order(conn, run_id)
     assert order.index("tool_chosen") < order.index("tool_outcome"), (
         "a tool's outcome is recorded before the choice that caused it; an investigator "

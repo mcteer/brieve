@@ -181,6 +181,11 @@ class AuditEventType(StrEnum):
     #: * ``not_consulted`` — this step asked no model, because the run invokes no tools
     #:   (FR-002a/FR-002b). Written so the carve-out is legible rather than showing as an
     #:   absence, which is how `STEP_REOBSERVED` came to exist one feature earlier.
+    #: * ``provider_unavailable`` — the provider could not be reached, or answered unusably.
+    #:   Terminal, with no fallback to any non-model selection (FR-007). Separate from
+    #:   ``empty`` because a model declining to act and a vendor failing to answer are
+    #:   different events with different fixes, and the trail must not report an outage as an
+    #:   agent decision. Carries an extra ``reason`` key naming which failure it was.
     #:
     #: **The model's reasoning is never carried.** It is not a governance fact, and it would
     #: bring whatever the model read out of a tool result into an append-only trail. The

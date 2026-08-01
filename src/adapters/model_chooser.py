@@ -154,18 +154,12 @@ def build_chooser(model: str, *, recording: str = "") -> Chooser:
     if provider == FIXTURE_PROVIDER:
         from core.choice.recorded import parse_recording
 
-        answers = parse_recording(recording)
-        if not answers:
-            # A fixture cell with no recording is a misconfiguration, and it must be loud.
-            # Answering "" would end every run terminally while looking like a model that
-            # chose nothing — a green-looking failure of exactly the kind FR-011a exists to
-            # prevent one layer up.
-            raise ChooserUnavailable(
-                f"model {model!r} names the {FIXTURE_PROVIDER!r} provider but no recording "
-                f"was supplied for this run",
-                reason_code="recording_missing",
-            )
-        return RecordedChooser(answers)
+        # An absent recording is a defined behaviour rather than a misconfiguration — the
+        # fixture model then names the first permitted tool. `RecordedChooser`'s docstring
+        # carries the argument; the short version is that requiring a script per run would
+        # have meant carrying one through the suspended-run index and the sweeper's resume
+        # dispatch, which is a control-plane column for a test affordance.
+        return RecordedChooser(parse_recording(recording))
     return ModelChooser(model)
 
 

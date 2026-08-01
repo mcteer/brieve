@@ -66,11 +66,29 @@ def test_the_bound_model_is_the_one_used(conn: Any) -> None:
     dispatches two definitions bound to different cells and requires the recorded models to
     differ, and to be the ones the control plane says.
     """
+    # `echo` for both, and the tool is beside the point here. What SC-004 compares is which
+    # MODEL each run used, so the fixture wants the one tool both halves of the ceiling pair
+    # can actually invoke — their other tools carry product actions the entitlement mirror
+    # cannot resolve in this enclave, which is a different property with its own rows.
     planner_run = h.unique("choice-model-planner")
-    c.run_to_completion(planner_run, answers=["plan"], definition=c.PLANNER)
+    c.run_to_completion(
+        planner_run,
+        answers=["echo"],
+        definition=c.PLANNER,
+        permitted=("echo",),
+        roles="operator",
+        packs=frozenset(),
+    )
 
     applier_run = h.unique("choice-model-applier")
-    c.run_to_completion(applier_run, answers=["plan"], definition=c.APPLIER)
+    c.run_to_completion(
+        applier_run,
+        answers=["echo"],
+        definition=c.APPLIER,
+        permitted=("echo",),
+        roles="operator",
+        packs=frozenset(),
+    )
 
     planner_models = {str(e.get("model") or "") for e in c.choices(conn, planner_run)}
     applier_models = {str(e.get("model") or "") for e in c.choices(conn, applier_run)}

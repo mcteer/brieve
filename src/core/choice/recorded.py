@@ -36,12 +36,29 @@ NOTHING = "-"
 
 
 class RecordedChooser:
-    """Replays a fixed sequence of answers, one per *ask*.
+    """Replays a fixed sequence of answers, one per *ask* — or names the first permitted tool.
 
     Per ask rather than per step, and the difference is the whole reason a recording can
     exercise the re-choice loop at all: a recording of ``["apply", "plan"]`` at a step whose
     ceiling forbids `apply` produces a refusal, a second ask, and a permitted choice — which is
     FR-004a and FR-004c happening for real rather than being simulated.
+
+    **An ABSENT recording is a defined behaviour, not a misconfiguration**, and the first
+    enclave run of this feature is what settled that. Every pre-020 dispatched row that invokes
+    tools now consults a model, and requiring each to carry a script would have meant carrying
+    that script through the suspended-run index and the sweeper's resume dispatch — a column in
+    a control-plane table, for a test affordance. So a fixture model with nothing recorded
+    answers with the first tool the request permits.
+
+    **That is a model's behaviour, not the loop's**, and the distinction is the whole of
+    SC-002. It sits on the far side of the seam, reached only through a cell the matrix
+    qualified and a definition bound; the loop still asks, still records what came back, and
+    still puts it to `invoke_tool`. What FR-002 forbids is the *loop* computing an index, and
+    the loop no longer can.
+
+    A recording that is present and runs out is still an error — see :meth:`choose`. Supplying
+    a script and having it end early is a row that does not cover the run it was written for,
+    which is a different thing from not supplying one.
     """
 
     def __init__(self, answers: Sequence[str]) -> None:
@@ -59,18 +76,24 @@ class RecordedChooser:
         return self._asked
 
     def choose(self, request: ChoiceRequest) -> str:
-        if self._asked >= len(self._answers):
+        self._asked += 1
+        if not self._answers:
+            # Nothing recorded: name the first tool this request permits. Sorted, so the
+            # answer is stable across runs — a fixture model that answered differently on
+            # identical input would make every row built on it intermittent.
+            return sorted(request.permitted)[0] if request.permitted else ""
+
+        if self._asked > len(self._answers):
             # Running off the end is a recording that does not cover the run it was written
             # for. Raised rather than answered with "" — an empty answer is the *terminal*
             # outcome, so defaulting to it would end runs quietly whenever a recording was
             # short, and a row asserting a terminal run would pass for the wrong reason.
             raise ChooserUnavailable(
                 f"the recording holds {len(self._answers)} answers and a "
-                f"{self._asked + 1}th was asked for at step {request.step_index}",
+                f"{self._asked}th was asked for at step {request.step_index}",
                 reason_code="recording_exhausted",
             )
-        answer = self._answers[self._asked]
-        self._asked += 1
+        answer = self._answers[self._asked - 1]
         return "" if answer == NOTHING else answer
 
 

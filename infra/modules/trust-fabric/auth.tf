@@ -11,6 +11,31 @@ resource "vault_jwt_auth_backend" "workload" {
   description        = "Workload identity (ADR-0048)"
 }
 
+# HOW MUCH CLOCK DISAGREEMENT AN ATTESTED IDENTITY SURVIVES.
+#
+# The scheduler signs a workload identity with ITS clock and Vault validates it with its own.
+# In the dev enclave those are different machines — the Nomad agents run on the host, Vault
+# runs in the container VM — so the two drift, and with no tolerance a token can be rejected
+# for `nbf` before it is a second old.
+#
+# **Found by 020's dispatched rows**, which failed intermittently with
+# `invalid not before (nbf) claim: token not yet valid` — a *different* subset of rows each
+# run, each with an empty audit trail, which reads as a flaky new feature rather than an
+# environment fault. The measured drift was 919 seconds on a long-running VM.
+#
+# 120 seconds, and it buys nothing an attacker wants. `exp` still bounds the token (the
+# identity's TTL is an hour), the audience and job-id claims are still exact, and the
+# signature is still the scheduler's. What it removes is a failure mode where attestation
+# succeeds or fails on which of two clocks is a second ahead — which is not a security
+# property, it is a lottery, and a lottery in the identity path is how people learn to
+# re-run a red gate instead of reading it.
+#
+# It does NOT excuse real drift: the enclave's clocks should be in sync, and a drift large
+# enough to exceed this is a machine to fix rather than a number to raise.
+locals {
+  jwt_clock_leeway = 120
+}
+
 # Per-definition agent roles. An agent's ceiling bounds what a model-chosen tool call
 # may reach — and deliberately does NOT include the state store: see policies.tf.
 resource "vault_jwt_auth_backend_role" "agent" {
@@ -20,6 +45,8 @@ resource "vault_jwt_auth_backend_role" "agent" {
   role_name               = each.key
   role_type               = "jwt"
   bound_audiences         = ["vault.io"]
+  not_before_leeway       = local.jwt_clock_leeway
+  clock_skew_leeway       = local.jwt_clock_leeway
   user_claim              = "/nomad_job_id"
   user_claim_json_pointer = true
 
@@ -43,6 +70,8 @@ resource "vault_jwt_auth_backend_role" "harness" {
   role_name               = "harness"
   role_type               = "jwt"
   bound_audiences         = ["vault.io"]
+  not_before_leeway       = local.jwt_clock_leeway
+  clock_skew_leeway       = local.jwt_clock_leeway
   user_claim              = "/nomad_job_id"
   user_claim_json_pointer = true
 
@@ -71,6 +100,8 @@ resource "vault_jwt_auth_backend_role" "conformance" {
   role_name               = "conformance"
   role_type               = "jwt"
   bound_audiences         = ["vault.io"]
+  not_before_leeway       = local.jwt_clock_leeway
+  clock_skew_leeway       = local.jwt_clock_leeway
   user_claim              = "/nomad_job_id"
   user_claim_json_pointer = true
 
@@ -106,6 +137,8 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
   role_name               = "agent-run"
   role_type               = "jwt"
   bound_audiences         = ["vault.io"]
+  not_before_leeway       = local.jwt_clock_leeway
+  clock_skew_leeway       = local.jwt_clock_leeway
   user_claim              = "/nomad_job_id"
   user_claim_json_pointer = true
 
@@ -163,6 +196,8 @@ resource "vault_jwt_auth_backend_role" "api" {
   role_name               = "api"
   role_type               = "jwt"
   bound_audiences         = ["vault.io"]
+  not_before_leeway       = local.jwt_clock_leeway
+  clock_skew_leeway       = local.jwt_clock_leeway
   user_claim              = "/nomad_job_id"
   user_claim_json_pointer = true
 
@@ -202,6 +237,8 @@ resource "vault_jwt_auth_backend_role" "mcp_surface" {
   role_name               = "mcp-surface"
   role_type               = "jwt"
   bound_audiences         = ["vault.io"]
+  not_before_leeway       = local.jwt_clock_leeway
+  clock_skew_leeway       = local.jwt_clock_leeway
   user_claim              = "/nomad_job_id"
   user_claim_json_pointer = true
 
@@ -223,6 +260,8 @@ resource "vault_jwt_auth_backend_role" "mcp" {
   role_name               = "mcp"
   role_type               = "jwt"
   bound_audiences         = ["vault.io"]
+  not_before_leeway       = local.jwt_clock_leeway
+  clock_skew_leeway       = local.jwt_clock_leeway
   user_claim              = "/nomad_job_id"
   user_claim_json_pointer = true
 

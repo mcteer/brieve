@@ -47,19 +47,36 @@ CHOICE_ROLE: Role = "plan"
 
 
 class ChoiceOutcome(StrEnum):
-    """What became of one attempt at one step. The closed payload vocabulary of `TOOL_CHOSEN`.
+    """What the platform made of one answer, **before** anything was executed.
 
-    Six values rather than a boolean, because a reader asking "why did this run stop" needs
-    the four terminal ones to be different from each other. A single `refused` covering a
-    malformed answer and an over-reach would report a model that misunderstood its task as a
-    model that reached past its ceiling.
+    **Deliberately no `chosen` or `refused`, and research F2 is why.** The first draft had
+    both, and they duplicate `PRE_DECISION` — which exists to record *what governance decided
+    about a tool*, while this event records *who named it and why it was on the table*. F2
+    argued that folding one into the other is how a reader loses the distinction; carrying a
+    verdict here would have folded it the other way.
+
+    It is also what let the first dispatched run write a tool's outcome **before** the choice
+    that caused it: a verdict cannot be known until the tool has been put to the pipeline, so
+    an event carrying one has to be written afterwards. Every other causal record in this
+    trail precedes its consequences — `MATRIX_FALLBACK` before `AUTHORITY_ISSUED`,
+    `RUN_RESUMED` before any pending step — and this one now does too.
+
+    The ordering buys a governance property as well as legibility: the choice is recorded
+    **before** the tool runs, so a choice that cannot be recorded cannot execute. Fail-closed,
+    on the same reasoning the hook engine denies when its own pre-execution append fails.
+
+    So: was a tool named, and if not, what happened instead. The four terminal values are kept
+    apart because a reader asking "why did this run stop" needs them to be — a single value
+    covering a malformed answer and an over-reach would report a model that misunderstood its
+    task as a model that reached past its ceiling.
     """
 
-    #: Named, permitted, executed.
-    CHOSEN = "chosen"
-    #: Named, and refused by the existing enforcement. Recorded per attempt (FR-004c).
-    REFUSED = "refused"
-    #: Not a tool name at all. Distinct from REFUSED — see the class docstring.
+    #: The model named a real tool, and it goes to the governed entry next. Whether it was
+    #: permitted is the `PRE_DECISION` entries that follow, joined by correlation and step.
+    NAMED = "named"
+    #: Not a tool name at all — the model misunderstood its task, rather than reaching past
+    #: its ceiling. Nothing is put to the pipeline, so there is no hook decision to join to,
+    #: which is exactly why this value has to live here.
     MALFORMED = "malformed"
     #: The model named nothing. Terminal, and never defaulted to a tool.
     EMPTY = "empty"
@@ -68,6 +85,15 @@ class ChoiceOutcome(StrEnum):
     EXHAUSTED = "exhausted"
     #: No model was asked, because this run invokes no tools (FR-002a/FR-002b).
     NOT_CONSULTED = "not_consulted"
+    #: The provider could not be reached, or answered unusably. Terminal (FR-007).
+    #:
+    #: **Distinct from EMPTY**, and the first dispatched run of this feature is why: the
+    #: handler recorded a provider failure as "the model named nothing", which is the same
+    #: conflation MALFORMED exists to avoid one row up. A model that declined to act and a
+    #: provider that did not answer are different events with different fixes — one sends
+    #: somebody to the prompt, the other to the vendor — and a trail that called them both
+    #: `empty` would report a platform outage as an agent decision.
+    PROVIDER_UNAVAILABLE = "provider_unavailable"
 
 
 @dataclass(frozen=True)

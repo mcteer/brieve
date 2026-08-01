@@ -54,16 +54,30 @@ def test_the_merge_lane_needs_no_provider() -> None:
     )
 
 
-def test_a_fixture_cell_without_a_recording_is_loud() -> None:
-    """A misconfiguration must not present as a model that chose nothing.
+def test_a_fixture_cell_without_a_recording_names_a_permitted_tool() -> None:
+    """An absent recording has a defined answer; a SHORT one is still an error.
 
-    Answering `""` here would end every such run terminally while looking exactly like a
-    model declining to act — a green-looking failure, which is the shape FR-011a exists to
-    prevent one level up.
+    The pair is the point, and the first enclave run of this feature is what set it. Every
+    pre-020 dispatched row that invokes tools now consults a model, and requiring each to
+    carry a script would have meant threading that script through the suspended-run index and
+    the sweeper's resume dispatch — a control-plane column for a test affordance. So no
+    script means "name the first permitted tool".
+
+    A script that is *present* and runs out stays loud, because that is a different mistake:
+    a row whose recording does not cover the run it was written for. Answering `""` there
+    would end the run terminally while looking exactly like a model declining to act, and a
+    row asserting a terminal run would pass for the wrong reason.
     """
+    request = ChoiceRequest(task=FIXTURE_TASK, permitted=FIXTURE_PERMITTED, step_index=0, attempt=0)
+    default = build_chooser(FIXTURE_MODEL, recording="")
+    assert default.choose(request) == "echo", "sorted-first of ('echo', 'plan')"
+    assert default.choose(request) == "echo", "the default answer is stable across asks"
+
+    short = build_chooser(FIXTURE_MODEL, recording=recording("plan"))
+    assert short.choose(request) == "plan"
     with pytest.raises(ChooserUnavailable) as excinfo:
-        build_chooser(FIXTURE_MODEL, recording="")
-    assert excinfo.value.reason_code == "recording_missing"
+        short.choose(request)
+    assert excinfo.value.reason_code == "recording_exhausted"
 
 
 def test_the_identifier_the_matrix_pins_is_the_one_called() -> None:

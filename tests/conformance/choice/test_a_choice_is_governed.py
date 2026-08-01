@@ -43,16 +43,23 @@ def test_an_unpermitted_choice_is_refused_by_existing_enforcement(conn: Any) -> 
     against the permitted set and never called `invoke_tool` at all.
 
     The discriminator is the hook trail. A refusal by the existing enforcement leaves a
-    `pre_decision` entry naming the tool and the hook that denied it; a refusal invented by
-    the choosing code leaves the `tool_chosen` entry alone. So the row asserts both are
-    present and that they name the same tool.
+    `pre_decision` entry from a named governance hook with the reason it denied; a refusal
+    invented by the choosing code leaves no `pre_decision` at all, because nothing was ever
+    put to the pipeline.
+
+    **What this row cannot do, stated rather than glossed**: `PRE_DECISION` carries
+    `hook_name`, `capability_kind`, `outcome` and `reason_code` — and no tool name. So the
+    assertion is "a governance hook denied, for the reason an over-reach produces", not "a
+    governance hook denied *this* tool". Tightening that would mean widening a sealed-core
+    audit payload, which is a bigger change than this row is worth; the run invokes one tool
+    and the counts below close most of the gap.
     """
     run_id = h.unique("choice-refused")
-    c.run_to_completion(run_id, answers=[c.FORBIDDEN, "plan"])
+    c.run_to_completion(run_id, answers=[c.FORBIDDEN, "vault_read"], steps=1)
 
-    assert c.named(conn, run_id) == [c.FORBIDDEN, "plan"]
-    assert c.outcomes(conn, run_id) == ["refused", "chosen"], (
-        f"the over-reach was not refused and re-chosen: {c.choices(conn, run_id)}"
+    assert c.named(conn, run_id) == [c.FORBIDDEN, "vault_read"]
+    assert c.outcomes(conn, run_id) == ["named", "named"], (
+        f"the over-reach was not put to the pipeline and re-chosen: {c.choices(conn, run_id)}"
     )
 
     decisions = h.events(conn, run_id, "pre_decision")
@@ -62,9 +69,24 @@ def test_an_unpermitted_choice_is_refused_by_existing_enforcement(conn: Any) -> 
         "from the governed pipeline — the choosing code decided permission for itself, which "
         "is the one thing the contract says it must never do"
     )
-    assert any(str(d.get("tool_name") or "") == c.FORBIDDEN for d in denials), (
-        f"a hook denied something, but not {c.FORBIDDEN!r}: {denials}"
+    assert any(str(d.get("reason_code") or "") == "out_of_scope" for d in denials), (
+        f"a hook denied, but not for the reason a tool outside the run's scope produces: "
+        f"{denials}. A different reason means something other than the ceiling refused, and "
+        f"this row would then be asserting the wrong mechanism"
     )
+    # `pipeline` is the run-scope check the engine performs before any hook is consulted, and
+    # it is the one that catches a tool outside the run's scope — which is what an over-reach
+    # is. Named alongside the hooks rather than instead of them because a *ceiling* over-reach
+    # and a *policy* denial come from different places and this row should accept either; what
+    # it must reject is a denial from outside the built-in governance set entirely, which is
+    # what a refusal invented by the choosing code would look like if it ever wrote one.
+    assert {str(d.get("hook_name") or "") for d in denials} <= {
+        "pipeline",
+        "authority",
+        "dependency",
+        "mirroring",
+        "governance",
+    }, f"the denial came from a hook outside the built-in governance set: {denials}"
     assert h.tool_invocations(conn, run_id) == 1, (
         "the refused tool executed, or the permitted one did not"
     )
@@ -81,7 +103,7 @@ def test_a_refusal_returns_to_the_model(conn: Any) -> None:
     behaviour FR-004a specifies and the only part of it the platform owns.
     """
     run_id = h.unique("choice-returns")
-    c.run_to_completion(run_id, answers=[c.FORBIDDEN, "plan"])
+    c.run_to_completion(run_id, answers=[c.FORBIDDEN, "vault_read"], steps=1)
 
     entries = c.choices(conn, run_id)
     assert [e["step_index"] for e in entries] == [0, 0], (
@@ -109,7 +131,7 @@ def test_the_rechoice_bound_is_terminal(conn: Any) -> None:
     c.run_to_completion(run_id, answers=[c.FORBIDDEN] * over, steps=1)
 
     outcomes = c.outcomes(conn, run_id)
-    assert outcomes == ["refused"] * DEFAULT_RECHOICE_BOUND + ["exhausted"], (
+    assert outcomes == ["named"] * DEFAULT_RECHOICE_BOUND + ["exhausted"], (
         f"the bound did not hold at {DEFAULT_RECHOICE_BOUND} attempts: {outcomes}"
     )
     assert h.tool_invocations(conn, run_id) == 0, "an exhausted run executed a tool anyway"
@@ -131,11 +153,21 @@ def test_every_refusal_is_recorded(conn: Any) -> None:
     executed — which is the natural implementation, and the wrong one.
     """
     run_id = h.unique("choice-all-refusals")
-    c.run_to_completion(run_id, answers=[c.FORBIDDEN, c.FORBIDDEN, "plan"], steps=1)
+    c.run_to_completion(run_id, answers=[c.FORBIDDEN, c.FORBIDDEN, "vault_read"], steps=1)
 
     outcomes = c.outcomes(conn, run_id)
-    assert outcomes == ["refused", "refused", "chosen"], (
-        f"the trail does not hold every refusal, only some: {outcomes}"
+    assert outcomes == ["named", "named", "named"], (
+        f"the trail does not hold every attempt, only some: {outcomes}"
+    )
+    # Two of those three were refused, and the refusals are the pipeline's own records. The
+    # count is what makes "every refusal, not only the last" checkable: a platform recording
+    # only successful choices would show one entry here, not three.
+    denials = [
+        d for d in h.events(conn, run_id, "pre_decision") if str(d.get("outcome") or "") == "deny"
+    ]
+    assert len(denials) >= 2, (
+        f"a run denied twice and permitted on the third try left {len(denials)} denial(s) in "
+        f"the trail; it would read as a run permitted sooner than it was"
     )
 
 
@@ -152,10 +184,11 @@ def test_a_malformed_choice_is_distinguishable(conn: Any) -> None:
     two outcomes that must differ cannot be shown to differ by two separate runs.
     """
     run_id = h.unique("choice-malformed")
-    c.run_to_completion(run_id, answers=[c.NOT_A_TOOL, c.FORBIDDEN, "plan"], steps=1)
+    c.run_to_completion(run_id, answers=[c.NOT_A_TOOL, c.FORBIDDEN, "vault_read"], steps=1)
 
-    assert c.outcomes(conn, run_id) == ["malformed", "refused", "chosen"], (
-        f"malformed and refused are not distinguished: {c.choices(conn, run_id)}"
+    assert c.outcomes(conn, run_id) == ["malformed", "named", "named"], (
+        f"a name that is not a tool is not distinguished from one that is: "
+        f"{c.choices(conn, run_id)}"
     )
     # And the malformed one never reached a hook — there was nothing to decide about.
     denied = [
@@ -201,9 +234,9 @@ def test_repetition_is_bounded_by_the_step_budget(conn: Any) -> None:
     regression gets in.
     """
     run_id = h.unique("choice-repetition")
-    c.run_to_completion(run_id, answers=["plan"] * 3, steps=3)
+    c.run_to_completion(run_id, answers=["vault_read"] * 3, steps=3)
 
-    assert c.outcomes(conn, run_id) == ["chosen"] * 3
+    assert c.outcomes(conn, run_id) == ["named"] * 3
     assert h.tool_invocations(conn, run_id) == 3, (
         "a model naming one tool three times did not produce exactly three invocations"
     )
@@ -236,7 +269,7 @@ def test_no_provider_credential_reaches_an_allocation(conn: Any) -> None:
         assert banned not in jobspec, f"{banned!r} appears in the dispatched jobspec"
 
     run_id = h.unique("choice-no-leak")
-    c.run_to_completion(run_id, answers=["plan"])
+    c.run_to_completion(run_id, answers=["vault_read"])
     payloads = str(c.choices(conn, run_id))
     for banned in (EVAL_PROVIDER_KEY, "sk-ant-", "ANTHROPIC_API_KEY"):
         assert banned not in payloads, f"{banned!r} appears in a recorded choice: {payloads}"
