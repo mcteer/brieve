@@ -95,7 +95,23 @@ class FakeOIDCProvider:
 
     issuer: str = ISSUER
     audience: str = AUDIENCE
-    key_id: str = "test-key-1"
+    #: A DISTINCT ID PER PROCESS, and the reason is worth reading before changing it back.
+    #:
+    #: This was the constant ``"test-key-1"``. Every process minted a fresh keypair and reused
+    #: that id, so after a restart a verifier holding a cached entry under the same id returned
+    #: the **old modulus**, the signature failed, and every token presented as
+    #: ``unverifiable_identity`` — a refusal naming the symptom and not the cause.
+    #:
+    #: **The explanation that circulated for this was wrong**, including in the body of a merged
+    #: pull request: that the surface caches JWKS at startup and must be restarted. It does not.
+    #: `surfaces/api/verification.py` caches with a 600-second TTL and **refetches immediately on
+    #: an id it does not recognise**. Reusing the id is what defeated that; it was never a
+    #: startup-cache problem, and no change under `src/` was needed to fix it.
+    #:
+    #: So a per-process id lets the verifier's own unknown-id path do the work: refetch on the
+    #: spot, verify correctly, no restart, no ten-minute window. A token from a previous process
+    #: is then refused promptly, which is correct — it was signed by a key that no longer exists.
+    key_id: str = field(default_factory=lambda: f"dev-key-{secrets.token_hex(6)}")
     _key: rsa.RSAPrivateKey = field(init=False)
     _other_key: rsa.RSAPrivateKey = field(init=False)
     _codes: dict[str, _PendingCode] = field(init=False, default_factory=dict)

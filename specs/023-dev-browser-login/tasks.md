@@ -39,10 +39,10 @@ worth having.
 
 ## Phase 1: Setup
 
-- [ ] T001 Read `tests/harness/dev_idp.py` and `tests/harness/fake_oidc_provider.py` end to end
+- [X] T001 Read `tests/harness/dev_idp.py` and `tests/harness/fake_oidc_provider.py` end to end
       before changing either. `/authorize` already returns a real 302 and `/token` already performs
       a real PKCE `S256` exchange — this feature adds around them and rebuilds neither (research F6).
-- [ ] T002 Record the current behaviour as a baseline: `curl` both `.well-known` paths and `/jwks`,
+- [X] T002 Record the current behaviour as a baseline: `curl` both `.well-known` paths and `/jwks`,
       and keep the output. The 404 on `/.well-known/oauth-authorization-server` is the measurement
       this feature exists to answer, and it should be visible in the change rather than remembered.
 - [ ] T003 Confirm `tests/conformance/mcp_served` passes before anything moves, via
@@ -53,11 +53,11 @@ worth having.
 
 ## Phase 2: Foundational — blocking prerequisites
 
-- [ ] T004 Extract the discovery document in `tests/harness/dev_idp.py` into a single function that
+- [X] T004 Extract the discovery document in `tests/harness/dev_idp.py` into a single function that
       builds it once, so the two paths in US1 cannot return different bodies. **One body, two
       routes** (research F4) — two bodies could drift, one cannot.
-- [ ] T005 Add `registration_endpoint` to that document, pointing at `{issuer}/register`.
-- [ ] T006 Keep the `DEV_ONLY` warning in the document unchanged (FR-013). Becoming more
+- [X] T005 Add `registration_endpoint` to that document, pointing at `{issuer}/register`.
+- [X] T006 Keep the `DEV_ONLY` warning in the document unchanged (FR-013). Becoming more
       standards-complete must not make this provider look deployable.
 
 **Checkpoint**: the document is built in one place and names the new endpoint. No route serves it
@@ -72,24 +72,24 @@ yet.
 **Independent test**: configure an editor with a URL and nothing else; connect; sign in; call an
 operation.
 
-- [ ] T007 [US1] (FR-004) Serve the discovery document at `/.well-known/oauth-authorization-server` in
+- [X] T007 [US1] (FR-004) Serve the discovery document at `/.well-known/oauth-authorization-server` in
       `tests/harness/dev_idp.py`, alongside the existing OpenID Connect path. **This path was
       measured returning 404** in the surface's own log, immediately after a client fetched the
       protected-resource document.
 - [ ] T008 [US1] [GATE:conformance] Assert in `tests/conformance/mcp_served/` that both paths return
       **byte-identical** bodies, and that both name `registration_endpoint`.
-- [ ] T009 [US1] (FR-005) Implement `POST /register` in `tests/harness/dev_idp.py`, answering with a
+- [X] T009 [US1] (FR-005) Implement `POST /register` in `tests/harness/dev_idp.py`, answering with a
       `client_id` and holding **no state** (research F5). The provider authenticates nobody and has
       no client to distinguish, so state would buy nothing and grow with every reconnect.
 - [ ] T010 [US1] Assert in `tests/conformance/mcp_served/` that registration succeeds **twice in a
       row**. Editors re-register on reconnect; a provider that errored the second time would work
       once per developer and then stop.
-- [ ] T011 [US1] Stop deriving the JWKS URI from the issuer in `infra/bin/mcp-surface-up` — remove
+- [X] T011 [US1] Stop deriving the JWKS URI from the issuer in `infra/bin/mcp-surface-up` — remove
       `OIDC_JWKS_URI="${OIDC_ISSUER_OVERRIDE}/jwks"` and accept the two as independent inputs.
       `src/surfaces/mcp/served.py` reads them separately: the issuer is a string it **compares**,
       the JWKS URI a location it **fetches**. The script reimposes a coupling the platform does not
       have, and removing it is what makes the whole approach possible (research F2).
-- [ ] T012 [US1] Set the issuer to a host-resolvable address and the JWKS URI to a
+- [X] T012 [US1] Set the issuer to a host-resolvable address and the JWKS URI to a
       container-reachable one in `infra/bin/mcp-surface-conformance`, replacing the single
       `IDP_ISSUER` used for both. The provider's minted `iss` and the surface's expected issuer
       MUST remain the same string (FR-006a) — that identity is the only reason two addresses are
@@ -152,11 +152,11 @@ each.
 **Independent test**: reach the provider from the host and from inside a container, and restart it
 without restarting the surface.
 
-- [ ] T018 [US3] (FR-005a) Mint a distinct signing key **id** per process in
+- [X] T018 [US3] (FR-005a) Mint a distinct signing key **id** per process in
       `tests/harness/fake_oidc_provider.py`, replacing the reused `test-key-1`. The surface caches
       keys with a 600-second TTL and **refetches on an id it does not know**, so a per-process id
       makes it refetch on the spot (research F3).
-- [ ] T019 [US3] Document in that same file why the id changes and the key does not need persisting
+- [X] T019 [US3] Document in that same file why the id changes and the key does not need persisting
       — including that the widely-repeated explanation, that the surface caches at startup and must
       be restarted, is **wrong**. It appears in a merged pull request, and correcting it only in a
       spec leaves it to be repeated from the code.
@@ -174,7 +174,7 @@ without restarting the surface.
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T022 (FR-003a) Start the development provider from `infra/bin/mcp-surface-up` when it is not
+- [X] T022 (FR-003a) Start the development provider from `infra/bin/mcp-surface-up` when it is not
       already listening, with the host-resolvable issuer. **Analysis found the first version of this
       task assumed work that did not exist**: `make dev-up` runs only `infra/bin/enclave-up`, which
       starts neither the provider nor the surface, so "ensure it is started by whichever script

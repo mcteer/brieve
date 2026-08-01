@@ -43,6 +43,43 @@ say "MCP surface"
 VAULT_ADDR_VAL="$(env_val VAULT_ADDR)"; VAULT_ADDR_VAL="${VAULT_ADDR_VAL:-https://127.0.0.1:8200}"
 VAULT_CACERT_VAL="$(env_val VAULT_CACERT)"; VAULT_CACERT_VAL="${VAULT_CACERT_VAL:-$REPO/.enclave/ca.pem}"
 
+# A DEVELOPER GETS A PROVIDER WITHOUT KNOWING ONE EXISTS (023 FR-003a).
+#
+# `make dev-up` runs `enclave-up` only — it starts neither this surface nor the development
+# identity provider, and the Makefile keeps the surfaces separate from it on purpose. So the
+# obligation belongs here: this is the command someone runs when they intend to connect an
+# editor, and needing to also start a second process they were never told about is the same
+# "step you had to already know" that pasting a token was.
+#
+# Opt-in via DEV_IDP, so this never starts a fake provider beside a real one. Already
+# listening is success, not a conflict — `mcp-surface-conformance` starts its own and then
+# calls this script.
+if [ -n "${DEV_IDP:-}" ] || [ -n "${OIDC_ISSUER_OVERRIDE:-}" ]; then
+  DEV_IDP_PORT_VAL="${DEV_IDP_PORT:-8090}"
+  if curl -sf "http://127.0.0.1:${DEV_IDP_PORT_VAL}/jwks" >/dev/null 2>&1; then
+    ok "development provider already listening on ${DEV_IDP_PORT_VAL}"
+  else
+    OIDC_ISSUER_OVERRIDE="${OIDC_ISSUER_OVERRIDE:-http://127.0.0.1:${DEV_IDP_PORT_VAL}}"
+    (
+      cd "$REPO"
+      DEV_IDP_HOST=0.0.0.0 DEV_IDP_PORT="$DEV_IDP_PORT_VAL" \
+        DEV_IDP_ISSUER="$OIDC_ISSUER_OVERRIDE" \
+        DEV_IDP_TOKEN_MINUTES="${DEV_IDP_TOKEN_MINUTES:-480}" \
+        uv run --extra surfaces python -m tests.harness.dev_idp \
+        >/tmp/brieve-dev-idp.log 2>&1 &
+    )
+    for _ in $(seq 1 30); do
+      curl -sf "http://127.0.0.1:${DEV_IDP_PORT_VAL}/jwks" >/dev/null 2>&1 && break
+      sleep 1
+    done
+    curl -sf "http://127.0.0.1:${DEV_IDP_PORT_VAL}/jwks" >/dev/null 2>&1 \
+      || die "the development provider never answered — see /tmp/brieve-dev-idp.log"
+    ok "development provider started on ${DEV_IDP_PORT_VAL}"
+  fi
+  : "${OIDC_JWKS_URI_OVERRIDE:=http://host.docker.internal:${DEV_IDP_PORT_VAL}/jwks}"
+  export OIDC_JWKS_URI_OVERRIDE
+fi
+
 # THE LANE SUPPLIES ITS OWN ISSUER, and nothing else may.
 #
 # `mcp-surface-conformance` points the surface at the development provider it started, whose
@@ -51,13 +88,25 @@ VAULT_CACERT_VAL="$(env_val VAULT_CACERT)"; VAULT_CACERT_VAL="${VAULT_CACERT_VAL
 # than a way to weaken a deployed surface by exporting a variable.
 if [ -n "${OIDC_ISSUER_OVERRIDE:-}" ]; then
   OIDC_ISSUER="$OIDC_ISSUER_OVERRIDE"
-  OIDC_JWKS_URI="${OIDC_ISSUER_OVERRIDE}/jwks"
+  # THE KEYS ARE FETCHED FROM A DIFFERENT ADDRESS THAN THE ISSUER NAMES, and that is correct.
+  #
+  # This line used to read `OIDC_JWKS_URI="${OIDC_ISSUER_OVERRIDE}/jwks"`, deriving one from the
+  # other. `src/surfaces/mcp/served.py` keeps them apart deliberately: the issuer is a string it
+  # COMPARES against a token's `iss`, the JWKS URI a location it FETCHES. The surface never
+  # resolves the issuer at all.
+  #
+  # That distinction is what lets a browser login work. A client on the host must resolve the
+  # advertised issuer, and `host.docker.internal` does not resolve there — it is a container's
+  # name for the host. So the issuer is advertised as a loopback address the client can reach,
+  # while the keys stay on the name the container can reach. The identities match because the
+  # provider mints exactly the string the surface compares; only the addresses differ.
+  OIDC_JWKS_URI="${OIDC_JWKS_URI_OVERRIDE:-${OIDC_ISSUER_OVERRIDE}/jwks}"
   # The development provider's own audience. Empty would leave the verifier expecting
   # "harness-api" — its default — while every minted token carries this, and the surface
   # would refuse every caller with an audience mismatch that names the token.
   OIDC_AUDIENCE="harness-api"
   OIDC_TENANT_CLAIM="tenant"
-  ok "issuer overridden for a lane: ${OIDC_ISSUER}"
+  ok "issuer overridden for a lane: ${OIDC_ISSUER} (keys from ${OIDC_JWKS_URI})"
 else
   AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"
   [ -n "$AUTH0_DOMAIN" ] || die "AUTH0_DOMAIN is not in .env — this surface verifies CALLERS and will not start without an issuer"

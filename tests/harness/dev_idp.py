@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import urllib.parse
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -52,17 +53,16 @@ class _Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed.query)
 
-        if parsed.path == "/.well-known/openid-configuration":
-            self._json(
-                {
-                    "issuer": self.issuer,
-                    "authorization_endpoint": f"{self.issuer}/authorize",
-                    "token_endpoint": f"{self.issuer}/token",
-                    "jwks_uri": f"{self.issuer}/jwks",
-                    "code_challenge_methods_supported": ["S256"],
-                    "_warning": DEV_ONLY,
-                }
-            )
+        # BOTH DISCOVERY PATHS, ONE BODY. An MCP client probes
+        # `/.well-known/oauth-authorization-server` first; this server answered 404 there while
+        # serving only the OpenID Connect path, which is where an editor's discovery stopped —
+        # observed in the surface's own access log. They describe the same authorization server,
+        # so one body is served twice: two bodies could drift, one cannot.
+        if parsed.path in (
+            "/.well-known/openid-configuration",
+            "/.well-known/oauth-authorization-server",
+        ):
+            self._json(self._discovery())
         elif parsed.path == "/jwks":
             self._json(self.provider.jwks())
         elif parsed.path == "/authorize":
@@ -70,8 +70,28 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             self._json({"error": "not_found", "_warning": DEV_ONLY}, status=404)
 
+    def _discovery(self) -> dict[str, Any]:
+        """What this provider says about itself. Built once, served at both paths."""
+        return {
+            "issuer": self.issuer,
+            "authorization_endpoint": f"{self.issuer}/authorize",
+            "token_endpoint": f"{self.issuer}/token",
+            "jwks_uri": f"{self.issuer}/jwks",
+            # Without this a client holding no `client_id` has nowhere to obtain one, and its
+            # discovery ends here (RFC 7591). Its absence is why an editor could find this
+            # provider and still not begin a flow.
+            "registration_endpoint": f"{self.issuer}/register",
+            "code_challenge_methods_supported": ["S256"],
+            # STAYS. Becoming more standards-complete must not make this look deployable — it
+            # authenticates nobody, which is the entire reason it lives under `tests/`.
+            "_warning": DEV_ONLY,
+        }
+
     def do_POST(self) -> None:  # noqa: N802 - stdlib signature
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/register":
+            self._register()
+            return
         if parsed.path != "/token":
             self._json({"error": "not_found", "_warning": DEV_ONLY}, status=404)
             return
@@ -91,8 +111,47 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._json({"access_token": token, "token_type": "Bearer", "_warning": DEV_ONLY})
 
+    def _register(self) -> None:
+        """Issue a client identifier. Holds nothing.
+
+        **Stateless on purpose.** This provider authenticates nobody and has no client to tell
+        apart, so a record would buy nothing and would accumulate — editors re-register on every
+        reconnect. Registration must therefore succeed every time it is asked, and asking twice
+        must not be an error.
+
+        It must also never become an authentication step. The moment it decides *who* may
+        register, this has begun authenticating someone and is no longer the quarantined thing.
+        """
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        raw = self.rfile.read(length).decode() if length else "{}"
+        try:
+            request = json.loads(raw) if raw.strip() else {}
+        except json.JSONDecodeError:
+            self._json({"error": "invalid_client_metadata", "_warning": DEV_ONLY}, status=400)
+            return
+
+        redirect_uris = request.get("redirect_uris") or []
+        # OBSERVED, NOT YET CONSTRAINED (023 T015). No redirect from a real MCP editor has ever
+        # been measured against this provider — the one client watched never reached `/authorize`
+        # because discovery broke first. Editors commonly use `localhost` by name rather than the
+        # loopback literal, or a private scheme. A constraint written from a guess would refuse
+        # exactly the clients this exists for, so the value is recorded first and the rule comes
+        # from what arrives.
+        print(f"::dev-idp:: register redirect_uris={redirect_uris!r}", flush=True)
+        self._json(
+            {
+                "client_id": f"dev-client-{secrets.token_hex(8)}",
+                "redirect_uris": redirect_uris,
+                "token_endpoint_auth_method": "none",
+                "_warning": DEV_ONLY,
+            },
+            status=201,
+        )
+
     def _authorize(self, query: dict[str, list[str]]) -> None:
         redirect_uri = _one(query, "redirect_uri")
+        # Same reason as `_register`: measure before constraining (023 T015).
+        print(f"::dev-idp:: authorize redirect_uri={redirect_uri!r}", flush=True)
         state = _one(query, "state")
         try:
             code = self.provider.authorize(
