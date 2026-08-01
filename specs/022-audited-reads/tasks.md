@@ -120,9 +120,9 @@ find a record naming the reader.
       do not reason about it.
 - [ ] T016 [P] [US1] Record in `list_runs_for` in `src/surfaces/api/runs.py`, with
       `target_correlation_id` null (a listing has no single target) and `result_count` set.
-- [ ] T017 [P] [US1] Record in the single-run read (`get_run`) in `src/surfaces/api/runs.py`.
+- [ ] T017 [US1] Record in the single-run read (`get_run`) in `src/surfaces/api/runs.py`.
 - [ ] T018 [P] [US1] Record in `list_threads_for` in `src/surfaces/api/threads.py`.
-- [ ] T019 [P] [US1] Record in `thread_detail_for` in `src/surfaces/api/threads.py`.
+- [ ] T019 [US1] Record in `thread_detail_for` in `src/surfaces/api/threads.py`.
 - [ ] T020 [US1] (FR-002a) Write `THREAD_CREATED` in `create_thread_for` in `src/surfaces/api/threads.py`,
       to **the thread's own stream** (`record.correlation_id`) — matching where `THREAD_DELETED`
       is written, not the reader stream. This is a creation, not a read.
@@ -294,8 +294,10 @@ Phase 8 (T042–T047)
 
 ## Parallel opportunities
 
-- **T016–T019** are four independent recording sites across two files. `runs.py` (T016, T017) and
-  `threads.py` (T018, T019) can proceed in parallel with each other; within a file, sequential.
+- **T016–T019** are four recording sites across two files. **T016 and T018 are the parallel pair**
+  — different files, no dependency. T017 follows T016 in `runs.py` and T019 follows T018 in
+  `threads.py`, so neither carries `[P]`: same-file edits serialise, and marking them parallel
+  would promise a concurrency the files cannot deliver.
 - **Phase 4 and Phase 5** run in parallel once T012 lands.
 - **Phase 7** is independent of Phases 3–6 once T008 exists.
 - **T003 and T004** touch the same file and must be sequential despite being trivially separate.
