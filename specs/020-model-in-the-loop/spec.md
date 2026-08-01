@@ -44,8 +44,26 @@ It simply never consults a model.
 
 ## Clarifications
 
-*None yet — `/speckit-clarify` has not run. The questions this spec expects to face are listed
-under Open questions.*
+### Session 2026-08-01
+
+- Q: When a model names a tool the definition does not permit, what happens? → A: **Refused,
+  and offered back to the model.** The denial becomes context; the model may choose again
+  within the same step budget. **Governance is a signal, not only a wall** — and the risk that
+  buys is explicit: an agent that keeps asking must not be able to grind past its ceiling. So
+  retries are bounded, every refusal is recorded, and exhausting the bound is itself a recorded
+  terminal outcome. The rejected alternative — a denial ends the run — is simpler and would push
+  people toward over-broad ceilings to avoid brittleness, which is a worse outcome by a
+  different route.
+- Q: What stands in for the model in the merge lane? → A: **A scripted double, and a row
+  proving it faithful.** Fast and hermetic — and worthless on its own, because a double nobody
+  checks is a double that drifts. A row asserts the double and a real provider agree on the
+  same fixture. **Without that row this is the exact shape 020 exists to end**: something
+  correct, tested, and standing in for the thing that was never exercised.
+- Q: Where is the choice recorded? → A: **A new audit event type**, beside the existing tool
+  bracket. A reader must be able to tell a chosen tool from a scheduled one, and **a refused
+  choice never opens a bracket** — so a field on the bracket would leave the single most
+  important record with nowhere to live. This adds to the audit schema, which is sealed core
+  (Principle V) and needs the review that entails.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -144,6 +162,15 @@ one execution per step.
 - **FR-004**: A choice the definition does not permit MUST be refused by the existing
   enforcement, and the refusal MUST be recorded **against the choice** — distinguishable from a
   tool the platform never offered.
+- **FR-004a**: A refused choice MUST be returned to the model as context, and the model MAY
+  choose again within the same step.
+- **FR-004b**: Re-choosing after a refusal MUST be **bounded**, and exhausting the bound MUST
+  end the run in a recorded terminal state. Unbounded re-choice is an agent grinding against
+  its ceiling until something gives; the bound is what keeps governance-as-a-signal from
+  becoming governance-as-a-suggestion.
+- **FR-004c**: Every refused choice MUST be recorded, not only the last one. A run that was
+  denied four times and permitted on the fifth is a different event from one permitted
+  immediately, and a trail showing only the success would describe the wrong run.
 - **FR-005**: The model used MUST be the one the definition's binding map names, validated
   against the qualified matrix before any provider call.
 - **FR-006**: An unqualified or unbound model MUST refuse the run before any provider call.
@@ -151,13 +178,22 @@ one execution per step.
   fall back to any non-model selection.
 - **FR-008**: Resuming a run MUST re-observe prior steps and MUST NOT re-issue their provider
   calls.
-- **FR-009**: The trail MUST record, per step, that a model chose and what it chose — enough
-  that a reader can tell a chosen tool from a scheduled one.
+- **FR-009**: The trail MUST record, per step, that a model chose and what it chose, as a
+  **distinct audit event type** — enough that a reader can tell a chosen tool from a scheduled
+  one, and giving a refused choice somewhere to live even though no tool ran and no bracket
+  opened.
+- **FR-009a**: Adding that event type touches the audit schema, which Principle V names sealed
+  core. It requires the approved spec and security-maintainer review Principle V demands, and
+  the plan MUST record that rather than treating the addition as routine.
 - **FR-010**: Conformance rows MUST run against a **dispatched run**, not a constructed agent.
   The adapter's governance is already asserted; what is unasserted is that a real run consults
   a model and the choice is governed.
 - **FR-011**: Model calls in the merge lane MUST NOT depend on a live provider. A gate that
   cannot run without a vendor is a gate that stops running.
+- **FR-011a**: The lane's model double MUST be asserted **faithful** — a row comparing the
+  double and a real provider against the same fixture. A double nobody checks drifts silently,
+  and the platform would then be asserting governance around a stand-in for the decision this
+  feature exists to make real.
 - **FR-012**: At least one demonstration MUST use a **real** provider, recorded with its
   output, because a scripted model proves the wiring and not the claim.
 
@@ -173,6 +209,9 @@ one execution per step.
 - **SC-002**: 0 production paths select a tool arithmetically.
 - **SC-003**: A choice outside the definition's permitted set is refused in 100% of cases, by
   the existing enforcement rather than by new logic.
+- **SC-003a**: A run that exhausts its re-choice bound ends terminally in 100% of cases — 0
+  runs continue past a ceiling by repetition.
+- **SC-003b**: Every refused choice appears in the trail, not only the last before success.
 - **SC-004**: Two definitions bound to different models produce runs evidenced as using
   different models.
 - **SC-005**: A model-driven run killed mid-flight resumes and completes with exactly one
@@ -189,15 +228,6 @@ one execution per step.
   (Principle VIII), not a governance one. This asserts the choice is governed, not good.
 - **Streaming or partial results.**
 - **Model promotion.** The matrix and its eval gates exist; this consumes them.
-
-## Open questions for `/speckit-clarify`
-
-1. **What stands in for the model in the merge lane** — a scripted double, a recorded
-   transcript, or a local model — and how a row proves the double is faithful.
-2. **Whether a refused choice ends the run or is offered back to the model**, which is the
-   difference between governance as a wall and governance as a signal.
-3. **Where the choice is recorded**: a new audit event type, or a field on the existing tool
-   bracket.
 
 ## Assumptions
 

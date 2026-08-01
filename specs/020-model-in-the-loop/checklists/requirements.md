@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic
@@ -31,15 +31,20 @@
 
 ## Notes
 
-**One item is deliberately unchecked.** There are no `[NEEDS CLARIFICATION]` markers inline,
-but three real questions are listed under *Open questions* instead — because each is a decision
-with more than one defensible answer, and burying them as markers inside requirements would
-make them look like gaps in the writing rather than decisions owed.
+**All 16 pass after clarification.** The three open questions were answered rather than
+deferred, and two of them added requirements the spec did not have.
 
-The sharpest is the second: **whether a refused choice ends the run or is offered back to the
-model.** That is the difference between governance as a wall and governance as a signal, and it
-changes what the trail must record, what a model can learn from a denial, and whether a run can
-be talked past its own ceiling by an agent that keeps asking. It is not a detail.
+**The sharpest answer created the sharpest new risk, deliberately.** A refused choice is offered
+back to the model — governance as a signal — which means an agent can choose again. FR-004b
+bounds that and makes exhausting the bound terminal, because without it governance becomes a
+suggestion an agent grinds against. FR-004c requires every refusal be recorded, not just the
+last: a run denied four times and permitted on the fifth is a different event from one permitted
+immediately, and a trail showing only the success would describe the wrong run.
+
+**FR-009a is the one to watch in planning.** A new audit event type touches the audit schema,
+which Principle V names sealed core — the same principle 019's plan nearly tripped over by
+claiming the core was untouched. Here it genuinely is touched, so it needs the review Principle V
+demands rather than a verdict asserting otherwise.
 
 **What this spec is careful not to claim.** Everything downstream of the choice already works
 and is asserted. This feature does not make governance better; it gives governance a real
