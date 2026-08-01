@@ -122,6 +122,12 @@ conformance:
 	# this recipe collects the tree — which is what makes `make conformance-hermetic` pass
 	# with no provider and no enclave (FR-011, SC-006).
 	@bash infra/bin/choice-conformance
+	#
+	# 021's reports lane. Its own runner because `tests/conformance/reports` holds BOTH
+	# hermetic and dispatched rows: naming the path on the host_enclave line above would
+	# collect the hermetic ones twice, and a marker mismatch would deselect exactly the
+	# dispatched ones — which is the failure 010, 014 and 018 each paid for.
+	@bash infra/bin/reports-conformance
 
 # The accessibility gate (012, FR-020a). Its own target because it is its own DISCIPLINE:
 # every other gate here asserts something about a process, and this one asserts something

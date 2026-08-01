@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# 021's lane — the rows where a RUN observes its own effects.
+#
+# Most of this feature is hermetic and needs no lane at all: the compiler takes records and
+# returns a report, so the rows that matter most are collected by the recipe's first line. What
+# needs the enclave is the other half of the Principle IV redesign — that the ALLOCATION performs
+# the read-back, under the attested identity it already holds — and that cannot be shown without
+# an allocation.
+#
+# Its own runner rather than another directory on the host_enclave pytest line, because
+# `tests/conformance/reports/` holds BOTH kinds. Naming the path there would collect the hermetic
+# rows twice and, worse, a marker mismatch would deselect exactly the dispatched ones — the shape
+# 010, 014 and 018 each paid for and `test_every_conformance_directory_is_run.py` exists to catch.
+
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+JOB_ID="agent-run"
+
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+ok() { printf '    \033[32mok\033[0m %s\n' "$*"; }
+die() {
+  printf '\033[31mthe reports lane could not run:\033[0m %s\n' "$*" >&2
+  exit 1
+}
+
+say "The enclave"
+command -v nomad >/dev/null 2>&1 || die "nomad is not on PATH — run \`make dev-up\`"
+status="$(nomad job status "$JOB_ID" 2>&1 || true)"
+case "$status" in
+*"No job(s) with prefix"* | "")
+  die "the parameterized job ${JOB_ID} is not registered — run \`make dev-up\`. Not skippable: a row that never dispatched has proven nothing about a run observing its own effects"
+  ;;
+esac
+ok "${JOB_ID} is registered"
+
+A="$(grep '^VAULT_ADDR=' "$REPO/.env" 2>/dev/null | cut -d= -f2- | tr -d '"')"
+C="$(grep '^VAULT_CACERT=' "$REPO/.env" 2>/dev/null | cut -d= -f2- | tr -d '"')"
+T="$(grep '^VAULT_ROOT_TOKEN=' "$REPO/.env" 2>/dev/null | cut -d= -f2- | tr -d '"')"
+[ -n "$A" ] && [ -n "$T" ] || die "no VAULT_ADDR/VAULT_ROOT_TOKEN in .env — run \`make dev-up\`"
+
+say "Rows against a run that observes"
+cd "$REPO"
+VAULT_ADDR="$A" VAULT_CACERT="$C" VAULT_TOKEN="$T" \
+  uv run --extra surfaces --extra adapters pytest tests/conformance/reports -m host_enclave -q \
+  || die "the lane failed — the rows' output is above"
+ok "reports lane passed"

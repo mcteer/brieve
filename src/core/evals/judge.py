@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Protocol
 
-from core.evals.suites import SUITES, UnrunnableSuite
+from core.evals.suites import MEASURED_SUITES, SUITES, UnrunnableSuite
 
 #: The floor (ADR-0052). Mechanical, so "representative" is checkable at its edges.
 MINIMUM_SEED_CASES: Final[int] = 20
@@ -96,7 +96,18 @@ def _assert_floor(cases: tuple[SeedCase, ...]) -> None:
             f"(ADR-0052); the root of the judge chain cannot be thinner than its record says"
         )
     suites_present = {case.suite for case in cases}
-    missing = set(SUITES) - suites_present
+    # MEASURED SUITES ARE EXCLUDED, and 021 is why.
+    #
+    # A seed set qualifies a JUDGE — a model scoring another model's response. `report_fidelity`
+    # is not judged: it scores a compiled report against labelled material events by precision
+    # and recall, deterministically, with no model in the loop at all. That is the whole point of
+    # ADR-0018.
+    #
+    # So requiring seeds for it would qualify a judge on verdicts it will never render, and the
+    # only way to satisfy the requirement would be to write seed cases nothing reads — a floor
+    # met with material that exists solely to meet it, which is the shape ADR-0052's floor exists
+    # to prevent.
+    missing = set(SUITES) - MEASURED_SUITES - suites_present
     if missing:
         raise UnrunnableSuite(
             f"seed set spans no cases for {sorted(missing)}; a judge qualified without them "

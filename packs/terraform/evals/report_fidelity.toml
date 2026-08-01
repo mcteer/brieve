@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+# terraform pack — report_fidelity suite.
+#
+# The same discipline as the vault pack's file, over the shapes an adopted pack produces. See
+# that file's header for why the cases are the hard ones and not the clean ones.
+
+[[cases]]
+id = "terraform-report-fidelity-001"
+suite = "report_fidelity"
+prompt = "clean_run"
+events = ["vault_write"]
+
+[[cases]]
+id = "terraform-report-fidelity-002"
+suite = "report_fidelity"
+prompt = "run_with_a_denial"
+# A refusal must appear whichever pack the run used. The compiler is pack-agnostic — it reads
+# records — and this case exists so that stays true rather than being true by accident.
+events = ["apply", "authority"]
+
+[[cases]]
+id = "terraform-report-fidelity-003"
+suite = "report_fidelity"
+prompt = "contradicted_effect"
+events = ["vault_write"]
+
+[[cases]]
+id = "terraform-report-fidelity-004"
+suite = "report_fidelity"
+prompt = "unrecognised_record"
+events = ["turn_recorded"]
+
+[[cases]]
+id = "terraform-report-fidelity-005"
+suite = "report_fidelity"
+prompt = "model_chose_nothing"
+# 020's terminal outcome. A model that named no tool ended the run deliberately, and a report
+# that omitted the choice would show a run which simply stopped.
+events = ["(nothing)"]
+
+[[cases]]
+id = "terraform-report-fidelity-006"
+suite = "report_fidelity"
+prompt = "killed_before_terminal"
+# A run that never got to observe. Its effect claim must say nobody asked, which is a different
+# fact from a product that could not be reached.
+events = ["vault_write"]

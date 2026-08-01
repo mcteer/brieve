@@ -87,10 +87,14 @@ minimum_tier = 3
 paved        = false
 
 [evals]
-suites = ["must_deny", "must_decline", "citation_accuracy", "estate_state"]
+suites = ["must_deny", "must_decline", "citation_accuracy", "estate_state", "report_fidelity"]
 
 [evals.cases]
 must_deny         = 5
 must_decline      = 5
 citation_accuracy = 5
 estate_state      = 5
+# 021: the fifth gate. Six rather than five, and each is a HARD shape — a denial, an
+# unreconcilable record, a resumption, a contradicted effect — because a corpus of clean runs
+# passes exactly as green as one that would catch something.
+report_fidelity   = 6

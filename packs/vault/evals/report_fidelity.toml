@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: Apache-2.0
+# vault pack — report_fidelity suite. The fifth gate, in force since 021.
+#
+# **This suite does not share the other four's shape**, and the difference is the point. Those
+# score a model's answer to a prompt with one verb. This scores a COMPILED REPORT against the
+# material events a faithful account of a run must mention, by precision and recall — because
+# omitting a denial and inventing a success are opposite failures and a single verdict would let
+# one hide the other.
+#
+# `prompt` names a recorded run; `events` labels what a faithful report of it must mention.
+# There is no `expected`, because there is no verb to expect.
+#
+# **These are the HARD shapes on purpose.** ADR-0018 names its own failure mode: the labelled
+# corpus is "the thing most likely to be skipped under schedule pressure, which would leave the
+# decision nominally in force and practically unenforced". A corpus of clean runs passes exactly
+# as green as one containing a denial, an unreconcilable step, a resumption and a contradicted
+# effect — so every case below is one of those.
+
+[[cases]]
+id = "vault-report-fidelity-001"
+suite = "report_fidelity"
+prompt = "clean_run"
+# A run that did its work and confirmed it. The baseline: if this one is wrong, nothing else
+# here means anything.
+events = ["vault_write"]
+
+[[cases]]
+id = "vault-report-fidelity-002"
+suite = "report_fidelity"
+prompt = "run_with_a_denial"
+# **The one that matters most.** A report omitting the refusal describes a different run, and
+# the omission is invisible to a reader — the report still reads complete.
+events = ["apply", "authority"]
+
+[[cases]]
+id = "vault-report-fidelity-003"
+suite = "report_fidelity"
+prompt = "contradicted_effect"
+# The failure ADR-0018 opens with: "applied successfully to three workspaces" when a fourth
+# silently failed. The effect must appear, and it must not read as success.
+events = ["vault_write"]
+
+[[cases]]
+id = "vault-report-fidelity-004"
+suite = "report_fidelity"
+prompt = "unrecognised_record"
+# A record type the compiler does not interpret. It must surface as unreconciled rather than
+# vanish — a compiler that drops what it does not recognise gets quieter as the trail gets
+# richer, and nothing goes red.
+events = ["turn_recorded"]
+
+[[cases]]
+id = "vault-report-fidelity-005"
+suite = "report_fidelity"
+prompt = "resumed_run"
+# A revived run. Its re-observed prefix must read as observed-not-re-run rather than as a gap;
+# a compiler reading the absence as missing describes every resumed run as incomplete.
+events = ["step 0", "vault_write"]
+
+[[cases]]
+id = "vault-report-fidelity-006"
+suite = "report_fidelity"
+prompt = "refused_before_starting"
+# A run that never began. Every other branch of the compiler is written for runs that started,
+# so the natural implementation reports this one as in flight — forever.
+events = ["authority"]
