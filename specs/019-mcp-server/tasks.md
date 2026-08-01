@@ -19,7 +19,7 @@
 | --- | --- | --- |
 | **Fail-closed** | **Yes** — identity and refusal paths | T009, T021, T027 |
 | **Conformance** | **Yes** — a transport surface | Phases 3–6 entirely |
-| **Correlation / evidence** | **Yes** — operations join a run's trail | T028, T030 |
+| **Correlation / evidence** | **Yes** — operations join a run's trail | **T028a** |
 | **No-secret-leak** | **Yes** — the server handles bearer credentials | T031 |
 | **Eval** | **No** | Promotes no pack, model, or policy. Principle VIII is N/A, as recorded in the plan's Constitution Check. |
 
@@ -55,7 +55,7 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 - [ ] T008 Implement the assembly in `served.py` — construct `McpTransport` with the **real** collaborators the API constructs, no in-memory or test doubles (FR-002). Mirror `src/surfaces/api/service.py`'s `build()`; it is the only other assembly of this kind in the tree.
 - [ ] T009 [GATE:fail-closed] In `src/surfaces/mcp/served.py`, make the process **refuse to start** when it cannot obtain what it needs, naming the missing thing (FR-003). A surface that starts degraded and accepts connections while unable to record evidence is worse than one plainly down.
 - [ ] T010 Add `infra/jobs/mcp-surface.nomad.hcl` — **bridge mode with a mapped port**, copying `postgres.nomad.hcl`'s shape rather than the API's host-mode jobspec. Born reachable; see [research.md](./research.md) F1.
-- [ ] T011 Add `infra/bin/mcp-surface-up`, and have it read Vault's coordinates through the script's own `.env` reader with `enclave-up`'s defaults as fallbacks. `enclave-up` writes `VAULT_ROOT_TOKEN` to `.env` but only *exports* the address and CA path — reading all three from `.env` works locally and fails in CI, which is a defect that shipped in `portal-up` and was caught only by running it against a deliberately minimal `.env`.
+- [ ] T011 Add `infra/bin/mcp-surface-up` **and the `mcp-surface-up` target in `Makefile` that invokes it** — [quickstart.md](./quickstart.md) documents `make mcp-surface-up` as step 1, and FR-015 requires someone connect by following those instructions without reading source, so a script with no target makes step 1 fail. Have it read Vault's coordinates through the script's own `.env` reader with `enclave-up`'s defaults as fallbacks. `enclave-up` writes `VAULT_ROOT_TOKEN` to `.env` but only *exports* the address and CA path — reading all three from `.env` works locally and fails in CI, which is a defect that shipped in `portal-up` and was caught only by running it against a deliberately minimal `.env`.
 - [ ] T012 Declare `mcp-surface` a deployment subject via the `meta` block in `infra/jobs/mcp-surface.nomad.hcl` — `harness_surface`, `harness_shape`, `harness_covered_by` — which is what `tests/conformance/deployment/surfaces.py` enumerates, so it is a declared surface rather than an unenrolled one (017's rule: coverage a process opts into is fail-open).
 
 ---
@@ -105,6 +105,10 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 - [ ] T026 [US3] Bind exactly one subject per session, fixed at the handshake, in `served.py` (FR-013a). The subject comes from the session and **never from the request** — a client-supplied subject is an impersonation surface.
 - [ ] T027 [GATE:fail-closed] [US3] Refuse an operation whose credential is no longer valid, **without changing or clearing the session's subject** (FR-013). See the state diagram in [data-model.md](./data-model.md): both arrows leave ESTABLISHED and the subject never moves on either. The misreading this guards — *verified at the handshake* rather than *fixed at the handshake* — produces a session that outlives its credential.
 - [ ] T028 [US3] Add `test_the_trail_names_the_caller` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-009, FR-010, SC-003).
+- [ ] T028a [GATE:correlation] [US3] Add `test_a_correlation_id_propagates` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` — a correlation ID supplied by the client reaches the trail, and the audit join is walkable from it.
+
+  **The gate table claimed this was covered by T028 and T030, and it was not.** Both are identity assertions; neither touches correlation. `start_run` accepts a `correlation_id`, so the gate genuinely applies rather than being boilerplate. Found by analysis pass 3 — **a gate table that certifies itself is the exact shape this feature exists to eliminate**, and it survived two passes because nominal FR coverage cannot see it.
+
 - [ ] T029 [US3] Add `test_two_callers_are_distinguishable` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-011, SC-004). **Not "a subject was recorded"** — that passes perfectly against a shared account, which is the defect this row exists to catch. Two callers, two records, neither the server's.
 - [ ] T030 [P] [US3] Add `test_a_lapsed_credential_stops_authorizing` and `test_a_session_binds_to_one_subject` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-013, FR-013a).
 - [ ] T031 [GATE:no-secret-leak] [US3] Assert in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` that no bearer credential appears in logs, audit entries, or error messages. The server now handles caller tokens, which nothing on this surface did before.
@@ -128,7 +132,11 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T036 Rename the `mcp` job in `infra/jobs/mcp.nomad.hcl` to describe what it actually runs — the supervisory loop — now that a second job serves the surface it is named for. **A deployment change, not a rename**: a running job under the old name must be stopped, and the deployment lane's subject list follows.
+- [ ] T036 **Do not rename the `mcp` job.** Record in `infra/jobs/mcp.nomad.hcl` that it runs the supervisory loop rather than the surface it is named for, and enumerate what a future rename must update.
+
+  **An earlier draft of this task renamed it**, describing the cost as stopping a running job and updating the deployment lane's subject list. Analysis pass 3 found the actual blast radius: `infra/modules/trust-fabric/variables.tf` defaults the bound job name to `mcp` and `auth.tf` defines `vault_jwt_auth_backend_role "mcp"`, so **the allocation's workload identity binds on that name** — renaming without re-binding leaves the supervisory loop unable to authenticate, which is the defect shape the API already paid for once. `tests/conformance/durability/test_dispatched_suspension_cycle.py` also hardcodes `nomad job status mcp`.
+
+  A task whose stated cost is "stop the old job" and whose real cost includes re-binding a Vault auth role is worse than one that is missing, because it reads as safe. If the name is worth changing it deserves its own change with these bindings enumerated — not a line in a Polish phase.
 - [ ] T037 [P] Add `test_the_contract_states_what_this_gate_does_not_assert` in `tests/conformance/mcp_served/test_it_is_reachable.py` (FR-018) — checked rather than trusted, because a later edit could remove the statement and let a green row imply more than it asserts.
 - [ ] T038 Update `specs/019-mcp-server/contracts/conformance.md` — replace the provisional row table with the rows as shipped, and record the SC-007 counts against T002's baseline.
 - [ ] T039 [P] Close ROADMAP gap 0f in `ROADMAP.md`, and update the surface-parity row: parity now binds between two **served** surfaces rather than between one service and one class.
@@ -163,7 +171,7 @@ Phase 7 (Polish)
 - **Within Phase 2**: T004 and T005/T006 are independent (code versus measurement).
 - **Within US1**: T016 and T017 are different assertions in one module, written in parallel once T013–T015 land. T018a is independent of both.
 - **Within US2**: T022 and T024 alongside T023.
-- **Within US3**: T030, T032, T032a and T032b alongside T028–T029.
+- **Within US3**: T028a, T030, T032, T032a and T032b alongside T028–T029.
 - **Phase 7**: T037 and T039 are independent of everything else remaining.
 
 ---

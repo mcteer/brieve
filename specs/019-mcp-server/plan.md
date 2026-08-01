@@ -167,9 +167,19 @@ something serves it.
 
 ## Two things carried into tasks
 
-**The `mcp` job's name describes a surface it does not serve.** With a second job arriving, two
-honest names are needed. Renaming a running job is a deployment change and not a rename — it
-belongs in tasks with that cost visible, not smuggled in as tidying.
+**The `mcp` job's name describes a surface it does not serve, and it keeps that name anyway.**
+With a second job arriving, two honest names would be better. They are not worth what they
+cost: `infra/modules/trust-fabric/variables.tf` defaults the bound job name to `mcp` and
+`auth.tf` defines `vault_jwt_auth_backend_role "mcp"`, so **the allocation's workload identity
+binds on that name** — renaming without re-binding leaves the supervisory loop unable to
+authenticate, which is a defect shape the API has already paid for once. A durability row
+hardcodes `nomad job status mcp` as well.
+
+An earlier draft of this plan carried the rename into tasks with its cost stated as "a
+deployment change, not a rename." That understated it, and a task whose stated cost is
+stopping a job while its real cost includes re-binding a Vault auth role is worse than one
+that is missing, because it reads as safe. **T036 now records the bindings instead**, so a
+future rename starts from a list rather than from a surprise. Found by analysis pass 3.
 
 **A new conformance directory must be named by a lane that selects its markers.** 018 shipped
 rows no lane collected while its contract asserted otherwise. That is now caught automatically

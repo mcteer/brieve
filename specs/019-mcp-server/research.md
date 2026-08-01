@@ -133,9 +133,11 @@ unhandled exception in either half can end the process, and "we will catch every
 promise FR-015a exists because nobody can keep); supervising and restarting in-process
 (rejected — more machinery than separation, and it fails in the way it is meant to prevent).
 
-**Consequence to carry into tasks**: the `mcp` job's name currently describes a surface it
-does not serve. Two jobs need two honest names, and renaming a running job is a deployment
-change, not a rename.
+**Consequence to carry into tasks**: the `mcp` job's name currently describes a surface it does
+not serve — and it keeps that name. The workload identity binds on it (`variables.tf` defaults
+the bound job name to `mcp`; `auth.tf` defines the matching JWT role), so renaming without
+re-binding leaves the supervisory loop unable to authenticate. T036 records the bindings a
+future rename must update rather than performing one here.
 
 ---
 

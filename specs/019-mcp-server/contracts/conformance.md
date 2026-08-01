@@ -26,8 +26,12 @@ both shapes of that, so this is a reminder rather than a risk.
 
 ## The rows
 
-Named provisionally; `/speckit-tasks` fixes them and this table is what a reviewer holds the
-change against.
+**Provisional, and knowingly stale.** `/speckit-tasks` has since run and three analysis passes
+have added rows this table does not list — the correlation row, the session-isolation row, the
+disconnect row, and the row that stops a later fixture from satisfying FR-016. **T038 replaces
+this table with the rows as shipped**, and that is when it becomes what a reviewer holds the
+change against. Until then it is a sketch, and is labelled as one rather than left to look
+authoritative.
 
 | Row | Asserts | Requirement |
 | --- | --- | --- |
