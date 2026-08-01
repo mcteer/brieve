@@ -190,3 +190,13 @@ markers = [
 # untyped surface stops at the module boundary rather than leaking into core.
 module = ["pg8000.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# PyYAML ships no stubs, and `types-PyYAML` is not worth a dependency for one test.
+#
+# `yaml` arrives transitively (pre-commit, the terraform tooling) and is read by exactly one
+# module: `tests/unit/test_workflow_files_are_valid.py`, which parses `.github/workflows/*`
+# to prove GitHub will accept them. It reaches no production code and no run path — the
+# platform's own config is TOML and HCL — so the untyped surface stops at that one file.
+module = ["yaml.*"]
+ignore_missing_imports = true
