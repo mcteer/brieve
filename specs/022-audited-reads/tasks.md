@@ -224,6 +224,11 @@ lying about what it records.
       record nothing, pinned deliberately so a later widening is a visible decision rather than a
       drift nobody notices. **Do not delete this row for looking like dead weight; that is what it
       is for.**
+- [ ] T036a [US3] Correct the stale count in `tests/component/test_operations_audited.py`'s
+      docstring — it says *eleven operations have been added since 008* and *"if a twelfth lands"*;
+      the real count is thirteen. The **list** in that file is test-enforced and stayed right; the
+      **prose count** beside it is not and drifted two behind. Prefer deriving the number from
+      `len(NEW_OPERATIONS)` in the message over restating it, so it cannot drift again.
 - [ ] T036 [US3] Rename or re-docstring `tests/component/test_operations_audited.py` so it stops
       implying coverage it never had. It asserts unauthenticated refusal and always did; leaving a
       file named for this feature's check, beside this feature, is how the next reader concludes
@@ -292,7 +297,7 @@ Phase 2 (T003–T012)  ← blocks everything; vocabulary + seam + classification
    ↓
    ├── Phase 3 US1 (T013–T029, incl. T020a/T020b/T023a/T023b)  ← the seven record
    ├── Phase 4 US2 (T030–T033)  ← needs T011–T012 only, NOT Phase 3
-   └── Phase 5 US3 (T034–T036, incl. T034a)  ← needs T011–T012 only
+   └── Phase 5 US3 (T034–T036, incl. T034a/T036a)  ← needs T011–T012 only
    ↓
 Phase 6 (T037–T039)  ← the ADR; must land in the same PR
 Phase 7 (T040–T041)  ← independent of everything; needs T008
@@ -336,7 +341,7 @@ understood.
 
 ## Notes
 
-**53 tasks**, after analysis added six. The largest phase is US1 at 21, and 10 of those are rows rather than
+**54 tasks**, after analysis added seven. The largest phase is US1 at 21, and 10 of those are rows rather than
 implementation — which is the right ratio for a feature whose entire subject is that a green suite
 proved nothing.
 

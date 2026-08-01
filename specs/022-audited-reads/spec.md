@@ -96,8 +96,11 @@ The trail can show a thread ended and what was said in it, and cannot show it ev
 `tests/component/test_operations_audited.py` asserts that every operation refuses an
 unauthenticated caller and that the refusal vocabulary distinguishes what the caller cannot. It
 never asserts that any operation writes an entry. It is a good file doing a different job under a
-name that reads like this one — which is why eleven operations were added since 008 under a guard
-that was watching something else.
+name that reads like this one — which is why **thirteen** operations were added since 008 under a
+guard that was watching something else. (That file's own docstring says *eleven*, and *"if a
+twelfth lands"*. Its **list** is test-enforced — `listed == shipped - original` — while its **prose
+count** is not, so the count drifted two behind while the list stayed correct. An earlier draft of
+this spec repeated the stale number as fact.)
 
 ## User Scenarios & Testing *(mandatory)*
 

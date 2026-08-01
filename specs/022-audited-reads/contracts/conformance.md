@@ -136,7 +136,8 @@ this feature, because a suite that grows without answering that question grows w
 
 **The claim-versus-behavior row (SC-003).** It compares the surfaces' governance sentence against
 measured dispositions. On the pre-022 codebase the sentence claimed every operation was recorded
-and eight were not, so it fails immediately. Nothing else in the existing 847-test suite compares
+and nine were not, so it fails immediately. Nothing else in the existing 857-test suite (collected
+2026-08-01) compares
 what the platform *says* to what it *does* — including
 `tests/component/test_operations_audited.py`, whose name promises exactly that and whose rows
 assert unauthenticated refusal instead.
