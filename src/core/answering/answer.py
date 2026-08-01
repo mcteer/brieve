@@ -121,8 +121,42 @@ def answer_question(*, question: str, corpus: Corpus, provider: AnswerProvider) 
     )
 
 
+class RecordedProvider:
+    """Replays a case's recorded model output **into the product path**.
+
+    **This is what moves a recording from the scorer to the provider**, and it is the whole of
+    024's Phase 5. `FixtureScorer` returned `case.recorded` as the answer, so nothing the product
+    does — resolving citations, dropping unsupported claims, deciding to decline — ever ran. Here
+    the recording is what the *model* said, and the path then does its work over it.
+
+    So the suite still scores deterministically with no vendor, and what it scores is the product's
+    output rather than the fixture's.
+    """
+
+    def __init__(self, recorded: str) -> None:
+        self._recorded = recorded
+
+    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+        import re as _re
+
+        urls = _re.findall(
+            r"https://developer\.hashicorp\.com(/[\w\-/]+)#([\w\-]+)", self._recorded
+        )
+        if not urls:
+            # A model that cited nothing. The path will decline, which is correct and is what
+            # `must_decline` exists to observe.
+            return [{"statement": self._recorded.strip(), "citations": []}]
+        return [
+            {
+                "statement": self._recorded.strip(),
+                "citations": [{"path": path, "anchor": anchor} for path, anchor in urls],
+            }
+        ]
+
+
 __all__ = [
     "ANSWERED",
+    "RecordedProvider",
     "DECLINED",
     "Answer",
     "AnswerProvider",
