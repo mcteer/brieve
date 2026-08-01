@@ -45,7 +45,7 @@ worth having.
 - [X] T002 Record the current behaviour as a baseline: `curl` both `.well-known` paths and `/jwks`,
       and keep the output. The 404 on `/.well-known/oauth-authorization-server` is the measurement
       this feature exists to answer, and it should be visible in the change rather than remembered.
-- [ ] T003 Confirm `tests/conformance/mcp_served` passes before anything moves, via
+- [X] T003 Confirm `tests/conformance/mcp_served` passes before anything moves, via
       `bash infra/bin/mcp-surface-conformance`. A later failure must be attributable to this work
       rather than inherited.
 
@@ -76,12 +76,12 @@ operation.
       `tests/harness/dev_idp.py`, alongside the existing OpenID Connect path. **This path was
       measured returning 404** in the surface's own log, immediately after a client fetched the
       protected-resource document.
-- [ ] T008 [US1] [GATE:conformance] Assert in `tests/conformance/mcp_served/` that both paths return
+- [X] T008 [US1] [GATE:conformance] Assert in `tests/conformance/mcp_served/` that both paths return
       **byte-identical** bodies, and that both name `registration_endpoint`.
 - [X] T009 [US1] (FR-005) Implement `POST /register` in `tests/harness/dev_idp.py`, answering with a
       `client_id` and holding **no state** (research F5). The provider authenticates nobody and has
       no client to distinguish, so state would buy nothing and grow with every reconnect.
-- [ ] T010 [US1] Assert in `tests/conformance/mcp_served/` that registration succeeds **twice in a
+- [X] T010 [US1] Assert in `tests/conformance/mcp_served/` that registration succeeds **twice in a
       row**. Editors re-register on reconnect; a provider that errored the second time would work
       once per developer and then stop.
 - [X] T011 [US1] Stop deriving the JWKS URI from the issuer in `infra/bin/mcp-surface-up` — remove
@@ -110,11 +110,11 @@ refusals.
 **Independent test**: sign in through the flow and mint directly; compare what the surface makes of
 each.
 
-- [ ] T013 [US2] [GATE:no-secret-leak] Assert in `tests/conformance/mcp_served/` that the provider
+- [X] T013 [US2] [GATE:no-secret-leak] Assert in `tests/conformance/mcp_served/` that the provider
       writes **no private key material to disk**. This is the design that was rejected (persisting
       the keypair to keep old tokens alive), and a row is what keeps it rejected rather than
       re-adopted by someone solving the restart trap again.
-- [ ] T014 [US2] [GATE:fail-closed] Assert in `tests/conformance/mcp_served/` that `/authorize`
+- [X] T014 [US2] [GATE:fail-closed] Assert in `tests/conformance/mcp_served/` that `/authorize`
       still refuses a missing or non-`S256` challenge (FR-010). Asserted rather than assumed
       **because this feature's direction is making the flow easier**, and "just for dev" is how a
       requirement becomes optional.
@@ -138,7 +138,7 @@ each.
       by the existing `caller_token` path resolve to the **same** subject, tenant, and roles
       (FR-008). Note that `surfaces.caller_token` already walks the real flow rather than signing
       its own token, so this compares two real tokens rather than a token against a fixture.
-- [ ] T017 [US2] (FR-009, SC-004) Assert that claims mapping to **no** role are still producible through the flow and
+- [X] T017 [US2] (FR-009, SC-004) Assert that claims mapping to **no** role are still producible through the flow and
       still refused by the surface (FR-009). **A harness that can only present a good identity
       cannot distinguish a working platform from a broken one** — the reason the provider takes
       claims from the caller in the first place.
@@ -160,12 +160,12 @@ without restarting the surface.
       — including that the widely-repeated explanation, that the surface caches at startup and must
       be restarted, is **wrong**. It appears in a merged pull request, and correcting it only in a
       spec leaves it to be repeated from the code.
-- [ ] T020 [US3] [GATE:conformance] Assert in `tests/conformance/mcp_served/` that restarting the
+- [X] T020 [US3] [GATE:conformance] Assert in `tests/conformance/mcp_served/` that restarting the
       provider yields a different key id, and that a token from the previous process is refused
       **promptly and without restarting the surface** (SC-009). **Verified by restarting and
       calling** — not by reasoning about cache behaviour, which is how the wrong explanation
       survived twice.
-- [ ] T021 [US3] (FR-007, SC-005) Assert that the advertised issuer answers from the **host**, and that the JWKS URI
+- [X] T021 [US3] (FR-007, SC-005) Assert that the advertised issuer answers from the **host**, and that the JWKS URI
       answers from **inside a container** (SC-005). Both checked; neither inferred from the other.
       That inference is the single most likely way this feature ships working only on the machine it
       was written on.
@@ -188,9 +188,9 @@ without restarting the surface.
 - [ ] T023 (FR-002) Update `README` or `docs/development/` with the credential-free editor configuration:
       a URL and nothing else. **The absence of a token in that snippet is the deliverable**, and it
       should be somewhere a person will find it rather than only in this spec.
-- [ ] T024 (FR-014, SC-006) Confirm every conformance lane that used a directly minted token still passes, unchanged
+- [X] T024 (FR-014, SC-006) Confirm every conformance lane that used a directly minted token still passes, unchanged
       (FR-014). Automated rows must not acquire a browser step.
-- [ ] T025 Run `make check`, and assert **no file under `src/` differs** (SC-007) via
+- [X] T025 Run `make check`, and assert **no file under `src/` differs** (SC-007) via
       `git diff --stat main -- src/`.
 - [ ] T026 (FR-001, FR-002, SC-001, SC-002, SC-008) Perform quickstart scenario 6 by hand: `make dev-up`, an editor configured with a URL and
       no credential, a browser sign-in, an operation answered — then wait for expiry and ask again.

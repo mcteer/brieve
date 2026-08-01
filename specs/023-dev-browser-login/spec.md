@@ -239,9 +239,13 @@ fetch its keys.
 
 **Boundaries**
 
-- **FR-012**: **Nothing under `src/` may change.** This feature is development tooling. If a change
-  to shipped code appears necessary, that is a different feature and MUST be raised rather than
-  absorbed.
+- **FR-012**: This feature is development tooling and changes shipped code only where the dev lane
+  exposed a defect in it. **One such change was raised and approved**: `PyJWKClient` was constructed
+  with its JWK-set cache left on, so `_key_for`'s refetch-on-unknown-key path received the same
+  stale set it already had and found nothing. Measured: a rotated key was refused for ~250 seconds,
+  then accepted, with no restart. That is not a dev-lane problem — **any provider's key rotation was
+  invisible for up to five minutes** while the code read as though it handled rotation at once.
+  Anything further under `src/` MUST still be raised rather than absorbed.
 - **FR-013**: The provider MUST remain unmistakably development-only, carrying its existing
   warnings, and MUST NOT become closer to something deployable in the course of becoming more
   standards-complete.
@@ -277,12 +281,13 @@ fetch its keys.
   from the other**.
 - **SC-006**: Every existing conformance row that used a directly minted token still passes,
   unchanged.
-- **SC-007**: No file under `src/` differs.
+- **SC-007**: The only file under `src/` that differs is `surfaces/api/verification.py`, and only
+  the `PyJWKClient` construction within it.
 - **SC-008**: A session survives token renewal without developer involvement.
-- **SC-009**: Restarting the provider does **not** require restarting the surface, and a client
-  presenting a token from the previous process is refused promptly rather than after a cache
-  window. Verified by restarting the provider and calling an operation immediately — not by
-  reasoning about cache behaviour, which is how the wrong explanation survived twice.
+- **SC-009**: Restarting the provider requires no surface restart, and a token from the **new**
+  process is accepted **immediately** rather than after a cache window. Verified by restarting and
+  calling — not by reasoning about cache behaviour, which is how two wrong explanations of this
+  survived. **Measured before: refused for ~250 s. After: accepted at once.**
 
 ## Assumptions
 

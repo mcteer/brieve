@@ -74,8 +74,19 @@ id, so it returns the **old modulus**, the signature check fails, and the caller
 **Decision**: mint a distinct key id per provider process.
 
 **Rationale**: the surface's own unknown-id path then does the work — refetch on the spot, verify
-correctly, no restart, no window. This removes the condition rather than improving the message, and
-requires no change under `src/`.
+correctly, no restart, no window.
+
+**And this was still only half the story, which implementation found.** A per-process id alone left
+a ~250-second window, measured. `verification.py` built `PyJWKClient(jwks_uri, cache_keys=False)`;
+`cache_keys` was already the default and governs a different cache, while `cache_jwk_set=True,
+lifespan=300` was left on. So the refetch fetched from a five-minute-old set and found nothing —
+**the unknown-key branch was effectively dead code**. Fixing it needed one argument under `src/`,
+which FR-012 forbade, so it was raised and approved rather than absorbed. It is not a dev-lane
+issue: any real provider's rotation was invisible for up to five minutes.
+
+**So this finding was corrected twice.** First the "caches at startup, must restart" explanation was
+wrong. Then the "per-process id removes the condition" replacement was incomplete. Both were
+believed on reading; only running it settled either.
 
 **Alternative considered**: persist the keypair across restarts, so outstanding tokens keep
 working. Rejected — it writes an RSA private key to disk, which sits badly against this

@@ -56,10 +56,15 @@ VAULT_CACERT_VAL="$(env_val VAULT_CACERT)"; VAULT_CACERT_VAL="${VAULT_CACERT_VAL
 # calls this script.
 if [ -n "${DEV_IDP:-}" ] || [ -n "${OIDC_ISSUER_OVERRIDE:-}" ]; then
   DEV_IDP_PORT_VAL="${DEV_IDP_PORT:-8090}"
+  # SET BEFORE THE BRANCH, not inside it. This lived in the `else` arm, so a provider that was
+  # already listening took the early exit and left the override empty — and the surface then fell
+  # through to the real provider from `.env` and refused every development token as
+  # `unverifiable_identity`. It worked the first time only because nothing was listening yet,
+  # which is the worst way for a bug like this to behave.
+  OIDC_ISSUER_OVERRIDE="${OIDC_ISSUER_OVERRIDE:-http://127.0.0.1:${DEV_IDP_PORT_VAL}}"
   if curl -sf "http://127.0.0.1:${DEV_IDP_PORT_VAL}/jwks" >/dev/null 2>&1; then
     ok "development provider already listening on ${DEV_IDP_PORT_VAL}"
   else
-    OIDC_ISSUER_OVERRIDE="${OIDC_ISSUER_OVERRIDE:-http://127.0.0.1:${DEV_IDP_PORT_VAL}}"
     (
       cd "$REPO"
       DEV_IDP_HOST=0.0.0.0 DEV_IDP_PORT="$DEV_IDP_PORT_VAL" \
