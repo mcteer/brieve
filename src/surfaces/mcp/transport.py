@@ -24,6 +24,12 @@ from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
 from core.runs.refusals import OperationRefused
 from core.threads.store import DEFAULT_PAGE_SIZE, InMemoryThreadStore, ThreadStore
+
+# Module level, unlike the other `surfaces.api` imports in this file, which are deferred to
+# break an import cycle. `record_access` imports nothing from `surfaces`, so it cannot
+# participate in one — and six handlers catch this error, which is exactly the situation where
+# a repeated function-local import stops being a deferral and becomes noise.
+from surfaces.api.record_access import RecordAccessUnavailable
 from surfaces.dispatch.types import RunDispatcher, RunHandle
 from surfaces.mcp.operations import operations
 
@@ -155,7 +161,17 @@ class McpTransport:
         return McpResult(ok=True, status=202, payload=handle.model_dump(mode="json"))
 
     def _get_run(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
-        handle = self._dispatcher.state_of(str(args["run_id"]))
+        from surfaces.api.runs import run_state_for
+
+        try:
+            handle = run_state_for(
+                run_id=str(args["run_id"]),
+                subject=subject,
+                dispatcher=self._dispatcher,
+                audit=self._audit,
+            )
+        except RecordAccessUnavailable as unrecordable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         if handle is None:
             return McpResult(ok=False, status=404, payload={"reason": "no such run"})
         return McpResult(ok=True, status=200, payload=handle.model_dump(mode="json"))
@@ -186,14 +202,18 @@ class McpTransport:
 
         from surfaces.api.evidence import read_evidence_for
 
-        entries, disposition = read_evidence_for(
-            query=self._evidence,
-            audit=self._audit,
-            subject=subject,
-            correlation_id=args.get("correlation_id"),
-            run_id=args.get("run_id"),
-            limit=int(args.get("limit") or 1000),
-        )
+        try:
+            entries, disposition = read_evidence_for(
+                query=self._evidence,
+                audit=self._audit,
+                subject=subject,
+                correlation_id=args.get("correlation_id"),
+                run_id=args.get("run_id"),
+                limit=int(args.get("limit") or 1000),
+            )
+        except RecordAccessUnavailable as unrecordable:
+            # The same 503 the API returns. Before 022 this escaped uncaught.
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         return McpResult(
             ok=True,
             status=200,
@@ -280,7 +300,9 @@ class McpTransport:
         from surfaces.api.threads import _thread_view, create_thread_for
 
         try:
-            record = create_thread_for(subject=subject, store=self._threads)
+            record = create_thread_for(subject=subject, store=self._threads, audit_sink=self._audit)
+        except RecordAccessUnavailable as unrecordable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         except OperationRefused as refused:
             return self._refused(refused)
         return McpResult(ok=True, status=201, payload=_thread_view(record).model_dump(mode="json"))
@@ -288,12 +310,16 @@ class McpTransport:
     def _list_threads(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         from surfaces.api.threads import list_threads_for
 
-        response = list_threads_for(
-            subject=subject,
-            store=self._threads,
-            limit=int(args.get("limit", DEFAULT_PAGE_SIZE)),
-            cursor=args.get("cursor"),
-        )
+        try:
+            response = list_threads_for(
+                subject=subject,
+                store=self._threads,
+                audit_sink=self._audit,
+                limit=int(args.get("limit", DEFAULT_PAGE_SIZE)),
+                cursor=args.get("cursor"),
+            )
+        except RecordAccessUnavailable as unrecordable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         return McpResult(ok=True, status=200, payload=response.model_dump(mode="json"))
 
     def _get_thread(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
@@ -301,8 +327,13 @@ class McpTransport:
 
         try:
             response = thread_detail_for(
-                subject=subject, store=self._threads, thread_id=str(args["thread_id"])
+                subject=subject,
+                store=self._threads,
+                thread_id=str(args["thread_id"]),
+                audit_sink=self._audit,
             )
+        except RecordAccessUnavailable as unrecordable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         except OperationRefused as refused:
             return self._refused(refused)
         return McpResult(ok=True, status=200, payload=response.model_dump(mode="json"))
@@ -366,7 +397,10 @@ class McpTransport:
                 subject=subject,
                 index=self._index,
                 durability=self._durability,
+                audit=self._audit,
             )
+        except RecordAccessUnavailable as unrecordable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         except OperationRefused as refused:
             return McpResult(
                 ok=False,
@@ -386,7 +420,14 @@ class McpTransport:
                 subject=subject,
                 index=self._index,
                 durability=self._durability,
+                audit=self._audit,
             )
+        except RecordAccessUnavailable as unrecordable:
+            # THE SAME VERDICT THE API RETURNS. Research F7 found the evidence path's
+            # equivalent raises an HTTPException that this transport does not catch, so its
+            # failure path has no parity in the one operation whose docstring argues hardest
+            # for it. 022 does not repeat that.
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         except OperationRefused as refused:
             return McpResult(
                 ok=False,
@@ -405,9 +446,12 @@ class McpTransport:
                 subject=subject,
                 index=self._index,
                 durability=self._durability,
+                audit=self._audit,
                 limit=int(args.get("limit") or DEFAULT_PAGE_SIZE),
                 cursor=args.get("cursor"),
             )
+        except RecordAccessUnavailable as unrecordable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unrecordable)})
         except RunIndexError:
             # 503 on both transports, because parity compares verdicts and "we could not
             # look" must never arrive as an empty list on either.

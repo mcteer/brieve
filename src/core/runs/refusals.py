@@ -34,6 +34,13 @@ OPERATION_REASONS: Final[dict[str, str]] = {
     # Distinct from `not_permitted` because conflating them tells someone their access is
     # fine when it is not, and tells another that it is not when it is.
     "nothing_to_dispatch": "no agent was selected, and none is available to dispatch",
+    # 022. The result exists and the caller may have it; it does not fit. This used to raise
+    # `not_permitted`, whose stated meaning is that the record is visible and the ACTION is not
+    # theirs — so a caller received 403 for a result that was merely too big. A misleading status
+    # code, and once 022 began recording refusals it would have become a permission denial
+    # written into the audit trail for a refusal that was never about permission. The comment
+    # above already settled the question; `message_too_large` had already settled the shape.
+    "result_too_large": "the result exists and exceeds the size bound this surface returns",
 }
 
 # 013's vocabulary is deliberately NOT here. Every matrix, pack, and tier refusal is raised

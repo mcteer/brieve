@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 
+from core.audit.sink import InMemoryAuditSink
 from core.identity.types import AuthenticatedSubject, SubjectKind
 from core.run import RunState
 from core.runs.index import InMemoryRunIndex, RunIndexEntry, RunIndexError
@@ -74,7 +75,7 @@ class Durability:
 
 
 def test_a_subject_lists_their_own_runs() -> None:
-    page = list_runs_for(subject=_subject(), index=_index(3))
+    page = list_runs_for(subject=_subject(), index=_index(3), audit=InMemoryAuditSink())
 
     assert [r.run_id for r in page.runs] == ["run-003", "run-002", "run-001"]
 
@@ -85,6 +86,7 @@ def test_the_state_is_joined_from_the_durable_record() -> None:
         subject=_subject(),
         index=_index(2),
         durability=Durability({"run-002": "completed"}),
+        audit=InMemoryAuditSink(),
     )
 
     by_id = {r.run_id: r.state for r in page.runs}
@@ -98,7 +100,12 @@ def test_an_unreadable_state_still_lists_the_run() -> None:
     Guessing a state would be worse than admitting the gap; omitting the run would be
     worse still, because the run is exactly what they asked about.
     """
-    page = list_runs_for(subject=_subject(), index=_index(1), durability=Durability(raises=True))
+    page = list_runs_for(
+        subject=_subject(),
+        index=_index(1),
+        durability=Durability(raises=True),
+        audit=InMemoryAuditSink(),
+    )
 
     assert [r.run_id for r in page.runs] == ["run-001"]
     assert page.runs[0].state is None
@@ -112,7 +119,7 @@ def test_an_unreadable_index_refuses_rather_than_returning_empty() -> None:
             raise RunIndexError("index unreachable")
 
     with pytest.raises(RunIndexError):
-        list_runs_for(subject=_subject(), index=Broken())
+        list_runs_for(subject=_subject(), index=Broken(), audit=InMemoryAuditSink())
 
 
 def test_the_response_carries_no_total() -> None:
@@ -121,7 +128,7 @@ def test_the_response_carries_no_total() -> None:
     A `total` field would be the withholding disclosure arrived at through helpfulness —
     and it is the field every list API grows eventually unless something forbids it.
     """
-    page = list_runs_for(subject=_subject(), index=_index(9), limit=2)
+    page = list_runs_for(subject=_subject(), index=_index(9), limit=2, audit=InMemoryAuditSink())
 
     assert not any(
         field in page.model_dump() for field in ("total", "count", "total_count", "pages")
@@ -136,7 +143,9 @@ def test_paging_reaches_every_run_exactly_once() -> None:
     cursor: str | None = None
 
     while True:
-        page = list_runs_for(subject=_subject(), index=index, limit=3, cursor=cursor)
+        page = list_runs_for(
+            subject=_subject(), index=index, limit=3, cursor=cursor, audit=InMemoryAuditSink()
+        )
         seen.extend(r.run_id for r in page.runs)
         cursor = page.cursor
         if cursor is None:

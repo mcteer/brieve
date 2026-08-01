@@ -36,6 +36,7 @@ from core.audit.schema import AuditEntry, AuditEventType, EvidenceDisposition
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
 from surfaces.api.dependencies import AuditDep, EvidenceDep, ReconcilerDep, SubjectDep
+from surfaces.api.record_access import RecordAccessUnavailable
 
 #: One stream per tenant, stable across reads.
 #:
@@ -195,16 +196,21 @@ def build_router() -> APIRouter:
         # The route is a thin binding onto the shared implementation. Zero rows either
         # way when out of scope: the caller must not learn which, because telling them
         # would leak the existence of what they may not see.
-        entries, _ = read_evidence_for(
-            query=query,
-            audit=audit,
-            subject=subject,
-            correlation_id=correlation_id,
-            run_id=run_id,
-            start_time=start_time,
-            end_time=end_time,
-            limit=limit,
-        )
+        try:
+            entries, _ = read_evidence_for(
+                query=query,
+                audit=audit,
+                subject=subject,
+                correlation_id=correlation_id,
+                run_id=run_id,
+                start_time=start_time,
+                end_time=end_time,
+                limit=limit,
+            )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         return EvidenceReadResponse(entries=entries, count=len(entries))
 
     @router.get("/evidence/reconciliation", response_model=ReconciliationResponse)
@@ -218,13 +224,18 @@ def build_router() -> APIRouter:
         # Registered on the evidence router rather than its own, so it exists exactly when
         # the read path does. A route whose presence varied independently would make the
         # operation snapshot depend on assembly, which 011 already paid for once.
-        report, _ = reconcile_evidence_for(
-            correlation_id=correlation_id,
-            query=query,
-            audit=audit,
-            subject=subject,
-            reconciler=reconciler,
-        )
+        try:
+            report, _ = reconcile_evidence_for(
+                correlation_id=correlation_id,
+                query=query,
+                audit=audit,
+                subject=subject,
+                reconciler=reconciler,
+            )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         # Out of scope returns the same empty shape as a clean stream, deliberately: telling
         # the caller which would leak the existence of what they may not see.
         return _reconciliation_response(correlation_id, report)
@@ -301,9 +312,15 @@ def _record_access(
             },
         )
     except Exception as exc:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "evidence access could not be recorded; the read is refused",
+        # A CORE ERROR, not an HTTPException. This raised a FastAPI type from
+        # transport-independent code, and `surfaces/mcp/transport.py::_read_evidence` did not
+        # catch it — so an unrecordable evidence read answered 503 with a stated reason on the
+        # API and escaped as something else entirely on MCP. The failure path had no parity in
+        # the one operation whose docstring argues hardest for parity. Found by 022's research
+        # while adopting this module's shape; fixed here rather than copied into seven new
+        # call sites.
+        raise RecordAccessUnavailable(
+            "evidence access could not be recorded; the read is refused"
         ) from exc
 
 

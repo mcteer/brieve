@@ -16,6 +16,7 @@ rows for this module drive a running process over a real socket.
 
 from __future__ import annotations
 
+import inspect
 import os
 import sys
 from typing import Any
@@ -47,7 +48,7 @@ from surfaces.api.verification import (
     TokenVerifier,
 )
 from surfaces.dispatch.nomad import NomadDispatcher
-from surfaces.mcp.operations import operations
+from surfaces.mcp.operations import governance_sentence, operations
 from surfaces.mcp.transport import McpResult, McpTransport
 from surfaces.toolset import build_registry, known_actions, known_tools
 
@@ -326,13 +327,20 @@ def build_server(
         # being true when 020 landed: a model now chooses each step's tool and the choice goes
         # through the same governed entry. A surface describing itself as less capable than it
         # is, to every client that connects, is a defect nobody inside the tree can see.
+        # THE RECORDING CLAIM IS GENERATED, not written here. It read "every operation ... is
+        # recorded in a tamper-evident trail" while nine of seventeen wrote nothing — the third
+        # self-description in two days measured against the running service and found false, and
+        # the first where the overclaim was about governance rather than capability. A test
+        # comparing this text to a second hand-written copy would have passed every one of those
+        # days, so the text is derived from the catalogue's dispositions instead.
         instructions=(
-            "The governed agent runtime. Every operation executes as the calling user and is "
-            "recorded in a tamper-evident trail. A dispatched run consults the model its "
-            "definition binds, and every tool that model chooses passes the same governed "
-            "entry a scripted one would — refused when it must be, recorded either way. "
-            "`get_run_report` compiles what a run did from those records; it composes "
-            "nothing, and states what it could not verify rather than smoothing it over."
+            "The governed agent runtime. "
+            + governance_sentence()
+            + " A dispatched run consults the model its definition binds, and every tool that "
+            "model chooses passes the same governed entry a scripted one would — refused when "
+            "it must be, recorded either way. `get_run_report` compiles what a run did from "
+            "those records; it composes nothing, and states what it could not verify rather "
+            "than smoothing it over."
         ),
         token_verifier=verifier,
         # THE SDK REFUSES A VERIFIER WITHOUT THESE, and the refusal is correct: a token
@@ -354,27 +362,43 @@ def build_server(
         port=int(os.environ.get("MCP_SURFACE_PORT", "8083")),
     )
 
-    # What each operation cannot do without, taken from the operation's own schema rather
-    # than a second list here — a list would drift from the schema silently.
-    required_fields = {
-        op.tool_name: tuple(op.input_schema.get("required", ())) for op in operations()
-    }
+    def _annotation_for(spec: dict[str, Any]) -> Any:
+        """A JSON-schema property as a Python annotation the SDK can evaluate."""
+        kinds = spec.get("type")
+        kinds = kinds if isinstance(kinds, list) else [kinds]
+        nullable = "null" in kinds
+        base: Any = str
+        if "integer" in kinds:
+            base = int
+        elif "array" in kinds:
+            base = list[str]
+        elif "object" in kinds:
+            base = dict[str, Any]
+        return base | None if nullable else base
 
-    def make_handler(tool_name: str) -> Any:
-        # ANNOTATIONS THE SDK CAN ACTUALLY EVALUATE, which is why they are bare.
-        #
-        # `func_metadata` calls `get_type_hints` on this handler to build the tool's input
-        # schema. Under `from __future__ import annotations` every annotation is a string,
-        # so each name must be resolvable in the MODULE's globals — which is why the SDK
-        # imports moved to the top of this file rather than staying inside `build_server`,
-        # where they were locals and the server died with "Unable to evaluate type
-        # annotations for callable 'start_run'".
-        #
-        # `Context` and `dict` are left unsubscripted because mypy's preferred
-        # `Context[Any, Any]` and `dict[str, Any]` are what the SDK must evaluate, and the
-        # generics resolve differently there. The `type: ignore` is narrow and deliberate:
-        # this signature answers to the SDK first.
-        async def handler(ctx: Context, arguments: dict | None = None) -> dict:  # type: ignore[type-arg]
+    def make_handler(operation: Any) -> Any:
+        """One handler per operation, carrying that operation's REAL parameters.
+
+        **This used to take a single `arguments: dict` and it made 13 of 17 operations
+        uncallable.** `add_tool` derives a tool's advertised input schema from the handler's
+        signature, so every tool was published as taking one object property literally named
+        `arguments` — and a spec-conforming client sending `{"run_id": "abc"}` was answered
+        `400 malformed request, missing: run_id`. Only the four operations with no arguments
+        worked, which is why an editor could list seventeen tools and call almost none.
+
+        **The served-surface rows passed the whole time**, because the harness called
+        `session.call_tool(tool, {"arguments": arguments})` — wrapping its own arguments to
+        match the defect rather than exercising what a client actually sends. Found by driving
+        the served process by hand, not by any check.
+
+        The signature is built from the operation's own `input_schema`, so the schema a client
+        is shown and the schema the catalogue declares cannot drift: there is one source.
+        """
+        tool_name = operation.tool_name
+        properties: dict[str, Any] = operation.input_schema.get("properties", {})
+        required = set(operation.input_schema.get("required", ()))
+
+        async def handler(ctx: Context, **supplied: Any) -> dict:  # type: ignore[type-arg]
             access = get_access_token()
             if access is None:
                 # FR-012: refused BEFORE the governed operation is entered.
@@ -389,16 +413,19 @@ def build_server(
             except AuthenticationRefused as refused:
                 return {"ok": False, "status": 403, "reason": refused.reason_code}
 
+            # An omitted argument is ABSENT, not null. Every parameter defaults to `None` in the
+            # signature, so keeping the nulls would hand the transport `run_id=None` — which
+            # reads as a supplied value, passes the missing-check below, and comes back "no such
+            # run" instead of "you did not say which run". Observed exactly that way.
+            arguments = {name: value for name, value in supplied.items() if value is not None}
+
             # MALFORMED INPUT IS REFUSED AT THE BOUNDARY, NAMING WHAT WAS WRONG (FR-007).
             #
             # Without this the transport raises `KeyError('run_id')` and the SDK reports
             # "Error executing tool get_run: 'run_id'" — a bare key repr, indistinguishable
             # from a platform fault, telling the caller nothing about what to fix. Observed
             # against the running surface before this existed.
-            supplied = arguments or {}
-            missing = [
-                field for field in required_fields.get(tool_name, ()) if field not in supplied
-            ]
+            missing = [field for field in sorted(required) if field not in arguments]
             if missing:
                 return {
                     "ok": False,
@@ -407,17 +434,56 @@ def build_server(
                     "missing": missing,
                 }
 
-            return result_payload(transport.call(tool_name, supplied, subject=subject))
+            return result_payload(transport.call(tool_name, arguments, subject=subject))
 
+        # THE SIGNATURE THE SDK PUBLISHES, built from the operation's own schema so the two
+        # cannot disagree. `inspect.signature` honours `__signature__`; `get_type_hints` reads
+        # `__annotations__`; `func_metadata` uses both, so both are set.
+        parameters = [
+            inspect.Parameter("ctx", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=Context)
+        ]
+        annotations: dict[str, Any] = {"ctx": Context, "return": dict}
+        for name, spec in properties.items():
+            annotation = _annotation_for(spec)
+            parameters.append(
+                inspect.Parameter(
+                    name,
+                    inspect.Parameter.KEYWORD_ONLY,
+                    annotation=annotation,
+                    # ALWAYS OPTIONAL AT THE SIGNATURE LEVEL, and the published schema is
+                    # corrected below. If a field were required here, pydantic would refuse a
+                    # malformed call before the handler ran and the caller would receive a
+                    # validation dump shaped exactly like "Unknown tool" — collapsing two of
+                    # the four failures FR-007 requires a client to tell apart.
+                    default=None,
+                )
+            )
+            annotations[name] = annotation
+
+        handler.__signature__ = inspect.Signature(parameters)  # type: ignore[attr-defined]
+        handler.__annotations__ = annotations
         handler.__name__ = tool_name
         return handler
 
     for operation in operations():
         server.add_tool(
-            make_handler(operation.tool_name),
+            make_handler(operation),
             name=operation.tool_name,
             description=operation.description,
         )
+        # THE PUBLISHED SCHEMA IS THE CATALOGUE'S OWN, not one derived from a signature.
+        #
+        # `add_tool` builds a schema from the handler, which is how every tool came to be
+        # advertised as taking a single object property named `arguments` — leaving 13 of 17
+        # uncallable by any conforming client. Replacing it here means the schema a client is
+        # shown and the schema `operations()` declares are the same object, so they cannot
+        # drift; a row asserting they match would be comparing a thing to itself.
+        #
+        # Reaching into the tool manager is a private-attribute access and is deliberate: the
+        # SDK offers no public way to declare a schema, and the alternative — making fields
+        # required in the signature — moves refusal into pydantic and costs the FR-007
+        # distinguishability above. Narrow, commented, and checked by the served rows.
+        server._tool_manager._tools[operation.tool_name].parameters = operation.input_schema  # noqa: SLF001
 
     return server
 

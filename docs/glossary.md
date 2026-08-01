@@ -430,3 +430,43 @@ Nomad allocation
 An agent is not a harness. Reasoning about credentials with the layers collapsed is how
 you end up believing the agent can reach its own state store — which it cannot, and must
 not.
+
+
+## Read record
+
+Evidence that someone was **shown** something about a run or a thread — caller, tenant, what,
+when, and the correlation id of the thing read. **Never the content.**
+
+Introduced by 022, after nine of seventeen operations were measured returning records and
+writing nothing while both surfaces told every connecting client that every operation was
+recorded. A read record answers the question an auditor asks *second*: not "what happened" but
+"who saw it".
+
+Distinct from an **evidence read**, which is a read of the audit plane itself (ADR-0035). Both
+are recorded; they live in different streams because a deliberate review and an idle editor's
+`list_runs` polling have profiles too different to share one chain.
+
+## record-access stream
+
+`record-access:{tenant_id}` — one hash-chained stream per tenant, **stable across reads**, where
+read records land. Stable rather than per-read: a fresh correlation id each time would make every
+record a chain of one, linked to nothing and removable without trace.
+
+**Never the chain of the thing read.** A read record refers to a run by correlation id and is
+never appended to that run's chain, because `RunReport` compiles from that chain — a read
+appended there would put "who read this run" inside the report of that run, including reads of
+the report, growing every time anyone looked.
+
+## Audit disposition
+
+A declared property of an operation: whether it records, and under which rule. Lives on the
+operation itself as a required field with no default, so an operation added without deciding is a
+construction error rather than a missed edit to a list someone has to remember.
+
+**The rule**: an operation that touches a **run or a thread** records; one that touches neither
+does not. Runs and threads are records of *activity*. Agent definitions are *configuration* —
+reading one discloses how the platform is set up, not what anyone did with it.
+
+`records_elsewhere` must **name where**. That requirement earned itself immediately: an early
+draft of 022 classified `stop_run` that way, and applying the rule revealed there was no where.
+It wrote nothing at all.
