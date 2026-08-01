@@ -39,15 +39,33 @@ where the rule lives, or what shape any new event type takes — those belong to
 The convention matches 020 and 021, both of which cited concrete platform vocabulary in their
 "what already holds" sections.
 
-**On "no [NEEDS CLARIFICATION] markers".** The central open question — *which* operations must
-record — is deliberately carried as a stated assumption rather than an inline marker, because it
-is not a gap in the description but the decision the feature exists to make. FR-001 through FR-003
-bound it: a rule must exist, must be decidable, must classify all seventeen, and must cover
-`get_run_result` under any answer. `/speckit-clarify` resolves the rest.
+**On "no [NEEDS CLARIFICATION] markers".** ~~The central open question is carried as a stated
+assumption.~~ **Resolved by clarify, 2026-08-01.** Three questions answered; FR-001 now states the
+rule rather than requiring one to exist.
 
-**One item worth a second look at clarify.** SC-004 ("an operation added without an audit
+**Re-validated after clarify — still 16/16, and one item changed state on the way.**
+"Requirements are testable and unambiguous" was **passing on a technicality** before clarify and
+now passes properly. FR-001 said a rule must exist and be decidable, which is testable only in the
+sense that one can check whether a document exists; it named no rule, so no implementation could be
+wrong against it. It now names one, and FR-002 enumerates the six operations it covers and the two
+it does not.
+
+**One contradiction clarify found in this spec, worth recording because it was mine.** The original
+FR-005 required a read record to join the correlation id "so reading a run appears in that run's
+walk". `src/surfaces/api/evidence.py` had already rejected that exact shape — appending to the
+chain being read means reading evidence writes into the evidence being read — and 021's `RunReport`
+made it worse, since it compiles from a run's chain and would have grown a claim about its own
+readers each time anyone looked. FR-005/005a/005b now carry the correlation id in a separate stream
+instead. **Nothing in the spec-writing process would have caught this**; it surfaced only from
+reading the implementation of the thing being extended.
+
+**One item still worth a second look at plan.** SC-004 ("an operation added without an audit
 disposition fails a check that names it") is verified by adding one and observing the failure —
-which means the verification is a deliberately-broken state, not a passing row. That is the right
-shape for a guard, and it is the same shape the existing
-`test_the_operation_list_here_matches_what_shipped` guard already uses, but it should be confirmed
-rather than assumed to be achievable as a standing check.
+a deliberately-broken state, not a passing row. That is the right shape for a guard and matches the
+existing `test_the_operation_list_here_matches_what_shipped`, but it should be confirmed achievable
+as a standing check rather than assumed.
+
+**SC-011 is a deliberate negative and should not be quietly deleted at plan.** It asserts the two
+catalogue operations *remain* unrecorded. A check that pins a non-behavior looks like dead weight
+until someone widens coverage by accident; this is what makes that a visible decision instead of a
+drift.

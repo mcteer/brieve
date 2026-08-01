@@ -14,8 +14,23 @@ done. The answer came back. The question left no trace.
 | Field | Value |
 | --- | --- |
 | **Requirements (R1–R17)** | **R4** (evidence over claims — the subject here is the trail's own completeness, and a gap in it is invisible to everyone who trusts the trail). **R10** (observability and attestation — a record of who read what is an attestation input, not a convenience). |
-| **ADRs touched** | **ADR-0035** (the load-bearing one: *"evidence access is itself audited — who reviewed which evidence, when. A meta-audit record, because the integrity of an audit trail includes knowing who read it"*. This feature decides whether that discipline stops at the audit plane or extends to records **about** runs. Likely **amended**, not merely consumed — see FR-012). **ADR-0009** (one correlation ID joins prompt → hooks → call → run → audit entry, walkable both directions; a read that writes nothing is a step in that walk with no entry). **ADR-0033** (four transports over one authorization core — whatever is decided binds on API and MCP identically; parity currently *holds*, at zero). **ADR-0018 / ADR-0032** (the shape of the get_run_result asymmetry: the report is governed and audited, the payload it deliberately excludes is neither). **ADR-0047** (whether a new gate row binds now). |
+| **ADRs touched** | **ADR-0035** (the load-bearing one: *"evidence access is itself audited — who reviewed which evidence, when. A meta-audit record, because the integrity of an audit trail includes knowing who read it"*. **Amended, not merely consumed.** Clarification extended that discipline past the audit plane to records **about** runs and threads, while keeping the ADR's own structural safeguard: the meta-audit goes to a separate stream, never into the chain being read — see FR-005a and FR-012). **ADR-0009** (one correlation ID joins prompt → hooks → call → run → audit entry, walkable both directions; a read that writes nothing is a step in that walk with no entry). **ADR-0033** (four transports over one authorization core — whatever is decided binds on API and MCP identically; parity currently *holds*, at zero). **ADR-0018 / ADR-0032** (the shape of the get_run_result asymmetry: the report is governed and audited, the payload it deliberately excludes is neither). **ADR-0047** (whether a new gate row binds now). |
 | **Evidence class** | **Attestation-relevant, and about attestation itself.** Every prior feature added records. This one asks whether the record of *reading* those records exists — the question an auditor asks second, after "what happened", and the one this platform currently cannot answer for eight of its seventeen operations. |
+
+## Clarifications
+
+### Session 2026-08-01
+
+- Q: Which operations must record a trail entry? → A: **B** — every operation touching a **run or
+  thread**, reads and creations alike. Catalogue reads (`list_agent_definitions`,
+  `get_agent_definition`) do not record: they disclose configuration rather than activity, and
+  they are the highest-frequency reads a connected client makes.
+- Q: Where does a read record live — the read object's own chain, or a separate stream? → A: **C**
+  — a dedicated reader stream that **carries** the correlation id as a field. Findable by run
+  without the run's own chain ever being altered by someone reading it.
+- Q: What happens when a covered read's own record cannot be written? → A: **A** — the read fails,
+  for all six covered operations. One posture, matching both existing precedents. Accepted cost: a
+  trail outage makes runs and threads unreadable.
 
 ## What already holds, and what does not
 
@@ -149,16 +164,15 @@ follows rather than leads.
 
 ### Edge Cases
 
-- **A read that fails.** An operation that refuses, or one whose backing store is unavailable and
-  answers 503 — does the attempt leave a record? A refusal that writes nothing means a caller can
-  probe a boundary indefinitely without trace, which is precisely the pattern
-  `EVIDENCE_READ_REFUSED` exists to catch on the evidence plane.
-- **A read whose audit write fails.** The trail is the thing being written to; when the write
-  fails, does the caller still receive the records? Principle III says enforcement that errors
-  must deny. Whether an audit write is enforcement or observation is a real question, and the
-  answer determines whether a trail outage takes the read path down with it.
-- **`list_runs` returning nothing.** An empty page still discloses that the caller asked. Whether
-  a read that returned no records is worth an entry decides whether the trail shows probing.
+- **A read that fails.** *Resolved — FR-007.* A refusal records, and the trail keeps the
+  distinction the caller cannot see. A boundary probeable without trace is the case
+  `EVIDENCE_READ_REFUSED` already prevents on the evidence plane.
+- **A read whose audit write fails.** *Resolved — FR-007a.* The read fails. An audit write on a
+  covered read is enforcement, not observation, which means a trail outage takes run and thread
+  reads down with it. Both existing precedents already do this; what is new is that it now applies
+  to ordinary listings, and that is the cost this feature accepts openly.
+- **`list_runs` returning nothing.** *Resolved — FR-007b.* It records. An empty page discloses
+  that the caller asked.
 - **Volume.** A listing called on every editor keystroke could write more entries than the runs it
   lists. The trail is append-only and never sampled (Principle IX), so this cannot be solved by
   dropping entries — it constrains which operations are worth recording, and that constraint
@@ -172,12 +186,22 @@ follows rather than leads.
 
 **The decision this feature exists to make**
 
-- **FR-001**: The platform MUST have a stated, written rule for which operations record a trail
-  entry. The rule MUST be decidable for an operation that does not yet exist, by someone who did
-  not write it.
+- **FR-001**: **An operation that touches a run or a thread MUST record a trail entry** — reads and
+  creations alike. An operation that touches neither MUST NOT be required to. This is the rule, and
+  it MUST be stated where someone adding an operation will apply it, decidable for an operation
+  that does not yet exist by someone who did not write it.
+- **FR-001a**: The rule's boundary MUST be justified where it is stated, not merely drawn. Runs and
+  threads are records of *activity* — what a person asked for, what a model chose, what a tool did.
+  Agent definitions are *configuration*: reading one discloses how the platform is set up, not what
+  anyone did with it. A future operation is classified by which of those two it touches.
 - **FR-002**: The rule MUST classify every one of the seventeen operations shipped as of this
   feature, and every classification MUST be checkable against measured behavior rather than
-  asserted in prose.
+  asserted in prose. Under FR-001 that means six operations gain records — `list_runs`, `get_run`,
+  `get_run_result`, `list_threads`, `get_thread`, `create_thread` — and two remain without:
+  `list_agent_definitions` and `get_agent_definition`.
+- **FR-002a**: `create_thread` MUST record. The trail can currently prove a thread was deleted and
+  what was said in it, and cannot prove it began; a lifecycle recorded only at its end is a
+  narrative with no first page.
 - **FR-003**: Reading a run's result payload MUST record who read it, which run, and when. This is
   the one operation the feature MUST cover under any rule chosen; a rule that leaves it uncovered
   MUST be rejected rather than accommodated.
@@ -186,20 +210,39 @@ follows rather than leads.
 
 - **FR-004**: A read record MUST identify the caller, the tenant, what was read, and when — with
   the same attribution every other entry carries, so it is queryable by the same governed path.
-- **FR-005**: A read record MUST join the correlation id of the thing read where one exists, so
-  reading a run appears in that run's walk (ADR-0009) rather than in a parallel stream nobody
-  reviews.
+- **FR-005**: A read record MUST carry the correlation id of the thing read where one exists, so
+  that holding a run id is enough to find who read it through the same governed query (ADR-0009,
+  walkable both directions).
+- **FR-005a**: A read record MUST NOT be appended to the chain of the thing read. Reading a run
+  MUST NOT alter that run's chain — the existing evidence path already refuses this, on the
+  grounds that reading evidence would otherwise write into the evidence being read, and the same
+  reasoning binds here for a stronger reason: 021's `RunReport` compiles from a run's chain, so a
+  read appended there would put "who read this run" inside the report of that run, including reads
+  of the report itself, growing every time anyone looked.
+- **FR-005b**: Read records MUST therefore live in a stream distinct from the chains they refer
+  to, and that stream MUST be tenant-scoped and readable through the same governed path as any
+  other evidence — a record nobody can query is not a record.
 - **FR-006**: A read record MUST NOT contain the content read. Recording that a payload was read
   MUST NOT copy the payload into the trail — the trail does not egress by default and a payload
   inside it inherits neither that boundary's intent nor `get_run_result`'s subject restriction.
 - **FR-007**: A refused read MUST be distinguishable in the trail from a permitted one, and the
   trail MUST preserve the distinction the caller cannot see (`no_such_record` vs `outside_tenant`,
-  per the existing vocabulary).
+  per the existing vocabulary). A refused read MUST record — a boundary a caller can probe without
+  trace is the case `EVIDENCE_READ_REFUSED` already exists to prevent on the evidence plane.
+- **FR-007a**: A covered read whose own record cannot be written MUST fail, and MUST NOT return the
+  records it was asked for. This holds for all six covered operations, with no exception for
+  listings. **Accepted cost, stated rather than discovered**: a trail outage makes runs and threads
+  unreadable through both surfaces. An unrecorded answer is the state this feature exists to end,
+  so serving one during an outage would reintroduce it at exactly the moment someone will later
+  investigate.
+- **FR-007b**: A covered read that returns nothing MUST still record. An empty listing discloses
+  that the caller asked, and a trail that omits fruitless reads cannot show probing.
 
 **Where it binds**
 
-- **FR-008**: Whatever is decided MUST bind identically on the API and MCP surfaces (ADR-0033).
-  Parity holds today at zero coverage; it MUST hold at whatever coverage is chosen.
+- **FR-008**: All six covered operations MUST record identically on the API and MCP surfaces, and
+  the two catalogue operations MUST record on neither (ADR-0033). Parity holds today at zero
+  coverage; it MUST hold at this one.
 - **FR-009**: An operation added after this feature MUST NOT be able to ship without an audit
   disposition. The check MUST fail on the operation's absence from the rule, not on a hand-kept
   list going stale.
@@ -215,10 +258,12 @@ follows rather than leads.
 
 **Sealed core and the decision record**
 
-- **FR-012**: If the chosen rule extends the governed-read discipline beyond the audit plane,
-  ADR-0035 MUST be amended to say so. Its current text scopes "evidence access is itself audited"
-  to the audit plane; extending that discipline in code while the ADR still describes the narrower
-  scope would put the decision record behind the system (Principle X).
+- **FR-012**: ADR-0035 MUST be amended. Its current text scopes "evidence access is itself audited"
+  to the audit plane, and this feature extends that discipline to records about runs and threads;
+  shipping the extension in code while the ADR still describes the narrower scope would put the
+  decision record behind the system (Principle X). The amendment MUST also carry forward what the
+  ADR got right and this feature keeps — that the meta-audit is written to a stream separate from
+  the one being read — since that is now load-bearing for a second reason (FR-005a).
 - **FR-013**: Any new audit event type is sealed core (Principle V) and MUST be additive, MUST
   carry a security review request, and MUST NOT move the hash of any entry already written — the
   digest pinned in `test_audit_chain.py` is the check and MUST remain unmoved.
@@ -261,14 +306,22 @@ follows rather than leads.
 - **SC-007**: A read refused for being outside the caller's tenant is distinguishable in the trail
   from one refused for not existing, while remaining indistinguishable to the caller.
 - **SC-008**: No operation loses an audit entry it wrote before this feature.
+- **SC-009**: With the trail unwritable, every one of the six covered operations refuses and
+  returns no records — verified by making the write fail, not by reasoning about it.
+- **SC-010**: Reading a run leaves that run's own chain byte-identical, and a report compiled for
+  that run afterward carries no claim about who read it.
+- **SC-011**: The two catalogue operations remain unrecorded, and a check says so deliberately —
+  so that a later change making them record is a visible decision rather than a drift nobody
+  notices.
 
 ## Assumptions
 
-- **The coverage rule is not assumed.** Whether every operation records, or only those returning
-  run-produced content, or only those crossing a subject boundary, is the central open question
-  and belongs to `/speckit-clarify`. This spec asserts only that a rule must exist, must be
-  decidable, must cover `get_run_result`, and must match what the surfaces claim. The volume edge
-  case above is the reason the answer is not obviously "everything".
+- **The coverage rule is decided** (clarified 2026-08-01): operations touching a run or thread
+  record; catalogue reads do not. The rejected alternative worth recording is "every operation" —
+  it matches today's claim verbatim and needs no narrowing, but it writes an entry every time a
+  connected client fetches the agent-definition list, which for an editor is every connect. The
+  trail is append-only and never sampled (Principle IX), so that cost is permanent and cannot be
+  tuned away later. Configuration reads were judged not worth it; activity reads were.
 - **`start_run` and `stop_run` are covered** by the run's own `authority_issued` and `run_start`
   entries. Measured, not assumed — but if a run refuses before writing either, the coverage claim
   needs rechecking.
