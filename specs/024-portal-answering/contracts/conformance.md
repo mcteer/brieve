@@ -3,6 +3,25 @@
 
 ---
 
+## The directory name predates the split, and is not a claim
+
+**`024-portal-answering` builds answering through the API and MCP. It touches no portal file.**
+
+The name was chosen when the feature was one feature. Analysis pass 3 found SC-001 reading
+*"through the portal"* while no task did anything of the kind, and the portal's own answering
+surface became the second of two deferrals — recorded in `ROADMAP.md` beside estate-state.
+
+Renaming a directory mid-feature would break every reference in the planning artifacts for a
+cosmetic gain. Leaving it unremarked would be worse: a planning document that misdescribes what
+exists has cost this repository twice in two days. So it is written down here instead.
+
+**The boundary is asserted, not asserted-about.** `git diff main -- src/surfaces/portal/` was
+empty at implementation. That check expires the moment this merges, so the durable form lives in
+`tests/conformance/portal/test_containment.py`: no portal module imports `core.answering`. The
+portal consumes the catalogue; it does not implement it (ADR-0034).
+
+---
+
 ## Who runs these rows
 
 | Group | Where | Needs |

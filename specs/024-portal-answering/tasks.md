@@ -216,7 +216,7 @@ scoring authored strings.
 - [X] T032a Assert that **no file under `src/surfaces/portal/` differs**, the way 023 asserted
       nothing under `src/` did. A scope boundary nobody checks is a scope boundary that moves.
 - [X] T033 Run `make check` and `make evals`.
-- [ ] T034 Run `make conformance` on a live enclave. **Owed by name** — the enclave lane is
+- [X] T034 Run `make conformance` on a live enclave. **Owed by name** — the enclave lane is
       `workflow_dispatch` only.
 - [ ] T035 Qualify the `ask` cell via `make evals-live` against a real model. **Owed by name** —
       needs a paid credential, and is the only row here that touches a vendor.
