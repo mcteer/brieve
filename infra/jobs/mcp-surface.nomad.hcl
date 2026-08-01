@@ -112,7 +112,16 @@ job "mcp-surface" {
     harness_surface     = "true"
     harness_shape       = "served"
     harness_covered_by  = "tests/conformance/mcp_served/test_a_client_reaches_the_surface.py"
-    harness_lane_starts = "true"
+    # FALSE, because the DEPLOYMENT lane does not own this surface — 019's own
+    # `infra/bin/mcp-surface-conformance` starts and stops it, and it needs a development
+    # identity provider standing before the surface starts at all.
+    #
+    # Set to "true" first, which told the deployment lane to bring it up: CI reported
+    # "Standing up: api mcp-surface portal" and then failed `declared but unasserted`,
+    # because a surface a lane starts must be asserted by a row in THAT lane. The gate was
+    # right and the declaration was wrong — two lanes cannot both own one process's
+    # lifecycle, and the second would have been starting it without its provider.
+    harness_lane_starts = "false"
     harness_started_by  = var.harness_started_by
   }
 
