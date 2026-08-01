@@ -512,9 +512,16 @@ demonstration of a model picking the obviously right tool is far more persuasive
 proves, which is why the conformance contract states that limit as prominently as what it does
 assert.
 
-**Still separate and still open**: reaching the mcp service from an IDE. Cursor speaks stdio or
-an HTTP port; the service uses host networking, which on Docker Desktop is the VM's namespace
-and not the developer's machine.
+**Reaching the mcp service from an IDE: CLOSED, and it was closed by 019 rather than by anything
+after it.** This note claimed the service used host networking and was unreachable from the
+developer's machine. Measured 2026-08-01: `infra/jobs/mcp-surface.nomad.hcl` uses **bridge mode
+with static port 8083 published to loopback**, and the jobspec comment beside it explains that
+host mode on Docker Desktop is the VM's namespace and was therefore wrong. The surface speaks
+streamable HTTP at `http://127.0.0.1:8083/mcp`; a client attaches with a bearer token whose
+claims map to a role.
+
+The note survived three features because nobody tried it — which is the shape this file's own
+gap section is about.
 
 <details>
 <summary>The gap as originally raised (2026-07-31)</summary>
@@ -555,10 +562,12 @@ entrypoint runs, completes, and writes evidence; it simply never consults a mode
 - ADR-0018's `RunReport` is still owed, and a model-driven run is the first thing whose
   output a report would be about.
 
-**Related but separate**: reaching the mcp service from an IDE. Cursor speaks stdio or an
-HTTP port; the service uses host networking, which on Docker Desktop is the VM's namespace
-and not the developer's machine — the same unreachability the portal has. Small next to the
-above, and it is what stands between "the platform works" and "I can watch it work."
+**Related but separate**: reaching the mcp service from an IDE — what stands between "the
+platform works" and "I can watch it work". **Closed by 019 and verified 2026-08-01**: bridge
+mode, port 8083, streamable HTTP, seventeen tools listed by a real client. See the note under
+gap 0f. What remains is ergonomic rather than structural: the development identity provider
+mints five-minute tokens, and a static `Authorization` header in an editor's config has no
+refresh flow.
 
 </details>
 

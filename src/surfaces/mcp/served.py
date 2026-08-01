@@ -320,11 +320,19 @@ def build_server(
     """
     server = FastMCP(
         name="brieve",
+        # WHAT A CLIENT IS TOLD, and it must not undersell the platform any more than it
+        # oversells it. This text said "it does not put a model in the run loop — a dispatched
+        # run still selects tools by a scripted sequence" until 021 noticed, which stopped
+        # being true when 020 landed: a model now chooses each step's tool and the choice goes
+        # through the same governed entry. A surface describing itself as less capable than it
+        # is, to every client that connects, is a defect nobody inside the tree can see.
         instructions=(
             "The governed agent runtime. Every operation executes as the calling user and is "
-            "recorded in a tamper-evident trail. NOTE: this surface serves the platform's "
-            "operations; it does not put a model in the run loop — a dispatched run still "
-            "selects tools by a scripted sequence."
+            "recorded in a tamper-evident trail. A dispatched run consults the model its "
+            "definition binds, and every tool that model chooses passes the same governed "
+            "entry a scripted one would — refused when it must be, recorded either way. "
+            "`get_run_report` compiles what a run did from those records; it composes "
+            "nothing, and states what it could not verify rather than smoothing it over."
         ),
         token_verifier=verifier,
         # THE SDK REFUSES A VERIFIER WITHOUT THESE, and the refusal is correct: a token

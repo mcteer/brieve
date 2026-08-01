@@ -93,9 +93,13 @@ cat <<NOTE
     token from the same identity provider the portal signs people in against. A token that
     maps to no role is refused — which is the mechanism working, not a misconfiguration.
 
-    IT SERVES THE TRANSPORT. IT DOES NOT PUT A MODEL IN THE RUN LOOP. A dispatched run
-    still selects tools by a scripted sequence (ROADMAP gap 0e). What a client sees here is
-    governance running, refusals refusing, and evidence being written — which is the
-    platform working, and is not an agent deciding anything.
+    IT SERVES THE TRANSPORT. Since 020 a dispatched run also consults the model its
+    definition binds, so what a client sees is a model choosing, governance intercepting the
+    choice, and evidence being written about both. `get_run_report` (021) compiles that into
+    an account whose every claim traces to a record.
+
+    This text claimed the opposite until 021 — "a dispatched run still selects tools by a
+    scripted sequence (ROADMAP gap 0e)" — which was true when it was written and stopped
+    being true the day 0e closed.
 
 NOTE
