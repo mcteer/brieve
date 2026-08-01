@@ -42,6 +42,38 @@ have described a scripted sequence: every tool the same, chosen by nobody, refus
 first run whose account is genuinely uncertain — a model chose, something was denied, it chose
 again — is the first run a report can get *wrong* in the way ADR-0018 is about.
 
+## Clarifications
+
+### Session 2026-08-01
+
+- Q: Is a report a stored snapshot or compiled on demand? → A: **Compiled on demand, never
+  stored.** Every request recompiles from the records. Two reports of the same run agree because
+  the records are append-only — and when a read-back differs, **the world changed, and that is
+  the finding rather than an inconsistency to hide.** The rejected alternative, compiling once at
+  run end and storing it, would make a report a second store that can drift from the evidence it
+  claims to summarise, and would quietly make "reports are presentation" false: something
+  persisted is something another component can eventually read as a source.
+- Q: Does read-back apply to every effect claim, or only non-repeatable ones? → A: **Wherever an
+  observer exists; flagged as `unverified: no observer` where none does.** The two rejected
+  answers both decide silently. Restricting to non-repeatable effects leaves every other claim
+  asserted from the record with nothing saying so; requiring it everywhere promises a read-back
+  for tools that have no way to perform one, which would be satisfied by writing a stub observer
+  that returns success. **The absence of a read-back is a fact about the claim, so it belongs in
+  the claim** — and this is the one option under which no claim is ever silently asserted.
+- Q: Who may request a report? → A: **Whoever may read the evidence — tenant-scoped, not
+  restricted to the run's subject.** Many personas in an organization need these: auditors,
+  compliance, platform operators, the reviewer of a change record that cites one. Measured rather
+  than assumed — `EvidenceQueryRequest` is bounded by `tenant_id` and carries **no subject field
+  at all**, so any authenticated caller can already read any run's entries in their tenant. **A
+  report therefore grants no new access; it makes legible what is already readable**, which is
+  the honest framing. A subject-only rule would have been theatre the raw evidence path walks
+  straight past.
+
+  **This uncovered a leak.** `get_run_result` *is* subject-restricted (`runs.py:183` refuses
+  `not_permitted` when the caller is not the run's subject) because a run's **output** is a work
+  product rather than a governance record. A report carrying that payload would route around the
+  restriction and become precisely what FR-009 forbids. See FR-008a.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Every claim traces to a record (Priority: P1)
@@ -64,6 +96,9 @@ record it came from.
    denial appears — a report that omits what was refused describes a different run.
 3. **Given** a run in another tenant, **When** a report is requested, **Then** it is answered
    exactly as a run that does not exist.
+3a. **Given** a caller in the run's tenant who did **not** start it — an auditor, a reviewer —
+   **When** they request the report, **Then** they receive it, and it contains no part of the run's
+   result payload.
 4. **Given** one run, **When** the fidelity gate scores its report and a person requests the same
    report, **Then** both receive the same set of claims — the gate is scoring what the person
    reads, not a variant of it.
@@ -110,10 +145,14 @@ observe the report decline to claim completion.
 
 **Acceptance Scenarios**:
 
-1. **Given** a step recorded as allowed, **When** the report is about to claim it completed,
-   **Then** the authoritative state is re-read and the claim reflects what was found.
+1. **Given** a step recorded as allowed **and a tool with an observer**, **When** the report is
+   about to claim it completed, **Then** the authoritative state is re-read and the claim
+   reflects what was found.
 2. **Given** the authoritative state cannot be re-read, **When** the report is compiled, **Then**
    the claim is flagged as unverified rather than asserted or dropped.
+3. **Given** a step recorded as allowed **and a tool with no observer**, **When** the report is
+   compiled, **Then** the claim carries `unverified: no observer` — visibly a record-only claim,
+   never presented as product-confirmed.
 
 ---
 
@@ -130,8 +169,10 @@ observe the report decline to claim completion.
   introduced, and a reader will want them distinguished from a crash.
 - **The report would contain a secret.** Tool arguments are hashed and secret values never enter
   the trail; a report that re-derived anything from a live product must hold the same line.
-- **Two reports of the same run.** They must agree, because both compile from the same records —
-  and if they do not, the records changed, which is itself the finding.
+- **Two reports of the same run.** They agree on what the records say, because the records are
+  append-only and nothing recompiles them differently. They may differ on a **read-back**, and
+  that is not an inconsistency to smooth over: it means the product's state changed after the run
+  ended, which is exactly the thing a report exists to surface.
 
 ## Requirements *(mandatory)*
 
@@ -155,6 +196,14 @@ observe the report decline to claim completion.
   would be an ungoverned read path wearing a report's clothes.
 - **FR-008**: A run outside the caller's tenant MUST be answered exactly as a run that does not
   exist — the same indistinguishability the evidence read path already holds.
+- **FR-008a**: A report MUST be scoped **as an evidence read is** — by tenant, not by the run's
+  subject — and MUST NOT carry the run's **result payload**, which `get_run_result` restricts to
+  the subject who started it. A run's governance record and its work product are scoped
+  differently on purpose, and a report is the first artifact able to smuggle the second out under
+  the first's rules.
+- **FR-008b**: A report MUST grant **no access the caller does not already have** through the
+  governed evidence path. It is a compilation of readable records, not a new privilege; if a
+  report can show something `read_evidence` cannot, that is a widening and a defect.
 - **FR-009**: A report MUST NOT contain secret values, and MUST NOT become a route to material
   the caller could not otherwise read.
 - **FR-010**: A report MUST record whether the evidence it compiled from **verified** — the chain,
@@ -175,6 +224,13 @@ observe the report decline to claim completion.
   enforces for the other four.
 - **FR-014**: Reports MUST NOT become the source of any claim elsewhere in the platform. Nothing
   may read a report to decide anything; attestation continues to rest on records.
+- **FR-014a**: A report MUST be **compiled on demand and never persisted**. No report store, no
+  report identity, no retention policy — because a stored report is a second copy of the evidence
+  that can drift from it, and anything persisted is eventually read as a source, which is
+  precisely what FR-014 forbids.
+- **FR-014b**: Two reports of the same run MUST agree on every claim drawn from the records.
+  They MAY differ on a **read-back** claim, and where they do, the report MUST make clear that
+  the difference is a change in the product's state rather than an inconsistency in the report.
 - **FR-015**: A report serves **two consumers, with different purposes and the same data**: a
   person reads it as the account of what a run did, and the fidelity gate scores it. Both MUST
   consume the **same compiled object**.
@@ -191,16 +247,23 @@ observe the report decline to claim completion.
 - **FR-015c**: The two purposes MAY differ in what they *emphasise* — a person wants what needs
   attention first, the gate wants every claim with its provenance — but neither may see a claim
   the other cannot. Prioritisation and ordering are presentation; the set of claims is not.
-- **FR-016**: [NEEDS CLARIFICATION: Does read-back (FR-006) apply to every effect claim, or only
-  to non-repeatable ones? Every observer that exists today was built for non-repeatable tools,
-  and re-reading state for a repeatable read costs a live product call per claim to re-derive a
-  fact the trail already holds. This decides how much of US3 exists.]
+- **FR-016**: Read-back MUST be performed for every effect claim **for which an observer exists**.
+- **FR-016a**: Where no observer exists, the claim MUST carry `unverified: no observer` rather
+  than being asserted as complete. **The absence of a read-back is a fact about the claim**, and
+  a report that omitted it would present a record-only claim and a product-confirmed one as the
+  same kind of statement.
+- **FR-016b**: This feature MUST NOT add observers to satisfy FR-016. An observer written to
+  make a claim verifiable, rather than because the product can genuinely be asked, is a stub that
+  returns success — which converts an honest `unverified` into a false `confirmed` and is worse
+  than the gap it closes. Observers for currently-unobservable tools are separate work with their
+  own justification.
 
 ### Key Entities
 
-- **RunReport**: a typed, structured account of one run, compiled from that run's records. Every
-  field traces to evidence; fields that could not be reconciled carry that status rather than a
-  value. New.
+- **RunReport**: a typed, structured account of one run, **compiled on demand from that run's
+  records and never stored**. Every field traces to evidence; fields that could not be reconciled
+  carry that status rather than a value. It has no identity of its own and no lifecycle — a
+  report is not a thing that exists between requests. New.
 - **Claim**: one statement in a report, together with what it was validated against and whether
   that validation succeeded. New.
 - **Material event**: something in a run that a faithful report must mention — a denial, an
@@ -216,10 +279,15 @@ observe the report decline to claim completion.
 - **SC-002**: A run containing a denial produces a report mentioning it in 100% of cases.
 - **SC-003**: An unreconcilable claim is flagged in 100% of cases, and **0** are omitted or
   softened.
-- **SC-004**: A terminal claim is preceded by a read-back of authoritative state in 100% of cases,
-  and a failed read-back yields a flag rather than an assertion.
+- **SC-004**: Every effect claim whose tool has an observer is preceded by a read-back, in 100% of
+  cases; a failed read-back yields a flag rather than an assertion.
+- **SC-004a**: **0** effect claims are asserted as complete without either a read-back or an
+  explicit `unverified: no observer` — the two together must account for every one of them.
 - **SC-005**: A report request for another tenant's run is indistinguishable from one for a
   nonexistent run — **0** discriminating signals, including message text and reason code.
+- **SC-005a**: A caller who is not the run's subject can obtain its report, and **0** run result
+  payloads reach them through it — the access a report grants matches the evidence path's exactly,
+  neither narrower nor wider.
 - **SC-006**: `report_fidelity` is a blocking suite; **0** owed Quality Gate rows remain.
 - **SC-007**: The fidelity suite measures claim precision and recall, and fails rather than skips
   when it cannot run.
@@ -258,4 +326,8 @@ observe the report decline to claim completion.
   governed read, not a modification of it.
 - `get_run_result` stays as it is. A report is a different artifact from a run's output, and
   merging them would make the checkpoint payload's shape a compatibility surface — which that
-  function's own docstring argues against.
+  function's own docstring argues against. **They are also scoped differently on purpose** (FR-008a):
+  the result is the subject's work product, the report is the tenant's governance record.
+- Many personas read reports. Auditors, compliance, platform operators and change reviewers are
+  the intended audience alongside the person who started the run — which is why the artifact is
+  scoped to the evidence path rather than to the run's owner.

@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic
@@ -31,13 +31,22 @@
 
 ## Notes
 
-**15 of 16 pass. One [NEEDS CLARIFICATION] marker remains, for `/speckit-clarify`.**
+**16 of 16 pass after clarification.** Three questions asked, three answered, zero markers remain.
 
-- **FR-016 — does read-back apply to every effect claim or only non-repeatable ones?** Every
-  observer in the tree was built for non-repeatable tools. Requiring read-back for repeatable
-  reads costs a live product call per claim to re-derive a fact the trail already holds; not
-  requiring it leaves a class of claim asserted from the record alone, which is most of what
-  ADR-0018 is worried about. The answer decides how much of US3 exists.
+**The most valuable answer was a correction, not a confirmation.** The recommendation on scoping
+was *the run's subject only*, matching `get_run_result`. That was wrong, and the maintainer said
+so: many personas in an organization read these — auditors, compliance, platform operators, the
+reviewer of a change record that cites one.
+
+Measuring rather than arguing settled it in one look. `EvidenceQueryRequest` is bounded by
+`tenant_id` and **carries no subject field at all**, so any authenticated caller can already read
+any run's entries in their tenant. A subject-only report would have been theatre the raw evidence
+path walks straight past.
+
+**And that measurement found a leak nothing else would have.** `get_run_result` *is*
+subject-restricted, because a run's output is a work product rather than a governance record. So
+a report carrying that payload routes around the restriction — the exact widening FR-009 forbids,
+arriving inside the feature that reads everything. FR-008a and SC-005a now forbid it explicitly.
 
 **Resolved during specify, by the maintainer: a report serves the human and the gate, for
 different purposes, from the same data.**
