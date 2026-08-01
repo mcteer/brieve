@@ -31,7 +31,7 @@
 
   **Deliberately NOT the `host_enclave` pytest line in `Makefile`**, which is where an earlier draft of this task sent it. These rows need the served process standing; 017's `tests/conformance/deployment` is likewise absent from that line and runs through `infra/bin/deployment-conformance`, which brings its surfaces up first. Rows on the pytest line would execute against nothing and fail. The lane wiring lives in T015, and it must land before T016 adds the first `test_*.py` — that is when `tests/unit/test_every_conformance_directory_is_run.py` starts checking this directory, since it only considers directories that contain rows.
 - [ ] T002 Record the per-directory `pytest --collect-only -q` counts from `main` in `specs/019-mcp-server/contracts/conformance.md`, as the baseline SC-007 compares against.
-- [ ] T003 [P] Confirm `mcp==1.28.1` resolves and expose the server and client entry points it provides, noting in `research.md` which API shape the version actually offers — the SDK is a declared dependency that nothing has ever imported, so its surface is unverified in this repository.
+- [ ] T003 [P] Record in `specs/019-mcp-server/research.md` which server and client APIs `mcp==1.28.1` actually provides, and confirm it resolves — the SDK is a declared dependency that nothing has ever imported, so its surface is unverified in this repository.
 
 ---
 
@@ -124,8 +124,12 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 
 **Independent test**: connect from macOS, outside the platform's network.
 
-- [ ] T033 [US4] Add `test_it_is_reachable_from_outside_the_platform_network` in `tests/conformance/mcp_served/test_it_is_reachable.py` (FR-014, SC-006). **Record its limit in the contract**: this proves reachability *from where the lane runs*, and if the lane ever moves somewhere sharing a network namespace with the platform, the row keeps passing and stops meaning anything.
+- [ ] T033 [US4] Add `test_it_is_reachable_from_outside_the_platform_network` in `tests/conformance/mcp_served/test_it_is_reachable.py` (FR-014). **Not SC-006** — an earlier draft tagged it so, and this row proves network reachability from where the lane runs, which is a different claim from *a person followed the instructions and succeeded*. Nominal coverage counted it and hid the gap; see T034a. **Record its limit in the contract**: this proves reachability *from where the lane runs*, and if the lane ever moves somewhere sharing a network namespace with the platform, the row keeps passing and stops meaning anything.
 - [ ] T034 [US4] Write the client setup instructions in `docs/development/connecting-a-client.md` — address, credential, configuration — such that someone connects from nothing without reading source (FR-015). Put the honest limit here too: this is one of the two places a reader arrives from, and a limit recorded only where nobody lands is not recorded (FR-018).
+- [ ] T034a [US4] **After T034**, perform SC-006 and FR-015 as a **documented act** and record it in `specs/019-mcp-server/contracts/conformance.md`: a person follows `docs/development/connecting-a-client.md` from nothing, connects a client, and records what happened — including anything they had to read source to discover, because that is the criterion failing.
+
+  **The constitution requires this to have a name.** "A blocking row that no automated check executes MUST have a named party responsible for running it before merge." SC-006 and FR-015 are human-judgement criteria; no row can evaluate them. The plan's "no named human runner is owed" is true of the rows and false of these two, which is the same distinction the contract already draws for FR-017's demonstration and had not applied here. Analysis pass 5 found it — SC-006 was tagged onto T033, which proves reachability rather than followability, so nominal coverage read 100% while nothing evaluated it.
+
 - [ ] T035 [P] [US4] Add `test_neither_process_takes_the_other_down` in `tests/conformance/mcp_served/test_it_is_reachable.py` (FR-015a, SC-008) — stop each, the other keeps serving.
 
 ---
@@ -172,6 +176,7 @@ Phase 7 (Polish)
 - **Within US1**: T016 and T017 are different assertions in one module, written in parallel once T013–T015 land. T018a is independent of both.
 - **Within US2**: T022 and T024 alongside T023.
 - **Within US3**: T028a, T030, T032, T032a and T032b alongside T028–T029.
+- **Within US4**: T033 and T035 are independent; **T034a is not** — it follows T034, because a person cannot follow instructions that have not been written. An earlier draft placed it first.
 - **Phase 7**: T037 and T039 are independent of everything else remaining.
 
 ---

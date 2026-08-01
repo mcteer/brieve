@@ -9,10 +9,19 @@ What these rows assert, what they refuse to assert, and who runs them.
 
 **Every row here is executed by an automated check** — a new `host_enclave` lane over
 `tests/conformance/mcp_served/`, which brings the served process up, drives it with a real
-client over a real socket, and tears it down. **No named human runner is owed for the rows**
+client over a real socket, and tears it down. **No named human runner is owed for the rows** — true of the rows and of nothing else
 (constitution v1.3.0, Quality Gates).
 
-**FR-017's demonstration is NOT a row.** It is a documented act, performed once by a person
+**Two things here are not rows, and each needs a named person.** The constitution requires it:
+a blocking row no automated check executes MUST have a named party responsible before merge.
+
+**SC-006 and FR-015 are the pair an earlier draft missed** — *a person follows the written setup
+from nothing and connects*. No row can evaluate followability, and SC-006 had been tagged onto
+an automated reachability row, so nominal coverage read 100% while nothing assessed it. T034a
+performs it and records the outcome here, including anything the person had to read source to
+discover, because that is the criterion failing rather than an aside.
+
+**FR-017's demonstration is the other, and is NOT a row.** It is a documented act, performed once by a person
 against their own enclave and recorded below with its output: a client presenting a credential
 that must be refused, observed being refused *by the core*. That distinction is the same one
 018 drew, and blurring it would let "no human runner owed" — true of the rows — read as true of

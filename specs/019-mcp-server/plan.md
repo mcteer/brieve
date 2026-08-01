@@ -77,9 +77,20 @@ transport class, its operations, and its fifty-six existing rows are unchanged.
 | X — The Decision Record Governs | **Pass** | ADR-0033 and ADR-0048 are implemented, not amended. No new ADR is needed — this builds what a record already decided. |
 
 **Quality Gates — who runs what.** Every row this feature adds is executed by an automated
-check. **No named human runner is owed for the rows.** FR-017's demonstration is not a row: it
-is a documented act performed once against a developer's own enclave and recorded with its
-output, on the model 018 set.
+check. **No named human runner is owed for the rows** — and that sentence is true of the rows
+and of nothing else, which an earlier draft of this plan did not say.
+
+Three things here are **not** rows and each needs a person:
+
+| | What it is | Who |
+| --- | --- | --- |
+| FR-017's demonstration | A credential that must be refused, observed refused *by the core* | The implementer, once, against their own enclave |
+| **SC-006 / FR-015** | Someone follows the written setup from nothing and connects | The implementer, once — **T034a** |
+
+The constitution is explicit that a blocking row no automated check executes MUST have a named
+party responsible before merge. SC-006 and FR-015 are human-judgement criteria that no row can
+evaluate; SC-006 was tagged onto an automated reachability row, so nominal coverage read 100%
+while nothing assessed it. Found by analysis pass 5.
 
 **Gate result**: **PASS — proceed to Phase 0**
 
