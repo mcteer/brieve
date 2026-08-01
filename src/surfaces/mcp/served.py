@@ -113,7 +113,20 @@ def build_transport() -> McpTransport:
     thread_store.migrate()
 
     return McpTransport(
-        run_dispatcher=NomadDispatcher(run_index=run_index),
+        # THE SCHEDULER'S ADDRESS IS CONFIGURATION, and leaving it defaulted is a defect
+        # this repository has now made twice.
+        #
+        # `NomadDispatcher()` defaults to `http://127.0.0.1:4646` — correct for a host
+        # process and wrong for an allocation, and doubly wrong for a BRIDGE one, where
+        # loopback is the container itself. 014 found the same omission in the sweeper,
+        # where every resume failed `Connection refused` on a path nobody was watching for
+        # five features. Here the jobspec sets NOMAD_ADDR and the first version of this
+        # assembly ignored it — caught by US3's rows on their first run, because starting a
+        # run is the only operation that dispatches.
+        run_dispatcher=NomadDispatcher(
+            run_index=run_index,
+            nomad_addr=os.environ.get("NOMAD_ADDR") or "http://127.0.0.1:4646",
+        ),
         audit_sink=audit_sink,
         evidence_query=PostgresEvidenceQuery(
             credentials=VaultDatabaseCredentials(
