@@ -67,13 +67,17 @@ class McpTransport:
         definitions: Any | None = None,
         thread_store: ThreadStore | None = None,
         reconciler: Any | None = None,
+        ask_provider: Any | None = None,
+        ask_model: str = "unconfigured",
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
         # 024. Absent by default: a surface with no model answers 503 rather than answering from
-        # the corpus alone, which FR-011a forbids.
-        self._ask_provider: Any = None
-        self._ask_model: str = "unconfigured"
+        # the corpus alone, which FR-011a forbids. Injected like the seven collaborators below,
+        # because parity compares what the two surfaces DO and one they cannot be shown to share
+        # is one they can silently differ on.
+        self._ask_provider: Any = ask_provider
+        self._ask_model: str = ask_model
         self._evidence = evidence_query
         self._submitter = authority_submitter
         # Mirrors `create_app`'s collaborators exactly, and the mirroring is the point: the

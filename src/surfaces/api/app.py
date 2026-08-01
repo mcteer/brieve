@@ -54,6 +54,10 @@ def create_app(
     definitions: Any | None = None,
     thread_store: ThreadStore | None = None,
     reconciler: Any | None = None,
+    # 024. Absent by default, and the route is mounted regardless: a surface with no model
+    # answers 503 rather than answering from the corpus alone, which FR-011a forbids.
+    ask_provider: Any | None = None,
+    ask_model: str = "unconfigured",
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -99,7 +103,7 @@ def create_app(
     # 024. Mounted unconditionally: the operation exists on this surface whether or not a model is
     # configured, and answers 503 when one is not. A route whose PRESENCE varied by configuration
     # would make the operation snapshot depend on assembly — which 011 already paid for once.
-    app.include_router(ask.build_router())
+    app.include_router(ask.build_router(provider=ask_provider, model=ask_model))
     app.include_router(threads.build_router())
     if authority_submitter is not None:
         app.include_router(mappings.build_router())

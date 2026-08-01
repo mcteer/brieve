@@ -111,6 +111,11 @@ def surface_under_test(
     subject: str = "alice",
     submit_outcome: str = "pending",
     reconciler: object | None = None,
+    # 024's collaborator, shared like the seven below. `None` leaves both surfaces with no
+    # model, which is what an unconfigured deployment actually has — the parity rows then
+    # compare two surfaces giving that same 503.
+    ask_provider: object | None = None,
+    ask_model: str = "unconfigured",
 ) -> SurfaceUnderTest:
     idp = FakeOIDCProvider()
     audit = InMemoryAuditSink()
@@ -153,6 +158,8 @@ def surface_under_test(
         # the ABSENT reconciler, which is what an estate with no second copy actually
         # has — the parity rows then compare two surfaces giving that same answer.
         reconciler=reconciler,
+        ask_provider=ask_provider,
+        ask_model=ask_model,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
@@ -166,6 +173,8 @@ def surface_under_test(
         definitions=definitions_fabric,
         thread_store=thread_store,
         reconciler=reconciler,
+        ask_provider=ask_provider,
+        ask_model=ask_model,
     )
     return SurfaceUnderTest(
         app=app,

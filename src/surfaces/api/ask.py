@@ -78,7 +78,14 @@ class AskRequest(BaseModel):
     question: str
 
 
-def build_router() -> APIRouter:
+def build_router(*, provider: Any = None, model: str = "unconfigured") -> APIRouter:
+    """The provider is a **parameter**, so a deployment can supply one and a test can share one.
+
+    An earlier draft read it off the router with `getattr`, which meant nothing could ever set it:
+    the operation was permanently 503 in every assembly, and the parity rows could only compare two
+    surfaces failing. A collaborator that cannot be injected is a collaborator the surfaces cannot
+    be shown to share — the exact asymmetry `surface_under_test` exists to prevent.
+    """
     router = APIRouter(tags=["ask"])
 
     @router.post("/ask")
@@ -99,7 +106,6 @@ def build_router() -> APIRouter:
                 status.HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)
             ) from unavailable
 
-        provider = getattr(router, "_provider", None)
         if provider is None:
             # RECORDED ANYWAY. Someone asked; the platform could not attempt it. 022 established
             # that a refusal records — a boundary a caller can probe without trace is the thing
@@ -123,7 +129,7 @@ def build_router() -> APIRouter:
                 corpus=corpus,
                 provider=provider,
                 audit=audit,
-                model=str(getattr(router, "_model", "unconfigured")),
+                model=model,
             )
         except ProviderUnavailable as unreachable:
             # NOT a decline. A reader cannot tell "the corpus does not say" from "we could not
