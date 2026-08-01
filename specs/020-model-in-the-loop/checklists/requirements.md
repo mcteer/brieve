@@ -51,3 +51,16 @@ and is asserted. This feature does not make governance better; it gives governan
 decision to intercept for the first time. Every existing row passes today about a sequence
 nobody chose, which is why FR-010 insists the new rows drive a dispatched run rather than a
 constructed agent — the same argument 019 made, for the same reason.
+
+## After planning (2026-08-01)
+
+**Constitution Check passes, with one obligation recorded rather than discharged.** Principle V
+is `Pass, WITH REVIEW OWED`: the audit schema is genuinely touched by one additive
+`AuditEventType` member. Research F1 establishes the change is additive, that the enum is
+unversioned, and that no test asserts its membership — **which is not the same as exempt.**
+Principle V requires security-maintainer review of an audit-schema change, and that is owed
+before merge.
+
+That distinction is the one 019's plan nearly got wrong in the other direction, claiming the
+core was untouched when the seam merely already existed. Here it is touched, and saying so is
+cheaper than a verdict that has to be walked back.
