@@ -13,6 +13,11 @@ is; both were invisible from the spec.
 - `FixtureScorer` returns `case.recorded` — the authored string. It never calls anything.
 - `LiveModelScorer` asks a real model **directly**.
 
+**This is true of every prompt-scoring suite, not just the two this feature fixes** —
+`citation_accuracy`, `must_decline`, `must_deny`, and `estate_state` all carry authored `recorded`
+strings and all are scored by `FixtureScorer`. Scoping the fix to two of them is a decision, and
+FR-015a requires the other two to carry a written disposition rather than an absence.
+
 **So both lanes bypass any answering path.** The blocking lane replays a recording; the live lane
 talks to a vendor. Neither has ever exercised product code, which is exactly why
 `citation_accuracy` and `must_decline` pass over a capability that does not exist.

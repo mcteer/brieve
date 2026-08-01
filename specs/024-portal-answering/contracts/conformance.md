@@ -45,6 +45,21 @@ Asserted by exercising the path, not argued from structure.
 **`citation_accuracy` and `must_decline` score what the product path produced.** This is the row
 that closes the finding this feature was written around.
 
+### Every prompt-scoring suite, and where it stands (FR-015a)
+
+**Written out in full, because the failure being fixed is a suite nobody looked at.**
+
+| Suite | After this feature | Why |
+| --- | --- | --- |
+| `citation_accuracy` | **Scores product output** | This feature's |
+| `must_decline` | **Scores product output** | This feature's |
+| `must_deny` | **Decided by T025a** — product output, or an entry here naming what would close it | Same shape as the two above: a prompt with an authored `recorded` response. It is about a governed run refusing rather than about answering, so it may not be reachable from this path — but *"not about answering"* is not by itself a reason to leave it, and an earlier draft used it as one. |
+| `estate_state` | **Stays authored** | Belongs to the deferred estate-state feature and is that feature's obligation. Recorded so it reads as assigned rather than overlooked. |
+| `report_fidelity` | Already scores compiled reports | 021's, and not prompt-scored. |
+
+**No suite is left unaccounted for.** That is the whole point of this table: the defect this feature
+exists to close was four suites nobody had asked what they scored.
+
 ---
 
 ## What these rows refuse to assert
@@ -57,7 +72,8 @@ answer was traceable, not that it was right.
 statement in the corpus, correctly cited, passes every row here — as it should.
 
 **They do not assert anything about estate-state answering.** That is a separate feature, and rows
-here must not be read as covering it.
+here must not be read as covering it — including its `estate_state` suite, which continues to score
+authored recordings until that feature closes it.
 
 **They do not assert the model will behave this way tomorrow.** The blocking lane scores a fixture.
 The live lane qualifies a cell at a point in time, which makes the guarantee **periodic** rather

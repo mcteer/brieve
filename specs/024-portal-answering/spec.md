@@ -211,6 +211,10 @@ from it.
   path** produces, not material authored to satisfy them. Their `recorded` fixtures currently
   describe runs that never happened, because no answering path existed. `estate_state` stays as it
   is and is that feature's obligation.
+- **FR-015a**: Every eval suite that scores a **response to a prompt** MUST either score product
+  output or carry a written statement of why it does not, naming what would close it. The defect
+  this feature exists to fix is a suite asserting over material nothing produced; fixing two suites
+  and declaring the rest out of scope leaves the same defect with no owner.
 - **FR-016**: A live provider lane MUST remain out of the blocking path, and the blocking lane MUST
   remain runnable with no vendor credential.
 - **FR-016a**: The answering path MUST accept an **injected provider**, so the blocking lane can
@@ -242,6 +246,9 @@ from it.
 - **SC-007**: The blocking lane runs green with **no vendor credential**.
 - **SC-008**: `citation_accuracy` and `must_decline` score output the product path produced,
   rather than material authored to satisfy them.
+- **SC-008a**: Every remaining prompt-scoring suite either does the same or carries a written
+  disposition naming what would close it. Verified by reading the contract and finding no suite
+  unaccounted for.
 - **SC-009**: A corpus change is detected without any version metadata, and citations reflect it.
 - **SC-010**: No answer's content is copied into the audit trail.
 

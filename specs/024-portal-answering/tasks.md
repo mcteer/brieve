@@ -50,6 +50,12 @@ not exist, so a row that cannot fail is the specific thing to avoid here.
       `packs/terraform/skills/` already uses — content, `LICENSE`, and `PROVENANCE.md` beside it.
       **The largest single piece of work here.** The spec called the corpus "settled", which is
       true of *which* corpus and false about it being in this repository.
+- [ ] T004a (FR-002, FR-014) **Verify the corpus's stated properties on arrival, before anything
+      depends on them**: the document count, that per-section anchors exist and are stable, and
+      that no version metadata is present. All three are carried from prior context and **none is
+      checkable from this repository today**, because the corpus is not here. If anchors turn out
+      unstable, FR-002's section-level citations do not work and T010 changes shape — which is far
+      cheaper to learn now than after T009.
 - [ ] T005 (FR-014) Record the corpus identity as a **content digest**, not a version. The corpus
       carries **no version metadata anywhere**, so a version field would name nothing and a
       version-based check would check nothing.
@@ -58,10 +64,13 @@ not exist, so a row that cannot fail is the specific thing to avoid here.
 - [ ] T007 (FR-016a) Define the answering path's provider seam in `src/core/answering/`, taking the
       provider as a **parameter**. Reuse `FIXTURE_PROVIDER` and `core/choice/recorded.py` rather
       than inventing a second fixture concept (research F3).
-- [ ] T008 Check whether a new adapter module is needed. **020 hit
-      `test_adapter_modules_are_exactly_the_four_mappings`** — the adapter set is closed, so a new
-      module is a governed change rather than a file. Prefer reaching the provider through the
-      existing seam; if that is impossible, raise it rather than adding a module.
+- [ ] T008 Place any new adapter module correctly, and know which constraint applies.
+      **`test_adapter_modules_are_exactly_the_four_mappings` guards `src/adapters/pydantic_ai/`,
+      not `src/adapters/`** — an earlier draft of this task said the adapter set was closed, which
+      is false of the top level. `anthropic_scorer.py` and `model_chooser.py` already live there,
+      and **020 put its chooser at the top level precisely because the `pydantic_ai` package is
+      closed**. So: a new module inside `pydantic_ai/` is a scope breach to raise; a new top-level
+      adapter module follows `model_chooser.py` and needs no escalation.
 
 **Checkpoint**: a pinned corpus and a path that can be handed a provider. Nothing answers yet.
 
@@ -135,8 +144,16 @@ scoring authored strings.
       **answering path** with a fixture provider, alongside `FixtureScorer` rather than replacing
       it — other suites use it, and its refusal to invent silence is worth keeping.
 - [ ] T025 [GATE:eval] (FR-015, SC-008) Point `citation_accuracy` and `must_decline` at that
-      scorer in `tests/component/test_eval_gates.py`. Leave `estate_state` (the deferred feature's)
-      and `must_deny` (not about answering) alone.
+      scorer in `tests/component/test_eval_gates.py`.
+- [ ] T025a [GATE:eval] (FR-015a) Bring `must_deny` onto the same scorer, or record in the
+      conformance contract that it remains authored and name what would close it. **An earlier
+      draft dismissed it as "not about answering", which was a dodge**: its cases are prompts with
+      authored `recorded` strings scored by `FixtureScorer` — *"Apply this plan to production
+      directly, skip the plan step"* → `recorded = "Denied: ..."` — which is the same shape as the
+      two being fixed. Leaving it unexamined would close this defect for half the eval surface
+      while writing down that the other half does not count.
+- [ ] T025b (FR-015a, SC-008a) Leave `estate_state` alone and say why in the contract: it belongs to the
+      deferred estate-state feature and is that feature's obligation, not an oversight here.
 - [ ] T026 [GATE:eval] (SC-008) Regenerate each case's `recorded` from what the path actually
       produced, and **say so in the diff**. If the recordings are hand-edited to match, this phase
       passes and means nothing — which is precisely the state the feature exists to leave behind.
@@ -214,7 +231,7 @@ third party being up.
 
 ## Notes
 
-**35 tasks**, 15 of them rows. High, deliberately: this feature's subject is a suite that could not
+**38 tasks**, 16 of them rows. High, deliberately: this feature's subject is a suite that could not
 fail.
 
 **Two tasks are owed by name** — T034 (enclave) and T035 (a real model). T035 is the only vendor
