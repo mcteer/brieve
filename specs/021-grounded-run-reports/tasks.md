@@ -184,7 +184,7 @@
 - [X] T056 [P] Close the owed row in `ROADMAP.md`: report fidelity moves out of "Owed Quality Gate rows", and 021 moves from "In progress" to "Shipped". **State what remains true** — the report is faithful to the records, not present-tense about the world.
 - [X] T057 [P] Add *claim*, *material event*, and *observation* to `docs/glossary.md`.
 - [X] T058 Obtain the **security-maintainer review Principle V requires** for the audit-schema change (T003) and record it in `specs/021-grounded-run-reports/contracts/conformance.md`. The plan records it as owed rather than discharged; a feature that shipped without it would have passed a Constitution Check that said so in writing.
-- [ ] T059 Run the gates: `make check`, `make evals`, `make conformance-hermetic`, and the full `make conformance`; compare per-directory counts against T002 (SC-011). **Resync the VM clock first** — dispatched rows fail on `nbf` when it drifts, and it presents as a random subset failing each run.
+- [X] T059 Run the gates: `make check`, `make evals`, `make conformance-hermetic`, and the full `make conformance`; compare per-directory counts against T002 (SC-011). **Resync the VM clock first** — dispatched rows fail on `nbf` when it drifts, and it presents as a random subset failing each run.
 
 ---
 
