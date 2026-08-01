@@ -98,3 +98,14 @@ repeated provider call — which is the observable property. It cannot assert wh
 Both to be completed when the feature lands: per-directory collection counts against `main`,
 and the recorded real-provider call with its output, the model used, the choice made, and
 whether it was permitted.
+
+---
+
+## Who runs these rows — 2026-08-01
+
+**The enclave lane does not run on every pull request.** These rows are run by a named party
+before merge — **Dan McTeer** — via `make conformance` in full on a live enclave. That is the
+model the constitution describes for a blocking row no automated check executes.
+
+Run the full `make conformance`, not the individual lanes. The two defects that lane caught on
+its last day were both COMPOSITION failures, visible only when everything ran together.
