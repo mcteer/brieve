@@ -133,6 +133,22 @@ class McpTransport:
             tenant_id=subject.tenant_id,
             agent_definition_id=str(args["agent_definition_id"]),
             requested_tools=frozenset(args.get("requested_tools") or ()),
+            # THE CALLER'S ROLES, WITHOUT WHICH THE RUN REFUSES ITSELF.
+            #
+            # This was missing, and `NomadDispatcher.dispatch` defaults it to the empty set —
+            # so every run started through MCP reached its allocation, tried to manufacture
+            # authority, and died with `no role for subject`. `surfaces/api/runs.py` has
+            # passed them all along; this transport never did.
+            #
+            # **Invisible for four features, for two reinforcing reasons.** The class rows
+            # drive a fake dispatcher that ignores the argument, and nothing had ever started
+            # a REAL run through MCP because nothing served MCP. The surface-parity gate
+            # compared the two transports and could not see it: both were asked to dispatch,
+            # both answered 202, and only one produced a run that could authorize itself.
+            #
+            # Found by 019's rows on the first live `start_run` — which is the whole reason
+            # rows must drive a served process rather than a constructed object.
+            subject_roles=frozenset(subject.roles),
         )
         # 202, as the API returns: the work is accepted, not completed.
         return McpResult(ok=True, status=202, payload=handle.model_dump(mode="json"))
