@@ -22,7 +22,7 @@ import os
 import secrets
 import urllib.parse
 from datetime import timedelta
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from tests.harness.fake_oidc_provider import AuthorizationRefused, FakeOIDCProvider
@@ -98,6 +98,20 @@ class _Handler(BaseHTTPRequestHandler):
             "_warning": DEV_ONLY,
         }
 
+    def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib signature
+        """Answer a preflight instead of 404ing it.
+
+        Part of this flow can run from a browser origin, and a browser that gets a 404 for its
+        preflight reports nothing useful — the request simply never happens and the client waits.
+        """
+        print(f"::dev-idp:: OPTIONS {self.path} origin={self.headers.get('Origin')}", flush=True)
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", self.headers.get("Origin", "*"))
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.end_headers()
+
     def do_POST(self) -> None:  # noqa: N802 - stdlib signature
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/register":
@@ -108,6 +122,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length", "0") or 0)
         form = urllib.parse.parse_qs(self.rfile.read(length).decode())
+        print(
+            f"::dev-idp:: token keys={sorted(form)} redirect={form.get('redirect_uri')}", flush=True
+        )
         try:
             token = self.provider.exchange(
                 code=_one(form, "code"),
@@ -118,9 +135,21 @@ class _Handler(BaseHTTPRequestHandler):
         except AuthorizationRefused as refused:
             # The same refusals the hermetic rows assert on, over the wire — so a browser
             # walking the flow exercises the real rejections rather than a happy path.
+            print(f"::dev-idp:: token REFUSED {refused.reason}", flush=True)
             self._json({"error": refused.reason, "_warning": DEV_ONLY}, status=400)
             return
-        self._json({"access_token": token, "token_type": "Bearer", "_warning": DEV_ONLY})
+        # `expires_in` IS NOT OPTIONAL IN PRACTICE. A client that renews on its own — which is
+        # the entire point of a browser login — needs to know when to. RFC 6749 calls it
+        # RECOMMENDED; a client with nothing to schedule against has no way to keep a session
+        # alive without asking a person, which is the thing being removed here.
+        self._json(
+            {
+                "access_token": token,
+                "token_type": "Bearer",
+                "expires_in": int(_token_lifetime().total_seconds()),
+                "_warning": DEV_ONLY,
+            }
+        )
 
     def _register(self) -> None:
         """Issue a client identifier. Holds nothing.
@@ -182,7 +211,21 @@ class _Handler(BaseHTTPRequestHandler):
                 #
                 # JSON values so a list survives the query string; a bare word is taken as
                 # itself, which keeps the common case readable.
-                claims=_claims(query) or {"groups": ["platform"]},
+                # THE DEFAULT MUST BE A CLAIM THIS PLATFORM ACTUALLY MAPS, or a browser login
+                # completes and every call is then refused `unmapped_claim` — which is the
+                # platform working correctly and is indistinguishable, to the person signing in,
+                # from it being broken.
+                #
+                # `{"groups": ["platform"]}` is what the in-process harness maps; the SERVED
+                # surface reads its mappings from the trust store and the conformance lane mints
+                # `permissions=["platform:operator"]`. A browser client sends no claims of its
+                # own, so it fell through to the wrong default and looped: obtain a token, be
+                # refused, start again.
+                #
+                # A caller can still ask for anything, including something that maps to nothing —
+                # that is FR-009, and the rows that show this platform refusing an unmapped
+                # identity depend on it.
+                claims=_claims(query) or {"permissions": ["platform:operator"]},
             )
         except AuthorizationRefused as refused:
             self._json({"error": refused.reason, "_warning": DEV_ONLY}, status=400)
@@ -200,14 +243,27 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("X-Dev-Only", DEV_ONLY)
+        self.send_header("Access-Control-Allow-Origin", self.headers.get("Origin", "*"))
         self.end_headers()
         self.wfile.write(payload)
 
 
 def _claims(query: dict[str, list[str]]) -> dict[str, Any]:
     """Everything the caller asked to carry, minus the protocol's own parameters."""
+    # A DENYLIST, and its gaps are silent — which is how this went wrong.
+    #
+    # `resource` was missing. MCP requires a client to send it (RFC 8707), so every real editor
+    # did, `_claims` returned `{"resource": ...}`, that was truthy, and the caller in `_authorize`
+    # therefore never fell back to its default claims. The token carried `resource` and nothing
+    # that maps to a role, and every call was refused `unmapped_claim` — after a browser login
+    # that appeared to succeed. A hand-driven flow that sent only the parameters this list already
+    # knew about worked perfectly, which is why it survived being tested.
+    #
+    # Everything the authorization request may legitimately carry, so that a parameter a client
+    # sends by specification never becomes an identity claim by accident.
     protocol = {
         "response_type",
+        "response_mode",
         "client_id",
         "redirect_uri",
         "state",
@@ -217,6 +273,18 @@ def _claims(query: dict[str, list[str]]) -> dict[str, Any]:
         "tenant",
         "scope",
         "nonce",
+        # RFC 8707, and required by the MCP authorization specification.
+        "resource",
+        "audience",
+        "prompt",
+        "display",
+        "login_hint",
+        "max_age",
+        "acr_values",
+        "ui_locales",
+        "id_token_hint",
+        "request",
+        "request_uri",
     }
     out: dict[str, Any] = {}
     for key, values in query.items():
@@ -292,7 +360,17 @@ def serve(*, host: str = "127.0.0.1", port: int = 8090) -> None:  # pragma: no c
         {"provider": FakeOIDCProvider(issuer=issuer), "issuer": issuer},
     )
     print(f"{DEV_ONLY} — listening on {host}:{port}, issuer {issuer}", flush=True)
-    HTTPServer((host, port), handler).serve_forever()
+    # THREADING, because a browser is not the conformance harness.
+    #
+    # This was `HTTPServer`, which serves one request at a time. Every automated row here makes
+    # strictly sequential `urllib` calls and closes each connection, so nothing ever noticed. A
+    # real editor does not: it opens the authorize URL in a browser, the browser holds its
+    # connection open with keep-alive, and the token POST that follows queues behind it forever.
+    #
+    # Observed exactly that way — a client that completed discovery, registration, and
+    # authorization, then hung on "Exchanging token...". The third defect in this chain that only
+    # a real client could surface.
+    ThreadingHTTPServer((host, port), handler).serve_forever()
 
 
 if __name__ == "__main__":  # pragma: no cover
