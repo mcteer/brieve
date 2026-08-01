@@ -224,6 +224,10 @@ from it.
   nothing produced.
 - **FR-012**: Asking MUST leave a record of who asked and what was consulted, and MUST NOT record
   the answer's content in a way that copies corpus or estate material into the trail.
+- **FR-012a**: That record MUST live in a **tenant-scoped stream of its own**, stable across asks.
+  An ask touches neither a run nor a thread, so neither of 022's placements applies, and an entry
+  cannot be written without naming one — the tenant and the subject come from the authenticated
+  caller, never from the request.
 
 **Where it binds**
 

@@ -67,6 +67,18 @@
 
 **What it represents**: that someone asked, and what was consulted.
 
+**Where it lands**: `ask:{tenant_id}` — one stream per tenant, **stable across asks**.
+
+An `AuditEntry` requires a `correlation_id` **and** a `tenant_id`, and an ask has neither a run nor
+a thread — so neither of 022's answers applies. Reads go to `record-access:{tenant}`; acts go to
+the object's own stream; an ask is neither, and an earlier draft of this section named no stream at
+all, which made FR-012 unimplementable.
+
+**Stable per tenant, not per ask**, for the reason `evidence-access` already records: *"a fresh
+correlation ID each time would make every record a chain of one — linked to nothing and removable
+without trace."* Both tenant and subject come from the authenticated caller, exactly as
+`record_access` takes them (`subject.tenant_id`); there is no tenant parameter to widen.
+
 | Field | Note |
 | --- | --- |
 | `subject_user_id` | Who asked. |

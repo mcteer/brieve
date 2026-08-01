@@ -59,9 +59,11 @@ ADR-0004's supply chain has "a genuine subject: real provenance to check, a real
 to pin". A guidance corpus is the same shape of artifact and should not invent a second mechanism
 (Principle VII).
 
-**Open for tasks**: whether the corpus lives under `packs/*/corpus/` per pack or in one shared
-place. It is cited by both packs' suites, which argues for shared; pack pinning argues for
-per-pack. Cheap either way and better decided against the actual documents.
+**Decided at analysis pass 4: one shared location.** Both packs' suites cite the same documents,
+and two copies of one corpus is two things that can drift — which is the failure mode this feature
+exists to remove, not to add. Pack-level pinning argued for per-pack, and it loses: a pack pins
+*its own* skills, and this corpus is not one pack's. If the documents turn out to be genuinely
+pack-specific on arrival (T004a verifies them), reopen it and say so.
 
 ---
 

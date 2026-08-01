@@ -47,7 +47,10 @@ not exist, so a row that cannot fail is the specific thing to avoid here.
 
 ## Phase 2: Foundational — the corpus, and the seam
 
-- [ ] T004 (FR-014) Vendor the guidance corpus under `packs/*/corpus/` following the pattern
+- [ ] T004 (FR-014) Vendor the guidance corpus **in one shared location, not per pack** — both
+      packs' suites cite the same documents, and two copies of one corpus is two things that can
+      drift. Research left this open *"better decided against the actual documents"*; if the
+      documents turn out to be genuinely pack-specific, reopen it and say so. Follow the pattern
       `packs/terraform/skills/` already uses — content, `LICENSE`, and `PROVENANCE.md` beside it.
       **The largest single piece of work here.** The spec called the corpus "settled", which is
       true of *which* corpus and false about it being in this repository.
@@ -71,6 +74,11 @@ not exist, so a row that cannot fail is the specific thing to avoid here.
       model already required a member.
 - [ ] T006b Extend the pinned-digest row in `tests/unit/test_audit_chain.py` with the new member,
       as 020, 021 and 022 each did. The literal must stay byte-identical.
+- [ ] T006c (FR-012a) Define the ask stream — `ask:{tenant_id}`, stable per tenant — beside
+      `record_stream_for`, following `evidence-access`'s reasoning that a fresh correlation id per
+      event makes every record a chain of one. **Analysis pass 4 found the data model named no
+      stream at all**, which made FR-012 unimplementable: an `AuditEntry` requires a
+      `correlation_id` and a `tenant_id`, and an ask has neither a run nor a thread.
 - [ ] T007 (FR-016a) Define the answering path's provider seam in `src/core/answering/`, taking the
       provider as a **parameter**. Reuse `FIXTURE_PROVIDER` and `core/choice/recorded.py` rather
       than inventing a second fixture concept (research F3).
@@ -186,14 +194,22 @@ scoring authored strings.
       the fourth: green because nothing collected them.
 - [ ] T029 [GATE:conformance] Extend the surface-parity rows so both surfaces return the same
       verdict for the same question, including the decline and the provider-failure cases.
-- [ ] T030 Give the operation an audit disposition in `src/surfaces/mcp/operations.py` — 022 made
-      that a required field, so this cannot be skipped.
+- [ ] T030 (FR-012a) Give the operation the `records` disposition in
+      `src/surfaces/mcp/operations.py` — 022 made that a required field with no default, so it
+      cannot be skipped. `records` is right because an ask **writes its own entry**; 022's rule that
+      an operation touching neither a run nor a thread need not record says *need not*, not *must
+      not*, and an ask is activity rather than configuration.
 
 ---
 
 ## Phase 7: Polish
 
 - [ ] T031 Update `docs/glossary.md` — *answer*, *citation*, *corpus pin*, *decline*.
+- [ ] T031a Record in the ROADMAP entry and in this feature's directory that **the name predates
+      the split**: `024-portal-answering` builds answering through the API and MCP, and the portal's
+      answering surface is a separate feature. A planning document that misdescribes what exists has
+      already cost this repository twice in two days; the directory name is not worth renaming
+      mid-feature, but it is worth not being read as a claim.
 - [ ] T032 Record 024 in `ROADMAP.md`, including **both** splits and their reasons — estate-state
       answering, and the portal's answering surface. Two deferrals from one feature is worth the
       next planner seeing plainly.
@@ -253,7 +269,7 @@ third party being up.
 
 ## Notes
 
-**42 tasks**, 18 of them rows. High, deliberately: this feature's subject is a suite that could not
+**43 tasks**, 18 of them rows. High, deliberately: this feature's subject is a suite that could not
 fail.
 
 **Three obligations are owed by name** — T034 (enclave), T035 (a real model), and the **Principle V
