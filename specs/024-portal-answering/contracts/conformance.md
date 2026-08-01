@@ -18,6 +18,7 @@ running, and this feature's whole subject is gates that stopped meaning anything
 | | What it is | Who | Status |
 | --- | --- | --- | --- |
 | Qualifying the `ask` matrix cell | `make evals-live` against a real model | **Dan McTeer** | **Owed** |
+| **Principle V review** | One additive `AuditEventType` member for the ask record (T006a) | **Dan McTeer** | **Owed** — the plan originally asserted no review was needed; analysis pass 2 found the data model already required a member |
 
 ---
 

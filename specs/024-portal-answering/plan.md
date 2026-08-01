@@ -58,7 +58,7 @@ re-pointed, one API operation, one parity row.
 | II — Total Interception; One Governed Tool Layer | **Pass, and by absence.** | The answering path reaches no tool at all. It is not a second tool layer; it is a path with none — which is what makes FR-006 structural rather than a rule. |
 | III — Fail-Closed | **Pass, and implicated.** | An unreachable provider **fails** rather than answering (clarify Q3). An unqualified matrix cell refuses **before** any provider call (FR-009). FR-011a forbids a model-less fallback, because a second path no gate scores is how this feature's own gates reached their current state. |
 | IV — Zero Standing Credentials | **Pass** | Asking carries no authority grant and manufactures none. The answer is bounded by the corpus, not by a credential. |
-| V — Sealed Core, Versioned Seams | **Pass, no review expected.** | No audit schema change, no registry change, no adapter contract change. `Scorer` gains an implementation — that protocol is a published seam and adding to it is what it is for. **If an audit event type turns out to be needed, that changes this verdict and must be raised.** |
+| V — Sealed Core, Versioned Seams | **Implicated. Review owed.** | **One additive `AuditEventType` member**, for the ask record. An earlier draft of this row said no review was expected and hedged it — *"if an audit event type turns out to be needed, that changes this verdict"*. The condition had **already fired at Phase 1**: `data-model.md` defines an Ask record and FR-012 puts it in the trail, and no existing member fits. `MODEL_GATE` carries `run_id, role, model, cell, verdict, step_index` — a verdict gating a **step in a run**, which an ask has neither of. The hedge is why nobody noticed; a conditional verdict reads as a pass. Additive only; the pinned digest must not move. `Scorer` gaining an implementation remains uncontroversial — that protocol is a published seam. |
 | VI — Lean by Default | **Pass, with the corpus noted.** | No new service or store. The corpus is vendored content, following `packs/*/skills/` rather than inventing a mechanism. |
 | VII — Anti-Fragmentation | **Pass, and it is the design.** | Third `Scorer` rather than a parallel harness; `FIXTURE_PROVIDER` reused rather than a second fixture concept; corpus pinned the way skills already are. |
 | VIII — Eval-Gated Promotion | **Pass, and this is where it becomes load-bearing.** | Every prior model call has been an eval harness asking directly. This is the first **product** path to call a provider, which is what turns Principle VIII from advisory into the thing standing between a model and a person. |
@@ -67,7 +67,10 @@ re-pointed, one API operation, one parity row.
 
 **Gate result**: **PASS — proceed to Phase 0.**
 
-**One obligation**: FR-015/SC-008 — the two suites must end up scoring product output. It is the
+**Two obligations.**
+
+1. **A security review request on the PR** (Principle V). Sealed core, and it is owed — see above.
+2. FR-015/SC-008 — the two suites must end up scoring product output. It is the
 requirement most likely to be dropped as "they already pass", and dropping it leaves this feature
 having built an answering path beside gates that still score authored strings.
 

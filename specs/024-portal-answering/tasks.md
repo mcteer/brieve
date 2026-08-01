@@ -61,6 +61,15 @@ not exist, so a row that cannot fail is the specific thing to avoid here.
       version-based check would check nothing.
 - [ ] T006 (SC-009) Assert in `tests/component/` that changing one byte of one document changes the digest,
       and that no version string is consulted.
+- [ ] T006a (FR-012) Add one additive `AuditEventType` member for the ask record in
+      `src/core/audit/schema.py`, with a docstring saying why no existing member fits — `MODEL_GATE`
+      carries `run_id`, `role`, `cell`, `verdict` and `step_index` and describes a verdict gating a
+      **step in a run**, which an ask has neither of. **Sealed core (Principle V): additive only,
+      security review requested on the PR, and the pinned digest in `test_audit_chain.py` must not
+      move.** Analysis pass 2 found this: the plan asserted no review was needed while the data
+      model already required a member.
+- [ ] T006b Extend the pinned-digest row in `tests/unit/test_audit_chain.py` with the new member,
+      as 020, 021 and 022 each did. The literal must stay byte-identical.
 - [ ] T007 (FR-016a) Define the answering path's provider seam in `src/core/answering/`, taking the
       provider as a **parameter**. Reuse `FIXTURE_PROVIDER` and `core/choice/recorded.py` rather
       than inventing a second fixture concept (research F3).
@@ -166,6 +175,12 @@ scoring authored strings.
 
 - [ ] T028 [GATE:conformance] (FR-013) Add the ask operation to the API, and to MCP for parity
       (ADR-0033). The portal calls it rather than answering itself (ADR-0034).
+- [ ] T028a [GATE:conformance] Register `tests/conformance/answering` in the `Makefile`'s
+      `host_enclave` line, which names directories **individually**. **A new directory is invisible
+      to it otherwise**, and the Makefile records that trap three times in its own comments —
+      *"`tests/conformance/identity` was invisible to this line"*, *"014 adds durability, and the
+      trap there is subtler"*, *"018 … very nearly repeated 010's mistake"*. T023's rows would be
+      the fourth: green because nothing collected them.
 - [ ] T029 [GATE:conformance] Extend the surface-parity rows so both surfaces return the same
       verdict for the same question, including the decline and the provider-failure cases.
 - [ ] T030 Give the operation an audit disposition in `src/surfaces/mcp/operations.py` — 022 made
@@ -231,8 +246,11 @@ third party being up.
 
 ## Notes
 
-**38 tasks**, 16 of them rows. High, deliberately: this feature's subject is a suite that could not
+**41 tasks**, 17 of them rows. High, deliberately: this feature's subject is a suite that could not
 fail.
+
+**Three obligations are owed by name** — T034 (enclave), T035 (a real model), and the **Principle V
+security review** for T006a's additive member, which the plan originally asserted was not needed.
 
 **Two tasks are owed by name** — T034 (enclave) and T035 (a real model). T035 is the only vendor
 contact anywhere in the feature.
