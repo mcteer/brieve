@@ -190,8 +190,10 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _authorize(self, query: dict[str, list[str]]) -> None:
         redirect_uri = _one(query, "redirect_uri")
-        # Same reason as `_register`: measure before constraining (023 T015).
         print(f"::dev-idp:: authorize redirect_uri={redirect_uri!r}", flush=True)
+        if not _is_allowed_redirect(redirect_uri):
+            self._json({"error": "invalid_redirect_uri", "_warning": DEV_ONLY}, status=400)
+            return
         state = _one(query, "state")
         try:
             code = self.provider.authorize(
@@ -246,6 +248,34 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", self.headers.get("Origin", "*"))
         self.end_headers()
         self.wfile.write(payload)
+
+
+#: Where an authorization code may be sent.
+#:
+#: **Written from a measurement, not a guess** (023 FR-011a). An editor completing a real flow
+#: registered three targets and used the third:
+#:
+#:     cursor://anysphere.cursor-mcp/oauth/callback
+#:     https://www.cursor.com/agents/mcp/oauth/callback
+#:     http://localhost:8787/callback
+#:
+#: A loopback-literal rule — the obvious thing to write — would have refused all three, and the
+#: refusal would have been indistinguishable from the platform working. So: a loopback host by
+#: name or literal, on any scheme and any port, or a private scheme that is not `http(s)` at all
+#: and therefore cannot leave the machine by itself.
+#:
+#: What this refuses is an arbitrary remote `http(s)` address, which is the case that would make
+#: this an open redirector. Authenticating nobody is not a reason to hand a code anywhere it is
+#: asked to.
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
+
+
+def _is_allowed_redirect(redirect_uri: str) -> bool:
+    parsed = urllib.parse.urlparse(redirect_uri)
+    if parsed.scheme not in ("http", "https"):
+        # A private scheme hands the code to a local application by OS registration.
+        return bool(parsed.scheme)
+    return (parsed.hostname or "") in _LOOPBACK_HOSTS
 
 
 def _claims(query: dict[str, list[str]]) -> dict[str, Any]:

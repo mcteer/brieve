@@ -118,23 +118,23 @@ each.
       still refuses a missing or non-`S256` challenge (FR-010). Asserted rather than assumed
       **because this feature's direction is making the flow easier**, and "just for dev" is how a
       requirement becomes optional.
-- [ ] T015 [US2] (FR-011a) **Observe a real client's `redirect_uri` before writing any constraint.**
+- [X] T015 [US2] (FR-011a) **Observe a real client's `redirect_uri` before writing any constraint.**
       Log what arrives at `/authorize` from an editor doing a genuine discovery-and-sign-in, and
       record the value in this feature's research. **Nothing has ever measured this** — the one
       client watched never reached `/authorize` because discovery broke first, so no `redirect_uri`
       appears in any log. Editors commonly use `http://localhost:PORT/...`, a name rather than the
       IP literal, or a private scheme like `cursor://`.
-- [ ] T015a [US2] [GATE:fail-closed] (FR-011, FR-011b) Constrain the redirect target in
+- [X] T015a [US2] [GATE:fail-closed] (FR-011, FR-011b) Constrain the redirect target in
       `tests/harness/dev_idp.py` using what T015 observed, and assert a clearly-remote target is
       refused. **Check the host only** — scheme, port, and path stay free, because the portal
       already uses `https://127.0.0.1:8082/callback` and the harness uses
       `http://127.0.0.1:0/callback`, and a narrower rule breaks the portal, which lives in `src/`
       where FR-012 forbids a compensating change.
-- [ ] T015b [US2] Assert in `tests/conformance/mcp_served/` that both existing callers' redirect
+- [X] T015b [US2] Assert in `tests/conformance/mcp_served/` that both existing callers' redirect
       shapes still pass — the portal's `https` loopback and the harness's port-`0` loopback. **This
       row exists because the constraint is the one change here that can break something that
       already works**, and it would break it in `src/`, where this feature may not follow.
-- [ ] T016 [US2] [GATE:conformance] (FR-008, SC-003) Assert that a token obtained through the flow and one obtained
+- [X] T016 [US2] [GATE:conformance] (FR-008, SC-003) Assert that a token obtained through the flow and one obtained
       by the existing `caller_token` path resolve to the **same** subject, tenant, and roles
       (FR-008). Note that `surfaces.caller_token` already walks the real flow rather than signing
       its own token, so this compares two real tokens rather than a token against a fixture.
@@ -180,19 +180,19 @@ without restarting the surface.
       starts neither the provider nor the surface, so "ensure it is started by whichever script
       `dev-up` invokes" pointed at nothing. `mcp-surface-conformance` already does this and is the
       pattern to follow.
-- [ ] T022a (FR-003) Write down the full command sequence — enclave up, surface up, configure,
+- [X] T022a (FR-003) Write down the full command sequence — enclave up, surface up, configure,
       connect — in the same place as T023. The Makefile separates `dev-up` from the surfaces *on
       purpose*, so the sequence is two commands and the documentation must say so rather than imply
       one. **A step a developer had to already know is the gap this feature is about**, reappearing
       as instructions instead of a token.
-- [ ] T023 (FR-002) Update `README` or `docs/development/` with the credential-free editor configuration:
+- [X] T023 (FR-002) Update `README` or `docs/development/` with the credential-free editor configuration:
       a URL and nothing else. **The absence of a token in that snippet is the deliverable**, and it
       should be somewhere a person will find it rather than only in this spec.
 - [X] T024 (FR-014, SC-006) Confirm every conformance lane that used a directly minted token still passes, unchanged
       (FR-014). Automated rows must not acquire a browser step.
 - [X] T025 Run `make check`, and assert **no file under `src/` differs** (SC-007) via
       `git diff --stat main -- src/`.
-- [ ] T026 (FR-001, FR-002, SC-001, SC-002, SC-008) Perform quickstart scenario 6 by hand: `make dev-up`, an editor configured with a URL and
+- [X] T026 (FR-001, FR-002, SC-001, SC-002, SC-008) Perform quickstart scenario 6 by hand: `make dev-up`, an editor configured with a URL and
       no credential, a browser sign-in, an operation answered — then wait for expiry and ask again.
       **Owed by name in the conformance contract.** It is the only row that tests what this feature
       is about, and the only one that would have caught the original problem.
