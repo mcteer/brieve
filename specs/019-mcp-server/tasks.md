@@ -27,7 +27,9 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `tests/conformance/mcp_served/__init__.py` and add `tests/conformance/mcp_served` to the `host_enclave` lane line in `Makefile` — **in this task, not later**. 018 shipped twelve rows no lane collected while its contract claimed otherwise; `tests/unit/test_every_conformance_directory_is_run.py` now fails on both shapes of that, so doing this last would simply turn the suite red until it is done first.
+- [ ] T001 Create `tests/conformance/mcp_served/__init__.py` — the directory only, no rows yet.
+
+  **Deliberately NOT the `host_enclave` pytest line in `Makefile`**, which is where an earlier draft of this task sent it. These rows need the served process standing; 017's `tests/conformance/deployment` is likewise absent from that line and runs through `infra/bin/deployment-conformance`, which brings its surfaces up first. Rows on the pytest line would execute against nothing and fail. The lane wiring lives in T015, and it must land before T016 adds the first `test_*.py` — that is when `tests/unit/test_every_conformance_directory_is_run.py` starts checking this directory, since it only considers directories that contain rows.
 - [ ] T002 Record the per-directory `pytest --collect-only -q` counts from `main` in `specs/019-mcp-server/contracts/conformance.md`, as the baseline SC-007 compares against.
 - [ ] T003 [P] Confirm `mcp==1.28.1` resolves and expose the server and client entry points it provides, noting in `research.md` which API shape the version actually offers — the SDK is a declared dependency that nothing has ever imported, so its surface is unverified in this repository.
 
@@ -41,7 +43,9 @@
 
 Today's portal fix cost three deploy cycles to learn this. It is a task now rather than a surprise.
 
-- [ ] T004 Add an environment-driven database host to `src/core/durability/postgres.py`, `src/core/audit/postgres_sink.py`, `src/core/audit/postgres_query.py`, and `src/core/dependencies/store.py` — all four hardcode `host: str = "127.0.0.1"` with no override. **The default stays `127.0.0.1`** so nothing outside an allocation changes, which is the pattern `surfaces/mcp/server.py` already documents for `NOMAD_ADDR`.
+- [ ] T004 Read the database host from the environment in `src/surfaces/mcp/served.py` and **pass it at construction** to the durability provider, the audit sink, the audit query, and the dependency store.
+
+  **Not a core change, and the first draft of this task got that wrong.** All four already accept `host` as a keyword argument — `src/surfaces/api/service.py` passes one on line 184 — so the seam exists and is merely unused from an assembly. An earlier version of this task proposed editing the four `src/core/` modules, which would have made the plan's Principle V verdict ("the core is untouched") false, and Principle V names *audit schema* and *durability* as sealed core requiring security-maintainer review. Analysis pass 1 caught it. **The default stays `127.0.0.1`** so nothing outside an allocation changes, which is the pattern `surfaces/mcp/server.py` documents for `NOMAD_ADDR`.
 - [ ] T005 Verify from inside a **bridge-mode** container which address reaches the trust store, the database, and the scheduler, and record each in `research.md`. **`host.docker.internal` is not automatically the answer**: measured 2026-07-31 it resolves to Docker Desktop's macOS-facing address, which reaches services *published to macOS* (the trust store, the databases) and **not** services in host mode (the API). Getting this wrong produces a service that starts and reaches nothing.
 - [ ] T006 Verify the trust store's certificate covers the name chosen in T005, against the SANs declared in `infra/modules/trust-fabric/pki.tf`. Its SANs are `localhost`, `host.docker.internal`, and `127.0.0.1` — a name outside that set fails verification while working perfectly from an operator's shell, which is the confusing half.
 
@@ -64,10 +68,15 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 
 - [ ] T013 [US1] Create `tests/conformance/mcp_served/surfaces.py` — bringing up, addressing, and reaching the served process, on the model of `tests/conformance/deployment/surfaces.py`.
 - [ ] T014 [US1] Create `tests/conformance/mcp_served/conftest.py` with the lifecycle fixtures and the `enclave`/`host_enclave` markers.
-- [ ] T015 [US1] Add `infra/bin/mcp-surface-conformance` — bring up, mark ownership in the job's `Meta`, run, tear down. 017's lifecycle, including the mark that distinguishes a lane-started surface from a developer's own.
+- [ ] T015 [US1] Add `infra/bin/mcp-surface-conformance` — bring up, mark ownership in the job's `Meta`, run, tear down — and call it from `Makefile`'s `conformance` recipe. 017's lifecycle, including the mark that distinguishes a lane-started surface from a developer's own.
+
+  **This is the lane wiring, and it must land before T016.** The moment a `test_*.py` exists in that directory, `tests/unit/test_every_conformance_directory_is_run.py` requires a lane that both names it and selects its markers — which is what stops the 018 repeat, and which is why this cannot be left to Polish.
 - [ ] T016 [P] [US1] Add `test_a_client_establishes_a_session` in `tests/conformance/mcp_served/test_a_client_reaches_the_surface.py` — the SDK's own client, against the running process (FR-001, SC-001).
 - [ ] T017 [P] [US1] Add `test_the_operation_set_matches_the_other_surface` in `tests/conformance/mcp_served/test_a_client_reaches_the_surface.py`, compared **mechanically** against `specs/008-northbound-api/contracts/operations.snapshot.json` (FR-008, SC-002).
 - [ ] T018 [US1] Add `test_the_served_process_is_assembled_from_real_parts` in `tests/conformance/mcp_served/test_the_assembly_is_real.py` (FR-002, FR-004) — **against the running process**, because assembly is the one path no unit test covers and the reason this feature exists.
+- [ ] T018a [US1] Add `test_no_row_here_constructs_the_transport` in `tests/conformance/mcp_served/test_the_assembly_is_real.py` (FR-016) — assert by source inspection that no module in this directory instantiates `McpTransport` directly.
+
+  **Without this, FR-016 is a sentence rather than a gate.** A row added later that constructs the transport in a fixture would pass, assert what fifty-six existing rows already assert, and be indistinguishable from one driving the served process — which is the exact defect this feature exists to close, reintroduced inside the fix. 018 needed the same shape for the same reason.
 
 ---
 
@@ -78,11 +87,11 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 **Independent test**: call an operation that must be refused and one that must not; confirm both outcomes and where the refusal originated.
 
 - [ ] T019 [US2] Route every operation through `McpTransport` in `src/surfaces/mcp/served.py`, with no protocol-layer path reaching a capability directly (FR-005).
-- [ ] T020 [US2] Map the core's outcomes onto protocol responses in `served.py` so **refused**, **unknown operation**, and **transport failure** are three distinguishable answers (FR-007). Collapsing them tells a caller which operations exist by which error they get, and tells an honest caller nothing.
+- [ ] T020 [US2] Map the core's outcomes onto protocol responses in `served.py` so **refused**, **unknown operation**, **malformed request**, and **transport failure** are four distinguishable answers (FR-007). The fourth was missing: FR-007 names four and an earlier `data-model.md` table listed three, so a requirement and its edge case would have gone unimplemented behind a task that looked complete. Collapsing them tells a caller which operations exist by which error they get, and tells an honest caller nothing.
 - [ ] T021 [GATE:fail-closed] [US2] Assert in `tests/conformance/mcp_served/test_the_refusal_is_the_cores.py` that the protocol layer **authors no refusals** — it may report the core's decision and never make one (FR-006).
 - [ ] T022 [P] [US2] Add `test_an_operation_is_governed` in `tests/conformance/mcp_served/test_the_refusal_is_the_cores.py` (FR-005).
 - [ ] T023 [US2] Add `test_a_refusal_comes_from_the_core` in `tests/conformance/mcp_served/test_the_refusal_is_the_cores.py` (FR-006, SC-005). **Design this row for the trap 018 hit**: a protocol layer refusing on its own produces an outcome identical to the core refusing, so the row must distinguish *where* the refusal came from and not merely that one occurred.
-- [ ] T024 [P] [US2] Add `test_three_failures_are_distinguishable` in `tests/conformance/mcp_served/test_the_refusal_is_the_cores.py` (FR-007).
+- [ ] T024 [P] [US2] Add `test_four_failures_are_distinguishable` in `tests/conformance/mcp_served/test_the_refusal_is_the_cores.py` (FR-007), including **malformed input rejected at the boundary before any governed operation is entered**, with a message naming what was wrong.
 
 ---
 
@@ -100,6 +109,8 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 - [ ] T030 [P] [US3] Add `test_a_lapsed_credential_stops_authorizing` and `test_a_session_binds_to_one_subject` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-013, FR-013a).
 - [ ] T031 [GATE:no-secret-leak] [US3] Assert in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` that no bearer credential appears in logs, audit entries, or error messages. The server now handles caller tokens, which nothing on this surface did before.
 - [ ] T032 [P] [US3] Add `test_no_credential_is_refused_before_the_operation` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-012).
+- [ ] T032a [P] [US3] Add `test_two_sessions_share_nothing` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` — two clients connected at once, neither seeing the other's session, subject, or results. **FR-013a binds one subject per session, which makes cross-session leakage precisely the failure that would be silent**: every operation would still succeed and the trail would still name *a* caller.
+- [ ] T032b [P] [US3] Add `test_a_disconnect_leaves_the_operation_governed` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` — an operation in flight when the client drops stays governed and recorded. A dropped connection must not be a way to leave an operation half-recorded, which would put a gap in a hash-chained trail.
 
 ---
 
@@ -150,9 +161,9 @@ Phase 7 (Polish)
 
 - **T003** runs alongside T001–T002.
 - **Within Phase 2**: T004 and T005/T006 are independent (code versus measurement).
-- **Within US1**: T016 and T017 are different assertions in one module, written in parallel once T013–T015 land.
+- **Within US1**: T016 and T017 are different assertions in one module, written in parallel once T013–T015 land. T018a is independent of both.
 - **Within US2**: T022 and T024 alongside T023.
-- **Within US3**: T030 and T032 alongside T028–T029.
+- **Within US3**: T030, T032, T032a and T032b alongside T028–T029.
 - **Phase 7**: T037 and T039 are independent of everything else remaining.
 
 ---
@@ -163,7 +174,16 @@ Phase 7 (Polish)
 
 **Do not stop at the MVP.** A served surface without US2 and US3 is the dangerous intermediate state: it looks like the platform working while nothing has confirmed that reaching the platform through this door is not a way around it, and every pre-existing row would still pass.
 
-**T001 comes first for a mechanical reason**, not a stylistic one. The lane-membership check fails on a conformance directory no lane selects, so creating the directory without wiring it turns the suite red immediately. That is the check working — 018 shipped rows nothing collected, and this is what stops the next one.
+**T015 must land before T016, for a mechanical reason** rather than a stylistic one. The
+lane-membership check fails on a conformance directory that contains rows and that no lane both
+names and selects the markers of — so the first `test_*.py` written before the lane exists turns
+the suite red. That is the check working: 018 shipped twelve rows nothing collected, and this is
+what stops the next one.
+
+**An earlier draft put that obligation on T001 and pointed it at the wrong lane** — the
+`host_enclave` pytest line, where the rows would have run with no served process standing.
+017's deployment rows are absent from that line for exactly this reason. Analysis pass 1 caught
+it; the ordering constraint is real, it simply belongs one task later and to a different lane.
 
 ## Notes
 

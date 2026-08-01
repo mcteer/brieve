@@ -87,15 +87,23 @@ What crosses the protocol boundary on a single call, before the transport is ent
 The transport already answers with `McpResult` — `ok`, the status the API would have returned,
 and a payload. This feature adds no outcome vocabulary; it frames what exists.
 
-**The three failures a client must be able to tell apart** (FR-007), because they call for
-three different responses and would otherwise share a shape:
+**The four failures a client must be able to tell apart** (FR-007), because they call for
+four different responses and would otherwise share a shape:
 
 | | Means | Client should |
 | --- | --- | --- |
 | **Refused** | The governed core said no | Stop, and tell the user why |
 | **Unknown operation** | No such operation exists | Fix the call |
+| **Malformed request** | The operation exists; the arguments do not fit it | Fix the arguments |
 | **Transport failure** | The surface is unreachable or broke | Retry, or report the platform down |
 
-A surface that returned one shape for all three would be indistinguishable from a broken
+A surface that returned one shape for all four would be indistinguishable from a broken
 platform on every denial — and, in the other direction, would let a genuine outage read as a
 policy decision.
+
+**This table listed three, and FR-007 names four.** Malformed request was missing, and the
+tasks derived from the table rather than from the requirement — so a requirement with an edge
+case of its own would have gone unimplemented behind a task that read as complete. Analysis
+pass 1 found it. The omission is recorded rather than quietly corrected because the mechanism
+is worth remembering: a downstream artifact that is *nearly* right is harder to catch than one
+that is missing.

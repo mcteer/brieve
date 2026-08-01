@@ -29,7 +29,15 @@ is born in bridge mode rather than converting anything that works today.**
 server and, per SC-001, the acceptance client. **No new dependency is added by this feature.**
 
 **Storage**: None new. The served process reaches the same Postgres-backed stores the API
-reaches, through the same collaborators.
+reaches, through the same collaborators — but it **addresses** them differently, because it
+runs in bridge mode. The host is passed at construction, which every one of those collaborators
+already accepts as a keyword argument and which `src/surfaces/api/service.py` already does.
+
+**No `src/core/` module changes, and this was nearly wrong.** The first task list proposed
+adding an environment-driven host to four core modules, which would have made the Principle V
+verdict below false — Principle V names *audit schema* and *durability* as sealed core and
+requires security-maintainer review for changes to them. The seam already existed and was
+merely unused from an assembly. Caught by analysis pass 1.
 
 **Testing**: `pytest`. A new `tests/conformance/mcp_served/` driven against the running process
 in the `host_enclave` lane — distinct from `tests/conformance/mcp/`, which exercises the
@@ -61,7 +69,7 @@ transport class, its operations, and its fifty-six existing rows are unchanged.
 | II — Total Interception; One Governed Tool Layer | **Pass** | FR-005 and FR-006 are this principle restated for a new door: every operation through the governed core, and the protocol layer may report a refusal but never author one. |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | FR-003 refuses to start when collaborators are missing; FR-012 refuses before the governed operation is entered. Both fail closed. |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass** | FR-013 forbids a session outliving the credential that opened it — "no standing authority" applied to a long-lived connection, which is precisely where it would otherwise erode unnoticed. |
-| V — Sealed Core, Versioned Seams | **Pass** | The core is untouched. This attaches at the transport seam ADR-0033 defines. |
+| V — Sealed Core, Versioned Seams | **Pass** | The core is untouched — **verified against the task list, not assumed**. Every collaborator the new assembly needs already exposes the configuration seam it requires; nothing in `src/core/` is edited. This attaches at the transport seam ADR-0033 defines. |
 | VI — Lean by Default | **Pass** | No new dependency. One new process, required by FR-015a rather than preferred — see Complexity Tracking. |
 | VII — Anti-Fragmentation | **Pass** | The opposite of fragmenting: two surfaces exist and only one is served, so *served* behaviour has only ever been one surface's. FR-008 checks the operation sets match mechanically rather than by inspection. |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **N/A** | Promotes no pack, model, or policy. |
@@ -111,7 +119,10 @@ infra/jobs/
 └── mcp-surface.nomad.hcl     # NEW — bridge mode, mapped port, reachable from macOS
 
 infra/bin/
+├── mcp-surface-up            # NEW — bring the surface up; reads .env with enclave-up's fallbacks
 └── mcp-surface-conformance   # NEW — 017's lifecycle: bring up, mark, run, tear down
+
+src/core/                     # UNCHANGED, and checked rather than assumed — see below
 
 tests/conformance/mcp_served/
 ├── __init__.py
