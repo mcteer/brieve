@@ -23,9 +23,9 @@ so the rows are the deliverable rather than a supplement to it.
 
 | Gate type | Required? | Where |
 | --- | --- | --- |
-| **Fail-closed** | **Yes** — FR-007a makes a read's audit write enforcement | T012, T013, T026 |
-| **Conformance** | **Yes** — sealed-core seam and both transport surfaces | T028, T029, T030 |
-| **Correlation / evidence** | **Yes** — read records join runs by correlation id, and must not join *into* them | T014, T024, T025 |
+| **Fail-closed** | **Yes** — FR-007a makes a read's audit write enforcement | **T010, T026** |
+| **Conformance** | **Yes** — sealed-core seam and both transport surfaces | **T005, T029** |
+| **Correlation / evidence** | **Yes** — read records join runs by correlation id, and must not join *into* them | T014, **T023a**, T024, T025 |
 | **No-secret-leak** | **Yes** — a record must carry no content it was shown | T015 |
 | **Eval** | **No.** No model, no judge, no pack, no policy. `OWED` stays empty and no suite moves. Stated rather than omitted. | — |
 
@@ -134,6 +134,17 @@ find a record naming the reader.
       path, which research F7 measured the existing evidence path does not have.
 - [ ] T023 [US1] Assert in `tests/component/test_record_access.py` that each of the six writes
       exactly one entry per call, naming caller, operation, and target.
+- [ ] T023a [US1] [GATE:correlation] Assert in `tests/component/test_record_access.py` that a
+      `record_read` entry is **returned by the governed evidence read** — call `read_evidence_for`
+      with `correlation_id=record_stream_for(tenant)` and find the entry — and that a caller from
+      another tenant is refused. FR-005b ends *"a record nobody can query is not a record"*, and
+      without this row the stream is written and never proven reachable. **Analysis found nothing
+      else covering this**, because the one artifact that would have shown it (quickstart §5) was
+      querying Postgres directly and skipping the governed path entirely.
+- [ ] T023b [US1] Assert in `tests/component/test_record_access.py` that the six operations answer
+      identically to before this feature for the same caller — same records, same refusals, same
+      status (SC-004a, FR-015). Six operations are being edited and nothing else checks that
+      recording a read did not change who may perform it.
 - [ ] T024 [US1] [GATE:correlation] Assert in `tests/component/test_record_access.py` that a read
       leaves the read object's chain **byte-identical** — the entry count and the head hash of the
       run's own stream are unchanged after reading it.
@@ -192,6 +203,10 @@ lying about what it records.
       justification: runs and threads are records of *activity*; agent definitions are
       *configuration*, and reading one discloses how the platform is set up rather than what
       anyone did with it.
+- [ ] T034a [US3] Assert in `tests/component/` that **every** shipped operation carries a
+      disposition and that the catalogue is complete against the operation set (SC-004). A required
+      dataclass field makes omission a constructor `TypeError`, which names an argument rather than
+      an operation — this row is what makes the failure name the thing a person has to fix.
 - [ ] T035 [US3] Assert in `tests/component/` that `SC-011` holds — the two catalogue operations
       record nothing, pinned deliberately so a later widening is a visible decision rather than a
       drift nobody notices. **Do not delete this row for looking like dead weight; that is what it
@@ -262,9 +277,9 @@ Phase 1 (T001–T002)
    ↓
 Phase 2 (T003–T012)  ← blocks everything; vocabulary + seam + classification
    ↓
-   ├── Phase 3 US1 (T013–T029)  ← the six record
+   ├── Phase 3 US1 (T013–T029, incl. T023a/T023b)  ← the six record
    ├── Phase 4 US2 (T030–T033)  ← needs T011–T012 only, NOT Phase 3
-   └── Phase 5 US3 (T034–T036)  ← needs T011–T012 only
+   └── Phase 5 US3 (T034–T036, incl. T034a)  ← needs T011–T012 only
    ↓
 Phase 6 (T037–T039)  ← the ADR; must land in the same PR
 Phase 7 (T040–T041)  ← independent of everything; needs T008
@@ -306,7 +321,7 @@ understood.
 
 ## Notes
 
-**47 tasks.** The largest phase is US1 at seventeen, and eight of those are rows rather than
+**50 tasks**, after analysis added three. The largest phase is US1 at nineteen, and ten of those are rows rather than
 implementation — which is the right ratio for a feature whose entire subject is that a green suite
 proved nothing.
 
@@ -314,6 +329,15 @@ proved nothing.
 demonstration), T047 (security review). They are tasks anyway, and they are named in the
 conformance contract, so merging without them is visibly a gate regression rather than an
 oversight.
+
+**Three tasks map to no FR or SC, deliberately.** T036 comes from plan.md's stated obligation
+about a misleading test name; T040–T041 are the adjacent defect research F7 found, flagged as a
+decision rather than folded in. Noted here so a reader mapping tasks to requirements finds them
+accounted for rather than orphaned.
+
+**Four tasks were added by analysis**: T023a (the governed-path read — nothing covered it, and the
+artifact that should have shown that was itself taking a shortcut), T023b (FR-015, a negative
+requirement with no check), T034a (SC-004's named failure), and the gate-table corrections above.
 
 **One task exists to delete a trap** (T036). `test_operations_audited.py` is a good file whose name
 promises this feature's check and delivers a different one. That misdirection is a measurable

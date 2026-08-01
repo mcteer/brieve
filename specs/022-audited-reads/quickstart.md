@@ -99,15 +99,19 @@ print(surfaces.caller_token(subject='caller-1', tenant='tenant-local',
 
 # 3. Start a run, let it finish, then read its result through the surface
 
-# 4. Ask the trail who read it
-docker exec <postgres> psql -U brieve -d brieve -c \
-  "SELECT event_type, payload->>'subject_user_id', payload->>'target_correlation_id'
-     FROM audit_entries
-    WHERE correlation_id = 'record-access:tenant-local'
-    ORDER BY timestamp DESC LIMIT 5;"
+# 4. Ask the trail who read it — THROUGH THE GOVERNED PATH, not through Postgres.
+#    Call read_evidence on the same surface, with the reader stream's correlation id:
+#      correlation_id = "record-access:tenant-local"
 ```
 
 **Expect**: a `record_read` entry naming `caller-1`, the operation, and the run's correlation id.
+
+**Use the governed read, not `psql`.** SC-002 says "discoverable through the governed read path",
+and a direct SQL query proves the row exists while proving nothing about the criterion. An earlier
+draft of this file used `psql` here — and because it did, nothing in the feature demonstrated that
+the record-access stream is reachable through the path FR-005b requires. Analysis caught it; T023a
+is the row that now covers it. Reach for `psql` only when the governed read has already failed and
+you are working out why.
 
 **Before this feature, that query returns nothing** — which is exactly what it returned on
 2026-08-01, with the whole suite green and both surfaces telling every connecting client that every

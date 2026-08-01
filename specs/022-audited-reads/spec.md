@@ -173,12 +173,19 @@ follows rather than leads.
   to ordinary listings, and that is the cost this feature accepts openly.
 - **`list_runs` returning nothing.** *Resolved — FR-007b.* It records. An empty page discloses
   that the caller asked.
-- **Volume.** A listing called on every editor keystroke could write more entries than the runs it
-  lists. The trail is append-only and never sampled (Principle IX), so this cannot be solved by
-  dropping entries — it constrains which operations are worth recording, and that constraint
-  belongs in the decision rather than discovered in production.
-- **The reconciler's own reads.** A meta-audit record is itself a record. Whether reading the
-  trail to reconcile it writes an entry, and whether that terminates, needs stating.
+- **Volume.** *Resolved — it decided the coverage rule.* A listing called on every editor connect
+  could write more entries than the runs it lists, and the trail is append-only and never sampled
+  (Principle IX), so the cost is permanent. This is why the two catalogue reads are excluded; see
+  Assumptions.
+- **The reconciler's own reads.** *Resolved, and the safeguard already exists one layer up.*
+  Measured: `emit_reconciled` appends to `audit-reconcile-{basis}` under tenant `__platform__` — a
+  **third** stream, never the one it just read. So reconciling `record-access` does not grow
+  `record-access`, and the recursion terminates for the same structural reason FR-005a relies on.
+  **Two consequences that must be stated rather than left to inference**: the reconciler's read of
+  the record-access stream writes **no** read record — it touches neither a run nor a thread under
+  FR-001, and it is platform machinery rather than a caller-facing operation. And the record-access
+  stream is subject to the same reconciliation as any other, which is what keeps a record of who
+  looked from being the one stream nobody checks.
 
 ## Requirements *(mandatory)*
 
@@ -297,8 +304,13 @@ follows rather than leads.
   surface, not a test double.
 - **SC-003**: No governance claim made by either surface is false of the running service. Verified
   by comparison against measured behavior, so the check would have failed before this feature.
-- **SC-004**: An operation added without an audit disposition fails a check that names it. Verified
-  by adding one and observing the failure.
+- **SC-004**: Every operation in the catalogue carries a disposition, and an operation lacking one
+  cannot be constructed. Verified two ways, because a required field alone is not a *named* check:
+  the catalogue is asserted complete against the shipped operation set, and the failure a caller
+  sees when a disposition is missing names the operation rather than a constructor argument.
+- **SC-004a**: The six covered operations answer exactly as they did before this feature to the
+  same caller with the same authority — same records returned, same refusals, same status. FR-015
+  is a negative requirement, and a negative requirement with no check is a hope.
 - **SC-005**: The pinned entry digest is unchanged, and every entry written before this feature
   still verifies against the chain that holds it.
 - **SC-006**: No read record contains content that was read. Verified by planting a
