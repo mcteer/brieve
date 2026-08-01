@@ -11,10 +11,28 @@ Terraform and Vault, under `https://developer.hashicorp.com/validated-patterns/`
 024's plan said to vendor the corpus the way `packs/terraform/skills/` vendors upstream skills.
 That precedent works because those skills come from a repository whose licence permits it.
 
-**These pages carry no statement about reuse or redistribution** — checked before deciding, on the
-index and on a product page. Copying 33 third-party documents into this repository on that basis is
-not a call to make quietly, and a licence question is not the kind of thing to resolve by not
-noticing it.
+**Not because redistribution is prohibited — because it could not be established that it is
+permitted, and this repository's own standard is higher than that.**
+
+What was checked: the validated-patterns index and a product page carry **no statement about reuse
+or redistribution**. Under default copyright, absence of a grant means no redistribution right —
+but silence is not proof of prohibition, and saying "cannot be vendored" would overstate what was
+found.
+
+What could not be checked: whether the tutorials live in a public repository with a licence. The
+GitHub API returns 403 for the whole `hashicorp` organisation under SAML enforcement, so the one
+check that would settle it was closed.
+
+**The deciding factor is the precedent already in this tree.** `packs/terraform/skills/` vendors
+upstream content and carries **MPL-2.0 copied verbatim**, with the licence named in its provenance.
+That is the bar: vendor when you hold a licence. No licence was in hand here, so the bar was not
+met — which is a different and smaller claim than "it is not allowed".
+
+**If the licence question later resolves in favour of vendoring, that is an addition rather than a
+correction.** The digest pin stands on its own merits either way: FR-014 asks for content-based
+change detection because the corpus carries no version metadata, a digest *is* exactly that, and it
+is a stronger pin than a copy — a vendored copy drifts from upstream silently, a digest mismatch is
+loud.
 
 ## What replaces it
 
