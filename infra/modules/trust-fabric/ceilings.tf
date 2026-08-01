@@ -82,6 +82,31 @@ resource "vault_kv_secret_v2" "definition_bindings" {
   })
 }
 
+# The Qualified Model Matrix — which models evaluation has qualified, per pack and role.
+#
+# **Authored here for the first time in 020**, and its absence until now is the finding.
+# 013 built the reader (`core.authority.matrix`), the policy grant, and the run-start
+# validation; nothing ever wrote the record, so `_resolve_binding_map` returned before
+# touching it for every definition — because every definition bound nothing. The matrix and
+# its binding maps were correct, complete, and load-bearing for nothing.
+#
+# ONE RECORD, not one per cell. `read_matrix()` reads a single path and parses the whole
+# vocabulary, because validating a binding map means asking "is this cell qualified" against
+# the *set* — a per-cell layout would make an absent cell and an unreachable store the same
+# 404, which is the distinction `MatrixSource` exists to preserve.
+#
+# Read-only to runs. A run that could write a cell could qualify a model for itself, which is
+# eval-gated promotion (Principle VIII) with the gate on the inside.
+resource "vault_kv_secret_v2" "model_matrix" {
+  mount = vault_mount.harness_authority.path
+  name  = "model-matrix"
+
+  data_json = jsonencode({
+    schema_version = 1
+    cells          = var.model_matrix_cells
+  })
+}
+
 # What a claim-derived role means in the harness domain.
 #
 # Same store and same governance as the ceilings above, because it is the same

@@ -1,0 +1,236 @@
+# SPDX-License-Identifier: Apache-2.0
+"""The re-choice budget: a denial teaches the model, and the bound keeps that honest.
+
+Clarification made governance a **signal** rather than only a wall — a refused choice goes
+back to the model, which may choose again. That is the sharper answer and it created the
+sharper risk, stated plainly in the spec: an agent that keeps asking must not be able to grind
+past its ceiling until something gives. Without a bound, governance-as-a-signal is
+governance-as-a-suggestion.
+
+So: attempts are bounded, **every** refusal is recorded rather than only the last before a
+success, and exhausting the bound is itself a recorded terminal outcome.
+
+**The bound is per step, not per run.** A run that legitimately needs several tools must not
+inherit a smaller budget because an earlier step took two attempts — that would make a run's
+remaining freedom depend on its own history in a way nothing in the definition describes.
+
+**Where this sits relative to the bracket** (research F3). `invoke_tool` brackets every
+non-repeatable tool itself, keyed ``{run_id}:{step_index}:{tool}``. A second choice at the same
+step names a *different* tool, so it yields a different key and cannot collide. A bound
+implemented as a retry *around* the bracket would make that key ambiguous on resume — two
+attempts, one key — and re-observe-never-re-execute would have to guess which. That is the
+durability guarantee breaking quietly, which is why this loop calls `invoke_tool` once per
+attempt rather than wrapping it in a retry.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any, Final
+
+from core.choice.chooser import (
+    Choice,
+    ChoiceOutcome,
+    ChoiceRequest,
+    Chooser,
+    is_tool_name,
+    record_choice,
+)
+from core.run import RunState
+from core.tools.invoke import InvokeResult, invoke_tool
+
+#: How many times a model may name a tool at one step before the run stops.
+#:
+#: Three: the first choice, and two chances to learn from a refusal. Small on purpose — an
+#: agent grinding against its ceiling and an agent thinking hard look identical from outside,
+#: and a generous bound makes the two indistinguishable for longer.
+#:
+#: Not per-definition today, and saying so is more honest than implying a record that does not
+#: exist: no control-plane field carries a re-choice budget. When one exists it is read here.
+DEFAULT_RECHOICE_BOUND: Final[int] = 3
+
+
+@dataclass(frozen=True)
+class StepResolution:
+    """How one step's tool was decided, and what happened to it.
+
+    Returned rather than acted on, for the reason `ResumeDecision` gives one module over:
+    the reasoning belongs where a caller and the audit trail can both see it, not buried in
+    control flow.
+    """
+
+    outcome: ChoiceOutcome
+    #: The tool that ran, or "" when none did.
+    tool: str = ""
+    #: The governed pipeline's own answer, when a tool was invoked at all.
+    result: InvokeResult | None = None
+    #: How many times the model was asked at this step.
+    attempts: int = 0
+    #: The run entered SUSPENDED while this step was being resolved. **Not a refusal** — a
+    #: wait — and the caller must file it as one rather than failing the allocation.
+    suspended: bool = False
+    #: Every choice made at this step, in order. The caller needs the count; the trail
+    #: already holds the contents.
+    choices: tuple[Choice, ...] = ()
+
+    def is_terminal(self) -> bool:
+        """True when the run must stop rather than continue to the next step."""
+        return self.outcome in {
+            ChoiceOutcome.EMPTY,
+            ChoiceOutcome.EXHAUSTED,
+        }
+
+
+def _record(
+    run: Any, step_index: int, attempt: int, model: str, named: str, outcome: ChoiceOutcome
+) -> Choice:
+    """Write the trail entry and return the in-memory twin, in that order.
+
+    The order is deliberate: the entry is the record, and the returned `Choice` is a
+    convenience for the caller. If the append raises, nothing is appended to ``choices``
+    either — so the two never disagree about what happened.
+    """
+    record_choice(
+        run,
+        step_index=step_index,
+        attempt=attempt,
+        model=model,
+        named=named,
+        outcome=outcome,
+    )
+    return Choice(step_index=step_index, attempt=attempt, named=named, outcome=outcome, model=model)
+
+
+def resolve_step_tool(
+    run: Any,
+    *,
+    task: str,
+    permitted: Sequence[str],
+    step_index: int,
+    model: str,
+    chooser: Chooser,
+    arguments: Mapping[str, Any],
+    bound: int = DEFAULT_RECHOICE_BOUND,
+    already_chosen: str = "",
+) -> StepResolution:
+    """Ask a model what to do at this step, and carry the answer into the governed entry.
+
+    ``already_chosen`` is the resume path (FR-008). When a disrupted run left an open intent
+    at this step, that intent names the tool the model *already* chose, and honouring it is
+    what makes re-observation honest: re-asking would let a resumed run execute a different
+    tool from the one whose bracket is open, which is re-execution wearing observation's
+    clothes. It costs no provider call, which is the observable half SC-005 asserts.
+
+    **Nothing here decides permission.** Each named tool goes to `invoke_tool` — the same
+    call a scripted name went to, unchanged — and what comes back is the core's answer. That
+    is what makes FR-003's "no new path to a capability" structural rather than a promise.
+
+    A `ChooserUnavailable` propagates. FR-007: a provider failure ends the run in a recorded
+    terminal state and never falls back to a non-model selection.
+    """
+    known = run.registry.tool_names()
+    refused: list[tuple[str, str]] = []
+    choices: list[Choice] = []
+
+    for attempt in range(max(bound, 1)):
+        if attempt == 0 and already_chosen:
+            named = already_chosen
+        else:
+            named = chooser.choose(
+                ChoiceRequest(
+                    task=task,
+                    permitted=tuple(permitted),
+                    step_index=step_index,
+                    attempt=attempt,
+                    refused=tuple(refused),
+                )
+            ).strip()
+
+        if not named:
+            # The model named nothing. Terminal, and emphatically not defaulted to a tool —
+            # defaulting here would be `_tool_for_step` returning through the back door.
+            choices.append(_record(run, step_index, attempt, model, named, ChoiceOutcome.EMPTY))
+            return StepResolution(
+                outcome=ChoiceOutcome.EMPTY, attempts=attempt + 1, choices=tuple(choices)
+            )
+
+        if not is_tool_name(named, known):
+            # Not a tool at all — the model misunderstood its task. Distinct from a real tool
+            # it may not have, which is a model that understood and reached past its ceiling.
+            # Re-choosable within the bound, because a malformed answer is exactly the kind of
+            # thing being told about tends to fix.
+            choices.append(_record(run, step_index, attempt, model, named, ChoiceOutcome.MALFORMED))
+            refused.append((named, "not_a_tool"))
+            continue
+
+        result = invoke_tool(run, named, arguments)
+
+        if result.allowed:
+            choices.append(_record(run, step_index, attempt, model, named, ChoiceOutcome.CHOSEN))
+            return StepResolution(
+                outcome=ChoiceOutcome.CHOSEN,
+                tool=named,
+                result=result,
+                attempts=attempt + 1,
+                choices=tuple(choices),
+            )
+
+        # A SUSPENSION IS NOT A REFUSAL, and re-choosing past one would be worse than the
+        # bug 014 fixed at the entrypoint: the dependency gate suspends a run whose product is
+        # unreachable, so a second choice would either hit the same unreachable product or
+        # reach a different one while the run is already waiting. Recorded as `refused`
+        # because the choice was in fact refused by the built-in governance set; *which* hook
+        # refused it, and why, is one correlation-joined `PRE_DECISION` entry away.
+        choices.append(_record(run, step_index, attempt, model, named, ChoiceOutcome.REFUSED))
+        if run.state is RunState.SUSPENDED:
+            return StepResolution(
+                outcome=ChoiceOutcome.REFUSED,
+                tool=named,
+                result=result,
+                attempts=attempt + 1,
+                suspended=True,
+                choices=tuple(choices),
+            )
+
+        # FR-004a: the denial becomes context. FR-004c: this entry stays in the trail whether
+        # or not a later attempt succeeds — a run denied four times and permitted on the fifth
+        # is a different event from one permitted immediately.
+        refused.append((named, result.reason_code))
+
+    # FR-004b. The bound is what keeps governance-as-a-signal from becoming
+    # governance-as-a-suggestion, and exhausting it is recorded rather than left to be
+    # inferred from a run of refusals that simply stops.
+    choices.append(_record(run, step_index, max(bound, 1), model, "", ChoiceOutcome.EXHAUSTED))
+    return StepResolution(
+        outcome=ChoiceOutcome.EXHAUSTED, attempts=max(bound, 1), choices=tuple(choices)
+    )
+
+
+def record_unconsulted_step(run: Any, *, step_index: int) -> None:
+    """Say in the trail that this step asked no model (FR-002a, FR-002b).
+
+    The `invoke_tools` carve-out is a production path that runs steps and invokes no tool, so
+    it has nothing to choose and asking would be a provider call whose answer is discarded.
+    That is defensible. What is not defensible is leaving it *invisible*: a run that looks
+    governed, executed nothing, and consulted nobody must not be indistinguishable from one
+    that consulted a model — and distinguishing them by the **absence** of `TOOL_CHOSEN`
+    entries is the weak form of evidence `STEP_REOBSERVED` was added one feature ago to
+    replace. An investigator should not have to notice that nothing is there.
+    """
+    record_choice(
+        run,
+        step_index=step_index,
+        attempt=0,
+        model="",
+        named="",
+        outcome=ChoiceOutcome.NOT_CONSULTED,
+    )
+
+
+__all__ = [
+    "DEFAULT_RECHOICE_BOUND",
+    "StepResolution",
+    "record_unconsulted_step",
+    "resolve_step_tool",
+]

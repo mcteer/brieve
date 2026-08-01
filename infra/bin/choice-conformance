@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# 020's lane — the rows where a MODEL names the tool.
+#
+# These rows dispatch runs and read back the trail, so they need the enclave standing and the
+# parameterized `agent-run` job registered. They do NOT need a new service: unlike 019's lane
+# there is nothing to stand up, because what they drive is the scheduler.
+#
+# So why a lane at all rather than another directory on the `host_enclave` pytest line?
+# Because the preconditions are specific and their absence is silent. A dispatched choice row
+# against an enclave with no `model-matrix` record refuses every run for `unqualified_cell` —
+# which looks exactly like the feature working correctly on a misconfigured definition. The
+# checks below turn that into one sentence naming the missing record.
+#
+# **FR-011: no vendor.** Every model a row here reaches is a `fixture/...` cell replaying a
+# recording. A gate that cannot run without a provider is a gate that stops running, and the
+# fidelity row that keeps the double honest (FR-011a) is deliberately outside this lane,
+# behind a named runner, because it costs a real provider call.
+
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+JOB_ID="agent-run"
+
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+ok() { printf '    \033[32mok\033[0m %s\n' "$*"; }
+die() {
+  printf '\033[31mthe choice lane could not run:\033[0m %s\n' "$*" >&2
+  exit 1
+}
+
+# NOTHING TO CLEAN UP, and saying so is the point of this comment rather than of an empty
+# trap. 017's rule is that a lane stops only what it started; this one starts nothing, so
+# there is nothing whose ownership could be got wrong. The runs it dispatches are batch
+# allocations that end on their own.
+
+say "The enclave"
+command -v nomad >/dev/null 2>&1 || die "nomad is not on PATH — run \`make dev-up\`"
+status="$(nomad job status "$JOB_ID" 2>&1 || true)"
+case "$status" in
+*"No job(s) with prefix"* | "")
+  die "the parameterized job ${JOB_ID} is not registered — run \`make dev-up\`. Not skippable: rows that never dispatched have proven nothing about a model choosing"
+  ;;
+esac
+ok "${JOB_ID} is registered"
+
+# THE MATRIX, CHECKED BEFORE THE ROWS RATHER THAN DIAGNOSED FROM THEM.
+#
+# 020 is the first feature to author a `model-matrix` record, so an enclave applied from an
+# older tree has the reader, the policy, and no record. Every dispatched row would then refuse
+# its run for `unqualified_cell` and report the refusal as the property under test passing —
+# a definition that binds a model the matrix does not qualify MUST refuse, which is FR-006,
+# and it is indistinguishable from the estate simply not having applied.
+say "The Qualified Model Matrix"
+A="$(grep '^VAULT_ADDR=' "$REPO/.env" 2>/dev/null | cut -d= -f2- | tr -d '"')"
+C="$(grep '^VAULT_CACERT=' "$REPO/.env" 2>/dev/null | cut -d= -f2- | tr -d '"')"
+T="$(grep '^VAULT_ROOT_TOKEN=' "$REPO/.env" 2>/dev/null | cut -d= -f2- | tr -d '"')"
+[ -n "$A" ] && [ -n "$T" ] || die "no VAULT_ADDR/VAULT_ROOT_TOKEN in .env — run \`make dev-up\`"
+cells="$(VAULT_ADDR="$A" VAULT_CACERT="$C" VAULT_TOKEN="$T" \
+  vault kv get -mount=harness-authority -field=cells model-matrix 2>/dev/null || true)"
+[ -n "$cells" ] || die "harness-authority/model-matrix holds no cells — re-apply the trust fabric (\`make dev-up\`). 020 is the first feature to write this record, so an enclave applied from an older tree will not have it"
+ok "the matrix is readable and non-empty"
+
+say "Rows against a dispatched run"
+cd "$REPO"
+VAULT_ADDR="$A" VAULT_CACERT="$C" VAULT_TOKEN="$T" \
+  uv run --extra surfaces --extra adapters pytest tests/conformance/choice -m host_enclave -q \
+  || die "the lane failed — the rows' output is above"
+ok "choice lane passed"

@@ -25,12 +25,22 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
+from adapters.model_chooser import build_chooser
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.schema import AuditEventType
 from core.authority.clock import Clock, SystemClock
+from core.authority.errors import ResolutionRefused
 from core.authority.grant import DEFAULT_MAX_RUN_DURATION, issue_grant
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
+from core.choice import (
+    CHOICE_ROLE,
+    ChoiceOutcome,
+    ChooserUnavailable,
+    record_unconsulted_step,
+    resolve_bound_model,
+    resolve_step_tool,
+)
 from core.dependencies.store import PostgresDependencyStore
 from core.durability.checkpoint import checkpoint_run, stop_requested
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
@@ -90,13 +100,18 @@ def _step_key(blob_id: str, step: int) -> str:
     return f"{blob_id}:step-{step}"
 
 
-def _tool_for_step(tools: list[str], step: int) -> str:
-    """Which tool a bracketed step invokes, or empty for the fixture bracket.
-
-    Round-robin so a run with one tool and five steps invokes that tool five times, which is
-    what an interruption row needs: several real brackets to be killed *between*.
-    """
-    return tools[step % len(tools)] if tools else ""
+#: `_tool_for_step` STOOD HERE, and its deletion is the feature (FR-002, T011).
+#:
+#: It returned ``tools[step % len(tools)]`` — an index nobody chose. Every governance
+#: guarantee this platform holds was asserted around that expression: interception, ordering,
+#: refusal, evidence, all correct, all about a sequence no model named.
+#:
+#: **It is not kept as a fallback**, and research F4 is why. A surviving fallback would be
+#: taken exactly when the provider is down — so the platform would silently revert to a
+#: scripted sequence at the moment nobody is watching, **while every governance row kept
+#: passing**. That is this feature's own defect preserved as a feature. FR-007 makes a
+#: provider failure terminal instead, and `tests/conformance/choice` asserts by source
+#: inspection that no arithmetic selection returned.
 
 
 def _run_steps(
@@ -108,6 +123,10 @@ def _run_steps(
     tools: list[str],
     invoke_tools: bool,
     skip_reason: Any,
+    chooser: Any = None,
+    model: str = "",
+    task: str = "",
+    already_chosen: Any = None,
 ) -> tuple[int, list[int], list[int]]:
     """Execute the run's steps, skipping the ones re-observation says already happened.
 
@@ -158,7 +177,90 @@ def _run_steps(
             return 0, executed, skipped
 
         run.step_index = step
-        tool_name = _tool_for_step(tools, step) if invoke_tools else ""
+
+        # WHO NAMES THE TOOL (020). A model does, and this is the line where that became
+        # true. Everything below is unchanged: the name goes to `invoke_tool`, which is the
+        # same governed entry a scripted name went through, so no new path to a capability is
+        # introduced by the model's involvement (FR-003).
+        #
+        # THE CARVE-OUT, named rather than left implicit (FR-002a). A run with `invoke_tools`
+        # off runs steps and invokes no tool — it exists for the durability fixtures, which
+        # need brackets to be killed *between* without caring what runs inside them. It has
+        # nothing to choose, so asking a model would be a provider call whose answer is
+        # discarded: cost and a failure mode for nothing. It stays, and it consults nobody.
+        #
+        # What it does NOT get is invisibility. `record_unconsulted_step` writes the fact into
+        # the trail (FR-002b), because otherwise the carve-out becomes a way to produce a run
+        # that looks governed, executed nothing, and consulted nobody — distinguishable from a
+        # model-driven run only by the *absence* of entries, which is the weak evidence
+        # `STEP_REOBSERVED` was added one feature ago to stop relying on.
+        if not invoke_tools:
+            record_unconsulted_step(run, step_index=step)
+            tool_name = ""
+        else:
+            try:
+                resolution = resolve_step_tool(
+                    run,
+                    task=task,
+                    permitted=tools,
+                    step_index=step,
+                    model=model,
+                    chooser=chooser,
+                    arguments=_PROBE_ARGUMENTS,
+                    # The tool this step ALREADY chose, when a disrupted run left an open
+                    # intent naming one (FR-008). Honouring it is what makes re-observation
+                    # honest — re-asking could return a different tool from the one whose
+                    # bracket is open, and the resumed run would then execute something the
+                    # first allocation never chose while claiming to have observed it.
+                    already_chosen=(already_chosen or {}).get(step, ""),
+                )
+            except ChooserUnavailable as exc:
+                # FR-007. Terminal and recorded, with no path back to a non-model selection.
+                # The run fails the allocation rather than completing quietly, because a run
+                # that could not consult its model has not done what it was dispatched to do
+                # — and a completion here would be the platform's central claim going false
+                # in exactly the case nobody is watching.
+                print(
+                    f"run {run.correlation_id} step {step}: {exc} ({exc.reason_code})",
+                    file=sys.stderr,
+                )
+                _emit(
+                    run.audit_sink,
+                    correlation_id=run.correlation_id,
+                    tenant_id=run.tenant_id,
+                    event=AuditEventType.TOOL_CHOSEN,
+                    payload={
+                        "run_id": blob_id,
+                        "step_index": step,
+                        "attempt": 0,
+                        "model": model,
+                        "named": "",
+                        "outcome": str(ChoiceOutcome.EMPTY),
+                        "reason": exc.reason_code,
+                    },
+                )
+                return 1, executed, skipped
+
+            if resolution.suspended:
+                # A wait, not a refusal. The caller files the index row and exits zero.
+                return _SUSPENDED, executed, skipped
+
+            if resolution.is_terminal():
+                # The model named nothing, or ground through its re-choice bound. Both are
+                # endings the platform chose, both are already recorded by `resolve_step_tool`,
+                # and neither is a crash — so this exits ZERO, on the same reasoning a
+                # grant-expiry stop does. Exiting non-zero would make every bound look like a
+                # failure to whoever reads allocation states.
+                print(
+                    f"run {run.correlation_id} ending at step {step}: "
+                    f"{resolution.outcome} after {resolution.attempts} attempt(s)",
+                    flush=True,
+                )
+                return 0, executed, skipped
+
+            tool_name = resolution.tool
+            result = resolution.result
+            print(f"tool {tool_name}: allowed={result.allowed if result else False}", flush=True)
 
         # WHO OWNS THE BRACKET (T018), and the task's premise needed correcting here.
         #
@@ -180,27 +282,19 @@ def _run_steps(
         # `invoke_tools` is off by default — this loop's own bracket is what gives a
         # multi-step run the step boundaries a stop is observed at and the open intents the
         # zero-open-intents row counts.
-        if tool_name:
-            from core.tools.invoke import invoke_tool
-
-            outcome = invoke_tool(run, tool_name, _PROBE_ARGUMENTS)
-            print(f"tool {tool_name}: allowed={outcome.allowed}", flush=True)
-            if not outcome.allowed:
-                print(f"tool {tool_name} refused: {outcome.reason_code}", file=sys.stderr)
-                # A SUSPENSION IS NOT A REFUSAL, and until 014 this line could not tell them
-                # apart (analyze C3). The dependency gate suspends a run whose product is
-                # unreachable — `suspend_for_dependency` sets the state and names what it
-                # waits on — and every such run arrived here, returned 1, and failed the
-                # allocation. So the spec's own US1 narrative, the fabric blinking mid-run,
-                # presented as a crashed run with no index row and nothing for the sweeper to
-                # find. A wait that looks like a failure is a wait nobody comes back for.
-                if run.state is RunState.SUSPENDED:
-                    return _SUSPENDED, executed, skipped
-                # Any intent the engine opened stays OPEN on purpose. A refused step did not
-                # happen, and the record of "we were about to" is what lets a resume resolve
-                # it by observation rather than by assumption.
-                return 1, executed, skipped
-        else:
+        # 020 MOVED THE INVOCATION UP, not out. `resolve_step_tool` calls `invoke_tool` once
+        # per attempt — the same call that stood here, with the same arguments, reached
+        # through no new path — because the refusal has to come back *into* the choosing loop
+        # to be offered to the model (FR-004a). Invoking here as well would have run every
+        # permitted choice twice.
+        #
+        # A REFUSAL NO LONGER FAILS THE ALLOCATION, and that is the clarification's whole
+        # substance. Until 020 an unpermitted tool returned 1 and the run died; now the denial
+        # goes back to the model as context and it may choose again, bounded. What still ends
+        # the run is exhausting that bound, and `resolve_step_tool` has already returned by
+        # then. Suspension is handled above for the reason 014 wrote down: a wait that looks
+        # like a failure is a wait nobody comes back for.
+        if not tool_name:
             key = _step_key(blob_id, step)
             durability.record_intent(
                 IntentRecord(
@@ -237,6 +331,86 @@ def _run_steps(
     return 0, executed, skipped
 
 
+def _run_task(*, run_id: str, credentials: Any, durability: Any) -> str:
+    """What this run was asked to do, as text a model can be given.
+
+    Read from durable state, never from the environment, and 012 established why: a person's
+    free text must not enter a jobspec, where it would be visible to anyone with scheduler
+    access and outside the tenant-scoped read path. That constraint was about *storage*; 020
+    is the first feature where the text is actually consumed, and it points the same way.
+
+    Empty is a real answer and not an error. A run started outside a thread has no message,
+    and those runs behave exactly as they did before threads existed — the model is told the
+    task is unsupplied and chooses from the permitted set on that basis, which is a worse
+    prompt but a governed one.
+
+    Failures are swallowed to the empty string, and this is the one place in this module where
+    that is right: the thread store is a *context* source, not an authority or evidence one.
+    A run that cannot read its own prompt should choose with less information, not refuse —
+    refusing would make a threads-table outage look like a governance failure.
+    """
+    try:
+        resolved = resolve_run_input(
+            run_id=run_id,
+            store=PostgresThreadStore(credentials=credentials),
+            durability=durability,
+        )
+    except Exception:  # noqa: BLE001 — see the docstring; context, not authority
+        return ""
+    return resolved.message if resolved else ""
+
+
+def _chooser_for(
+    *,
+    identity_fabric: Any,
+    audit_sink: Any,
+    correlation_id: str,
+    tenant_id: str,
+    agent_definition_id: str,
+    run_id: str,
+) -> tuple[Any, str]:
+    """The model this definition binds, and a chooser for it — or refuse before calling out.
+
+    **The ordering is the requirement** (FR-005, FR-006). `resolve_bound_model` reads the
+    binding map, parses the matrix, and validates the cell; only then does `build_chooser`
+    construct anything. A model the matrix does not qualify must not be *reached*, not merely
+    not used, and nothing here can reach one because there is no branch that builds a chooser
+    from an unvalidated identifier.
+
+    **Never defaults.** No binding for the role refuses the run — a default model is an
+    ungoverned model choice, the same defect as an ungoverned tool choice one level up, and
+    ADR-0022 and ADR-0039 exist to prevent exactly it.
+
+    Raises ``ResolutionRefused``, recorded as `AUTHORITY_REFUSED` first: this is the same
+    class of refusal `manufacture` records under that event for `unqualified_cell` and
+    `cell_withdrawn`, and a refusal nobody can see is indistinguishable from a run nobody
+    attempted.
+    """
+    try:
+        model = resolve_bound_model(identity_fabric, agent_definition_id=agent_definition_id)
+    except ResolutionRefused as exc:
+        _emit(
+            audit_sink,
+            correlation_id=correlation_id,
+            tenant_id=tenant_id,
+            event=AuditEventType.AUTHORITY_REFUSED,
+            payload={
+                "run_id": run_id,
+                "reason_code": str(getattr(exc, "reason_code", "") or "authority_refused"),
+                "role": CHOICE_ROLE,
+            },
+        )
+        raise
+
+    # The recording, for a cell whose provider is `fixture`. Read here rather than inside
+    # `build_chooser` so the environment stays at the edge of the process, and ignored
+    # entirely for a live provider — a recording present alongside an `anthropic/...` cell
+    # grants nothing, because the branch that consults it is chosen by the *matrix*, not by
+    # the presence of the variable.
+    recording = os.environ.get("RUN_CHOICE_RECORDING", "").strip()
+    return build_chooser(model, recording=recording), model
+
+
 def resume_dispatched_run(
     *,
     durability: Any,
@@ -254,6 +428,7 @@ def resume_dispatched_run(
     tools: list[str],
     invoke_tools: bool,
     record_suspension: Any = None,
+    task: str = "",
 ) -> int:
     """Revive a disrupted run, or record why it will not be revived.
 
@@ -475,6 +650,22 @@ def resume_dispatched_run(
     recorded = {intent.step_index for intent in decision.recorded_steps}
     resume_from = checkpoint.step_index + 1
 
+    # THE CHOICE THIS STEP ALREADY MADE (FR-008, T029), read from the open intent rather than
+    # stored a second time.
+    #
+    # A pending step is one whose bracket was opened and whose effect re-observation found had
+    # NOT landed — so it runs again. `invoke_tool` wrote that intent, and an intent carries
+    # `tool_name`: the tool a model named before the disruption. Honouring it is what makes
+    # "re-observe, never re-execute" honest under a non-deterministic chooser. Re-asking could
+    # return a *different* tool, and the resumed run would then execute something the first
+    # allocation never chose while an intent naming the original sat open — two tools, one
+    # step, and a trail that reads as observation.
+    #
+    # No new record for this. The intent is already the durable statement of "we were about
+    # to run X", written before the effect for exactly this purpose; a second store holding
+    # the same fact would eventually disagree with it.
+    already_chosen = {intent.step_index: intent.tool_name for intent in decision.pending_steps}
+
     def skip_reason(step: int) -> str | None:
         """Why this step will not run, or ``None`` to run it.
 
@@ -508,6 +699,25 @@ def resume_dispatched_run(
             return "below_checkpoint"
         return None
 
+    # Built only when the run will actually consult one. A revived run that invokes no tools
+    # reaches no model, so resolving a binding here would refuse revivals of every pre-020
+    # fixture for naming no cell — turning a carve-out into an outage.
+    chooser: Any = None
+    model = ""
+    if invoke_tools:
+        try:
+            chooser, model = _chooser_for(
+                identity_fabric=identity_fabric,
+                audit_sink=audit_sink,
+                correlation_id=correlation_id,
+                tenant_id=tenant_id,
+                agent_definition_id=grant.agent_definition_id,
+                run_id=blob_id,
+            )
+        except ResolutionRefused as exc:
+            print(f"resume refused: {exc}", file=sys.stderr)
+            return 1
+
     code, executed, skipped = _run_steps(
         run,
         durability=durability,
@@ -516,6 +726,10 @@ def resume_dispatched_run(
         tools=tools,
         invoke_tools=invoke_tools,
         skip_reason=skip_reason,
+        chooser=chooser,
+        model=model,
+        task=task,
+        already_chosen=already_chosen,
     )
     print(f"resumed {blob_id}: executed={executed} skipped={skipped}", flush=True)
     if code == _SUSPENDED:
@@ -706,6 +920,11 @@ def main() -> int:
         durability = PostgresDurabilityProvider(credentials=credentials)
         store = PostgresDependencyStore(credentials=credentials)
         return resume_dispatched_run(
+            task=_run_task(
+                run_id=blob_id,
+                credentials=credentials,
+                durability=durability,
+            ),
             durability=durability,
             audit_sink=audit,
             registry=registry,
@@ -833,6 +1052,29 @@ def main() -> int:
     # identity protocol — and `tests/unit/test_surface_never_pauses.py` caught it, which
     # is the check doing its job rather than obstructing.
     if steps > 0:
+        # THE MODEL, RESOLVED BEFORE THE FIRST STEP AND BEFORE ANY PROVIDER CALL (FR-005,
+        # FR-006). A definition binding no model for the role, or binding a cell the matrix
+        # does not qualify, refuses the run here — with nothing reached and nothing invoked.
+        #
+        # Only when the run will consult one. `invoke_tools` off is the carve-out (FR-002a):
+        # those runs choose nothing, so requiring them to name a qualified cell would refuse
+        # every pre-020 durability fixture for a binding it has no use for.
+        chooser: Any = None
+        model = ""
+        if invoke_tools:
+            try:
+                chooser, model = _chooser_for(
+                    identity_fabric=fabric,
+                    audit_sink=audit,
+                    correlation_id=correlation_id,
+                    tenant_id=tenant_id,
+                    agent_definition_id=definition_id,
+                    run_id=blob_id,
+                )
+            except ResolutionRefused as exc:
+                print(f"run refused: {exc}", file=sys.stderr)
+                return 1
+
         # Nothing is already done on a fresh dispatch, and saying so as a predicate rather
         # than as a second loop is what keeps the resumed path from having an execution route
         # of its own.
@@ -844,6 +1086,9 @@ def main() -> int:
             tools=sorted(tools),
             invoke_tools=invoke_tools,
             skip_reason=lambda _step: None,
+            chooser=chooser,
+            model=model,
+            task=_run_task(run_id=blob_id, credentials=credentials, durability=durability),
         )
         if code == _SUSPENDED:
             # A FRESH run can suspend too, and this arm is the more common one in production:

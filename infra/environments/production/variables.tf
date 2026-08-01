@@ -40,6 +40,30 @@ variable "agent_definitions" {
   }))
 }
 
+variable "model_matrix_cells" {
+  description = <<-DESC
+    Qualified Model Matrix cells (pack × model × role) — the only models a binding map may
+    name (ADR-0022/0039, Principle VIII).
+
+    Declared here as well as in the module for the reason the comment above records: object
+    types silently drop attributes they do not name, and 013's first apply of `vault-agent`
+    wrote `packs = []` because of exactly that.
+
+    NO DEFAULT in production. The dev environment ships two `fixture` cells so the merge lane
+    needs no vendor; an operator's estate must author its own from real eval runs, and a
+    default here would qualify a model by inheritance — ungated promotion arriving through a
+    variable, which is what Principle VIII exists to forbid.
+  DESC
+  type = list(object({
+    pack         = string
+    model        = string
+    role         = string
+    qualified_by = string
+    judge        = optional(string, "")
+    withdrawn    = optional(bool, false)
+  }))
+}
+
 variable "ca_cert_file" {
   description = "Control-plane CA the provider must trust. Operator-supplied in production."
   type        = string

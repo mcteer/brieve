@@ -146,6 +146,48 @@ class AuditEventType(StrEnum):
     #: re-execute" stops being an inference from counts and becomes a statement in the record.
     STEP_REOBSERVED = "step_reobserved"
 
+    #: How a step's tool was decided, and by whom (020, ADR-0022/0039). Payload: run_id,
+    #: step_index, attempt, model, named, outcome.
+    #:
+    #: **A SEALED-CORE ADDITION** (Principle V). The audit schema is named sealed core
+    #: explicitly, so this member required the approved spec and the security-maintainer
+    #: review that principle demands. Research F1 established the change is purely additive
+    #: to an unversioned enum that no test asserts the membership of — which made it small,
+    #: not exempt.
+    #:
+    #: **Why a new type rather than a field on the tool bracket.** A refused choice never
+    #: opens a bracket. The single most important record this feature produces — a model
+    #: reached past its ceiling — would have had nowhere to live, so the trail would have
+    #: shown only the choices that succeeded and described the wrong run.
+    #:
+    #: **Why not `PRE_DECISION`.** That records what a *hook* decided about a tool
+    #: (`hook_name`, `capability_kind`, `outcome`, `reason_code`). This records who *named*
+    #: the tool and why it was on the table. Folding the second into the first would leave a
+    #: reader unable to tell a chosen tool from a scheduled one, which is the whole of what
+    #: SC-002 must be able to prove.
+    #:
+    #: One type with the distinction in `outcome`, on the `MODEL_GATE` / `RUN_RESUMED`
+    #: pattern. The vocabulary is closed and lives in `core.choice.ChoiceOutcome`:
+    #:
+    #: * ``chosen`` — named, permitted, executed.
+    #: * ``refused`` — named, refused by the existing enforcement. Every attempt gets one,
+    #:   not only the last before success (FR-004c).
+    #: * ``malformed`` — the model emitted something that is not a tool name at all.
+    #:   Distinct from ``refused`` because the two mean different things to a reader: one
+    #:   model misunderstood the task, the other understood it and reached past its ceiling.
+    #: * ``empty`` — the model named nothing. Terminal; the run does not default to a tool.
+    #: * ``exhausted`` — the re-choice bound ran out. Terminal, and recorded rather than
+    #:   inferred from a run of ``refused`` entries that simply stops.
+    #: * ``not_consulted`` — this step asked no model, because the run invokes no tools
+    #:   (FR-002a/FR-002b). Written so the carve-out is legible rather than showing as an
+    #:   absence, which is how `STEP_REOBSERVED` came to exist one feature earlier.
+    #:
+    #: **The model's reasoning is never carried.** It is not a governance fact, and it would
+    #: bring whatever the model read out of a tool result into an append-only trail. The
+    #: no-secret-leak posture applies to what is recorded about a choice exactly as it
+    #: applies to a tool result.
+    TOOL_CHOSEN = "tool_chosen"
+
 
 class AuditEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")

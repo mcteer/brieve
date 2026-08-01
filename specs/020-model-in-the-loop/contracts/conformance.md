@@ -95,9 +95,35 @@ repeated provider call — which is the observable property. It cannot assert wh
 
 ## SC-008 and the demonstration
 
-Both to be completed when the feature lands: per-directory collection counts against `main`,
-and the recorded real-provider call with its output, the model used, the choice made, and
-whether it was permitted.
+### The baseline (T002)
+
+`pytest --collect-only -q` per directory, taken on `main` at `f947bad` before any 020 code
+landed. SC-008 says no pre-existing directory loses rows; this is the number each is compared
+against at T041.
+
+| Directory | Rows on `main` |
+| --- | --- |
+| `tests/conformance/adapter` | 12 |
+| `tests/conformance/api` | 46 |
+| `tests/conformance/authority` | 12 |
+| `tests/conformance/deployment` | 22 |
+| `tests/conformance/durability` | 48 |
+| `tests/conformance/evidence` | 17 |
+| `tests/conformance/identity` | 28 |
+| `tests/conformance/mcp` | 56 |
+| `tests/conformance/mcp_served` | 19 |
+| `tests/conformance/packs` | 30 |
+| `tests/conformance/portal` | 8 |
+| `tests/conformance/choice` | 0 — created empty by T001 |
+
+**Collection counts, not pass counts**, and the distinction is what SC-008 actually protects.
+A row that stops being collected disappears silently; a row that is collected and fails is
+loud. Only the first failure mode needs a baseline to be visible at all.
+
+### The demonstration
+
+To be completed when the feature lands: the recorded real-provider call with its output, the
+model used, the choice made, and whether it was permitted.
 
 ---
 

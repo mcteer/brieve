@@ -102,6 +102,15 @@ job "agent-run" {
       # dangerous direction is the other one, and it is unreachable: a resume cannot be
       # inferred, so a flag nobody set is never invented.
       "resume",
+      # 020: the answers a `fixture/...` model replays instead of calling a provider, so the
+      # merge lane needs no vendor (FR-011).
+      #
+      # Optional, and it grants nothing by itself. Which chooser a run builds is decided by
+      # the MATRIX — a qualified cell whose model names the `fixture` provider, bound by the
+      # definition for the role — so this value is read only when two operator-authored
+      # records already say a recording is what this definition uses. A recording dispatched
+      # alongside a live binding is ignored.
+      "choice_recording",
     ]
   }
 
@@ -227,6 +236,9 @@ job "agent-run" {
         # allocation nothing, and it still manufactures its own credentials from its own
         # attested identity (ADR-0048).
         RUN_RESUME = "${NOMAD_META_resume}"
+        # 020. Read only when the definition's binding map resolves to a `fixture/...` cell,
+        # so it is inert beside a live model rather than a switch that overrides one.
+        RUN_CHOICE_RECORDING = "${NOMAD_META_choice_recording}"
         RUN_ID              = "${NOMAD_META_run_id}"
         RUN_STEP_INDEX      = "${NOMAD_META_step_index}"
       }

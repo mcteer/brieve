@@ -40,7 +40,9 @@
 ### The seam
 
 - [ ] T006 Create `src/core/choice/__init__.py` and `src/core/choice/chooser.py` — the interface a provider or a double satisfies: given the task, the permitted tools, and what has happened at this step, return a named tool or nothing.
-- [ ] T007 Implement the provider-backed chooser in `src/core/choice/chooser.py`, calling the model through `build_governed_agent` in `src/adapters/pydantic_ai/agent.py` — **which is unchanged**. It has taken a model since it was written and installs governance outermost; this feature is its first production caller.
+- [ ] T007 Implement the provider-backed chooser in `src/adapters/model_chooser.py`, calling the model through `build_governed_agent` in `src/adapters/pydantic_ai/agent.py` — **which is unchanged**. It has taken a model since it was written and installs governance outermost; this feature is its first production caller.
+
+  **Path reconciled from `src/core/choice/chooser.py`, and research F8 records why.** As written this task put a `build_governed_agent` call inside `src/core/`, which imports `pydantic_ai` at module scope — Principle I forbids core importing an agent framework, and `tests/unit/test_core_import.py` exists to catch it. The protocol stays in core; the provider implementation moves to the adapter, which is the `Scorer`/`LiveModelScorer` shape already in the tree. Nothing about the task's substance changes: `build_governed_agent` is still the call and still unchanged.
 - [ ] T008 Implement the re-choice budget in `src/core/choice/bounded.py` (FR-004b). **Per step, not per run** — a run that legitimately needs several tools must not inherit a smaller budget because an earlier step took two attempts.
 - [ ] T009 Create `tests/harness/scripted_chooser.py` — the lane's double, satisfying the same interface. **Injected where the binding resolves a model, never at the loop** (research F5): a double at the loop would let the loop be tested without the code path that consults a model, which is the shape this feature exists to end.
 
