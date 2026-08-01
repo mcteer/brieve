@@ -100,6 +100,8 @@ src/adapters/pydantic_ai/
 │   └── agent.py                 # UNCHANGED — already takes a model, already outermost
 src/surfaces/dispatch/
 │   └── entrypoint.py            # `_tool_for_step` DELETED; the loop asks a chooser
+infra/bin/
+│   └── choice-conformance       # NEW — the lane: stand up, run the rows, tear down
 tests/harness/
 │   └── scripted_chooser.py      # NEW — the lane's double, injected at the binding
 tests/conformance/choice/        # NEW — rows against a dispatched run
