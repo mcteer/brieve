@@ -53,6 +53,8 @@
 **Independent test**: run a task whose correct tool is not the one round-robin would have picked; observe the model's choice executed and recorded.
 
 - [ ] T010 [US1] Replace the selection site in `src/surfaces/dispatch/entrypoint.py`: the loop asks a chooser instead of computing an index.
+- [ ] T010a [US1] Preserve the `invoke_tools` branch in `src/surfaces/dispatch/entrypoint.py` (FR-002a): a run that invokes no tool consults no model. **Do not fold it into the chooser** — a provider call whose answer is discarded is a cost and a failure mode for nothing, and the flag exists for durability fixtures that need brackets to be killed *between* without caring what runs inside.
+- [ ] T010b [US1] Mark such a run distinguishable in the trail (FR-002b), in `src/surfaces/dispatch/entrypoint.py`. Without this the carve-out becomes a way to produce a run that looks governed, executed nothing, and consulted nobody.
 - [ ] T011 [US1] **Delete `_tool_for_step`** from `src/surfaces/dispatch/entrypoint.py` (FR-002). Not kept as a fallback: a surviving fallback is taken exactly when the provider is down, silently reverting the platform to a scripted sequence **while every governance row keeps passing** — this feature's own defect, preserved as a feature.
 - [ ] T012 [GATE:fail-closed] [US1] Make a provider failure terminal and recorded in `src/core/choice/chooser.py` (FR-007), with no path back to any non-model selection.
 - [ ] T013 [GATE:no-secret-leak] [US1] Ensure the model's reasoning is **not** recorded, in `src/core/choice/chooser.py`. It is not a governance fact and it would carry whatever the model read from tool results into the trail — the no-secret-leak posture applies to what is recorded about a choice, not only to tool results.
@@ -67,7 +69,8 @@
 
 - [ ] T017 [US1] Add `infra/bin/choice-conformance` and call it from `Makefile`'s `conformance` recipe — bring up what a dispatched run needs, run the rows, tear down what it started. **Must land before T018.**
 - [ ] T018 [P] [US1] Add `test_a_model_choice_is_executed` in `tests/conformance/choice/test_a_model_chooses.py` (FR-001, SC-001) — against a dispatched run, evidenced from the trail.
-- [ ] T019 [GATE:fail-closed] [P] [US1] Add `test_no_arithmetic_selection_remains` in `tests/conformance/choice/test_a_model_chooses.py` (FR-002, SC-002) — by source inspection, because a deleted function leaves no runtime trace to assert on.
+- [ ] T019 [GATE:fail-closed] [P] [US1] Add `test_no_arithmetic_selection_remains` in `tests/conformance/choice/test_a_model_chooses.py` (FR-002, SC-002) — by source inspection, because a deleted function leaves no runtime trace to assert on. **Verified non-vacuous**: `_tool_for_step` at `entrypoint.py:99` is the only arithmetic selection in `src/`, with one call site, so the row has exactly one thing to assert against.
+- [ ] T019a [P] [US1] Add `test_a_toolless_run_is_distinguishable` in `tests/conformance/choice/test_a_model_chooses.py` (FR-002a, FR-002b) — the carve-out is asserted rather than trusted, because an unasserted carve-out is indistinguishable from the defect it resembles.
 - [ ] T020 [US1] Add `test_an_unpermitted_choice_is_refused_by_existing_enforcement` in `tests/conformance/choice/test_a_choice_is_governed.py` (FR-003, FR-004, SC-003). **Assert the refusal came from the core, not from the choosing code** — 019 learned that a layer refusing on its own is outcome-identical to the core refusing, so this discriminates on provenance.
 - [ ] T021 [P] [US1] Add `test_a_refusal_returns_to_the_model` in `tests/conformance/choice/test_a_choice_is_governed.py` (FR-004a).
 - [ ] T022 [US1] Add `test_the_rechoice_bound_is_terminal` in `tests/conformance/choice/test_a_choice_is_governed.py` (FR-004b, SC-003a) — **the property whose absence would look like the feature working**, because a run grinding against its ceiling forever and a run thinking hard are the same picture from outside.
@@ -143,7 +146,7 @@ nothing yet asserting the model is the bound one or that a killed run resumes co
 
 - **T003** alongside T001–T002.
 - **Within Phase 2**: T004/T005 (audit) and T006–T009 (the seam) are independent.
-- **Within US1**: T018, T019, T021, T022a, T022b and T023 once T017 lands. T016a and T016b are independent of each other.
+- **Within US1**: T018, T019, T019a, T021, T022a, T022b and T023 once T017 lands. T016a and T016b are independent of each other; T010a and T010b are independent of T011.
 - **Within US2**: T026, T027, T028 are three assertions in one module.
 - **Phase 6**: T034, T035 and T038 are independent of the rest.
 

@@ -157,6 +157,23 @@ one execution per step.
   the tools the definition permits.
 - **FR-002**: `_tool_for_step`'s arithmetic selection MUST NOT remain reachable from a
   production run. A fallback that survives is a fallback that will be taken.
+- **FR-002a**: The `invoke_tools` flag — a production path that runs steps and invokes no tool
+  (`entrypoint.py:161`) — **stays, and consults no model.** A run that invokes nothing has
+  nothing to choose, so asking a model would be a provider call whose answer is discarded.
+
+  **This is a carve-out, and naming it is the point.** Analysis pass 3 found the flag mentioned
+  in no artifact: FR-001 said every run obtains its tool from a model with no exception, and the
+  task deleting `_tool_for_step` said nothing about the `else` branch. An implementer would have
+  had to invent one of three answers under time pressure, and *silently keeping the branch* is
+  the answer that leaves a production path running steps with no model — FR-002's defect wearing
+  a different name.
+
+  The flag exists for the durability fixtures, which need brackets to be killed *between*
+  without caring what runs inside them. It is not a way to run a real agent without a model, and
+  FR-002b keeps it that way.
+- **FR-002b**: A run with `invoke_tools` disabled MUST be distinguishable in the trail from a
+  model-driven run. Otherwise the carve-out above becomes a way to produce a run that looks
+  governed, executed nothing, and consulted nobody.
 - **FR-003**: The chosen tool MUST enter the same governed entry every scripted tool entered.
   No new path to a capability may be introduced by the model's involvement.
 - **FR-004**: A choice the definition does not permit MUST be refused by the existing

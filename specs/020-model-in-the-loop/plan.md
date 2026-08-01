@@ -42,6 +42,13 @@ long inference takes; that is the feature, not a regression.
 recorded, not just the last (FR-004c). No fallback to arithmetic selection survives (FR-002).
 Resume must not re-issue provider calls (FR-008).
 
+**One carve-out, named rather than left implicit** (FR-002a): the `invoke_tools` flag at
+`entrypoint.py:161` is a production path that runs steps and invokes no tool. It stays and
+consults no model — a provider call whose answer is discarded is cost and failure surface for
+nothing — and FR-002b requires such a run be distinguishable in the trail, so the carve-out
+cannot become a way to produce a run that looks governed, executed nothing, and consulted
+nobody. Analysis pass 3 found the flag mentioned in no artifact at all.
+
 **Scale/Scope**: One selection site, one audit member, one new conformance directory.
 
 ## Constitution Check
@@ -99,7 +106,8 @@ src/core/choice/                 # NEW — asking, bounding, recording a choice
 src/adapters/pydantic_ai/
 │   └── agent.py                 # UNCHANGED — already takes a model, already outermost
 src/surfaces/dispatch/
-│   └── entrypoint.py            # `_tool_for_step` DELETED; the loop asks a chooser
+│   └── entrypoint.py            # `_tool_for_step` DELETED; the loop asks a chooser.
+│                                # The `invoke_tools` carve-out stays — FR-002a
 infra/bin/
 │   └── choice-conformance       # NEW — the lane: stand up, run the rows, tear down
 tests/harness/

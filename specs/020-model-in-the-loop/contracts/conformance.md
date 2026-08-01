@@ -11,11 +11,22 @@ What these rows assert, what they refuse to assert, and who runs them.
 constructed agent. The adapter's governance is already asserted by existing rows; what is
 unasserted is that a real run consults a model and the choice is governed.
 
-**FR-012's demonstration is NOT a row.** One call to a real provider, performed by hand and
-recorded with its output. **A named party is responsible for it before merge** — the
-constitution requires that of any blocking row no automated check executes, and 019 had to
-learn this the hard way when a success criterion needing a person was tagged onto an automated
-row that proved something else.
+**Three things here are not rows, and each has a name.**
+
+| | What it is | Who |
+| --- | --- | --- |
+| FR-012's demonstration (T039) | One call to a real provider, recorded with its output | **Dan McTeer** |
+| FR-011a's fidelity row (T033) | The double and a real provider compared on one fixture | **Dan McTeer** |
+| Principle V review (T040) | Security-maintainer review of the audit-schema change | **Dan McTeer** |
+
+**The name is written because the phrase is not the thing.** An earlier draft of this contract
+said "a named party is responsible for it before merge" and named nobody — which is the
+constitution's requirement quoted back at itself. That is the third feature running where a
+"named party" clause was satisfied by naming the clause; 019 hit it when a success criterion
+needing a person was tagged onto an automated row proving something else.
+
+Dan holds every review role in this repository, so the name was never in doubt — which is
+exactly why writing it costs nothing and its absence was pure ceremony.
 
 Everything in the merge lane uses the double. **The double is proven faithful by a row**
 (FR-011a) rather than trusted — a stand-in nobody checks is the exact shape this feature exists
