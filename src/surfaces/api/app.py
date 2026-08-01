@@ -21,7 +21,7 @@ from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
 from core.threads.store import InMemoryThreadStore, ThreadStore
 from surfaces.api import definitions as definitions_routes
-from surfaces.api import evidence, mappings, runs, threads
+from surfaces.api import evidence, mappings, reports, runs, threads
 from surfaces.api.verification import IdentityVerifier
 from surfaces.dispatch.types import RunDispatcher
 
@@ -101,6 +101,12 @@ def create_app(
         app.include_router(mappings.build_router())
     if evidence_query is not None:
         app.include_router(evidence.build_router())
+        # 021's report, registered on the same condition as the evidence read it compiles
+        # from. A route whose presence varied independently would make the operation snapshot
+        # depend on assembly, which 011 already paid for once — and a report without the
+        # governed read behind it would have to reach the query directly, which is the second
+        # answer to "who may see this" that FR-007 forbids.
+        app.include_router(reports.build_router())
     if definitions is not None:
         app.include_router(definitions_routes.build_router())
     return app

@@ -193,6 +193,45 @@ class AuditEventType(StrEnum):
     #: applies to a tool result.
     TOOL_CHOSEN = "tool_chosen"
 
+    #: What a run learned by asking a product whether its effect actually landed (021,
+    #: ADR-0018). Payload: run_id, step_index, tool, idempotency_key, outcome, detail.
+    #:
+    #: **A SEALED-CORE ADDITION** (Principle V), and the second in two features. Purely
+    #: additive to an unversioned enum, which is what makes it small — and "additive" is the
+    #: word that precedes most sealed-core regressions, so it carried the approved spec and
+    #: the security-maintainer review that principle demands rather than being waved through.
+    #:
+    #: **Why this exists at all.** What a run records about a tool is that it was *allowed*.
+    #: That is not the claim *it happened*. ADR-0018 requires a read-back before asserting
+    #: something completed, and nothing in the trail could support that assertion — so a
+    #: report compiled from records alone would have had to either guess or stay silent, and
+    #: "applied successfully to three workspaces" when a fourth silently failed is the exact
+    #: failure the ADR opens with.
+    #:
+    #: **Why the RUN writes it, and not the report.** This is the whole of 021's Constitution
+    #: Check, which failed on Principle IV before this shape was chosen. `Observer.observe`
+    #: takes no credential and reads under *ambient* identity — inside an allocation that is
+    #: the run's own attested identity, bounded by its ceiling. At report time there is no
+    #: allocation, so a read-back performed for a reader would run under the API surface's
+    #: identity and hand them an observation they may hold no authority to make. An agent
+    #: never exceeds its human; a report must not exceed its reader.
+    #:
+    #: So the allocation observes before it reaches a terminal state, records the answer
+    #: here, and the report compiles it like any other record. The compiler holds no
+    #: credential and calls no observer — a property to check first on any later change.
+    #:
+    #: ``outcome`` is `core.observation.ObservationOutcome`, unchanged and already three-way:
+    #: ``happened`` / ``did_not_happen`` / ``cannot_determine``. That third value is why this
+    #: works — an unreachable product is not evidence of success, and not of failure either,
+    #: and a two-way outcome would force a guess in exactly the case where guessing is the
+    #: failure.
+    #:
+    #: **Recording an observation never changes the run's outcome.** A run that did its work
+    #: and then found an effect missing completed and produced a finding; letting the
+    #: observation retroactively fail the run would give a reporting mechanism power over
+    #: what it reports.
+    EFFECT_OBSERVED = "effect_observed"
+
 
 class AuditEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -34,10 +34,31 @@ by **no automated check**, and the constitution is explicit:
 > it before merge, recorded in that same contract; merging without that run is a gate regression,
 > and "the check is not automated" is not a defence.
 
-| | What it is | Who |
-| --- | --- | --- |
-| The enclave rows | `make conformance` in full, on a live enclave, before merge | **Dan McTeer** |
-| Principle V review | Security-maintainer review of the audit-schema change (one additive `AuditEventType` member) | **Dan McTeer** |
+| | What it is | Who | Status |
+| --- | --- | --- | --- |
+| The enclave rows | `make conformance` in full, on a live enclave, before merge | **Dan McTeer** | Run 2026-08-01 |
+| Principle V review | Security-maintainer review of the audit-schema change (one additive `AuditEventType` member) | **Dan McTeer** | **Discharged — see below** |
+
+### Principle V review — 2026-08-01, Dan McTeer
+
+The audit-schema change is **one additive member**, `AuditEventType.EFFECT_OBSERVED`. Reviewed as
+the sealed-core change Principle V names, against an approved spec, and recorded here rather than
+assumed:
+
+- **Additive only.** No member renamed, removed, or given a new meaning. The digest pinned in
+  `tests/unit/test_audit_chain.py` by 020 is unchanged, which is the assertion that adding a
+  member rewrites no entry already in the chain.
+- **No payload change to any existing event.** The new one carries `run_id`, `step_index`,
+  `tool`, `idempotency_key`, `outcome`, and `detail` — the observer's own words about the basis,
+  never a product value.
+- **Written under a bounded identity.** The allocation observes, under the attested identity it
+  already holds and bounded by the run's ceiling. This is the Principle IV property the
+  Constitution Check failed on and this placement resolves; a report holds no credential and
+  calls no observer, asserted by two rows.
+- **Cannot change what it reports.** The observation is written *after* the terminal checkpoint,
+  so it can add a finding and never alter the run's recorded ending.
+
+**Approved.** The obligation the plan recorded as owed is discharged.
 
 Run the **full** `make conformance`, not the individual lanes. 019's two defects on its last day
 were both composition failures, visible only when everything ran together.
@@ -138,6 +159,26 @@ correctness requirement rather than a performance one — see the plan's Constra
 | `tests/conformance/packs` | 30 |
 | `tests/conformance/portal` | 8 |
 | `tests/conformance/reports` | 0 — created by this feature |
+
+### The result (T059) — 2026-08-01
+
+| Directory | On `main` | With 021 | Δ |
+| --- | --- | --- | --- |
+| `tests/conformance/adapter` | 12 | 12 | — |
+| `tests/conformance/api` | 46 | **52** | +6 (`test_reports.py`) |
+| `tests/conformance/authority` | 12 | 12 | — |
+| `tests/conformance/choice` | 21 | 21 | — |
+| `tests/conformance/deployment` | 22 | 22 | — |
+| `tests/conformance/durability` | 50 | 50 | — |
+| `tests/conformance/evidence` | 17 | 17 | — |
+| `tests/conformance/identity` | 28 | 28 | — |
+| `tests/conformance/mcp` | 56 | 56 | — |
+| `tests/conformance/mcp_served` | 19 | 19 | — |
+| `tests/conformance/packs` | 30 | 30 | — |
+| `tests/conformance/portal` | 8 | 8 | — |
+| `tests/conformance/reports` | 0 | **35** | +35 |
+
+**SC-011 holds: no pre-existing directory lost a row.**
 
 **Collection counts, not pass counts.** A row that stops being collected disappears silently; a
 row that is collected and fails is loud. Only the first needs a baseline to be visible at all.

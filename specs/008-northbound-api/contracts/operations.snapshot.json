@@ -46,6 +46,11 @@
   },
   {
     "method": "GET",
+    "name": "get_run_report",
+    "path": "/runs/{run_id}/report"
+  },
+  {
+    "method": "GET",
     "name": "get_run_result",
     "path": "/runs/{run_id}/result"
   },

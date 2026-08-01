@@ -48,6 +48,7 @@ from core.durability.lease import RunLease
 from core.durability.postgres import PostgresDurabilityProvider
 from core.durability.resume import resume_run
 from core.durability.types import CheckpointBlob, IntentRecord, ResultRecord, RunOutcome
+from core.observation.record import observe_effects
 from core.run import RunState, start_governed_run
 from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
@@ -127,6 +128,7 @@ def _run_steps(
     model: str = "",
     task: str = "",
     already_chosen: Any = None,
+    effects: dict[int, str] | None = None,
 ) -> tuple[int, list[int], list[int]]:
     """Execute the run's steps, skipping the ones re-observation says already happened.
 
@@ -151,6 +153,14 @@ def _run_steps(
     """
     executed: list[int] = []
     skipped: list[int] = []
+    # WHICH TOOL RAN AT WHICH STEP (021). Read back before the run ends, so the report can say
+    # whether an effect landed rather than only that it was allowed. Accumulated here because
+    # this is the only place that knows both — the step index and the name the model chose.
+    #
+    # Mutated in place rather than returned: every caller already unpacks three values, and a
+    # fourth would be a signature change across four call sites for a mapping only one of them
+    # reads.
+    ran: dict[int, str] = effects if effects is not None else {}
 
     for step in range(total_steps):
         if (why := skip_reason(step)) is not None:
@@ -333,6 +343,9 @@ def _run_steps(
         # is decided — including the revival count, which a hand-built blob is free to forget.
         checkpoint_run(run, payload={"step": step})
         executed.append(step)
+        if tool_name:
+            # Recorded for the read-back this run performs before it ends (021, FR-006).
+            ran[step] = tool_name
 
     return 0, executed, skipped
 
@@ -724,6 +737,7 @@ def resume_dispatched_run(
             print(f"resume refused: {exc}", file=sys.stderr)
             return 1
 
+    effects: dict[int, str] = {}
     code, executed, skipped = _run_steps(
         run,
         durability=durability,
@@ -736,6 +750,7 @@ def resume_dispatched_run(
         model=model,
         task=task,
         already_chosen=already_chosen,
+        effects=effects,
     )
     print(f"resumed {blob_id}: executed={executed} skipped={skipped}", flush=True)
     if code == _SUSPENDED:
@@ -768,6 +783,15 @@ def resume_dispatched_run(
             resume_count=decision.resume_count,
         )
     )
+
+    # The read-back, on the revived allocation's own attested identity — see the fresh path's
+    # comment for why placement is the whole of 021's Constitution Check.
+    #
+    # **Only the effects THIS allocation ran.** A step it skipped was executed by a previous
+    # allocation, which observed its own effects before it ended; re-observing here would be
+    # this allocation making a claim about work it did not do, and the trail already holds the
+    # answer the run that did it recorded.
+    observe_effects(run, observers=observers, executed=effects, run_id=blob_id)
     return 0
 
 
@@ -1057,6 +1081,7 @@ def main() -> int:
     # production code, which is precisely what 010 spent a user story removing from the
     # identity protocol — and `tests/unit/test_surface_never_pauses.py` caught it, which
     # is the check doing its job rather than obstructing.
+    effects: dict[int, str] = {}
     if steps > 0:
         # THE MODEL, RESOLVED BEFORE THE FIRST STEP AND BEFORE ANY PROVIDER CALL (FR-005,
         # FR-006). A definition binding no model for the role, or binding a cell the matrix
@@ -1095,6 +1120,7 @@ def main() -> int:
             chooser=chooser,
             model=model,
             task=_run_task(run_id=blob_id, credentials=credentials, durability=durability),
+            effects=effects,
         )
         if code == _SUSPENDED:
             # A FRESH run can suspend too, and this arm is the more common one in production:
@@ -1173,6 +1199,22 @@ def main() -> int:
             outcome=RunOutcome(state=RunState.COMPLETED.value, stop_reason=None),
         )
     )
+
+    # THE READ-BACK (021, FR-006), and its placement is the whole of this feature's
+    # Constitution Check.
+    #
+    # `Observer.observe` takes no credential and reads under AMBIENT identity — here that is
+    # this allocation's, attested and bounded by the run's ceiling. At report time there is no
+    # allocation, so a read-back performed for a reader would run under the API surface's
+    # identity and hand them an observation they may hold no authority to make. An agent never
+    # exceeds its human; a report must not exceed its reader.
+    #
+    # AFTER the terminal checkpoint, deliberately. Recording an observation must not change the
+    # run's outcome (FR-016c): a run that did its work and then found an effect missing
+    # completed and produced a finding, and letting the observation retroactively fail the run
+    # would give a reporting mechanism power over what it reports. The checkpoint is already
+    # written, so nothing below can alter it.
+    observe_effects(run, observers=registry.observers(), executed=effects, run_id=blob_id)
     return 0
 
 

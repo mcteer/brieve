@@ -26,9 +26,10 @@ provider would move every time the provider did.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final, Protocol
+from typing import Any, Final, Protocol
 
-from core.evals.suites import EvalCase, UnrunnableSuite
+from core.evals.fidelity import score_fidelity
+from core.evals.suites import MEASURED_SUITES, EvalCase, UnrunnableSuite
 
 #: The ONE name for the live lane's credential. Asserted against by the no-secret-leak row
 #: as `scoring.EVAL_PROVIDER_KEY`, imported — a row matching a string literal that nothing
@@ -186,13 +187,38 @@ def _judge_response(case: EvalCase, response: str) -> tuple[bool, str]:
 
 
 def run_suite(
-    suite: str, cases: tuple[EvalCase, ...], *, subject: GovernedSubject, scorer: Scorer
+    suite: str,
+    cases: tuple[EvalCase, ...],
+    *,
+    subject: GovernedSubject,
+    scorer: Scorer,
+    compile_for: Any = None,
 ) -> SuiteResult:
-    """Score every case. Raises `UnrunnableSuite` rather than returning emptiness."""
+    """Score every case. Raises `UnrunnableSuite` rather than returning emptiness.
+
+    ``compile_for`` is required for a **measured** suite and ignored by the other four: it maps
+    a case's recorded-run name to a compiled `RunReport`, which is what fidelity scores. It is a
+    callable rather than the reports package itself, because `core.evals` scoring a report is a
+    different thing from `core.evals` depending on how one is built.
+    """
     if not cases:
         raise UnrunnableSuite(f"suite {suite!r} has zero cases; an empty gate passes vacuously")
+    if suite in MEASURED_SUITES and compile_for is None:
+        raise UnrunnableSuite(
+            f"suite {suite!r} is measured by precision and recall over a compiled report, and no "
+            f"way to compile one was supplied; a gate that cannot run must fail rather than pass"
+        )
+
     verdicts = []
     for case in cases:
+        if suite in MEASURED_SUITES:
+            # No model is asked anything. Fidelity scores the COMPILER, which is the whole point
+            # of ADR-0018: the artifact people read is built from records rather than composed.
+            score = score_fidelity(compile_for(case.prompt), case.events)
+            verdicts.append(
+                Verdict(case_id=case.id, suite=suite, passed=score.passed, observed=score.explain())
+            )
+            continue
         response = scorer.respond(subject, case)
         passed, observed = _judge_response(case, response)
         verdicts.append(Verdict(case_id=case.id, suite=suite, passed=passed, observed=observed))

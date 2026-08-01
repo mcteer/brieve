@@ -287,6 +287,27 @@ signal and not only a wall; the bound is what keeps that from becoming a suggest
 grinds against. **Per step, not per run** — a run needing several tools must not inherit a
 smaller budget because an earlier step took two attempts.
 
+**RunReport** — a typed account of one run, **compiled on demand from its records and never
+stored** (ADR-0018, 021). Every field traces to evidence; anything unsupportable carries a status
+saying so rather than being omitted. *Reports are presentation; attestation rests on records* —
+nothing in the platform may read a report to decide anything, and a report carries no part of a
+run's **result**, which is scoped to the subject who started it rather than to the tenant.
+
+**Claim** — one statement in a report, with the records it cites and how well they support it.
+Seven statuses, of which five **partition** every claim about an effect: observed, contradicted,
+and three distinct reasons for unverified. **No effect is ever asserted from the record alone** —
+what a run records is that a tool was *allowed*, which is not the claim that it *happened*.
+
+**Material event** — something in a run a faithful report must mention: a denial, an executed
+effect, a terminal state. What the **report-fidelity** corpus labels, and what precision and
+recall are measured against.
+
+**Observation** — what a run learned by asking a product whether its effect landed, recorded as
+evidence before the run reaches a terminal state. **Made by the allocation, never by a report**:
+an observer reads under ambient identity, so at report time it would run under the surface's
+authority — an agent never exceeds its human, and a report must not exceed its reader. An
+observation is therefore a fact about run-end, not about the product now.
+
 **Prompt bundle / policy bundle** — the pinned prompt/skill set and the composed
 policy set referenced by a definition; versioned independently, pinned together.
 

@@ -16,6 +16,7 @@ import pytest
 
 from core.evals.scoring import FixtureScorer, GovernedSubject, build_governed_subject, run_suite
 from core.evals.suites import (
+    OWED,
     SUITES,
     EvalCase,
     UnrunnableSuite,
@@ -23,8 +24,31 @@ from core.evals.suites import (
     parse_cases,
     suite_listing,
 )
+from core.reports import RunReport, compile_report
+from tests.harness import recorded_runs
 
 PACKS = Path(__file__).resolve().parents[2] / "packs"
+
+#: Tool names the registry holds an observer for, in the recorded runs the corpus names.
+_OBSERVERS = frozenset({"vault_write"})
+
+
+def _compile_for(recorded_run: str) -> RunReport:
+    """Compile the report a fidelity case is about.
+
+    A fidelity case's `prompt` names a recorded run rather than carrying one, so the corpus stays
+    readable TOML and the entries stay in one place. `killed_before_terminal` is compiled with
+    `terminal=False` because that is what the fixture *is* — a run that never got to observe.
+    """
+    fixture = getattr(recorded_runs, recorded_run, None)
+    if fixture is None:
+        raise UnrunnableSuite(
+            f"fidelity case names recorded run {recorded_run!r}, which no fixture provides; a "
+            f"case scoring a run that does not exist would pass or fail on nothing"
+        )
+    terminal = recorded_run != "killed_before_terminal"
+    return compile_report(fixture(), run_id="run-fixture", observers=_OBSERVERS, terminal=terminal)
+
 
 SUBJECT = GovernedSubject(
     agent_definition_id="applier",
@@ -35,12 +59,18 @@ SUBJECT = GovernedSubject(
 )
 
 
-def test_all_four_suites_pass_against_both_shipped_packs() -> None:
-    """The gates, end to end, against the real content. The blocking lane's whole job."""
+def test_all_five_suites_pass_against_both_shipped_packs() -> None:
+    """The gates, end to end, against the real content. The blocking lane's whole job.
+
+    **Five since 021**, and `OWED` is empty for the first time — report fidelity was an explicit
+    skip citing ADR-0018 from 013 until `RunReport` existed to score.
+    """
     for pack in ("vault", "terraform"):
         for suite in SUITES:
             cases = load_pack_cases(PACKS / pack, suite)
-            result = run_suite(suite, cases, subject=SUBJECT, scorer=FixtureScorer())
+            result = run_suite(
+                suite, cases, subject=SUBJECT, scorer=FixtureScorer(), compile_for=_compile_for
+            )
             assert result.passed, (
                 f"{pack}/{suite} failed: {[v.case_id for v in result.verdicts if not v.passed]}"
             )
@@ -49,16 +79,23 @@ def test_all_four_suites_pass_against_both_shipped_packs() -> None:
             )
 
 
-def test_report_fidelity_is_an_explicit_skip_naming_its_deferring_record() -> None:
-    """FR-013a: absent or an explicit skip citing ADR-0018 — never a passing stub.
+def test_report_fidelity_is_in_force_and_nothing_is_owed() -> None:
+    """FR-013, SC-006 — the last owed Quality Gate row closes.
 
-    The listing is the output a gate run produces, so the skip is a statement somebody
-    reads, not a gap somebody infers.
+    From 013 until 021 this suite was an explicit skip citing ADR-0018, which is what ADR-0047
+    requires of a row whose feature does not exist yet — never a passing stub. `RunReport` exists
+    now, so the skip becomes a gate.
+
+    **`OWED` empty is the assertion**, not `report_fidelity` present: a listing could name the
+    suite and still carry something else as deferred, and the constitution's row is satisfied
+    only when nothing is.
     """
     listing = suite_listing()
-    assert "report_fidelity" in listing, "the owed suite is silently missing from the listing"
-    assert "ADR-0018" in listing["report_fidelity"]
-    assert listing["report_fidelity"] != "in force", "the owed suite reads as in force"
+    assert listing.get("report_fidelity") == "in force", (
+        f"report fidelity reads {listing.get('report_fidelity')!r}; ADR-0018 has been Accepted "
+        f"since 2026-04-08 and 021 is what makes it bindable"
+    )
+    assert not OWED, f"a Quality Gate row is still owed: {OWED}"
     assert set(SUITES) <= set(listing)
 
 
@@ -88,23 +125,20 @@ def test_a_case_with_no_recording_raises_in_the_fixture_lane() -> None:
         run_suite("must_deny", (case,), subject=SUBJECT, scorer=FixtureScorer())
 
 
-def test_a_case_naming_the_owed_suite_is_refused_with_the_pointer() -> None:
-    """Someone writing a report_fidelity case today gets sent to the record, not a stub."""
+def test_a_fidelity_case_labelling_no_events_is_refused() -> None:
+    """FR-013a — the thin corpus ADR-0018 warns about, refused at load.
+
+    Precision and recall over an empty labelled set are 1.0 for *any* report, so a case with no
+    events is a gate that passes whatever the compiler says. That is the exact shape the ADR
+    predicts under schedule pressure — "nominally in force and practically unenforced" — and it
+    is cheap to make impossible.
+    """
     with pytest.raises(UnrunnableSuite) as caught:
         parse_cases(
-            {
-                "cases": [
-                    {
-                        "id": "r1",
-                        "suite": "report_fidelity",
-                        "prompt": "p",
-                        "expected": "match",
-                    }
-                ]
-            },
+            {"cases": [{"id": "r1", "suite": "report_fidelity", "prompt": "clean_run"}]},
             source="test",
         )
-    assert "ADR-0018" in str(caught.value)
+    assert "no material events" in str(caught.value)
 
 
 def test_a_subject_cannot_be_built_for_an_unbound_role() -> None:
@@ -150,6 +184,11 @@ def test_both_packs_ship_at_or_above_the_case_floor() -> None:
         for suite in SUITES:
             cases = load_pack_cases(PACKS / pack, suite)
             assert len(cases) >= 5, f"{pack}/{suite} ships {len(cases)} cases, below the floor"
+            if suite == "report_fidelity":
+                # Six, not five. A fidelity corpus of clean runs passes exactly as green as one
+                # containing a denial and a contradicted effect, so the floor is set from the
+                # hard shapes rather than from the count alone.
+                assert len(cases) >= 6, f"{pack}/{suite} ships {len(cases)}, below its own floor"
     # And the refuse/decline half: content is where a floor is easiest to let slide.
     for pack in ("vault", "terraform"):
         refusing = [
