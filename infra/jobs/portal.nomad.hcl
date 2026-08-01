@@ -12,7 +12,23 @@
 
 variable "api_base_url" {
   type        = string
-  description = "Where the northbound API answers. Loopback inside the enclave for dev."
+  description = <<-DESC
+    Where the northbound API answers, AS SEEN FROM THIS CONTAINER.
+
+    Not loopback any more. This task runs in bridge mode (see the config block below), so
+    `127.0.0.1` is the portal's own container and reaches nothing.
+
+    **And it is not `host.docker.internal` either**, which is the obvious wrong guess. Measured
+    from inside this container: that name resolves to Docker Desktop's macOS-facing address and
+    routes OUT to the developer's machine, where the API — still in host mode — publishes
+    nothing. The API listens in the Linux VM's host namespace, reachable from a bridge
+    container only at that bridge's own gateway, which `portal-up` derives.
+
+    This is the same distinction 014 paid for in the sweeper's dispatcher: an address correct
+    for a host process and wrong for an allocation, failing with `Connection refused` where
+    nobody was watching. The difference here is that the failure is loud — the portal's first
+    page load reports it.
+  DESC
 }
 
 variable "oidc_authorize_endpoint" {
@@ -111,9 +127,24 @@ job "portal" {
       driver = "docker"
 
       config {
-        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
-        entrypoint   = ["/bin/sh", "-c"]
-        network_mode = "host"
+        image      = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
+        entrypoint = ["/bin/sh", "-c"]
+
+        # BRIDGE MODE, AND THIS IS THE WHOLE FIX. It said `network_mode = "host"`, and the
+        # port block above was therefore inert: host mode shares the Docker VM's network
+        # namespace and publishes nothing, so `docker ps` showed an empty Ports column and
+        # nothing on the developer's machine could reach 8082 — while `portal-up` ended by
+        # telling them to open it in a browser.
+        #
+        # Measured 2026-07-31 with the portal running and answering: `200` from inside the
+        # VM's namespace, no answer from macOS. `docker inspect` states it in one line —
+        # `host  ports=map[]` here against `bridge  ports=map[5432/tcp:[{127.0.0.1 5432}]]`
+        # for the database, which the host lanes reach from macOS on every run.
+        #
+        # **A browser-facing surface is the one thing that cannot live in host mode**, because
+        # the browser is the one client that is never inside the VM. `postgres.nomad.hcl` had
+        # the answer the whole time; this is its port block, copied.
+        ports = ["http"]
 
         mount {
           type     = "bind"
@@ -151,10 +182,25 @@ job "portal" {
         PORTAL_REDIRECT_URI     = var.portal_redirect_uri
         PORTAL_BIND             = "0.0.0.0:8082"
 
+        # TLS. The paths are as seen INSIDE this container — `/src` is the working tree,
+        # bind-mounted read-only above, and `.enclave/` is where bring-up materialises what
+        # the control plane issued. Both files are gitignored.
+        PORTAL_TLS_CERT = "/src/.enclave/portal.crt"
+        PORTAL_TLS_KEY  = "/src/.enclave/portal.key"
+
         # The session cookie is ALWAYS Secure and always `__Host-` prefixed; there is no
-        # setting for it. Dev works over plain HTTP because browsers treat loopback as a
-        # trustworthy origin. A real deployment terminates TLS in front of this — that
-        # posture is a deployment concern and is deliberately not solved here.
+        # setting for it, and `session.cookie_attributes` explains at length why the flag
+        # must not come back.
+        #
+        # **What used to be written here was wrong.** It said dev works over plain HTTP
+        # because browsers treat loopback as a trustworthy origin. Chromium and Firefox do;
+        # Safari does not, and wants a real https scheme. The accessibility lane drives
+        # Chromium, so the claim was only ever checked where it holds — and in Safari the
+        # callback succeeded, the cookie was discarded, and the portal rendered its own
+        # sign-in page forever.
+        #
+        # So dev serves TLS too, with a certificate the control plane's own CA issued. That
+        # is not "deferring the deployment posture" — it IS the posture, one enclave early.
 
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
 

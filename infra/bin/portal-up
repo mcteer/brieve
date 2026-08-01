@@ -127,14 +127,92 @@ nomad job run -detach -var="repo=$REPO" \
   || die "could not submit the api service"
 
 say "Portal"
+
+# THE PORTAL'S TLS CERTIFICATE, ISSUED BY THE CONTROL PLANE'S OWN CA.
+#
+# The session cookie is `__Host-` prefixed and therefore `Secure`, and `Secure` over plain
+# HTTP is accepted by Chromium and Firefox on loopback and REFUSED BY SAFARI. The symptom is
+# the cruellest available: sign-in succeeds, the callback returns 303, the cookie is silently
+# discarded, and the portal renders its own sign-in page again. Observed 2026-07-31 with an
+# empty Safari cookie store.
+#
+# Issued fresh on every bring-up rather than kept: it costs one API call, it cannot expire in
+# a drawer, and it means nobody has to know it exists to get a working portal.
+PORTAL_CRT="$REPO/.enclave/portal.crt"
+PORTAL_KEY="$REPO/.enclave/portal.key"
+# The coordinates come from `.env` through this script's own reader, which is the only thing
+# here that knows where `.env` is. The first version of this block assumed VAULT_ADDR and a
+# token were already exported; nothing in `portal-up` exports either, so `vault` ran with no
+# address and failed producing NO OUTPUT AT ALL — and the die message discarded what little
+# there was. Both halves are fixed: the values are read the way every other value here is
+# read, and the message carries the cause.
+# THE COORDINATES, AND THEIR FALLBACKS, WHICH ARE THE PART THAT MATTERS.
+#
+# `enclave-up` writes VAULT_ROOT_TOKEN into `.env` but only EXPORTS the address and the CA
+# path — so a developer's `.env` has all three and CI's has one. Reading all three from
+# `.env` worked perfectly here and would have failed in CI with a TLS error naming the
+# certificate rather than the missing setting.
+#
+# The defaults are `enclave-up`'s own, copied deliberately rather than invented: if it moves
+# the CA, this follows by being wrong in the same direction, which is easier to find than
+# being wrong in a new one.
+_vault_addr="$(env_val VAULT_ADDR)"; _vault_addr="${_vault_addr:-https://127.0.0.1:8200}"
+_vault_cacert="$(env_val VAULT_CACERT)"; _vault_cacert="${_vault_cacert:-$REPO/.enclave/ca.pem}"
+_vault_token="$(env_val VAULT_ROOT_TOKEN)"
+[ -n "$_vault_token" ] || die "VAULT_ROOT_TOKEN is not in .env — the portal's certificate cannot be issued. Has enclave-up run?"
+
+if ! _cert=$(VAULT_ADDR="$_vault_addr" VAULT_CACERT="$_vault_cacert" VAULT_TOKEN="$_vault_token" \
+      vault write -format=json \
+      pki/issue/control-plane \
+      common_name="localhost" \
+      ip_sans="127.0.0.1" \
+      alt_names="localhost,host.docker.internal" \
+      ttl="8760h" 2>&1); then
+  die "could not issue the portal's certificate — it would serve plain HTTP and sign nobody in: ${_cert}"
+fi
+printf '%s' "$_cert" | python3 -c '
+import json, os, sys
+d = json.load(sys.stdin)["data"]
+crt, key = sys.argv[1], sys.argv[2]
+open(crt, "w").write(d["certificate"] + "\n" + "\n".join(d.get("ca_chain", [])))
+open(key, "w").write(d["private_key"])
+os.chmod(key, 0o600)
+' "$PORTAL_CRT" "$PORTAL_KEY" || die "could not write the portal certificate"
+unset _cert _vault_addr _vault_cacert _vault_token
+ok "portal certificate issued by the control plane CA (localhost, 127.0.0.1)"
+
+# TWO ADDRESSES FOR THE SAME ENCLAVE, AND THE DIFFERENCE IS NOT A TYPO.
+#
+#   api_base_url        — where the PORTAL PROCESS reaches the API. A server-to-server hop
+#                         inside the substrate.
+#   portal_redirect_uri — where the BROWSER comes back to. A human's address bar, on the
+#                         developer's machine, where the portal's port is now published.
+#
+# They were the same string only while the portal was in host mode and reachable by nobody.
+#
+# **`host.docker.internal` is NOT the answer here, and it is the obvious wrong guess.**
+# Measured from inside the running portal container: `host.docker.internal` resolves to
+# 192.168.65.254 and `gateway.docker.internal` to 192.168.65.1 — both Docker Desktop's
+# macOS-facing addresses. From a bridge container they route OUT to the developer's machine,
+# where the API (host mode) publishes nothing. Both refuse the connection.
+#
+# The API listens in the LINUX VM's host namespace. The only address that reaches it from a
+# bridge container is that bridge's own gateway, derived below rather than hardcoded as
+# `172.17.0.1` — the value is stable on this substrate, and a magic constant would be
+# indistinguishable from a guess by whoever reads it next.
+#
+# The durable fix is to publish the API too, at which point this whole hop becomes an
+# ordinary published port. That belongs with 019, which needs the API reachable anyway.
+API_GATEWAY=$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null)
+[ -n "$API_GATEWAY" ] || die "could not derive the docker bridge gateway — the portal would start and reach nothing"
 nomad job run -detach -var="repo=$REPO" \
-  -var="api_base_url=http://127.0.0.1:8081" \
+  -var="api_base_url=http://${API_GATEWAY}:8081" \
   -var="oidc_issuer=${OIDC_ISSUER}" \
   -var="oidc_authorize_endpoint=${OIDC_AUTHORIZE}" \
   -var="oidc_token_endpoint=${OIDC_TOKEN}" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \
   -var="portal_client_id=${PORTAL_CLIENT_ID}" \
-  -var="portal_redirect_uri=http://127.0.0.1:8082/callback" \
+  -var="portal_redirect_uri=https://127.0.0.1:8082/callback" \
   -var="harness_started_by=${HARNESS_STARTED_BY}" \
   "$REPO/infra/jobs/portal.nomad.hcl" >/dev/null \
   && ok "portal submitted (thin client; holds no credential of any kind)" \
@@ -147,7 +225,7 @@ cat <<MSG
         nomad job status api
         nomad job status portal
 
-    Then open http://127.0.0.1:8082/ and sign in.
+    Then open https://127.0.0.1:8082/ and sign in.
 
 MSG
 

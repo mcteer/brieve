@@ -208,7 +208,7 @@ def require_running(job: str) -> str:
 def _attempt(alloc: str, path: str, method: str) -> Response | None:
     """One request from inside the allocation. `None` when nothing answered."""
     script = f"""
-import json, urllib.request, urllib.error
+import json, os, ssl, urllib.request, urllib.error
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -216,7 +216,21 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-opener = urllib.request.build_opener(_NoRedirect)
+# HTTPS, VERIFIED AGAINST THE CONTROL PLANE'S OWN CA — never unverified.
+#
+# The portal serves TLS because its session cookie is `__Host-` prefixed and therefore
+# `Secure`, which Safari refuses over plain HTTP. This probe runs INSIDE an allocation,
+# where the working tree is mounted at /src, so the CA the enclave issued from is right
+# there. Turning verification off instead would make this row pass against a surface
+# presenting any certificate at all, which is a weaker assertion than the one it makes now.
+_ctx = None
+if {path!r}.startswith("https:"):
+    _ca = "/src/.enclave/ca.pem"
+    if not os.path.exists(_ca):
+        raise SystemExit(f"no CA at {{_ca}} — an https probe cannot verify anything")
+    _ctx = ssl.create_default_context(cafile=_ca)
+
+opener = urllib.request.build_opener(_NoRedirect, urllib.request.HTTPSHandler(context=_ctx))
 req = urllib.request.Request({path!r}, method={method!r})
 try:
     with opener.open(req, timeout=20) as r:
