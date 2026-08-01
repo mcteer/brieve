@@ -125,7 +125,11 @@ design decision for `data-model.md` rather than an open question.
 - **PKCE stays required** (FR-010).
 - **The direct-mint path keeps working** (FR-014). Every conformance lane depends on it, and
   replacing it would put a browser step in the middle of automated rows.
-- **The provider stays standard-library only.** No dependency is added.
+- **No new dependency is added.** The HTTP wrapper is standard library; `fake_oidc_provider.py`
+  already imports PyJWT and `cryptography` to sign. An earlier draft of this line said the
+  provider was standard-library only, which is true of one file and false of the pair — the fourth
+  unverified assertion caught in this repository in two days, and the reason the check is now to
+  read the imports rather than recall them.
 - **The `DEV_ONLY` warnings stay.** Becoming more standards-complete must not make this look
   deployable (FR-013).
 
@@ -133,9 +137,12 @@ design decision for `data-model.md` rather than an open question.
 
 ## Open for tasks, not for plan
 
-- Whether `make dev-up` should start the provider itself, or continue to leave that to the
-  conformance script and `mcp-surface-up`. FR-003 says `make dev-up` must be sufficient; which
-  script satisfies it is an implementation choice.
+- **Resolved by analysis, and it moved a requirement.** `make dev-up` runs only
+  `infra/bin/enclave-up`, which starts neither the provider nor the surface — so FR-003's first
+  draft, *"`make dev-up` MUST be sufficient"*, described something that was never true. The Makefile
+  keeps them apart deliberately (*"the surfaces a person uses, separate from `dev-up` on purpose"*),
+  so widening `dev-up` would fight that decision. FR-003a instead puts the obligation on the surface
+  command, which is the one a person runs when they intend to connect something to it.
 - Whether the two `DEV_IDP_ISSUER` uses — the provider's minted `iss`
   (`mcp-surface-conformance:66`) and the address a test process connects to (line 104) — should
   keep sharing one variable name. They mean different things and currently differ in value, which

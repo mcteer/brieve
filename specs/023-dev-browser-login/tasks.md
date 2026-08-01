@@ -93,7 +93,10 @@ operation.
       container-reachable one in `infra/bin/mcp-surface-conformance`, replacing the single
       `IDP_ISSUER` used for both. The provider's minted `iss` and the surface's expected issuer
       MUST remain the same string (FR-006a) — that identity is the only reason two addresses are
-      safe.
+      safe. **Side effect worth making deliberate**: `DEV_IDP_ISSUER` currently means two things —
+      the minted `iss` at line 30 and the address a test process connects to at line 104 — holding
+      different values. After this change both are `127.0.0.1`, so the ambiguity disappears. Note it
+      in the script rather than leaving a reader to wonder whether the collision is intentional.
 
 **Checkpoint**: US1 is independently shippable. A client can discover, register, and sign in.
 
@@ -158,9 +161,17 @@ without restarting the surface.
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T022 Make `make dev-up` sufficient (FR-003) — ensure the provider is started with the right
-      issuer by whichever script `dev-up` invokes, so a developer needs no further undocumented
-      step.
+- [ ] T022 (FR-003a) Start the development provider from `infra/bin/mcp-surface-up` when it is not
+      already listening, with the host-resolvable issuer. **Analysis found the first version of this
+      task assumed work that did not exist**: `make dev-up` runs only `infra/bin/enclave-up`, which
+      starts neither the provider nor the surface, so "ensure it is started by whichever script
+      `dev-up` invokes" pointed at nothing. `mcp-surface-conformance` already does this and is the
+      pattern to follow.
+- [ ] T022a (FR-003) Write down the full command sequence — enclave up, surface up, configure,
+      connect — in the same place as T023. The Makefile separates `dev-up` from the surfaces *on
+      purpose*, so the sequence is two commands and the documentation must say so rather than imply
+      one. **A step a developer had to already know is the gap this feature is about**, reappearing
+      as instructions instead of a token.
 - [ ] T023 (FR-002) Update `README` or `docs/development/` with the credential-free editor configuration:
       a URL and nothing else. **The absence of a token in that snippet is the deliverable**, and it
       should be somewhere a person will find it rather than only in this spec.
@@ -224,7 +235,7 @@ be noticed.
 
 ## Notes
 
-**26 tasks**, of which 9 are rows. Small, and the smallness is the finding: the surface's OAuth half
+**27 tasks**, of which 9 are rows. Small, and the smallness is the finding: the surface's OAuth half
 already worked, `/authorize` already redirected, `/token` already exchanged. What was missing was
 two routes, one constant, and one deleted line.
 

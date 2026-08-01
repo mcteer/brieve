@@ -9,9 +9,13 @@ copying a token, which is exactly the state this exists to end.
 ## Prerequisites
 
 ```bash
-make dev-up
+make dev-up            # the enclave
+make mcp-surface-up    # the surface, and the development provider
 docker run --rm --privileged alpine hwclock -s   # VM clock drift breaks attestation
 ```
+
+**Two commands, not one.** `make dev-up` runs `enclave-up` only — it starts neither the surface nor
+the provider, and the Makefile keeps them apart deliberately.
 
 ---
 
@@ -99,16 +103,19 @@ feature ships working only on the machine it was written on.
 
 **By hand. A browser. No credential anywhere.**
 
-1. `make dev-up`
-2. Configure an editor with **only** the surface's URL:
+1. `make dev-up` — brings up the enclave
+2. `make mcp-surface-up` — brings up the surface **and the development provider**. The Makefile
+   keeps these separate on purpose; an earlier draft of this scenario began and ended at
+   `make dev-up` and would have had you configuring an editor against nothing.
+3. Configure an editor with **only** the surface's URL:
 
    ```json
    { "mcpServers": { "brieve": { "url": "http://127.0.0.1:8083/mcp" } } }
    ```
 
    **No `headers`. No `Authorization`. No token.**
-3. Connect. A browser opens. Sign in.
-4. Ask the editor to list runs.
+4. Connect. A browser opens. Sign in.
+5. Ask the editor to list runs.
 
 **Expect**: it answers, and the trail names the person who signed in.
 

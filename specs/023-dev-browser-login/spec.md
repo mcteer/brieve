@@ -169,8 +169,16 @@ fetch its keys.
   credential**, complete a browser sign-in, and call governed operations.
 - **FR-002**: The developer MUST NOT be required to see, copy, paste, or store a token at any point,
   including on renewal.
-- **FR-003**: `make dev-up` MUST be sufficient. A login that requires a further undocumented step is
-  the same gap with more instructions.
+- **FR-003**: The documented path MUST be complete — every command a developer runs is written
+  down, and there is no step that is not. **Measured, and it corrects this requirement's first
+  draft**: `make dev-up` runs only `infra/bin/enclave-up`, which starts neither the development
+  provider nor the MCP surface. The Makefile keeps them separate *on purpose* — *"the surfaces a
+  person uses, separate from `dev-up` on purpose"* — so the fix is not to widen `dev-up` against a
+  deliberate decision, but to make the surface command self-sufficient and state the sequence.
+- **FR-003a**: Bringing up the MCP surface MUST start the development provider if it is not already
+  running. A developer who has run the documented commands MUST NOT then need to know that a second
+  process exists. **This is where "sufficient" actually lives** — the surface command is the one a
+  person runs when they want to connect something to it.
 
 **Discovery**
 
@@ -239,8 +247,11 @@ fetch its keys.
 
 - **SC-001**: A developer connects an editor and reaches a working session with **zero** credential
   handling steps — measured by a written procedure containing no copy, paste, or token.
-- **SC-002**: The procedure works from a clean start: `make dev-up`, configure, connect, sign in,
-  call an operation. Demonstrated end to end against the running service, not a test double.
+- **SC-002**: The procedure works from a clean start, following **only** written commands: bring up
+  the enclave, bring up the surface, configure an editor, connect, sign in, call an operation.
+  Demonstrated end to end against the running service, not a test double. **A step someone had to
+  already know fails this criterion**, which is how its first draft — beginning and ending at
+  `make dev-up` — would have passed while a developer stared at a surface that was not running.
 - **SC-003**: A token from browser login and one minted directly resolve to the same subject,
   tenant, and roles.
 - **SC-004**: Claims that map to no role are still producible through the login, and the surface
@@ -267,7 +278,9 @@ fetch its keys.
   fact** — the last three things asserted that way in this repository turned out to be false.
 - **The provider authenticates nobody, and still will.** It is quarantined in `tests/` for that
   reason. Becoming more standards-complete must not soften it.
-- **No new dependency.** The provider is standard-library only, and staying that way is assumed.
+- **No new dependency.** Assumed, and the constraint is exactly that — **not** "standard library
+  only", which an earlier draft of this line said and which is false: `fake_oidc_provider.py`
+  already imports PyJWT and `cryptography` to sign. Only the HTTP wrapper is standard library.
 - **The gaps are exactly three.** Measured on 2026-08-01 against a running service. A fourth
   emerging during implementation is expected rather than surprising — this list came from following
   one client, and a second client may reveal more.

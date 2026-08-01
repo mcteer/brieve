@@ -26,10 +26,13 @@ challenge.
 
 ## Technical Context
 
-**Language/Version**: Python 3.12, standard library only in the provider.
+**Language/Version**: Python 3.12. The HTTP wrapper (`dev_idp.py`) is standard library;
+`fake_oidc_provider.py` already uses PyJWT and `cryptography` to sign. **No new dependency** is the
+constraint that matters, and it is not the same claim as "standard library only" — which an earlier
+draft of this line made, and which is false of the pair.
 
-**Primary Dependencies**: **None added.** `tests/harness/dev_idp.py` uses `http.server`; the
-provider's crypto is the existing `FakeOIDCProvider`.
+**Primary Dependencies**: **None added.** `dev_idp.py` uses `http.server`; signing goes through the
+existing `FakeOIDCProvider`, which already depends on PyJWT and `cryptography`.
 
 **Storage**: None. Registration holds nothing (research F5).
 
@@ -48,8 +51,9 @@ human.
 remain unmistakably development-only (FR-013). PKCE stays required (FR-010). The direct-mint path
 keeps working, because every automated lane depends on it (FR-014).
 
-**Scale/Scope**: One file (`tests/harness/dev_idp.py`), one or two scripts under `infra/bin/`. Two
-new HTTP routes, one changed constant, one deleted line.
+**Scale/Scope**: `tests/harness/dev_idp.py`, `tests/harness/fake_oidc_provider.py`, and two scripts
+under `infra/bin/`. Two new HTTP routes, one changed key-id default, one deleted line, and
+`mcp-surface-up` gaining the ability to start the provider it currently assumes is running.
 
 ## Constitution Check
 
@@ -57,12 +61,12 @@ new HTTP routes, one changed constant, one deleted line.
 
 | Principle | Verdict | Notes |
 | --- | --- | --- |
-| I — Build Glue Only | **Pass** | Nothing enters core. The provider is standard-library HTTP and stays that way. |
+| I — Build Glue Only | **Pass** | Nothing enters core. The provider's HTTP wrapper is standard library; its signing already goes through PyJWT and `cryptography`, and no new dependency joins either. |
 | II — Total Interception; One Governed Tool Layer | **N/A** | No tool, hook, registry, or governed operation is touched. |
 | III — Fail-Closed, In-Process Enforcement | **Pass, and worth watching.** | The surface's refusals cannot change — no `src/` change is permitted. The risk here is the opposite of weakening: a provider that becomes easier to authenticate against must not become one that produces only well-mapped claims. FR-009 forbids that, because a harness unable to present a bad identity cannot show the platform refusing one. |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass, and it is the point.** | A long-lived token in a config file *is* a standing credential. Replacing it with a flow the client renews applies the principle to the lane where developers form their intuitions. **The rejected alternative mattered**: persisting the provider's keypair would put a private key on disk to keep old tokens alive — the same instinct this principle exists to refuse. |
 | V — Sealed Core, Versioned Seams | **N/A** | No sealed-core file is touched: no audit event type, no schema, no registry, no adapter. **No security review is owed** — stated explicitly because the previous three features each owed one, and an absence should be asserted rather than inferred from silence. |
-| VI — Lean by Default | **Pass, strongly.** | No dependency, no service, no store. The largest single change is deleting a line that derived one config value from another. |
+| VI — Lean by Default | **Pass, strongly.** | No **new** dependency, no service, no store. The largest single change is deleting a line that derived one config value from another. |
 | VII — Anti-Fragmentation | **Pass** | The second discovery path serves the **same document body** as the first rather than a parallel one. Two bodies could drift; one cannot. |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **N/A** | No model, judge, pack, or policy. `OWED` stays empty. |
 | IX — Evidence Over Claims | **Pass** | No evidence path changes. The feature's own claims were measured before being written, and two corrected statements this repository already carried (research F2, F3). |
