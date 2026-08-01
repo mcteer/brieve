@@ -43,17 +43,34 @@ say "MCP surface"
 VAULT_ADDR_VAL="$(env_val VAULT_ADDR)"; VAULT_ADDR_VAL="${VAULT_ADDR_VAL:-https://127.0.0.1:8200}"
 VAULT_CACERT_VAL="$(env_val VAULT_CACERT)"; VAULT_CACERT_VAL="${VAULT_CACERT_VAL:-$REPO/.enclave/ca.pem}"
 
-AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"
-[ -n "$AUTH0_DOMAIN" ] || die "AUTH0_DOMAIN is not in .env — this surface verifies CALLERS and will not start without an issuer"
+# THE LANE SUPPLIES ITS OWN ISSUER, and nothing else may.
+#
+# `mcp-surface-conformance` points the surface at the development provider it started, whose
+# JWKS the surface must fetch from inside a bridge container. Outside the lane this is unset
+# and the real provider from `.env` is used — so the override is a lane affordance rather
+# than a way to weaken a deployed surface by exporting a variable.
+if [ -n "${OIDC_ISSUER_OVERRIDE:-}" ]; then
+  OIDC_ISSUER="$OIDC_ISSUER_OVERRIDE"
+  OIDC_JWKS_URI="${OIDC_ISSUER_OVERRIDE}/jwks"
+  # The development provider's own audience. Empty would leave the verifier expecting
+  # "harness-api" — its default — while every minted token carries this, and the surface
+  # would refuse every caller with an audience mismatch that names the token.
+  OIDC_AUDIENCE="harness-api"
+  OIDC_TENANT_CLAIM="tenant"
+  ok "issuer overridden for a lane: ${OIDC_ISSUER}"
+else
+  AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"
+  [ -n "$AUTH0_DOMAIN" ] || die "AUTH0_DOMAIN is not in .env — this surface verifies CALLERS and will not start without an issuer"
 
 # The trailing slash is not optional and not cosmetic: Auth0's `iss` carries one, and a
 # verifier configured without it rejects every token with an issuer mismatch that names the
 # issuer rather than the slash.
-OIDC_ISSUER="https://${AUTH0_DOMAIN}/"
-OIDC_JWKS_URI="https://${AUTH0_DOMAIN}/.well-known/jwks.json"
-OIDC_AUDIENCE="$(env_val AUTH0_API_AUDIENCE)"
-OIDC_TENANT_CLAIM="$(env_val OIDC_TENANT_CLAIM)"
-OIDC_TENANT_CLAIM="${OIDC_TENANT_CLAIM:-tenant}"
+  OIDC_ISSUER="https://${AUTH0_DOMAIN}/"
+  OIDC_JWKS_URI="https://${AUTH0_DOMAIN}/.well-known/jwks.json"
+  OIDC_AUDIENCE="$(env_val AUTH0_API_AUDIENCE)"
+  OIDC_TENANT_CLAIM="$(env_val OIDC_TENANT_CLAIM)"
+  OIDC_TENANT_CLAIM="${OIDC_TENANT_CLAIM:-tenant}"
+fi
 HARNESS_STARTED_BY="${HARNESS_STARTED_BY:-}"
 
 ok "issuer ${OIDC_ISSUER}"

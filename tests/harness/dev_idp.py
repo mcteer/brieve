@@ -100,7 +100,17 @@ class _Handler(BaseHTTPRequestHandler):
                 # Whoever asks. There is no authentication here, which is the whole reason
                 # this file is quarantined in tests/.
                 subject=_one(query, "subject") or "alice",
-                claims={"groups": ["platform"]},
+                tenant=_one(query, "tenant") or "tenant-test",
+                # CLAIMS THE CALLER ASKS FOR, because a fixed set makes the platform's own
+                # refusal unfalsifiable. This was `{"groups": ["platform"]}` always — so
+                # every development token carried the same claim, and a row could never
+                # present one that maps to a role and one that does not. The platform
+                # refuses an unmapped claim correctly; a harness that can only ever produce
+                # unmapped claims cannot tell that from the platform being broken.
+                #
+                # JSON values so a list survives the query string; a bare word is taken as
+                # itself, which keeps the common case readable.
+                claims=_claims(query) or {"groups": ["platform"]},
             )
         except AuthorizationRefused as refused:
             self._json({"error": refused.reason, "_warning": DEV_ONLY}, status=400)
@@ -122,6 +132,32 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
 
+def _claims(query: dict[str, list[str]]) -> dict[str, Any]:
+    """Everything the caller asked to carry, minus the protocol's own parameters."""
+    protocol = {
+        "response_type",
+        "client_id",
+        "redirect_uri",
+        "state",
+        "code_challenge",
+        "code_challenge_method",
+        "subject",
+        "tenant",
+        "scope",
+        "nonce",
+    }
+    out: dict[str, Any] = {}
+    for key, values in query.items():
+        if key in protocol or not values:
+            continue
+        raw = values[0]
+        try:
+            out[key] = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            out[key] = raw
+    return out
+
+
 def _one(values: dict[str, list[str]], key: str) -> str:
     found = values.get(key) or [""]
     return found[0]
@@ -130,7 +166,23 @@ def _one(values: dict[str, list[str]], key: str) -> str:
 def serve(*, host: str = "127.0.0.1", port: int = 8090) -> None:  # pragma: no cover
     """Run until killed. Called by `make dev-up`, never by anything shipped."""
     issuer = os.environ.get("DEV_IDP_ISSUER", f"http://{host}:{port}")
-    handler = type("_BoundHandler", (_Handler,), {"provider": FakeOIDCProvider(), "issuer": issuer})
+    # THE PROVIDER MUST MINT WHAT THE DOCUMENT ANNOUNCES, and it did not.
+    #
+    # This said `FakeOIDCProvider()`, so the discovery document announced `issuer` while every
+    # token carried the class default `https://idp.test.invalid/`. Any verifier checking `iss`
+    # against the discovered issuer refuses all of them — with a mismatch that names the
+    # issuer rather than this line.
+    #
+    # It was invisible because nothing walked a full development sign-in through to a
+    # verifier: the deployment rows assert the portal REDIRECTS, and stop there. 019's rows
+    # are the first to redeem a code and present the result to a surface that verifies it.
+    # `portal-up` has the same exposure — it tells the API to expect
+    # `http://127.0.0.1:8090` — so this fixes a defect on a path nobody had run either.
+    handler = type(
+        "_BoundHandler",
+        (_Handler,),
+        {"provider": FakeOIDCProvider(issuer=issuer), "issuer": issuer},
+    )
     print(f"{DEV_ONLY} — listening on {host}:{port}, issuer {issuer}", flush=True)
     HTTPServer((host, port), handler).serve_forever()
 

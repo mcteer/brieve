@@ -66,15 +66,15 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 
 **Independent test**: attach the SDK's client to the running platform; the session establishes and the operation set comes back.
 
-- [ ] T013 [US1] Create `tests/conformance/mcp_served/surfaces.py` — bringing up, addressing, and reaching the served process, on the model of `tests/conformance/deployment/surfaces.py`.
-- [ ] T014 [US1] Create `tests/conformance/mcp_served/conftest.py` with the lifecycle fixtures and the `enclave`/`host_enclave` markers.
-- [ ] T015 [US1] Add `infra/bin/mcp-surface-conformance` — bring up, mark ownership in the job's `Meta`, run, tear down — and call it from `Makefile`'s `conformance` recipe. 017's lifecycle, including the mark that distinguishes a lane-started surface from a developer's own.
+- [X] T013 [US1] Create `tests/conformance/mcp_served/surfaces.py` — bringing up, addressing, and reaching the served process, on the model of `tests/conformance/deployment/surfaces.py`.
+- [X] T014 [US1] Create `tests/conformance/mcp_served/conftest.py` with the lifecycle fixtures and the `enclave`/`host_enclave` markers.
+- [X] T015 [US1] Add `infra/bin/mcp-surface-conformance` — bring up, mark ownership in the job's `Meta`, run, tear down — and call it from `Makefile`'s `conformance` recipe. 017's lifecycle, including the mark that distinguishes a lane-started surface from a developer's own.
 
   **This is the lane wiring, and it must land before T016.** The moment a `test_*.py` exists in that directory, `tests/unit/test_every_conformance_directory_is_run.py` requires a lane that both names it and selects its markers — which is what stops the 018 repeat, and which is why this cannot be left to Polish.
-- [ ] T016 [P] [US1] Add `test_a_client_establishes_a_session` in `tests/conformance/mcp_served/test_a_client_reaches_the_surface.py` — the SDK's own client, against the running process (FR-001, SC-001).
-- [ ] T017 [P] [US1] Add `test_the_operation_set_matches_the_other_surface` in `tests/conformance/mcp_served/test_a_client_reaches_the_surface.py`, compared **mechanically** against `specs/008-northbound-api/contracts/operations.snapshot.json` (FR-008, SC-002).
-- [ ] T018 [US1] Add `test_the_served_process_is_assembled_from_real_parts` in `tests/conformance/mcp_served/test_the_assembly_is_real.py` (FR-002, FR-004) — **against the running process**, because assembly is the one path no unit test covers and the reason this feature exists.
-- [ ] T018a [US1] Add `test_no_row_here_constructs_the_transport` in `tests/conformance/mcp_served/test_the_assembly_is_real.py` (FR-016) — assert by source inspection that no module in this directory instantiates `McpTransport` directly.
+- [X] T016 [P] [US1] Add `test_a_client_establishes_a_session` in `tests/conformance/mcp_served/test_a_client_reaches_the_surface.py` — the SDK's own client, against the running process (FR-001, SC-001).
+- [X] T017 [P] [US1] Add `test_the_operation_set_matches_the_other_surface` in `tests/conformance/mcp_served/test_a_client_reaches_the_surface.py`, compared **mechanically** against `specs/008-northbound-api/contracts/operations.snapshot.json` (FR-008, SC-002).
+- [X] T018 [US1] Add `test_the_served_process_is_assembled_from_real_parts` in `tests/conformance/mcp_served/test_the_assembly_is_real.py` (FR-002, FR-004) — **against the running process**, because assembly is the one path no unit test covers and the reason this feature exists.
+- [X] T018a [US1] Add `test_no_row_here_constructs_the_transport` in `tests/conformance/mcp_served/test_the_assembly_is_real.py` (FR-016) — assert by source inspection that no module in this directory instantiates `McpTransport` directly.
 
   **Without this, FR-016 is a sentence rather than a gate.** A row added later that constructs the transport in a fixture would pass, assert what fifty-six existing rows already assert, and be indistinguishable from one driving the served process — which is the exact defect this feature exists to close, reintroduced inside the fix. 018 needed the same shape for the same reason.
 
@@ -112,7 +112,7 @@ Today's portal fix cost three deploy cycles to learn this. It is a task now rath
 - [ ] T029 [US3] Add `test_two_callers_are_distinguishable` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-011, SC-004). **Not "a subject was recorded"** — that passes perfectly against a shared account, which is the defect this row exists to catch. Two callers, two records, neither the server's.
 - [ ] T030 [P] [US3] Add `test_a_lapsed_credential_stops_authorizing` and `test_a_session_binds_to_one_subject` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-013, FR-013a).
 - [ ] T031 [GATE:no-secret-leak] [US3] Assert in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` that no bearer credential appears in logs, audit entries, or error messages. The server now handles caller tokens, which nothing on this surface did before.
-- [ ] T032 [P] [US3] Add `test_no_credential_is_refused_before_the_operation` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-012).
+- [X] T032 [P] [US3] Add `test_no_credential_is_refused_before_the_operation` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` (FR-012).
 - [ ] T032a [P] [US3] Add `test_two_sessions_share_nothing` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` — two clients connected at once, neither seeing the other's session, subject, or results. **FR-013a binds one subject per session, which makes cross-session leakage precisely the failure that would be silent**: every operation would still succeed and the trail would still name *a* caller.
 - [ ] T032b [P] [US3] Add `test_a_disconnect_leaves_the_operation_governed` in `tests/conformance/mcp_served/test_the_caller_is_the_subject.py` — an operation in flight when the client drops stays governed and recorded. A dropped connection must not be a way to leave an operation half-recorded, which would put a gap in a hash-chained trail.
 

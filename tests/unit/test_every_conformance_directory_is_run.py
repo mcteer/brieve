@@ -40,7 +40,21 @@ def _recipe_lines() -> list[str]:
     directory as unwired, which is a false alarm, and a false alarm in a hygiene check is how
     the check gets deleted.
     """
-    sources = [ROOT / "Makefile", *sorted((ROOT / "infra/bin").iterdir())]
+    makefile = (ROOT / "Makefile").read_text()
+    # A SCRIPT ONLY COUNTS IF SOMETHING INVOKES IT.
+    #
+    # The first version read every script under `infra/bin` unconditionally, so a lane script
+    # that existed but was called by nothing still made its directory look wired. Removing
+    # the `@bash infra/bin/mcp-surface-conformance` line from the recipe left this check
+    # green — which is the exact failure it exists to prevent, one level up.
+    #
+    # Found while wiring 019's lane, by deleting the recipe line to confirm the check bit.
+    # It did not.
+    sources = [ROOT / "Makefile"]
+    for script in sorted((ROOT / "infra/bin").iterdir()):
+        if script.is_file() and script.name in makefile:
+            sources.append(script)
+
     lines: list[str] = []
     for source in sources:
         if not source.is_file():

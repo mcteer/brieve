@@ -101,6 +101,11 @@ conformance:
 	# than of a workflow file nobody runs locally — registering these surfaces at bring-up
 	# once left that batch job unplaceable and the merge-blocking durability rows never ran.
 	@bash infra/bin/deployment-conformance
+	#
+	# 019's served-surface lane. NOT the host_enclave pytest line above: these rows drive a
+	# running process, and a directory named there would be collected with nothing serving —
+	# which is why `tests/conformance/deployment` is absent from it too.
+	@bash infra/bin/mcp-surface-conformance
 
 # The accessibility gate (012, FR-020a). Its own target because it is its own DISCIPLINE:
 # every other gate here asserts something about a process, and this one asserts something

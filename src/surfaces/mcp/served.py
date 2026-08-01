@@ -17,6 +17,7 @@ rows for this module drive a running process over a real socket.
 from __future__ import annotations
 
 import os
+import sys
 from typing import Any
 from weakref import WeakKeyDictionary
 
@@ -263,9 +264,23 @@ class HarnessTokenVerifier:
     async def verify_token(self, token: str) -> Any:
         try:
             subject = self._verifier.verify(token)
-        except AuthenticationRefused:
+        except AuthenticationRefused as refused:
+            # THE REASON, NEVER THE CREDENTIAL. A refusal with no diagnostic is a support
+            # ticket that cannot be answered — and printing the token to make it answerable
+            # would put a live bearer credential in an allocation log every operator can read.
+            # The reason code names the decision; the token is not written anywhere.
+            print(
+                f"::mcp-surface:: refused a caller — {refused.reason_code}",
+                file=sys.stderr,
+                flush=True,
+            )
             return None
-        except Exception:  # noqa: BLE001 — an unverifiable credential is a refusal, not a 500
+        except Exception as exc:  # noqa: BLE001 — an unverifiable credential is a refusal
+            print(
+                f"::mcp-surface:: could not verify a caller — {type(exc).__name__}: {exc}",
+                file=sys.stderr,
+                flush=True,
+            )
             return None
 
         self._subjects[token] = subject
