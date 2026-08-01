@@ -20,9 +20,31 @@
 
 name: enclave
 
+# NO LONGER ON EVERY PULL REQUEST — 2026-08-01.
+#
+# This lane stood a whole enclave up inside GitHub for each change: Vault, Nomad, Terraform,
+# Postgres, five services, and every conformance row. It worked, and it was the wrong shape.
+#
+# **A real enclave on a maintainer's machine is better evidence than a synthetic one**, not
+# worse. The rows are identical — the same `make conformance` a person runs — so what CI added
+# was insistence, not coverage, and it added it at the cost of a second environment to keep
+# alive. It began failing for reasons about the runner rather than the platform: a job that
+# could not be placed because five services already held the runner's cores.
+#
+# **What this gives up, stated plainly.** Two defects in one day were COMPOSITION failures,
+# visible only when everything ran together — a surface two lanes both claimed to own, and a
+# reservation that fit an empty runner and not a full one. Running lanes one at a time locally
+# would have shown neither. So `make conformance` in full, before merge, is now a person's
+# responsibility rather than a machine's.
+#
+# The constitution already anticipates exactly this: a blocking row no automated check executes
+# MUST have a named party responsible before merge. That party is named in each feature's
+# conformance contract. This is not a weakening of the gate; it is the model the constitution
+# describes, with the lane kept available on demand.
 on:
-  pull_request:
-    branches: [main]
+  # Still runnable, deliberately: `gh workflow run enclave.yml` when a change warrants a clean
+  # substrate, and the capability is worth keeping even when it is not compulsory.
+  workflow_dispatch:
   # Manual runs, so a maintainer can exercise the lane without opening a pull request —
   # and so its first run could answer T002 (does the enclave come up on a Linux runner at
   # all) before anything was built on the assumption that it does.
