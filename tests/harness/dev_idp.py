@@ -81,6 +81,17 @@ class _Handler(BaseHTTPRequestHandler):
             # discovery ends here (RFC 7591). Its absence is why an editor could find this
             # provider and still not begin a flow.
             "registration_endpoint": f"{self.issuer}/register",
+            # REQUIRED BY RFC 8414, and its absence is not cosmetic: a real editor fetched this
+            # document, validated it, and refused the connection with "expected array, received
+            # undefined". Discovery reaching a client is not the same as a client accepting it,
+            # and only connecting one showed the difference.
+            "response_types_supported": ["code"],
+            # The flow this provider actually implements. Omitting it makes a client fall back to
+            # the specification's default, which includes `implicit` — a flow with no PKCE and no
+            # exchange, and one this provider would refuse. Better to say what is true.
+            "grant_types_supported": ["authorization_code"],
+            # A public client: it holds no secret, and PKCE is what stands in for one.
+            "token_endpoint_auth_methods_supported": ["none"],
             "code_challenge_methods_supported": ["S256"],
             # STAYS. Becoming more standards-complete must not make this look deployable — it
             # authenticates nobody, which is the entire reason it lives under `tests/`.
