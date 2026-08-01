@@ -50,14 +50,14 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
 
 ### The sealed-core change, done deliberately
 
-- [ ] T003 Add `RECORD_READ = "record_read"` and `RECORD_READ_REFUSED = "record_read_refused"` to
+- [ ] T003 (FR-013) Add `RECORD_READ = "record_read"` and `RECORD_READ_REFUSED = "record_read_refused"` to
       `AuditEventType` in `src/core/audit/schema.py`, each with a docstring saying why it is not
       `EVIDENCE_READ` — those members mean *someone read the audit plane*, and reusing them would
       hand an operator asking who read the trail a list of run listings.
-- [ ] T004 Add `THREAD_CREATED = "thread_created"` to `AuditEventType` in
+- [ ] T004 (FR-002a, FR-013) Add `THREAD_CREATED = "thread_created"` to `AuditEventType` in
       `src/core/audit/schema.py`, with a docstring pointing at its existing counterpart: the trail
       can prove a thread was deleted and what was said in it, and cannot prove it began.
-- [ ] T005 [GATE:conformance] Extend
+- [ ] T005 [GATE:conformance] (FR-013, SC-005) Extend
       `tests/unit/test_audit_chain.py::test_widening_the_event_vocabulary_moves_no_existing_hash`
       with the three new members, asserting each `.value` individually rather than counting the
       enum — a count passes when one member is removed and another added, which is the change this
@@ -78,7 +78,7 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
       error, not an `HTTPException`** — research F7 found the existing evidence path raises a
       FastAPI type from transport-independent code that the MCP transport does not catch, so its
       failure path has no parity. This type is what both transports map identically.
-- [ ] T009 Implement `record_access(...)` in `src/surfaces/api/record_access.py` writing one entry
+- [ ] T009 (FR-004) Implement `record_access(...)` in `src/surfaces/api/record_access.py` writing one entry
       to `record_stream_for(subject.tenant_id)` with the payload fields data-model.md specifies:
       `subject_user_id`, `operation`, `target_correlation_id`, `target_id`, `disposition`,
       `result_count`. No other fields.
@@ -91,7 +91,7 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
 - [ ] T011 Add a required `audit_disposition` field to `McpOperation` in
       `src/surfaces/mcp/operations.py` — no default. An operation added without deciding must be a
       construction error, not a missed edit to a list someone has to remember (FR-009).
-- [ ] T012 Set the disposition on all seventeen operations in
+- [ ] T012 (FR-002, SC-001) Set the disposition on all seventeen operations in
       `src/surfaces/mcp/operations.py`: `records` for the six covered, `no_record` for
       `list_agent_definitions` and `get_agent_definition`, `records_elsewhere` for the rest —
       and for each `records_elsewhere`, name where, because a disposition that says "recorded
@@ -109,13 +109,13 @@ any reading of the rule.
 **Independent test**: start a run, read its result, query the trail by that run's correlation id,
 find a record naming the reader.
 
-- [ ] T013 [US1] Record in `get_run_result`'s shared implementation in
+- [ ] T013 [US1] (FR-003) Record in `get_run_result`'s shared implementation in
       `src/surfaces/api/runs.py` — before returning the payload, never after. A read that answered
       first and recorded second produces the unrecorded answer on any failure between the two.
 - [ ] T014 [US1] [GATE:correlation] Populate `target_correlation_id` from the run's own
       correlation id in `src/surfaces/api/runs.py`, so holding a run id is enough to find its
       readers through the existing governed query.
-- [ ] T015 [US1] [GATE:no-secret-leak] Assert in `tests/component/test_record_access.py` that a
+- [ ] T015 [US1] [GATE:no-secret-leak] (FR-006, SC-006) Assert in `tests/component/test_record_access.py` that a
       credential-shaped value planted in a run's result payload reaches no audit entry. Plant it;
       do not reason about it.
 - [ ] T016 [P] [US1] Record in `list_runs_for` in `src/surfaces/api/runs.py`, with
@@ -123,7 +123,7 @@ find a record naming the reader.
 - [ ] T017 [P] [US1] Record in the single-run read (`get_run`) in `src/surfaces/api/runs.py`.
 - [ ] T018 [P] [US1] Record in `list_threads_for` in `src/surfaces/api/threads.py`.
 - [ ] T019 [P] [US1] Record in `thread_detail_for` in `src/surfaces/api/threads.py`.
-- [ ] T020 [US1] Write `THREAD_CREATED` in `create_thread_for` in `src/surfaces/api/threads.py`,
+- [ ] T020 [US1] (FR-002a) Write `THREAD_CREATED` in `create_thread_for` in `src/surfaces/api/threads.py`,
       to **the thread's own stream** (`record.correlation_id`) — matching where `THREAD_DELETED`
       is written, not the reader stream. This is a creation, not a read.
 - [ ] T021 [US1] Map `RecordAccessUnavailable` to a 503 in the API routes in
@@ -145,20 +145,20 @@ find a record naming the reader.
       identically to before this feature for the same caller — same records, same refusals, same
       status (SC-004a, FR-015). Six operations are being edited and nothing else checks that
       recording a read did not change who may perform it.
-- [ ] T024 [US1] [GATE:correlation] Assert in `tests/component/test_record_access.py` that a read
+- [ ] T024 [US1] [GATE:correlation] (FR-005a, SC-010) Assert in `tests/component/test_record_access.py` that a read
       leaves the read object's chain **byte-identical** — the entry count and the head hash of the
       run's own stream are unchanged after reading it.
-- [ ] T025 [US1] [GATE:correlation] Assert in `tests/conformance/reports/` that a report compiled
+- [ ] T025 [US1] [GATE:correlation] (SC-010) Assert in `tests/conformance/reports/` that a report compiled
       for a run after that run has been read carries **no claim about who read it**. This is the
       row protecting 021, and it is the guard against the first draft's reasoning returning.
-- [ ] T026 [US1] [GATE:fail-closed] Assert in `tests/component/test_record_access.py` that with
+- [ ] T026 [US1] [GATE:fail-closed] (FR-007a, SC-009) Assert in `tests/component/test_record_access.py` that with
       the sink made to fail, **all six** operations refuse and return no records — listings
       included. Listings are the case with no precedent and the one most likely to be softened
       later for convenience.
-- [ ] T027 [US1] Assert in `tests/component/test_record_access.py` that a refused read records,
+- [ ] T027 [US1] (FR-007, SC-007) Assert in `tests/component/test_record_access.py` that a refused read records,
       and that `no_such_record` and `outside_tenant` stay distinct in the entry while remaining
       indistinguishable in the response.
-- [ ] T028 [US1] Assert in `tests/component/test_record_access.py` that a read returning nothing
+- [ ] T028 [US1] (FR-007b) Assert in `tests/component/test_record_access.py` that a read returning nothing
       still records — an empty listing discloses that the caller asked, and a trail omitting
       fruitless reads cannot show probing.
 - [ ] T029 [US1] [GATE:conformance] Extend `tests/conformance/mcp/test_surface_parity.py` so the
@@ -175,17 +175,17 @@ find a record naming the reader.
 
 **Independent test**: change one operation's disposition; the surface's sentence changes with it.
 
-- [ ] T030 [US2] Replace the hand-written governance sentence in `src/surfaces/mcp/served.py`
+- [ ] T030 [US2] (FR-010) Replace the hand-written governance sentence in `src/surfaces/mcp/served.py`
       (currently *"Every operation executes as the calling user and is recorded in a tamper-evident
       trail"*) with text **generated** from the operation catalogue's dispositions.
-- [ ] T031 [US2] Assert in `tests/component/` that the generated sentence names the recorded
+- [ ] T031 [US2] (FR-011, SC-003) Assert in `tests/component/` that the generated sentence names the recorded
       operations accurately, by flipping one disposition and observing the sentence change.
       A row comparing the sentence to a second hand-written expectation would have passed every
       day this gap existed — research F9.
-- [ ] T032 [US2] Assert in `tests/component/` that every operation whose disposition is `records`
+- [ ] T032 [US2] (FR-011, SC-003) Assert in `tests/component/` that every operation whose disposition is `records`
       actually writes an entry, and every `no_record` operation writes none. This is the row that
       would have failed on 2026-08-01, and the contract names it as such.
-- [ ] T033 [US2] Check the API surface for any equivalent governance claim in its title,
+- [ ] T033 [US2] (FR-010) Check the API surface for any equivalent governance claim in its title,
       description, or docs, and bring it into line or confirm in writing that it makes none.
       Parity of claims, not only of behavior.
 
@@ -198,7 +198,7 @@ lying about what it records.
 
 **Goal**: the next operation cannot repeat this.
 
-- [ ] T034 [US3] Write the rule where someone adding an operation will meet it — in
+- [ ] T034 [US3] (FR-001, FR-001a) Write the rule where someone adding an operation will meet it — in
       `src/surfaces/mcp/operations.py` beside the field — stating the boundary and its
       justification: runs and threads are records of *activity*; agent definitions are
       *configuration*, and reading one discloses how the platform is set up rather than what
@@ -257,14 +257,14 @@ shape into transport-independent code.
       disposition*.
 - [ ] T043 Update `ROADMAP.md` recording 022 shipped, and that the gap was found by connecting an
       editor rather than by any check.
-- [ ] T044 Run `make check` and confirm the pinned digest is unmoved and no operation lost an
+- [ ] T044 (FR-014, SC-005, SC-008) Run `make check` and confirm the pinned digest is unmoved and no operation lost an
       entry it wrote before this feature (SC-008).
 - [ ] T045 Run `make conformance` in full on a live enclave. **Owed by name** — the enclave lane is
       `workflow_dispatch` only and will not run on the PR.
-- [ ] T046 Perform quickstart scenario 5 against a **served** surface: read a run's result through
+- [ ] T046 (SC-002) Perform quickstart scenario 5 against a **served** surface: read a run's result through
       the running service, then find the reader in the trail. SC-002 is written not to be hermetic
       on purpose — this defect survived a green suite and was found by connecting a real editor.
-- [ ] T047 Request the Principle V security review on the PR for the three additive members, and
+- [ ] T047 (FR-013) Request the Principle V security review on the PR for the three additive members, and
       record its discharge in `specs/022-audited-reads/contracts/conformance.md` — sealed core is
       not dischargeable by the author alone.
 
