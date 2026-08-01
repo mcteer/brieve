@@ -269,7 +269,14 @@ One ADR remains **Proposed** and is expected to resolve rather than linger. Neit
 sequence above, but a Proposed record that quietly becomes permanent is a failure of the process
 ([`docs/adr/README.md`](docs/adr/README.md)).
 
-- **ADR-0011** — harness-first SDKs at the perimeter; awaiting the evidence ADR-0012 produces.
+- **ADR-0011** — harness-first SDKs at the perimeter. **Reviewed 2026-08-01 and deliberately
+  left open, with three named triggers** rather than resolved or forgotten. ADR-0012's
+  resolution says in writing that its evidence does not resolve this one; 020 strengthens the
+  record's central claim — harness guarantees are structural and *now demonstrated*, since a
+  model finally makes a real decision for the harness to intercept — but that is evidence about
+  what was built, not about what adopters want, which is what this record asks for. The likely
+  resolution is a maintainer's judgement that the dependency was mis-stated; see the ADR's
+  "Still open" section.
 - **ADR-0012** — ✅ **Accepted 2026-07-29.** Harness-as-runtime leads. Decided on the platform's own construction rather than the early-adopter cohort the ADR named, because there is no cohort yet — recorded that way in the ADR's Resolution, since a record claiming evidence that never arrived is worse than one admitting its basis.
 
 ## Known gaps in the record

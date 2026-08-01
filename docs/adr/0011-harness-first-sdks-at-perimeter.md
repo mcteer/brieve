@@ -56,3 +56,49 @@ footnote.
 
 This decision remains **Proposed** pending the evidence the attach experiment is
 designed to produce.
+
+## Still open — reviewed 2026-08-01
+
+**Deliberately open, with a trigger, rather than quietly forgotten.** This is the only
+Proposed record in the repository, and a Proposed record that becomes permanent by inattention
+is a failure of the process ([`docs/adr/README.md`](README.md)). Reviewed after 020; **not
+resolved**, and the reasons are worth writing down so the next review starts from here rather
+than from the beginning.
+
+**What has been settled since.** [ADR-0012](0012-runtime-versus-attach-posture.md) was Accepted
+2026-07-29 — harness-as-runtime leads — on the platform's own construction rather than on the
+cohort behaviour it named. Its Resolution says explicitly that its evidence "is weaker than
+what [ADR-0011] was waiting for, so this resolution does not automatically resolve it."
+
+**What 020 adds, and what it does not.** This ADR's load-bearing claim is that harness-run
+guarantees are *structural and provable by conformance test*, as against the cooperative
+guarantees an attach posture offers. Until 020 that claim held structurally and had never been
+exercised by a real agent decision: the harness owned the only path to tools, and nothing ever
+*chose* to take it. A model now chooses, the choice enters the same governed entry, an
+over-reach is refused by the existing enforcement, and the trail records all of it. **The
+distinction this ADR rests on is now demonstrated rather than asserted.**
+
+That strengthens the decision. It is not the evidence the record asked for, which was about
+what adopters want.
+
+**What is not built.** "Extension SDKs live at the perimeter — custom hooks, packs, providers."
+Packs are real: two ship, with eval suites. `hooks/` and `providers/` are directories holding a
+README each. Acceptance would not require them — Accepted records routinely describe work not
+yet done (ADR-0018, ADR-0040, ADR-0044) — but the perimeter model is a plan here, not a fact,
+and a review that skipped past that would be reading the tree generously.
+
+**What would resolve it.** Any one of:
+
+1. **A first adopter**, which is the evidence the record actually names. It decides both this
+   and whether ADR-0012 was resolved on the right basis.
+2. **A decision that the dependency was mis-stated** — that the cohort evidence decides
+   ADR-0012's investment question and not this one, whose substantive claims (harness-first;
+   SDKs extend rather than replace; any reduced-assurance tier labels itself at every point it
+   makes a claim) are positions on honest labelling and do not turn on what buyers want. This
+   is the most likely resolution and it is a maintainer's call, not an inference from the tree.
+3. **An embedded-mode tier being built**, which would force the reduced-assurance language to
+   become concrete and settle the third paragraph of the Decision by construction.
+
+Recorded rather than resolved, because resolving it on (2) means revising what a prior record
+says about its own dependency, and that is a judgement to make deliberately rather than in
+passing.
