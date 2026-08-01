@@ -60,6 +60,20 @@ OWED: Final[dict[str, str]] = {}
 #: shape.
 MEASURED_SUITES: Final[frozenset[str]] = frozenset({"report_fidelity"})
 
+#: Suites scored by driving the **product answering path** rather than replaying a recording (024).
+#:
+#: **This is what makes those gates mean something.** Before 024 both scorers went around the
+#: product — `FixtureScorer` returns `case.recorded`, `LiveModelScorer` asks a vendor directly — so
+#: nothing the product does (resolving a citation, dropping an unsupported claim, deciding to
+#: decline) ever ran, and the suites were green over a capability that did not exist.
+#:
+#: **Declared here, beside the suite list, because both lanes must agree.** The blocking lane and
+#: the live lane each pick a scorer from this set; two copies of the membership would let one lane
+#: quietly revert while the other kept asserting the property. `test_eval_gates.py` asserts the
+#: scorer each suite actually used, so a reversion fails a hermetic row rather than only the lane
+#: that costs money to run.
+ANSWERING_SUITES: Final[frozenset[str]] = frozenset({"citation_accuracy", "must_decline"})
+
 #: What each suite's expected outcomes may be. `deny` and `decline` are different verbs on
 #: purpose — a denial is the governance boundary holding, a decline is competence about
 #: scope — and a case may not blur them.
@@ -174,6 +188,7 @@ def suite_listing() -> dict[str, str]:
 
 __all__ = [
     "EXPECTED_OUTCOMES",
+    "ANSWERING_SUITES",
     "MEASURED_SUITES",
     "OWED",
     "SUITES",

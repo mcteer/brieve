@@ -27,10 +27,18 @@ from pathlib import Path
 
 import pytest
 
+from adapters.anthropic_answering import LiveAnswerProvider
 from adapters.anthropic_scorer import LiveModelScorer
+from core.answering.corpus import load_corpus
 from core.evals.judge import SeedCase, load_seed_set, qualify_first_judge
-from core.evals.scoring import LIVE_MODEL, GovernedSubject, run_suite
-from core.evals.suites import SUITES, load_pack_cases
+from core.evals.scoring import (
+    LIVE_MODEL,
+    AnsweringScorer,
+    GovernedSubject,
+    Scorer,
+    run_suite,
+)
+from core.evals.suites import ANSWERING_SUITES, SUITES, load_pack_cases
 
 pytestmark = pytest.mark.live_model
 
@@ -64,7 +72,13 @@ def test_live_suite(pack: str, suite: str) -> None:
     """One suite, one pack, one real model. The per-cell table's `live` column is earned
     here or not at all."""
     cases = load_pack_cases(PACKS / pack, suite)
-    scorer = LiveModelScorer(grounding=_grounding_for(pack, suite))
+    if suite in ANSWERING_SUITES:
+        # A real model, reaching the corpus THROUGH `answer_question`. The model proposes; the
+        # pin disposes — every citation is resolved before a claim ships, so what this row
+        # qualifies is the product answering, not the vendor talking.
+        scorer: Scorer = AnsweringScorer(corpus=load_corpus(), provider=LiveAnswerProvider())
+    else:
+        scorer = LiveModelScorer(grounding=_grounding_for(pack, suite))
 
     # Majority of three, per case. Three full-lane single-sample runs produced three
     # different pass/fail sets — a coin flip on marginal cases — and the model rejects

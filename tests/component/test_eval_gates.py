@@ -22,6 +22,7 @@ from core.evals.scoring import (
     run_suite,
 )
 from core.evals.suites import (
+    ANSWERING_SUITES,
     OWED,
     SUITES,
     EvalCase,
@@ -63,16 +64,6 @@ SUBJECT = GovernedSubject(
     role="ask",
     cell="vault:anthropic/claude-opus@5:ask",
 )
-
-
-#: Suites scored by driving the PRODUCT answering path rather than replaying a recording (024).
-#:
-#: **This is what makes those gates mean something.** `FixtureScorer` returns `case.recorded`, so
-#: nothing the product does — resolving a citation, dropping an unsupported claim, deciding to
-#: decline — ever ran. These two suites now hand the recording to the path as *what the model said*
-#: and score what comes out. A case citing a section the pinned corpus does not contain fails,
-#: which it could not do before.
-ANSWERING_SUITES: frozenset[str] = frozenset({"citation_accuracy", "must_decline"})
 
 
 def _scorer_for(suite: str) -> Scorer:
