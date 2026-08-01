@@ -163,6 +163,49 @@ against at T041.
 A row that stops being collected disappears silently; a row that is collected and fails is
 loud. Only the first failure mode needs a baseline to be visible at all.
 
+### The result (T041) — 2026-08-01
+
+| Directory | On `main` | With 020 | Δ |
+| --- | --- | --- | --- |
+| `tests/conformance/adapter` | 12 | 12 | — |
+| `tests/conformance/api` | 46 | 46 | — |
+| `tests/conformance/authority` | 12 | 12 | — |
+| `tests/conformance/deployment` | 22 | 22 | — |
+| `tests/conformance/durability` | 48 | **50** | +2 (`test_model_driven_resume.py`) |
+| `tests/conformance/evidence` | 17 | 17 | — |
+| `tests/conformance/identity` | 28 | 28 | — |
+| `tests/conformance/mcp` | 56 | 56 | — |
+| `tests/conformance/mcp_served` | 19 | 19 | — |
+| `tests/conformance/packs` | 30 | 30 | — |
+| `tests/conformance/portal` | 8 | 8 | — |
+| `tests/conformance/choice` | 0 | **21** | +21 |
+
+**SC-008 holds: no pre-existing directory lost a row.**
+
+`make check` and the full `make conformance` both pass on a live enclave — the latter
+end to end, including `choice lane passed`, on 2026-08-01.
+
+**One environmental hazard, recorded because it cost hours and will recur.** The dev
+enclave's Nomad agents run on the host and sign workload identities with host time; Vault
+and every allocation run in the container VM. When that VM's clock drifts behind — measured
+at 919 seconds on this machine — every dispatched run dies at startup with
+`invalid not before (nbf) claim: token not yet valid`, and it presents as a *different
+subset* of rows failing each run, each with an empty audit trail. That reads as a flaky new
+feature rather than an environment fault.
+
+Two things came out of it, and only the first is a fix to this repository:
+
+- **Every workload-identity role now sets 120s of clock leeway** (`infra/modules/trust-fabric/auth.tf`).
+  They had none, so an attested identity could be rejected before it was a second old — which
+  is not a security property, it is a lottery in the identity path.
+- **The VM clock itself must be resynced** before a long gate run
+  (`docker run --rm --privileged alpine hwclock -s`). The leeway does not excuse real drift,
+  and a drift large enough to exceed it is a machine to fix rather than a number to raise.
+
+A stale `mcp` allocation is the other thing to check first: the sweeper and the audit shipper
+both run in it, and a token minted before a policy change does not gain the policy. Three
+rows failed on that and passed immediately once the allocation was replaced.
+
 ### The demonstration (T039, FR-012, SC-007) — performed 2026-08-01 by Dan McTeer
 
 One call to a real provider, by hand, never in a lane. **The step that proves the wiring
