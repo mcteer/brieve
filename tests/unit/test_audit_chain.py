@@ -157,6 +157,11 @@ def test_widening_the_event_vocabulary_moves_no_existing_hash() -> None:
         "change no longer verifies against the chain that holds it"
     )
 
-    # And the new member is genuinely present, so the test above is being run against the
-    # widened vocabulary rather than passing because the addition never landed.
-    assert AuditEventType.TOOL_CHOSEN.value == "tool_chosen"
+    # And the new members are genuinely present, so the assertion above is being run against
+    # the widened vocabulary rather than passing because an addition never landed.
+    #
+    # One per feature that has touched this enum since the digest was pinned. Naming them
+    # individually rather than counting the enum: a count passes when one member is removed
+    # and another added, which is the change this row would most want to notice.
+    assert AuditEventType.TOOL_CHOSEN.value == "tool_chosen"  # 020
+    assert AuditEventType.EFFECT_OBSERVED.value == "effect_observed"  # 021

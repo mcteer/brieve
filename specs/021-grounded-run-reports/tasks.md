@@ -30,8 +30,8 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `tests/conformance/reports/__init__.py` — the directory only, no rows yet. The lane wiring is T029 and must land before the first `test_*.py`, which is when `tests/unit/test_every_conformance_directory_is_run.py` starts checking this directory at all. 010 lost a feature's rows to a directory no lane enumerated; 014 hit the subtler form.
-- [ ] T002 Record the per-directory `pytest --collect-only -q` counts from `main` in `specs/021-grounded-run-reports/contracts/conformance.md` as SC-011's baseline. **Already captured at `bee9384`** — verify it still matches before relying on it.
+- [X] T001 Create `tests/conformance/reports/__init__.py` — the directory only, no rows yet. The lane wiring is T029 and must land before the first `test_*.py`, which is when `tests/unit/test_every_conformance_directory_is_run.py` starts checking this directory at all. 010 lost a feature's rows to a directory no lane enumerated; 014 hit the subtler form.
+- [X] T002 Record the per-directory `pytest --collect-only -q` counts from `main` in `specs/021-grounded-run-reports/contracts/conformance.md` as SC-011's baseline. **Already captured at `bee9384`** — verify it still matches before relying on it.
 
 ---
 
@@ -39,13 +39,13 @@
 
 ### The sealed-core change, done deliberately
 
-- [ ] T003 Add one `EFFECT_OBSERVED` member to `AuditEventType` in `src/core/audit/schema.py`. **This is a Principle V change** — the audit schema is named sealed core and requires security-maintainer review. Document the payload vocabulary in the member's docstring the way `TOOL_CHOSEN` and `RUN_RESUMED` do: `run_id`, `step_index`, `tool`, `idempotency_key`, `outcome`, `detail`.
-- [ ] T004 Assert in `tests/unit/test_audit_chain.py` that the pinned digest from 020 is unchanged — adding a member must move no existing entry's `entry_hash`. The test already exists; extend its final assertion to name the new member so the check is against the widened vocabulary rather than passing because the addition never landed.
+- [X] T003 Add one `EFFECT_OBSERVED` member to `AuditEventType` in `src/core/audit/schema.py`. **This is a Principle V change** — the audit schema is named sealed core and requires security-maintainer review. Document the payload vocabulary in the member's docstring the way `TOOL_CHOSEN` and `RUN_RESUMED` do: `run_id`, `step_index`, `tool`, `idempotency_key`, `outcome`, `detail`.
+- [X] T004 Assert in `tests/unit/test_audit_chain.py` that the pinned digest from 020 is unchanged — adding a member must move no existing entry's `entry_hash`. The test already exists; extend its final assertion to name the new member so the check is against the widened vocabulary rather than passing because the addition never landed.
 
 ### The typed object
 
-- [ ] T005 [P] Create `src/core/reports/__init__.py` and `src/core/reports/report.py` — `RunReport`, `Claim`, and `ClaimStatus` per [data-model.md](./data-model.md). **Seven statuses, not two.** Each unsupported value sends a reader somewhere different: the product, the tool's registration, the run's ending, or the records themselves.
-- [ ] T006 [P] Assert in `tests/unit/test_report_statuses_are_reachable.py` that **every `ClaimStatus` value is produced by at least one fixture** in `tests/harness/recorded_runs.py` — iterating the enum, so a value added later and never produced fails the row rather than passing silently.
+- [X] T005 [P] Create `src/core/reports/__init__.py` and `src/core/reports/report.py` — `RunReport`, `Claim`, and `ClaimStatus` per [data-model.md](./data-model.md). **Seven statuses, not two.** Each unsupported value sends a reader somewhere different: the product, the tool's registration, the run's ending, or the records themselves.
+- [X] T006 [P] Assert in `tests/unit/test_report_statuses_are_reachable.py` that **every `ClaimStatus` value is produced by at least one fixture** in `tests/harness/recorded_runs.py` — iterating the enum, so a value added later and never produced fails the row rather than passing silently.
 
   **Rewritten in analysis pass 3, because the first version could not fail.** It said "assert no two values are collapsible", which has no operational meaning — nothing distinguishes a passing implementation from a failing one, and a row that cannot fail is a governance hole with a green checkmark.
 
@@ -53,8 +53,8 @@
 
 ### The compiler
 
-- [ ] T007 Implement `compile_report(entries, observations, ...)` in `src/core/reports/compile.py`. **It takes already-read entries and holds no query and no credential** — that is what makes FR-008b structural rather than promised, and it is the property a reviewer should check first on any later change.
-- [ ] T008 [P] Create `tests/harness/recorded_runs.py` — entry fixtures covering **every `ClaimStatus` value**, because T006 iterates the enum and a status with no fixture fails that row:
+- [X] T007 Implement `compile_report(entries, observations, ...)` in `src/core/reports/compile.py`. **It takes already-read entries and holds no query and no credential** — that is what makes FR-008b structural rather than promised, and it is the property a reviewer should check first on any later change.
+- [X] T008 [P] Create `tests/harness/recorded_runs.py` — entry fixtures covering **every `ClaimStatus` value**, because T006 iterates the enum and a status with no fixture fails that row:
 
   | Fixture | Reaches |
   | --- | --- |
