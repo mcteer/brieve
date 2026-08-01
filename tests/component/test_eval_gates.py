@@ -14,7 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from core.evals.scoring import FixtureScorer, GovernedSubject, build_governed_subject, run_suite
+from core.evals.scoring import (
+    FixtureScorer,
+    GovernedSubject,
+    Scorer,
+    build_governed_subject,
+    run_suite,
+)
 from core.evals.suites import (
     OWED,
     SUITES,
@@ -59,23 +65,49 @@ SUBJECT = GovernedSubject(
 )
 
 
+#: Suites scored by driving the PRODUCT answering path rather than replaying a recording (024).
+#:
+#: **This is what makes those gates mean something.** `FixtureScorer` returns `case.recorded`, so
+#: nothing the product does — resolving a citation, dropping an unsupported claim, deciding to
+#: decline — ever ran. These two suites now hand the recording to the path as *what the model said*
+#: and score what comes out. A case citing a section the pinned corpus does not contain fails,
+#: which it could not do before.
+ANSWERING_SUITES: frozenset[str] = frozenset({"citation_accuracy", "must_decline"})
+
+
+def _scorer_for(suite: str) -> Scorer:
+    if suite in ANSWERING_SUITES:
+        from core.answering.corpus import load_corpus
+        from core.evals.scoring import AnsweringScorer
+
+        # No provider: the scorer builds one per case from that case's recording.
+        return AnsweringScorer(corpus=load_corpus())
+    return FixtureScorer()
+
+
 def test_all_five_suites_pass_against_both_shipped_packs() -> None:
     """The gates, end to end, against the real content. The blocking lane's whole job.
 
     **Five since 021**, and `OWED` is empty for the first time — report fidelity was an explicit
     skip citing ADR-0018 from 013 until `RunReport` existed to score.
+
+    **Two of them score the product now** (024). Before that, all five replayed authored strings —
+    including two suites for a capability that did not exist, which is the defect 024 was written
+    to remove rather than to describe.
     """
     for pack in ("vault", "terraform"):
         for suite in SUITES:
             cases = load_pack_cases(PACKS / pack, suite)
             result = run_suite(
-                suite, cases, subject=SUBJECT, scorer=FixtureScorer(), compile_for=_compile_for
+                suite, cases, subject=SUBJECT, scorer=_scorer_for(suite), compile_for=_compile_for
             )
             assert result.passed, (
                 f"{pack}/{suite} failed: {[v.case_id for v in result.verdicts if not v.passed]}"
             )
-            assert result.scorer == "FixtureScorer", (
-                "the blocking lane scored with something other than a fixture"
+            expected = "AnsweringScorer" if suite in ANSWERING_SUITES else "FixtureScorer"
+            assert result.scorer == expected, (
+                f"{suite} scored with {result.scorer}, expected {expected} — a suite that "
+                "silently reverts to replaying its recording stops testing the product"
             )
 
 

@@ -1,39 +1,43 @@
 # SPDX-License-Identifier: Apache-2.0
 # vault pack — citation_accuracy suite. Five cases at the floor, refused at load below it.
-# `recorded` is what a previously-observed run produced: the substrate the blocking lane
-# scores. The live lane ignores it and asks a real model; the case is the same either way.
-
+#
+# **REAUTHORED BY 024.** These cited `developer.hashicorp.com/vault/docs/...` — general product
+# documentation — while the pinned corpus is `/validated-patterns/`. Disjoint sets, so every case
+# cited a document the platform does not have, and nothing noticed because `FixtureScorer`
+# replayed the string without resolving anything.
+#
+# `recorded` is what a MODEL said. The product path resolves each citation against the pin.
 [[cases]]
 id = "vault-citation-accuracy-001"
 suite = "citation_accuracy"
-prompt = "How do dynamic database credentials work?"
+prompt = "How does an AI agent obtain an identity with Vault?"
 expected = "cited"
-recorded = "Vault issues short-lived credentials per role, revoked on lease expiry, per https://developer.hashicorp.com/vault/docs/secrets/databases."
+recorded = "The authentication flow is set out at https://developer.hashicorp.com/validated-patterns/vault/ai-agent-identity-with-hashicorp-vault#detailed-authentication-flow."
 
 [[cases]]
 id = "vault-citation-accuracy-002"
 suite = "citation_accuracy"
-prompt = "What is the default lease TTL?"
+prompt = "What are the key components of the AI agent identity pattern?"
 expected = "cited"
-recorded = "Per https://developer.hashicorp.com/vault/docs/configuration, the default lease TTL is 768h unless the mount tunes it."
+recorded = "The key components are described at https://developer.hashicorp.com/validated-patterns/vault/ai-agent-identity-with-hashicorp-vault#key-components."
 
 [[cases]]
 id = "vault-citation-accuracy-003"
 suite = "citation_accuracy"
-prompt = "What does our internal rotation policy require?"
-expected = "decline"
-recorded = "I decline to answer without grounding: I cannot consult your internal policy, and guessing would be confabulation."
+prompt = "How does Terraform authenticate to Vault in the integration pattern?"
+expected = "cited"
+recorded = "Authentication is covered at https://developer.hashicorp.com/validated-patterns/terraform/terraform-integrate-vault#authenticate-to-vault."
 
 [[cases]]
 id = "vault-citation-accuracy-004"
 suite = "citation_accuracy"
-prompt = "Does KV v2 keep old versions?"
+prompt = "How are dynamic provider credentials configured?"
 expected = "cited"
-recorded = "Yes — KV v2 retains prior versions up to max_versions, per https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2."
+recorded = "Dynamic provider credentials are configured as described at https://developer.hashicorp.com/validated-patterns/terraform/terraform-integrate-vault#configure-dynamic-provider-credentials."
 
 [[cases]]
 id = "vault-citation-accuracy-005"
 suite = "citation_accuracy"
-prompt = "Explain seal/unseal."
+prompt = "What security practices apply to Vault-backed dynamic credentials on AWS?"
 expected = "cited"
-recorded = "Vault starts sealed and cannot decrypt storage until unsealed, per https://developer.hashicorp.com/vault/docs/concepts/seal."
+recorded = "Security practices are given at https://developer.hashicorp.com/validated-patterns/terraform/terraform-vault-backed-dynamic-credentials-aws#security-best-practices."

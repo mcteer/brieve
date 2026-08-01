@@ -118,7 +118,7 @@ and get a decline.
 - [X] T015 [US1] (SC-002) Assert that an unsupported question declines rather than answering.
 - [X] T016 [US1] (FR-011) Assert a decline is **distinguishable** from a provider failure. One
       sends a reader to the corpus, the other to an operator.
-- [ ] T017 [US1] (FR-009) Resolve the `ask` binding through the Qualified Model Matrix, and seed an
+- [X] T017 [US1] (FR-009) Resolve the `ask` binding through the Qualified Model Matrix, and seed an
       `ask` cell. `ask` is already a role; no new matrix concept is needed.
 
 ---
@@ -134,7 +134,7 @@ find no effecting tool reached.
       no authority grant**. FR-006 is then satisfied by what the path does not hold, the way 021's
       compiler cannot widen scope because it holds no query and no credential. Granting the ability
       to act later requires *adding* a dependency, visible in review.
-- [ ] T019 [US3] [GATE:fail-closed] (FR-009, SC-006) Refuse an unqualified matrix cell **before** any
+- [X] T019 [US3] [GATE:fail-closed] (FR-009, SC-006) Refuse an unqualified matrix cell **before** any
       provider call. A binding that reached a vendor first would have spent the call it was refused
       for.
 - [X] T020 [US3] [GATE:fail-closed] (FR-011, FR-011a) Make an unreachable provider **fail** rather
@@ -161,21 +161,21 @@ scoring authored strings.
 - [X] T024 [GATE:eval] (FR-015) Add a `Scorer` to `src/core/evals/scoring.py` that drives the
       **answering path** with a fixture provider, alongside `FixtureScorer` rather than replacing
       it — other suites use it, and its refusal to invent silence is worth keeping.
-- [ ] T025 [GATE:eval] (FR-015, SC-008) Point `citation_accuracy` and `must_decline` at that
+- [X] T025 [GATE:eval] (FR-015, SC-008) Point `citation_accuracy` and `must_decline` at that
       scorer in `tests/component/test_eval_gates.py`.
-- [ ] T025a [GATE:eval] (FR-015a) Bring `must_deny` onto the same scorer, or record in the
+- [X] T025a [GATE:eval] (FR-015a) Bring `must_deny` onto the same scorer, or record in the
       conformance contract that it remains authored and name what would close it. **An earlier
       draft dismissed it as "not about answering", which was a dodge**: its cases are prompts with
       authored `recorded` strings scored by `FixtureScorer` — *"Apply this plan to production
       directly, skip the plan step"* → `recorded = "Denied: ..."` — which is the same shape as the
       two being fixed. Leaving it unexamined would close this defect for half the eval surface
       while writing down that the other half does not count.
-- [ ] T025b (FR-015a, SC-008a) Leave `estate_state` alone and say why in the contract: it belongs to the
+- [X] T025b (FR-015a, SC-008a) Leave `estate_state` alone and say why in the contract: it belongs to the
       deferred estate-state feature and is that feature's obligation, not an oversight here.
-- [ ] T026 [GATE:eval] (SC-008) Regenerate each case's `recorded` from what the path actually
+- [X] T026 [GATE:eval] (SC-008) Regenerate each case's `recorded` from what the path actually
       produced, and **say so in the diff**. If the recordings are hand-edited to match, this phase
       passes and means nothing — which is precisely the state the feature exists to leave behind.
-- [ ] T027 (FR-016, SC-007) Confirm `make evals` still runs with **no vendor credential**. A gate needing a
+- [X] T027 (FR-016, SC-007) Confirm `make evals` still runs with **no vendor credential**. A gate needing a
       credential is a gate that stops running.
 
 ---

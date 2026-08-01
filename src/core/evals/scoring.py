@@ -150,14 +150,18 @@ class AnsweringScorer:
     refusal to invent silence for an unrecorded case is a property worth keeping.
     """
 
-    def __init__(self, *, corpus: Any, provider: Any) -> None:
+    def __init__(self, *, corpus: Any, provider: Any = None) -> None:
         self._corpus = corpus
+        # Built PER CASE when omitted, because the recording is that case's model output. One
+        # provider held across a suite would answer every prompt with a single recording — not a
+        # fixture of the suite, but a fixture of one case wearing the suite's name.
         self._provider = provider
 
     def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
-        from core.answering.answer import ANSWERED, answer_question
+        from core.answering.answer import ANSWERED, RecordedProvider, answer_question
 
-        answer = answer_question(question=case.prompt, corpus=self._corpus, provider=self._provider)
+        provider = self._provider or RecordedProvider(case.recorded)
+        answer = answer_question(question=case.prompt, corpus=self._corpus, provider=provider)
         if answer.disposition != ANSWERED:
             # A decline is a real response and is scored as one — `must_decline` exists precisely
             # to check that the platform declines when it should.
