@@ -29,8 +29,10 @@ material events); the surface rows join the existing API and MCP conformance dir
 the parity snapshot at `specs/008-northbound-api/contracts/operations.snapshot.json` is
 regenerated.
 
-**Target Platform**: The enclave, for the surface rows. The compiler itself needs no
-infrastructure, which is the point of the seam in research F6.
+**Target Platform**: The enclave, for the surface rows and for the run that observes. The
+compiler itself needs no infrastructure — it takes records and returns a report — which is the
+point of the seam in research F6 **as amended after the Constitution Check** (F6's original table
+had the compiler calling `observe()`, which is what Principle IV rejected).
 
 **Project Type**: A new core package, one API route, one MCP operation, and a fifth eval suite.
 

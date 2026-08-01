@@ -3,6 +3,20 @@
 
 Phase 0. Measured against the tree on 2026-08-01, not inferred.
 
+> **Amended 2026-08-01, after the Constitution Check failed.** This file was written *before*
+> the Phase 1 gate, which failed on Principle IV: read-back at report time has no bounded
+> authority to run under. The maintainer chose resolution C — the allocation observes at run end
+> and records the answer — and **F2 and F6 originally described the rejected design**, F6 in the
+> form of a decision table saying the core compiler calls `observe()`.
+>
+> Both are corrected below, marked where they changed. Nothing else in this file moved.
+>
+> **The general lesson, because 021 is the first feature here whose gate failed:** when a
+> Constitution Check sends a design back, every artifact *downstream* of the gate gets rewritten
+> and the one *upstream* silently stops describing the feature. Phase 0 research is upstream by
+> definition. Three analysis passes read spec, plan and tasks and found this nowhere, because it
+> was not in them.
+
 ---
 
 ## F1. The governed read already exists, transport-independent, and already audits itself
@@ -46,9 +60,15 @@ protocol states that an implementation which cannot reach the external system **
 `CANNOT_DETERMINE`. `registry.observers()` returns observers by tool name.
 
 **Decision**: read-back is `registry.observers().get(tool)`, called with the step's idempotency
-key. `HAPPENED` → the claim is product-confirmed; `DID_NOT_HAPPEN` → the claim is contradicted
-and says so; `CANNOT_DETERMINE` → `unverified_unreachable`; **no observer at all** →
-`unverified_no_observer` (FR-016a).
+key, **by the allocation, before the run reaches a terminal state**. `HAPPENED` → the claim is
+product-confirmed; `DID_NOT_HAPPEN` → the claim is contradicted and says so; `CANNOT_DETERMINE` →
+`unverified_unreachable`; **no observer at all** → `unverified_no_observer` (FR-016a); and no
+observation recorded because the run was killed → `unverified_not_observed` (FR-006c).
+
+**Amended after the gate.** This originally named the lookup and the mapping and said nothing
+about *who* calls it or *when* — written when the answer was "the report, at request time", which
+Principle IV then forbade because a report re-reading a product runs under the surface's identity
+rather than the reader's. The mapping was and remains correct; only its performer moved.
 
 **Rationale**: the mapping is total, and the two `unverified` reasons are kept apart because they
 send a reader to different places — one to the product, one to the tool's registration.
@@ -149,7 +169,8 @@ is whether the compiler is core or surface.
 
 | Lives in | What it holds |
 | --- | --- |
-| `src/core/reports/` | The typed `RunReport` and `Claim`, the verification vocabulary, and `compile_report(entries, observers, ...)` — pure, taking records in and returning a report. Calls `observe()`, because `Observer` and the registry are both core. |
+| `src/core/reports/` | The typed `RunReport` and `Claim`, the verification vocabulary, and `compile_report(entries, observations, ...)` — pure, taking records in and returning a report. **Calls no observer and holds no credential.** |
+| `src/surfaces/dispatch/entrypoint.py` | Performs the read-back: asks each effect's observer before a terminal state and records the answer, under the allocation's own attested identity. |
 | `src/surfaces/api/reports.py` | The governed read (`read_evidence_for`) and the route. |
 | `src/surfaces/mcp/` | The operation map entry and dispatch, reaching the same function the API route does. |
 
