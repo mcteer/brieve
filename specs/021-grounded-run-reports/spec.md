@@ -332,8 +332,14 @@ observe the report decline to claim completion.
   state, in 100% of cases; an unreachable product yields a recorded `cannot determine` rather than
   an assertion.
 - **SC-004a**: **0** effect claims are asserted as complete without either a recorded observation
-  or an explicit `unverified` reason — observed, unreachable, no observer, and not observed must
-  together account for every one of them.
+  or an explicit `unverified` reason. **Five statuses partition every effect claim**: `observed`,
+  `contradicted`, `unverified_unreachable`, `unverified_no_observer`, `unverified_not_observed`.
+
+  **`contradicted` was missing from this list until analysis pass 2**, and its absence is the
+  sharpest thing either pass found. It is the status meaning *the product was asked and said the
+  effect did not land* — the failure ADR-0018 opens with. A criterion written to close silent
+  assertion, which omitted the one claim a reader most needs to see, would have certified a
+  compiler that left contradicted effects unaccounted for.
 - **SC-004b**: **0** observations are performed by a report. Every one is made by the allocation
   that produced the effect, under its own attested identity — demonstrated from the trail, not
   asserted.

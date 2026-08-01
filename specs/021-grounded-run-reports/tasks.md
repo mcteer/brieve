@@ -15,10 +15,16 @@
 | Gate type | Required? | Where |
 | --- | --- | --- |
 | **Fail-closed** | **Yes** — an unreconcilable claim, an unreachable product, a failed meta-audit write | T014, T016, **T024**, T031 |
-| **Conformance** | **Yes** — sealed-core seam, and a transport surface that grows the parity row | Phases 3–6 |
-| **Correlation / evidence** | **Yes** — a new audit event joins the run's trail, and compiling is itself an audited read | **T009**, **T030** |
+| **Conformance** | **Yes** — sealed-core seam, and a transport surface that grows the parity row | **T051** |
+| **Correlation / evidence** | **Yes** — a new audit event joins the run's trail, and compiling is itself an audited read | **T009**, **T030**, **T042** |
 | **No-secret-leak** | **Yes** — a report reads everything a run recorded | **T017**, T033 |
 | **Eval** | **Yes** — the fifth suite is the point | Phase 6, **T036–T040** |
+
+> **This table names task IDs, not phase ranges, and pass 2 is why.** It previously said
+> "Phases 3–6" for conformance while the only `[GATE:conformance]` task was T051 in Phase 7, and
+> omitted T042 from correlation. A gate table that points at a range is a table nobody can check;
+> one that names IDs can be diffed against the tags. 019's conformance contract carried a stale
+> table through six analysis passes.
 
 ---
 
@@ -58,6 +64,11 @@
 - [ ] T010 [US1] Render 020's vocabulary in `src/core/reports/compile.py` (FR-011): attribute a chosen tool to the model that chose it, and render *nothing named*, *bound exhausted*, and *provider unreachable* as the distinct endings they are.
 - [ ] T011 [US1] Render `STEP_REOBSERVED` as *observed, not re-run* rather than as a gap, in `src/core/reports/compile.py`. A resumed run's earlier steps carry no outcome of their own, and a report reading that as missing would describe every resumed run as incomplete.
 - [ ] T012 [US1] State the run's disposition, distinguishing in-flight from finished (FR-002), in `src/core/reports/compile.py`.
+- [ ] T012a [US1] Compile a report for a run that **never started** — authority refused before anything ran — in `src/core/reports/compile.py`, and add `test_a_refused_run_still_reports` in `tests/conformance/reports/test_claims_trace_to_records.py`.
+
+  Analysis pass 2 found this edge case stated in the spec in a full sentence and touched by no task. Its trail is `authority_refused` and nothing else: no steps, no tools, no observations, and no terminal checkpoint. **Every other task in this phase is written for a run that started**, so the natural implementation reads the absence as "still running" and reports a refused run as in flight — forever.
+
+  It is also likely the **first** report anyone requests in anger, because a run that refused is the one people ask about. A report that cannot describe the failure people actually hit is a report for the happy path.
 - [ ] T013 [US1] Include what was **refused**, not only what succeeded (FR-003), in `src/core/reports/compile.py`.
 - [ ] T014 [GATE:fail-closed] [US1] Emit a claim for material the compiler cannot interpret rather than dropping it, in `src/core/reports/compile.py`. An entry type the compiler does not recognise must surface as `unreconciled` — **silence is the failure mode**, and a compiler that ignores what it does not understand gets quieter as the trail gets richer.
 - [ ] T015 [P] [US1] Add `test_every_claim_traces_to_a_record` in `tests/conformance/reports/test_claims_trace_to_records.py` (FR-001, SC-001).
@@ -99,7 +110,7 @@
 - [ ] T026 [US3] Observe each effect with a registered observer before a terminal state, in `src/surfaces/dispatch/entrypoint.py`, and record `EFFECT_OBSERVED` (FR-016). **Under the allocation's own attested identity** (FR-006b) — `registry.observers()` supplies the observer, `Observer.observe` is called with the step's idempotency key, and the protocol is **not** changed.
 - [ ] T027 [US3] Map the three `ObservationOutcome` values onto claim statuses in `src/core/reports/compile.py`: `happened` → `observed`, `did_not_happen` → `contradicted`, `cannot_determine` → `unverified_unreachable`. Absent observer → `unverified_no_observer`; absent observation → `unverified_not_observed`.
 - [ ] T028 [US3] Ensure observing changes no run outcome (FR-016c) in `src/surfaces/dispatch/entrypoint.py`. A run that did its work and then found an effect missing completed and produced a finding — letting the observation retroactively fail the run gives a reporting mechanism power over what it reports.
-- [ ] T029 [US3] Add `infra/bin/reports-conformance` and call it from `Makefile`'s `conformance` recipe — the rows that need a dispatched run that observes. **Must land before T031.** The hermetic rows need no wiring; the first recipe line collects the tree.
+- [ ] T029 [US3] Add `infra/bin/reports-conformance` and call it from `Makefile`'s `conformance` recipe — the rows that need a dispatched run that observes. **Must land before T030**, which is the first row in that file. The hermetic rows need no wiring; the first recipe line collects the tree.
 - [ ] T029a [US3] Mark T030–T035 `enclave` and `host_enclave` in `tests/conformance/reports/test_the_run_observes.py`, and make T029's lane **select those markers** while the hermetic rows stay on the first recipe line.
 
   **`tests/conformance/reports/` will hold both kinds**, which is exactly the `tests/conformance/api` situation the `Makefile` comment already describes: ignoring the path drops the hermetic rows, collecting the enclave ones fails the lane. `tests/unit/test_every_conformance_directory_is_run.py` requires a lane that both *names* a directory **and** *selects the markers its rows carry* — and that check exists because this gap has been paid for three times: 010 lost a feature's identity rows to a directory no lane enumerated, 014 hit the subtler form where the lane named the directory and deselected the rows, and 018 came within one commit of it in the feature built to end the class.
@@ -111,9 +122,11 @@
 - [ ] T033 [GATE:no-secret-leak] [P] [US3] Add `test_the_report_performs_no_observation` in `tests/conformance/reports/test_the_run_observes.py` (SC-004b) — **0** read-backs at report time. Assert the compiler holds no credential and no client, because this is the Principle IV property and it must not regress silently.
 - [ ] T034 [P] [US3] Add `test_a_killed_run_says_it_was_never_observed` in `tests/conformance/reports/test_the_run_observes.py` (FR-006c) — distinct from unreachable, because a killed run and a down product are different facts.
 - [ ] T035 [P] [US3] Add `test_a_tool_with_no_observer_says_so` in `tests/conformance/reports/test_the_run_observes.py` (FR-016a). **FR-016b forbids adding an observer to satisfy this** — one written to make a claim verifiable rather than because the product can be asked is a stub returning success, which turns an honest `unverified` into a false `confirmed`.
-- [ ] T035a [US3] Add `test_every_effect_claim_is_accounted_for` in `tests/conformance/reports/test_the_run_observes.py` (SC-004a) — the four statuses `observed`, `contradicted`, `unverified_unreachable`, `unverified_no_observer`, `unverified_not_observed` **partition** every effect claim, with none left asserted from the tool outcome alone.
+- [ ] T035a [US3] Add `test_every_effect_claim_is_accounted_for` in `tests/conformance/reports/test_the_run_observes.py` (SC-004a) — the **five** statuses `observed`, `contradicted`, `unverified_unreachable`, `unverified_no_observer`, `unverified_not_observed` **partition** every effect claim, with none left asserted from the tool outcome alone.
 
-  **This is the no-silent-assertion property, and T031/T034/T035 do not prove it.** Each asserts that one status appears in one arranged situation; none asserts the set is *closed*. A compiler that handled the three arranged cases and fell through to a bare "completed" for anything else would pass all three and fail this one — which is precisely the shape SC-004a was written as a partition rather than as a list.
+  **This is the no-silent-assertion property, and T031/T034/T035 do not prove it.** Each asserts that one status appears in one arranged situation; none asserts the set is *closed*. A compiler that handled the three arranged cases and fell through to a bare "completed" for anything else would pass all three and fail this one — which is precisely why SC-004a is written as a partition rather than a list.
+
+  **Assert the partition against `ClaimStatus` itself, not against a hand-written tuple.** A literal list in the row would drift from the enum exactly as this task's own first draft drifted from the criterion it cites — it said "the four statuses" and named five, because SC-004a had omitted `contradicted`. A row that enumerates its own expectations cannot catch a status being added and never handled.
 
 ---
 
@@ -188,8 +201,8 @@ Phase 8 (Polish)
 
 - **Within Phase 2**: T003/T004 (audit) and T005–T008 (the object) are independent.
 - **Within US1**: T015–T019 once the compiler exists.
-- **Within US2**: T023–T025 are three assertions in one module.
-- **Within US3**: T030–T035 once T029 lands.
+- **Within US2**: T023–T025, T025a and T025b are five assertions in one module.
+- **Within US3**: T030–T035 once T029 and T029a land. T035a is **not** parallel — it asserts the partition the others populate.
 - **Phase 7**: T048–T050 are three assertions in one module.
 - **Phase 8**: T053, T054, T056, T057 are independent of the rest.
 
