@@ -26,9 +26,16 @@ from tests.harness.scripted_chooser import FIXTURE_MODEL, recording
 
 ROOT = Path(__file__).resolve().parents[3]
 
-#: One fixture, put to both. The task and the ceiling a fidelity comparison uses.
+#: One fixture, put to both — and the task and the permitted set must COHERE.
+#:
+#: The first version paired that task with ``("echo", "plan")``, and the live model answered
+#: NONE: neither tool reads a secret, so declining was the correct choice and the row failed on
+#: a disagreement that was not a fidelity problem at all. FR-011a asserts both choosers return
+#: a *well-formed choice from the permitted set*, which presumes the set contains something the
+#: task could plausibly want. An incoherent fixture tests whether a model will invent a use for
+#: the wrong tool, which is the opposite of what this platform wants a model to do.
 FIXTURE_TASK = "Read the current value stored at conformance/probe."
-FIXTURE_PERMITTED = ("echo", "plan")
+FIXTURE_PERMITTED = ("vault_read", "vault_write")
 
 
 def test_the_merge_lane_needs_no_provider() -> None:
@@ -40,9 +47,9 @@ def test_the_merge_lane_needs_no_provider() -> None:
     accident — a live cell added for a demonstration and left behind would make the merge
     gate depend on a vendor without anyone changing a test.
     """
-    chooser = build_chooser(FIXTURE_MODEL, recording=recording("plan", "echo"))
+    chooser = build_chooser(FIXTURE_MODEL, recording=recording("vault_write", "vault_read"))
     request = ChoiceRequest(task=FIXTURE_TASK, permitted=FIXTURE_PERMITTED, step_index=0, attempt=0)
-    assert chooser.choose(request) == "plan"
+    assert chooser.choose(request) == "vault_write"
 
     variables = (ROOT / "infra/environments/dev/variables.tf").read_text()
     matrix = variables.split('variable "model_matrix_cells"', 1)
@@ -70,11 +77,11 @@ def test_a_fixture_cell_without_a_recording_names_a_permitted_tool() -> None:
     """
     request = ChoiceRequest(task=FIXTURE_TASK, permitted=FIXTURE_PERMITTED, step_index=0, attempt=0)
     default = build_chooser(FIXTURE_MODEL, recording="")
-    assert default.choose(request) == "echo", "sorted-first of ('echo', 'plan')"
-    assert default.choose(request) == "echo", "the default answer is stable across asks"
+    assert default.choose(request) == "vault_read", "sorted-first of the permitted set"
+    assert default.choose(request) == "vault_read", "the default answer is stable across asks"
 
-    short = build_chooser(FIXTURE_MODEL, recording=recording("plan"))
-    assert short.choose(request) == "plan"
+    short = build_chooser(FIXTURE_MODEL, recording=recording("vault_write"))
+    assert short.choose(request) == "vault_write"
     with pytest.raises(ChooserUnavailable) as excinfo:
         short.choose(request)
     assert excinfo.value.reason_code == "recording_exhausted"
@@ -119,7 +126,7 @@ def test_the_double_is_faithful() -> None:
         )
 
     request = ChoiceRequest(task=FIXTURE_TASK, permitted=FIXTURE_PERMITTED, step_index=0, attempt=0)
-    double = build_chooser(FIXTURE_MODEL, recording=recording("plan"))
+    double = build_chooser(FIXTURE_MODEL, recording=recording("vault_read"))
     live = build_chooser(LIVE_MODEL)
 
     answers = {"double": double.choose(request), "live": live.choose(request)}

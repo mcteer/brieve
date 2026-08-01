@@ -444,7 +444,39 @@ stderr, and the wait stopped at *placed* rather than at *answering* — so rows 
 surfaces that were merely young. Both are the shape this whole gap is about, arriving one
 level up: a thing that looked right on paper and was wrong when run.
 
-### 0e. No model is in the loop — a dispatched run executes a scripted tool sequence — **OPEN**
+### 0e. No model is in the loop — a dispatched run executes a scripted tool sequence — **CLOSED by 020, 2026-08-01**
+
+**What closed it.** `_tool_for_step` is deleted, and a dispatched run asks the model its
+definition's binding map names. The name goes to the same `invoke_tool` the scripted name went
+to — no new path to a capability — and the trail records who chose it as a distinct
+`TOOL_CHOSEN` event. `build_governed_agent` finally has a production caller, ten features after
+it was written.
+
+Governance also became a **signal** and not only a wall: a refused choice goes back to the
+model, which may choose again, bounded per step, every attempt recorded, and exhausting the
+bound is a recorded terminal outcome. That bound is the whole reason the signal is safe — a run
+grinding against its ceiling and a run thinking hard are the same picture from outside.
+
+The three things this gap said it needed are all now load-bearing. The binding map and the
+Qualified Model Matrix are read on every model-driven run and refuse before any provider call
+(and 020 authored the first matrix record this repository has ever had — 013 built the reader,
+the policy grant, and the validation, and nothing ever wrote a cell). Principle VIII's gates
+are consumed rather than advisory. `RunReport` (ADR-0018) is **still owed** and is now the
+clearest remaining gap: a model-driven run is exactly the thing a report would be about.
+
+**What is true, and what is still not.** The choice is *governed* — refused when it must be,
+recorded either way, durable across a kill, and made by the model the matrix bound. Whether the
+choice is **good** is an eval question (Principle VIII) and 020 asserts nothing about it. A
+demonstration of a model picking the obviously right tool is far more persuasive than what it
+proves, which is why the conformance contract states that limit as prominently as what it does
+assert.
+
+**Still separate and still open**: reaching the mcp service from an IDE. Cursor speaks stdio or
+an HTTP port; the service uses host networking, which on Docker Desktop is the VM's namespace
+and not the developer's machine.
+
+<details>
+<summary>The gap as originally raised (2026-07-31)</summary>
 
 **Raised 2026-07-31, answering "how close are we to running a task end to end?"** The
 governance chassis is complete and proven; the agent is not connected to it.
@@ -486,6 +518,8 @@ entrypoint runs, completes, and writes evidence; it simply never consults a mode
 HTTP port; the service uses host networking, which on Docker Desktop is the VM's namespace
 and not the developer's machine — the same unreachability the portal has. Small next to the
 above, and it is what stands between "the platform works" and "I can watch it work."
+
+</details>
 
 ### 0f. The MCP surface has no server — **CLOSED by 019, 2026-08-01**
 
