@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Fetch the guidance corpus into a LOCAL CACHE and pin it by content digest.
+#
+# **THE CONTENT IS NOT VENDORED, AND THAT IS A DEVIATION FROM THE PLAN.** 024's T004 said to
+# vendor the corpus the way `packs/terraform/skills/` vendors upstream skills. That precedent
+# works because those skills come from a repository with a licence permitting it. These are
+# HashiCorp's published tutorials, and the pages carry **no statement about reuse or
+# redistribution** — checked before deciding. Copying 33 third-party documents into this
+# repository on that basis is not a call to make quietly.
+#
+# So the pin is a MANIFEST rather than a copy: URL, content digest, and section anchors. The
+# digest is the pin — which is exactly what FR-014 asks for, since the corpus carries no version
+# metadata anywhere and change can only be detected by content.
+#
+# The cache is gitignored. Answering reads it and verifies each digest against the manifest;
+# nothing is fetched at answer time, which is what the plan rejected and this preserves.
+set -uo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+exec uv run --extra surfaces python "$REPO/infra/bin/corpus_sync.py" "$@"

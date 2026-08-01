@@ -1,0 +1,245 @@
+# SPDX-License-Identifier: Apache-2.0
+"""GATE:fail-closed, GATE:correlation — an answer is cited, or it is a decline.
+
+**Every row here would have failed before this feature**, because there was nothing to ask. Four
+eval suites were green over authored recordings of runs that never happened; these are the rows
+that make the difference between a capability and a claim about one.
+"""
+
+from __future__ import annotations
+
+import ast
+import pathlib
+from typing import Any
+
+import pytest
+
+from core.answering.answer import (
+    ANSWERED,
+    DECLINED,
+    ProviderUnavailable,
+    answer_question,
+)
+from core.answering.corpus import Corpus, CorpusUnavailable, Document, load_corpus
+from core.answering.streams import ask_stream_for
+
+REAL_PATH = "/validated-patterns/vault/vault-agent-approle"
+
+
+def _corpus() -> Corpus:
+    return Corpus(
+        digest="digest-under-test",
+        documents={
+            REAL_PATH: Document(
+                path=REAL_PATH,
+                url="https://developer.hashicorp.com" + REAL_PATH,
+                digest="d",
+                anchors=frozenset({"prerequisites", "conclusion"}),
+            )
+        },
+    )
+
+
+class _Provider:
+    def __init__(self, claims: list[dict[str, Any]]) -> None:
+        self._claims = claims
+
+    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+        return self._claims
+
+
+class _Unreachable:
+    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+        raise ConnectionError("no route to provider")
+
+
+def _claim(anchor: str, statement: str = "A supported statement.") -> dict[str, Any]:
+    return {"statement": statement, "citations": [{"path": REAL_PATH, "anchor": anchor}]}
+
+
+# ---------------------------------------------------------------- a cited answer
+
+
+def test_an_answer_carries_resolvable_citations() -> None:
+    """FR-002. Every claim rests on a section that exists."""
+    result = answer_question(
+        question="How does Vault Agent use AppRole?",
+        corpus=_corpus(),
+        provider=_Provider([_claim("prerequisites")]),
+    )
+    assert result.disposition == ANSWERED
+    assert len(result.claims) == 1
+    assert result.claims[0].citations[0].anchor == "prerequisites"
+    assert result.corpus_digest == "digest-under-test"
+
+
+def test_a_claim_whose_citation_does_not_resolve_does_not_ship() -> None:
+    """**The single most important row in this feature.**
+
+    An unresolvable citation is worse than none: it reads as evidence, and a reader who follows it
+    and finds nothing has been told something false about what this platform knows.
+    """
+    result = answer_question(
+        question="anything",
+        corpus=_corpus(),
+        provider=_Provider([_claim("a-section-that-does-not-exist", "Confident and unsupported.")]),
+    )
+    assert result.disposition == DECLINED
+    assert "Confident and unsupported." in result.dropped
+    assert result.claims == ()
+
+
+def test_one_bad_citation_sinks_its_whole_claim() -> None:
+    """A claim resting partly on something that does not exist rests partly on nothing."""
+    mixed = {
+        "statement": "Half-supported.",
+        "citations": [
+            {"path": REAL_PATH, "anchor": "prerequisites"},
+            {"path": REAL_PATH, "anchor": "invented"},
+        ],
+    }
+    result = answer_question(question="q", corpus=_corpus(), provider=_Provider([mixed]))
+    assert result.disposition == DECLINED
+
+
+def test_declining_names_what_was_missing() -> None:
+    """FR-003. Declining beats confabulating, and says which kind of nothing it found."""
+    empty = answer_question(question="q", corpus=_corpus(), provider=_Provider([]))
+    assert empty.disposition == DECLINED
+    assert "does not support" in empty.declined_reason
+
+    unresolvable = answer_question(
+        question="q", corpus=_corpus(), provider=_Provider([_claim("nope")])
+    )
+    assert "does not resolve" in unresolvable.declined_reason
+
+
+# ---------------------------------------------------------------- GATE:fail-closed
+
+
+def test_an_unreachable_provider_fails_rather_than_declining() -> None:
+    """FR-011. A reader cannot tell "I can't help" from "the corpus does not say".
+
+    One sends them to an operator and the other to the corpus, so they must not share a shape.
+    """
+    with pytest.raises(ProviderUnavailable):
+        answer_question(question="q", corpus=_corpus(), provider=_Unreachable())
+
+
+def test_there_is_no_answer_without_the_model() -> None:
+    """FR-011a. No fallback path that omits the provider.
+
+    A second path no gate scores is exactly how four suites came to be green over material nothing
+    produced. `answer_question` takes the provider as a required argument — there is no call that
+    omits it.
+    """
+    import inspect
+
+    from core.answering.answer import answer_question as fn
+
+    provider = inspect.signature(fn).parameters["provider"]
+    assert provider.default is inspect.Parameter.empty
+
+
+def test_a_corpus_that_does_not_match_its_pin_is_refused() -> None:
+    """FR-014. A digest mismatch is a refusal, never a silent fallback."""
+    with pytest.raises(CorpusUnavailable):
+        load_corpus(manifest=pathlib.Path("/nonexistent/manifest.json"))
+
+
+# ---------------------------------------------------------------- GATE:never-acts
+
+
+def test_the_answering_path_reaches_no_tool_or_authority_module() -> None:
+    """FR-006/FR-008, asserted on **imports** rather than on prose.
+
+    A first version of this row searched the source text and failed on the docstring saying the
+    path holds no tool registry — matching documentation instead of behaviour. This reads the
+    module's actual imports, so it cannot pass because of what the file says about itself.
+
+    Never-acts is satisfied by what the path does not hold. Granting the ability to act means
+    *adding* an import here, which is visible in review.
+    """
+    tree = ast.parse(pathlib.Path("src/core/answering/answer.py").read_text())
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+        elif isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+
+    forbidden = {"registry", "authority", "tools", "hooks", "invoke"}
+    offending = [m for m in imported if any(word in m for word in forbidden)]
+    assert not offending, (
+        f"the answering path imports {offending} — never-acts is meant to hold because this "
+        "module cannot reach a tool, not because it was told not to"
+    )
+
+
+# ---------------------------------------------------------------- GATE:correlation
+
+
+def test_the_ask_stream_is_stable_per_tenant() -> None:
+    """FR-012a. An ask has no run and no thread, so it needed a placement of its own.
+
+    Stable rather than per-ask, for the reason `evidence-access` already records: a fresh
+    correlation id each time makes every record a chain of one, linked to nothing and removable
+    without trace.
+    """
+    assert ask_stream_for("tenant-a") == "ask:tenant-a"
+    assert ask_stream_for("tenant-a") == ask_stream_for("tenant-a")
+    assert ask_stream_for("tenant-a") != ask_stream_for("tenant-b")
+
+
+# ---------------------------------------------------------------- the real corpus
+
+
+def test_the_pinned_corpus_has_the_properties_the_design_assumes() -> None:
+    """T004a. Three claims carried from prior context, none checkable here until now.
+
+    If anchors were unstable, section-level citations would not work and this feature would have a
+    different shape — far cheaper to learn from a row than from an implementation.
+    """
+    corpus = load_corpus(verify=False)
+    assert len(corpus.documents) == 33
+    assert all(doc.anchors for doc in corpus.documents.values())
+    # Chrome is excluded structurally: `sidebar-label` appeared in all 33 before the fix.
+    assert not any("sidebar-label" in doc.anchors for doc in corpus.documents.values())
+
+
+def test_an_ask_record_carries_shape_and_never_content() -> None:
+    """FR-012, GATE:no-secret-leak.
+
+    The corpus is somebody else's copyrighted documentation. Copying a passage into an append-only
+    trail that does not egress by default would be both a leak and a licensing problem — so the
+    record names which corpus was consulted, not what it said.
+    """
+    from datetime import UTC, datetime
+
+    from core.answering.record import record_ask
+    from core.audit.sink import InMemoryAuditSink
+    from core.identity.types import AuthenticatedSubject, SubjectKind
+
+    sink = InMemoryAuditSink()
+    subject = AuthenticatedSubject(
+        subject_user_id="alice",
+        tenant_id="tenant-a",
+        roles=frozenset({"operator"}),
+        subject_kind=SubjectKind.HUMAN,
+        expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+    )
+    record_ask(
+        audit=sink,
+        subject=subject,
+        corpus_digest="f854d621",
+        model="anthropic/claude-opus@5",
+        disposition="answered",
+    )
+
+    entries = sink.list_by_correlation_id(ask_stream_for("tenant-a"))
+    assert len(entries) == 1
+    payload = entries[0].payload
+    assert payload["subject_user_id"] == "alice"
+    assert payload["corpus_digest"] == "f854d621"
+    assert set(payload) == {"subject_user_id", "corpus_digest", "model", "disposition"}
+    assert "question" not in payload and "answer" not in payload

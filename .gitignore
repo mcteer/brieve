@@ -55,3 +55,8 @@ crash.log
 .vscode/
 *.iml
 .enclave/
+
+# 024: the guidance corpus is PINNED BY DIGEST, not vendored — the upstream pages carry no
+# statement permitting redistribution. `corpus/manifest.json` is the pin; this is the cache it
+# verifies against, refreshed by `infra/bin/corpus-sync`.
+.corpus-cache/

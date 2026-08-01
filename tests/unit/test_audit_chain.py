@@ -169,3 +169,4 @@ def test_widening_the_event_vocabulary_moves_no_existing_hash() -> None:
     assert AuditEventType.RECORD_READ_REFUSED.value == "record_read_refused"  # 022
     assert AuditEventType.THREAD_CREATED.value == "thread_created"  # 022
     assert AuditEventType.RUN_STOPPED.value == "run_stopped"  # 022
+    assert AuditEventType.ASK_ANSWERED.value == "ask_answered"  # 024

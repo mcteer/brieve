@@ -303,6 +303,37 @@ class AuditEventType(StrEnum):
     #: On the run's own stream, for the same reason `THREAD_DELETED` is on the thread's.
     RUN_STOPPED = "run_stopped"
 
+    #: Someone asked a question and was answered or declined (024, ADR-0039). Payload:
+    #: subject_user_id, corpus_digest, model, disposition.
+    #:
+    #: **A SEALED-CORE ADDITION** (Principle V), the fourth feature running to make one, and the
+    #: one whose review this feature's plan originally asserted was not needed. The plan hedged —
+    #: *"if an audit event type turns out to be needed, that changes this verdict"* — and the
+    #: condition had already fired when the data model was written. A conditional verdict reads as
+    #: a pass; that is why nobody noticed until an analysis pass compared the two.
+    #:
+    #: **Why no existing member fits.** `MODEL_GATE` is the closest and carries ``run_id``,
+    #: ``role``, ``cell``, ``verdict`` and ``step_index`` — a model verdict gating a **step in a
+    #: run**. An ask has neither a run nor a step. `RECORD_READ` means a run or thread record was
+    #: shown to someone; an ask consults a corpus, not the platform's own records.
+    #:
+    #: **Written to ``ask:{tenant_id}``**, stable per tenant. An ask touches neither a run nor a
+    #: thread, so neither of 022's placements applies — reads go to ``record-access:{tenant}`` and
+    #: acts go to the object's own stream. Stable rather than per-ask for the reason
+    #: `EVIDENCE_STREAM_PREFIX` already records: a fresh correlation id each time makes every
+    #: record a chain of one, linked to nothing and removable without trace.
+    #:
+    #: **Never the question and never the answer.** Recording either would copy corpus text into
+    #: an append-only trail that does not egress by default, and 022 established that a record of
+    #: an access carries its shape and never its content. What is recorded is who asked, which
+    #: corpus pin was consulted, which model the binding named, and whether they were answered or
+    #: declined.
+    #:
+    #: **A model verdict, never an approval.** ADR-0039 and Principle IX: a model may inform; it
+    #: never satisfies an approval requirement policy assigns to a person. `MODEL_GATE` already
+    #: establishes that distinction for runs, and this keeps it for asks rather than blurring it.
+    ASK_ANSWERED = "ask_answered"
+
 
 class AuditEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
