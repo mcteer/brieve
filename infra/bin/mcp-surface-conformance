@@ -27,7 +27,12 @@ IDP_PORT="${DEV_IDP_PORT:-8090}"
 #
 # So the provider announces the name the surface will use, and the rows redeem against
 # loopback. Two addresses, one issuer.
-IDP_ISSUER="http://host.docker.internal:${IDP_PORT}"
+# WHAT THE PROVIDER MINTS AND WHAT A CLIENT RESOLVES — a loopback address, because a browser
+# login happens on the host and `host.docker.internal` does not resolve there.
+IDP_ISSUER="http://127.0.0.1:${IDP_PORT}"
+# WHERE THE SURFACE FETCHES KEYS — from inside its container, which is the one place the name
+# above cannot be reached from. Separate values on purpose; see the note in `mcp-surface-up`.
+IDP_JWKS_URI="http://host.docker.internal:${IDP_PORT}/jwks"
 
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
 ok() { printf '    \033[32mok\033[0m %s\n' "$*"; }
@@ -80,6 +85,7 @@ fi
 say "Standing up the served surface"
 HARNESS_STARTED_BY="$MARK" \
   OIDC_ISSUER_OVERRIDE="$IDP_ISSUER" \
+  OIDC_JWKS_URI_OVERRIDE="$IDP_JWKS_URI" \
   bash "$REPO/infra/bin/mcp-surface-up" >/dev/null \
   || die "mcp-surface-up failed"
 

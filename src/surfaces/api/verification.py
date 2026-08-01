@@ -133,7 +133,30 @@ class TokenVerifier:
         if key_loader is not None:
             self._key_loader = key_loader
         elif jwks_uri is not None:
-            client = PyJWKClient(jwks_uri, cache_keys=False)
+            # `cache_jwk_set=False` IS THE POINT OF THIS LINE, and its absence made the
+            # unknown-key path below effectively dead code.
+            #
+            # `cache_keys=False` was already the library default and governs a different cache
+            # — an LRU over signing keys. Left at their defaults, `cache_jwk_set=True` and
+            # `lifespan=300` meant the JWK SET itself was held for five minutes inside the
+            # client. So `_key_for` would meet a key id it did not recognise, refetch exactly as
+            # it was written to, and receive the same stale set back — finding nothing.
+            #
+            # MEASURED, not reasoned: after the provider rotated, a valid token was refused for
+            # ~250 seconds and then accepted, with no restart. The refusal was
+            # `unverifiable_identity`, which names the symptom and not the cause.
+            #
+            # This is not a development-lane concern. Against any real provider, a key rotation
+            # was invisible here for up to five minutes while this code looked like it handled
+            # rotation immediately.
+            #
+            # **Staleness is now bounded by `_KeyCache` alone**, which is the one that fails
+            # closed and is written to. FOR REVIEW: an unknown key id now reaches the provider
+            # rather than a local cache, so a caller presenting fabricated ids can prompt a
+            # fetch per request. That is the cost of resolving rotation promptly, it is one GET
+            # to the provider, and rate-limiting it belongs to the provider rather than here —
+            # but it is a real change in outbound behaviour and is named rather than buried.
+            client = PyJWKClient(jwks_uri, cache_keys=False, cache_jwk_set=False)
             self._key_loader = lambda: {
                 k.key_id: k.key for k in client.get_jwk_set().keys if k.key_id
             }

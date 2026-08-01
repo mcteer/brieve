@@ -9,9 +9,13 @@ that is FR-015 failing** — record what you had to look up.
 ## 1. Bring it up
 
 ```
-make enclave-up          # the trust store, the scheduler, the databases
-make mcp-surface-up      # the served surface, on its own job
+make dev-up              # the trust store, the scheduler, the databases
+DEV_IDP=1 make mcp-surface-up   # the served surface AND a development identity provider
 ```
+
+**Two commands, not one.** `make dev-up` brings up the enclave only — the surfaces are kept
+separate from it deliberately. `DEV_IDP=1` is what starts the development identity provider
+alongside the surface; without it the surface uses the real provider from your `.env`.
 
 The surface announces itself:
 
@@ -43,11 +47,32 @@ not, that is the finding rather than a misconfiguration on your side.
 
 **Address**: `http://127.0.0.1:8083/mcp` — Streamable HTTP.
 
-**Credential**: a bearer token from the identity provider the platform verifies against, sent
-as `Authorization: Bearer <token>`. **Not a credential this platform issues** — the surface
-verifies, it does not mint. The same provider the portal signs people in against.
+**Credential: none that you handle.** The surface publishes
+`/.well-known/oauth-protected-resource` naming its authorization server, which is the discovery
+flow the MCP specification defines. A client follows it, registers itself, opens a browser, and
+manages its own token — including renewing it.
 
-For an IDE, that is an MCP server entry with the URL above and an `Authorization` header.
+So the editor entry is a URL and nothing else:
+
+```json
+{
+  "mcpServers": {
+    "brieve": { "url": "http://127.0.0.1:8083/mcp" }
+  }
+}
+```
+
+**No `headers`. No `Authorization`. No token.** If you find yourself pasting one into a config
+file, something above has not come up — that is worth reporting rather than working around,
+because a credential in a config file is a standing credential, which is the thing this platform
+exists to avoid.
+
+**Still not a credential this platform issues** — the surface verifies, it does not mint. Against
+a real deployment the same flow runs against Auth0 or Okta; only the issuer configuration differs.
+
+**If you need a token directly** — for a script, or to reproduce something without an editor —
+`tests/conformance/mcp_served/surfaces.py::caller_token` walks the same flow and hands you one.
+That path is unchanged and every automated lane still uses it.
 
 ---
 
