@@ -253,7 +253,7 @@ lying about what it records.
 
 ## Phase 7: The adjacent fix (recommended, flagged)
 
-**Research F7 found a live defect in the code this feature copies.** It is pre-existing and is not
+**Research F7 and analysis pass 10 each found a live defect in code adjacent to this feature.** Both are pre-existing and neither is
 one of the seven covered operations. It is listed separately so that including it is a decision and
 cutting it is also a decision.
 
@@ -263,6 +263,14 @@ cutting it is also a decision.
 - [ ] T041 Catch it in `src/surfaces/mcp/transport.py::_read_evidence` and return the same 503
       verdict the API returns, then extend the parity row to cover the evidence path's failure
       case.
+
+- [ ] T041a Add a reason code meaning *the result exists and is too large to return* to
+      `OPERATION_REASONS` in `src/core/runs/refusals.py`, and use it in `run_result_for`'s
+      `_too_large` branch in `src/surfaces/api/runs.py` in place of `not_permitted` (FR-007c).
+      Additive to the vocabulary; removes a 403 that misstates why, and stops 022 from writing a
+      permission denial into the trail for a refusal that was about size.
+- [ ] T041b Assert in `tests/component/` that an oversized result is refused with the new code and
+      that the recorded entry carries it — the point is the entry, not the status.
 
 **If Phase 7 is cut**, T008 still stands: the six new call sites must not copy the HTTPException
 shape into transport-independent code.
@@ -300,7 +308,7 @@ Phase 2 (T003–T012)  ← blocks everything; vocabulary + seam + classification
    └── Phase 5 US3 (T034–T036, incl. T034a/T036a)  ← needs T011–T012 only
    ↓
 Phase 6 (T037–T039)  ← the ADR; must land in the same PR
-Phase 7 (T040–T041)  ← independent of everything; needs T008
+Phase 7 (T040–T041b)  ← independent of everything; T040–T041 need T008
 Phase 8 (T042–T047)
 ```
 
@@ -341,7 +349,7 @@ understood.
 
 ## Notes
 
-**54 tasks**, after analysis added seven. The largest phase is US1 at 21, and 10 of those are rows rather than
+**56 tasks**, after analysis added nine. The largest phase is US1 at 21, and 10 of those are rows rather than
 implementation — which is the right ratio for a feature whose entire subject is that a green suite
 proved nothing.
 

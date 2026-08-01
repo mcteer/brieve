@@ -48,7 +48,7 @@ the running service on 2026-08-01, not inferred from the source:
 | --- | --- | --- |
 | `list_runs` | run ids, correlation ids, agent definition ids, states, timestamps | **none** |
 | `get_run` | one run's record | **none** |
-| `get_run_result` | **the run's result payload** | **none** |
+| `get_run_result` | **the run's result** — `payload[RESULT_KEY]`, not the whole checkpoint | **none** |
 | `list_threads` | the subject's threads | **none** |
 | `get_thread` | one thread and its turns | **none** |
 | `create_thread` | a new thread | **none** |
@@ -266,6 +266,15 @@ follows rather than leads.
   unreadable through both surfaces. An unrecorded answer is the state this feature exists to end,
   so serving one during an outage would reintroduce it at exactly the moment someone will later
   investigate.
+- **FR-007c**: A refusal MUST be recorded with a reason code that is **true of why it was refused**.
+  Measured, and this one already fails: `run_result_for` refuses an oversized result with
+  `not_permitted`, whose stated meaning is *"the record is visible to this caller, and this action
+  is not theirs"*. The caller receives 403 for a result that merely did not fit, and once this
+  feature records refusals, the trail will assert a permission denial that never happened. The
+  vocabulary already proves the distinction matters — `message_too_large` exists for exactly this
+  shape, and `nothing_to_dispatch` carries the comment *"conflating them tells someone their access
+  is fine when it is not, and tells another that it is not when it is."* A wrong status code is a
+  bad answer; a wrong audit entry is false evidence.
 - **FR-007b**: A covered read that returns nothing MUST still record. An empty listing discloses
   that the caller asked, and a trail that omits fruitless reads cannot show probing.
 
