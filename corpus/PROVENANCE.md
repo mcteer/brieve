@@ -12,10 +12,21 @@ The content is here — 33 documents, as extracted sections under `documents/`.
 
 **An earlier version of this file pinned by digest only and left the content out**, on the grounds
 that the pages state no licence and this repository's precedent (`packs/terraform/skills/`, MPL-2.0
-copied verbatim) is to vendor only with a licence in hand. The maintainer's call was that these are
-publicly accessible pages and this is a HashiCorp-endorsed project — context the caution did not
-have. Recorded rather than quietly reversed, because the reasoning is worth finding if the question
-comes up again.
+copied verbatim) is to vendor only with a licence in hand.
+
+**Two things were wrong with that, and the second is the instructive one.**
+
+The maintainer's call was that these are publicly accessible pages and this is a HashiCorp-endorsed
+project — context the caution did not have, and his to make.
+
+And the claim that the licence *could not be checked* was simply false. It rested on `gh api`
+returning 403 for the `hashicorp` organisation, which is **SAML rejecting an authenticated token**,
+not a private repository. Unauthenticated, `github.com/hashicorp/agent-skills` answers 200 and
+serves an MPL-2.0 `LICENSE` — the same licence already sitting in `packs/terraform/skills/`. A
+failing authenticated request was read as a closed door when the open one was one `curl` away.
+
+Recorded rather than quietly reversed, because "the tool I reached for failed, therefore the
+question is unanswerable" is a mistake worth recognising again.
 
 **Sections, not markup.** Thirty-three pages of raw HTML is roughly fourteen megabytes of
 navigation, scripts and styling, none of which an answer cites. What a citation points at is a

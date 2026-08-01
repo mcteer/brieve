@@ -7,10 +7,10 @@
 # vendor the corpus the way `packs/terraform/skills/` vendors upstream skills. That precedent
 # works because those skills come from a repository with a licence permitting it — MPL-2.0,
 # copied verbatim beside the content. That is this repository's bar: vendor when you hold a
-# licence. These pages state none, and whether the tutorials live in a licensed public repo could
-# not be checked (the GitHub API 403s for the whole hashicorp org under SAML). So the bar was not
-# met — which is a smaller claim than "redistribution is prohibited", and the wording here said
-# the larger one until it was corrected.
+# licence. The content here is vendored on the maintainer's call: publicly accessible pages, a
+# HashiCorp-endorsed project. An earlier version of this comment claimed the licence could not be
+# checked because the GitHub API 403s for the hashicorp org — that is SAML rejecting a token, not
+# a private repo, and unauthenticated the same repos answer fine. See corpus/PROVENANCE.md.
 #
 # So the pin is a MANIFEST rather than a copy: URL, content digest, and section anchors. The
 # digest is the pin — which is exactly what FR-014 asks for, since the corpus carries no version
