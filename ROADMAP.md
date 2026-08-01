@@ -487,7 +487,7 @@ HTTP port; the service uses host networking, which on Docker Desktop is the VM's
 and not the developer's machine — the same unreachability the portal has. Small next to the
 above, and it is what stands between "the platform works" and "I can watch it work."
 
-### 0f. The MCP surface has no server — nothing frames the transport in the protocol — **OPEN**
+### 0f. The MCP surface has no server — **CLOSED by 019, 2026-08-01**
 
 **Raised 2026-07-31, while scoping "connect it to Cursor."** The expected answer was
 networking: the mcp job uses host mode, which on Docker Desktop is the VM's namespace and not
@@ -514,6 +514,18 @@ in force between one surface that answers real requests over a real socket (017 
 constructing `McpTransport` the way `api.nomad.hcl` constructs `build()`, plus the
 reachability fix the networking question was actually about. The operations exist and are
 tested; what is missing is the framing and the front door.
+
+**Closed.** The surface is served, reachable from the developer's machine, and driven by
+eighteen rows through the SDK's own client over a real socket. Born in bridge mode rather than
+converted, because the measurement was done first.
+
+**It found a defect four features old that no existing gate could see.**
+`McpTransport._start_run` never passed `subject_roles`, so every run started through MCP
+reached its allocation and died with `no role for subject`. The API had passed them all along.
+The surface-parity gate compared the two transports, saw both answer `202`, and could not see
+that only one produced a run able to authorize itself — **parity compared the answer, not the
+consequence.** Found on the first live `start_run`, which is the whole argument for rows that
+drive a served process.
 
 **Ordering note.** This is separate from 0e and smaller. A served MCP surface with the current
 round-robin tool selection is still the platform working — a client connects, a governed

@@ -107,28 +107,56 @@ directories are the comparison** — a rising total proves nothing.
 
 | Directory | Baseline on `main` | With 019 |
 | --- | --- | --- |
-| `adapter/` | 12 | *(pending)* |
-| `api/` | 46 | *(pending)* |
-| `authority/` | 12 | *(pending)* |
-| `deployment/` | 22 | *(pending)* |
-| `durability/` | 48 | *(pending)* |
-| `evidence/` | 17 | *(pending)* |
-| `identity/` | 28 | *(pending)* |
-| `mcp/` | 56 | *(pending)* |
-| `mcp_served/` | — | *(pending)* |
-| `packs/` | 30 | *(pending)* |
-| `portal/` | 8 | *(pending)* |
+| `adapter/` | 12 | 12 |
+| `api/` | 46 | 46 |
+| `authority/` | 12 | 12 |
+| `deployment/` | 22 | 22 |
+| `durability/` | 48 | 48 |
+| `evidence/` | 17 | 17 |
+| `identity/` | 28 | 28 |
+| `mcp/` | 56 | 56 |
+| `mcp_served/` | — | **19** |
+| `packs/` | 30 | 30 |
+| `portal/` | 8 | 8 |
 
-Completed by T041.
+**Nothing stopped running.** Every pre-existing directory holds exactly the count it held on
+`main`; the total rises by the eighteen rows this feature adds, which is the only movement
+there should be. A rising total on its own would prove nothing, which is why the comparison is
+per-directory.
 
 ---
 
 ## The one-time demonstration
 
-To be completed at implementation. Must record: the credential used, the client's own output
-showing the refusal, evidence that the refusal originated in the governed core rather than the
-protocol layer, and the state of the platform afterwards.
+Performed by hand on **2026-08-01** against a local enclave. Not a fixture and not in a lane:
+an act whose point is that a person watched it happen is not improved by automating the
+watching.
 
-Performed by hand against a developer's own enclave, never in a lane — the same posture 018
-set, and for a weaker reason here (nothing is made permissive), but the same one: an act whose
-point is that a person watched it happen is not improved by automating the watching.
+**The credential**: a token from the platform's own provider, carrying claims that map to no
+role — `groups: ["not-a-mapped-claim"]`. Well-formed, correctly signed, from a trusted issuer.
+Everything about it is valid except entitlement, which is the only interesting case.
+
+**What the client saw:**
+
+```
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'http://127.0.0.1:8083/mcp'
+```
+
+**Where the refusal came from**, which is the part a client cannot see and the whole reason
+this is recorded:
+
+```
+::mcp-surface:: refused a caller — unmapped_claim
+```
+
+`unmapped_claim` is the platform's own reason code, produced by the verification the API uses.
+The protocol layer did not decide anything — it reported a decision made in
+`surfaces/api/verification.py` and returned `None` to the SDK, which framed it as 401.
+
+**The control**, run in the same breath so the refusal is not just the surface being down: the
+same call with `permissions: ["platform:operator"]` answered `{"ok": true, "status": 200}`.
+
+**And the credential is not in the log.** The reason is named; the token never appears.
+`test_no_credential_appears_in_the_surface_output` asserts that continuously — a refusal with
+no diagnostic is a support ticket nobody can answer, and printing the token to fix that would
+put a live bearer credential where every operator with scheduler access can read it.

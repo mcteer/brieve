@@ -9,6 +9,7 @@ convert a delegation chain into a shared account. Nothing above the audit entry 
 from __future__ import annotations
 
 import time
+import uuid
 
 import pytest
 
@@ -120,3 +121,45 @@ def test_no_credential_appears_in_the_surface_output(running_surface: str, calle
     )
     for fragment in (caller[:24], caller.rsplit(".", 1)[-1][:24]):
         assert fragment not in output, f"part of a caller's credential is in the log: {fragment}"
+
+
+def test_a_correlation_id_propagates(caller: str) -> None:
+    """[GATE:correlation] FR-009's evidence half: a client's own correlation id reaches the
+    trail, and the join is walkable from it.
+
+    **This gate was claimed and uncovered until analysis pass 3.** The task list asserted it
+    was satisfied by two rows that are purely about identity and touch no correlation at all —
+    a gate table vouching for itself, which is the shape this whole feature exists to
+    eliminate. It survived two passes because nominal requirement coverage cannot see it: the
+    gate table is written beside the requirements, not derived from them.
+
+    A client supplies the id so it can find its own work later. If the platform substituted
+    one of its own, every operation would still succeed and the caller would have no way to
+    join what they asked for to what was recorded.
+    """
+    supplied = f"client-chosen-{uuid.uuid4().hex[:12]}"
+
+    started = surfaces.call(
+        "start_run",
+        {
+            "agent_definition_id": "planner-agent",
+            "requested_tools": [],
+            "correlation_id": supplied,
+        },
+        token=caller,
+    )
+
+    assert started.get("correlation_id") == supplied, (
+        f"the surface answered with correlation id {started.get('correlation_id')!r} instead "
+        f"of the {supplied!r} the client supplied. A platform that substitutes its own leaves "
+        f"a caller unable to join what they asked for to what was recorded."
+    )
+
+    subjects = _authority_subjects(supplied, caller)
+    assert subjects, (
+        f"nothing in the trail carries {supplied!r}. The id reached the answer and not the "
+        f"evidence, so the join a caller would walk does not exist."
+    )
+    assert "caller-1" in subjects, (
+        f"the trail joins on the client's id but names {subjects}, not the caller"
+    )

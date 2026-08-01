@@ -3,7 +3,7 @@
 # `evals` is .PHONY twice over: it is a recipe, and a DIRECTORY named evals/ exists at
 # the repository root — without the declaration, make reports the seed set 'up to date'
 # and the gate never runs, which is a skip wearing a build system's clothes.
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
+.PHONY: check mcp-surface-up conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
