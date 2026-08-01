@@ -96,7 +96,7 @@ wherever an observer exists.
 
 | | Resolution | Cost | Constitution |
 | --- | --- | --- | --- |
-| **A** | **Drop read-back.** US3 leaves this feature; every effect claim carries `unverified: record only`. | Loses the ADR-0018 property that arguably matters most — the "applied successfully to three workspaces" failure the ADR opens with stays possible. | Clean. Nothing re-reads anything. |
+| **A** | **Drop read-back.** US3 leaves this feature; every effect claim carries `unverified_not_observed`. | Loses the ADR-0018 property that arguably matters most — the "applied successfully to three workspaces" failure the ADR opens with stays possible. | Clean. Nothing re-reads anything. |
 | **B** | **Read-back under manufactured requester authority.** `manufacture_authority` for the requester, threaded into `observe()`. | Changes the `Observer` protocol — **sealed core** (`core.observation`), plus the pinned call-shape test and both shipped observers. | Compliant, but converts this into a sealed-core feature with the review that entails. |
 | **C** | **Read-back at run end, recorded as evidence.** The allocation — which already holds the right attested identity and already re-observes — records an `Observation` for each effect before it exits. The report compiles that record like any other. | The observation is a fact about run-end, not report-time, so "the world changed since" stops being detectable. Adds work to the run loop. | Clean, and arguably the most faithful: ADR-0018 says read-back happens *before asserting completion*, and run-end is when the run asserts it. |
 
@@ -158,7 +158,9 @@ src/surfaces/mcp/transport.py    # +1 dispatch entry
 src/core/evals/suites.py         # report_fidelity moves OWED → SUITES; a fifth case shape
 packs/*/evals/report_fidelity.toml  # NEW — recorded runs, labelled material events
 specs/008-northbound-api/contracts/operations.snapshot.json  # regenerated — parity grows
-tests/conformance/reports/       # NEW — rows against a compiled report
+infra/bin/reports-conformance    # NEW — the lane for the rows that need a dispatched run
+tests/conformance/reports/       # NEW — rows against a compiled report; hermetic AND enclave,
+│                                # so the lane must select the markers (see tasks T029a)
 ```
 
 **Structure Decision**: the compiler is core and takes already-read entries; the governed read

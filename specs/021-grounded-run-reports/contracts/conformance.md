@@ -21,15 +21,30 @@ Three groups of rows, and only the second needs the enclave:
 | Observation at run end, and the surface | `tests/conformance/reports/`, `tests/conformance/api`, `tests/conformance/mcp` | The enclave — a dispatched run that observes, and both transports answering |
 | Report fidelity | `packs/*/evals/report_fidelity.toml` via `make evals` | Nothing. Recorded runs, labelled material events |
 
-**Nothing here has a named human runner**, and that is worth stating because 020 had three. No row
-in this feature requires a live provider or a hand-performed demonstration: there is no model in
-this path at all, which is the point of ADR-0018.
+**No row here needs a live provider or a hand-performed demonstration.** There is no model in this
+path at all, which is the point of ADR-0018 — so 020's three named obligations have no equivalent
+here.
 
-**One obligation does need a person**, and it is not a row:
+**That is not the same as no named runner, and an earlier draft of this section said it was.**
+The enclave lane has not run on pull requests since #95; it is `workflow_dispatch` only. So the
+second group above — a dispatched run that observes, and both transports answering — is executed
+by **no automated check**, and the constitution is explicit:
+
+> A blocking row that no automated check executes MUST have a named party responsible for running
+> it before merge, recorded in that same contract; merging without that run is a gate regression,
+> and "the check is not automated" is not a defence.
 
 | | What it is | Who |
 | --- | --- | --- |
+| The enclave rows | `make conformance` in full, on a live enclave, before merge | **Dan McTeer** |
 | Principle V review | Security-maintainer review of the audit-schema change (one additive `AuditEventType` member) | **Dan McTeer** |
+
+Run the **full** `make conformance`, not the individual lanes. 019's two defects on its last day
+were both composition failures, visible only when everything ran together.
+
+**Before running it, resync the container VM's clock** (`docker run --rm --privileged alpine
+hwclock -s`). Drift makes dispatched runs die on `nbf` as a different random subset each time,
+which reads as a flaky feature rather than an environment fault.
 
 ---
 

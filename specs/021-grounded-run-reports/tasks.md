@@ -75,11 +75,16 @@
 **Independent test**: compile a report for a run with an unresolvable record and find the gap stated rather than absent.
 
 - [ ] T020 [US2] Flag an unreconcilable claim in place (FR-005) in `src/core/reports/compile.py` — never omitted, never softened, and **never fatal to the rest of the report**.
+- [ ] T020a [US2] Implement the **validation pass** in `src/core/reports/compile.py` (FR-004): every claim is checked against the record it cites **before the report is emitted**, and the check's result is what sets its status.
+
+  Analysis pass 1 found no task for this. The spec separates three things — FR-001 *populated from* the records, FR-004 *validated against* them, FR-005 *flagged* when that fails — and the task list covered the first and third while skipping the middle. **Without an explicit validation step, "validated" degrades into "constructed from", which is a claim about where a value came from rather than a check that it is still true of the record.** Those are the same thing only while the compiler is correct, which is the assumption the check exists to remove.
 - [ ] T021 [US2] Record whether the evidence verified — the chain, and reconciliation where a second copy exists (FR-010) — in `src/core/reports/compile.py`. A report compiled from records nobody checked is a weaker claim than one compiled from records that were.
 - [ ] T022 [US2] State the report's own scope, per ADR-0032 (FR-012), in `src/core/reports/compile.py`.
 - [ ] T023 [P] [US2] Add `test_an_open_bracket_is_stated_not_guessed` in `tests/conformance/reports/test_gaps_are_stated.py` (US2 scenario 1).
 - [ ] T024 [GATE:fail-closed] [P] [US2] Add `test_one_unreconcilable_claim_does_not_suppress_the_report` in `tests/conformance/reports/test_gaps_are_stated.py` (FR-005, SC-003). **The property whose absence looks like caution**: a compiler that refused to emit anything when one claim failed would read as conservative and would hide every other finding.
 - [ ] T025 [P] [US2] Add `test_the_basis_is_stated` in `tests/conformance/reports/test_gaps_are_stated.py` (FR-010).
+- [ ] T025a [P] [US2] Add `test_two_reports_of_one_run_agree` in `tests/conformance/reports/test_gaps_are_stated.py` (FR-014b). Compile twice, compare every claim. **Cheap to assert only because of resolution C** — before read-back moved to run end, this property did not hold, and the first clarification said so. Now nothing is re-derived at request time, so any disagreement means the compiler is not a function of the records.
+- [ ] T025b [P] [US2] Add `test_no_report_is_ever_persisted` in `tests/conformance/reports/test_gaps_are_stated.py` (FR-014a) — by source inspection over `src/core/reports/` and `src/surfaces/api/reports.py`, **parsed rather than grepped**. A negative property nothing else would catch: a report store added later would break no existing row, and FR-014's "nothing may read a report to decide anything" starts eroding the moment one exists to read.
 
 ---
 
@@ -91,16 +96,24 @@
 
 **This phase is the Constitution Check's redesign.** The first plan failed Principle IV here: a read-back at report time would run under the API surface's identity and hand a reader an observation they may hold no authority to make. Everything below exists because the observation moved to where the authority already is.
 
-- [ ] T026 [US3] Observe each effect with a registered observer before a terminal state, in `src/surfaces/dispatch/entrypoint.py`, and record `EFFECT_OBSERVED`. **Under the allocation's own attested identity** (FR-006b) — `registry.observers()` supplies the observer, `Observer.observe` is called with the step's idempotency key, and the protocol is **not** changed.
+- [ ] T026 [US3] Observe each effect with a registered observer before a terminal state, in `src/surfaces/dispatch/entrypoint.py`, and record `EFFECT_OBSERVED` (FR-016). **Under the allocation's own attested identity** (FR-006b) — `registry.observers()` supplies the observer, `Observer.observe` is called with the step's idempotency key, and the protocol is **not** changed.
 - [ ] T027 [US3] Map the three `ObservationOutcome` values onto claim statuses in `src/core/reports/compile.py`: `happened` → `observed`, `did_not_happen` → `contradicted`, `cannot_determine` → `unverified_unreachable`. Absent observer → `unverified_no_observer`; absent observation → `unverified_not_observed`.
 - [ ] T028 [US3] Ensure observing changes no run outcome (FR-016c) in `src/surfaces/dispatch/entrypoint.py`. A run that did its work and then found an effect missing completed and produced a finding — letting the observation retroactively fail the run gives a reporting mechanism power over what it reports.
 - [ ] T029 [US3] Add `infra/bin/reports-conformance` and call it from `Makefile`'s `conformance` recipe — the rows that need a dispatched run that observes. **Must land before T031.** The hermetic rows need no wiring; the first recipe line collects the tree.
+- [ ] T029a [US3] Mark T030–T035 `enclave` and `host_enclave` in `tests/conformance/reports/test_the_run_observes.py`, and make T029's lane **select those markers** while the hermetic rows stay on the first recipe line.
+
+  **`tests/conformance/reports/` will hold both kinds**, which is exactly the `tests/conformance/api` situation the `Makefile` comment already describes: ignoring the path drops the hermetic rows, collecting the enclave ones fails the lane. `tests/unit/test_every_conformance_directory_is_run.py` requires a lane that both *names* a directory **and** *selects the markers its rows carry* — and that check exists because this gap has been paid for three times: 010 lost a feature's identity rows to a directory no lane enumerated, 014 hit the subtler form where the lane named the directory and deselected the rows, and 018 came within one commit of it in the feature built to end the class.
+
+  Analysis pass 1 found the task list silent on markers entirely.
 - [ ] T030 [GATE:correlation] [P] [US3] Add `test_a_run_observes_before_it_ends` in `tests/conformance/reports/test_the_run_observes.py` (FR-006, SC-004) — against a dispatched run, evidenced from the trail.
 - [ ] T031 [GATE:fail-closed] [P] [US3] Add `test_an_unreachable_product_is_not_success` in `tests/conformance/reports/test_the_run_observes.py` (FR-006a) — `cannot_determine` is recorded, and the claim reads `unverified_unreachable` rather than either outcome.
 - [ ] T032 [P] [US3] Add `test_a_contradicted_effect_never_reads_as_success` in `tests/conformance/reports/test_the_run_observes.py`. **The failure ADR-0018 opens with**, and the one a reader is least able to catch by reading.
 - [ ] T033 [GATE:no-secret-leak] [P] [US3] Add `test_the_report_performs_no_observation` in `tests/conformance/reports/test_the_run_observes.py` (SC-004b) — **0** read-backs at report time. Assert the compiler holds no credential and no client, because this is the Principle IV property and it must not regress silently.
 - [ ] T034 [P] [US3] Add `test_a_killed_run_says_it_was_never_observed` in `tests/conformance/reports/test_the_run_observes.py` (FR-006c) — distinct from unreachable, because a killed run and a down product are different facts.
 - [ ] T035 [P] [US3] Add `test_a_tool_with_no_observer_says_so` in `tests/conformance/reports/test_the_run_observes.py` (FR-016a). **FR-016b forbids adding an observer to satisfy this** — one written to make a claim verifiable rather than because the product can be asked is a stub returning success, which turns an honest `unverified` into a false `confirmed`.
+- [ ] T035a [US3] Add `test_every_effect_claim_is_accounted_for` in `tests/conformance/reports/test_the_run_observes.py` (SC-004a) — the four statuses `observed`, `contradicted`, `unverified_unreachable`, `unverified_no_observer`, `unverified_not_observed` **partition** every effect claim, with none left asserted from the tool outcome alone.
+
+  **This is the no-silent-assertion property, and T031/T034/T035 do not prove it.** Each asserts that one status appears in one arranged situation; none asserts the set is *closed*. A compiler that handled the three arranged cases and fell through to a bare "completed" for anything else would pass all three and fail this one — which is precisely the shape SC-004a was written as a partition rather than as a list.
 
 ---
 
@@ -119,7 +132,7 @@
 ## Phase 7: The surface, and the parity row it grows
 
 - [ ] T041 Add `report_for` in `src/surfaces/api/reports.py` — the governed read plus compilation, **transport-independent**, on the pattern `read_evidence_for` established so MCP reaches *this* rather than reimplementing it.
-- [ ] T042 [GATE:correlation] [US1] Reach `read_evidence_for` rather than `EvidenceQuery.search` in `src/surfaces/api/reports.py` (FR-007, research F1) — it bounds by tenant, computes the disposition, and **fails the read if the meta-audit write fails**. A direct `search` would duplicate the disposition logic and silently skip the one write that must not be best-effort.
+- [ ] T042 [GATE:correlation] Reach `read_evidence_for` rather than `EvidenceQuery.search` in `src/surfaces/api/reports.py` (FR-007, research F1) — it bounds by tenant, computes the disposition, and **fails the read if the meta-audit write fails**. A direct `search` would duplicate the disposition logic and silently skip the one write that must not be best-effort.
 - [ ] T043 Handle the truncated read in `src/surfaces/api/reports.py`. `EvidenceQueryRequest.limit` defaults to **1000** and a 400-step run writes roughly seven entries per step, so a report over one would be complete in form and missing most of the run. **A correctness problem wearing a performance problem's clothes** — a truncated compilation must refuse or state the truncation, never silently report a partial run as whole.
 - [ ] T044 Exclude the run's result payload in `src/surfaces/api/reports.py` (FR-008a). `get_run_result` is subject-restricted; a report is tenant-scoped, so carrying that payload routes around the restriction.
 - [ ] T045 Add the route to the API router in `src/surfaces/api/app.py`.
@@ -134,7 +147,7 @@
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T052 Add `test_the_gate_scores_what_a_person_reads` in `tests/conformance/reports/test_one_object_two_consumers.py` (FR-015a, SC-009). **The requirement the maintainer's answer produced**: a gate scoring a different object from the one a person reads is not gating what anyone sees — this platform's recurring failure shape, given a row instead of being left available as a shortcut.
+- [ ] T052 Add `test_the_gate_scores_what_a_person_reads` in `tests/conformance/reports/test_one_object_two_consumers.py` (FR-015, FR-015a, FR-015c, SC-009). **The requirement the maintainer's answer produced**: a gate scoring a different object from the one a person reads is not gating what anyone sees — this platform's recurring failure shape, given a row instead of being left available as a shortcut.
 - [ ] T053 [P] Add `test_nothing_reads_a_report` in `tests/conformance/reports/test_one_object_two_consumers.py` (FR-014, SC-008) — **0** code paths consume a report to decide anything. By source inspection, parsed.
 - [ ] T054 [P] Add `test_the_contract_states_what_this_gate_does_not_assert` in `tests/conformance/reports/test_one_object_two_consumers.py`. **The limit most likely to be misread** is that a report is present-tense: observations are facts about run-end, and "verified" invites a tense the claim does not have.
 - [ ] T055 Update `specs/021-grounded-run-reports/contracts/conformance.md` — replace the sketch table with the rows as shipped, and record SC-011 against T002's baseline. 019's contract carried a stale table through six analysis passes.

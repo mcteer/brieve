@@ -58,7 +58,7 @@ again — is the first run a report can get *wrong* in the way ADR-0018 is about
   request time and two reports now agree on **every** claim. Corrected here rather than left to
   contradict, because a superseded sentence in a clarification log is read as current.
 - Q: Does read-back apply to every effect claim, or only non-repeatable ones? → A: **Wherever an
-  observer exists; flagged as `unverified: no observer` where none does.** The two rejected
+  observer exists; flagged as `unverified_no_observer` where none does.** The two rejected
   answers both decide silently. Restricting to non-repeatable effects leaves every other claim
   asserted from the record with nothing saying so; requiring it everywhere promises a read-back
   for tools that have no way to perform one, which would be satisfied by writing a stub observer
@@ -182,10 +182,10 @@ observe the report decline to claim completion.
 3. **Given** the product could not be reached at run end, **When** a report is compiled, **Then**
    the claim is flagged as unverified rather than asserted or dropped.
 4. **Given** a step recorded as allowed **and a tool with no observer**, **When** a report is
-   compiled, **Then** the claim carries `unverified: no observer` — visibly a record-only claim,
+   compiled, **Then** the claim carries `unverified_no_observer` — visibly a record-only claim,
    never presented as product-confirmed.
 5. **Given** a run that was killed and never reached a terminal state, **When** a report is
-   compiled, **Then** its effect claims carry `unverified: not observed` rather than being
+   compiled, **Then** its effect claims carry `unverified_not_observed` rather than being
    asserted from the tool outcome alone.
 
 ---
@@ -231,7 +231,7 @@ observe the report decline to claim completion.
   a report that re-read a product would run under the surface's authority rather than the
   requester's, which is amplification and the reason this moved (Principle IV).
 - **FR-006c**: A run that never reaches a terminal state records no observation, and its effect
-  claims MUST carry `unverified: not observed` — distinct from both "unreachable" and "no
+  claims MUST carry `unverified_not_observed` — distinct from both "unreachable" and "no
   observer", because a killed run and an unreachable product are different facts.
 - **FR-007**: Compiling a report MUST go through the governed, tenant-scoped evidence read path,
   and the read MUST itself be audited (ADR-0035). A second, unaudited route to the same records
@@ -246,8 +246,10 @@ observe the report decline to claim completion.
 - **FR-008b**: A report MUST grant **no access the caller does not already have** through the
   governed evidence path. It is a compilation of readable records, not a new privilege; if a
   report can show something `read_evidence` cannot, that is a widening and a defect.
-- **FR-009**: A report MUST NOT contain secret values, and MUST NOT become a route to material
-  the caller could not otherwise read.
+- **FR-009**: A report MUST NOT contain secret values. Tool arguments are hashed and secret values
+  never enter the trail; a report must hold the same line, including anything a re-read of a
+  product surfaced. *(Access scope is FR-008b's — this requirement carried a second clause saying
+  the same thing, removed rather than left to drift out of step with it.)*
 - **FR-010**: A report MUST record whether the evidence it compiled from **verified** — the chain,
   and where a second copy exists, the reconciliation. A report compiled from records nobody
   checked is a weaker claim than one compiled from records that were, and the difference must be
@@ -291,7 +293,7 @@ observe the report decline to claim completion.
   attention first, the gate wants every claim with its provenance — but neither may see a claim
   the other cannot. Prioritisation and ordering are presentation; the set of claims is not.
 - **FR-016**: A run MUST observe every effect **for which an observer exists**, at run end.
-- **FR-016a**: Where no observer exists, the claim MUST carry `unverified: no observer` rather
+- **FR-016a**: Where no observer exists, the claim MUST carry `unverified_no_observer` rather
   than being asserted as complete. **The absence of a read-back is a fact about the claim**, and
   a report that omitted it would present a record-only claim and a product-confirmed one as the
   same kind of statement.

@@ -47,8 +47,8 @@ protocol states that an implementation which cannot reach the external system **
 
 **Decision**: read-back is `registry.observers().get(tool)`, called with the step's idempotency
 key. `HAPPENED` → the claim is product-confirmed; `DID_NOT_HAPPEN` → the claim is contradicted
-and says so; `CANNOT_DETERMINE` → `unverified: could not reach`; **no observer at all** →
-`unverified: no observer` (FR-016a).
+and says so; `CANNOT_DETERMINE` → `unverified_unreachable`; **no observer at all** →
+`unverified_no_observer` (FR-016a).
 
 **Rationale**: the mapping is total, and the two `unverified` reasons are kept apart because they
 send a reader to different places — one to the product, one to the tool's registration.
