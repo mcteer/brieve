@@ -37,12 +37,15 @@ being re-derived at the start of every spec.
 | 014 | Dispatched resume | ADR-0026 (**the durable half built** — `resume_run` gets its first `src/` caller), ADR-0048 (a resume is a new allocation with a new attested identity), ADR-0049 (grant expiry stops terminally), ADR-0047 (FR-020 re-scoping — 005's rows now asserted through a dispatch) | Ten dispatch-level rows in the durability lane. **Closed ROADMAP gap 0a**, and uncovered four latent defects — the missing grant store, an index with no writer, a sweeper that had never dispatched since 009, an observer that could not be called |
 | 015 | Audit egress for tamper-evidence | ADR-0055 (**built** — the rule was settled and nothing existed), ADR-0020 (unchanged — this adds a NEAR destination, not a far one), ADR-0035 (reconciliation runs through the governed read path and is itself audited) | Thirteen rows against a live second store under the collector administrator's credential. **Closed ROADMAP gap 0**, the most consequential gap on this page. Found a reconciler that compared the two copies' hash *claims* rather than their contents — an administrator who rewrote a payload and left `entry_hash` alone passed the comparison |
 | — | Federated sign-in and the surface that serves it | ADR-0033 (the API's first *working* deployment), ADR-0016 (claim mappings become readable, so the gate has an effect), ADR-0048 (the API gets its own attested identity), ADR-0057 (the phrasing it left owed, amended) | No new gate class. Three component suites and one conformance row on the real Vault path, plus a unit gate over the API assembly. **Not a numbered feature** — direct work off 016's parking, PRs #76–#80, recorded here because the ROADMAP's own rule is that deferrals and landings are written down where the next planner will see them |
+| 021 | Grounded run reports | ADR-0018 (**built**, four months after it was Accepted), ADR-0035 (a report is a governed, audited evidence read), ADR-0032 (attestation states its scope), ADR-0033 (the parity row grows by one operation), ADR-0055 (a report says whether its own basis verified) | **The last owed row: report fidelity.** `OWED` is empty for the first time since the constitution named five eval suites. Its Constitution Check **failed** on Principle IV — read-back at report time would have run under the API surface's identity — and the redesign put observation in the allocation, where an identity bounded by the run already exists. Four analysis passes, 11 → 6 → 6 → 3 findings; the fourth found `research.md` still describing the rejected architecture, which three passes over spec/plan/tasks could not see |
 | 017 | Deployment lane | ADR-0047 (**the inverse case it governs** — gates that PASSED while the guarantee was absent, because they asserted about the wrong object), ADR-0048 (a surface's identity is attested, and an assembly asking for the wrong role fails at login), ADR-0033, ADR-0025 | Twenty-one rows against the served surfaces, in a lane that stands them up. **Closed ROADMAP gap 0d.** A gate class no prior lane could run: every other asserts about a process the test constructs, this about the one a deployment constructs. Eight analysis passes before implementation, six of which found something in the surfaces' lifecycle; running it then found two more |
 
 ## In progress
 
-**021 grounded run reports** (`specs/021-grounded-run-reports`, branch
-`spec/021-grounded-run-reports`) — specified and clarified; plan not yet run.
+*Nothing in progress.*
+
+<details>
+<summary>021 grounded run reports — shipped 2026-08-01</summary>
 
 **The last owed Quality Gate row.** ADR-0018 has been Accepted since 2026-04-08 and implemented
 by nothing: `RunReport` appears nowhere in `src/`, and `core/evals/suites.py` carries report
@@ -62,6 +65,8 @@ payload would route around it. Forbidden by FR-008a before a line was written.
 
 **Known consequence for the parity row**: a requestable report is an operation, so ADR-0033's
 surface-parity row grows across API and MCP. Inherited work, not a discovery.
+
+</details>
 
 **016 task-scoped authority is PARKED** (`specs/016-task-scoped-authority`, branch
 `feat/016-task-scoped-authority`, 19 of 51 tasks). Specified, planned, and the substrate built
@@ -273,13 +278,22 @@ The constitution names these as blocking for adapters and providers. Under ADR-0
 when its feature lands, and until then must be **absent or an explicit skip citing its deferring
 ADR — never a passing stub.**
 
+> **Nothing is owed as of 021, 2026-08-01.** Every row below is in force or deferred by a named
+> ADR that has not yet been implemented (tool-call parity, ADR-0040). The last genuinely owed one
+> was report fidelity, which had been an explicit skip since 013 because `RunReport` did not
+> exist to score.
+>
+> **The heading stays.** ADR-0047 makes a row binding the moment its feature exists, so the next
+> feature to attach one needs somewhere to record it as deferred — and a table that has been
+> empty once is easier to fill correctly than a convention somebody has to re-derive.
+
 | Row | Attaches with | Status |
 | --- | --- | --- |
 | Governance-ordering, fail-closed, governed entry | 004 | ✅ In force |
 | Durability scenarios (ADR-0024/0026, as amended by ADR-0049) | 005, amended by 009 | ✅ In force — all seven, both providers, under an attested identity. **Now run by CI** on same-repo pull requests: 009's enclave lane holds the licensed Vault as a repository secret, which a fork-originating run cannot read. Fork pull requests still fall to the agent harness per `AGENTS.md`. The grant-expiry row asserts *stopping* rather than parking — inverted by ADR-0049, not removed |
 | Surface parity | 009 | ✅ **In force.** Amended, then satisfied. It read "across all four transports"; 009 has two, so claiming it would have asserted something untrue — the stub ADR-0047 forbids. 009 amends it to bind **incrementally**, across every pair of implemented transports, and satisfies it for the API/MCP pair. Better than claiming or deferring: the gate now binds at two, three, and four rather than catching nothing until the last transport lands, which is well after divergence would start. Compared against `specs/008-northbound-api/contracts/operations.snapshot.json` |
 | Tool-call parity under deferred disclosure | Deferred-disclosure feature | Deferred — ADR-0040 |
-| Eval gates (packs, models, policies) | 013 | ✅ **In force — four of five.** Must-deny, must-decline, citation accuracy, and estate-state run blocking against both shipped packs, scored on fixtures with a marked live lane behind a named runner. **Report fidelity stays owed** against ADR-0018: `RunReport` does not exist, and per ADR-0047 the row is an explicit skip citing its deferring record rather than a stub. The judge chain terminates at a human-labeled seed set (ADR-0052) |
+| Eval gates (packs, models, policies) | 013, completed by 021 | ✅ **In force — all five, and nothing is owed.** Must-deny, must-decline, citation accuracy, and estate-state run blocking against both shipped packs, scored on fixtures with a marked live lane behind a named runner. **Report fidelity closed by 021**: `RunReport` exists, and the suite scores a compiled report against labelled material events by **precision and recall** rather than a verb — omitting a denial and inventing a success are opposite failures, and one verdict would let either hide the other. A fidelity case labelling no events is refused at load, because precision and recall over an empty set pass for any report: the thin corpus ADR-0018 predicts, wearing the schema's clothes. Measured suites are excluded from the judge-span requirement — fidelity is never judged, so seeds for it would qualify a judge on verdicts it will never render. The judge chain terminates at a human-labeled seed set (ADR-0052) |
 | Registry isolation (control-plane write denials) | 018 | ✅ **In force.** Fourteen bounding paths get a real write attempt under a real run's authority, against the live control plane, and every refusal is observed. The mechanism always held — every policy grants read and list and nothing else — but nothing had ever *attempted* one, so the guarantee rested on someone having read the Terraform and concluded correctly. **Half the paths are named rather than derived**, because a run holds no read access to the grant that bounds it, to what decides which grants it receives, or to the trusted-key configuration, and no derivation can reach what it cannot see. A refusal counts only where the same authority can see the path — the control plane answers identically for *forbidden* and *absent*, so a row reading denial as proof would pass with one letter wrong in its path, forever. The break was demonstrated, not argued |
 | Accessibility (WCAG 2.2 AA, rendered interface) | 012 | ✅ **In force.** A gate class no prior lane could run: every other gate asserts something about a process, this one about a rendered page. Twenty-one rows: a vendored, pinned axe ruleset over every page state, **plus a keyboard-and-screen-reader harness** that walks the real tab order against visual position, reads the browser's own accessibility tree over CDP, measures focus indicators and target sizes, and re-renders under the reflow and text-spacing criteria. **No named runner is owed** — what was once a manual checklist runs in CI, and it found three defects on its first run. What stays outside a browser's reach (whether the words are good; any specific screen reader's behaviour) is recorded in the contract |
 
