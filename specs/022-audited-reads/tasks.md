@@ -37,10 +37,10 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
 
 ## Phase 1: Setup
 
-- [ ] T001 Read `src/surfaces/api/evidence.py` end to end before writing anything — it is the
+- [X] T001 Read `src/surfaces/api/evidence.py` end to end before writing anything — it is the
       pattern this feature adopts (research F1), and three of its decisions are load-bearing here:
       the stable per-tenant stream, the shape-not-rows payload, and the failing write.
-- [ ] T002 Confirm the pinned digest baseline is green before any schema change, by running
+- [X] T002 Confirm the pinned digest baseline is green before any schema change, by running
       `uv run pytest tests/unit/test_audit_chain.py -q`. A later failure must be attributable to
       this feature rather than inherited.
 
@@ -50,18 +50,18 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
 
 ### The sealed-core change, done deliberately
 
-- [ ] T003 (FR-013) Add `RECORD_READ = "record_read"` and `RECORD_READ_REFUSED = "record_read_refused"` to
+- [X] T003 (FR-013) Add `RECORD_READ = "record_read"` and `RECORD_READ_REFUSED = "record_read_refused"` to
       `AuditEventType` in `src/core/audit/schema.py`, each with a docstring saying why it is not
       `EVIDENCE_READ` — those members mean *someone read the audit plane*, and reusing them would
       hand an operator asking who read the trail a list of run listings.
-- [ ] T004 (FR-002a, FR-013) Add `THREAD_CREATED = "thread_created"` to `AuditEventType` in
+- [X] T004 (FR-002a, FR-013) Add `THREAD_CREATED = "thread_created"` to `AuditEventType` in
       `src/core/audit/schema.py`, with a docstring pointing at its existing counterpart: the trail
       can prove a thread was deleted and what was said in it, and cannot prove it began.
-- [ ] T004a (FR-002b, FR-013) Add `RUN_STOPPED = "run_stopped"` to `AuditEventType` in
+- [X] T004a (FR-002b, FR-013) Add `RUN_STOPPED = "run_stopped"` to `AuditEventType` in
       `src/core/audit/schema.py`. **Added by analysis pass 8**, which found `stop_run` writes no
       audit entry at all — the only attribution is `written_by="stop:{user}"` on a durability blob,
       which is not hash-chained and not reachable through the governed evidence path.
-- [ ] T005 [GATE:conformance] (FR-013, SC-005) Extend
+- [X] T005 [GATE:conformance] (FR-013, SC-005) Extend
       `tests/unit/test_audit_chain.py::test_widening_the_event_vocabulary_moves_no_existing_hash`
       with the four new members, asserting each `.value` individually rather than counting the
       enum — a count passes when one member is removed and another added, which is the change this
@@ -69,33 +69,33 @@ Single project: `src/`, `tests/` at repository root, per plan.md's structure dec
 
 ### The recording seam
 
-- [ ] T006 Create `src/surfaces/api/record_access.py` with `RECORD_ACCESS_STREAM_PREFIX =
+- [X] T006 Create `src/surfaces/api/record_access.py` with `RECORD_ACCESS_STREAM_PREFIX =
       "record-access"` and `record_stream_for(tenant_id)`, carrying the note that the stream is
       **stable per tenant, never per read** — a fresh correlation id each time makes every record a
       chain of one, linked to nothing and removable without trace.
-- [ ] T007 Add to `src/surfaces/api/record_access.py` a docstring stating why this is a second
+- [X] T007 Add to `src/surfaces/api/record_access.py` a docstring stating why this is a second
       stream rather than `evidence-access` (research F3): deliberate evidence reads are what an
       auditor opens first, and an editor's idle `list_runs` polling would bury them permanently
       because the trail is never sampled. Name the cost — "who looked at anything" now queries two
       streams.
-- [ ] T008 Define `RecordAccessUnavailable` in `src/surfaces/api/record_access.py` as a **core
+- [X] T008 Define `RecordAccessUnavailable` in `src/surfaces/api/record_access.py` as a **core
       error, not an `HTTPException`** — research F7 found the existing evidence path raises a
       FastAPI type from transport-independent code that the MCP transport does not catch, so its
       failure path has no parity. This type is what both transports map identically.
-- [ ] T009 (FR-004) Implement `record_access(...)` in `src/surfaces/api/record_access.py` writing one entry
+- [X] T009 (FR-004) Implement `record_access(...)` in `src/surfaces/api/record_access.py` writing one entry
       to `record_stream_for(subject.tenant_id)` with the payload fields data-model.md specifies:
       `subject_user_id`, `operation`, `target_correlation_id`, `target_id`, `disposition`,
       `result_count`. No other fields.
-- [ ] T010 [GATE:fail-closed] Make `record_access` raise `RecordAccessUnavailable` when the append
+- [X] T010 [GATE:fail-closed] Make `record_access` raise `RecordAccessUnavailable` when the append
       fails. **No best-effort path, no swallow, no log-and-continue.** An access that succeeded
       while its record did not is the state this feature exists to end.
 
 ### The disposition, where it cannot be skipped
 
-- [ ] T011 Add a required `audit_disposition` field to `McpOperation` in
+- [X] T011 Add a required `audit_disposition` field to `McpOperation` in
       `src/surfaces/mcp/operations.py` — no default. An operation added without deciding must be a
       construction error, not a missed edit to a list someone has to remember (FR-009).
-- [ ] T012 (FR-002, SC-001) Set the disposition on all seventeen operations in
+- [X] T012 (FR-002, SC-001) Set the disposition on all seventeen operations in
       `src/surfaces/mcp/operations.py`: `records` for the seven covered, `no_record` for
       `list_agent_definitions` and `get_agent_definition`, `records_elsewhere` for the rest —
       and for each `records_elsewhere`, name where, because a disposition that says "recorded
@@ -113,24 +113,24 @@ any reading of the rule.
 **Independent test**: start a run, read its result, query the trail by that run's correlation id,
 find a record naming the reader.
 
-- [ ] T013 [US1] (FR-003) Record in `get_run_result`'s shared implementation in
+- [X] T013 [US1] (FR-003) Record in `get_run_result`'s shared implementation in
       `src/surfaces/api/runs.py` — before returning the payload, never after. A read that answered
       first and recorded second produces the unrecorded answer on any failure between the two.
-- [ ] T014 [US1] [GATE:correlation] Populate `target_correlation_id` from the run's own
+- [X] T014 [US1] [GATE:correlation] Populate `target_correlation_id` from the run's own
       correlation id in `src/surfaces/api/runs.py`, so holding a run id is enough to find its
       readers through the existing governed query.
 - [ ] T015 [US1] [GATE:no-secret-leak] (FR-006, SC-006) Assert in `tests/component/test_record_access.py` that a
       credential-shaped value planted in a run's result payload reaches no audit entry. Plant it;
       do not reason about it.
-- [ ] T016 [P] [US1] Record in `list_runs_for` in `src/surfaces/api/runs.py`, with
+- [X] T016 [P] [US1] Record in `list_runs_for` in `src/surfaces/api/runs.py`, with
       `target_correlation_id` null (a listing has no single target) and `result_count` set.
-- [ ] T017 [US1] Record in the single-run read (`get_run`) in `src/surfaces/api/runs.py`.
-- [ ] T018 [P] [US1] Record in `list_threads_for` in `src/surfaces/api/threads.py`.
-- [ ] T019 [US1] Record in `thread_detail_for` in `src/surfaces/api/threads.py`.
-- [ ] T020 [US1] (FR-002a) Write `THREAD_CREATED` in `create_thread_for` in `src/surfaces/api/threads.py`,
+- [X] T017 [US1] Record in the single-run read (`get_run`) in `src/surfaces/api/runs.py`.
+- [X] T018 [P] [US1] Record in `list_threads_for` in `src/surfaces/api/threads.py`.
+- [X] T019 [US1] Record in `thread_detail_for` in `src/surfaces/api/threads.py`.
+- [X] T020 [US1] (FR-002a) Write `THREAD_CREATED` in `create_thread_for` in `src/surfaces/api/threads.py`,
       to **the thread's own stream** (`record.correlation_id`) — matching where `THREAD_DELETED`
       is written, not the reader stream. This is a creation, not a read.
-- [ ] T020a [US1] (FR-002b) Write `RUN_STOPPED` in `stop_run_for` in `src/surfaces/api/runs.py`,
+- [X] T020a [US1] (FR-002b) Write `RUN_STOPPED` in `stop_run_for` in `src/surfaces/api/runs.py`,
       to **the run's own stream** (`entry.correlation_id`), naming who stopped it — before the
       terminal `CheckpointBlob` is saved, so a stop that cannot be recorded does not happen.
       Symmetric with `THREAD_DELETED`; this is an act on the run, not a read of it, so FR-005a does
@@ -139,10 +139,10 @@ find a record naming the reader.
       `tests/component/test_record_access.py` that when the entry cannot be written the stop fails
       **and the run keeps running** — a run silently terminated with no record is strictly worse
       than a stop that refuses, because the caller believes it worked.
-- [ ] T021 [US1] Map `RecordAccessUnavailable` to a 503 in the API routes in
+- [X] T021 [US1] Map `RecordAccessUnavailable` to a 503 in the API routes in
       `src/surfaces/api/runs.py` and `src/surfaces/api/threads.py`, with a reason naming that the
       read was refused because it could not be recorded.
-- [ ] T022 [US1] Map `RecordAccessUnavailable` to the **same** 503 verdict in the six MCP handlers
+- [X] T022 [US1] Map `RecordAccessUnavailable` to the **same** 503 verdict in the six MCP handlers
       in `src/surfaces/mcp/transport.py`. This is what makes FR-008's parity hold on the failure
       path, which research F7 measured the existing evidence path does not have.
 - [ ] T023 [US1] Assert in `tests/component/test_record_access.py` that each of the six writes

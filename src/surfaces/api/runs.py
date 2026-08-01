@@ -21,6 +21,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.audit.schema import AuditEventType
+from core.audit.sink import AuditSink
 from core.correlation import validate_correlation_id
 from core.durability.types import CheckpointBlob, RunOutcome
 from core.errors import CorrelationRequiredError
@@ -28,7 +30,18 @@ from core.identity.types import AuthenticatedSubject
 from core.run import RunState
 from core.runs.index import DEFAULT_PAGE_SIZE, RunIndexError
 from core.runs.refusals import OperationRefused
-from surfaces.api.dependencies import DispatcherDep, DurabilityDep, RunIndexDep, SubjectDep
+from surfaces.api.dependencies import (
+    AuditDep,
+    DispatcherDep,
+    DurabilityDep,
+    RunIndexDep,
+    SubjectDep,
+)
+from surfaces.api.record_access import (
+    RecordAccessUnavailable,
+    record_access,
+    record_access_refused,
+)
 from surfaces.dispatch.types import RunHandle
 
 
@@ -76,6 +89,7 @@ def list_runs_for(
     *,
     subject: AuthenticatedSubject,
     index: Any,
+    audit: AuditSink,
     durability: Any = None,
     limit: int = DEFAULT_PAGE_SIZE,
     cursor: str | None = None,
@@ -92,6 +106,15 @@ def list_runs_for(
         subject_user_id=subject.subject_user_id,
         limit=limit,
         cursor=cursor,
+    )
+    # Recorded before the page is returned, never after: a listing that answered first and
+    # recorded second would produce an unrecorded answer on any failure between the two, and
+    # an empty page still discloses that the caller asked (FR-007b).
+    record_access(
+        audit=audit,
+        subject=subject,
+        operation="list_runs",
+        result_count=len(page.entries),
     )
     return RunListResponse(
         runs=[
@@ -168,6 +191,7 @@ def run_result_for(
     subject: AuthenticatedSubject,
     index: Any,
     durability: Any,
+    audit: AuditSink,
 ) -> RunResultResponse:
     """A run's output, without the caller reading a single audit entry.
 
@@ -177,12 +201,39 @@ def run_result_for(
     make their shape a compatibility surface, which is the argument against reconstructing
     results from the audit trail, one layer down.
     """
+    # THE SHARPEST CASE IN 022. 021 kept the run's result out of `RunReport` so a tenant-scoped
+    # report could not route around the subject-only restriction below — and this operation, the
+    # one that actually serves the result, recorded nothing about who read it. The artifact that
+    # could not leak it was audited; the one that served it was not.
     entry = index.get(run_id=run_id, tenant_id=subject.tenant_id)
     if entry is None:
+        record_access_refused(
+            audit=audit,
+            subject=subject,
+            operation="get_run_result",
+            reason_code="no_such_record",
+            target_id=run_id,
+        )
         raise OperationRefused("no such run", reason_code="no_such_record")
     if entry.subject_user_id != subject.subject_user_id:
+        record_access_refused(
+            audit=audit,
+            subject=subject,
+            operation="get_run_result",
+            reason_code="not_permitted",
+            target_correlation_id=entry.correlation_id,
+            target_id=run_id,
+        )
         raise OperationRefused("this run belongs to someone else", reason_code="not_permitted")
 
+    record_access(
+        audit=audit,
+        subject=subject,
+        operation="get_run_result",
+        target_correlation_id=entry.correlation_id,
+        target_id=run_id,
+        result_count=1,
+    )
     blob = durability.load(run_id) if durability is not None else None
     if blob is None or blob.outcome is None:
         return RunResultResponse(run_id=run_id, disposition="running")
@@ -237,6 +288,7 @@ def stop_run_for(
     subject: AuthenticatedSubject,
     index: Any,
     durability: Any,
+    audit: AuditSink,
 ) -> StopRunResponse:
     """Withdraw a run this subject started.
 
@@ -255,9 +307,24 @@ def stop_run_for(
     """
     entry = index.get(run_id=run_id, tenant_id=subject.tenant_id)
     if entry is None:
+        record_access_refused(
+            audit=audit,
+            subject=subject,
+            operation="stop_run",
+            reason_code="no_such_record",
+            target_id=run_id,
+        )
         raise OperationRefused("no such run", reason_code="no_such_record")
     if entry.subject_user_id != subject.subject_user_id:
         # Only the person who gave consent may withdraw it.
+        record_access_refused(
+            audit=audit,
+            subject=subject,
+            operation="stop_run",
+            reason_code="not_permitted",
+            target_correlation_id=entry.correlation_id,
+            target_id=run_id,
+        )
         raise OperationRefused("this run belongs to someone else", reason_code="not_permitted")
 
     blob = durability.load(run_id)
@@ -273,6 +340,31 @@ def stop_run_for(
         )
 
     reason = f"stopped_by:{subject.subject_user_id}"
+    # WRITTEN BEFORE THE TERMINAL SAVE, and to the RUN'S OWN stream rather than the reader
+    # stream — this is an act performed on the run, not a read of it, so it belongs where
+    # `THREAD_DELETED` belongs. A stop that cannot be recorded does not happen: silently
+    # terminating a run with no record is strictly worse than refusing, because the caller
+    # believes it worked.
+    #
+    # Before 022 this wrote nothing at all. The only attribution was `written_by` on the blob
+    # below — not hash-chained, and not reachable through the governed evidence path. A person
+    # withdrawing consent and ending a run left nothing a reviewer could find.
+    try:
+        audit.append_event(
+            correlation_id=entry.correlation_id,
+            tenant_id=subject.tenant_id,
+            event_type=AuditEventType.RUN_STOPPED,
+            payload={
+                "subject_user_id": subject.subject_user_id,
+                "run_id": run_id,
+                "stop_reason": reason,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 — an unrecordable stop must not stop the run
+        raise RecordAccessUnavailable(
+            "the stop could not be recorded; the run is still running"
+        ) from exc
+
     durability.save(
         CheckpointBlob(
             blob_id=run_id,
@@ -287,6 +379,43 @@ def stop_run_for(
     return StopRunResponse(run_id=run_id, state=RunState.STOPPED, stop_reason=reason)
 
 
+def run_state_for(
+    *,
+    run_id: str,
+    subject: AuthenticatedSubject,
+    dispatcher: Any,
+    audit: AuditSink,
+) -> RunHandle | None:
+    """A run's current state, recorded as read.
+
+    **Extracted by 022 so there is one place to record.** Both transports previously called
+    `dispatcher.state_of` directly, which meant recording would have had to be written twice
+    and kept in agreement by inspection — the property ADR-0033 exists to make structural
+    rather than careful.
+
+    Authorization is unchanged (FR-015): this reads the dispatcher exactly as both callers did.
+    """
+    handle = dispatcher.state_of(run_id)
+    if handle is None:
+        record_access_refused(
+            audit=audit,
+            subject=subject,
+            operation="get_run",
+            reason_code="no_such_record",
+            target_id=run_id,
+        )
+        return None
+    record_access(
+        audit=audit,
+        subject=subject,
+        operation="get_run",
+        target_correlation_id=getattr(handle, "correlation_id", None),
+        target_id=run_id,
+        result_count=1,
+    )
+    return handle
+
+
 def build_router() -> APIRouter:
     router = APIRouter(tags=["runs"])
 
@@ -296,10 +425,21 @@ def build_router() -> APIRouter:
         subject: SubjectDep,
         index: RunIndexDep,
         durability: DurabilityDep,
+        audit: AuditDep,
     ) -> StopRunResponse:
         """End a run you started."""
         try:
-            return stop_run_for(run_id=run_id, subject=subject, index=index, durability=durability)
+            return stop_run_for(
+                run_id=run_id,
+                subject=subject,
+                index=index,
+                durability=durability,
+                audit=audit,
+            )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         except OperationRefused as refused:
             code = (
                 status.HTTP_403_FORBIDDEN
@@ -314,12 +454,21 @@ def build_router() -> APIRouter:
         subject: SubjectDep,
         index: RunIndexDep,
         durability: DurabilityDep,
+        audit: AuditDep,
     ) -> RunResultResponse:
         """What this run produced."""
         try:
             return run_result_for(
-                run_id=run_id, subject=subject, index=index, durability=durability
+                run_id=run_id,
+                subject=subject,
+                index=index,
+                durability=durability,
+                audit=audit,
             )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         except OperationRefused as refused:
             code = (
                 status.HTTP_403_FORBIDDEN
@@ -333,6 +482,7 @@ def build_router() -> APIRouter:
         subject: SubjectDep,
         index: RunIndexDep,
         durability: DurabilityDep,
+        audit: AuditDep,
         limit: int = DEFAULT_PAGE_SIZE,
         cursor: str | None = None,
     ) -> RunListResponse:
@@ -344,8 +494,17 @@ def build_router() -> APIRouter:
         """
         try:
             return list_runs_for(
-                subject=subject, index=index, durability=durability, limit=limit, cursor=cursor
+                subject=subject,
+                index=index,
+                durability=durability,
+                audit=audit,
+                limit=limit,
+                cursor=cursor,
             )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         except RunIndexError as exc:
             # A failed read is not an empty list. Telling a person they have started
             # nothing, when the truth is that we could not look, is the one answer here
@@ -392,9 +551,17 @@ def build_router() -> APIRouter:
         run_id: str,
         subject: SubjectDep,
         dispatcher: DispatcherDep,
+        audit: AuditDep,
     ) -> RunHandle:
         """Return the run's current state through its handle."""
-        handle = dispatcher.state_of(run_id)
+        try:
+            handle = run_state_for(
+                run_id=run_id, subject=subject, dispatcher=dispatcher, audit=audit
+            )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         if handle is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "no such run")
         return handle

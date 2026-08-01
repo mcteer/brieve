@@ -20,7 +20,7 @@ divergent when they are not.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 #: MCP tool name → the API operation it corresponds to.
 #:
@@ -56,6 +56,30 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
 }
 
 
+#: Whether an operation records a trail entry, and under which rule.
+#:
+#: **THE RULE: an operation that touches a run or a thread records. One that touches neither
+#: does not.** Runs and threads are records of *activity* — what a person asked for, what a
+#: model chose, what a tool did. Agent definitions are *configuration*: reading one discloses
+#: how the platform is set up, not what anyone did with it. A new operation is classified by
+#: which of those two it touches.
+#:
+#: * ``records`` — writes its own entry. Reads go to ``record-access:{tenant}``; acts on a run
+#:   or thread go to that run's or thread's own stream.
+#: * ``records_elsewhere`` — the act is recorded, but by the machinery it starts rather than by
+#:   the operation. **Must name where.** A disposition saying "recorded somewhere" without
+#:   saying where is indistinguishable from a wrong one — and that is not hypothetical: an
+#:   earlier draft of 022 classified ``stop_run`` this way, and applying this rule is what
+#:   revealed there was no where. It wrote nothing at all.
+#: * ``no_record`` — touches neither a run nor a thread. Deliberate, and pinned by a row, so
+#:   that widening it later is a decision someone makes rather than a drift nobody notices.
+RECORDS: Final[str] = "records"
+RECORDS_ELSEWHERE: Final[str] = "records_elsewhere"
+NO_RECORD: Final[str] = "no_record"
+
+AUDIT_DISPOSITIONS: Final[frozenset[str]] = frozenset({RECORDS, RECORDS_ELSEWHERE, NO_RECORD})
+
+
 @dataclass(frozen=True)
 class McpOperation:
     """One operation this surface exposes."""
@@ -65,6 +89,26 @@ class McpOperation:
     path: str
     description: str
     input_schema: dict[str, Any]
+    #: Whether this operation records. **Required, with no default** — an operation added
+    #: without deciding must be a construction error rather than a missed edit to a list
+    #: someone has to remember. Eight operations shipped unrecorded across thirteen additions
+    #: under a guard that required a human to notice; this one cannot be skipped.
+    audit_disposition: str
+    #: Where the record lands, when the disposition is not ``records``. Empty otherwise.
+    audit_note: str = ""
+
+    def __post_init__(self) -> None:
+        if self.audit_disposition not in AUDIT_DISPOSITIONS:
+            raise ValueError(
+                f"{self.tool_name}: unknown audit disposition "
+                f"{self.audit_disposition!r}; expected one of {sorted(AUDIT_DISPOSITIONS)}"
+            )
+        if self.audit_disposition == RECORDS_ELSEWHERE and not self.audit_note.strip():
+            raise ValueError(
+                f"{self.tool_name}: disposition {RECORDS_ELSEWHERE!r} must name where the act "
+                "is recorded — a disposition that says 'recorded somewhere' without saying "
+                "where is indistinguishable from a wrong one"
+            )
 
 
 def operations() -> list[McpOperation]:
@@ -72,6 +116,8 @@ def operations() -> list[McpOperation]:
     return [
         McpOperation(
             tool_name="start_run",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note="the run itself writes `authority_issued` and `run_start`",
             method="POST",
             path="/runs",
             description=(
@@ -91,6 +137,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="get_run",
+            audit_disposition=RECORDS,
             method="GET",
             path="/runs/{run_id}",
             description="Return a run's current state through its handle.",
@@ -103,6 +150,8 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="read_evidence",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note="`evidence.py` writes `evidence_read` / `evidence_read_refused`",
             method="GET",
             path="/evidence",
             description=(
@@ -123,6 +172,8 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="reconcile_evidence",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note="`emit_reconciled` writes `audit_reconciled`",
             method="GET",
             path="/evidence/reconciliation",
             description=(
@@ -142,6 +193,8 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="request_mapping_change",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note="the mapping path writes its own decision entry",
             method="POST",
             path="/claim-mappings",
             description=(
@@ -160,6 +213,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="list_runs",
+            audit_disposition=RECORDS,
             method="GET",
             path="/runs",
             description=(
@@ -179,6 +233,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="get_run_result",
+            audit_disposition=RECORDS,
             method="GET",
             path="/runs/{run_id}/result",
             description=(
@@ -195,6 +250,8 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="get_run_report",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note="compiling a report writes `evidence_read` through the governed path (021)",
             method="GET",
             path="/runs/{run_id}/report",
             description=(
@@ -212,6 +269,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="stop_run",
+            audit_disposition=RECORDS,
             method="POST",
             path="/runs/{run_id}/stop",
             description=(
@@ -228,6 +286,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="list_agent_definitions",
+            audit_disposition=NO_RECORD,
             method="GET",
             path="/agent-definitions",
             description=(
@@ -238,6 +297,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="get_agent_definition",
+            audit_disposition=NO_RECORD,
             method="GET",
             path="/agent-definitions/{agent_definition_id}",
             description="One agent definition's public view.",
@@ -250,6 +310,8 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="collect_mapping_change",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note="the mapping path writes its own collection entry",
             method="GET",
             path="/claim-mappings/{accessor}",
             description=(
@@ -270,6 +332,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="create_thread",
+            audit_disposition=RECORDS,
             method="POST",
             path="/threads",
             description="Start a conversation. Returns its identifier.",
@@ -283,6 +346,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="list_threads",
+            audit_disposition=RECORDS,
             method="GET",
             path="/threads",
             description="The conversations you have started, newest first.",
@@ -297,6 +361,7 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="get_thread",
+            audit_disposition=RECORDS,
             method="GET",
             path="/threads/{thread_id}",
             description="One conversation, with its turns in order.",
@@ -309,6 +374,8 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="delete_thread",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note="`threads.py` writes `thread_deleted`",
             method="DELETE",
             path="/threads/{thread_id}",
             description=(
@@ -323,6 +390,8 @@ def operations() -> list[McpOperation]:
         ),
         McpOperation(
             tool_name="send_turn",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note="`threads.py` writes `turn_recorded` / `turn_refused`",
             method="POST",
             path="/threads/{thread_id}/turns",
             description=(

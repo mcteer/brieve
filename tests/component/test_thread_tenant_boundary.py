@@ -72,7 +72,12 @@ def test_every_operation_answers_another_tenant_identically_to_absent() -> None:
 
     reasons: list[str] = []
     for call in (
-        lambda: thread_detail_for(subject=intruder, store=store, thread_id=theirs.thread_id),
+        lambda: thread_detail_for(
+            subject=intruder,
+            store=store,
+            thread_id=theirs.thread_id,
+            audit_sink=InMemoryAuditSink(),
+        ),
         lambda: delete_thread_for(
             subject=intruder, store=store, audit_sink=sink, thread_id=theirs.thread_id
         ),
@@ -94,7 +99,9 @@ def test_every_operation_answers_another_tenant_identically_to_absent() -> None:
     # A genuinely absent thread must produce the same answers.
     absent: list[str] = []
     for call in (
-        lambda: thread_detail_for(subject=intruder, store=store, thread_id="th-nope"),
+        lambda: thread_detail_for(
+            subject=intruder, store=store, thread_id="th-nope", audit_sink=InMemoryAuditSink()
+        ),
         lambda: delete_thread_for(
             subject=intruder, store=store, audit_sink=sink, thread_id="th-nope"
         ),
@@ -122,10 +129,12 @@ def test_a_listing_never_shows_another_tenants_threads() -> None:
     _thread(store)
     _thread(store, tenant=OTHER)
 
-    page = list_threads_for(subject=_subject(tenant=OTHER), store=store)
+    page = list_threads_for(
+        subject=_subject(tenant=OTHER), store=store, audit_sink=InMemoryAuditSink()
+    )
 
     assert len(page.threads) == 0 or all(t.thread_id for t in page.threads)
-    mine = list_threads_for(subject=_subject(), store=store)
+    mine = list_threads_for(subject=_subject(), store=store, audit_sink=InMemoryAuditSink())
     assert len(mine.threads) == 1
 
 

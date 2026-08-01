@@ -20,6 +20,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.audit.schema import AuditEventType
+from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
 from core.runs.refusals import OperationRefused
 from core.threads.records import (
@@ -41,6 +43,11 @@ from surfaces.api.dependencies import (
     DurabilityDep,
     SubjectDep,
     ThreadStoreDep,
+)
+from surfaces.api.record_access import (
+    RecordAccessUnavailable,
+    record_access,
+    record_access_refused,
 )
 
 
@@ -149,7 +156,9 @@ def _refuse(refused: OperationRefused) -> HTTPException:
     return HTTPException(code, str(refused))
 
 
-def create_thread_for(*, subject: AuthenticatedSubject, store: Any) -> ThreadRecord:
+def create_thread_for(
+    *, subject: AuthenticatedSubject, store: Any, audit_sink: AuditSink
+) -> ThreadRecord:
     """Create an empty thread, counting the creation against the rate window.
 
     Transport-independent so MCP reaches this rather than reimplementing it — and so the
@@ -180,22 +189,61 @@ def create_thread_for(*, subject: AuthenticatedSubject, store: Any) -> ThreadRec
         created_at=datetime.now(UTC),
     )
     store.create_thread(record)
+    # THREAD_CREATED, the counterpart `THREAD_DELETED` had been missing since 012. Until 022 the
+    # trail could show a thread ended and everything said in it, and could not show it began —
+    # a lifecycle recorded only at its end is a narrative with no first page. On the thread's
+    # own stream, where its counterpart is written.
+    try:
+        audit_sink.append_event(
+            correlation_id=record.correlation_id,
+            tenant_id=subject.tenant_id,
+            event_type=AuditEventType.THREAD_CREATED,
+            payload={
+                "thread_id": record.thread_id,
+                "subject_user_id": subject.subject_user_id,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 — an unrecordable creation must not stand
+        raise RecordAccessUnavailable(
+            "the thread creation could not be recorded; it is refused"
+        ) from exc
     return record
 
 
 def thread_detail_for(
-    *, subject: AuthenticatedSubject, store: Any, thread_id: str
+    *, subject: AuthenticatedSubject, store: Any, thread_id: str, audit_sink: AuditSink
 ) -> ThreadDetailResponse:
     """One thread with its turns, or refuse. Tenant collapse lives in the store."""
     record = store.get_thread(thread_id=thread_id, tenant_id=subject.tenant_id)
     if record is None:
+        record_access_refused(
+            audit=audit_sink,
+            subject=subject,
+            operation="get_thread",
+            reason_code="no_such_record",
+            target_id=thread_id,
+        )
         raise OperationRefused("no such thread", reason_code="no_such_record")
     if record.subject_user_id != subject.subject_user_id:
+        record_access_refused(
+            audit=audit_sink,
+            subject=subject,
+            operation="get_thread",
+            reason_code="not_permitted",
+            target_correlation_id=record.correlation_id,
+            target_id=thread_id,
+        )
         raise OperationRefused("this thread belongs to someone else", reason_code="not_permitted")
-    return ThreadDetailResponse(
-        thread=_thread_view(record),
-        turns=[_turn_view(t) for t in store.turns_of(thread_id=thread_id)],
+    turns = [_turn_view(t) for t in store.turns_of(thread_id=thread_id)]
+    record_access(
+        audit=audit_sink,
+        subject=subject,
+        operation="get_thread",
+        target_correlation_id=record.correlation_id,
+        target_id=thread_id,
+        result_count=len(turns),
     )
+    return ThreadDetailResponse(thread=_thread_view(record), turns=turns)
 
 
 def delete_thread_for(
@@ -234,6 +282,7 @@ def list_threads_for(
     *,
     subject: AuthenticatedSubject,
     store: Any,
+    audit_sink: AuditSink,
     limit: int = DEFAULT_PAGE_SIZE,
     cursor: str | None = None,
 ) -> ThreadListResponse:
@@ -242,6 +291,12 @@ def list_threads_for(
         subject_user_id=subject.subject_user_id,
         limit=limit,
         cursor=cursor,
+    )
+    record_access(
+        audit=audit_sink,
+        subject=subject,
+        operation="list_threads",
+        result_count=len(page.threads),
     )
     return ThreadListResponse(threads=[_thread_view(t) for t in page.threads], cursor=page.cursor)
 
@@ -312,10 +367,18 @@ def build_router() -> APIRouter:
     router = APIRouter(tags=["threads"])
 
     @router.post("/threads", response_model=ThreadView, status_code=status.HTTP_201_CREATED)
-    def create_thread(subject: SubjectDep, store: ThreadStoreDep) -> ThreadView:
+    def create_thread(
+        subject: SubjectDep, store: ThreadStoreDep, audit_sink: AuditDep
+    ) -> ThreadView:
         """Start a conversation."""
         try:
-            return _thread_view(create_thread_for(subject=subject, store=store))
+            return _thread_view(
+                create_thread_for(subject=subject, store=store, audit_sink=audit_sink)
+            )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         except OperationRefused as refused:
             raise _refuse(refused) from refused
         except ThreadStoreError as unavailable:
@@ -327,12 +390,19 @@ def build_router() -> APIRouter:
     def list_threads(
         subject: SubjectDep,
         store: ThreadStoreDep,
+        audit_sink: AuditDep,
         limit: int = DEFAULT_PAGE_SIZE,
         cursor: str | None = None,
     ) -> ThreadListResponse:
         """The conversations this person has started."""
         try:
-            return list_threads_for(subject=subject, store=store, limit=limit, cursor=cursor)
+            return list_threads_for(
+                subject=subject, store=store, audit_sink=audit_sink, limit=limit, cursor=cursor
+            )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         except ThreadStoreError as unavailable:
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)
@@ -340,11 +410,17 @@ def build_router() -> APIRouter:
 
     @router.get("/threads/{thread_id}", response_model=ThreadDetailResponse)
     def get_thread(
-        thread_id: str, subject: SubjectDep, store: ThreadStoreDep
+        thread_id: str, subject: SubjectDep, store: ThreadStoreDep, audit_sink: AuditDep
     ) -> ThreadDetailResponse:
         """One conversation, with its turns in order."""
         try:
-            return thread_detail_for(subject=subject, store=store, thread_id=thread_id)
+            return thread_detail_for(
+                subject=subject, store=store, thread_id=thread_id, audit_sink=audit_sink
+            )
+        except RecordAccessUnavailable as unrecordable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unrecordable)
+            ) from unrecordable
         except OperationRefused as refused:
             raise _refuse(refused) from refused
         except ThreadStoreError as unavailable:

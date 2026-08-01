@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
+from core.audit.sink import InMemoryAuditSink
 from core.durability.checkpoint import stop_requested
 from core.durability.memory import InMemoryDurabilityProvider
 from core.durability.types import CheckpointBlob, RunOutcome
@@ -89,7 +90,13 @@ def test_a_healthy_run_is_not_asked_to_stop() -> None:
 def test_a_stopped_run_is_noticed_with_its_reason() -> None:
     durability = InMemoryDurabilityProvider()
     _running(durability)
-    stop_run_for(run_id="run-1", subject=_subject(), index=_index(), durability=durability)
+    stop_run_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=durability,
+        audit=InMemoryAuditSink(),
+    )
 
     assert stop_requested(_Run(durability)) == "stopped_by:alice"
 

@@ -165,3 +165,7 @@ def test_widening_the_event_vocabulary_moves_no_existing_hash() -> None:
     # and another added, which is the change this row would most want to notice.
     assert AuditEventType.TOOL_CHOSEN.value == "tool_chosen"  # 020
     assert AuditEventType.EFFECT_OBSERVED.value == "effect_observed"  # 021
+    assert AuditEventType.RECORD_READ.value == "record_read"  # 022
+    assert AuditEventType.RECORD_READ_REFUSED.value == "record_read_refused"  # 022
+    assert AuditEventType.THREAD_CREATED.value == "thread_created"  # 022
+    assert AuditEventType.RUN_STOPPED.value == "run_stopped"  # 022

@@ -232,6 +232,77 @@ class AuditEventType(StrEnum):
     #: what it reports.
     EFFECT_OBSERVED = "effect_observed"
 
+    #: Someone was shown a record about a run or a thread (022). Payload: subject_user_id,
+    #: operation, target_correlation_id, target_id, disposition, result_count.
+    #:
+    #: **A SEALED-CORE ADDITION** (Principle V), and the third feature running to make one. The
+    #: additive-only argument is the same one 020 and 021 made, and it is checked rather than
+    #: repeated: `test_widening_the_event_vocabulary_moves_no_existing_hash` pins one entry's
+    #: digest as a literal, because the hash covers an entry's *own* ``event_type`` value and
+    #: not the set of possible values.
+    #:
+    #: **Why this is not `EVIDENCE_READ`.** That member means someone read the *audit plane*.
+    #: Reusing it would hand an operator asking who read the trail a list of run listings, and
+    #: would silently change what entries already written appear to mean — which is not an
+    #: additive change however it is spelled.
+    #:
+    #: **Why it exists.** ADR-0035 made reading the evidence itself evidence, and stopped at
+    #: the audit plane. Nine of seventeen operations returned records about runs and threads
+    #: and wrote nothing, while both surfaces told every client that every operation was
+    #: recorded. The sharpest case: 021 kept the run's result out of `RunReport` so a
+    #: tenant-scoped report could not route around `get_run_result`'s subject-only
+    #: restriction — and `get_run_result` itself recorded nothing about who read it. The
+    #: artifact that could not leak the result was audited; the one that served it was not.
+    #:
+    #: **Never the content read** — the payload carries the shape of the access and the
+    #: identifiers, never rows. A record that quoted what it described would copy the thing it
+    #: points at into an append-only trail, and would inherit neither the trail's
+    #: no-egress-by-default posture nor `get_run_result`'s subject restriction.
+    #:
+    #: **Written to `record-access:{tenant}`, never to the chain being read.** Appending to a
+    #: run's own chain would mean reading a run alters it — and 021's `RunReport` compiles
+    #: from that chain, so a report of a run would carry claims about who read the run,
+    #: including reads of the report, growing every time anyone looked. The evidence path
+    #: already refused this shape for its own reason; here it is load-bearing twice.
+    RECORD_READ = "record_read"
+
+    #: A read of a run or thread record that was refused (022). Same payload, with
+    #: ``disposition`` carrying the reason code.
+    #:
+    #: **A separate member rather than a flag**, mirroring `EVIDENCE_READ_REFUSED`. A boundary
+    #: a caller can probe without trace is the thing this prevents, and the trail keeps the
+    #: distinction the caller cannot see: ``no_such_record`` and ``outside_tenant`` are one
+    #: answer to the caller and two different events here — a run of the second is someone
+    #: probing, and collapsing them would show a user who mistypes a lot.
+    RECORD_READ_REFUSED = "record_read_refused"
+
+    #: A thread was created (022). Payload: subject_user_id, thread_id.
+    #:
+    #: **The missing counterpart to `THREAD_DELETED`**, which has existed since 012. The trail
+    #: could show a thread ended and everything said in it, and could not show it began — a
+    #: lifecycle recorded only at its end is a narrative with no first page. Written to the
+    #: thread's own stream, where its counterpart is written; this is an act on the thread
+    #: rather than a read of it.
+    THREAD_CREATED = "thread_created"
+
+    #: A person withdrew consent and ended a run (022). Payload: subject_user_id, run_id,
+    #: stop_reason.
+    #:
+    #: **Found by analysis, after this feature's own spec asserted it already existed.** The
+    #: spec said `stop_run` was covered alongside `start_run` and called the pair *measured*;
+    #: only `start_run` had been. `stop_run_for` wrote a `CheckpointBlob` carrying
+    #: ``written_by="stop:{user}"`` and returned — no audit entry at all, no ``STOP`` member in
+    #: this enum. The only attribution lived in a durability field: not hash-chained, and not
+    #: reachable through the governed evidence path.
+    #:
+    #: **The only write among 022's seven covered operations, and the most consequential.** The
+    #: other six are reads, where the gap is no trace of who looked. This one is a run being
+    #: terminated by a named person — the operation whose own implementation says *"only the
+    #: person who gave consent may withdraw it"* — leaving nothing a reviewer could find.
+    #:
+    #: On the run's own stream, for the same reason `THREAD_DELETED` is on the thread's.
+    RUN_STOPPED = "run_stopped"
+
 
 class AuditEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")

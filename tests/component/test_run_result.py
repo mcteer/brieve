@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 
+from core.audit.sink import InMemoryAuditSink
 from core.identity.types import AuthenticatedSubject, SubjectKind
 from core.runs.index import InMemoryRunIndex, RunIndexEntry
 from core.runs.refusals import OperationRefused
@@ -85,6 +86,7 @@ def test_a_finished_run_returns_its_result() -> None:
         subject=_subject(),
         index=_index(),
         durability=Durability(_blob(state="completed", payload={RESULT_KEY: {"plan": "ok"}})),
+        audit=InMemoryAuditSink(),
     )
 
     assert response.disposition == "complete"
@@ -94,7 +96,11 @@ def test_a_finished_run_returns_its_result() -> None:
 def test_a_running_run_says_so_rather_than_returning_nothing() -> None:
     """Distinguishable from a run that finished empty — one is worth waiting for."""
     response = run_result_for(
-        run_id="run-1", subject=_subject(), index=_index(), durability=Durability(_blob(state=None))
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=Durability(_blob(state=None)),
+        audit=InMemoryAuditSink(),
     )
 
     assert response.disposition == "running"
@@ -112,6 +118,7 @@ def test_a_stopped_run_returns_its_reason_not_an_empty_result() -> None:
         subject=_subject(),
         index=_index(),
         durability=Durability(_blob(state="stopped", stop_reason="stopped_by:alice")),
+        audit=InMemoryAuditSink(),
     )
 
     assert response.disposition == "ended_without_result"
@@ -125,6 +132,7 @@ def test_another_tenant_is_answered_as_absent() -> None:
             subject=_subject(tenant="tenant-a"),
             index=_index(tenant="tenant-b"),
             durability=Durability(),
+            audit=InMemoryAuditSink(),
         )
 
     assert caught.value.reason_code == "no_such_record"
@@ -138,6 +146,7 @@ def test_someone_elses_run_in_the_same_tenant_is_refused_with_a_reason() -> None
             subject=_subject(user="alice"),
             index=_index(subject="bob"),
             durability=Durability(),
+            audit=InMemoryAuditSink(),
         )
 
     assert caught.value.reason_code == "not_permitted"
@@ -157,6 +166,7 @@ def test_an_over_bound_result_refuses_rather_than_truncating() -> None:
             subject=_subject(),
             index=_index(),
             durability=Durability(_blob(state="completed", payload={RESULT_KEY: enormous})),
+            audit=InMemoryAuditSink(),
         )
 
     assert "too large" in str(caught.value)
@@ -183,6 +193,7 @@ def test_break_fixture_the_raw_checkpoint_payload_is_never_returned() -> None:
                 },
             )
         ),
+        audit=InMemoryAuditSink(),
     )
 
     assert response.result == {"plan": "ok"}

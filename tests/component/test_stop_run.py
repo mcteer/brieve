@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 
+from core.audit.sink import InMemoryAuditSink
 from core.durability.memory import InMemoryDurabilityProvider
 from core.durability.types import CheckpointBlob, RunOutcome
 from core.identity.types import AuthenticatedSubject, SubjectKind
@@ -73,7 +74,11 @@ def test_a_stop_reaches_a_terminal_state() -> None:
     _running(durability)
 
     response = stop_run_for(
-        run_id="run-1", subject=_subject(), index=_index(), durability=durability
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=durability,
+        audit=InMemoryAuditSink(),
     )
 
     assert response.state is RunState.STOPPED
@@ -89,7 +94,13 @@ def test_the_stop_is_attributable_and_distinguishable_from_a_bound() -> None:
     """
     durability = InMemoryDurabilityProvider()
     _running(durability)
-    stop_run_for(run_id="run-1", subject=_subject(), index=_index(), durability=durability)
+    stop_run_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=durability,
+        audit=InMemoryAuditSink(),
+    )
 
     blob = durability.load("run-1")
     assert blob is not None and blob.outcome is not None
@@ -106,7 +117,13 @@ def test_a_routine_checkpoint_cannot_resurrect_a_stopped_run() -> None:
     """
     durability = InMemoryDurabilityProvider()
     _running(durability)
-    stop_run_for(run_id="run-1", subject=_subject(), index=_index(), durability=durability)
+    stop_run_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=durability,
+        audit=InMemoryAuditSink(),
+    )
 
     # The allocation, still unaware, checkpoints its next step.
     durability.save(
@@ -137,7 +154,13 @@ def test_the_first_terminal_write_wins() -> None:
     """
     durability = InMemoryDurabilityProvider()
     _running(durability)
-    stop_run_for(run_id="run-1", subject=_subject(), index=_index(), durability=durability)
+    stop_run_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=durability,
+        audit=InMemoryAuditSink(),
+    )
 
     # The allocation finishes its step and records completion, unaware of the stop.
     durability.save(
@@ -168,6 +191,7 @@ def test_only_the_starter_may_stop() -> None:
             subject=_subject(user="bob"),
             index=_index(subject="alice"),
             durability=durability,
+            audit=InMemoryAuditSink(),
         )
 
     assert caught.value.reason_code == "not_permitted"
@@ -182,6 +206,7 @@ def test_another_tenant_is_answered_as_absent() -> None:
             subject=_subject(tenant="tenant-a"),
             index=_index(tenant="tenant-b"),
             durability=durability,
+            audit=InMemoryAuditSink(),
         )
 
     assert caught.value.reason_code == "no_such_record"
@@ -191,9 +216,21 @@ def test_stopping_twice_reports_the_existing_state() -> None:
     """Asking twice is not an error (FR-011)."""
     durability = InMemoryDurabilityProvider()
     _running(durability)
-    stop_run_for(run_id="run-1", subject=_subject(), index=_index(), durability=durability)
+    stop_run_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=durability,
+        audit=InMemoryAuditSink(),
+    )
 
-    second = stop_run_for(run_id="run-1", subject=_subject(), index=_index(), durability=durability)
+    second = stop_run_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=durability,
+        audit=InMemoryAuditSink(),
+    )
 
     assert second.already_terminal
     assert second.state is RunState.STOPPED
@@ -211,6 +248,12 @@ def test_a_stopped_run_is_invisible_to_the_sweeper() -> None:
 
     durability = InMemoryDurabilityProvider()
     _running(durability)
-    stop_run_for(run_id="run-1", subject=_subject(), index=_index(), durability=durability)
+    stop_run_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=durability,
+        audit=InMemoryAuditSink(),
+    )
 
     assert not _is_suspended(durability.load("run-1"))
