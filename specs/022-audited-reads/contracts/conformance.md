@@ -43,6 +43,12 @@ the second group is executed by **no automated check**, and the constitution is 
 | The enclave rows | `make conformance` in full, on a live enclave, before merge | **Dan McTeer** | **Owed** |
 | SC-002 served demonstration | Read a run's result through a served surface; find the reader in the trail | **Dan McTeer** | **Owed** |
 | Principle V review | Security-maintainer review of three additive `AuditEventType` members | **Dan McTeer** | **Owed — requested on the PR** |
+| Principle X amendment | ADR-0035 amended in **this** change, not a follow-up (FR-012, T037–T039) | **Dan McTeer** | **Owed** |
+
+*The last row is not a conformance row and no check executes it — which is exactly why it belongs
+here. `plan.md` names it as a gate obligation and `quickstart.md` points at this table for it;
+before analysis pass 6 it was named in both of those and in neither of the places that would stop a
+merge.*
 
 **None of the three is discharged by this plan.** They are recorded here so that merging without
 them is visibly a gate regression rather than an oversight.
