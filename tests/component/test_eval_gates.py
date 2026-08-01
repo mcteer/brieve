@@ -24,7 +24,7 @@ from core.evals.suites import (
     parse_cases,
     suite_listing,
 )
-from core.reports import compile_report
+from core.reports import RunReport, compile_report
 from tests.harness import recorded_runs
 
 PACKS = Path(__file__).resolve().parents[2] / "packs"
@@ -33,7 +33,7 @@ PACKS = Path(__file__).resolve().parents[2] / "packs"
 _OBSERVERS = frozenset({"vault_write"})
 
 
-def _compile_for(recorded_run: str):
+def _compile_for(recorded_run: str) -> RunReport:
     """Compile the report a fidelity case is about.
 
     A fidelity case's `prompt` names a recorded run rather than carrying one, so the corpus stays

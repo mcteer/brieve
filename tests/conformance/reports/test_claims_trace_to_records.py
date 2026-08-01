@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -27,12 +28,14 @@ ROOT = Path(__file__).resolve().parents[3]
 OBSERVERS = frozenset({"vault_write"})
 
 
-def _report(fixture, *, terminal: bool = True, observers=OBSERVERS) -> RunReport:
+def _report(
+    fixture: Any, *, terminal: bool = True, observers: frozenset[str] = OBSERVERS
+) -> RunReport:
     return compile_report(fixture(), run_id="run-fixture", observers=observers, terminal=terminal)
 
 
 @pytest.mark.parametrize("fixture", fixtures.ALL_FIXTURES, ids=fixtures.recorded_run_ids())
-def test_every_claim_traces_to_a_record(fixture) -> None:
+def test_every_claim_traces_to_a_record(fixture: Any) -> None:
     """FR-001, SC-001 — no claim without evidence behind it.
 
     Every fixture, not one: a compiler that populated evidence for the shapes it recognised and

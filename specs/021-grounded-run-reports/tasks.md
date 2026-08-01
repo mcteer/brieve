@@ -161,29 +161,29 @@
 
 ## Phase 7: The surface, and the parity row it grows
 
-- [ ] T041 Add `report_for` in `src/surfaces/api/reports.py` — the governed read plus compilation, **transport-independent**, on the pattern `read_evidence_for` established so MCP reaches *this* rather than reimplementing it.
-- [ ] T042 [GATE:correlation] Reach `read_evidence_for` rather than `EvidenceQuery.search` in `src/surfaces/api/reports.py` (FR-007, research F1) — it bounds by tenant, computes the disposition, and **fails the read if the meta-audit write fails**. A direct `search` would duplicate the disposition logic and silently skip the one write that must not be best-effort.
-- [ ] T043 Handle the truncated read in `src/surfaces/api/reports.py`. `EvidenceQueryRequest.limit` defaults to **1000** and a 400-step run writes roughly seven entries per step, so a report over one would be complete in form and missing most of the run. **A correctness problem wearing a performance problem's clothes** — a truncated compilation must refuse or state the truncation, never silently report a partial run as whole.
-- [ ] T044 Exclude the run's result payload in `src/surfaces/api/reports.py` (FR-008a). `get_run_result` is subject-restricted; a report is tenant-scoped, so carrying that payload routes around the restriction.
-- [ ] T045 Add the route to the API router in `src/surfaces/api/app.py`.
-- [ ] T046 Add the operation map entry in `src/surfaces/mcp/operations.py` and the dispatch entry in `src/surfaces/mcp/transport.py`, reaching the same `report_for` the API route does.
-- [ ] T047 Regenerate `specs/008-northbound-api/contracts/operations.snapshot.json`. **The parity row grows by this operation** (FR-015b) — inherited work, and the snapshot is the part most likely to be forgotten.
-- [ ] T048 [P] Add `test_a_non_subject_gets_the_report_without_the_result` in `tests/conformance/api/test_reports.py` (FR-008a, SC-005a) — both halves in one row, because they must hold together.
-- [ ] T049 [P] Add `test_another_tenant_is_indistinguishable` in `tests/conformance/api/test_reports.py` (FR-008, SC-005) — same reason code, same message text.
-- [ ] T050 [P] Add `test_a_report_grants_no_new_access` in `tests/conformance/api/test_reports.py` (FR-008b) — nothing visible that `read_evidence` would not return to the same caller.
-- [ ] T051 [GATE:conformance] Add the report operation to `tests/conformance/mcp/test_surface_parity.py`'s coverage (FR-015b, SC-010) — same verdict, equivalent audit events, both transports.
+- [X] T041 Add `report_for` in `src/surfaces/api/reports.py` — the governed read plus compilation, **transport-independent**, on the pattern `read_evidence_for` established so MCP reaches *this* rather than reimplementing it.
+- [X] T042 [GATE:correlation] Reach `read_evidence_for` rather than `EvidenceQuery.search` in `src/surfaces/api/reports.py` (FR-007, research F1) — it bounds by tenant, computes the disposition, and **fails the read if the meta-audit write fails**. A direct `search` would duplicate the disposition logic and silently skip the one write that must not be best-effort.
+- [X] T043 Handle the truncated read in `src/surfaces/api/reports.py`. `EvidenceQueryRequest.limit` defaults to **1000** and a 400-step run writes roughly seven entries per step, so a report over one would be complete in form and missing most of the run. **A correctness problem wearing a performance problem's clothes** — a truncated compilation must refuse or state the truncation, never silently report a partial run as whole.
+- [X] T044 Exclude the run's result payload in `src/surfaces/api/reports.py` (FR-008a). `get_run_result` is subject-restricted; a report is tenant-scoped, so carrying that payload routes around the restriction.
+- [X] T045 Add the route to the API router in `src/surfaces/api/app.py`.
+- [X] T046 Add the operation map entry in `src/surfaces/mcp/operations.py` and the dispatch entry in `src/surfaces/mcp/transport.py`, reaching the same `report_for` the API route does.
+- [X] T047 Regenerate `specs/008-northbound-api/contracts/operations.snapshot.json`. **The parity row grows by this operation** (FR-015b) — inherited work, and the snapshot is the part most likely to be forgotten.
+- [X] T048 [P] Add `test_a_non_subject_gets_the_report_without_the_result` in `tests/conformance/api/test_reports.py` (FR-008a, SC-005a) — both halves in one row, because they must hold together.
+- [X] T049 [P] Add `test_another_tenant_is_indistinguishable` in `tests/conformance/api/test_reports.py` (FR-008, SC-005) — same reason code, same message text.
+- [X] T050 [P] Add `test_a_report_grants_no_new_access` in `tests/conformance/api/test_reports.py` (FR-008b) — nothing visible that `read_evidence` would not return to the same caller.
+- [X] T051 [GATE:conformance] Add the report operation to `tests/conformance/mcp/test_surface_parity.py`'s coverage (FR-015b, SC-010) — same verdict, equivalent audit events, both transports.
 
 ---
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T052 Add `test_the_gate_scores_what_a_person_reads` in `tests/conformance/reports/test_one_object_two_consumers.py` (FR-015, FR-015a, FR-015c, SC-009). **The requirement the maintainer's answer produced**: a gate scoring a different object from the one a person reads is not gating what anyone sees — this platform's recurring failure shape, given a row instead of being left available as a shortcut.
-- [ ] T053 [P] Add `test_nothing_reads_a_report` in `tests/conformance/reports/test_one_object_two_consumers.py` (FR-014, SC-008) — **0** code paths consume a report to decide anything. By source inspection, parsed.
-- [ ] T054 [P] Add `test_the_contract_states_what_this_gate_does_not_assert` in `tests/conformance/reports/test_one_object_two_consumers.py`. **The limit most likely to be misread** is that a report is present-tense: observations are facts about run-end, and "verified" invites a tense the claim does not have.
-- [ ] T055 Update `specs/021-grounded-run-reports/contracts/conformance.md` — replace the sketch table with the rows as shipped, and record SC-011 against T002's baseline. 019's contract carried a stale table through six analysis passes.
-- [ ] T056 [P] Close the owed row in `ROADMAP.md`: report fidelity moves out of "Owed Quality Gate rows", and 021 moves from "In progress" to "Shipped". **State what remains true** — the report is faithful to the records, not present-tense about the world.
-- [ ] T057 [P] Add *claim*, *material event*, and *observation* to `docs/glossary.md`.
-- [ ] T058 Obtain the **security-maintainer review Principle V requires** for the audit-schema change (T003) and record it in `specs/021-grounded-run-reports/contracts/conformance.md`. The plan records it as owed rather than discharged; a feature that shipped without it would have passed a Constitution Check that said so in writing.
+- [X] T052 Add `test_the_gate_scores_what_a_person_reads` in `tests/conformance/reports/test_one_object_two_consumers.py` (FR-015, FR-015a, FR-015c, SC-009). **The requirement the maintainer's answer produced**: a gate scoring a different object from the one a person reads is not gating what anyone sees — this platform's recurring failure shape, given a row instead of being left available as a shortcut.
+- [X] T053 [P] Add `test_nothing_reads_a_report` in `tests/conformance/reports/test_one_object_two_consumers.py` (FR-014, SC-008) — **0** code paths consume a report to decide anything. By source inspection, parsed.
+- [X] T054 [P] Add `test_the_contract_states_what_this_gate_does_not_assert` in `tests/conformance/reports/test_one_object_two_consumers.py`. **The limit most likely to be misread** is that a report is present-tense: observations are facts about run-end, and "verified" invites a tense the claim does not have.
+- [X] T055 Update `specs/021-grounded-run-reports/contracts/conformance.md` — replace the sketch table with the rows as shipped, and record SC-011 against T002's baseline. 019's contract carried a stale table through six analysis passes.
+- [X] T056 [P] Close the owed row in `ROADMAP.md`: report fidelity moves out of "Owed Quality Gate rows", and 021 moves from "In progress" to "Shipped". **State what remains true** — the report is faithful to the records, not present-tense about the world.
+- [X] T057 [P] Add *claim*, *material event*, and *observation* to `docs/glossary.md`.
+- [X] T058 Obtain the **security-maintainer review Principle V requires** for the audit-schema change (T003) and record it in `specs/021-grounded-run-reports/contracts/conformance.md`. The plan records it as owed rather than discharged; a feature that shipped without it would have passed a Constitution Check that said so in writing.
 - [ ] T059 Run the gates: `make check`, `make evals`, `make conformance-hermetic`, and the full `make conformance`; compare per-directory counts against T002 (SC-011). **Resync the VM clock first** — dispatched rows fail on `nbf` when it drifts, and it presents as a random subset failing each run.
 
 ---

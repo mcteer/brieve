@@ -30,6 +30,10 @@ from tests.harness.api_fixtures import surface_under_test
 NEW_OPERATIONS = [
     ("GET", "/runs", "list_runs", {}),
     ("GET", "/runs/r/result", "get_run_result", {"run_id": "r"}),
+    # 021's report. Added here because the guard below caught its absence — which is the
+    # check working: an operation that skipped these rows would ship without the
+    # authentication coverage every other one has, and nothing would have said so.
+    ("GET", "/runs/r/report", "get_run_report", {"run_id": "r"}),
     ("POST", "/runs/r/stop", "stop_run", {"run_id": "r"}),
     ("GET", "/claim-mappings/a", "collect_mapping_change", {"accessor": "a"}),
     ("GET", "/agent-definitions", "list_agent_definitions", {}),

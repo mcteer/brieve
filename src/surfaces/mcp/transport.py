@@ -102,6 +102,7 @@ class McpTransport:
             "collect_mapping_change": self._collect_mapping_change,
             "list_runs": self._list_runs,
             "get_run_result": self._get_run_result,
+            "get_run_report": self._get_run_report,
             "stop_run": self._stop_run,
             "list_agent_definitions": self._list_agent_definitions,
             "get_agent_definition": self._get_agent_definition,
@@ -158,6 +159,26 @@ class McpTransport:
         if handle is None:
             return McpResult(ok=False, status=404, payload={"reason": "no such run"})
         return McpResult(ok=True, status=200, payload=handle.model_dump(mode="json"))
+
+    def _get_run_report(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        """021. Reaches the same `report_for` the API route does.
+
+        Not a reimplementation: ADR-0033 asks for the same verdict on every transport, and two
+        implementations agreeing by inspection would make that a measure of how carefully they
+        were written rather than a property a row can check.
+        """
+        if self._evidence is None:
+            return McpResult(ok=False, status=503, payload={"reason": "evidence unavailable"})
+
+        from surfaces.api.reports import report_for
+
+        response = report_for(
+            run_id=str(args.get("run_id") or ""),
+            subject=subject,
+            query=self._evidence,
+            audit=self._audit,
+        )
+        return McpResult(ok=True, status=200, payload=response.model_dump(mode="json"))
 
     def _read_evidence(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         if self._evidence is None:

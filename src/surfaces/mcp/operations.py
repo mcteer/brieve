@@ -37,6 +37,10 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     "collect_mapping_change": ("GET", "/claim-mappings/{accessor}"),
     "list_runs": ("GET", "/runs"),
     "get_run_result": ("GET", "/runs/{run_id}/result"),
+    # 021. A report is what a person actually reads, so it is requestable — and ADR-0033 binds
+    # parity across every implemented pair, so it is here as well as on the API. An operation on
+    # one surface and not the other is a second authorization path wearing a friendlier name.
+    "get_run_report": ("GET", "/runs/{run_id}/report"),
     "stop_run": ("POST", "/runs/{run_id}/stop"),
     "list_agent_definitions": ("GET", "/agent-definitions"),
     "get_agent_definition": ("GET", "/agent-definitions/{agent_definition_id}"),
@@ -181,6 +185,23 @@ def operations() -> list[McpOperation]:
                 "What a run produced. Distinguishes still-running, finished with a "
                 "result, and ended without one — three states an empty answer would "
                 "conflate."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"run_id": {"type": "string", "minLength": 1}},
+                "required": ["run_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="get_run_report",
+            method="GET",
+            path="/runs/{run_id}/report",
+            description=(
+                "What a run did, compiled from its records: what ran, what was refused, "
+                "and what could not be verified. Every claim traces to evidence and "
+                "nothing is composed. Observations are facts about run-end, not about "
+                "the product now."
             ),
             input_schema={
                 "type": "object",

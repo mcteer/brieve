@@ -18,6 +18,8 @@ that made SC-004a wrong for two analysis passes: a literal list drifts from the 
 
 from __future__ import annotations
 
+from typing import Any
+
 from tests.harness import recorded_runs as fixtures
 
 from core.reports import ClaimStatus, compile_report
@@ -29,7 +31,7 @@ from core.reports import ClaimStatus, compile_report
 #: the same entries with `terminal=False`. Encoding them here keeps the fixtures honest — a
 #: fixture that only reached its status because of a compile flag would otherwise look like it
 #: reached it on its own.
-REACHES: dict[ClaimStatus, tuple] = {
+REACHES: dict[ClaimStatus, tuple[Any, frozenset[str], bool]] = {
     ClaimStatus.FROM_RECORD: (fixtures.clean_run, frozenset({"vault_write"}), True),
     ClaimStatus.OBSERVED: (fixtures.clean_run, frozenset({"vault_write"}), True),
     ClaimStatus.CONTRADICTED: (fixtures.contradicted_effect, frozenset({"vault_write"}), True),
@@ -52,7 +54,7 @@ REACHES: dict[ClaimStatus, tuple] = {
 }
 
 
-def _statuses(fixture, observers, terminal) -> set[ClaimStatus]:
+def _statuses(fixture: Any, observers: frozenset[str], terminal: bool) -> set[ClaimStatus]:
     report = compile_report(fixture(), run_id="run-fixture", observers=observers, terminal=terminal)
     return {claim.status for claim in report.claims}
 
