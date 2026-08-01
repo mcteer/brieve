@@ -187,6 +187,37 @@ resource "vault_jwt_auth_backend_role" "api" {
   token_type = "service"
 }
 
+# 019's served surface. Its own role, because it is its own job.
+#
+# **The API paid for getting this wrong once**: it asked for a role bound to a different
+# `nomad_job_id`, so it never started at all — and the failure named authentication rather
+# than the binding. A served surface with no matching role is a service that comes up,
+# presents an attestation nothing accepts, and reports a Vault problem.
+#
+# Policies are the API's exactly, and deliberately so: this surface serves the SAME
+# operations against the SAME core as the calling user. A different policy set would make
+# ADR-0033's parity guarantee a claim about two differently-privileged services.
+resource "vault_jwt_auth_backend_role" "mcp_surface" {
+  backend                 = vault_jwt_auth_backend.workload.path
+  role_name               = "mcp-surface"
+  role_type               = "jwt"
+  bound_audiences         = ["vault.io"]
+  user_claim              = "/nomad_job_id"
+  user_claim_json_pointer = true
+
+  bound_claims = {
+    nomad_job_id = var.mcp_surface_job_id
+  }
+
+  token_policies = [
+    vault_policy.harness_database.name,
+    vault_policy.evidence_database.name,
+    vault_policy.harness_authority_read.name,
+  ]
+  token_ttl  = 3600
+  token_type = "service"
+}
+
 resource "vault_jwt_auth_backend_role" "mcp" {
   backend                 = vault_jwt_auth_backend.workload.path
   role_name               = "mcp"

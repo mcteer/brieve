@@ -94,6 +94,15 @@ ENCLAVE_PATHS = frozenset(
         # authority appears is enumeration — never an assertion of denial, because a refusal
         # to an administrator proves nothing.
         "conformance/authority/bounding_records.py",
+        # 019's served-surface rows. They reach the MCP surface over a real socket and walk
+        # the development provider's authorization-code flow to obtain a caller credential —
+        # neither of which a client that does not speak HTTP can do.
+        #
+        # Both destinations are local: the surface is an allocation on this machine's
+        # published port, and the provider is a process this lane starts. Nothing here
+        # reaches a vendor. The whole point of the directory is that a row constructing the
+        # transport in-process would assert what 56 existing rows already assert.
+        "conformance/mcp_served/surfaces.py",
         "conformance/identity/test_pack_tools_dispatch.py",
         # 011's divergence rows read the audit trail as an OPERATOR, with a token.
         #

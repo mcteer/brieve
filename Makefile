@@ -3,7 +3,7 @@
 # `evals` is .PHONY twice over: it is a recipe, and a DIRECTORY named evals/ exists at
 # the repository root — without the declaration, make reports the seed set 'up to date'
 # and the gate never runs, which is a skip wearing a build system's clothes.
-.PHONY: check conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
+.PHONY: check mcp-surface-up conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
@@ -33,6 +33,9 @@ check:
 # enclave-marked API rows both hold their OWN workload identity, so running them here
 # would fail for the right reason and the wrong purpose — a host process has no attested
 # identity and should not be able to reach the state store. They run in the allocation.
+mcp-surface-up:
+	@bash infra/bin/mcp-surface-up
+
 conformance:
 	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave" -q
 	@bash infra/bin/enclave-conformance
@@ -98,6 +101,11 @@ conformance:
 	# than of a workflow file nobody runs locally — registering these surfaces at bring-up
 	# once left that batch job unplaceable and the merge-blocking durability rows never ran.
 	@bash infra/bin/deployment-conformance
+	#
+	# 019's served-surface lane. NOT the host_enclave pytest line above: these rows drive a
+	# running process, and a directory named there would be collected with nothing serving —
+	# which is why `tests/conformance/deployment` is absent from it too.
+	@bash infra/bin/mcp-surface-conformance
 
 # The accessibility gate (012, FR-020a). Its own target because it is its own DISCIPLINE:
 # every other gate here asserts something about a process, and this one asserts something
