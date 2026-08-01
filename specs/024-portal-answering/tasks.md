@@ -10,7 +10,8 @@ description: "Task list for 024 — grounded guidance"
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md),
 [data-model.md](./data-model.md), [contracts/conformance.md](./contracts/conformance.md)
 
-**Scope**: Grounded guidance only. Estate-state answering is a separate feature.
+**Scope**: Grounded guidance, through the **API and MCP**. Estate-state answering and the
+**portal's answering surface** are separate features — see spec.md.
 
 **Tests**: Included. This feature exists because four suites were green over a capability that did
 not exist, so a row that cannot fail is the specific thing to avoid here.
@@ -173,8 +174,10 @@ scoring authored strings.
 
 ## Phase 6: The surface
 
-- [ ] T028 [GATE:conformance] (FR-013) Add the ask operation to the API, and to MCP for parity
-      (ADR-0033). The portal calls it rather than answering itself (ADR-0034).
+- [ ] T028 [GATE:conformance] (FR-013, SC-001) Add the ask operation to the API, and to MCP for
+      parity (ADR-0033). **Nothing under `src/surfaces/portal/` changes** — the portal's answering
+      surface is its own feature. Analysis pass 3 found SC-001 reading "through the portal" while no
+      task touched it; narrowed rather than widened.
 - [ ] T028a [GATE:conformance] Register `tests/conformance/answering` in the `Makefile`'s
       `host_enclave` line, which names directories **individually**. **A new directory is invisible
       to it otherwise**, and the Makefile records that trap three times in its own comments —
@@ -191,7 +194,11 @@ scoring authored strings.
 ## Phase 7: Polish
 
 - [ ] T031 Update `docs/glossary.md` — *answer*, *citation*, *corpus pin*, *decline*.
-- [ ] T032 Record 024 in `ROADMAP.md`, including that estate-state answering was split out and why.
+- [ ] T032 Record 024 in `ROADMAP.md`, including **both** splits and their reasons — estate-state
+      answering, and the portal's answering surface. Two deferrals from one feature is worth the
+      next planner seeing plainly.
+- [ ] T032a Assert that **no file under `src/surfaces/portal/` differs**, the way 023 asserted
+      nothing under `src/` did. A scope boundary nobody checks is a scope boundary that moves.
 - [ ] T033 Run `make check` and `make evals`.
 - [ ] T034 Run `make conformance` on a live enclave. **Owed by name** — the enclave lane is
       `workflow_dispatch` only.
@@ -246,7 +253,7 @@ third party being up.
 
 ## Notes
 
-**41 tasks**, 17 of them rows. High, deliberately: this feature's subject is a suite that could not
+**42 tasks**, 18 of them rows. High, deliberately: this feature's subject is a suite that could not
 fail.
 
 **Three obligations are owed by name** — T034 (enclave), T035 (a real model), and the **Principle V

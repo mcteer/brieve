@@ -8,8 +8,9 @@
 
 **Input**: The portal has threads, a client, and a deployment. It has no way to answer anything.
 
-**Scope**: **Grounded guidance only.** Estate-state answering is deferred to its own feature —
-see Clarifications.
+**Scope**: **Grounded guidance, through the API and MCP.** Two things are deferred to their own
+features and recorded rather than dropped: **estate-state answering** (see Clarifications) and the
+**portal's answering surface** (see below).
 
 ## Traceability *(mandatory)*
 
@@ -79,14 +80,18 @@ They simply score something a person can never obtain.
 
 ### User Story 1 - Someone asks how something works and gets a cited answer (Priority: P1)
 
-A person asks a question about the guidance corpus and receives an answer whose every claim
-carries a visible citation. When the corpus does not support an answer, they are told so.
+A caller asks a question about the guidance corpus **through the API or an MCP client** and
+receives an answer whose every claim carries a visible citation. When the corpus does not support
+an answer, they are told so.
+
+**Not through the portal, and that is a scope decision rather than an oversight** — see the
+deferral below.
 
 **Why this priority**: It is the smaller of the two classes and the one whose gates are most
 developed. It also establishes the answering path the other class reuses.
 
-**Independent Test**: Ask a question the corpus answers; check every claim is cited. Ask one it
-does not; check the answer declines.
+**Independent Test**: Ask a question the corpus answers through the API or an MCP client; check
+every claim is cited. Ask one it does not; check the answer declines.
 
 **Acceptance Scenarios**:
 
@@ -98,6 +103,28 @@ does not; check the answer declines.
 3. **Given** the corpus changes, **When** the same question is asked, **Then** the citations
    reflect the current corpus. **The corpus carries no version metadata anywhere**, so change
    detection is content-based rather than version-based.
+
+---
+
+### The portal's answering surface — DEFERRED to its own feature (analysis pass 3)
+
+**This feature builds the answering capability, not a place to type a question.** Everything below
+stops at the API, with MCP for parity — which makes answering immediately usable by an editor, and
+leaves the portal for a slice that can be scoped properly.
+
+**Why it is a slice rather than a line of work absorbed here.** `relay.py` is the only module in
+`surfaces/portal` holding an HTTP client, and a conformance row asserts exactly that — so reaching
+a new operation means work there, plus a route, plus something a person types into. The portal also
+carries two gates this feature never mentions: `tests/conformance/portal/test_containment.py`, and
+`make a11y` (WCAG 2.2 AA, a blocking lane). None of that is large; all of it is unscoped, and
+absorbing it here would repeat the mistake clarify already avoided once.
+
+**An earlier draft of this spec had SC-001 reading "through the portal" while no task touched the
+portal at all** — the feature's own headline uncovered. Corrected by narrowing rather than by
+quietly widening the work.
+
+**ADR-0034 is the reason this is safe, and was nearly the reason it was missed.** The portal is a
+thin client, which is why answering belongs in the API — and "thin" briefly became "absent".
 
 ---
 
@@ -233,8 +260,9 @@ from it.
 
 ### Measurable Outcomes
 
-- **SC-001**: A person asks a guidance question through the portal and receives an answer whose
-  every claim carries a citation that resolves.
+- **SC-001**: A caller asks a guidance question **through the API or an MCP client** and receives
+  an answer whose every claim carries a citation that resolves. **The portal is deliberately not
+  the path here** — see the deferral in User Scenarios.
 - **SC-002**: A question the corpus does not support is declined, and the decline is
   distinguishable from a provider failure.
 - **SC-003**: **Deferred with estate-state answering.**

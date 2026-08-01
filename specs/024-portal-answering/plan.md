@@ -2,7 +2,8 @@
 
 **Branch**: `spec/024-portal-answering` | **Date**: 2026-08-01 | **Spec**: [spec.md](./spec.md)
 
-**Scope**: Grounded guidance only. Estate-state answering is a separate feature (clarify Q1).
+**Scope**: Grounded guidance through the **API and MCP**. Two deferrals: estate-state answering
+(clarify Q1) and the portal's answering surface (analysis pass 3).
 
 ## Summary
 
@@ -93,6 +94,7 @@ src/core/answering/          # NEW — the path. Holds a corpus and a provider; 
 src/core/evals/scoring.py    # a third Scorer that drives the answering path
 src/surfaces/api/            # the ask operation
 src/surfaces/mcp/            # the same operation, for parity (ADR-0033)
+src/surfaces/portal/         # UNCHANGED — its answering surface is a separate feature
 packs/*/corpus/              # NEW — the pinned corpus, with PROVENANCE.md beside it
 packs/*/evals/               # citation_accuracy + must_decline re-pointed at product output
 ```
