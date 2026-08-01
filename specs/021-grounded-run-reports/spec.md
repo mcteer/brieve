@@ -376,9 +376,15 @@ observe the report decline to claim completion.
 
 ## Assumptions
 
-- The records are sufficient. Every prior feature's evidence — hook decisions, outcomes, choices,
-  revivals, re-observations — is assumed adequate to compile from, and where it is not, that is a
-  finding this feature is expected to surface rather than work around.
+- The records are sufficient **for everything except whether an effect landed**. Hook decisions,
+  outcomes, choices, revivals and re-observations are adequate to compile from; what a run
+  recorded about a tool is that it was *allowed*, which is not the same claim as *it happened*.
+  That gap is exactly why this feature adds one record rather than only reading them, and it is
+  the reason a sealed-core change is in scope at all.
+
+  **This assumption originally said the records were sufficient full stop**, and survived the
+  read-back redesign unamended until analysis pass 3 — which would have left a reader unable to
+  see why an audit-schema change was needed for a feature that claims to only compile.
 - Observers are the read-back mechanism. `Observer` implementations exist for non-repeatable
   tools and are already used by resume; this feature consumes them rather than inventing a second
   way to ask "did it land".

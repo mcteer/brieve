@@ -45,12 +45,29 @@
 ### The typed object
 
 - [ ] T005 [P] Create `src/core/reports/__init__.py` and `src/core/reports/report.py` — `RunReport`, `Claim`, and `ClaimStatus` per [data-model.md](./data-model.md). **Seven statuses, not two.** Each unsupported value sends a reader somewhere different: the product, the tool's registration, the run's ending, or the records themselves.
-- [ ] T006 [P] Assert in `tests/unit/test_report_statuses_are_distinct.py` that no two `ClaimStatus` values are collapsible — a report with one "unknown" would be honest and useless, and collapsing them is the refactor a future reader is most likely to attempt.
+- [ ] T006 [P] Assert in `tests/unit/test_report_statuses_are_reachable.py` that **every `ClaimStatus` value is produced by at least one fixture** in `tests/harness/recorded_runs.py` — iterating the enum, so a value added later and never produced fails the row rather than passing silently.
+
+  **Rewritten in analysis pass 3, because the first version could not fail.** It said "assert no two values are collapsible", which has no operational meaning — nothing distinguishes a passing implementation from a failing one, and a row that cannot fail is a governance hole with a green checkmark.
+
+  Reachability catches both failures the original was reaching for: a status that exists and can never be produced, and one silently merged into another — its fixture stops producing it, and the row goes red. It also covers `from_record`, the ordinary status, which analysis pass 3 found named by no task at all.
 
 ### The compiler
 
 - [ ] T007 Implement `compile_report(entries, observations, ...)` in `src/core/reports/compile.py`. **It takes already-read entries and holds no query and no credential** — that is what makes FR-008b structural rather than promised, and it is the property a reviewer should check first on any later change.
-- [ ] T008 [P] Create `tests/harness/recorded_runs.py` — entry fixtures for the shapes the rows need: a clean run, a run with a denial, an open bracket, a resumed run, a model that chose nothing, a contradicted effect.
+- [ ] T008 [P] Create `tests/harness/recorded_runs.py` — entry fixtures covering **every `ClaimStatus` value**, because T006 iterates the enum and a status with no fixture fails that row:
+
+  | Fixture | Reaches |
+  | --- | --- |
+  | a clean run | `from_record`, `observed` |
+  | a run with a denial | `from_record` |
+  | a contradicted effect | `contradicted` |
+  | an effect whose product was unreachable at run end | `unverified_unreachable` |
+  | an effect on a tool with no registered observer | `unverified_no_observer` |
+  | a run killed before it reached a terminal state | `unverified_not_observed` |
+  | an open bracket, and an entry type the compiler does not recognise | `unreconciled` |
+  | a resumed run; a model that chose nothing; **a run refused before it started** (T012a) | run-shape coverage |
+
+  **The last three statuses were absent from this task's first draft**, which would have made T006 unsatisfiable as rewritten in analysis pass 3 — a row that iterates an enum needs a fixture per value, and the pass that tightened the row is the pass that had to widen the fixtures.
 
 ---
 
@@ -184,11 +201,15 @@ Phase 4 (US2) ── gaps stated. US1 is worth little without it
    ↓
 Phase 5 (US3) ── the run observes. The Principle IV redesign
    ↓
-Phase 6 (the fifth gate) ── needs claims to score, so it follows US1–US3
-   ↓
-Phase 7 (surface) ── independent of Phase 6; both need US1
-   ↓
-Phase 8 (Polish)
+   ├──────────────────────────────┐
+   ↓                              ↓
+Phase 6 (the fifth gate)      Phase 7 (surface + parity)
+   needs claims to score,        needs US1 only. The
+   so it follows US1–US3         user-visible half
+   ↓                              ↓
+   └──────────────┬───────────────┘
+                  ↓
+            Phase 8 (Polish)
 ```
 
 **Story independence, honestly.** US1 and US2 are one deliverable in practice: a report that traces every claim but silently drops what it cannot verify is the artifact ADR-0018 warns about, wearing this feature's name. US3 is genuinely separable — a report compiled with every effect claim reading `unverified_not_observed` is honest and useful, and it is the sane fallback if the observation work proves larger than expected.

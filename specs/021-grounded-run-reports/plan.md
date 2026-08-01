@@ -64,8 +64,10 @@ as a correctness requirement.
 
 **Gate result**: **PASS — proceed to Phase 1**, with the Principle V review recorded as owed.
 
-**Re-check after Phase 1 design**: **PASS**, unchanged. The sealed-core obligation is the only
-item in Complexity Tracking that survived, and it did not grow.
+**Re-check after Phase 1 design**: **PASS**, unchanged. **Two** items remain in Complexity
+Tracking — the sealed-core audit member, and the fifth eval-case shape — and neither grew during
+design. (This sentence said "the only item" until analysis pass 3; a Constitution Check statement
+that miscounts the table beneath it is the kind of thing a reviewer reads instead of the table.)
 
 ### The failure, measured — kept because the redesign is only legible beside it
 
@@ -178,4 +180,4 @@ a silent regression.
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 | --- | --- | --- |
 | **A sealed-core change: one `AuditEventType` member** | The observation must be recorded somewhere, and the trail is the only store that is hash-chained, tenant-scoped, readable through the governed evidence path the report already uses, and append-only. Recording it anywhere else would give the report a second source to reconcile. | **On the checkpoint payload**: rejected — checkpoints hold resume state, and `run_result_for` already argues that returning their contents makes their shape a compatibility surface. **A new durability record type**: rejected — it would be a second store for evidence, reachable outside the audited read path, which is FR-007's whole objection. **The obligation stands regardless**: Principle V requires security-maintainer review of an audit-schema change, and "additive" is the word that precedes most sealed-core regressions. |
-| **A fifth eval-case shape** (if the feature proceeds) | Report fidelity scores a compiled report against labelled material events, measured by precision and recall. The existing `EvalCase` is `(prompt, expected, recorded)` scoring a model's answer, and `EXPECTED_OUTCOMES` has no entry for it (research F3). | **Forcing it into `expected: str`**: rejected — it reduces fidelity to a boolean, losing the precision and recall FR-013a requires, or smuggles a structure into a string. **A gate outside `suites.py`**: rejected — the constitution names five suites in one place, and moving one out leaves `SUITES` a list of four forever. |
+| **A fifth eval-case shape** | Report fidelity scores a compiled report against labelled material events, measured by precision and recall. The existing `EvalCase` is `(prompt, expected, recorded)` scoring a model's answer, and `EXPECTED_OUTCOMES` has no entry for it (research F3). | **Forcing it into `expected: str`**: rejected — it reduces fidelity to a boolean, losing the precision and recall FR-013a requires, or smuggles a structure into a string. **A gate outside `suites.py`**: rejected — the constitution names five suites in one place, and moving one out leaves `SUITES` a list of four forever. |
