@@ -52,6 +52,9 @@ def ask_for(
     provider: Any,
     audit: AuditSink,
     model: str,
+    cell: str = "",
+    bound_cell: str = "",
+    cell_disposition: str = "",
 ) -> dict[str, Any]:
     """Answer or decline, and record that someone asked.
 
@@ -70,10 +73,9 @@ def ask_for(
         model=model,
         disposition=answer.disposition,
         source=GUIDANCE_SOURCE,
-        # T010 makes these real; "" is visibly not-yet-wired.
-        cell="",
-        bound_cell="",
-        cell_disposition="",
+        cell=cell,
+        bound_cell=bound_cell,
+        cell_disposition=cell_disposition,
     )
 
     if answer.disposition != ANSWERED:
@@ -104,6 +106,9 @@ def estate_answer_for(
     model: str,
     provider: Any,
     now: datetime | None = None,
+    cell: str = "",
+    bound_cell: str = "",
+    cell_disposition: str = "",
 ) -> dict[str, Any]:
     """Answer an estate question from the asker's own records, or decline.
 
@@ -127,9 +132,11 @@ def estate_answer_for(
             model=model,
             disposition="scope_empty",
             source=str(Route.ESTATE),
-            cell="",
-            bound_cell="",
-            cell_disposition="",
+            # Resolution SUCCEEDED; the ask failed on scope afterwards. Keeping the resolution
+            # outcome is what preserves the fact that governance passed.
+            cell=cell,
+            bound_cell=bound_cell,
+            cell_disposition=cell_disposition,
         )
         raise ScopeEmpty(
             "no records are visible to this subject's roles; an estate answer would have "
@@ -158,9 +165,9 @@ def estate_answer_for(
         model=model,
         disposition=answer.disposition,
         source=answer.source,
-        cell="",
-        bound_cell="",
-        cell_disposition="",
+        cell=cell,
+        bound_cell=bound_cell,
+        cell_disposition=cell_disposition,
     )
 
     if answer.disposition != ESTATE_ANSWERED:
@@ -209,6 +216,95 @@ def _window(question: str, now: datetime | None) -> tuple[datetime | None, datet
             return None, None
 
 
+#: What a resolution refusal is called on the ask record. The reason vocabulary is the
+#: platform's; this maps it to the three the trail and the caller see (data-model.md).
+_GOVERNANCE_DISPOSITION: dict[str, str] = {
+    "unbound_ask_source": "unbound",
+    "fabric_unreachable": "matrix_unreadable",
+    "fabric_timeout": "matrix_unreadable",
+}
+
+
+class AskNotQualified(Exception):
+    """Governance refused this ask before any provider was contacted.
+
+    Carries the disposition the record and the caller both see. `unqualified_cell` deliberately
+    does not distinguish absent / withdrawn / wrong-role **to the caller** — the resolver collapses
+    them too, so no caller can learn which it was; the trail's `bound_cell` and the matrix record
+    answer that for an investigator.
+    """
+
+    def __init__(self, disposition: str, detail: str) -> None:
+        super().__init__(detail)
+        self.disposition = disposition
+
+
+def _available(model: str, provider: Any) -> frozenset[str]:
+    """Exactly the model the injected provider was constructed for — never wider.
+
+    **Analysis U2's requirement, and the reason is record/actual agreement.** A wider set lets
+    fallback select a cell for a model this provider cannot call: the ask record would then name
+    cell X while the provider called model Y, and the trail would carry an authorisation for a
+    model that never ran. On an attestation-relevant record that is the worst available outcome.
+    """
+    return frozenset() if provider is None else frozenset({model})
+
+
+def authorise_ask(
+    *,
+    source: str,
+    subject: AuthenticatedSubject,
+    audit: AuditSink,
+    authority: Any,
+    available: frozenset[str],
+) -> tuple[str, str, str]:
+    """Resolve the cell this ask may use, or refuse — **before any provider is contacted**.
+
+    Returns `(cell, bound_cell, cell_disposition)` for the record. Raises `AskNotQualified` on a
+    governance refusal, having recorded it: someone asked, and a boundary a caller can probe
+    without trace is what 022 removed.
+
+    **Called first, always** — governance precedes scope and precedes provider availability. An
+    unbound surface refuses `unbound` even with no provider configured, because "nobody decided
+    which model may answer" is the answer an operator needs before "nothing is wired". The reverse
+    order would have told them to go configure a provider they are not yet permitted to use.
+    """
+    from core.authority.errors import ResolutionRefused
+
+    if authority is None:
+        disposition = "unbound"
+        detail = (
+            "no ask binding is configured for this surface; a configured provider is not a "
+            "qualification"
+        )
+    else:
+        try:
+            cell, fallback = authority.resolve(source, available=available)
+        except ResolutionRefused as refused:
+            disposition = _GOVERNANCE_DISPOSITION.get(refused.reason_code, "unqualified_cell")
+            detail = str(refused)
+        else:
+            bound = fallback.pinned_cell if fallback is not None else cell.reference
+            return (
+                cell.reference,
+                bound,
+                f"fallback:{fallback.reason}" if fallback is not None else "pinned",
+            )
+
+    record_ask(
+        audit=audit,
+        subject=subject,
+        corpus_digest="",
+        model="unresolved",
+        disposition=disposition,
+        source=source,
+        cell="",
+        bound_cell="",
+        cell_disposition=f"refused:{disposition}",
+    )
+    raise AskNotQualified(disposition, detail)
+
+
 class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -222,6 +318,7 @@ def build_router(
     provider: Any = None,
     model: str = "unconfigured",
     evidence_query: Any = None,
+    ask_authority: Any = None,
 ) -> APIRouter:
     """The provider is a **parameter**, so a deployment can supply one and a test can share one.
 
@@ -251,6 +348,19 @@ def build_router(
         destination = route(body.question)
 
         if destination is Route.ESTATE:
+            # GOVERNANCE FIRST — before scope, before provider availability, before the evidence
+            # plane is even looked at. An unqualified model must be unreachable, not merely unused.
+            try:
+                cell, bound_cell, cell_disposition = authorise_ask(
+                    source=str(Route.ESTATE),
+                    subject=subject,
+                    audit=audit,
+                    authority=ask_authority,
+                    available=_available(model, provider),
+                )
+            except AskNotQualified as refused:
+                raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
+
             if evidence_query is None:
                 raise HTTPException(
                     status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -270,6 +380,9 @@ def build_router(
                     model=model,
                     provider=provider,
                     now=datetime.now(UTC),
+                    cell=cell,
+                    bound_cell=bound_cell,
+                    cell_disposition=cell_disposition,
                 )
             except ScopeEmpty as empty:
                 raise HTTPException(status.HTTP_403_FORBIDDEN, str(empty)) from empty
@@ -301,6 +414,18 @@ def build_router(
                 ),
             }
 
+        # GOVERNANCE FIRST here too — the corpus is not even loaded for an ask nobody permitted.
+        try:
+            cell, bound_cell, cell_disposition = authorise_ask(
+                source=GUIDANCE_SOURCE,
+                subject=subject,
+                audit=audit,
+                authority=ask_authority,
+                available=_available(model, provider),
+            )
+        except AskNotQualified as refused:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
+
         try:
             corpus = load_corpus()
         except CorpusUnavailable as unavailable:
@@ -320,9 +445,11 @@ def build_router(
                 model="unconfigured",
                 disposition="provider_unavailable",
                 source=GUIDANCE_SOURCE,
-                cell="",
-                bound_cell="",
-                cell_disposition="",
+                # Resolution SUCCEEDED; the ask failed later. Overwriting the resolution outcome
+                # here would erase the fact that governance passed.
+                cell=cell,
+                bound_cell=bound_cell,
+                cell_disposition=cell_disposition,
             )
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -336,6 +463,9 @@ def build_router(
                 provider=provider,
                 audit=audit,
                 model=model,
+                cell=cell,
+                bound_cell=bound_cell,
+                cell_disposition=cell_disposition,
             )
         except ProviderUnavailable as unreachable:
             # NOT a decline. A reader cannot tell "the corpus does not say" from "we could not

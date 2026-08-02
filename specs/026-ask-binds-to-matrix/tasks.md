@@ -78,12 +78,12 @@ distinguishable recorded refusals.
 **Independent test**: a counting provider with no authority records zero calls (T001's row,
 marker off).
 
-- [ ] T009 [US1] Define the `AskAuthority` collaborator in `src/core/authority/ask_binding.py`:
+- [X] T009 [US1] Define the `AskAuthority` collaborator in `src/core/authority/ask_binding.py`:
       holds a binding reader and a matrix reader (callables — in-memory in tests, fabric-backed
       in assembly), exposes `resolve(source, available)`; reader failure surfaces as the
       unreadable refusal, **distinct from empty** (SC-004 — `MatrixSource`'s own documented
       distinction, kept).
-- [ ] T010 [US1] Wire the ordering into `src/surfaces/api/ask.py`: `build_router` and
+- [X] T010 [US1] Wire the ordering into `src/surfaces/api/ask.py`: `build_router` and
       `estate_answer_for`/guidance branch gain `ask_authority` (default `None` = refuse
       `unbound` — **a configured provider is not a qualification**, FR-004a); resolution runs
       **before any provider call in both branches**, and the refusal order is fixed (analysis
@@ -97,16 +97,16 @@ marker off).
       U4, data-model § ASK_ANSWERED): post-resolution refusals (`scope_empty`,
       `provider_unavailable`) keep the resolution outcome, and the `neither` decline records
       `not_applicable` — no site is left inventing one.
-- [ ] T011 [US1] `create_app` in `src/surfaces/api/app.py` and `McpTransport` in
+- [X] T011 [US1] `create_app` in `src/surfaces/api/app.py` and `McpTransport` in
       `src/surfaces/mcp/transport.py` gain `ask_authority`, threaded to the one shared
       implementation — parity by construction, not by twin edits (ADR-0033).
-- [ ] T012 [US1] Fixture plumbing in `tests/harness/api_fixtures.py`: `surface_under_test`
+- [X] T012 [US1] Fixture plumbing in `tests/harness/api_fixtures.py`: `surface_under_test`
       gains `ask_authority`, **one instance shared by both surfaces** like the eight before it;
       add `qualified_ask_authority(model=...)` building an in-memory binding + matrix pair
       qualifying `model` for both sources. **The default stays `None` and the fixture never
       auto-qualifies an injected provider** (research F5 — that would rebuild
       "configured = qualified" inside the harness).
-- [ ] T013 [US1] [GATE:conformance] The headline rows in
+- [X] T013 [US1] [GATE:conformance] The headline rows in
       `tests/conformance/answering/test_ask_binds_to_matrix.py` (T001's file, marker removed
       here): provider-never-called with no authority (SC-001, **counted at the provider**, both
       surfaces, both sources); fixture-default-refuses (SC-003b — provider injected, no
@@ -118,17 +118,17 @@ marker off).
       answered half, analysis C1 — T018 covers fallback, this covers the common case); and the
       **combined-absence** case (analysis U3) — no authority AND no provider refuses `unbound`,
       not `provider_unavailable`, proving governance precedes availability.
-- [ ] T014 [US1] Update the ~20 existing answering rows to arrange authority **explicitly**:
+- [X] T014 [US1] Update the ~20 existing answering rows to arrange authority **explicitly**:
       `tests/conformance/answering/test_ask_routes_by_shape.py`,
       `tests/conformance/answering/test_estate_bounded_by_asker.py`,
       `tests/conformance/mcp/test_ask_parity.py`, and any component row that drives `ask_for` —
       each gains `ask_authority=qualified_ask_authority(...)`. **Run the suite before editing**:
       every one of these must be seen failing `unbound` first, which is the refusal default
       demonstrating itself across the whole surface area.
-- [ ] T015 [US1] Remove T001's xfail marker — the row now passes for the right reason and
+- [X] T015 [US1] Remove T001's xfail marker — the row now passes for the right reason and
       becomes SC-009's tripwire. Verify by commenting out the resolution step locally
       (quickstart §3) and watching it fail; restore.
-- [ ] T016 [US1] [GATE:conformance] Refusal parity rows in
+- [X] T016 [US1] [GATE:conformance] Refusal parity rows in
       `tests/conformance/mcp/test_ask_parity.py`: all three dispositions produce the same
       verdict and the same reason on both surfaces (SC-007, FR-011).
 

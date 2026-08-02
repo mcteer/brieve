@@ -69,6 +69,7 @@ class McpTransport:
         reconciler: Any | None = None,
         ask_provider: Any | None = None,
         ask_model: str = "unconfigured",
+        ask_authority: Any | None = None,
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
@@ -78,6 +79,7 @@ class McpTransport:
         # is one they can silently differ on.
         self._ask_provider: Any = ask_provider
         self._ask_model: str = ask_model
+        self._ask_authority: Any = ask_authority
         self._evidence = evidence_query
         self._submitter = authority_submitter
         # Mirrors `create_app`'s collaborators exactly, and the mirroring is the point: the
@@ -199,12 +201,32 @@ class McpTransport:
         from core.answering.estate import EstateProviderUnavailable
         from core.answering.record import record_ask
         from core.answering.routing import Route, route
-        from surfaces.api.ask import ScopeEmpty, ask_for, estate_answer_for
+        from surfaces.api.ask import (
+            AskNotQualified,
+            ScopeEmpty,
+            _available,
+            ask_for,
+            authorise_ask,
+            estate_answer_for,
+        )
 
         question = str(args["question"])
         destination = route(question)
 
         if destination is Route.ESTATE:
+            # GOVERNANCE FIRST, through the same shared function the API calls — parity by
+            # construction rather than by twin edits (ADR-0033).
+            try:
+                cell, bound_cell, cell_disposition = authorise_ask(
+                    source=str(Route.ESTATE),
+                    subject=subject,
+                    audit=self._audit,
+                    authority=self._ask_authority,
+                    available=_available(self._ask_model, self._ask_provider),
+                )
+            except AskNotQualified as refused:
+                return McpResult(ok=False, status=403, payload={"reason": str(refused)})
+
             if self._evidence is None:
                 return McpResult(
                     ok=False,
@@ -227,6 +249,9 @@ class McpTransport:
                         model=self._ask_model,
                         provider=self._ask_provider,
                         now=datetime.now(UTC),
+                        cell=cell,
+                        bound_cell=bound_cell,
+                        cell_disposition=cell_disposition,
                     ),
                 )
             except ScopeEmpty as empty:
@@ -260,6 +285,17 @@ class McpTransport:
             )
 
         try:
+            guidance_cell, guidance_bound, guidance_disposition = authorise_ask(
+                source="guidance",
+                subject=subject,
+                audit=self._audit,
+                authority=self._ask_authority,
+                available=_available(self._ask_model, self._ask_provider),
+            )
+        except AskNotQualified as refused:
+            return McpResult(ok=False, status=403, payload={"reason": str(refused)})
+
+        try:
             corpus = load_corpus()
         except CorpusUnavailable as unavailable:
             return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
@@ -274,9 +310,9 @@ class McpTransport:
                 model="unconfigured",
                 disposition="provider_unavailable",
                 source="guidance",
-                cell="",
-                bound_cell="",
-                cell_disposition="",
+                cell=guidance_cell,
+                bound_cell=guidance_bound,
+                cell_disposition=guidance_disposition,
             )
             return McpResult(
                 ok=False, status=503, payload={"reason": "no model is configured for `ask`"}
@@ -289,6 +325,9 @@ class McpTransport:
                 provider=self._ask_provider,
                 audit=self._audit,
                 model=self._ask_model,
+                cell=guidance_cell,
+                bound_cell=guidance_bound,
+                cell_disposition=guidance_disposition,
             )
         except (CorpusUnavailable, ProviderUnavailable) as unavailable:
             return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
