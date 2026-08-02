@@ -70,6 +70,10 @@ def ask_for(
         model=model,
         disposition=answer.disposition,
         source=GUIDANCE_SOURCE,
+        # T010 makes these real; "" is visibly not-yet-wired.
+        cell="",
+        bound_cell="",
+        cell_disposition="",
     )
 
     if answer.disposition != ANSWERED:
@@ -123,6 +127,9 @@ def estate_answer_for(
             model=model,
             disposition="scope_empty",
             source=str(Route.ESTATE),
+            cell="",
+            bound_cell="",
+            cell_disposition="",
         )
         raise ScopeEmpty(
             "no records are visible to this subject's roles; an estate answer would have "
@@ -151,6 +158,9 @@ def estate_answer_for(
         model=model,
         disposition=answer.disposition,
         source=answer.source,
+        cell="",
+        bound_cell="",
+        cell_disposition="",
     )
 
     if answer.disposition != ESTATE_ANSWERED:
@@ -277,6 +287,10 @@ def build_router(
                 model=model,
                 disposition="declined",
                 source=str(Route.NEITHER),
+                cell="",
+                bound_cell="",
+                # No source was consulted, so no cell question arose.
+                cell_disposition="not_applicable",
             )
             return {
                 "disposition": "declined",
@@ -306,6 +320,9 @@ def build_router(
                 model="unconfigured",
                 disposition="provider_unavailable",
                 source=GUIDANCE_SOURCE,
+                cell="",
+                bound_cell="",
+                cell_disposition="",
             )
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,

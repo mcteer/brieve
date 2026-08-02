@@ -18,7 +18,7 @@ right reason rather than edited pre-emptively.
 
 ## Phase 1: Setup
 
-- [ ] T001 Pin the gap as an executable measurement in
+- [X] T001 Pin the gap as an executable measurement in
       `tests/conformance/answering/test_ask_binds_to_matrix.py`: a row asserting the
       FR-001-**correct** behaviour — a counting provider injected with **no** authority records
       **zero calls** — marked `xfail(strict=True)` with a reason naming 024's SC-006, because
@@ -28,38 +28,38 @@ right reason rather than edited pre-emptively.
 
 ## Phase 2: Foundational — the resolver and the record
 
-- [ ] T002 Create `src/core/authority/ask_binding.py`: `AskBinding` (optional `guidance_cell` /
+- [X] T002 Create `src/core/authority/ask_binding.py`: `AskBinding` (optional `guidance_cell` /
       `estate_cell`), `parse_ask_binding_record` on `ceiling.py`'s discipline —
       `schema_version` required and `1`, absent/newer refuses `unsupported_schema_version`, a
       cell reference whose role is not `ask` refuses `malformed_record` **at parse** (a
       mis-authored binding fails when written about, not when first asked through). Module
       docstring carries research F1: this lives in `authority`, not `answering`, because 025's
       never-acts rows forbid the answering path any import containing "authority".
-- [ ] T003 Implement `resolve_ask_cell(source, binding, cells, available)` in the same file:
+- [X] T003 Implement `resolve_ask_cell(source, binding, cells, available)` in the same file:
       look up the bound cell for the source, refuse `unbound` when the record or the source's
       cell is absent, then **delegate to `resolve_with_fallback`** — no branch of this module's
       own, so the no-third-branch property is inherited rather than re-established.
-- [ ] T004 [P] [GATE:fail-closed] Component rows for parsing in
+- [X] T004 [P] [GATE:fail-closed] Component rows for parsing in
       `tests/component/test_ask_binding.py`: well-formed parses; either cell omissible; both
       omitted is well-formed and refuses everything; missing/newer schema_version refuses;
       non-`ask` role refuses at parse; malformed table refuses.
-- [ ] T005 [P] [GATE:fail-closed] Component rows for resolution in the same file: bound + green
+- [X] T005 [P] [GATE:fail-closed] Component rows for resolution in the same file: bound + green
       resolves `pinned`; `unbound` for no record and for no cell-for-this-source; withdrawn
       refuses like absent (SC-002, asserted though inherited — inherited properties nobody
       asserts stop being inherited); a `plan` cell never authorises (SC-003); unavailable model
       with a qualified alternative returns the fallback pair; without one, refuses.
-- [ ] T006 [GATE:conformance] **SEALED CORE** — `AuditEventType.ASK_ANSWERED`'s documented
+- [X] T006 [GATE:conformance] **SEALED CORE** — `AuditEventType.ASK_ANSWERED`'s documented
       payload in `src/core/audit/schema.py` gains `cell`, `bound_cell`, `cell_disposition`
       (data-model.md table — the substitution rides the ask record, research F3, so no run id is
       fabricated and `MATRIX_FALLBACK` is not generalised). Update
       `src/core/answering/record.py`'s `record_ask` to require the three fields.
       **Principle V review: Dan McTeer, before merge** — declared in plan and contract; this
       task is the change it reviews.
-- [ ] T007 [P] Extend the exact-payload row in `tests/component/test_answering.py` by exactly
+- [X] T007 [P] Extend the exact-payload row in `tests/component/test_answering.py` by exactly
       the three keys, and annotate the pinned-digest row in `tests/unit/test_audit_chain.py`
       the way 025 did — the payload contract and its test move together or the review has
       nothing to hold.
-- [ ] T008 Thread the three fields through every existing `record_ask` call site
+- [X] T008 Thread the three fields through every existing `record_ask` call site
       (`src/surfaces/api/ask.py` ×3 paths, `src/surfaces/mcp/transport.py`,
       `tests/component/test_answering.py`) with the interim value
       `cell="", bound_cell="", cell_disposition=""` and a comment naming T010 as the task that

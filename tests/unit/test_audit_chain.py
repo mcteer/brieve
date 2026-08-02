@@ -171,6 +171,12 @@ def test_widening_the_event_vocabulary_moves_no_existing_hash() -> None:
     assert AuditEventType.RUN_STOPPED.value == "run_stopped"  # 022
     assert AuditEventType.ASK_ANSWERED.value == "ask_answered"  # 024
 
+    # 026 changed no MEMBER either — it widened ASK_ANSWERED's documented payload again, with
+    # cell / bound_cell / cell_disposition. Third additive touch to one payload in three
+    # features, which is worth noticing as a pattern: the ask record is where facts about an ask
+    # accumulate, precisely because an ask has no run to hang them on. The payload contract is
+    # asserted exactly in tests/component/test_answering.py.
+    #
     # 025 changed no MEMBER — it widened ASK_ANSWERED's documented PAYLOAD with `source`, which
     # the enum cannot express and this row therefore cannot see. Named here anyway, because the
     # next person reading this list to learn what has touched sealed core since the pin would

@@ -242,6 +242,9 @@ class McpTransport:
                 model=self._ask_model,
                 disposition="declined",
                 source=str(Route.NEITHER),
+                cell="",
+                bound_cell="",
+                cell_disposition="not_applicable",
             )
             return McpResult(
                 ok=True,
@@ -271,6 +274,9 @@ class McpTransport:
                 model="unconfigured",
                 disposition="provider_unavailable",
                 source="guidance",
+                cell="",
+                bound_cell="",
+                cell_disposition="",
             )
             return McpResult(
                 ok=False, status=503, payload={"reason": "no model is configured for `ask`"}

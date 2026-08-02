@@ -61,6 +61,19 @@ RESOLUTION_REASONS: Final[dict[str, str]] = {
     # no path on which "bound to nothing" could be refused rather than shrugged at.
     "no_binding_for_role": "the definition binds no model for the role a run needs one for; "
     "refused rather than defaulted, because a defaulted model is an ungoverned model choice",
+    # --- 026: asking is bound per SOURCE, and nothing is bound for this one
+    #
+    # Distinct from `no_binding_for_role` above, and the difference is what an ask is: a run
+    # binds through its agent definition, so "bound to nothing" is a fact about a definition.
+    # An ask has no definition — it binds through an operator-authored record, per source, so
+    # guidance can be bound while estate is not. Sending someone to a definition would send
+    # them somewhere that does not exist for this path.
+    #
+    # It refuses rather than defaulting for the same reason `no_binding_for_role` does: a
+    # defaulted model is an ungoverned model choice. 024 and 025 shipped an answering path
+    # that consulted no binding at all, and this is the code that makes that unrepeatable.
+    "unbound_ask_source": "no ask binding names a cell for the source this question needs; "
+    "refused rather than defaulted, because a defaulted model is an ungoverned model choice",
     # --- 013: the pack a definition names cannot supply what it is being asked for
     "pack_exceeds_ceiling": "a named pack declares a tool the ceiling does not permit; a "
     "pack narrows what a definition may do and never widens it",

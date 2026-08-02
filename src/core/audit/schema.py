@@ -321,6 +321,34 @@ class AuditEventType(StrEnum):
     #: chain to each other rather than each being a chain of one. Within the stream the read is
     #: locatable by subject and time.
     #:
+    #: **`cell`, `bound_cell` and `cell_disposition` are 026's additive fields**, and they answer
+    #: the question the rest of the payload cannot: the `model` says which model answered, and
+    #: nothing said whether it was *allowed to*. Principle VIII permits model use only through a
+    #: binding over eval-qualified Qualified Model Matrix cells; between 024 and 026 the answering
+    #: path consulted no binding at all, while 024's conformance contract asserted that an
+    #: unqualified cell refused before any provider call.
+    #:
+    #: - ``cell`` — the cell that authorised the answer, i.e. the one actually used. Empty on a
+    #:   governance refusal, because none did.
+    #: - ``bound_cell`` — the cell the ask binding named for this source. Empty when nothing was
+    #:   bound. Equal to ``cell`` in the ordinary case; **different is the whole point** when a
+    #:   pinned model was unavailable and another qualified cell served.
+    #: - ``cell_disposition`` — ``pinned`` | ``fallback:<reason>`` | ``refused:<reason>`` |
+    #:   ``not_applicable``.
+    #:
+    #: **A substitution rides this record rather than `MATRIX_FALLBACK`.** That event's payload
+    #: carries ``run_id`` — an ask has no run, and fabricating one or generalising a second
+    #: sealed-core payload would both be worse than saying so here. An ask consults exactly one
+    #: model, so which cell authorised it is an *attribute of the ask*, the same argument that put
+    #: ``source`` here rather than in a routing event of its own.
+    #:
+    #: **`cell_disposition` describes the RESOLUTION outcome and only that.** A refusal that
+    #: happens *after* resolution succeeded — ``scope_empty``, ``provider_unavailable`` — keeps
+    #: ``pinned``/``fallback``: the ``disposition`` field already says the ask failed later, and
+    #: overwriting the resolution outcome would erase the fact that governance passed.
+    #: ``not_applicable`` is the unroutable decline, where no source was consulted and so no cell
+    #: question arose.
+    #:
     #: **The narrowed request is what the access record carries**, and it is how an investigator
     #: distinguishes "your scope contained nothing" from "records existed outside your scope" —
     #: `EvidenceDisposition` does not distinguish those (it separates only the cross-tenant case),
