@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.audit.schema import AuditEventType
 from tests.a11y.conftest import AXE_TAGS, PortalServer, audit, describe
 
 
@@ -86,6 +87,85 @@ def test_the_delete_confirmation_meets_wcag_22_aa(page: Any, portal_server: Port
     page.goto(f"{thread_url}/delete")
     violations = audit(page)
     assert violations == [], describe(violations)
+
+
+def _ask(page: Any, portal_server: PortalServer, question: str) -> None:
+    page.goto(f"{portal_server.base}/ask")
+    page.fill("#question", question)
+    page.click("form.ask button[type=submit]")
+    page.wait_for_load_state()
+
+
+def test_the_ask_form_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
+    """028. The empty form, including the expectation text a person reads before waiting.
+
+    That text is plain page content rather than a spinner or a live region, which is what makes
+    it perceivable here at all — an announcement nobody can audit is not an affordance.
+    """
+    page.goto(f"{portal_server.base}/ask")
+    violations = audit(page)
+    assert violations == [], describe(violations)
+
+
+def test_a_guidance_answer_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
+    """The state a person actually reads: claims with followable citations."""
+    _ask(page, portal_server, "How does an AI agent obtain an identity with Vault?")
+    violations = audit(page)
+    assert violations == [], describe(violations)
+
+
+def test_an_estate_answer_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
+    """The other answered shape — references rendered as identifiers rather than links.
+
+    Audited separately from guidance because it renders different markup: inert `code` elements
+    where the guidance page has anchors, and a11y failures live in exactly that difference.
+    """
+    portal_server.surface.audit.append_event(
+        correlation_id="a11y-estate-run",
+        tenant_id="tenant-test",
+        event_type=AuditEventType.RUN_START,
+        payload={"subject_user_id": "alice"},
+    )
+    _ask(page, portal_server, "Which runs were denied?")
+    violations = audit(page)
+    assert violations == [], describe(violations)
+
+
+def test_a_declined_ask_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
+    """A decline is an answer, and it gets audited as one."""
+    _ask(page, portal_server, "What is the capital of France?")
+    violations = audit(page)
+    assert violations == [], describe(violations)
+
+
+def test_a_refused_ask_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
+    """The refusal page carries the platform's own sentence, and it must still be readable.
+
+    Rendered by asking with an empty question, which the form refuses before any relay call —
+    the one refusal state reachable without disturbing the session-scoped surface's wiring.
+    """
+    page.goto(f"{portal_server.base}/ask")
+    page.eval_on_selector("#question", "el => el.removeAttribute('required')")
+    page.click("form.ask button[type=submit]")
+    page.wait_for_load_state()
+    violations = audit(page)
+    assert violations == [], describe(violations)
+
+
+def test_the_ask_form_labels_its_control(page: Any, portal_server: PortalServer) -> None:
+    """The same association the composer row protects, for the new field.
+
+    Axe checks a label exists; this checks it points at the question box, because a label
+    pointing at the wrong control is worse than none.
+    """
+    page.goto(f"{portal_server.base}/ask")
+    label = page.get_attribute("label[for=question]", "for")
+    assert label == "question", "the ask form's label does not point at the question box"
+    described = page.get_attribute("#question", "aria-describedby")
+    assert described == "ask-expectation", (
+        "the question box is not described by the expectation text, so a screen-reader user is "
+        "not told an answer takes a while before they wait for one"
+    )
 
 
 def test_the_composer_labels_its_controls(page: Any, portal_server: PortalServer) -> None:

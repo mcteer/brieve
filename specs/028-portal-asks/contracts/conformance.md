@@ -7,10 +7,10 @@
 
 | Group | Where | Needs | Status |
 | --- | --- | --- | --- |
-| The four shapes, patience, token relay, no-classification | `tests/component/test_portal_asks.py` | Nothing | Planned |
-| Containment (egress, catalogued-operations, no credential, client size) | `tests/conformance/portal/test_containment.py` | Nothing — existing rows, which the new route must pass unmodified | In force already |
-| WCAG 2.2 AA + keyboard, for form / answered / declined / refused | `tests/a11y/` | The browser lane CI already runs | Planned |
-| **A person asks through the deployed portal and reads a cited answer (SC-001)** | Browser, deployed portal | The enclave, `ASK_MODEL`, the credential, a qualified cell — all standing as of 2026-08-02 | **Named runner: Dan McTeer** |
+| The four shapes, patience, token relay, no-classification | `tests/component/test_portal_asks.py` | Nothing | **In force** — 11 rows |
+| Containment (egress, catalogued-operations, no credential, client size) | `tests/conformance/portal/test_containment.py` | Nothing | **In force** — 10 rows; the scripted session now drives the ask, so the newest page is inside the claim |
+| WCAG 2.2 AA + keyboard, for form / answered (both sources) / declined / refused | `tests/a11y/` | The browser lane CI already runs | **In force** — 27 rows green |
+| **A person asks through the deployed portal and reads a cited answer (SC-001)** | Browser, deployed portal | The enclave, `ASK_MODEL`, the credential, a qualified cell — all standing as of 2026-08-02 | **Owed — named runner: Dan McTeer** |
 
 No sealed core is touched and no constitution text moves: **no Principle V review and no
 security-maintainer review arises** — the first feature in five for which that sentence is true.
@@ -77,3 +77,17 @@ becomes a portal-authored paragraph about credentials. It would look better in r
 from the API's vocabulary the first time a reason code was added or reworded, leaving the page
 confidently explaining the wrong cause. The row pins the refusal block to the transported
 `detail` string so that fix fails a gate instead of shipping.
+
+---
+
+## What implementation changed about this contract
+
+**The minimum target size, found by the lane rather than by review.** The new navigation links
+rendered at their text height, 18px, and WCAG 2.2's 24px minimum target applies to them. The
+keyboard row caught it on the first run of the ask page. Fixed in the stylesheet (vertical padding
+and an explicit `min-height`) rather than by exempting the nav, because the rule is about whether
+a person with imprecise pointing can hit the link, and the nav is on every page.
+
+Worth recording because it is the second time this feature's own gates found something a reading
+would not: the analysis pass caught the containment session excluding the new page, and the a11y
+lane caught the nav. Both were additions that looked complete and were not.

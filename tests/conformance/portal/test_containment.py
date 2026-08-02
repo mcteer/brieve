@@ -162,6 +162,11 @@ def test_row_every_request_the_portal_makes_is_a_catalogued_operation() -> None:
     )
     portal.get(thread_path + "/delete")
     portal.post(thread_path + "/delete", follow_redirects=False)
+    # 028's ask. A page this session never drives is a page this row never observes, so the
+    # newest route would sit outside the strongest-form containment claim while the row kept
+    # reporting green — the shape 010, 014 and 018 each paid for, one surface over.
+    portal.get("/ask")
+    portal.post("/ask", data={"question": "how does this work?"}, follow_redirects=False)
 
     assert seen, "the scripted session reached nothing; the row proves nothing"
     uncatalogued = [

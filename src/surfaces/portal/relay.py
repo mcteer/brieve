@@ -73,8 +73,24 @@ class ApiRelay:
         token: str,
         json_body: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        timeout: float | None = None,
     ) -> ApiResponse:
-        """One operation, as this person. Every portal call goes through here."""
+        """One operation, as this person. Every portal call goes through here.
+
+        ``timeout`` is **per-operation patience**, and `None` means this relay's own — so every
+        existing call site is untouched by its arrival (028).
+
+        **A parameter rather than a second relay.** Asking takes far longer than anything else the
+        portal does: measured 2026-08-02, roughly two minutes, because the model reasons before it
+        answers and retrieval runs over an 856K corpus. Two relays with two defaults would be two
+        egress points for the containment rows to reason about, and raising the shared default
+        above would spend an ask's patience on a thread listing — the exact harm the ten seconds
+        was chosen to avoid. One number stays the rule; one caller states its own exception.
+
+        **The injected-transport branch deliberately does not receive it.** Both harnesses that
+        inject a transport share a keyword-only signature, and widening it would touch every
+        fixture for a value none of them uses. Patience is therefore asserted at *this* seam.
+        """
         supplied = {k: v for k, v in (params or {}).items() if v is not None}
         query = f"?{urllib.parse.urlencode(supplied)}" if supplied else ""
         url = f"{self.base_url.rstrip('/')}{path}{query}"
@@ -93,7 +109,8 @@ class ApiRelay:
             url, data=data, headers=headers, method=method
         )
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as response:  # noqa: S310
+            patience = self.timeout if timeout is None else timeout
+            with urllib.request.urlopen(req, timeout=patience) as response:  # noqa: S310
                 body = response.read()
                 return ApiResponse(
                     status=response.status, payload=json.loads(body) if body else None

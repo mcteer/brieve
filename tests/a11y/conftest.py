@@ -26,7 +26,11 @@ from fastapi.testclient import TestClient
 from surfaces.portal.app import create_portal
 from surfaces.portal.oidc import OidcClient, code_challenge_for
 from surfaces.portal.relay import ApiRelay, ApiResponse
-from tests.harness.api_fixtures import surface_under_test
+from tests.harness.api_fixtures import (
+    available_credential,
+    qualified_ask_authority,
+    surface_under_test,
+)
 
 AXE = pathlib.Path(__file__).parent / "vendor/axe.min.js"
 PORT = 8099
@@ -49,10 +53,43 @@ class PortalServer:
     surface: Any
 
 
+class _Answers:
+    """An ask provider that cites the corpus, so the ANSWERED page state is reachable (028).
+
+    This gate is about the page, not the platform — everything behind the portal is doubled
+    already. Without a provider the ask page could only ever be audited in its refused state,
+    and the state a person actually reads is the answered one.
+    """
+
+    def answer(self, question: str, material: Any) -> list[dict[str, Any]]:
+        from core.answering.corpus import Corpus
+
+        if isinstance(material, Corpus):
+            document = next(iter(material.documents.values()))
+            return [
+                {
+                    "statement": "An agent presents an attested identity.",
+                    "citations": [{"path": document.path, "anchor": next(iter(document.anchors))}],
+                }
+            ]
+        return [
+            {
+                "statement": "A run was recorded.",
+                "references": [{"entry_hash": r.entry_hash} for r in material[:1]],
+            }
+        ]
+
+
 @pytest.fixture(scope="session")
 def portal_server() -> Iterator[PortalServer]:
     """The real portal as a process, because a browser cannot drive an ASGI object."""
-    surface = surface_under_test()
+    surface = surface_under_test(
+        # 028: arranged so the ask page's ANSWERED state is auditable, not only its refusals.
+        ask_provider=_Answers(),
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(model="anthropic/claude-opus@5"),
+        credential_source=available_credential(),
+    )
     api = TestClient(surface.app)
 
     def transport(*, method: str, url: str, token: str, json_body: object) -> ApiResponse:

@@ -33,6 +33,14 @@ header {
   padding: 0.75rem 1rem; border-bottom: 1px solid var(--line);
 }
 .brand { font-weight: 700; color: var(--ink); text-decoration: none; }
+/* Main navigation (028). The links carry vertical padding rather than sitting at their
+   text height, because WCAG 2.2's 24px minimum target applies to them and an 18px line
+   box fails it — caught by the keyboard lane on the first run of the ask page. */
+header nav { display: flex; gap: 1rem; margin-left: auto; margin-right: 1rem; }
+header nav a {
+  color: var(--ink); min-height: 24px; display: inline-flex; align-items: center;
+  padding: 0.25rem 0;
+}
 main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 footer {
   max-width: 46rem; margin: 0 auto; padding: 1rem;
@@ -100,3 +108,16 @@ form.inline { display: inline; }
   min-height: 24px;
   line-height: 24px;
 }
+
+/* The ask page (028). The answer's own regions, and the reference identifiers that are
+   deliberately not links — `code` rather than `a`, because a record hash resolves to
+   nothing a browser can fetch and a dead link teaches readers the references are decorative. */
+.ask textarea { width: 100%; font: inherit; padding: 0.5rem; border: 1px solid var(--line); }
+.ask label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+.ask button { margin-top: 0.75rem; }
+.answer { margin-top: 2rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+.claims { padding-left: 1.25rem; }
+.claims li { margin-bottom: 1rem; }
+.citations, .references { list-style: none; padding-left: 0; font-size: 0.875rem; }
+.citations a { color: var(--accent); }
+.references code { color: var(--muted); word-break: break-all; }

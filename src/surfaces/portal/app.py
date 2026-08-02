@@ -35,6 +35,19 @@ STATIC = Path(__file__).parent / "static"
 #: How long a portal session lasts when the token carries no usable expiry.
 FALLBACK_SESSION_LIFETIME = timedelta(hours=1)
 
+#: How long the portal waits for an answer, and **only** for an answer.
+#:
+#: Measured rather than chosen: a real question through the deployed surface on 2026-08-02 took
+#: roughly two minutes, because the model reasons before it answers and retrieval runs over an
+#: 856K corpus. 180 seconds is that plus headroom, and it is the same allowance the demonstration
+#: used.
+#:
+#: **Passed per call, so no other page becomes slower.** The relay's own ten seconds exists
+#: because a page that hangs teaches people to reload; extending it globally would apply an ask's
+#: patience to a thread listing and turn one slow request into several. A row asserts both halves
+#: — that an ask carries this, and that a listing in the same session does not.
+ASK_PATIENCE = 180.0
+
 
 def create_portal(
     *,
@@ -126,6 +139,62 @@ def create_portal(
                 "reachable": threads.reachable,
                 "refused": not threads.ok and threads.reachable,
             },
+        )
+
+    # ------------------------------------------------------------------- ask
+
+    @app.get("/ask", response_class=HTMLResponse)
+    def ask_form(request: Request) -> Response:
+        """The question box. Its own page, and that is a decision rather than layout.
+
+        A thread is where turns **act**; an ask never does (ADR-0039). Putting them in one
+        surface would make that difference a property of which button was pressed — legible to
+        whoever wrote the code and invisible to the person using it.
+        """
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/ask")
+        return templates.TemplateResponse(request=request, name="ask.html", context={})
+
+    @app.post("/ask")
+    def ask(request: Request, question: str = Form("")) -> Response:
+        """Relay the question and render what came back. **Decide nothing.**
+
+        The portal does not route between guidance and estate, does not evaluate governance,
+        does not compute scope, and does not classify refusals. It sends the person's own token
+        and renders the platform's answer — which is ADR-0034's thin-client rule at the one place
+        this feature could most easily have broken it.
+        """
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/ask")
+
+        asked = question.strip()
+        if not asked:
+            # THE CHEAPEST REFUSAL IN THE FEATURE, and it costs no API call and no model call.
+            # An empty question relayed would spend a governed ask, a vendor call and a trail
+            # record to be told what this line already knows.
+            return templates.TemplateResponse(
+                request=request,
+                name="ask.html",
+                context={"empty": True},
+                status_code=400,
+            )
+
+        answered = app.state.relay.request(
+            "POST",
+            "/ask",
+            token=session.access_token,
+            json_body={"question": asked},
+            # The one call in the portal that waits longer, and only this one.
+            timeout=ASK_PATIENCE,
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="ask.html",
+            context={"question": asked, "response": answered},
+            # The API's own status, carried rather than reinterpreted. A refusal is an answer.
+            status_code=answered.status if answered.reachable else 503,
         )
 
     @app.post("/threads")
