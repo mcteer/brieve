@@ -93,7 +93,10 @@ marker off).
       operator needs before "nothing is wired". Today the provider-None check runs first
       (measured, `ask.py:249,297`); this task inverts that. The three refusals are **recorded
       via `record_ask` then returned** (SC-008); a produced answer records `cell`, `bound_cell`,
-      `cell_disposition` (SC-005).
+      `cell_disposition` (SC-005). **All seven call sites get their defined value** (analysis
+      U4, data-model § ASK_ANSWERED): post-resolution refusals (`scope_empty`,
+      `provider_unavailable`) keep the resolution outcome, and the `neither` decline records
+      `not_applicable` — no site is left inventing one.
 - [ ] T011 [US1] `create_app` in `src/surfaces/api/app.py` and `McpTransport` in
       `src/surfaces/mcp/transport.py` gain `ask_authority`, threaded to the one shared
       implementation — parity by construction, not by twin edits (ADR-0033).
@@ -178,15 +181,20 @@ contract names it.
 
 ## Phase 6: Polish, deployment, and the named runs
 
-- [ ] T022 [P] Terraform policy in `infra/environments/dev/`: the surface's role reads
-      `harness-authority/data/ask-bindings` and `data/model-matrix`; seed an example ask-binding
+- [ ] T022 [P] Terraform policy in `infra/environments/dev/`: the **`mcp-surface`** role — the
+      served surface's own identity (measured, `served.py:58`), distinct from the service's
+      `mcp` and from the run role `test_matrix_is_readable` covers — reads
+      `harness-authority/data/ask-bindings` and `data/model-matrix`. **A two-path grant to a
+      named role, not an increment**: no dev policy grants either path to any surface role
+      today (analysis U5); seed an example ask-binding
       record **and the two `ask` cells it names** into the dev matrix record — honest only as a
       pair (research: a seeded binding naming cells the matrix lacks would make `make dev-up`
       produce a surface that refuses `unqualified_cell` out of the box, which reads as broken
       rather than unbound).
 - [ ] T023 [GATE:conformance] The readability row in
-      `tests/conformance/identity/test_matrix_is_readable.py` (or sibling): the surface's role
-      reads `data/ask-bindings` against the live fabric — a grant in HCL and an effective grant
+      `tests/conformance/identity/test_matrix_is_readable.py` (or sibling): authenticating **as
+      `mcp-surface`** — not the run role — reads `data/ask-bindings` and `data/model-matrix`
+      against the live fabric — a grant in HCL and an effective grant
       are different claims (010's lesson, the plan's named row).
 - [ ] T024 [P] Glossary entries in `docs/glossary.md`: *ask binding*, *cell disposition* —
       linking *scope*, *route*, and the matrix vocabulary.

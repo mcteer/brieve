@@ -52,6 +52,15 @@ raise `ResolutionRefused`.
 - **Substitution is FR-006 satisfied in one record**: `bound_cell` is the pinned one, `cell` is
   the used one, `cell_disposition` carries the reason. No run id is fabricated and no second
   sealed-core payload is generalised (research F3).
+- **Every call site has a defined value (analysis U4 — seven sites, measured).**
+  `cell_disposition` describes the **resolution outcome**, and only that:
+  - Answered, and refusals occurring **after** resolution succeeded (`scope_empty`,
+    `provider_unavailable`): the resolution outcome stands — `pinned` or `fallback:<reason>`.
+    The `disposition` field already says the ask failed later; overwriting the resolution
+    outcome would erase the fact that governance passed.
+  - The three governance refusals: `refused:<reason>` mirroring the disposition.
+  - A `neither` decline: **`not_applicable`** — no source was consulted, so there was no cell
+    question to answer. Not an empty string, which T008 reserves for "not yet wired".
 - **Principle V review covers all three fields** (Dan McTeer, before merge). The exact-payload
   row in `tests/component/test_answering.py` grows by exactly these keys, in the same change.
 

@@ -74,6 +74,13 @@ platform's behaviour when none exists — refuse — is exactly what SC-001 asse
 flat assertion with a pointer to the rows here; the history of the gap stays in this spec and in
 026's traceability, not papered over.
 
+**They do not assert the core answer functions are unreachable without a cell.** The binding
+governs the **surfaces** — the only places a real provider exists — and the eval lanes drive
+`answer_question` / `answer_estate_question` directly with recorded providers, by design: core is
+handed its provider the same way it is handed its records, and the never-acts rows are what keep
+that hand-off from widening. The provider-never-called row asserts the surfaces; it does not
+claim core is unreachable, and reading it that way would be wrong (analysis C2).
+
 **They do not assert the substitution path against a live vendor.** `available` is arranged in
 fixtures; the live lane's cost buys qualification evidence, not fallback choreography.
 
