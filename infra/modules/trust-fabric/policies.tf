@@ -185,6 +185,22 @@ resource "vault_policy" "harness_authority_read" {
     path "${vault_mount.harness_authority.path}/data/model-matrix" {
       capabilities = ["read"]
     }
+    # The ASK BINDING (026). Which qualified cell an ask may use, per source.
+    #
+    # Beside the matrix and read-only for the same reason: a surface that could write its own
+    # binding could point an ask at any cell it liked, which is qualification by whoever holds
+    # the surface rather than by evaluation.
+    #
+    # **The exact path, not a glob** — the trap two blocks up, applied on the first try rather
+    # than after a 403 that presents as an unreachable fabric. `ask-bindings` is one record with
+    # no subpath, exactly like `model-matrix`, and a Vault glob does not match the empty
+    # remainder. The pairing below exists so nobody adds only the glob later.
+    path "${vault_mount.harness_authority.path}/data/ask-bindings" {
+      capabilities = ["read"]
+    }
+    path "${vault_mount.harness_authority.path}/data/ask-bindings/*" {
+      capabilities = ["read"]
+    }
     # Which packs a definition reaches, its binding map, and its tier (013). The record the
     # whole feature reads: isolation, binding-map validation, and tier resolution all
     # consume these three fields. Beside the ceiling and granted in the same policy,

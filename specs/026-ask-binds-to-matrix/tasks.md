@@ -141,14 +141,14 @@ marker off).
 **Independent test**: pinned model unavailable + qualified alternative → answer with
 `bound_cell` ≠ `cell` and a reason; no alternative → refusal.
 
-- [ ] T017 [US2] Thread `available` into `AskAuthority.resolve` in
+- [X] T017 [US2] Thread `available` into `AskAuthority.resolve` in
       `src/core/authority/ask_binding.py` and `src/surfaces/api/ask.py`, and it is **exactly
       `{the injected provider's model}`** — one element, the model the provider was constructed
       for (analysis U2). Anything wider lets fallback select a cell for a model the provider
       cannot call, and the ask record would then name cell X while the provider called model Y:
       record/actual divergence on an attestation-relevant record, which is the worst available
       outcome. The docstring says this in exactly those words.
-- [ ] T018 [US2] [GATE:conformance] Substitution rows in
+- [X] T018 [US2] [GATE:conformance] Substitution rows in
       `tests/conformance/answering/test_ask_binds_to_matrix.py`: pinned unavailable + qualified
       alternative → answered, record carries `bound_cell`, `cell`,
       `cell_disposition="fallback:model_unavailable"` (SC-006, FR-006); **no alternative →
@@ -158,7 +158,7 @@ marker off).
       constructed for, asserted by comparing the record against the provider's own
       configuration — divergence here would be the trail naming an authorisation for a model
       that never ran.
-- [ ] T019 [P] [US2] [GATE:correlation/evidence] The investigator walk row: for a substituted
+- [X] T019 [P] [US2] [GATE:correlation/evidence] The investigator walk row: for a substituted
       answer, the ask record alone names what was asked for and what was used — no second
       event, no run id anywhere in the payload (research F3's claim, asserted).
 
@@ -171,17 +171,17 @@ marker off).
 **Independent test**: T001's row fails when the check is removed (verified at T015); the 024
 contract names it.
 
-- [ ] T020 [US3] Correct `specs/024-portal-answering/contracts/conformance.md` (FR-012): the
+- [X] T020 [US3] Correct `specs/024-portal-answering/contracts/conformance.md` (FR-012): the
       line *"An unqualified cell refuses before any provider call"* gains the named row
       reference (`test_ask_binds_to_matrix.py::`provider-never-called) and a dated note that
       the assertion was unbacked between 024's merge (2026-08-02) and 026's — recorded plainly,
       because a claim nobody re-measured is the defect class this lineage keeps closing.
-- [ ] T021 [P] [US3] Update 026's own `specs/026-ask-binds-to-matrix/contracts/conformance.md`
+- [X] T021 [P] [US3] Update 026's own `specs/026-ask-binds-to-matrix/contracts/conformance.md`
       status table as rows land, and record the Principle V review outcome when given.
 
 ## Phase 6: Polish, deployment, and the named runs
 
-- [ ] T022 [P] Terraform policy in `infra/environments/dev/`: the **`mcp-surface`** role — the
+- [X] T022 [P] Terraform policy in `infra/environments/dev/`: the **`mcp-surface`** role — the
       served surface's own identity (measured, `served.py:58`), distinct from the service's
       `mcp` and from the run role `test_matrix_is_readable` covers — reads
       `harness-authority/data/ask-bindings` and `data/model-matrix`. **A two-path grant to a
@@ -191,14 +191,14 @@ contract names it.
       pair (research: a seeded binding naming cells the matrix lacks would make `make dev-up`
       produce a surface that refuses `unqualified_cell` out of the box, which reads as broken
       rather than unbound).
-- [ ] T023 [GATE:conformance] The readability row in
+- [X] T023 [GATE:conformance] The readability row in
       `tests/conformance/identity/test_matrix_is_readable.py` (or sibling): authenticating **as
       `mcp-surface`** — not the run role — reads `data/ask-bindings` and `data/model-matrix`
       against the live fabric — a grant in HCL and an effective grant
       are different claims (010's lesson, the plan's named row).
-- [ ] T024 [P] Glossary entries in `docs/glossary.md`: *ask binding*, *cell disposition* —
+- [X] T024 [P] Glossary entries in `docs/glossary.md`: *ask binding*, *cell disposition* —
       linking *scope*, *route*, and the matrix vocabulary.
-- [ ] T025 [P] ROADMAP entry for 026: the gap (a merged contract asserting an unperformed
+- [X] T025 [P] ROADMAP entry for 026: the gap (a merged contract asserting an unperformed
       refusal), the fix, and the standing deferrals (portal answering, corpus freshness, team
       scope, **and — new here — real served answering**: the served surface holds no vendor
       credential and wiring one is an undecided deployment posture, so the served check proves

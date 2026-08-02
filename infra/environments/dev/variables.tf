@@ -165,7 +165,37 @@ variable "model_matrix_cells" {
       qualified_by = "fixture"
       judge        = "seed"
     },
+    # 026's `ask` cell, seeded TOGETHER WITH the binding below that names it.
+    #
+    # Separately would be worse than not at all: a binding naming a cell the matrix does not
+    # hold makes `make dev-up` produce a surface refusing `unqualified_cell`, which reads as
+    # broken and sends whoever hits it to the matrix instead of to the missing provider.
+    #
+    # The dev enclave wires no vendor provider (that posture is undecided and deferred), so a
+    # seeded ask still refuses — but it refuses `provider_unavailable`, which is only reachable
+    # once governance has PASSED. That progression is the served check.
+    {
+      pack         = "fixture"
+      model        = "fixture/scripted@1"
+      role         = "ask"
+      qualified_by = "fixture"
+      judge        = "seed"
+    },
   ]
+}
+
+variable "ask_binding" {
+  description = "Which qualified cell an ask may use, per source (026)."
+  type = object({
+    guidance_cell = optional(string, "")
+    estate_cell   = optional(string, "")
+  })
+  # Both sources bound to the one seeded `ask` cell above. Per-source binding is what the
+  # record supports; one cell serving both is what a dev enclave with one fixture model has.
+  default = {
+    guidance_cell = "fixture:fixture/scripted@1:ask"
+    estate_cell   = "fixture:fixture/scripted@1:ask"
+  }
 }
 
 # Supplied by the second phase of bring-up, not by a human.

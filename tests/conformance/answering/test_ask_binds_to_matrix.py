@@ -251,3 +251,130 @@ def test_governance_refuses_before_availability_when_both_are_absent() -> None:
 
     assert response.status_code == 403
     assert _asks(surface)[0].payload["disposition"] == "unbound"
+
+
+# --------------------------------------------------------------- US2: substitution
+
+
+ALTERNATE = "anthropic/claude-sonnet@5"
+
+
+def test_an_unavailable_pinned_cell_falls_back_and_the_record_says_so() -> None:
+    """SC-006, FR-006 — one record carries the pinned cell, the used cell, and the reason.
+
+    No second event and no fabricated run id: `MATRIX_FALLBACK`'s payload assumes a run, and an
+    ask has none. An ask consults exactly one model, so which cell authorised it is an attribute
+    of the ask.
+    """
+    surface = surface_under_test(
+        # The provider is constructed for the ALTERNATE model — so that is what `available` holds.
+        ask_provider=CountingProvider(),
+        ask_model=ALTERNATE,
+        ask_authority=_authority(
+            {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
+            _cells(f"vault:{MODEL}:ask", f"vault:{ALTERNATE}:ask"),
+        ),
+    )
+
+    response = TestClient(surface.app).post(
+        "/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer()
+    )
+
+    assert response.status_code == 200
+    payload = _asks(surface)[0].payload
+    assert payload["bound_cell"] == f"vault:{MODEL}:ask"
+    assert payload["cell"] == f"vault:{ALTERNATE}:ask"
+    assert payload["cell_disposition"].startswith("fallback:")
+
+
+def test_no_qualified_alternative_refuses_rather_than_reaching_further() -> None:
+    """FR-007. There is no path from unavailability to an unqualified model."""
+    provider = CountingProvider()
+    surface = surface_under_test(
+        ask_provider=provider,
+        ask_model=ALTERNATE,
+        ask_authority=_authority(
+            # Only the pinned cell is qualified, and its model is not the one configured.
+            {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
+            _cells(f"vault:{MODEL}:ask"),
+        ),
+    )
+
+    response = TestClient(surface.app).post(
+        "/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer()
+    )
+
+    assert response.status_code == 403
+    assert provider.calls == 0
+
+
+def test_fallback_never_selects_a_withdrawn_cell() -> None:
+    """The no-third-branch property, exercised for asks.
+
+    An available alternative that has been withdrawn is not a candidate — otherwise "withdrawn"
+    would mean "unpinnable" rather than "not qualified".
+    """
+    surface = surface_under_test(
+        ask_provider=CountingProvider(),
+        ask_model=ALTERNATE,
+        ask_authority=_authority(
+            {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
+            _cells(f"vault:{MODEL}:ask", f"vault:{ALTERNATE}:ask", withdrawn=True),
+        ),
+    )
+
+    response = TestClient(surface.app).post(
+        "/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer()
+    )
+    assert response.status_code == 403
+
+
+def test_the_used_cells_model_is_the_model_the_provider_was_built_for() -> None:
+    """Analysis U2 — record/actual agreement, asserted rather than assumed.
+
+    `available` is exactly the injected provider's model. Anything wider would let fallback select
+    a cell for a model this provider cannot call, and the record would then name an authorisation
+    for a model that never ran — on an attestation-relevant record, the worst available outcome.
+    """
+    surface = surface_under_test(
+        ask_provider=CountingProvider(),
+        ask_model=ALTERNATE,
+        ask_authority=_authority(
+            {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
+            _cells(f"vault:{MODEL}:ask", f"vault:{ALTERNATE}:ask"),
+        ),
+    )
+
+    TestClient(surface.app).post(
+        "/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer()
+    )
+
+    payload = _asks(surface)[0].payload
+    # The cell's model component, compared against what the surface was configured with.
+    assert payload["cell"].split(":")[1] == ALTERNATE
+
+
+def test_a_substitution_needs_no_second_event_and_names_no_run() -> None:
+    """T019 — the investigator walk, in one record.
+
+    The whole provenance of a substituted answer is on the ask record: what was asked for, what
+    was used, and why. No `matrix_fallback` entry, and no `run_id` anywhere in the payload.
+    """
+    surface = surface_under_test(
+        ask_provider=CountingProvider(),
+        ask_model=ALTERNATE,
+        ask_authority=_authority(
+            {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
+            _cells(f"vault:{MODEL}:ask", f"vault:{ALTERNATE}:ask"),
+        ),
+    )
+
+    TestClient(surface.app).post(
+        "/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer()
+    )
+
+    kinds = {str(e.event_type) for e in surface.audit.all_entries()}
+    assert "matrix_fallback" not in kinds
+    payload = _asks(surface)[0].payload
+    assert "run_id" not in payload
+    assert {"cell", "bound_cell", "cell_disposition"} <= set(payload)

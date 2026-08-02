@@ -58,7 +58,14 @@ decline (FR-011).
 **Asking reaches no effecting tool** — including when the question is phrased as an instruction.
 Asserted by exercising the path, not argued from structure.
 
-**An unqualified cell refuses before any provider call.**
+**An unqualified cell refuses before any provider call.** — **UNBACKED FROM 2026-08-02 UNTIL
+2026-08-02 (026).** This line asserted a refusal that nothing performed: no module on the
+answering path referenced the Qualified Model Matrix, and the matrix record held no `ask` cell for
+any pack. It is now backed by
+`tests/conformance/answering/test_ask_binds_to_matrix.py::test_a_provider_with_no_qualified_cell_is_never_called`,
+which counts calls **at the provider** — a response-level check would have passed a refusal that
+had already called the model. Recorded rather than quietly corrected, because the defect this
+lineage keeps closing is exactly a claim nobody re-measured.
 
 **The trail records who asked and what was consulted, and never the content.**
 
