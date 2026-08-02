@@ -71,7 +71,7 @@ conformance:
 	C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
-	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability tests/conformance/evidence tests/conformance/authority tests/conformance/answering -m host_enclave -q
+	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability tests/conformance/evidence tests/conformance/authority -m host_enclave -q
 	#
 	# 018 adds `tests/conformance/authority`, and it very nearly repeated 010's mistake in
 	# the feature built to end exactly this class of gap. Its rows passed by hand and its
@@ -85,6 +85,15 @@ conformance:
 	# 012's containment lane. Named here in the same change that created the directory —
 	# 010 lost a whole feature's rows to a directory no lane enumerated, and the fix is to
 	# wire it at birth rather than to remember later.
+	#
+	# 024's answering lane is deliberately NOT on the host_enclave line above, and an
+	# earlier draft of this change put it there. Its rows carry no `host_enclave` marker,
+	# so that line deselected all five while reading as though it ran them — an inert
+	# entry is worse than no entry, because it answers "is this directory wired?" with a
+	# yes. They are swept by the FIRST line of this recipe, which runs every directory
+	# under tests/conformance that is not enclave-marked, and that is the whole coverage
+	# story for them. The trap this file documents three times is about directories that
+	# line CANNOT see; this is not one.
 	$(UV_RUN) pytest tests/conformance/portal -q
 	#
 	# 013's pack lane. Its HERMETIC rows need no wiring — the first line of this recipe
