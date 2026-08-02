@@ -22,8 +22,8 @@
 | --- | --- | --- | --- |
 | Constitution amendment | Two named exceptions; the static-key sentence rewritten. **Landed in this PR** (v1.4.0, ADR-0058) | **Dan McTeer** (security-maintainer review) | **Owed — review gates the merge; the text itself is in the diff** |
 | Principle V review | One additive reference field on a sealed-core record (`model_authority` on `ASK_ANSWERED`; `MODEL_GATE` untouched) | **Dan McTeer** | **Owed — gates this PR** |
-| SC-001 real answer + SC-003 revocation | Ask through the deployed surface, rotate, delete (quickstart §5) | **Dan McTeer** | **Owed** |
-| `make conformance` on a live enclave | Includes the readability and grant rows | **Dan McTeer** | **Owed** |
+| SC-001 real answer + SC-003 revocation | Ask through the deployed surface, rotate, delete (quickstart §5) | **Dan McTeer** | **Owed — and blocked on out-of-scope work; see below** |
+| `make conformance` on a live enclave | Includes the readability and grant rows | **Dan McTeer** | **Done 2026-08-02, exit 0** |
 
 ---
 
@@ -142,3 +142,29 @@ deployed estate answer would have dropped every claim and read as *the records d
 answer*. And the conformance-lane marker check matched `mark.enclave` inside a docstring, which
 would have reported a row that does not exist while a real orphaned row elsewhere stayed findable
 only by luck.
+
+## SC-001 is not reachable inside this feature's stated scope
+
+Stated plainly rather than left to be discovered at the demonstration.
+
+The deployed answer needs three things. Two are delivered and verified against the live enclave:
+`ASK_MODEL` reaches both surfaces, and the credential mount, policy, record and per-role grants are
+applied and readable. The third is **a Qualified Model Matrix cell for a real model in the `ask`
+role**, and the enclave holds only `fixture:` cells.
+
+**That cell cannot be written by hand.** Principle VIII permits model use only through eval-gated
+promotion; authoring a cell directly would fabricate a qualification, which is precisely what the
+matrix exists to prevent — and 026 exists because a governed answering path was shipped without
+one. Earning it requires a clean `make evals-live` run, which this feature's spec lists under
+*Deferred and NOT in scope*: "promoting the `ask` cell to `live` (which needs a clean full-lane
+run and is unrelated to posture)".
+
+**The tension was in the spec from the start.** SC-001 promises an outcome that depends on work the
+Assumptions section defers. Implementation did not create it and cannot dissolve it: the two
+remaining actions — qualifying the cell, and writing a real vendor credential into the enclave —
+are the maintainer's, and neither belongs to a posture feature.
+
+What the posture itself proves without them: the credential is brokered per task, refuses
+distinguishably, never leaks, never falls back to the environment, revokes without a restart, and
+is reached by one reader from both paths. All of that is asserted by rows in the blocking lanes,
+and the enclave lane confirms the deployment matches.

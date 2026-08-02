@@ -233,13 +233,30 @@ check.
       material* — linking *ask binding* and the matrix vocabulary.
 - [X] T028 [P] ROADMAP entry for 027: the posture, the amendment, and the standing deferrals
       (per-tenant model scope — new here — plus portal answering, corpus freshness, team scope).
-- [ ] T029 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep all
-      green; then `make conformance` on a live enclave (includes T026). **Runner: Dan McTeer.**
-- [ ] T030 The thing three features could not do (SC-001, SC-003) — **named runner: Dan McTeer**.
-      Write a real key to `model-credentials/anthropic`, seed a live `ask` cell, and per
-      quickstart §5: ask through the served surface → a real answer with `model_authority`
-      recorded; rotate → next ask on the new generation; **delete → next ask refuses
-      `credential_unavailable`, no restart**. The same three steps prove SC-001 and SC-003.
+- [X] T029 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep all
+      green; then `make conformance` on a live enclave (includes T026). **Run 2026-08-02, exit 0**
+      — every lane including the deployment and mcp-surface lanes that stand real surfaces up. The
+      trust-fabric changes were applied **targeted to `module.trust_fabric`**: a bare apply outside
+      `enclave-up` wants to replace the Vault container on pre-existing env drift, unrelated to
+      this change and deliberately not applied.
+- [ ] T030 The thing three features could not do (SC-001, SC-003) — **named runner: Dan McTeer.
+      BLOCKED on work this spec puts out of scope, and the blocker is worth stating precisely.**
+
+      Three preconditions (quickstart §5). Two are ready: `ASK_MODEL` now reaches both deployed
+      surfaces, and the credential path is applied and readable by all three roles (T029). The
+      third is **a matrix cell qualifying a real model for `ask`**, and the dev matrix holds only
+      `fixture:` cells — measured, and confirmed at the live enclave after the apply.
+
+      **That cell cannot be written by hand.** Principle VIII permits model use only through
+      eval-gated promotion; hand-authoring a cell would fabricate a qualification, which is the
+      one thing the matrix exists to prevent. Earning it means a clean `make evals-live` run —
+      which this feature's own spec lists under *Deferred and NOT in scope*: "promoting the `ask`
+      cell to `live` (which needs a clean full-lane run and is unrelated to posture)".
+
+      **So SC-001 is not reachable inside this feature's stated scope**, and that tension was in
+      the spec from the start rather than introduced by implementation. Recorded here rather than
+      resolved unilaterally: qualifying the cell and writing a real vendor credential into the
+      enclave are both the maintainer's calls.
 
 ---
 
