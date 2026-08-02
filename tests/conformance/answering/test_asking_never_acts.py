@@ -88,7 +88,10 @@ def test_the_path_cannot_reach_a_tool_at_all() -> None:
 ANSWERING_MODULES = (
     "src/core/answering/answer.py",
     "src/core/answering/corpus.py",
+    "src/core/answering/estate.py",
     "src/core/answering/record.py",
+    "src/core/answering/routing.py",
+    "src/core/answering/scope.py",
     "src/core/answering/streams.py",
 )
 
@@ -123,3 +126,21 @@ def test_the_answering_path_fetches_nothing_for_itself(module: str) -> None:
         f"{module} fetches its own material ({reaching}) — the answering path must be HANDED "
         f"what it may see, or scope becomes a matter of what it chose to read"
     )
+
+
+@pytest.mark.parametrize(
+    "module", ["src/core/answering/estate.py", "src/core/answering/routing.py"]
+)
+def test_the_estate_path_cannot_reach_a_tool_either(module: str) -> None:
+    """025's half of FR-007, read from imports rather than from prose.
+
+    The estate path is the one most likely to acquire the ability to act: it already knows what
+    happened, and *"and could you re-run the failed one"* is one sentence away. Granting that means
+    adding an import here, which is visible in review.
+    """
+    reaching = [
+        m
+        for m in _imports_of(module)
+        if any(w in m for w in ("registry", "authority", "tools", "dispatch"))
+    ]
+    assert not reaching, f"the estate answering path can reach {reaching}"

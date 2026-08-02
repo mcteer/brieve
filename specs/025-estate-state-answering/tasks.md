@@ -97,17 +97,17 @@ every claim referenced, no verdicts.
 answers differing exactly by entitlement, each claim resolving into that subject's own scoped
 read.
 
-- [ ] T010 [US1] Create `src/core/answering/estate.py`: `EstateReference` (entry hash),
+- [X] T010 [US1] Create `src/core/answering/estate.py`: `EstateReference` (entry hash),
       `EstateClaim`, `EstateAnswer` (disposition / source / claims / declined_reason / dropped —
       data-model.md shapes), `EstateProvider` protocol, and `RecordedEstateProvider`. Module
       docstring carries the never-acts inheritance: a reader of scoped records and a provider
       seam, no registry, no grant, no store import.
-- [ ] T011 [US1] Implement `answer_estate_question(question, records, provider)` in
+- [X] T011 [US1] Implement `answer_estate_question(question, records, provider)` in
       `src/core/answering/estate.py`: provider proposes claims; **every reference must resolve
       into `records` — the asker's own scoped read result — or the claim drops** (research F3);
       nothing left → decline whose reason names the records, never the corpus (FR-010c). Provider
       faults raise `ProviderUnavailable`, never shape a decline (FR-003).
-- [ ] T012 [P] [US1] [GATE:fail-closed] Component rows in
+- [X] T012 [P] [US1] [GATE:fail-closed] Component rows in
       `tests/component/test_estate_answering.py`: resolvable references survive; one unresolvable
       reference drops its claim into `dropped`; all-dropped declines with the estate-naming
       reason; empty scoped read declines identically to not-yours (SC-008's response half);
@@ -115,11 +115,11 @@ read.
       ("which secrets engines are mounted?") routed to estate declines plainly, naming the
       records, because the eval suite structurally cannot carry decline cases (data-model.md §
       Eval case shape) and this behaviour must be asserted somewhere.
-- [ ] T013 [P] [US1] [GATE:fail-closed] Verdict-vocabulary row in the same file: an answer citing
+- [X] T013 [P] [US1] [GATE:fail-closed] Verdict-vocabulary row in the same file: an answer citing
       violation records that contains *compliant / passing / healthy / safe* about the estate
       fails (SC-003, FR-005) — checked over the assembled answer, where the temptation lives, not
       the provider output.
-- [ ] T014 [US1] Wire the estate branch into `ask_for()` in `src/surfaces/api/ask.py` — and the
+- [X] T014 [US1] Wire the estate branch into `ask_for()` in `src/surfaces/api/ask.py` — and the
       collaborators are **parameters, injected end to end** (pass-2 P2-2): `build_router` and
       `create_app` gain `evidence_query` for the ask path (the transport already holds
       `self._evidence`), and `tests/harness/api_fixtures.py` shares ONE instance between both
@@ -132,43 +132,43 @@ read.
       door, FR-008 free), then `answer_estate_question` over the result; `record_ask` with
       `source="estate"` and the access stream's correlation id as the consulted identity (U2). On
       `neither` — decline naming both sources, `source="neither"`.
-- [ ] T015 [US1] The MCP side reaches the same implementation through the shared `ask_for` in
+- [X] T015 [US1] The MCP side reaches the same implementation through the shared `ask_for` in
       `src/surfaces/mcp/transport.py` — parameter threading only; any logic difference between
       the surfaces is a defect by construction (ADR-0033).
-- [ ] T016 [US1] [GATE:conformance] The differential-entitlement row (SC-001) in
+- [X] T016 [US1] [GATE:conformance] The differential-entitlement row (SC-001) in
       `tests/conformance/answering/test_estate_bounded_by_asker.py`: two subjects, same tenant,
       different roles (`operator` vs `compliance-analyst` — the two visibility classes T004
       seeds; subjects are **harness-constructed**, so no production claim-mapping change is
       needed for the row — pass-4 P4-2), identical question — answers compared (not inspected) and differing
       exactly by scope; each claim's reference resolves into that subject's own read; the
       role-poorer subject's answer contains no shape of the other's records (FR-005a).
-- [ ] T016a [US1] [GATE:conformance] The SC-009 integration row (analysis C1) in
+- [X] T016a [US1] [GATE:conformance] The SC-009 integration row (analysis C1) in
       `tests/conformance/answering/test_ask_routes_by_shape.py`: through the **wired** `ask_for`
       on both surfaces — an estate-shaped question never consults the corpus, and a
       guidance-shaped question leaves the evidence-access stream **unchanged** (asserted by
       absence of a new access record). T005 tests `route()` in isolation and cannot catch the
       wiring bug where routing is consulted but the estate read happens anyway — this row can.
-- [ ] T017 [P] [US1] [GATE:conformance] The caller/investigator row (SC-008) in the same file:
+- [X] T017 [P] [US1] [GATE:conformance] The caller/investigator row (SC-008) in the same file:
       "no records in scope" and "records exist, not yours" produce byte-identical response
       dispositions and reasons, while the trail lets an investigator tell them apart via the
       **narrowed request recorded on the access record** — NOT via disposition (analysis U1:
       `_disposition` distinguishes only cross-tenant; both role-scope cases record `SCOPED`). The
       row asserts the access record carries the narrowed `event_types`, and that re-running the
       query unnarrowed surfaces what lay outside them. Both halves asserted; either alone fails.
-- [ ] T018 [P] [US1] [GATE:no-secret-leak] Row asserting the estate answer carries references and
+- [X] T018 [P] [US1] [GATE:no-secret-leak] Row asserting the estate answer carries references and
       statements only — no payload content of the referenced entries beyond the claim's own text,
       and nothing credential-shaped, in `tests/conformance/answering/test_estate_bounded_by_asker.py`.
-- [ ] T019 [US1] [GATE:conformance] Extend the never-acts rows in
+- [X] T019 [US1] [GATE:conformance] Extend the never-acts rows in
       `tests/conformance/answering/test_asking_never_acts.py` over the estate path: the import
       row covers `routing.py` / `scope.py` / `estate.py` (replacing T002's baseline with the
       one-door shape: `estate.py` imports no query, no store, no registry), and the exercised
       rows add instruction-shaped estate questions — *"fix the workspaces that violate this
       control"* answers or declines and changes nothing (SC-004, US1 scenario 4).
-- [ ] T020 [US1] [GATE:conformance] Estate verdicts join the parity rows in
+- [X] T020 [US1] [GATE:conformance] Estate verdicts join the parity rows in
       `tests/conformance/mcp/test_ask_parity.py`: estate answer, estate decline (reason
       compared, not just disposition), empty-roles refusal, and store-failure-is-not-a-decline —
       same verdict on both surfaces. Parity grows by zero operations.
-- [ ] T021 [US1] [GATE:correlation/evidence] The walk row: an estate ask's `ask_answered`
+- [X] T021 [US1] [GATE:correlation/evidence] The walk row: an estate ask's `ask_answered`
       record's consulted-identity field leads to the evidence-access **stream**
       (`evidence-access:{tenant}` — stable per 022, so one hop lands on the stream, not the
       single record; analysis U2), and within it the read this question performed is **locatable
