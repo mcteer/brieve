@@ -48,15 +48,22 @@ resource "vault_policy" "model_credential_read" {
 
 # The dev placeholder — deliberately non-functional, and seeded rather than absent.
 #
-# **Seeded because it exercises one more link.** With no record at all, `make dev-up`'s ask
-# progression stops at `credential_unavailable` and the fetch path itself is never proven. With a
-# dud, the fetch SUCCEEDS and the vendor call is attempted — so the mount, the policy, the
-# attested read, and the provider construction are all exercised without a real key existing
-# anywhere in dev.
+# **What it does NOT do, measured rather than assumed.** The plan claimed this would make
+# `make dev-up`'s ask progression reach a fetch that succeeds and a vendor call that fails. It
+# does not, and cannot: dev's matrix holds only `fixture:` cells, and governance is checked
+# before the credential. With `ASK_MODEL` set to a real model the ask refuses `unqualified_cell`
+# and the store is never read (confirmed by running it, not by reading the code); with it unset
+# there is no provider to build. Either way the dud is not reached by an ask.
 #
-# **What the vendor answers is confirmed at run, not predicted.** A rejected key may surface as
-# `provider_unavailable` or as a provider fault depending on how the API answers a bad
-# credential; the design depends only on the fetch succeeding and the call being attempted.
+# **So why seed it at all.** Two reasons that survive the correction. The enclave readability row
+# reads this record directly, under the operator's identity, and proves the mount, the policy and
+# the KV shape are as applied rather than as declared. And it means the deployed demonstration —
+# once an operator has qualified a real cell, which is eval-gated work this feature deliberately
+# does not do — starts from a path that is already wired rather than one nobody has exercised.
+#
+# **What the vendor answers to a dud is confirmed at run, not predicted.** A rejected key may
+# surface as `provider_unavailable` or as a provider fault depending on how the API answers; the
+# design depends only on the fetch succeeding and the call being attempted.
 #
 # The value says what it is. A plausible-looking placeholder would be worse than no placeholder:
 # somebody would eventually wonder whether it was real.
@@ -73,9 +80,11 @@ resource "vault_kv_secret_v2" "model_credential_dev_placeholder" {
 
 variable "seed_model_credential_placeholder" {
   description = <<-DESC
-    Seed a clearly-marked non-functional model credential so the fetch path is exercised end to
-    end without a real key. Dev only. Production writes the record out of band, under Control
-    Group, and this stays false so an apply can never overwrite a real credential with a dud.
+    Seed a clearly-marked non-functional model credential so the record, mount and policy exist
+    and are readable. Dev only — and NOT a way to exercise an ask end to end, since governance
+    refuses before the credential is sought while the matrix holds only fixture cells. Production
+    writes the record out of band, under Control Group, and this stays false so an apply can never
+    overwrite a real credential with a dud.
   DESC
   type        = bool
   default     = false

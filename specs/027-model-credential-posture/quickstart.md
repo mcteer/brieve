@@ -53,7 +53,14 @@ deployment that contradicts the amended text.
 
 ## 5. The thing three features could not do (SC-001, SC-003) — named runner
 
-With a real key written to `model-credentials/anthropic` and a live `ask` cell:
+**Three things must be true first, and the third is the one that surprises.** A real key at
+`model-credentials/anthropic`; `ASK_MODEL` set on the surface (it is a jobspec variable, passed by
+`mcp-surface-up` from `.env`); and **a matrix cell qualifying that model for `ask`, with the ask
+binding naming it**. Governance is checked before the credential, so without the third the ask
+refuses `unqualified_cell` and never reads the store — measured, not predicted. Qualifying a cell
+is eval-gated work this feature deliberately does not do.
+
+With all three:
 
 1. Ask through the served surface → **a real answer**, and `model_authority` on the record.
 2. Rotate the credential in the store → the next ask answers on the new generation (version

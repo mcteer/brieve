@@ -217,13 +217,14 @@ check.
       026 also paid; a Vault glob does not match the empty remainder). Governance clause matching
       the first exception's in production posture.
 - [X] T025 [P] Dev placeholder in `infra/environments/dev/`: seed a **clearly-marked
-      non-functional** credential so `make dev-up`'s ask progression reaches **a fetch that
-      succeeds and a vendor call that fails** — one link past `credential_unavailable`, proving
-      the fetch path end to end without a real key. **The exact disposition the dud produces is
-      confirmed at run, not predicted** (analysis A1: a rejected key may surface as
-      `provider_unavailable` or as a provider fault depending on how the vendor answers a bad key;
-      the design depends only on the fetch succeeding and the call being attempted). Seeded-and-
-      marked over absent, because it exercises one more link.
+      non-functional** credential. **The stated outcome was wrong and is corrected here** (third
+      analysis pass, measured by running it): this does NOT make `make dev-up`'s ask progression
+      reach a fetch, because dev's matrix holds only `fixture:` cells and governance is checked
+      before the credential — a real `ASK_MODEL` refuses `unqualified_cell` with zero store reads,
+      and an unset one has no provider. Qualifying a real cell is eval-gated work this feature
+      deliberately excludes (Principle VIII; spec Assumptions). The seed is kept for the two
+      things it does do: the enclave readability row reads it as applied, and T030 starts from a
+      wired path. **What the vendor answers to a dud is confirmed at run, not predicted.**
 
 - [X] T026 [GATE:conformance] The readability row in `tests/conformance/identity/`: `mcp-surface`
       and the run role read `model-credentials/<vendor>` against the live fabric (as-applied,
