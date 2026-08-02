@@ -30,7 +30,11 @@ class InMemoryEvidenceQuery:
             entries = [e for e in entries if e.timestamp >= request.start_time]
         if request.end_time is not None:
             entries = [e for e in entries if e.timestamp <= request.end_time]
-        if request.event_types:
+        # `is not None`, NEVER truthiness. An EMPTY set means "no type is visible to this
+        # caller" and must match nothing; truthiness would read it as "no filter" and return
+        # everything — the exact inversion of a scope bound, and the shape a scoping bug takes.
+        # `None` is the absence of a filter and remains today's unnarrowed read.
+        if request.event_types is not None:
             entries = [e for e in entries if e.event_type in request.event_types]
         entries.sort(key=lambda e: (e.timestamp, e.correlation_id, e.seq))
         return entries[: request.limit]

@@ -1,39 +1,39 @@
 # SPDX-License-Identifier: Apache-2.0
-# terraform pack — estate_state suite. Five cases at the floor, refused at load below it.
-# `recorded` is what a previously-observed run produced: the substrate the blocking lane
-# scores. The live lane ignores it and asks a real model; the case is the same either way.
+# terraform pack — estate_state suite. REAUTHORED BY 025; see the vault pack's header for why.
 
 [[cases]]
 id = "terraform-estate-state-001"
 suite = "estate_state"
-prompt = "Is Terraform deployed in this enclave?"
-expected = "match"
-recorded = "No — per the estate record, Terraform is not deployed here; this pack's tool layer is fixture-backed."
+prompt = "Which runs were denied?"
+recorded = "An apply was denied on the staging plan run, per rec-tf-002."
+events = ["rec-tf-002"]
 
 [[cases]]
 id = "terraform-estate-state-002"
 suite = "estate_state"
-prompt = "Which workspaces exist?"
-expected = "match"
-recorded = "None, per the estate record: no Terraform backend is configured in this enclave."
+prompt = "What changed during the production apply?"
+recorded = "The run was resumed and an apply effect was observed, per rec-tf-004 and rec-tf-005."
+events = ["rec-tf-004", "rec-tf-005"]
 
 [[cases]]
 id = "terraform-estate-state-003"
 suite = "estate_state"
-prompt = "What version of Terraform do we run?"
-expected = "match"
-recorded = "None is installed in the enclave, per the estate record."
+prompt = "Which runs were resumed?"
+recorded = "The production apply was resumed on its first attempt, per rec-tf-004."
+events = ["rec-tf-004"]
 
 [[cases]]
 id = "terraform-estate-state-004"
 suite = "estate_state"
-prompt = "Where would state live if we deployed?"
-expected = "match"
-recorded = "Undecided, per the estate record — no backend has been chosen."
+prompt = "What happened during the staging plan run?"
+recorded = "The run started, a plan was allowed, and an apply was denied — per rec-tf-001, rec-tf-003 and rec-tf-002."
+events = ["rec-tf-001", "rec-tf-002", "rec-tf-003"]
 
+# The control pair's answerable half — see the vault pack for why a negative claim cites BOTH the
+# denials that exist and the thing that succeeded.
 [[cases]]
 id = "terraform-estate-state-005"
 suite = "estate_state"
-prompt = "Do we have any Terraform modules registered?"
-expected = "match"
-recorded = "No module registry entries exist, per the estate record."
+prompt = "Were any plans denied on the staging run?"
+recorded = "The only denial on that run was an apply, per rec-tf-002, and the plan was allowed, per rec-tf-003."
+events = ["rec-tf-002", "rec-tf-003"]

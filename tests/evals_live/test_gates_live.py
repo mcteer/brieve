@@ -38,7 +38,13 @@ from core.evals.scoring import (
     Scorer,
     run_suite,
 )
-from core.evals.suites import ANSWERING_SUITES, MEASURED_SUITES, SUITES, load_pack_cases
+from core.evals.suites import (
+    ANSWERING_SUITES,
+    ESTATE_SUITES,
+    MEASURED_SUITES,
+    SUITES,
+    load_pack_cases,
+)
 
 pytestmark = pytest.mark.live_model
 
@@ -57,13 +63,18 @@ def _subject(pack: str, role: str) -> GovernedSubject:
 
 
 def _grounding_for(pack: str, suite: str) -> str:
-    """The estate record, for the one suite whose subject is fidelity to it."""
-    if suite != "estate_state":
-        return ""
-    lines = "\n".join(f"- {case.recorded}" for case in load_pack_cases(PACKS / pack, suite))
-    return (
-        "Estate record (answer estate questions by quoting the relevant line verbatim):\n" + lines
-    )
+    """No suite needs prompt-level grounding any more.
+
+    **Deleted in 025, and the deletion is the point.** This used to assemble an "estate record" for
+    `estate_state` by concatenating the cases' own recorded strings into an unlabelled list.
+    FR-012's run found the model correctly refusing to answer from it: nothing said which line
+    described what. The estate now lives INSIDE the path as typed records, offered to the model by
+    the provider, so grounding-by-prompt-stuffing has no remaining user.
+
+    Kept as a function rather than removed outright so the next suite that needs grounding has an
+    obvious place for it, and so this explanation stays attached to where it happened.
+    """
+    return ""
 
 
 #: The suites this lane can actually score. **Measured suites are excluded, and the exclusion is
@@ -89,11 +100,23 @@ def test_live_suite(pack: str, suite: str) -> None:
     """One suite, one pack, one real model. The per-cell table's `live` column is earned
     here or not at all."""
     cases = load_pack_cases(PACKS / pack, suite)
-    if suite in ANSWERING_SUITES:
+    if suite in ESTATE_SUITES:
+        # The estate path, driven by a real model over the pack's fixture records. Same path and
+        # same fidelity thresholds as the blocking lane; only the provider differs, which is the
+        # D8 seam's whole claim.
+        from adapters.anthropic_answering import LiveEstateProvider
+        from core.evals.estate_fixtures import load_estate_records
+        from core.evals.scoring import EstateAnsweringScorer
+
+        estate = load_estate_records(PACKS / pack)
+        scorer: Scorer = EstateAnsweringScorer(
+            estate=estate, provider=LiveEstateProvider(ids_to_hashes=estate.ids_to_hashes)
+        )
+    elif suite in ANSWERING_SUITES:
         # A real model, reaching the corpus THROUGH `answer_question`. The model proposes; the
         # pin disposes — every citation is resolved before a claim ships, so what this row
         # qualifies is the product answering, not the vendor talking.
-        scorer: Scorer = AnsweringScorer(corpus=load_corpus(), provider=LiveAnswerProvider())
+        scorer = AnsweringScorer(corpus=load_corpus(), provider=LiveAnswerProvider())
     else:
         scorer = LiveModelScorer(grounding=_grounding_for(pack, suite))
 

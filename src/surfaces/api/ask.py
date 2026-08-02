@@ -11,6 +11,7 @@ instruction given to a model — see `core.answering.answer`.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -18,10 +19,29 @@ from pydantic import BaseModel, ConfigDict
 
 from core.answering.answer import ANSWERED, ProviderUnavailable, answer_question
 from core.answering.corpus import Corpus, CorpusUnavailable
+from core.answering.estate import ANSWERED as ESTATE_ANSWERED
+from core.answering.estate import EstateProviderUnavailable, answer_estate_question
 from core.answering.record import record_ask
+from core.answering.routing import Route, route, window_phrase
+from core.answering.scope import visible_event_types
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
 from surfaces.api.dependencies import AuditDep, SubjectDep
+from surfaces.api.evidence import evidence_stream_for, read_evidence_for
+
+
+class ScopeEmpty(Exception):
+    """The subject's roles map to no visible record type.
+
+    **A refusal, raised before any read.** FR-004c: empty means refuse, never a default scope —
+    and refusing here rather than reading-then-finding-nothing is what keeps an unscoped subject
+    from leaving an access record for a read they were never entitled to make.
+    """
+
+
+#: The source an ask consulted, for the record. 025 adds estate routing; until the
+#: estate branch lands, every ask that reaches this module consulted the corpus.
+GUIDANCE_SOURCE = str(Route.GUIDANCE)
 
 
 def ask_for(
@@ -49,6 +69,7 @@ def ask_for(
         corpus_digest=answer.corpus_digest,
         model=model,
         disposition=answer.disposition,
+        source=GUIDANCE_SOURCE,
     )
 
     if answer.disposition != ANSWERED:
@@ -70,6 +91,114 @@ def ask_for(
     }
 
 
+def estate_answer_for(
+    *,
+    question: str,
+    subject: AuthenticatedSubject,
+    query: Any,
+    audit: AuditSink,
+    model: str,
+    provider: Any,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Answer an estate question from the asker's own records, or decline.
+
+    **The order is the security argument.** Scope is computed, an empty scope refuses *before any
+    read happens* — so a subject with no mapped roles leaves no access record, because no access
+    was attempted — and only then is the governed read performed, narrowed to what that subject
+    may see. Narrowing the request rather than filtering its results is what keeps out-of-scope
+    entries from ever being read at all.
+
+    ``now`` is injected rather than read here (analysis U4): a window phrase resolves against it,
+    and ambient time inside an answering path is how an eval lane stops being reproducible.
+    """
+    visible = visible_event_types(subject.roles)
+    if not visible:
+        # No read attempted, so no access record — and the ask itself still records, because a
+        # boundary a caller can probe without trace is what 022 removed.
+        record_ask(
+            audit=audit,
+            subject=subject,
+            corpus_digest=evidence_stream_for(subject.tenant_id),
+            model=model,
+            disposition="scope_empty",
+            source=str(Route.ESTATE),
+        )
+        raise ScopeEmpty(
+            "no records are visible to this subject's roles; an estate answer would have "
+            "nothing it may rest on"
+        )
+
+    start, end = _window(question, now)
+    entries, _disposition = read_evidence_for(
+        query=query,
+        audit=audit,
+        subject=subject,
+        start_time=start,
+        end_time=end,
+        event_types=visible,
+    )
+
+    answer = answer_estate_question(question=question, records=tuple(entries), provider=provider)
+
+    # Recorded before the answer is returned, pointing at the access STREAM (stable per tenant,
+    # 022) rather than a single record — one hop, and the read is locatable within it by subject
+    # and time. See `AuditEventType.ASK_ANSWERED`.
+    record_ask(
+        audit=audit,
+        subject=subject,
+        corpus_digest=evidence_stream_for(subject.tenant_id),
+        model=model,
+        disposition=answer.disposition,
+        source=answer.source,
+    )
+
+    if answer.disposition != ESTATE_ANSWERED:
+        return {
+            "disposition": answer.disposition,
+            "source": answer.source,
+            "declined_reason": answer.declined_reason,
+        }
+    return {
+        "disposition": answer.disposition,
+        "source": answer.source,
+        "claims": [
+            {
+                "statement": claim.statement,
+                "references": [ref.entry_hash for ref in claim.references],
+            }
+            for claim in answer.claims
+        ],
+    }
+
+
+def _window(question: str, now: datetime | None) -> tuple[datetime | None, datetime | None]:
+    """Resolve a recognised temporal phrase against the injected clock.
+
+    An unrecognised phrase — or none — yields no bounds, and the read's own ``limit`` is the bound
+    instead. **No general time parsing**: a window guessed wrong returns records from the wrong
+    period while looking entirely correct.
+    """
+    phrase = window_phrase(question)
+    if phrase is None or now is None:
+        return None, None
+    day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    match phrase:
+        case "today":
+            return day, now
+        case "yesterday":
+            return day - timedelta(days=1), day
+        case "last night" | "overnight":
+            return day - timedelta(hours=8), day + timedelta(hours=6)
+        case "this week":
+            return day - timedelta(days=day.weekday()), now
+        case "last week":
+            monday = day - timedelta(days=day.weekday())
+            return monday - timedelta(days=7), monday
+        case _:  # pragma: no cover - window_phrase only returns the above
+            return None, None
+
+
 class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -78,7 +207,12 @@ class AskRequest(BaseModel):
     question: str
 
 
-def build_router(*, provider: Any = None, model: str = "unconfigured") -> APIRouter:
+def build_router(
+    *,
+    provider: Any = None,
+    model: str = "unconfigured",
+    evidence_query: Any = None,
+) -> APIRouter:
     """The provider is a **parameter**, so a deployment can supply one and a test can share one.
 
     An earlier draft read it off the router with `getattr`, which meant nothing could ever set it:
@@ -90,7 +224,12 @@ def build_router(*, provider: Any = None, model: str = "unconfigured") -> APIRou
 
     @router.post("/ask")
     def ask(body: AskRequest, subject: SubjectDep, audit: AuditDep) -> dict[str, Any]:
-        """Answer from the pinned corpus, or decline. Never act.
+        """Answer from whichever source the question needs, or decline. Never act.
+
+        **One place to ask** (FR-010): the platform decides what the question needs rather than
+        making the caller declare it. Routing is deterministic and recorded, and a decline names
+        the door that was opened so nobody who asked about their estate is told the documentation
+        does not cover it.
 
         **The provider is resolved per deployment and may be absent.** A surface with no model
         configured fails here rather than answering from the corpus alone — FR-011a forbids a
@@ -98,6 +237,55 @@ def build_router(*, provider: Any = None, model: str = "unconfigured") -> APIRou
         reached the state it was written to fix.
         """
         from core.answering.corpus import load_corpus
+
+        destination = route(body.question)
+
+        if destination is Route.ESTATE:
+            if evidence_query is None:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "no evidence plane is configured; estate questions cannot be answered",
+                )
+            if provider is None:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "no model is configured for `ask`; the records alone are not an answer",
+                )
+            try:
+                return estate_answer_for(
+                    question=body.question,
+                    subject=subject,
+                    query=evidence_query,
+                    audit=audit,
+                    model=model,
+                    provider=provider,
+                    now=datetime.now(UTC),
+                )
+            except ScopeEmpty as empty:
+                raise HTTPException(status.HTTP_403_FORBIDDEN, str(empty)) from empty
+            except EstateProviderUnavailable as unreachable:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE, str(unreachable)
+                ) from unreachable
+
+        if destination is Route.NEITHER:
+            # Declined, not coerced. Both doors are named so the asker can rephrase toward one.
+            record_ask(
+                audit=audit,
+                subject=subject,
+                corpus_digest="",
+                model=model,
+                disposition="declined",
+                source=str(Route.NEITHER),
+            )
+            return {
+                "disposition": "declined",
+                "source": str(Route.NEITHER),
+                "declined_reason": (
+                    "this question matches neither the pinned guidance corpus nor your estate "
+                    "records; those are the two sources available"
+                ),
+            }
 
         try:
             corpus = load_corpus()
@@ -117,6 +305,7 @@ def build_router(*, provider: Any = None, model: str = "unconfigured") -> APIRou
                 corpus_digest=corpus.digest,
                 model="unconfigured",
                 disposition="provider_unavailable",
+                source=GUIDANCE_SOURCE,
             )
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,

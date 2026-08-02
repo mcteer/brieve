@@ -188,12 +188,73 @@ class McpTransport:
     def _ask(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         """The same verdict the API gives, from the same implementation (ADR-0033).
 
-        A surface with no model configured answers 503 here exactly as the API does — including
-        that a provider failure is not delivered as a decline.
+        Routing, scope, the estate read and the corpus path are all reached through the shared
+        functions rather than restated here — two implementations agreeing by inspection would
+        make parity a measure of how carefully they were written.
         """
+        from datetime import UTC, datetime
+
         from core.answering.answer import ProviderUnavailable
         from core.answering.corpus import CorpusUnavailable, load_corpus
-        from surfaces.api.ask import ask_for
+        from core.answering.estate import EstateProviderUnavailable
+        from core.answering.record import record_ask
+        from core.answering.routing import Route, route
+        from surfaces.api.ask import ScopeEmpty, ask_for, estate_answer_for
+
+        question = str(args["question"])
+        destination = route(question)
+
+        if destination is Route.ESTATE:
+            if self._evidence is None:
+                return McpResult(
+                    ok=False,
+                    status=503,
+                    payload={"reason": "no evidence plane is configured"},
+                )
+            if self._ask_provider is None:
+                return McpResult(
+                    ok=False, status=503, payload={"reason": "no model is configured for `ask`"}
+                )
+            try:
+                return McpResult(
+                    ok=True,
+                    status=200,
+                    payload=estate_answer_for(
+                        question=question,
+                        subject=subject,
+                        query=self._evidence,
+                        audit=self._audit,
+                        model=self._ask_model,
+                        provider=self._ask_provider,
+                        now=datetime.now(UTC),
+                    ),
+                )
+            except ScopeEmpty as empty:
+                return McpResult(ok=False, status=403, payload={"reason": str(empty)})
+            except EstateProviderUnavailable as unreachable:
+                return McpResult(ok=False, status=503, payload={"reason": str(unreachable)})
+
+        if destination is Route.NEITHER:
+            record_ask(
+                audit=self._audit,
+                subject=subject,
+                corpus_digest="",
+                model=self._ask_model,
+                disposition="declined",
+                source=str(Route.NEITHER),
+            )
+            return McpResult(
+                ok=True,
+                status=200,
+                payload={
+                    "disposition": "declined",
+                    "source": str(Route.NEITHER),
+                    "declined_reason": (
+                        "this question matches neither the pinned guidance corpus nor your "
+                        "estate records; those are the two sources available"
+                    ),
+                },
+            )
 
         try:
             corpus = load_corpus()
@@ -203,21 +264,20 @@ class McpTransport:
         if self._ask_provider is None:
             # Recorded anyway — see the API's note. Someone asked and the platform could not
             # attempt it, which is a fact about this surface worth having in the trail.
-            from core.answering.record import record_ask
-
             record_ask(
                 audit=self._audit,
                 subject=subject,
                 corpus_digest=corpus.digest,
                 model="unconfigured",
                 disposition="provider_unavailable",
+                source="guidance",
             )
             return McpResult(
                 ok=False, status=503, payload={"reason": "no model is configured for `ask`"}
             )
         try:
             payload = ask_for(
-                question=str(args["question"]),
+                question=question,
                 subject=subject,
                 corpus=corpus,
                 provider=self._ask_provider,

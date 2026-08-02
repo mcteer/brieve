@@ -74,6 +74,11 @@ class SurfaceUnderTest:
     mcp: McpTransport
     idp: FakeOIDCProvider
     audit: InMemoryAuditSink
+    #: ONE evidence query, shared by both surfaces. They previously built one each — same
+    #: behaviour, since both wrap this sink, but two objects a parity row could not prove were
+    #: the same collaborator. 025's estate path reads through this, so sharing it is what makes
+    #: "both surfaces read the same records" a fact rather than an inference.
+    evidence: InMemoryEvidenceQuery
     dispatcher: InProcessDispatcher
     submitter: ScriptedSubmitter
     thread_store: InMemoryThreadStore
@@ -128,6 +133,7 @@ def surface_under_test(
     # 012's collaborator, shared for the same reason as the four above: two surfaces
     # reading different thread stores would diverge in ways no catalogue comparison sees.
     thread_store = InMemoryThreadStore()
+    evidence = InMemoryEvidenceQuery(audit)
     definitions_fabric = fake_definitions_fabric(subject)
     dispatcher = InProcessDispatcher(
         identity_fabric=fake_identity_fabric(subject_user_id=subject),
@@ -145,7 +151,7 @@ def surface_under_test(
     app = create_app(
         token_verifier=verifier,
         run_dispatcher=dispatcher,
-        evidence_query=InMemoryEvidenceQuery(audit),
+        evidence_query=evidence,
         audit_sink=audit,
         authority_submitter=submitter,
         run_index=index,
@@ -164,7 +170,7 @@ def surface_under_test(
     mcp = McpTransport(
         run_dispatcher=dispatcher,
         audit_sink=audit,
-        evidence_query=InMemoryEvidenceQuery(audit),
+        evidence_query=evidence,
         authority_submitter=submitter,
         run_index=index,
         durability=durability,
@@ -181,6 +187,7 @@ def surface_under_test(
         mcp=mcp,
         idp=idp,
         audit=audit,
+        evidence=evidence,
         dispatcher=dispatcher,
         subject_name=subject,
         submitter=submitter,

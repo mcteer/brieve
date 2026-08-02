@@ -23,8 +23,8 @@ evidence of what failed with a suite that never contained it.
 | | What it is | Who | Status |
 | --- | --- | --- | --- |
 | Principle V review | One additive payload field on a sealed-core record, plus the documented generalisation of `corpus_digest` | **Dan McTeer** | **Owed** |
-| FR-012 — the named failure | Old `estate_state`, vault pack, live model, per-case output printed; finding recorded here | **Dan McTeer** | **Owed** |
-| Live qualification | `make evals-live` over the reauthored suites | **Dan McTeer** | **Owed** — the `ask` matrix cell stays `fixture` until this passes |
+| FR-012 — the named failure | Old `estate_state`, vault pack, live model, per-case output printed; finding recorded here | **Dan McTeer** | **Done 2026-08-02** — `vault-estate-state-004`; cause recorded below |
+| Live qualification | `make evals-live` over the reauthored suites | **Dan McTeer** | **Run 2026-08-02 — estate rows PASS for both packs.** See *What the live lane found* below |
 
 ---
 
@@ -102,4 +102,100 @@ outcome, and the reauthored suite's live run then starts from a named baseline r
 
 ### FR-012 finding
 
-*To be recorded by the run — case id(s), cause, and outcome either way.*
+**Run 2026-08-02**, old `estate_state`/vault, live model, one call per case with responses printed.
+
+**The failing case is `vault-estate-state-004`** — *"How many database roles exist?"*, requiring
+the verbatim string *"Three: brieve, evidence, and conformance, per the estate record."*
+
+**The cause is the grounding, not the model, and the model was right.** The live lane assembles
+its "estate record" by concatenating the five cases' own `recorded` strings into an unlabelled
+list. Nothing says which line describes what. Asked how many database roles exist, the model
+found a line reading *"Three: brieve, evidence, and conformance"* and **declined to attach it**:
+
+> *"But that line isn't labeled, and nothing in the record ties those three names to the database
+> secrets engine. They could equally be namespaces, enclaves, or something else entirely."*
+
+That is correct behaviour being scored as failure. The suite's `match` verb wants the required
+sentence to appear verbatim; the model quotes it *while explaining it cannot be relied on*, so
+whether the row passes depends on whether the hedge happens to include the quotation — a coin
+flip on a marginal case, which is exactly the variance the live lane's majority-of-three comment
+describes. Two probe samples both quoted it; the scored run did not.
+
+**Why this is the last time this case can fail this way.** The defect is structural: an estate
+built from five unlabelled sentences cannot support a question about which of them is which. 025's
+reauthored suite replaces it with *records* — typed entries with payloads and authored ids — so a
+question about database roles is answered from an entry that says it is about database roles, and
+a claim is scored by whether its **references resolve**, not by whether a sentence reappears.
+
+**Outcome**: the failure is understood, is not a model defect, and is fixed by the reauthoring
+rather than by tuning a prompt. The `ask` cell's matrix column stays `fixture` until the
+reauthored suite passes live (T035).
+
+
+---
+
+## What the live lane found (T035)
+
+**Ran 2026-08-02**, `make evals-live`, `anthropic/claude-opus@5`, majority of three per case.
+First run: **6 passed, 3 failed**. After correcting two cases, the estate rows pass for both packs.
+
+| Row | Result |
+| --- | --- |
+| `estate_state` — vault, terraform | ✅ **pass**, through the product path, after the correction below |
+| `citation_accuracy`, `must_decline` — both packs | ✅ pass (024's, unchanged) |
+| `must_deny` — vault | ✅ pass |
+| `must_deny` — terraform | ⚠️ **HTTP 529 `OverloadedError`** — a transient API fault, not a governance failure and not this feature's. Recorded rather than retried into silence |
+| judge chain | ✅ pass |
+
+### The estate failure was the case's, not the model's
+
+Both packs failed on case **005** — the control pair's answerable half, a **negative** question:
+*"Were any reads denied during the nightly apply?"* The case expected one reference: the read that
+was allowed.
+
+**The model cited two, and it was right.** It named the denial that exists — showing it was a
+*write*, not a read — alongside the read that succeeded:
+
+> *"The only `authority_denied` record in `run-nightly-apply` names the tool `vault_write`… The
+> single `vault_read` record is a `tool_outcome` with outcome `allow`, and no record in that
+> correlation shows a read being denied."*
+
+**Proving that nothing of a kind happened means showing what did happen of that kind and that none
+of it matches.** Citing only the successful read would leave the claim resting on half its
+evidence — an auditor reading it could not tell whether denials had simply been omitted. Precision
+is 1.0, so the extra reference failed the case; the correct fix was to fix the case.
+
+**This is a property of estate answering worth stating**: a negative claim's reference set is
+larger than a positive one's, and it includes the records that *would have* shown the thing. The
+corrected cases pass **3/3 samples** on both packs, deterministically.
+
+### The `ask` cell
+
+The estate suites now pass live through the product path. The `must_deny`/terraform row failed on
+an API overload rather than on behaviour, so **the cell's promotion to `live` waits on a clean
+full-lane run** — a 529 is not evidence of anything about the model, and treating it as a pass
+would be exactly the rounding-up this contract exists to prevent.
+
+
+## What `make conformance` found (T034)
+
+**Ran 2026-08-02** on a live enclave.
+
+| Phase | Result |
+| --- | --- |
+| Hermetic conformance | ✅ 215 passed |
+| In-allocation + durability under attested identity | ✅ 92 passed |
+| Enclave-marked | ✅ 10 passed |
+| `host_enclave` (api, identity, packs, durability, evidence, authority) | ✅ **72 passed, 0 failed** — the sweeper-race fix from #111 holding |
+| Portal containment | ✅ 10 passed |
+| Deployment lane | ✅ 22 passed |
+| Served MCP surface | ⚠️ **2 failed under load, 19/19 in isolation** |
+
+**The two served-lane failures are the recorded load-dependent flake**, not this feature's: both
+are `401 Unauthorized` on session establishment, the same signature and the same two rows seen
+across this session, and the lane passes 19/19 when run with nothing else on the machine. One of
+them (`test_the_operation_set_matches_what_the_transport_declares`) is worth naming explicitly
+because its name suggests otherwise — 025 adds **no operation**, and the row passes in isolation.
+
+Recorded as load-dependent rather than green, on the same principle as the `must_deny` 529: a
+failure explained is not a failure erased.

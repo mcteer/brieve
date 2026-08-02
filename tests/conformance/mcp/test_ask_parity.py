@@ -18,6 +18,7 @@ fixture's shared collaborators exist to prevent.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -154,3 +155,106 @@ def test_break_fixture_a_surface_answering_where_the_other_declines_is_detected(
     )
 
     assert one.json()["disposition"] != other.payload["disposition"]
+
+
+# --------------------------------------------------------------- 025: estate verdicts
+
+ESTATE_QUESTION = "Which runs were denied last night?"
+
+
+class _AnswersFromRecords:
+    """Cites the first record it is handed, whatever that is."""
+
+    def answer(self, question: str, material: Any) -> list[dict[str, Any]]:
+        if isinstance(material, Corpus):
+            return [{"statement": "From the corpus.", "citations": []}]
+        return [
+            {
+                "statement": "A run was recorded.",
+                "references": [{"entry_hash": r.entry_hash} for r in material[:1]],
+            }
+        ]
+
+
+def _with_records(**kwargs: Any) -> Any:
+    from core.audit.schema import AuditEventType
+
+    surface = surface_under_test(**kwargs)
+    surface.audit.append_event(
+        correlation_id="estate-run-1",
+        tenant_id="tenant-test",
+        event_type=AuditEventType.RUN_START,
+        payload={"subject_user_id": "alice"},
+    )
+    return surface
+
+
+def test_row_an_estate_answer_is_the_same_on_both() -> None:
+    """The estate half of ADR-0033's parity, through the operation that already existed.
+
+    Parity grows by **zero operations** — asking stays one place, and what grew is the set of
+    verdicts that operation can produce.
+    """
+    surface = _with_records(ask_provider=_AnswersFromRecords(), ask_model="anthropic/claude-opus@5")
+    api = TestClient(surface.app).post(
+        "/ask", json={"question": ESTATE_QUESTION}, headers=surface.bearer()
+    )
+    mcp = surface.mcp.call("ask", {"question": ESTATE_QUESTION}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 200
+    assert api.json()["source"] == mcp.payload["source"] == "estate"
+    assert api.json()["disposition"] == mcp.payload["disposition"]
+    assert api.json().get("claims") == mcp.payload.get("claims")
+
+
+def test_row_an_estate_decline_is_the_same_on_both_including_its_reason() -> None:
+    """The reason is compared, not just the disposition.
+
+    Two surfaces agreeing that they declined while explaining it differently would send two
+    callers to two different places for the same situation.
+    """
+    surface = surface_under_test(
+        ask_provider=_AnswersFromRecords(), ask_model="anthropic/claude-opus@5"
+    )
+    api = TestClient(surface.app).post(
+        "/ask", json={"question": ESTATE_QUESTION}, headers=surface.bearer()
+    )
+    mcp = surface.mcp.call("ask", {"question": ESTATE_QUESTION}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 200
+    assert api.json()["disposition"] == mcp.payload["disposition"] == "declined"
+    assert api.json()["declined_reason"] == mcp.payload["declined_reason"]
+
+
+def test_row_an_unroutable_question_declines_the_same_on_both() -> None:
+    surface = _with_records(ask_provider=_AnswersFromRecords(), ask_model="anthropic/claude-opus@5")
+    question = {"question": "What is the weather in Denver?"}
+
+    api = TestClient(surface.app).post("/ask", json=question, headers=surface.bearer())
+    mcp = surface.mcp.call("ask", question, subject=surface.subject())
+
+    assert api.json()["source"] == mcp.payload["source"] == "neither"
+    assert api.json()["declined_reason"] == mcp.payload["declined_reason"]
+
+
+def test_row_an_empty_scope_refuses_the_same_on_both() -> None:
+    """SC-011 across surfaces: 403 on both, and no read attempted on either."""
+    from core.identity.types import AuthenticatedSubject, SubjectKind
+
+    surface = _with_records(ask_provider=_AnswersFromRecords(), ask_model="anthropic/claude-opus@5")
+    unscoped = AuthenticatedSubject(
+        subject_user_id="alice",
+        tenant_id="tenant-test",
+        roles=frozenset(),
+        subject_kind=SubjectKind.HUMAN,
+        expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+    )
+
+    api = TestClient(surface.app).post(
+        "/ask",
+        json={"question": ESTATE_QUESTION},
+        headers=surface.bearer(claims={"groups": ["nothing-mapped"]}),
+    )
+    mcp = surface.mcp.call("ask", {"question": ESTATE_QUESTION}, subject=unscoped)
+
+    assert api.status_code == mcp.status == 403

@@ -74,6 +74,19 @@ MEASURED_SUITES: Final[frozenset[str]] = frozenset({"report_fidelity"})
 #: that costs money to run.
 ANSWERING_SUITES: Final[frozenset[str]] = frozenset({"citation_accuracy", "must_decline"})
 
+#: Suites scored by driving the **estate** answering path and measuring which references survived
+#: (025). The last suite to stop scoring authored recordings.
+#:
+#: **A distinct set, never membership in `ANSWERING_SUITES`** (analysis P4-1). That set routes to
+#: the corpus scorer at three call sites, whose provider parses documentation URLs out of
+#: recordings — estate recordings contain none, so every case would decline and fail for a reason
+#: no message would explain. Two classifications, two scorers, and the scorer-identity assertion
+#: names which is which.
+#:
+#: **And NOT `MEASURED_SUITES`**, though both are scored by `score_fidelity`. That set's branch
+#: demands `compile_for` and would refuse this suite as unrunnable — measured, not assumed.
+ESTATE_SUITES: Final[frozenset[str]] = frozenset({"estate_state"})
+
 #: What each suite's expected outcomes may be. `deny` and `decline` are different verbs on
 #: purpose — a denial is the governance boundary holding, a decline is competence about
 #: scope — and a case may not blur them.
@@ -81,7 +94,10 @@ EXPECTED_OUTCOMES: Final[dict[str, frozenset[str]]] = {
     "must_deny": frozenset({"deny"}),
     "must_decline": frozenset({"decline"}),
     "citation_accuracy": frozenset({"cited", "decline"}),
-    "estate_state": frozenset({"match"}),
+    # `estate_state` is deliberately ABSENT since 025. It is scored by which references survived
+    # the answering path, not by a verb, so a mapping here would describe a field its cases no
+    # longer carry — and the `match` verb it used could not fail an answer that reproduced the
+    # record AND invented a workspace, which is why the suite moved.
 }
 
 
@@ -136,7 +152,17 @@ def parse_cases(document: dict[str, object], *, source: str) -> tuple[EvalCase, 
         if case.suite not in SUITES:
             raise UnrunnableSuite(f"{source}: case {case.id!r} names unknown suite {case.suite!r}")
 
-        if case.suite in MEASURED_SUITES:
+        if case.suite in ESTATE_SUITES:
+            # `events` is the expected REFERENCE set, and it must be non-empty for the same
+            # reason a measured suite's must: precision and recall over an empty expected set
+            # pass for any answer at all. Decline behaviour is asserted in component rows
+            # instead — see data-model.md § Eval case shape.
+            if not case.events:
+                raise UnrunnableSuite(
+                    f"{source}: case {case.id!r} is an {case.suite!r} case and names no expected "
+                    f"references; fidelity over an empty expected set passes for any answer"
+                )
+        elif case.suite in MEASURED_SUITES:
             # A measured suite scores a SET, not a verb, so `expected` has nothing to validate
             # against — `events` does. A fidelity case with no events is the thin corpus
             # ADR-0018 warns about wearing the schema's clothes: it would score precision and
@@ -146,7 +172,7 @@ def parse_cases(document: dict[str, object], *, source: str) -> tuple[EvalCase, 
                     f"{source}: case {case.id!r} is a {case.suite!r} case and names no material "
                     f"events; precision and recall over an empty set pass for any report"
                 )
-        else:
+        elif case.suite not in ESTATE_SUITES:
             allowed = EXPECTED_OUTCOMES[case.suite]
             if case.expected not in allowed:
                 raise UnrunnableSuite(
@@ -189,6 +215,7 @@ def suite_listing() -> dict[str, str]:
 __all__ = [
     "EXPECTED_OUTCOMES",
     "ANSWERING_SUITES",
+    "ESTATE_SUITES",
     "MEASURED_SUITES",
     "OWED",
     "SUITES",

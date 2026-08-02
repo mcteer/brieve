@@ -304,7 +304,27 @@ class AuditEventType(StrEnum):
     RUN_STOPPED = "run_stopped"
 
     #: Someone asked a question and was answered or declined (024, ADR-0039). Payload:
-    #: subject_user_id, corpus_digest, model, disposition.
+    #: subject_user_id, corpus_digest, model, disposition, source.
+    #:
+    #: **`source` is 025's additive field** and names which material answered: ``guidance`` (the
+    #: pinned corpus), ``estate`` (the tenant's own records, through the governed read), or
+    #: ``neither`` (the question fit no source and was declined). Asking happens in one place and
+    #: the platform routes, so *which door was opened* is a fact about the ask that an
+    #: investigator cannot otherwise recover — two asks with identical dispositions may have
+    #: consulted entirely different material.
+    #:
+    #: **`corpus_digest` generalises to "identity of what was consulted"** rather than gaining a
+    #: sibling field. For a guidance ask it remains the corpus pin. For an estate ask it carries
+    #: the **evidence-access stream's** correlation id (``evidence-access:{tenant}``), so the walk
+    #: from *someone asked* to *here is what was read* is one hop to that stream — the stream, not
+    #: a single record, because 022 made the id stable per tenant on purpose so access records
+    #: chain to each other rather than each being a chain of one. Within the stream the read is
+    #: locatable by subject and time.
+    #:
+    #: **The narrowed request is what the access record carries**, and it is how an investigator
+    #: distinguishes "your scope contained nothing" from "records existed outside your scope" —
+    #: `EvidenceDisposition` does not distinguish those (it separates only the cross-tenant case),
+    #: and the caller is deliberately told the same thing either way.
     #:
     #: **A SEALED-CORE ADDITION** (Principle V), the fourth feature running to make one, and the
     #: one whose review this feature's plan originally asserted was not needed. The plan hedged —

@@ -170,3 +170,9 @@ def test_widening_the_event_vocabulary_moves_no_existing_hash() -> None:
     assert AuditEventType.THREAD_CREATED.value == "thread_created"  # 022
     assert AuditEventType.RUN_STOPPED.value == "run_stopped"  # 022
     assert AuditEventType.ASK_ANSWERED.value == "ask_answered"  # 024
+
+    # 025 changed no MEMBER — it widened ASK_ANSWERED's documented PAYLOAD with `source`, which
+    # the enum cannot express and this row therefore cannot see. Named here anyway, because the
+    # next person reading this list to learn what has touched sealed core since the pin would
+    # otherwise conclude 025 did not. The payload contract itself is asserted exactly, in
+    # tests/component/test_answering.py::test_an_ask_record_carries_shape_and_never_content.

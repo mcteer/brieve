@@ -87,10 +87,21 @@ class PostgresEvidenceQuery:
         if request.end_time is not None:
             clauses.append("timestamp <= %s")
             params.append(request.end_time)
-        if request.event_types:
-            placeholders = ", ".join(["%s"] * len(request.event_types))
-            clauses.append(f"event_type IN ({placeholders})")
-            params.extend(sorted(str(e) for e in request.event_types))
+        # `is not None`, NEVER truthiness. An EMPTY set means "no type is visible to this
+        # caller" and must match nothing; truthiness would read it as "no filter" and return
+        # everything — the exact inversion of a scope bound, and the shape a scoping bug takes.
+        # `None` is the absence of a filter and remains today's unnarrowed read.
+        if request.event_types is not None:
+            if not request.event_types:
+                # `IN ()` is a syntax error, so the empty case needs its own clause rather than a
+                # degenerate one. FALSE is the honest translation of "no type is visible": the
+                # query runs, matches nothing, and the caller gets an empty result — not an error
+                # that a caller might be tempted to treat as "filter unavailable, read broadly".
+                clauses.append("FALSE")
+            else:
+                placeholders = ", ".join(["%s"] * len(request.event_types))
+                clauses.append(f"event_type IN ({placeholders})")
+                params.extend(sorted(str(e) for e in request.event_types))
 
         sql = (
             "SELECT tenant_id, correlation_id, seq, event_type, timestamp, payload, "
