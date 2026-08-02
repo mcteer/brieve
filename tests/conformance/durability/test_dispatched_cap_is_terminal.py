@@ -33,6 +33,21 @@ def conn() -> Any:
     connection.close()
 
 
+@pytest.fixture(autouse=True)
+def _leaves_the_product_down() -> Any:
+    """This row needs `terraform` healthy, and must not hand that on.
+
+    It ends with the product UP, which is correct for what it asserts and wrong for whatever
+    runs next: the `mcp` service then finds the following row's suspended runs on its next
+    pass and revives them, inflating counts that row believed it controlled. Measured — the
+    service's log names `trail-order-*` runs it resumed.
+
+    So the health change is scoped to this row rather than left as ambient state.
+    """
+    yield
+    h.mark_reachable("terraform", reachable=False)
+
+
 def test_row_a_flapping_dependency_revives_a_run_exactly_to_its_cap(conn: Any) -> None:
     """Exactly `RESUME_ATTEMPT_CAP` revivals, then a terminal stop, then nothing.
 

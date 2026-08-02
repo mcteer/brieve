@@ -30,6 +30,29 @@ def conn() -> Any:
     connection.close()
 
 
+@pytest.fixture(autouse=True)
+def _product_held_down() -> Any:
+    """Hold `terraform` unreachable for these rows, and leave it that way.
+
+    **These rows count revivals they caused, and they are not the only thing that revives.**
+    The `mcp` service sweeps every awaited product on its own interval — that is its job, and
+    another row in this directory exists to prove it. Its log names the runs: a pass that lands
+    between two of the dispatches below adds a revival this row did not make, and the count
+    comes back one high. Which row notices depends on where the interval falls, so the failure
+    moves between runs and looks like flakiness rather than like coupling.
+
+    The sweeper only acts on a product it believes is HEALTHY, so holding this one down is
+    enough — and it is the platform's own semantics rather than a relaxed assertion. Nothing
+    here needs a recovery: every revival below is dispatched by hand.
+
+    The conftest already learned this shape for run ids — *"distinct per test, or one row's
+    leftover state breaks another"*. The leftover state this time is product health.
+    """
+    h.mark_reachable("terraform", reachable=False)
+    yield
+    h.mark_reachable("terraform", reachable=False)
+
+
 def test_row_every_revival_appears_numbered_and_before_what_it_caused(conn: Any) -> None:
     """Three revivals, three events, 1-based, each ahead of that revival's work.
 
