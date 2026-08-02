@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from typing import Final
 import sys
 import urllib.request
 from html.parser import HTMLParser
@@ -17,6 +18,40 @@ MANIFEST = REPO / "corpus" / "manifest.json"
 DOCS = REPO / "corpus" / "documents"
 BASE = "https://developer.hashicorp.com"
 INDEXES = ("boundary", "nomad", "packer", "terraform", "vault")
+
+
+#: Credential-shaped strings that appear in IDENTITY documentation and must not be vendored.
+#:
+#: **Vendoring somebody else's docs imports whatever those docs illustrate**, and an
+#: identity-integration guide illustrates tokens. The Backstage/Okta pattern prints an example JWT;
+#: it is truncated upstream and is not a live credential, and the repository's rule still covers it
+#: — plausible-looking fake ones count, precisely so that nobody has to adjudicate which is which.
+#:
+#: **Redacted here rather than allowlisted in the scanner.** A `.gitleaks.toml` entry for `corpus/`
+#: would stop the scan looking at a directory that grows by re-running this script against a third
+#: party — turning off the check exactly where the untrusted input arrives.
+#:
+#: Targeted rather than an entropy sweep: a JWT has an unmistakable shape, while "long
+#: high-entropy run" also describes digests, resource ids and base64 diagrams that carry meaning.
+CREDENTIAL_SHAPES: Final[tuple[re.Pattern[str], ...]] = (
+    # JWT: base64url of a JSON header, which always begins `{"` → `eyJ`.
+    re.compile(r"eyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+){0,2}"),
+    # Vault/Nomad style tokens, and AWS access key ids.
+    re.compile(r"\b(?:hv[sb]\.[A-Za-z0-9_-]{15,}|AKIA[0-9A-Z]{16})\b"),
+)
+
+REDACTED: Final[str] = "[redacted-by-corpus-sync]"
+
+
+def redact(text: str) -> str:
+    """Strip credential-shaped strings from vendored prose.
+
+    The surrounding sentence is kept: *"the following is an example Backstage log that contains a
+    JWT"* is the part an answer would cite, and the token itself carries no meaning a reader needs.
+    """
+    for pattern in CREDENTIAL_SHAPES:
+        text = pattern.sub(REDACTED, text)
+    return text
 
 
 class _Content(HTMLParser):
@@ -43,7 +78,7 @@ class _Content(HTMLParser):
         if self._anchor and self._heading:
             text = " ".join(" ".join(self._body).split())
             self.sections.append(
-                {"anchor": self._anchor, "title": self._heading, "text": text[:4000]}
+                {"anchor": self._anchor, "title": self._heading, "text": redact(text)[:4000]}
             )
         self._anchor = self._heading = None
         self._body = []
