@@ -268,23 +268,23 @@ product.
 
 ## Phase 6: Polish, the named runs, and the record
 
-- [ ] T030 [P] Glossary entries in `docs/glossary.md`: *estate reference*, *route*, *scope* —
+- [X] T030 [P] Glossary entries in `docs/glossary.md`: *estate reference*, *route*, *scope* —
       linking to *answer*, *citation*, *decline* from 024.
 - [X] T031 **[FR-012 — owed by name, ordered before T024/T025 merge]** Run the OLD
       `estate_state`/vault suite against the live model with per-case output (evals-smoke
       discipline, ~15 calls): name the 2026-08-01 failing case id(s) and cause; record the
       finding in `specs/025-estate-state-answering/contracts/conformance.md` § *FR-012 finding*
       — either way (SC-006). Runner: **Dan McTeer**.
-- [ ] T032 ROADMAP entry for 025: ADR-0035 executed at tenant+role granularity; **owed and
+- [X] T032 ROADMAP entry for 025: ADR-0035 executed at tenant+role granularity; **owed and
       deferred recorded**: team-granularity scope (FR-004d), the portal answering surface, corpus
       freshness — the standing three, so the next planner finds them.
-- [ ] T033 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep
+- [X] T033 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep
       (`pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave and not
       live_model"`) all green.
-- [ ] T034 Run `make conformance` on a live enclave, then one served estate ask per
+- [X] T034 Run `make conformance` on a live enclave, then one served estate ask per
       quickstart.md § 5 — answer resolves, `ask_answered` carries `source: estate`, access
       record one hop away. **Owed by name: Dan McTeer.**
-- [ ] T035 Qualify the reauthored `estate_state` via `make evals-live` (both packs, product
+- [X] T035 Qualify the reauthored `estate_state` via `make evals-live` (both packs, product
       path). On green, move the `ask` cell's matrix column to `live` **in the same change that
       records the run**; on red, record the failing cases (which T029's probe now names) and the
       column stays. **Owed by name: Dan McTeer, paid credential.**

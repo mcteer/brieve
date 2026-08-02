@@ -175,3 +175,27 @@ The estate suites now pass live through the product path. The `must_deny`/terraf
 an API overload rather than on behaviour, so **the cell's promotion to `live` waits on a clean
 full-lane run** — a 529 is not evidence of anything about the model, and treating it as a pass
 would be exactly the rounding-up this contract exists to prevent.
+
+
+## What `make conformance` found (T034)
+
+**Ran 2026-08-02** on a live enclave.
+
+| Phase | Result |
+| --- | --- |
+| Hermetic conformance | ✅ 215 passed |
+| In-allocation + durability under attested identity | ✅ 92 passed |
+| Enclave-marked | ✅ 10 passed |
+| `host_enclave` (api, identity, packs, durability, evidence, authority) | ✅ **72 passed, 0 failed** — the sweeper-race fix from #111 holding |
+| Portal containment | ✅ 10 passed |
+| Deployment lane | ✅ 22 passed |
+| Served MCP surface | ⚠️ **2 failed under load, 19/19 in isolation** |
+
+**The two served-lane failures are the recorded load-dependent flake**, not this feature's: both
+are `401 Unauthorized` on session establishment, the same signature and the same two rows seen
+across this session, and the lane passes 19/19 when run with nothing else on the machine. One of
+them (`test_the_operation_set_matches_what_the_transport_declares`) is worth naming explicitly
+because its name suggests otherwise — 025 adds **no operation**, and the row passes in isolation.
+
+Recorded as load-dependent rather than green, on the same principle as the `must_deny` 529: a
+failure explained is not a failure erased.
