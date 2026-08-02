@@ -53,6 +53,8 @@ DEFINITION_BINDINGS_PATH = "harness-authority/data/definition-bindings"
 #: estate-wide authorization fact, and per-definition copies would let two definitions
 #: disagree about whether a model is qualified.
 MATRIX_PATH = "harness-authority/data/model-matrix"
+#: 026. Which qualified cell an ask may use, per source.
+ASK_BINDING_PATH = "harness-authority/data/ask-bindings"
 
 #: Policies the `agent_registry` engine appends to every registration on its own.
 #:
@@ -219,6 +221,23 @@ class VaultIdentityFabric:
                 "no Qualified Model Matrix record; an absent matrix would refuse every "
                 "binding map as unqualified, so this refuses as a fabric problem rather "
                 "than as an estate of misconfigured definitions",
+                reason_code="missing_ceiling_record",
+            )
+        return record
+
+    def read_ask_binding(self) -> Mapping[str, Any]:
+        """The ask binding, raw. Parsing belongs to `core.authority.ask_binding` (026).
+
+        **Absent refuses as a fabric problem, not as an unbound source.** The two are different
+        answers: `unbound` says an operator has not decided, and sends them to author a binding;
+        a missing record says the fabric did not apply what it should hold. Collapsing them would
+        send someone to write a binding that is already there.
+        """
+        record = self._kv_data(self._read(ASK_BINDING_PATH))
+        if record is None:
+            raise ResolutionRefused(
+                "no ask-binding record; an absent record is a fabric problem rather than an "
+                "operator who has not yet decided which model may answer",
                 reason_code="missing_ceiling_record",
             )
         return record

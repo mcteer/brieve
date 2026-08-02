@@ -235,6 +235,9 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
         model="anthropic/claude-opus@5",
         disposition="answered",
         source="guidance",
+        cell="vault:anthropic/claude-opus@5:ask",
+        bound_cell="vault:anthropic/claude-opus@5:ask",
+        cell_disposition="pinned",
     )
 
     entries = sink.list_by_correlation_id(ask_stream_for("tenant-a"))
@@ -245,6 +248,18 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
     # 025 adds `source`. The set is EXACT rather than a superset check, which is why this row
     # fires on a deliberate change as loudly as on an accidental one — a payload contract nobody
     # is forced to look at is a payload contract that grows a content field eventually.
-    assert set(payload) == {"subject_user_id", "corpus_digest", "model", "disposition", "source"}
+    # 026 adds cell/bound_cell/cell_disposition. EXACT set, still — the row fires on a
+    # deliberate change as loudly as on an accidental one, which is why it keeps catching these.
+    assert set(payload) == {
+        "subject_user_id",
+        "corpus_digest",
+        "model",
+        "disposition",
+        "source",
+        "cell",
+        "bound_cell",
+        "cell_disposition",
+    }
     assert payload["source"] == "guidance"
+    assert payload["cell_disposition"] == "pinned"
     assert "question" not in payload and "answer" not in payload

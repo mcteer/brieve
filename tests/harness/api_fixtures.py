@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import FastAPI
 
 from core.audit.sink import InMemoryAuditSink
+from core.authority.ask_binding import AskAuthority
 from core.authority.changes import BlockedPendingApprovalError, ChangeDisposition
 from core.durability.memory import InMemoryDurabilityProvider
 from core.identity.claims import ClaimMapping
@@ -121,6 +122,12 @@ def surface_under_test(
     # compare two surfaces giving that same 503.
     ask_provider: object | None = None,
     ask_model: str = "unconfigured",
+    # 026's collaborator, shared like the eight before it. **`None` means every ask refuses
+    # `unbound`**, and that default is deliberate: a fixture that auto-qualified whatever
+    # provider was injected would rebuild "configured = qualified" inside the harness — the
+    # exact equation this feature exists to break. Rows that answer call
+    # `qualified_ask_authority()` explicitly.
+    ask_authority: object | None = None,
 ) -> SurfaceUnderTest:
     idp = FakeOIDCProvider()
     audit = InMemoryAuditSink()
@@ -166,6 +173,7 @@ def surface_under_test(
         reconciler=reconciler,
         ask_provider=ask_provider,
         ask_model=ask_model,
+        ask_authority=ask_authority,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
@@ -181,6 +189,7 @@ def surface_under_test(
         reconciler=reconciler,
         ask_provider=ask_provider,
         ask_model=ask_model,
+        ask_authority=ask_authority,
     )
     return SurfaceUnderTest(
         app=app,
@@ -228,3 +237,36 @@ def fake_definitions_fabric(subject: str) -> Any:
             return AuthorityScope(tool_names=frozenset(allowed.get(agent_definition_id, set())))
 
     return _Fabric()
+
+
+def qualified_ask_authority(
+    *, model: str = "anthropic/claude-opus@5", packs: tuple[str, str] = ("vault", "terraform")
+) -> AskAuthority:
+    """An in-memory binding + matrix qualifying `model` for both sources.
+
+    **Called explicitly by rows that answer**, never applied by default. The default is refusal,
+    because a harness that qualified whatever provider a test injected would make every refusal
+    row test an override rather than the behaviour — and "a configured provider is a
+    qualification" is precisely the equation 026 exists to break.
+    """
+    guidance, estate = packs
+    return AskAuthority(
+        read_binding=lambda: {
+            "schema_version": 1,
+            "guidance_cell": f"{guidance}:{model}:ask",
+            "estate_cell": f"{estate}:{model}:ask",
+        },
+        read_matrix=lambda: {
+            "schema_version": 1,
+            "cells": [
+                {
+                    "pack": pack,
+                    "model": model,
+                    "role": "ask",
+                    "qualified_by": "fixture",
+                    "judge": "seed",
+                }
+                for pack in (guidance, estate)
+            ],
+        },
+    )

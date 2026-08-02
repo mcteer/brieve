@@ -58,6 +58,9 @@ def create_app(
     # answers 503 rather than answering from the corpus alone, which FR-011a forbids.
     ask_provider: Any | None = None,
     ask_model: str = "unconfigured",
+    # 026. Absent means every ask refuses `unbound` — a configured provider is not a
+    # qualification, and Principle VIII permits model use only through a binding.
+    ask_authority: Any | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -111,6 +114,7 @@ def create_app(
             # evidence operation uses. Passed rather than resolved, so both surfaces can
             # be shown to share it.
             evidence_query=evidence_query,
+            ask_authority=ask_authority,
         )
     )
     app.include_router(threads.build_router())

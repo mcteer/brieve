@@ -35,6 +35,18 @@ variable "agent_definitions" {
   }))
 }
 
+variable "ask_binding" {
+  description = "Which qualified cell an ask may use, per source (026). Absent means every ask refuses `unbound`."
+  type = object({
+    # Cell references (`pack:model:role`) whose role MUST be `ask`. Either may be empty: a
+    # source with no cell named refuses for that source alone, which is an operator saying
+    # "not yet" legibly rather than a malformed record.
+    guidance_cell = optional(string, "")
+    estate_cell   = optional(string, "")
+  })
+  default = {}
+}
+
 variable "model_matrix_cells" {
   description = "Qualified Model Matrix cells (pack × model × role), the only models a binding map may name (ADR-0022/0039, Principle VIII)."
   type = list(object({

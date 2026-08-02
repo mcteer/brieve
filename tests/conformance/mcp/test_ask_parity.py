@@ -21,11 +21,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from core.answering.answer import ProviderUnavailable
 from core.answering.corpus import Corpus, load_corpus
-from tests.harness.api_fixtures import surface_under_test
+from tests.harness.api_fixtures import qualified_ask_authority, surface_under_test
 from tests.harness.parity import project
 
 CORPUS = load_corpus()
@@ -69,7 +70,11 @@ class _Unreachable:
 
 
 def _both(provider: object) -> tuple[Any, Any, Any]:
-    surface = surface_under_test(ask_provider=provider, ask_model="anthropic/claude-opus@5")
+    surface = surface_under_test(
+        ask_provider=provider,
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(),
+    )
     api = TestClient(surface.app).post(
         "/ask", json={"question": "How does this work?"}, headers=surface.bearer()
     )
@@ -112,23 +117,34 @@ def test_row_a_provider_failure_is_the_same_on_both_and_is_not_a_decline() -> No
 
 
 def test_row_an_unconfigured_surface_refuses_the_same_on_both() -> None:
-    """The default assembly. Both 503, and both record that someone asked (022's rule)."""
+    """The default assembly — and since 026 it refuses on GOVERNANCE, not on wiring.
+
+    Both surfaces answer 403 `unbound` rather than 503 `provider_unavailable`, because "nobody
+    decided which model may answer" is the answer an operator needs before "nothing is wired" —
+    telling them to configure a provider they are not yet permitted to use would send them one
+    step too far. Both still record that someone asked (022's rule).
+    """
     surface = surface_under_test()
     api = TestClient(surface.app).post(
         "/ask", json={"question": "How does this work?"}, headers=surface.bearer()
     )
     mcp = surface.mcp.call("ask", {"question": "How does this work?"}, subject=surface.subject())
 
-    assert api.status_code == mcp.status == 503
+    assert api.status_code == mcp.status == 403
     asks = [e for e in surface.audit.all_entries() if str(e.event_type) == "ask_answered"]
     assert len(asks) == 2, "a boundary a caller can probe without trace is what 022 removed"
-    assert {a.payload["disposition"] for a in asks} == {"provider_unavailable"}
+    assert {a.payload["disposition"] for a in asks} == {"unbound"}
+    assert {a.payload["cell_disposition"] for a in asks} == {"refused:unbound"}
 
 
 def test_row_the_ask_trail_is_equivalent_on_both() -> None:
     """Same type, subject, and decision fields — the named projection, not 'some audit'."""
-    api_surface = surface_under_test(ask_provider=_Answers())
-    mcp_surface = surface_under_test(ask_provider=_Answers())
+    api_surface = surface_under_test(
+        ask_provider=_Answers(), ask_model=MODEL, ask_authority=qualified_ask_authority()
+    )
+    mcp_surface = surface_under_test(
+        ask_provider=_Answers(), ask_model=MODEL, ask_authority=qualified_ask_authority()
+    )
 
     TestClient(api_surface.app).post(
         "/ask", json={"question": "How does this work?"}, headers=api_surface.bearer()
@@ -144,8 +160,19 @@ def test_row_the_ask_trail_is_equivalent_on_both() -> None:
 
 def test_break_fixture_a_surface_answering_where_the_other_declines_is_detected() -> None:
     """Self-verifying: constructs the divergence this row exists to catch."""
-    answering = surface_under_test(ask_provider=_Answers())
-    declining = surface_under_test(ask_provider=_CitesNothingReal())
+    # `ask_model` must name the model the authority qualifies: `available` is exactly the
+    # injected provider's model (026), so a fixture qualifying one model while the surface is
+    # configured for another correctly refuses — record/actual agreement, working.
+    answering = surface_under_test(
+        ask_provider=_Answers(),
+        ask_model=MODEL,
+        ask_authority=qualified_ask_authority(),
+    )
+    declining = surface_under_test(
+        ask_provider=_CitesNothingReal(),
+        ask_model=MODEL,
+        ask_authority=qualified_ask_authority(),
+    )
 
     one = TestClient(answering.app).post(
         "/ask", json={"question": "How does this work?"}, headers=answering.bearer()
@@ -160,6 +187,7 @@ def test_break_fixture_a_surface_answering_where_the_other_declines_is_detected(
 # --------------------------------------------------------------- 025: estate verdicts
 
 ESTATE_QUESTION = "Which runs were denied last night?"
+MODEL = "anthropic/claude-opus@5"
 
 
 class _AnswersFromRecords:
@@ -177,6 +205,13 @@ class _AnswersFromRecords:
 
 
 def _with_records(**kwargs: Any) -> Any:
+    """A surface with one record arranged, and authority arranged **explicitly**.
+
+    Set here rather than defaulted in the fixture: rows that answer must say so, because a
+    fixture that qualified whatever provider was injected would make every refusal row an
+    override rather than the behaviour (026).
+    """
+    kwargs.setdefault("ask_authority", qualified_ask_authority())
     from core.audit.schema import AuditEventType
 
     surface = surface_under_test(**kwargs)
@@ -214,7 +249,9 @@ def test_row_an_estate_decline_is_the_same_on_both_including_its_reason() -> Non
     callers to two different places for the same situation.
     """
     surface = surface_under_test(
-        ask_provider=_AnswersFromRecords(), ask_model="anthropic/claude-opus@5"
+        ask_provider=_AnswersFromRecords(),
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(),
     )
     api = TestClient(surface.app).post(
         "/ask", json={"question": ESTATE_QUESTION}, headers=surface.bearer()
@@ -258,3 +295,92 @@ def test_row_an_empty_scope_refuses_the_same_on_both() -> None:
     mcp = surface.mcp.call("ask", {"question": ESTATE_QUESTION}, subject=unscoped)
 
     assert api.status_code == mcp.status == 403
+
+
+# --------------------------------------------------------------- 026: refusal parity
+
+
+def _governance_surface(binding: dict[str, Any], matrix: dict[str, Any]) -> Any:
+    from core.authority.ask_binding import AskAuthority
+
+    return surface_under_test(
+        ask_provider=_Answers(),
+        ask_model=MODEL,
+        ask_authority=AskAuthority(read_binding=lambda: binding, read_matrix=lambda: matrix),
+    )
+
+
+def _matrix(*refs: str, **kw: Any) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "cells": [
+            {
+                "pack": r.split(":")[0],
+                "model": r.split(":")[1],
+                "role": "ask",
+                "qualified_by": "fixture",
+                "judge": "seed",
+                "withdrawn": kw.get("withdrawn", False),
+            }
+            for r in refs
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    ("binding", "matrix", "expected"),
+    [
+        ({"schema_version": 1}, {"schema_version": 1, "cells": []}, "unbound"),
+        (
+            {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
+            _matrix(f"vault:{MODEL}:ask", withdrawn=True),
+            "unqualified_cell",
+        ),
+    ],
+    ids=["unbound", "unqualified_cell"],
+)
+def test_row_a_governance_refusal_is_identical_on_both_surfaces(
+    binding: dict[str, Any], matrix: dict[str, Any], expected: str
+) -> None:
+    """SC-007, FR-011 — same verdict AND same reason, for each governance refusal.
+
+    Two surfaces agreeing that they refused while explaining it differently would send two callers
+    to two different places for one situation. The reason is compared, not just the status.
+    """
+    surface = _governance_surface(binding, matrix)
+
+    api = TestClient(surface.app).post(
+        "/ask", json={"question": "How does this work?"}, headers=surface.bearer()
+    )
+    mcp = surface.mcp.call("ask", {"question": "How does this work?"}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 403
+    assert api.json()["detail"] == mcp.payload["reason"]
+
+    asks = [e for e in surface.audit.all_entries() if str(e.event_type) == "ask_answered"]
+    assert [a.payload["disposition"] for a in asks] == [expected, expected]
+
+
+def test_row_an_unreadable_fabric_refuses_identically_on_both() -> None:
+    """The third refusal, and the one that must not read as a governance decision."""
+
+    def _down() -> dict[str, Any]:
+        raise ConnectionError("vault is unreachable")
+
+    from core.authority.ask_binding import AskAuthority
+
+    surface = surface_under_test(
+        ask_provider=_Answers(),
+        ask_model=MODEL,
+        ask_authority=AskAuthority(read_binding=_down, read_matrix=lambda: _matrix()),
+    )
+
+    api = TestClient(surface.app).post(
+        "/ask", json={"question": "How does this work?"}, headers=surface.bearer()
+    )
+    mcp = surface.mcp.call("ask", {"question": "How does this work?"}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 403
+    assert api.json()["detail"] == mcp.payload["reason"]
+    asks = [e for e in surface.audit.all_entries() if str(e.event_type) == "ask_answered"]
+    assert {a.payload["disposition"] for a in asks} == {"matrix_unreadable"}

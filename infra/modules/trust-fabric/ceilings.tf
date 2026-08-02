@@ -107,6 +107,29 @@ resource "vault_kv_secret_v2" "model_matrix" {
   })
 }
 
+# Which qualified cell an ask may use, per source (026).
+#
+# A run binds through its agent definition. An ask has neither a run nor a definition, so its
+# binding is its own operator-authored record — here, beside the matrix it names into, and
+# read-only for the same reason: a surface that could write its own binding could point an ask
+# at any cell it liked, which is qualification by whoever holds the surface.
+#
+# **Seeded together with the cells it names, or not at all.** A binding naming cells the matrix
+# does not hold makes `make dev-up` produce a surface that refuses `unqualified_cell` out of the
+# box — which reads as broken rather than as unbound, and sends whoever hits it to the wrong
+# question. The default is an empty record: every ask refuses `unbound`, honestly, until an
+# operator decides.
+resource "vault_kv_secret_v2" "ask_binding" {
+  mount = vault_mount.harness_authority.path
+  name  = "ask-bindings"
+
+  data_json = jsonencode({
+    schema_version = 1
+    guidance_cell  = var.ask_binding.guidance_cell
+    estate_cell    = var.ask_binding.estate_cell
+  })
+}
+
 # What a claim-derived role means in the harness domain.
 #
 # Same store and same governance as the ceilings above, because it is the same

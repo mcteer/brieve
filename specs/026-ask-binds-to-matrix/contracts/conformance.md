@@ -99,3 +99,64 @@ On completion, `specs/024-portal-answering/contracts/conformance.md`'s line *"An
 refuses before any provider call"* gains the row reference and a dated note that the assertion was
 unbacked between 024's merge and 026's — recorded plainly, because the defect class this lineage
 keeps closing is precisely a claim nobody re-measured.
+
+
+---
+
+## Status on completion (2026-08-02)
+
+| Row group | Result |
+| --- | --- |
+| Parsing, resolution, disposition vocabulary (`tests/component/test_ask_binding.py`) | ✅ 17 rows |
+| Provider-never-called, fixture-default, withdrawn, wrong-role, unreadable≠unbound, per-source, answered-records-cell, precedence, substitution ×5 | ✅ 13 rows |
+| Refusal parity — all three dispositions, both surfaces | ✅ 3 rows |
+| `make check` | ✅ 963 |
+| Hermetic conformance | ✅ 226 (was 215) |
+
+**Two spec names became existing platform names**, and the reason is anti-fragmentation rather
+than convenience:
+
+- `matrix_unreadable` as a *reason code* is **`fabric_unreachable`**, which already means "the
+  trust fabric did not answer". A second code for one concept would split every investigator's
+  filter. It remains `matrix_unreadable` as the ask record's **disposition**, which is the
+  ask-facing vocabulary.
+- Only **`unbound_ask_source`** was genuinely new in `RESOLUTION_REASONS`, registered with the
+  distinction that earns it: `no_binding_for_role` is a fact about a *definition*, and an ask has
+  none.
+
+**SC-002's property is stronger than the spec wrote it.** `resolve_with_fallback` collapses
+absent, withdrawn and wrong-role alike to `no_qualified_fallback` once candidates are exhausted —
+so the three are indistinguishable *at the seam*, not merely mapped to one disposition afterwards.
+
+
+## What the served process showed (T027)
+
+**Ran 2026-08-02** against the dev enclave, with the binding and its `ask` cell seeded and the
+grant applied. One real ask through the served MCP surface:
+
+```
+403 — definition 'ask-binding' pinned 'fixture:fixture/scripted@1:ask' for role 'ask',
+      which is unavailable, and no other qualified cell exists for that role
+```
+
+and the record it wrote:
+
+```
+disposition=unqualified_cell  source=guidance  cell_disposition='refused:unqualified_cell'
+```
+
+**Governance ran end to end.** The surface read the binding record from the fabric, read the
+matrix, matched the named cell, and refused — the reason names the pinned cell, which it could
+only do having resolved the record. That is what the check exists to show.
+
+**The progression differs from the one quickstart predicted, and the difference is honest.**
+Quickstart §5 expected `unbound` → seeded → `provider_unavailable`. What happens is `unbound` →
+seeded → **`unqualified_cell`**, because the served surface wires no provider, so `available` is
+empty and *no* cell's model is reachable. Availability is checked **inside** resolution
+(`resolve_with_fallback` takes `available`), not after it — so with no provider there is nothing
+to fall through to `provider_unavailable` for.
+
+That is arguably the better answer: "the model this cell names is not reachable from this surface"
+is a fact about whether the ask can be authorised, and it belongs with the other authorisation
+refusals rather than downstream of them. Recorded rather than adjusted, because the prediction was
+wrong about a mechanism and the mechanism is right.

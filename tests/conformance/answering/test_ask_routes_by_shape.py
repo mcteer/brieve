@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from core.answering.corpus import Corpus
 from core.audit.schema import AuditEntry
 from surfaces.api.evidence import evidence_stream_for
-from tests.harness.api_fixtures import surface_under_test
+from tests.harness.api_fixtures import qualified_ask_authority, surface_under_test
 
 ESTATE_QUESTION = "Which runs were denied last night?"
 GUIDANCE_QUESTION = "How does an AI agent obtain an identity with Vault?"
@@ -75,7 +75,11 @@ def test_row_a_guidance_question_never_reads_the_records() -> None:
     works. The wrong answer would be recoverable; the read is not.
     """
     provider = _RecordsWhatItWasAsked()
-    surface = surface_under_test(ask_provider=provider, ask_model="anthropic/claude-opus@5")
+    surface = surface_under_test(
+        ask_provider=provider,
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(),
+    )
     _arrange(surface)
     before = _access_count(surface)
 
@@ -92,7 +96,11 @@ def test_row_a_guidance_question_never_reads_the_records() -> None:
 
 def test_row_an_estate_question_never_consults_the_corpus() -> None:
     provider = _RecordsWhatItWasAsked()
-    surface = surface_under_test(ask_provider=provider, ask_model="anthropic/claude-opus@5")
+    surface = surface_under_test(
+        ask_provider=provider,
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(),
+    )
     _arrange(surface)
 
     response = TestClient(surface.app).post(
@@ -107,7 +115,11 @@ def test_row_an_estate_question_never_consults_the_corpus() -> None:
 def test_row_the_same_routing_holds_on_mcp() -> None:
     """ADR-0033. Routing lives in the shared path, so both surfaces inherit one decision."""
     provider = _RecordsWhatItWasAsked()
-    surface = surface_under_test(ask_provider=provider, ask_model="anthropic/claude-opus@5")
+    surface = surface_under_test(
+        ask_provider=provider,
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(),
+    )
     _arrange(surface)
     before = _access_count(surface)
 
@@ -127,7 +139,11 @@ def test_row_a_question_fitting_no_source_declines_naming_both() -> None:
     misroute wearing a different hat.
     """
     provider = _RecordsWhatItWasAsked()
-    surface = surface_under_test(ask_provider=provider, ask_model="anthropic/claude-opus@5")
+    surface = surface_under_test(
+        ask_provider=provider,
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(),
+    )
     _arrange(surface)
     before = _access_count(surface)
 
@@ -146,7 +162,11 @@ def test_row_a_question_fitting_no_source_declines_naming_both() -> None:
 def test_row_the_route_is_recorded_on_every_ask() -> None:
     """FR-010b. A route nobody can see is a decision nobody can audit."""
     provider = _RecordsWhatItWasAsked()
-    surface = surface_under_test(ask_provider=provider, ask_model="anthropic/claude-opus@5")
+    surface = surface_under_test(
+        ask_provider=provider,
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(),
+    )
     _arrange(surface)
     client = TestClient(surface.app)
 
@@ -164,7 +184,11 @@ def test_row_the_route_is_recorded_on_every_ask() -> None:
 def test_row_a_decline_never_names_the_wrong_door() -> None:
     """SC-010. Nobody who asked about their estate is told the documentation does not cover it."""
     provider = _RecordsWhatItWasAsked()
-    surface = surface_under_test(ask_provider=provider, ask_model="anthropic/claude-opus@5")
+    surface = surface_under_test(
+        ask_provider=provider,
+        ask_model="anthropic/claude-opus@5",
+        ask_authority=qualified_ask_authority(),
+    )
     # No records at all, so the estate question must decline.
     response = TestClient(surface.app).post(
         "/ask", json={"question": ESTATE_QUESTION}, headers=surface.bearer()

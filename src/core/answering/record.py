@@ -31,6 +31,9 @@ def record_ask(
     model: str,
     disposition: str,
     source: str,
+    cell: str,
+    bound_cell: str,
+    cell_disposition: str,
 ) -> None:
     """Write the ask record, or fail the ask.
 
@@ -38,6 +41,10 @@ def record_ask(
     forgot it silently claimed the corpus, and the field exists precisely because asking now
     happens in one place and the platform decides the door — which is unrecoverable from the rest
     of the payload. 022 made audit dispositions required for the same reason.
+
+    ``cell``, ``bound_cell`` and ``cell_disposition`` are **required, no defaults** (026), for the
+    same reason ``source`` is: a default would let every call site that forgot one silently claim
+    an authorisation it never resolved. See `AuditEventType.ASK_ANSWERED`.
 
     ``corpus_digest`` is the **identity of what was consulted**: the corpus pin for guidance, the
     evidence-access stream's correlation id for estate. See `AuditEventType.ASK_ANSWERED`.
@@ -57,6 +64,11 @@ def record_ask(
                 "disposition": disposition,
                 # WHICH door was opened. Not derivable from anything else in the payload.
                 "source": source,
+                # WHETHER the model was allowed to answer, and under which authority (026).
+                # `model` says which model answered; only these say whether it was permitted.
+                "cell": cell,
+                "bound_cell": bound_cell,
+                "cell_disposition": cell_disposition,
             },
         )
     except Exception as exc:  # noqa: BLE001 — an unrecorded ask must not stand

@@ -54,8 +54,11 @@ read `data/ask-bindings` and `data/model-matrix` against the live fabric, on the
 proves resolution by how the refusal *moves*:
 
 1. Enclave up, nothing seeded → an ask refuses **`unbound`**.
-2. Seed the binding and its two cells (T022) → the same ask now refuses
-   **`provider_unavailable`** — which can only happen if governance resolution **passed**.
+2. Seed the binding and its cell (T022) → the same ask now refuses **`unqualified_cell`**, and
+   **the reason names the pinned cell** — which the surface could only do having read the binding
+   and the matrix. (The first draft of this step predicted `provider_unavailable`; availability is
+   checked *inside* resolution, so with no provider wired no cell's model is reachable. See the
+   contract's T027 note.)
 3. Withdraw a cell in the matrix record → **`unqualified_cell`**, provider never in the picture.
 
 Each step's disposition lands in the `ask_answered` record. A real served *answer* would need a

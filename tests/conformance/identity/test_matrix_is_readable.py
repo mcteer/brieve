@@ -70,7 +70,12 @@ def test_the_run_roles_policy_grants_the_matrix_and_bindings_paths() -> None:
     assert body is not None, "the harness-authority-read policy does not exist in Vault"
     rules = str(body.get("rules", "") or body.get("data", {}).get("rules", ""))
 
-    for path in ("data/model-matrix", "data/definition-bindings"):
+    # 026 adds `data/ask-bindings` — the record naming which qualified cell an ask may use.
+    # Same trap, same grant, same reason: without it Vault answers 403, and an absent binding
+    # would present as an unreachable fabric rather than as an unbound source. The two send an
+    # operator to different places, and 026's own refusal vocabulary exists to keep them apart —
+    # which a missing grant would silently undo.
+    for path in ("data/model-matrix", "data/definition-bindings", "data/ask-bindings"):
         assert path in rules, (
             f"the applied harness-authority-read policy does not grant {path!r}. Without "
             f"it Vault answers 403 rather than 404, so an absent record reports as a "

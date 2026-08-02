@@ -541,3 +541,29 @@ records are never read at all and the access record shows what was actually aske
 
 **Empty refuses.** A subject whose roles map to nothing is refused before any read happens, so the
 refusal leaves no access record — there was no access. Empty never means "everything".
+
+## Ask binding
+
+The operator-authored record naming, **per source**, which qualified cell an ask may use. Lives in
+the trust fabric beside the [ceiling](#ceiling) and the Qualified Model Matrix; read-only to the
+platform; **absent means refuse**.
+
+**A run binds through its agent definition. An ask has neither a run nor a definition**, which is
+why this record exists rather than reusing that mechanism. Deployment configuration was rejected
+deliberately: *where* a model is reachable from is assembly, *which* model is permitted is
+governance, and a binding in a jobspec would make Principle VIII configurable by whoever deploys.
+
+Per-source because the two halves are different work — an operator can qualify a model to
+summarise a tenant's records without licensing it to cite documentation.
+
+## Cell disposition
+
+What the ask record says about **how the authorising cell was resolved**: `pinned`,
+`fallback:<reason>`, `refused:<reason>`, or `not_applicable`.
+
+It describes the resolution outcome **and only that**. A refusal that happens *after* resolution
+succeeded — an empty [scope](#scope), an unreachable provider — keeps `pinned` or `fallback`,
+because the record's `disposition` field already says the ask failed later, and overwriting the
+resolution outcome would erase the fact that governance passed.
+
+`not_applicable` is the unroutable decline: no source was consulted, so no cell question arose.
