@@ -503,3 +503,41 @@ from upstream silently, while a digest mismatch is loud.
 Saying the corpus does not support an answer. **A first-class outcome, not an error** — the
 required behaviour rather than the polite one, since an answer that cannot be traced is the failure
 this platform is built against.
+
+## Estate reference
+
+A pointer from a claim in an estate answer to the audit record supporting it — an entry hash,
+resolved **against the asker's own scoped read** rather than against the trail.
+
+**That distinction is the whole bound.** "Exists in the trail" would let an answer cite a record
+the asker was never entitled to see, and the citation would read as evidence. Resolving against
+what they were actually shown is what makes it structural: nothing outside scope enters the path,
+so no answer can carry its shape — including by implication, counts, or absences.
+
+Same rule as a [citation](#citation): one that does not resolve drops its claim, and an answer
+with nothing left is a [decline](#decline).
+
+## Route
+
+Which source a question needs: **guidance** (the pinned corpus), **estate** (the tenant's own
+records), or **neither**.
+
+Asking happens in one place, so the platform decides rather than making the caller declare it.
+Deterministic — no model, no clock, no state — because a model router would put Principle VIII's
+gates on routing and have to be scored against recordings, which is the defect this lineage keeps
+closing. **`neither` is a real answer**: a router that always returned a source would answer
+questions from material that was never about them.
+
+Ties break toward estate, because that misroute declines visibly and gets rephrased, while the
+other returns a plausible answer from the wrong source and nobody finds out.
+
+## Scope
+
+What an asker may see: their tenant, and the audit event types their **roles** map to.
+
+Computed from the authenticated subject, never accepted from the request — a caller-supplied scope
+is a request to widen. It **narrows the query** rather than filtering results, so out-of-scope
+records are never read at all and the access record shows what was actually asked for.
+
+**Empty refuses.** A subject whose roles map to nothing is refused before any read happens, so the
+refusal leaves no access record — there was no access. Empty never means "everything".
