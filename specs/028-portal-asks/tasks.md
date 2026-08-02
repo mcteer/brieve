@@ -133,18 +133,23 @@ differ, and every refusal sentence is the API's own.
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T011 [P] Accessibility rows in `tests/a11y/test_wcag.py` (and the keyboard row where it
-      lives): the ask form with its expectation text, an answered page for **each** source, a
+- [ ] T011 [P] Accessibility rows in `tests/a11y/test_wcag.py` (and
+      `tests/a11y/test_keyboard_and_screenreader.py` for the keyboard row): the ask form with its expectation text, an answered page for **each** source, a
       declined page, and a refused page each pass WCAG 2.2 AA. The a11y `portal_server` fixture
       builds `surface_under_test()` bare — arrange the answered states by constructing the
       surface with `qualified_ask_authority()` and `available_credential()` (a fixture parameter
       or a second server fixture, whichever the conftest wears better; the transport signature
       does not change — T001's constraint).
-- [ ] T012 [P] Containment and hermetic sweeps green with the new route:
-      `pytest tests/conformance/portal -q` passes **unmodified** (only `relay.py` reaches the
-      network; every portal request is a catalogued operation — `/ask` is one; no credential;
-      client size bound), then `make check` and the hermetic conformance sweep. Any containment
-      row that needed editing is a finding to surface, not an edit to make quietly.
+- [ ] T012 [P] Containment green with the new route — and **the scripted session gains the
+      ask** (analysis C1). `test_row_every_request_the_portal_makes_is_a_catalogued_operation`
+      drives "every page and every action this portal offers" and checks the request log against
+      the snapshot; a route the session never drives is a route the row never observes, so its
+      strongest-form claim would silently exclude the newest page. Add a `portal.post("/ask",
+      data={"question": ...})` to the session — coverage growth, not weakening; `POST /ask` is in
+      the snapshot (verified), so the row passes by the same mechanism as every other action.
+      Every OTHER containment row passes unmodified (egress allowlist, no credential, client
+      size); one of those needing an edit is still a finding to surface. Then `make check` and
+      the hermetic conformance sweep.
 - [ ] T013 [P] Update this feature's `contracts/conformance.md` status rows as they land, and
       the ROADMAP entry for 028 (closing 024's named deferral; standing deferrals restated:
       corpus refresh, team granularity, per-tenant model scope, further cell promotion,
