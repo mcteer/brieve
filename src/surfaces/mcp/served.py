@@ -28,12 +28,14 @@ from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import AnyHttpUrl
 
+from adapters.anthropic_answering import build_ask_provider
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.reconcile_service import PostgresReconciler
 from core.authority.ask_binding import AskAuthority
+from core.authority.model_credential import BrokeredModelCredential
 from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
@@ -69,6 +71,13 @@ VAULT_ROLE = "mcp-surface"
 #:
 #: The default stays loopback so nothing outside an allocation changes.
 DB_HOST_ENV = "HARNESS_DB_HOST"
+
+#: Which model `ask` may call, as a matrix cell's model identifier. Unset = no model configured.
+#:
+#: **Not a credential and not a permission.** It says what this deployment is wired to call; the
+#: ask binding says whether it may, and the trust store says whether the platform holds the
+#: authority to. Three separate facts, three separate places, three distinguishable refusals.
+ASK_MODEL_ENV = "ASK_MODEL"
 
 _REGISTRY = build_registry()[0]
 KNOWN_TOOLS = known_tools(_REGISTRY)
@@ -118,6 +127,13 @@ def build_transport() -> McpTransport:
         credentials=credentials, known_tools=KNOWN_TOOLS, known_actions=KNOWN_ACTIONS
     )
 
+    # WHICH model this surface can call, as a qualified-matrix identifier
+    # (`anthropic/claude-opus@5`). Unset means no model is configured and every ask answers 503 —
+    # which is what a deployment that has not chosen one actually has, and is legible rather than
+    # hidden. It does NOT mean unqualified: governance still refuses first, so an operator who
+    # sets this without authoring a binding is told about the binding, not about the wiring.
+    ask_model = os.environ.get(ASK_MODEL_ENV, "").strip()
+
     return McpTransport(
         # THE SCHEDULER'S ADDRESS IS CONFIGURATION, and leaving it defaulted is a defect
         # this repository has now made twice.
@@ -152,14 +168,33 @@ def build_transport() -> McpTransport:
         definitions=_fabric,
         # 026. The served surface reads the ask binding and the matrix from the fabric it
         # already holds, so an unqualified model is unreachable here as everywhere.
-        #
-        # **No vendor provider is wired**, deliberately: putting a vendor credential inside the
-        # service is a deployment posture nobody has decided, and this feature does not decide it
-        # by accident. The consequence is legible rather than hidden — a seeded binding moves the
-        # refusal from `unbound` to `provider_unavailable`, which is only reachable once
-        # governance has PASSED, and that progression is what the served check observes.
         ask_authority=AskAuthority(
             read_binding=_fabric.read_ask_binding, read_matrix=_fabric.read_matrix
+        ),
+        # 027 — the posture three features deferred, now decided (ADR-0058).
+        #
+        # This assembly deliberately wired NO provider for three features, because putting a
+        # vendor credential inside the service was a constitutional question nobody had answered.
+        # It is answered now: the credential lives in the trust store, this surface reads it
+        # **under its own attested identity**, per ask, and holds nothing between asks.
+        #
+        # **A factory, not a provider.** `build_ask_provider` is called once per question with
+        # material brokered for that question and the result is dropped with the answer. A
+        # provider built here instead would hold the credential for the life of the process —
+        # which is the standing credential Principle IV forbids, moved rather than removed.
+        #
+        # **The key never appears in this module.** It travels inside a `ModelCredential` from
+        # the reader to the factory in `adapters`, which is what lets
+        # `test_no_static_credentials.py` keep asserting — with no exemption — that no surface
+        # names one.
+        ask_model=ask_model or "unconfigured",
+        ask_providers=(
+            (lambda source, secret: build_ask_provider(source, secret, model=ask_model))
+            if ask_model
+            else None
+        ),
+        credential_source=(
+            BrokeredModelCredential(read=_fabric.read_versioned) if ask_model else None
         ),
         thread_store=thread_store,
         reconciler=PostgresReconciler(
@@ -262,6 +297,7 @@ def result_payload(result: McpResult) -> dict[str, Any]:
 
 
 __all__ = [
+    "ASK_MODEL_ENV",
     "DB_HOST_ENV",
     "VAULT_ROLE",
     "SessionSubjects",

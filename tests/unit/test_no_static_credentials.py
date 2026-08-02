@@ -6,15 +6,18 @@ authentication path in the surface and asserts what is **not** there.
 
 **Comments and docstrings are stripped before matching.** Prose about API keys is not an
 API key, and this file necessarily contains a great deal of prose about API keys. This
-repository has now had three checks match a comment instead of code — 006's boundary
-checker, 007's run-reference check, and this feature's own read-path isolation test — so
-the stripping is not defensive tidiness, it is the whole reliability of the check.
+repository has now had five checks match a comment instead of code — 006's boundary
+checker, 007's run-reference check, 024's read-path isolation test, 020's conformance-marker
+check, and the provider-key row — so the stripping is not defensive tidiness, it is the whole
+reliability of the check. The stripper itself moved to `tests/harness/source_reading.py` at
+the fifth occurrence; the rows below still exercise it, because it is load-bearing here.
 """
 
 from __future__ import annotations
 
-import ast
 import pathlib
+
+from tests.harness.source_reading import code_without_prose
 
 SURFACES = pathlib.Path(__file__).resolve().parents[2] / "src" / "surfaces"
 
@@ -34,27 +37,32 @@ FORBIDDEN = (
     "personal_access_token",
 )
 
+#: The one module permitted to name a vendor key's field, and the one term it may name.
+#:
+#: **027 amended this gate in the open, in the same change that amended the constitution**, and
+#: for the same reason: the platform now holds a model vendor credential, so a check asserting it
+#: holds none anywhere would be a check asserting something untrue. The alternative considered and
+#: rejected was renaming the KV field to something the matcher does not know — which would have
+#: left the gate green while the credential existed, and a gate that passes by vocabulary is worse
+#: than no gate.
+#:
+#: **What the exception deliberately does not cover.** It is one module, one term. Every surface
+#: module still fails on any of these names, which is why `ModelCredential.secret` is called
+#: `secret`: the brokered key crosses into `served.py` inside a value object and is handed
+#: straight to a provider constructor, so a surface that started *holding* one would trip this
+#: gate exactly as before. The lifetime property — fetched per task, never persisted — is not
+#: visible to a name check and is asserted where it is observable, at the trail and the
+#: checkpoint (027 T016).
+EXEMPT: dict[str, frozenset[str]] = {
+    "model_credential.py": frozenset({"api_key"}),
+}
 
-def _code_without_prose(path: pathlib.Path) -> str:
-    """Return the module's source with docstrings and comments removed.
 
-    `ast.unparse` of a parsed module drops comments entirely and lets us strip docstring
-    expressions explicitly, so what remains is code and string literals that actually
-    participate in behaviour.
-    """
-    tree = ast.parse(path.read_text())
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        body = getattr(node, "body", [])
-        if (
-            body
-            and isinstance(body[0], ast.Expr)
-            and isinstance(body[0].value, ast.Constant)
-            and isinstance(body[0].value.value, str)
-        ):
-            node.body = body[1:] or [ast.Pass()]
-    return ast.unparse(tree)
+#: Shared rather than kept here (027). This file grew the first stripper; by the fifth check to
+#: match prose instead of code it was clear the next one would need it too, and two copies means
+#: fixing the sixth occurrence twice. The rows below still exercise it, because it is load-bearing
+#: for this gate whoever owns it.
+_code_without_prose = code_without_prose
 
 
 def _surface_sources() -> list[pathlib.Path]:
@@ -80,10 +88,50 @@ def test_no_static_credential_appears_in_any_surface_module() -> None:
     offenders: list[str] = []
     for path in _surface_sources():
         code = _code_without_prose(path).lower()
+        allowed = EXEMPT.get(path.name, frozenset())
         for name in FORBIDDEN:
-            if name in code:
+            if name in code and name not in allowed:
                 offenders.append(f"{path.name}: {name}")
     assert offenders == [], f"static credential paths present: {offenders}"
+
+
+def test_the_exemption_stays_exactly_one_module_and_one_term() -> None:
+    """The exemption is a named exception, and a named exception that grows is not one.
+
+    Pinned by count so a second module or a second term cannot be added quietly — the same
+    discipline the constitution's *"exactly two named exceptions"* clause applies one level up.
+    Whoever needs a third comes here, changes this number, and says why.
+    """
+    assert list(EXEMPT) == ["model_credential.py"]
+    assert EXEMPT["model_credential.py"] == frozenset({"api_key"})
+
+
+def test_the_exempt_module_exists_and_still_names_the_term() -> None:
+    """A stale exemption is a hole nobody is watching.
+
+    If `model_credential.py` is renamed, deleted, or stops naming the field, this fails and the
+    exemption is removed rather than left standing over nothing.
+    """
+    exempt = [p for p in _surface_sources() if p.name == "model_credential.py"]
+    assert len(exempt) == 1, "the exempt module moved; the exemption must move or go"
+    assert "api_key" in _code_without_prose(exempt[0]).lower()
+
+
+def test_no_surface_module_names_a_vendor_key_even_now_that_one_exists() -> None:
+    """The half of the gate 027 must not cost, asserted separately so it cannot erode.
+
+    The brokered key crosses `served.py` inside a `ModelCredential` and goes straight into a
+    provider constructor; no surface names it, holds it as an attribute, or logs it. This row
+    scopes the original assertion to `src/surfaces/` alone, with **no exemption at all** — so if
+    the exemption above is ever widened to cover a surface module, this fails first.
+    """
+    offenders = [
+        f"{path.relative_to(SURFACES)}: {name}"
+        for path in sorted(SURFACES.rglob("*.py"))
+        for name in FORBIDDEN
+        if name in _code_without_prose(path).lower()
+    ]
+    assert offenders == [], f"a surface module names a static credential: {offenders}"
 
 
 def test_stripping_actually_works() -> None:

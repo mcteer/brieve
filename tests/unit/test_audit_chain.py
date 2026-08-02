@@ -171,6 +171,12 @@ def test_widening_the_event_vocabulary_moves_no_existing_hash() -> None:
     assert AuditEventType.RUN_STOPPED.value == "run_stopped"  # 022
     assert AuditEventType.ASK_ANSWERED.value == "ask_answered"  # 024
 
+    # 027 changed no MEMBER either — it widened ASK_ANSWERED's documented payload a fourth time,
+    # with `model_authority`: a reference to the brokered credential and its rotation generation,
+    # never a value. It deliberately did NOT touch MODEL_GATE, which is the closer fit on its face
+    # — no run has ever bound a real model, so a run-side field would be written by nothing and
+    # verified by nothing. That restraint is the part worth finding here later.
+    #
     # 026 changed no MEMBER either — it widened ASK_ANSWERED's documented payload again, with
     # cell / bound_cell / cell_disposition. Third additive touch to one payload in three
     # features, which is worth noticing as a pattern: the ask record is where facts about an ask

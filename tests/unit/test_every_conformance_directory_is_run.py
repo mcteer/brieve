@@ -21,6 +21,7 @@ conformance lanes are complete cannot live inside one of them.
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -68,15 +69,72 @@ def _recipe_lines() -> list[str]:
     return lines
 
 
+def _decorators(module: Path) -> str:
+    """Every decorator in the module, as text — and nothing else.
+
+    **A marker is a decorator, and this check reads decorators.** The first version matched
+    ``mark.<name>`` anywhere in the file, so a docstring *explaining* that some row belongs in the
+    enclave lane reported that file as carrying the marker — a false alarm about a row that does
+    not exist, in a check whose whole purpose is to be believed.
+
+    That makes four checks in this repository to have matched prose instead of code (006's
+    boundary checker, 007's run-reference check, 024's read-path isolation test, and this). The
+    pattern is now clear enough to state as a rule: **a check that reads source must parse it.**
+    Ripgrep over Python is a heuristic, and heuristics in gates get weakened rather than fixed the
+    first time they cry wolf.
+    """
+    tree = ast.parse(module.read_text())
+    return "\n".join(
+        ast.unparse(decorator)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        for decorator in node.decorator_list
+    ) + "\n".join(
+        # Module-level `pytestmark = pytest.mark.enclave`, which applies to every row in the file
+        # and is not a decorator at all. Missing this would be the check's own blind spot.
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(getattr(t, "id", "") == "pytestmark" for t in node.targets)
+    )
+
+
 def _markers_used(directory: Path) -> set[str]:
     """The gated markers actually carried by rows in this directory."""
     used: set[str] = set()
     for module in directory.rglob("test_*.py"):
-        source = module.read_text()
+        source = _decorators(module)
         for marker in GATED:
             if re.search(rf"\bmark\.{marker}\b", source):
                 used.add(marker)
     return used
+
+
+def test_the_marker_reader_sees_decorators_and_not_prose() -> None:
+    """The reader is load-bearing, so it gets its own row — both directions.
+
+    A reader that matched everything would fail the gate on documentation; one that matched
+    nothing would make the whole check vacuous while looking like it worked. Both have happened
+    in this repository, to different checks.
+    """
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:
+        fh.write(
+            '"""A docstring mentioning pytest.mark.enclave."""\n'
+            "# a comment mentioning pytest.mark.host_enclave\n"
+            "import pytest\n\n\n"
+            "@pytest.mark.enclave\n"
+            "def test_real() -> None:\n"
+            "    pass\n"
+        )
+        temp = Path(fh.name)
+    try:
+        seen = _decorators(temp)
+        assert "mark.enclave" in seen, "the reader missed a real marker"
+        assert "mark.host_enclave" not in seen, "the reader matched a comment"
+    finally:
+        temp.unlink()
 
 
 def _names(line: str, directory: str) -> bool:

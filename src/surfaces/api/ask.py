@@ -55,6 +55,7 @@ def ask_for(
     cell: str = "",
     bound_cell: str = "",
     cell_disposition: str = "",
+    model_authority: str = "",
 ) -> dict[str, Any]:
     """Answer or decline, and record that someone asked.
 
@@ -77,6 +78,7 @@ def ask_for(
         cell=cell,
         bound_cell=bound_cell,
         cell_disposition=cell_disposition,
+        model_authority=model_authority,
     )
 
     if answer.disposition != ANSWERED:
@@ -110,6 +112,7 @@ def estate_answer_for(
     cell: str = "",
     bound_cell: str = "",
     cell_disposition: str = "",
+    model_authority: str = "",
 ) -> dict[str, Any]:
     """Answer an estate question from the asker's own records, or decline.
 
@@ -139,6 +142,9 @@ def estate_answer_for(
             cell=cell,
             bound_cell=bound_cell,
             cell_disposition=cell_disposition,
+            # A credential may have been obtained before scope refused; carrying it keeps the
+            # record honest about what authority was in hand when the ask stopped.
+            model_authority=model_authority,
         )
         raise ScopeEmpty(
             "no records are visible to this subject's roles; an estate answer would have "
@@ -171,6 +177,7 @@ def estate_answer_for(
         cell=cell,
         bound_cell=bound_cell,
         cell_disposition=cell_disposition,
+        model_authority=model_authority,
     )
 
     if answer.disposition != ESTATE_ANSWERED:
@@ -228,6 +235,88 @@ _GOVERNANCE_DISPOSITION: dict[str, str] = {
 }
 
 
+class AskCredentialUnavailable(Exception):
+    """The cell is qualified and the platform holds no authority to call the vendor (027).
+
+    **Recorded before it is raised**, like every other ask refusal: someone asked, and a boundary
+    a caller can probe without trace is what 022 removed.
+
+    Deliberately its own type rather than a `provider_unavailable`. Those two send an operator to
+    different people — one to whoever governs the credential, one to the vendor or the network —
+    and the whole design of the refusal ladder is that a person reading the trail knows which door
+    to knock on without guessing.
+    """
+
+    disposition = "credential_unavailable"
+
+
+def obtain_ask_credential(
+    *,
+    credential_source: Any,
+    model: str,
+    subject: AuthenticatedSubject,
+    audit: AuditSink,
+    source: str,
+    cell: str,
+    bound_cell: str,
+    cell_disposition: str,
+    corpus_digest: str = "",
+    evidence_stream: str = "",
+) -> Any:
+    """Broker the credential for **this ask**, or record a refusal and raise.
+
+    Called **after** `authorise_ask` and **before** any provider is built: governance decides
+    whether a model may answer, and only then does the platform go looking for the authority to
+    call one. The reverse order would send an operator to write a credential for a cell they are
+    not permitted to use.
+
+    **The vendor is derived from the bound model**, not configured separately — ``anthropic`` from
+    ``anthropic/claude-opus@5``. So the matrix decides which vendor's credential is needed, and a
+    deployment cannot end up holding authority for a vendor no cell qualifies.
+
+    **There is no environment fallback and no default source.** `None` refuses. A path that fell
+    back to `EVAL_PROVIDER_API_KEY` would work on the operator's laptop, fail in the enclave, and
+    pass every row except the one written to catch it (T014).
+    """
+    from core.authority.errors import ResolutionRefused
+
+    vendor = model.split("/", 1)[0].strip()
+    detail = ""
+    if credential_source is None:
+        detail = (
+            "no model credential source is configured for this surface; a qualified cell is not "
+            "authority to call a vendor"
+        )
+    else:
+        try:
+            return credential_source.obtain(vendor)
+        except ResolutionRefused as refused:
+            # `fabric_unreachable` arrives here too, and it is deliberately NOT flattened into
+            # the caller-facing disposition: the trail keeps `credential_unavailable` as the ask's
+            # outcome while the detail names the store fault, because a caller learning that the
+            # trust store is down learns something about the platform's internals that a refusal
+            # should not teach.
+            detail = str(refused)
+
+    record_ask(
+        audit=audit,
+        subject=subject,
+        corpus_digest=corpus_digest,
+        evidence_stream=evidence_stream,
+        model=model,
+        disposition=AskCredentialUnavailable.disposition,
+        source=source,
+        # Resolution SUCCEEDED; the ask failed on the credential afterwards. Keeping the
+        # resolution outcome is what preserves the fact that governance passed.
+        cell=cell,
+        bound_cell=bound_cell,
+        cell_disposition=cell_disposition,
+        # No credential was obtained, so none was exercised. Empty is the statement.
+        model_authority="",
+    )
+    raise AskCredentialUnavailable(detail)
+
+
 class AskNotQualified(Exception):
     """Governance refused this ask before any provider was contacted.
 
@@ -242,15 +331,19 @@ class AskNotQualified(Exception):
         self.disposition = disposition
 
 
-def _available(model: str, provider: Any) -> frozenset[str]:
-    """Exactly the model the injected provider was constructed for — never wider.
+def _available(model: str, providers: Any) -> frozenset[str]:  # noqa: D417
+    """Exactly the model this surface can build a provider for — never wider.
 
     **Analysis U2's requirement, and the reason is record/actual agreement.** A wider set lets
     fallback select a cell for a model this provider cannot call: the ask record would then name
     cell X while the provider called model Y, and the trail would carry an authorisation for a
     model that never ran. On an attestation-relevant record that is the worst available outcome.
+
+    ``providers`` is a **factory** as of 027 rather than a built provider, because a provider is
+    now built per ask from material brokered for that ask. What this function asks of it is
+    unchanged: whether this surface can call the bound model at all.
     """
-    return frozenset() if provider is None else frozenset({model})
+    return frozenset() if providers is None else frozenset({model})
 
 
 def authorise_ask(
@@ -305,6 +398,9 @@ def authorise_ask(
         cell="",
         bound_cell="",
         cell_disposition=f"refused:{disposition}",
+        # Governance refused BEFORE any credential was sought. Empty here is load-bearing: a
+        # reference would claim an authority the platform never exercised.
+        model_authority="",
     )
     raise AskNotQualified(disposition, detail)
 
@@ -319,10 +415,11 @@ class AskRequest(BaseModel):
 
 def build_router(
     *,
-    provider: Any = None,
+    providers: Any = None,
     model: str = "unconfigured",
     evidence_query: Any = None,
     ask_authority: Any = None,
+    credential_source: Any = None,
 ) -> APIRouter:
     """The provider is a **parameter**, so a deployment can supply one and a test can share one.
 
@@ -330,6 +427,14 @@ def build_router(
     the operation was permanently 503 in every assembly, and the parity rows could only compare two
     surfaces failing. A collaborator that cannot be injected is a collaborator the surfaces cannot
     be shown to share — the exact asymmetry `surface_under_test` exists to prevent.
+
+    **`providers` is a factory as of 027, not a built provider**: `(source, secret) -> provider`,
+    called once per ask with material brokered for that ask. A surface holding a built provider
+    would hold whatever credential built it for the life of the process, which is the standing
+    credential this feature exists to remove — one layer above the reader that refuses to cache.
+
+    **`credential_source` defaults to `None`, and `None` refuses.** A default that supplied one
+    would rebuild "configured means permitted" one level below where 026 broke it.
     """
     router = APIRouter(tags=["ask"])
 
@@ -360,7 +465,7 @@ def build_router(
                     subject=subject,
                     audit=audit,
                     authority=ask_authority,
-                    available=_available(model, provider),
+                    available=_available(model, providers),
                 )
             except AskNotQualified as refused:
                 raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
@@ -370,11 +475,30 @@ def build_router(
                     status.HTTP_503_SERVICE_UNAVAILABLE,
                     "no evidence plane is configured; estate questions cannot be answered",
                 )
-            if provider is None:
+            if providers is None:
                 raise HTTPException(
                     status.HTTP_503_SERVICE_UNAVAILABLE,
                     "no model is configured for `ask`; the records alone are not an answer",
                 )
+            # THE CREDENTIAL, between governance and the vendor (027). Before the evidence plane
+            # is read, so an ask the platform cannot complete does not leave an access record for
+            # a read that answered nobody.
+            try:
+                credential = obtain_ask_credential(
+                    credential_source=credential_source,
+                    model=model,
+                    subject=subject,
+                    audit=audit,
+                    source=str(Route.ESTATE),
+                    cell=cell,
+                    bound_cell=bound_cell,
+                    cell_disposition=cell_disposition,
+                    evidence_stream=evidence_stream_for(subject.tenant_id),
+                )
+            except AskCredentialUnavailable as unavailable:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)
+                ) from unavailable
             try:
                 return estate_answer_for(
                     question=body.question,
@@ -382,11 +506,12 @@ def build_router(
                     query=evidence_query,
                     audit=audit,
                     model=model,
-                    provider=provider,
+                    provider=providers(str(Route.ESTATE), credential.secret),
                     now=datetime.now(UTC),
                     cell=cell,
                     bound_cell=bound_cell,
                     cell_disposition=cell_disposition,
+                    model_authority=credential.reference,
                 )
             except ScopeEmpty as empty:
                 raise HTTPException(status.HTTP_403_FORBIDDEN, str(empty)) from empty
@@ -409,6 +534,8 @@ def build_router(
                 bound_cell="",
                 # No source was consulted, so no cell question arose.
                 cell_disposition="not_applicable",
+                # No model was called, so no authority was exercised. Empty is the statement.
+                model_authority="",
             )
             return {
                 "disposition": "declined",
@@ -426,7 +553,7 @@ def build_router(
                 subject=subject,
                 audit=audit,
                 authority=ask_authority,
-                available=_available(model, provider),
+                available=_available(model, providers),
             )
         except AskNotQualified as refused:
             raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
@@ -438,7 +565,7 @@ def build_router(
                 status.HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)
             ) from unavailable
 
-        if provider is None:
+        if providers is None:
             # RECORDED ANYWAY. Someone asked; the platform could not attempt it. 022 established
             # that a refusal records — a boundary a caller can probe without trace is the thing
             # that prevents — and repeated asks against a surface with no model is exactly the
@@ -456,22 +583,42 @@ def build_router(
                 cell=cell,
                 bound_cell=bound_cell,
                 cell_disposition=cell_disposition,
+                # No provider, so no vendor call, so no credential was exercised.
+                model_authority="",
             )
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 "no model is configured for `ask`; the corpus alone is not an answer",
             )
         try:
+            credential = obtain_ask_credential(
+                credential_source=credential_source,
+                model=model,
+                subject=subject,
+                audit=audit,
+                source=GUIDANCE_SOURCE,
+                cell=cell,
+                bound_cell=bound_cell,
+                cell_disposition=cell_disposition,
+                corpus_digest=corpus.digest,
+            )
+        except AskCredentialUnavailable as unavailable:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)
+            ) from unavailable
+
+        try:
             return ask_for(
                 question=body.question,
                 subject=subject,
                 corpus=corpus,
-                provider=provider,
+                provider=providers(GUIDANCE_SOURCE, credential.secret),
                 audit=audit,
                 model=model,
                 cell=cell,
                 bound_cell=bound_cell,
                 cell_disposition=cell_disposition,
+                model_authority=credential.reference,
             )
         except ProviderUnavailable as unreachable:
             # NOT a decline. A reader cannot tell "the corpus does not say" from "we could not
@@ -483,4 +630,12 @@ def build_router(
     return router
 
 
-__all__ = ["AskRequest", "CorpusUnavailable", "ProviderUnavailable", "ask_for", "build_router"]
+__all__ = [
+    "AskCredentialUnavailable",
+    "AskRequest",
+    "CorpusUnavailable",
+    "ProviderUnavailable",
+    "ask_for",
+    "build_router",
+    "obtain_ask_credential",
+]

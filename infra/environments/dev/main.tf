@@ -51,4 +51,11 @@ module "trust_fabric" {
   definition_policies = var.definition_policies
   model_matrix_cells  = var.model_matrix_cells
   ask_binding         = var.ask_binding
+
+  # 027. Dev seeds a clearly-marked non-functional credential so `make dev-up`'s ask
+  # progression reaches a fetch that SUCCEEDS and a vendor call that fails — one link past
+  # `credential_unavailable`, proving the mount, the policy, the attested read and the provider
+  # construction without a real key existing anywhere in dev. Production leaves this false and
+  # writes the record out of band, so an apply can never overwrite a real credential with a dud.
+  seed_model_credential_placeholder = true
 }

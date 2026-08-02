@@ -17,6 +17,7 @@ import ast
 from pathlib import Path
 
 from core.evals.scoring import EVAL_PROVIDER_KEY
+from tests.harness.source_reading import code_without_prose
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -50,15 +51,33 @@ def test_the_key_appears_in_no_jobspec_or_infra_file() -> None:
 
 
 def test_no_run_path_module_reads_the_key() -> None:
-    """The run path calls no model; a run reading this key is the posture quietly changing."""
+    """The run path calls no model; a run reading this key is the posture quietly changing.
+
+    **Prose is stripped before matching** (027). A module explaining *why* it must never fall back
+    to the eval-lane key is doing the opposite of reading it, and this check reported one as a
+    leak — the fifth time a check in this repository has matched a comment instead of code. The
+    stripper is shared rather than copied; see `tests/harness/source_reading.py` for the tally and
+    the reasoning.
+
+    The infra row above deliberately still matches raw text: HCL and JSON have no Python AST, and
+    a key named anywhere in a jobspec is a leak whatever syntax surrounds it.
+    """
     offenders = []
     for path in (ROOT / "src").rglob("*.py"):
         relative = str(path.relative_to(ROOT))
         if relative in ALLOWED:
             continue
-        if _references_key(path.read_text()):
+        if _references_key(code_without_prose(path)):
             offenders.append(relative)
     assert not offenders, f"the provider key is referenced outside the allowed modules: {offenders}"
+
+
+def test_the_stripper_still_lets_a_real_read_through() -> None:
+    """The complement, and the more important half: a stripper that hid code would make the row
+    above vacuous while looking like it worked.
+    """
+    assert _references_key(code_without_prose('import os\nk = os.environ["EVAL_PROVIDER_API_KEY"]'))
+    assert not _references_key(code_without_prose('"""Never read EVAL_PROVIDER_API_KEY here."""'))
 
 
 def test_the_key_is_absent_from_every_pack_manifest() -> None:

@@ -239,6 +239,7 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
         cell="vault:anthropic/claude-opus@5:ask",
         bound_cell="vault:anthropic/claude-opus@5:ask",
         cell_disposition="pinned",
+        model_authority="vault:model-credentials/anthropic@v3",
     )
 
     entries = sink.list_by_correlation_id(ask_stream_for("tenant-a"))
@@ -251,6 +252,8 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
     # is forced to look at is a payload contract that grows a content field eventually.
     # 026 adds cell/bound_cell/cell_disposition. EXACT set, still — the row fires on a
     # deliberate change as loudly as on an accidental one, which is why it keeps catching these.
+    # 027 adds `model_authority`, the fifth feature in five to extend this payload. The exactness
+    # is what makes each of those a decision somebody had to write down.
     assert set(payload) == {
         "subject_user_id",
         "corpus_digest",
@@ -261,7 +264,11 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
         "cell",
         "bound_cell",
         "cell_disposition",
+        "model_authority",
     }
     assert payload["source"] == "guidance"
     assert payload["cell_disposition"] == "pinned"
+    # A REFERENCE, never a value — the property the whole field exists for. `vault:` and a version
+    # generation, and nothing that could be presented to a vendor.
+    assert payload["model_authority"] == "vault:model-credentials/anthropic@v3"
     assert "question" not in payload and "answer" not in payload

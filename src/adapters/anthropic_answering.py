@@ -116,8 +116,12 @@ _INSTRUCTION: Final[str] = (
 class LiveAnswerProvider:
     """Asks a real model for cited claims. Behind `@pytest.mark.live_model`, never in a gate."""
 
-    def __init__(self, model: str = LIVE_MODEL) -> None:
+    def __init__(self, model: str = LIVE_MODEL, *, api_key: str | None = None) -> None:
         self._model = model
+        #: Supplied by a production caller that brokered it for this task; `None` in the eval
+        #: lane, where `client_and_model` reads the environment (FR-013). Held for the lifetime of
+        #: this provider — which is one ask, because the surface builds one per ask and drops it.
+        self._api_key = api_key
 
     def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
         sections = _relevant(question, corpus)
@@ -130,7 +134,7 @@ class LiveAnswerProvider:
             f"--- path: {path}\n--- anchor: {anchor}\n{text[:SECTION_CHARS]}"
             for path, anchor, text in sections
         )
-        client, api_model = client_and_model(self._model)
+        client, api_model = client_and_model(self._model, api_key=self._api_key)
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             # 4096 for the same reason the scorer uses it: Opus 5 reasons before it answers and
@@ -173,9 +177,6 @@ class LiveAnswerProvider:
         return [item for item in parsed if isinstance(item, dict)]
 
 
-__all__ = ["LiveAnswerProvider", "LiveEstateProvider", "SECTIONS_OFFERED"]
-
-
 _ESTATE_INSTRUCTION: Final[str] = (
     "You answer questions about what a governed agent platform actually did, using ONLY the audit "
     "records supplied below. You have no tools and take no actions.\n\n"
@@ -209,23 +210,51 @@ class LiveEstateProvider:
     the recorded provider does — a content hash is unwritable by hand and meaningless to a model.
     """
 
-    def __init__(self, *, ids_to_hashes: dict[str, str], model: str = LIVE_MODEL) -> None:
+    def __init__(
+        self,
+        *,
+        ids_to_hashes: dict[str, str] | None = None,
+        model: str = LIVE_MODEL,
+        api_key: str | None = None,
+    ) -> None:
+        #: `None` means **the entry hash is the id** — the deployed shape, where records are the
+        #: tenant's own and nobody authored a friendly name for them. The eval fixtures pass a
+        #: mapping because their cases cite `rec-vault-002`, which is a property of the fixture
+        #: and not of the platform.
+        #:
+        #: Without this branch a deployed estate answer offers every record as ``id: ?`` and
+        #: resolves every citation to ``unresolvable:?`` — the provider would answer and the
+        #: path would drop every claim, which reads as "the records do not support an answer".
+        #: Found while wiring `served.py`, which is the first assembly to construct one.
+        self._by_hash = ids_to_hashes is None
+        ids_to_hashes = ids_to_hashes or {}
         self._ids = ids_to_hashes
         self._hashes_to_ids = {h: i for i, h in ids_to_hashes.items()}
         self._model = model
+        #: See `LiveAnswerProvider.__init__` — brokered per task by a production caller, `None`
+        #: in the eval lane.
+        self._api_key = api_key
+
+    def _id_for(self, entry_hash: str) -> str:
+        return entry_hash if self._by_hash else self._hashes_to_ids.get(entry_hash, "?")
+
+    def _hash_for(self, cited: str) -> str:
+        if self._by_hash:
+            return cited
+        return self._ids.get(cited, f"unresolvable:{cited}")
 
     def answer(self, question: str, records: tuple[Any, ...]) -> list[dict[str, Any]]:
         if not records:
             return []
 
         offered = "\n\n".join(
-            f"--- id: {self._hashes_to_ids.get(record.entry_hash, '?')}\n"
+            f"--- id: {self._id_for(record.entry_hash)}\n"
             f"--- event: {record.event_type}\n"
             f"--- correlation: {record.correlation_id}\n"
             f"--- payload: {json.dumps(record.payload, sort_keys=True)}"
             for record in records
         )
-        client, api_model = client_and_model(self._model)
+        client, api_model = client_and_model(self._model, api_key=self._api_key)
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             max_tokens=4096,
@@ -258,9 +287,39 @@ class LiveEstateProvider:
             references = [
                 # An id the fixture does not contain resolves to nothing, and the path drops the
                 # claim — which is precision failing, exactly as it should.
-                {"entry_hash": self._ids.get(str(ref.get("id")), f"unresolvable:{ref.get('id')}")}
+                {"entry_hash": self._hash_for(str(ref.get("id")))}
                 for ref in item.get("references", [])
                 if isinstance(ref, dict)
             ]
             claims.append({"statement": str(item.get("statement", "")), "references": references})
         return claims
+
+
+def build_ask_provider(source: str, secret: str, *, model: str = LIVE_MODEL) -> Any:
+    """The provider for one ask, built from material brokered for that ask (027).
+
+    **This function exists so that no surface module ever names a vendor key.** A surface holds a
+    `ModelCredential` and hands it straight here; `tests/unit/test_no_static_credentials.py`
+    forbids the static-credential vocabulary in every surface, with no exemption, and that check
+    is only worth keeping if it is structurally impossible to trip. Assembly calling
+    `LiveAnswerProvider(model, api_key=...)` directly would have traded the gate for convenience.
+
+    **Built per ask and dropped with it.** The provider holds the key for as long as it exists,
+    and it exists for one question. A surface that built one at construction and reused it would
+    hold a credential for the life of the process — the standing credential 027 exists to avoid,
+    reintroduced one layer above the reader that refuses to cache.
+
+    `source` selects which material the provider reads, matching `core.answering.routing.Route`.
+    The estate provider takes no id mapping: deployed records are cited by their own entry hash.
+    """
+    if source == "estate":
+        return LiveEstateProvider(model=model, api_key=secret)
+    return LiveAnswerProvider(model, api_key=secret)
+
+
+__all__ = [
+    "LiveAnswerProvider",
+    "LiveEstateProvider",
+    "SECTIONS_OFFERED",
+    "build_ask_provider",
+]

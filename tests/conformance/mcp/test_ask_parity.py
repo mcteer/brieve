@@ -26,7 +26,11 @@ from fastapi.testclient import TestClient
 
 from core.answering.answer import ProviderUnavailable
 from core.answering.corpus import Corpus, load_corpus
-from tests.harness.api_fixtures import qualified_ask_authority, surface_under_test
+from tests.harness.api_fixtures import (
+    available_credential,
+    qualified_ask_authority,
+    surface_under_test,
+)
 from tests.harness.parity import project
 
 CORPUS = load_corpus()
@@ -74,6 +78,7 @@ def _both(provider: object) -> tuple[Any, Any, Any]:
         ask_provider=provider,
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     api = TestClient(surface.app).post(
         "/ask", json={"question": "How does this work?"}, headers=surface.bearer()
@@ -140,10 +145,16 @@ def test_row_an_unconfigured_surface_refuses_the_same_on_both() -> None:
 def test_row_the_ask_trail_is_equivalent_on_both() -> None:
     """Same type, subject, and decision fields — the named projection, not 'some audit'."""
     api_surface = surface_under_test(
-        ask_provider=_Answers(), ask_model=MODEL, ask_authority=qualified_ask_authority()
+        ask_provider=_Answers(),
+        ask_model=MODEL,
+        ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     mcp_surface = surface_under_test(
-        ask_provider=_Answers(), ask_model=MODEL, ask_authority=qualified_ask_authority()
+        ask_provider=_Answers(),
+        ask_model=MODEL,
+        ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
 
     TestClient(api_surface.app).post(
@@ -167,11 +178,13 @@ def test_break_fixture_a_surface_answering_where_the_other_declines_is_detected(
         ask_provider=_Answers(),
         ask_model=MODEL,
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     declining = surface_under_test(
         ask_provider=_CitesNothingReal(),
         ask_model=MODEL,
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
 
     one = TestClient(answering.app).post(
@@ -210,8 +223,13 @@ def _with_records(**kwargs: Any) -> Any:
     Set here rather than defaulted in the fixture: rows that answer must say so, because a
     fixture that qualified whatever provider was injected would make every refusal row an
     override rather than the behaviour (026).
+
+    027 adds the credential the same way and for the same reason: a qualified cell is not
+    authority to call a vendor, and a helper that supplied one silently would make the
+    credential rows overrides rather than the behaviour.
     """
     kwargs.setdefault("ask_authority", qualified_ask_authority())
+    kwargs.setdefault("credential_source", available_credential())
     from core.audit.schema import AuditEventType
 
     surface = surface_under_test(**kwargs)
@@ -252,6 +270,7 @@ def test_row_an_estate_decline_is_the_same_on_both_including_its_reason() -> Non
         ask_provider=_AnswersFromRecords(),
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     api = TestClient(surface.app).post(
         "/ask", json={"question": ESTATE_QUESTION}, headers=surface.bearer()
@@ -307,6 +326,7 @@ def _governance_surface(binding: dict[str, Any], matrix: dict[str, Any]) -> Any:
         ask_provider=_Answers(),
         ask_model=MODEL,
         ask_authority=AskAuthority(read_binding=lambda: binding, read_matrix=lambda: matrix),
+        credential_source=available_credential(),
     )
 
 

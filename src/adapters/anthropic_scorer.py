@@ -31,15 +31,26 @@ from core.evals.scoring import (
 from core.evals.suites import EvalCase, UnrunnableSuite
 
 
-def client_and_model(model: str = LIVE_MODEL) -> tuple[object, str]:
+def client_and_model(model: str = LIVE_MODEL, *, api_key: str | None = None) -> tuple[object, str]:
     """The credential check, the import check, and the model-id derivation — once.
 
     **Shared rather than copied**, because 024 added a second live caller (the answering provider)
     and all three of these have already been wrong here at least once: an unset key that skipped
     instead of raising, a missing extra, and a bare model name no API serves. Two copies would mean
     fixing the next one twice, and Principle VII exists for exactly this.
+
+    **``api_key`` supplied → the environment is never consulted** (027). A production caller
+    brokers the credential per task and passes it here; the branch below belongs to the eval lane
+    alone. The ordering is deliberate: *supplied wins, and there is no fallback the other way*. A
+    production path that quietly fell back to ``EVAL_PROVIDER_KEY`` would work on the operator's
+    laptop, fail in the enclave, and pass every row except the one written to catch it.
+
+    **The eval lane keeps the environment path, and that exemption is FR-013's, stated here rather
+    than inferred**: `make evals-live` runs with a named human present and no brokered store, and
+    an unset key there raises `UnrunnableSuite` rather than skipping — a suite that cannot run must
+    not report as passing.
     """
-    key = os.environ.get(EVAL_PROVIDER_KEY, "").strip()
+    key = (api_key or "").strip() or os.environ.get(EVAL_PROVIDER_KEY, "").strip()
     if not key:
         raise UnrunnableSuite(
             f"the live lane has no provider credential ({EVAL_PROVIDER_KEY} is unset); "
@@ -66,8 +77,14 @@ def client_and_model(model: str = LIVE_MODEL) -> tuple[object, str]:
 class LiveModelScorer:
     """Asks a real model. Behind `@pytest.mark.live_model`, never in a blocking lane."""
 
-    def __init__(self, model: str = LIVE_MODEL, *, grounding: str = "") -> None:
+    def __init__(
+        self, model: str = LIVE_MODEL, *, grounding: str = "", api_key: str | None = None
+    ) -> None:
         self._model = model
+        #: Threaded for uniformity with the answering providers (027): all three live callers
+        #: take a credential the same way, so "how does a caller supply one" has one answer.
+        #: The eval lane leaves it `None` and keeps the environment path.
+        self._api_key = api_key
         #: Extra system context — the estate record for estate_state cases, where fidelity
         #: to a supplied record is exactly what the suite scores. Empty for suites that
         #: score refusal or citation, where grounding would be answering the question for
@@ -75,7 +92,7 @@ class LiveModelScorer:
         self._grounding = grounding
 
     def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
-        client, api_model = client_and_model(self._model)
+        client, api_model = client_and_model(self._model, api_key=self._api_key)
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             # 4096, because 1024 was the live lane's quietest defect: Opus 5 reasons

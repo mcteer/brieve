@@ -34,6 +34,19 @@ RESOLUTION_REASONS: Final[dict[str, str]] = {
     "fabric_timeout": "the trust fabric answered too slowly",
     "entitlement_unavailable": "the product could not be asked",
     "broker_not_implemented": "the brokered credential path does not exist yet",
+    # --- 027: the cell is qualified, and the credential to call it could not be obtained
+    #
+    # Three codes now sit between a question and a model, and each sends someone somewhere
+    # different. `unqualified_cell` means evaluation has not qualified what was asked for —
+    # go to the matrix. `fabric_unreachable` means the store itself did not answer — go to the
+    # outage. This one means both of those succeeded and the credential is simply not there:
+    # never written, rotated to nothing, or revoked. Go to whoever governs the credential.
+    #
+    # Collapsing it into either neighbour was the tempting shape, and it costs the one thing
+    # the code buys: revocation is *supposed* to produce this, so an operator who deletes a
+    # credential must see something distinguishable from an outage they did not cause.
+    "credential_unavailable": "the cell is qualified and the model credential could not be "
+    "obtained; the platform holds no authority to call this vendor",
     # --- what they may do does not include this
     "outside_scope": "resolution succeeded; the action is not permitted",
     # --- 013: the record could not be read as written

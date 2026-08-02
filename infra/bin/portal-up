@@ -116,7 +116,13 @@ fi
 # Without it a service that cannot start holds this script for as long as Nomad keeps
 # trying, and the failure reads as a hang rather than as a failure.
 say "API service"
+# 027. Which model `ask` may call, from .env — the same variable `mcp-surface-up` passes, because
+# the two deployed surfaces must take the same configuration or ADR-0033's parity guarantee is a
+# statement about a test fixture rather than about a deployment. The credential is never passed
+# here; the surface reads it from the trust store per ask.
+ASK_MODEL="$(env_val ASK_MODEL)"
 nomad job run -detach -var="repo=$REPO" \
+  -var="ask_model=${ASK_MODEL}" \
   -var="oidc_issuer=${OIDC_ISSUER}" \
   -var="oidc_jwks_uri=${OIDC_JWKS_URI}" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \

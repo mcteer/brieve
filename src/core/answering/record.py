@@ -35,6 +35,7 @@ def record_ask(
     cell: str,
     bound_cell: str,
     cell_disposition: str,
+    model_authority: str,
 ) -> None:
     """Write the ask record, or fail the ask.
 
@@ -51,6 +52,12 @@ def record_ask(
     interchangeable: a corpus digest is content, a stream id is a location. One field holding
     either — which an earlier version of this record did — made a query over it return two kinds
     of value depending on ``source``. See `AuditEventType.ASK_ANSWERED`.
+
+    ``model_authority`` is **required, no default** (027) — the fourth field to be required for
+    the same reason, and by now the pattern is the point: a default here would let a call site
+    that never obtained a credential claim one silently, which is the exact inversion of what the
+    field is for. Pass ``""`` deliberately when no credential was obtained; that is a statement,
+    not an omission. It is a **reference, never a key value**.
     """
     try:
         audit.append_event(
@@ -73,6 +80,9 @@ def record_ask(
                 "cell": cell,
                 "bound_cell": bound_cell,
                 "cell_disposition": cell_disposition,
+                # HOW the call was permitted: where the credential lives and which rotation
+                # generation was in force. A reference — never the key, never a hash of it.
+                "model_authority": model_authority,
             },
         )
     except Exception as exc:  # noqa: BLE001 — an unrecorded ask must not stand

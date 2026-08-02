@@ -242,6 +242,27 @@ class VaultIdentityFabric:
             )
         return record
 
+    def read_versioned(self, path: str) -> dict[str, Any] | None:
+        """A KV v2 record **with its metadata**, or `None` when absent (027).
+
+        `_kv_data` above unwraps to the secret alone, which is right for records whose identity is
+        their content — a matrix, a binding. It is wrong for a credential, where *which rotation
+        generation was in force* is the fact the audit trail carries, and that lives in
+        ``metadata.version``. So this returns the inner envelope — ``{"data": ..., "metadata":
+        ...}`` — and lets the caller take both from one read.
+
+        **One read yields both**, deliberately: a second read for the version could land after a
+        rotation and have the trail record a generation the call did not use.
+
+        Read failures still raise `ResolutionRefused` from `_read`; absence is `None` rather than a
+        refusal, because absence is a governance state a caller must be able to name for itself.
+        """
+        response = self._read(path)
+        if response is None:
+            return None
+        envelope = response.get("data")
+        return envelope if isinstance(envelope, dict) else None
+
     def observed_policies(self, agent_definition_id: str) -> dict[str, list[str]]:
         """What the registry actually holds, split into configured and engine-appended.
 

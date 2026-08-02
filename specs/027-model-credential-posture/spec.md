@@ -112,9 +112,11 @@ running system contradicts it.
 
 ### Edge Cases
 
-- **The credential expires mid-run.** A long run that authenticated once must not silently
-  continue on stale authority, nor lose work — the existing resume discipline says re-authenticate
-  rather than replay.
+- **The credential is withdrawn mid-run.** *(Restated at implement — see FR-010.)* A static vendor
+  key has no expiry, so authority never goes stale on its own; what can happen is an operator
+  rotating or deleting it while a run holds it. That run completes on what it holds, and the next
+  task refuses — the same rule every per-task grant here follows. A resume re-authenticates rather
+  than replaying, which the existing checkpoint discipline already requires.
 - **The vendor is unreachable versus the credential is refused.** Different causes, different
   people; they must not share a refusal.
 - **Two tenants, one credential.** If the platform holds one vendor account, every tenant's asks
@@ -132,10 +134,25 @@ running system contradicts it.
 
 - **FR-001**: A model credential MUST be **brokered**, on the pattern ADR-0044 already establishes
   for products that cannot federate: the platform holds one vendor credential, governed and rotated
-  the way the existing named exception is, and a workload obtains **short-lived material per task**
-  rather than the credential itself.
-- **FR-001a**: No workload MUST ever hold the vendor credential. A dispatched allocation and a
-  served surface both obtain task material; neither can read what it was derived from.
+  the way the existing named exception is, and a workload obtains it **per task** rather than
+  holding it standing.
+- **FR-001a** *(amended at implement — research F2, plan Complexity Tracking)*: **No workload ever
+  persists the credential.** It is obtained at task start under the workload's own attested
+  identity, held in process memory for that task, and evaporates with it. It never enters a
+  checkpoint, a log, the trail, or model context.
+
+  **The original wording promised derivation, and a model vendor makes derivation impossible.** It
+  read *"a workload obtains short-lived material per task rather than the credential itself…
+  neither can read what it was derived from"*. Vault mints lesser material for products that expose
+  a credential API — a scoped database role, a short-lived certificate — and a model vendor exposes
+  none: there is nothing to derive *from*, so the material a workload uses **is** the key. Building
+  to the original sentence would have required a proxy holding the key on the workload's behalf,
+  which relocates it and removes nothing, and which the precedent this feature reasons from does
+  not do either.
+
+  **So the guarantee is lifetime, not scope**, and the amendment is here rather than in a comment
+  because a spec claiming a property the system cannot have is the exact defect this feature was
+  written to stop one level up.
 - **FR-001b**: The vendor credential MUST be **rotatable without redeploying anything**, on the
   same reasoning as the existing exception: a credential whose rotation requires a deployment is
   one nobody rotates.
@@ -172,8 +189,19 @@ running system contradicts it.
 
 - **FR-009**: A credential that cannot be obtained MUST refuse **distinguishably** from an
   unqualified cell (026) and from an unreachable vendor. Three causes, three people.
-- **FR-010**: A run MUST NOT silently continue on expired model authority. Re-authenticate, never
-  replay.
+- **FR-010** *(reconciled at implement — the condition it describes cannot arise)*: A run MUST NOT
+  silently continue on **withdrawn** model authority.
+
+  The original wording said *expired*, assuming derived material with a lifetime of its own. A
+  static vendor key has no expiry, so nothing ever becomes stale — which means the risk this
+  requirement was reaching for is **withdrawal**, not expiry, and that is FR-006's: rotate or
+  delete the record and the next task's fetch refuses. A task already in flight completes on the
+  authority it holds, exactly like every other per-task grant this platform manufactures, and a
+  row asserts precisely that so nobody later satisfies revocation by reaching back into a running
+  task.
+
+  Recorded rather than deleted, because a requirement that quietly disappears between spec and
+  merge is indistinguishable from one that was missed.
 
 ### What must not change
 
@@ -191,18 +219,30 @@ running system contradicts it.
 
 - **Model credential**: the one vendor credential the platform holds, governed and rotated. Never
   reaches a workload.
-- **Model authority**: the short-lived material a workload holds for one task, derived from the
-  credential and evaporating with the task.
+- **Model authority**: what the trail carries to say **how a model call was permitted** — a
+  reference of the form `vault:model-credentials/<vendor>@v<version>`, naming where the credential
+  lives and which rotation generation was in force. **A reference, never a value, and never a hash
+  of one.**
+
+  Deliberately *not* the name for the material itself, which is what an earlier draft of this
+  entity described. The material has no separate identity to name: it is the credential, held for
+  one task (FR-001a). Two things called "model authority" — one a secret, one a trail field — would
+  have an investigator reading the record expecting material.
 - **Posture**: the platform's stated answer, written where a reader looks and checkable against a
   running deployment.
 
 ## Success Criteria *(mandatory)*
 
 - **SC-001**: A real question through the deployed surface returns a real answer.
-- **SC-002**: The same mechanism serves an agent run that binds a real model.
+- **SC-002**: The same mechanism serves an agent run that binds a real model. *(Asserted
+  structurally in the blocking lanes — both assemblies reach one reader and check in the same order
+  — because the run path resolves authority under an attested workload identity that no hermetic
+  row can hold. The behavioural half is owed by name at the deployed demonstration; see the
+  conformance contract.)*
 - **SC-003**: Revocation stops model calls with no restart, and the moment is locatable.
-- **SC-004**: Model authority does not outlive its task, and no workload can read the credential
-  it was derived from.
+- **SC-004**: The credential does not outlive the task it was obtained for, and no workload
+  persists it. *(Amended with FR-001a: the original said "cannot read the credential it was derived
+  from", which described a derivation a model vendor cannot perform.)*
 - **SC-004a**: Every model call's asker is identifiable in the trail, though the call is made under
   the platform's authority.
 - **SC-005**: No credential value appears in the trail, logs, checkpoints, or model context.

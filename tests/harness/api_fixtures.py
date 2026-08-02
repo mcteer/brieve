@@ -111,6 +111,65 @@ class SurfaceUnderTest:
         return {"Authorization": f"Bearer {self.idp.token(**kwargs)}"}  # type: ignore[arg-type]
 
 
+class FixedCredential:
+    """A credential source over a mutable backing value, for rows that need one (027).
+
+    **Counts its reads**, because "two asks are two fetches" is a property no single-ask row can
+    see: a surface that fetched once and reused the key across asks would pass every other row
+    here and hold a credential for the life of the process — the standing credential the feature
+    exists to remove, one layer above the reader that refuses to cache.
+
+    **Revocable in place**: `revoke()` empties the backing store, so the *next* ask refuses without
+    anything being reconstructed. That is what revocation without a restart means (SC-003).
+    """
+
+    def __init__(self, *, secret: str = "brokered-for-this-task", version: int = 1) -> None:
+        self.secret: str | None = secret
+        self.version = version
+        self.reads: list[str] = []
+
+    def revoke(self) -> None:
+        self.secret = None
+
+    def rotate(self, secret: str) -> None:
+        self.secret = secret
+        self.version += 1
+
+    def obtain(self, vendor: str) -> Any:
+        from core.authority.errors import ResolutionRefused
+        from core.authority.model_credential import ModelCredential
+
+        self.reads.append(vendor)
+        if self.secret is None:
+            raise ResolutionRefused(
+                f"no model credential is stored for {vendor!r}",
+                reason_code="credential_unavailable",
+            )
+        return ModelCredential(
+            secret=self.secret,
+            reference=f"vault:model-credentials/{vendor}@v{self.version}",
+        )
+
+
+def available_credential(**kwargs: Any) -> FixedCredential:
+    """The explicit opt-in a row makes when it expects an ask to reach a model."""
+    return FixedCredential(**kwargs)
+
+
+def _providers_of(provider: object | None) -> Any:
+    """Wrap a built provider as the per-ask factory both surfaces now take (027).
+
+    Production builds a provider per ask from material brokered for that ask; a row that already
+    has a fake provider does not need to model the construction, only the seam. The wrapper
+    ignores the secret and returns the same instance, which is exactly what a row asserting
+    *routing* wants — and exactly why the credential rows use a counting source instead of
+    counting provider constructions.
+    """
+    if provider is None:
+        return None
+    return lambda source, secret: provider
+
+
 def surface_under_test(
     registry: ToolRegistry | None = None,
     *,
@@ -122,6 +181,12 @@ def surface_under_test(
     # compare two surfaces giving that same 503.
     ask_provider: object | None = None,
     ask_model: str = "unconfigured",
+    # 027's collaborator, shared like the nine before it. **`None` means every ask refuses
+    # `credential_unavailable`**, and that default is deliberate for the same reason
+    # `ask_authority`'s is: a fixture that auto-supplied a credential would rebuild "a provider is
+    # configured, therefore it may be called" one level below where 026 broke it. Rows that answer
+    # call `available_credential()` explicitly.
+    credential_source: object | None = None,
     # 026's collaborator, shared like the eight before it. **`None` means every ask refuses
     # `unbound`**, and that default is deliberate: a fixture that auto-qualified whatever
     # provider was injected would rebuild "configured = qualified" inside the harness — the
@@ -171,9 +236,10 @@ def surface_under_test(
         # the ABSENT reconciler, which is what an estate with no second copy actually
         # has — the parity rows then compare two surfaces giving that same answer.
         reconciler=reconciler,
-        ask_provider=ask_provider,
+        ask_providers=_providers_of(ask_provider),
         ask_model=ask_model,
         ask_authority=ask_authority,
+        credential_source=credential_source,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
@@ -187,9 +253,10 @@ def surface_under_test(
         definitions=definitions_fabric,
         thread_store=thread_store,
         reconciler=reconciler,
-        ask_provider=ask_provider,
+        ask_providers=_providers_of(ask_provider),
         ask_model=ask_model,
         ask_authority=ask_authority,
+        credential_source=credential_source,
     )
     return SurfaceUnderTest(
         app=app,

@@ -87,11 +87,55 @@ def _prompt(request: ChoiceRequest) -> str:
 class ModelChooser:
     """Asks a real model, through the governed agent, for one tool name."""
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, *, secret: str = "") -> None:
         #: The pinned identifier from the matrix, kept verbatim so what is recorded is what
         #: was called. `to_model_string` derives the client's form; it never replaces this.
         self.model = model
+        #: The vendor credential, brokered for **this allocation** and passed explicitly (027).
+        #:
+        #: Empty means "let the client resolve it from its environment", which is the eval
+        #: lane's path and is exempt (FR-013). A dispatched allocation always supplies one, so
+        #: the credential a run calls with is the one the trust store held when it started —
+        #: never an ambient variable that would outlive scrutiny and be readable by anything
+        #: else in the allocation.
+        #:
+        #: An allocation IS one task, so this object's lifetime is the task's lifetime and the
+        #: material evaporates with it. That is the whole posture; there is nothing else keeping
+        #: it short-lived.
+        self._secret = secret
         self._agent: Any | None = None
+
+    def _model_for_client(self) -> Any:
+        """The pinned identifier as the client wants it, carrying explicit credentials (027).
+
+        With no secret this is the string form and the client resolves a key from its
+        environment — unchanged, and the eval lane's path.
+
+        With one, an explicit provider object is constructed so the key travels as an argument
+        rather than as process state. **The import is deferred and vendor-specific by
+        necessity**: naming a provider's credential parameter is the one place a vendor's own
+        vocabulary cannot be avoided, and it is confined to this function so nothing above it
+        has to know. A second vendor adds a branch here and nowhere else.
+        """
+        as_string = to_model_string(self.model)
+        if not self._secret:
+            return as_string
+
+        vendor, _, name = as_string.partition(":")
+        if vendor == "anthropic":
+            from pydantic_ai.models.anthropic import AnthropicModel
+            from pydantic_ai.providers.anthropic import AnthropicProvider
+
+            return AnthropicModel(name, provider=AnthropicProvider(api_key=self._secret))
+
+        # A vendor this function does not know must NOT silently fall through to the string
+        # form: that would resolve a key from the environment, which is the exact fallback 027
+        # exists to remove. It fails as a provider problem, naming what is missing.
+        raise ChooserUnavailable(
+            f"no explicit-credential provider is wired for vendor {vendor!r}; refusing rather "
+            f"than falling back to an ambient credential",
+            reason_code="provider_unavailable",
+        )
 
     def _build(self) -> Any:
         if self._agent is None:
@@ -100,10 +144,12 @@ class ModelChooser:
                 # declares position='outermost', so were this agent ever given a toolset, no
                 # capability downstream could produce an ungoverned execution.
                 self._agent = build_governed_agent(
-                    to_model_string(self.model),
+                    self._model_for_client(),
                     system_prompt=_SYSTEM,
                     output_type=str,
                 )
+            except ChooserUnavailable:
+                raise
             except Exception as exc:
                 # FR-007 begins here: a provider that cannot even be constructed is a provider
                 # failure, and it must reach the caller as one. Converting it to "no choice"
@@ -140,7 +186,7 @@ class ModelChooser:
         return answer
 
 
-def build_chooser(model: str, *, recording: str = "") -> Chooser:
+def build_chooser(model: str, *, recording: str = "", secret: str = "") -> Chooser:
     """A chooser for the identifier the binding map resolved. **The injection point.**
 
     Research F5: the stand-in goes *here*, at the binding, and never at the loop. A double
@@ -159,8 +205,11 @@ def build_chooser(model: str, *, recording: str = "") -> Chooser:
         # carries the argument; the short version is that requiring a script per run would
         # have meant carrying one through the suspended-run index and the sweeper's resume
         # dispatch, which is a control-plane column for a test affordance.
+        # A FIXTURE MODEL FETCHES NOTHING. There is no vendor to hold authority for, so a
+        # deployment running only fixture cells needs no model credential at all — which is what
+        # every blocking lane in this repository is (FR-011).
         return RecordedChooser(parse_recording(recording))
-    return ModelChooser(model)
+    return ModelChooser(model, secret=secret)
 
 
 __all__ = ["FIXTURE_PROVIDER", "ModelChooser", "build_chooser", "to_model_string"]
