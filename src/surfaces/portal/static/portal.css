@@ -31,12 +31,18 @@ body {
 header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.75rem 1rem; border-bottom: 1px solid var(--line);
+  /* WRAPS, because a header that cannot is a page that scrolls sideways (028).
+     Adding the nav pushed the row past 320px and broke WCAG 2.2 reflow — on CI's Linux
+     Chromium first, where the same strings render wider than on macOS, which is why the
+     lane caught it and a local run did not. Wrapping is the fix rather than shrinking the
+     text: at 320px the header becomes two lines and nothing is lost. */
+  flex-wrap: wrap; gap: 0.5rem 1rem;
 }
 .brand { font-weight: 700; color: var(--ink); text-decoration: none; }
 /* Main navigation (028). The links carry vertical padding rather than sitting at their
    text height, because WCAG 2.2's 24px minimum target applies to them and an 18px line
    box fails it — caught by the keyboard lane on the first run of the ask page. */
-header nav { display: flex; gap: 1rem; margin-left: auto; margin-right: 1rem; }
+header nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-right: auto; }
 header nav a {
   color: var(--ink); min-height: 24px; display: inline-flex; align-items: center;
   padding: 0.25rem 0;

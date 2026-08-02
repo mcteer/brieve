@@ -82,11 +82,21 @@ confidently explaining the wrong cause. The row pins the refusal block to the tr
 
 ## What implementation changed about this contract
 
+**Two a11y failures from one three-line nav addition**, and the second is the more instructive.
+
 **The minimum target size, found by the lane rather than by review.** The new navigation links
 rendered at their text height, 18px, and WCAG 2.2's 24px minimum target applies to them. The
 keyboard row caught it on the first run of the ask page. Fixed in the stylesheet (vertical padding
 and an explicit `min-height`) rather than by exempting the nav, because the rule is about whether
 a person with imprecise pointing can hit the link, and the nav is on every page.
+
+**Reflow at 320px — which passed locally and failed in CI.** The header could not wrap, so adding
+the nav pushed it past a 320px viewport and the page scrolled sideways. macOS renders the same
+strings narrower than CI's Linux Chromium, so a local run said green and the gate said 340 > 320.
+Fixed by letting the header wrap rather than by shrinking the text: at 320px it becomes two lines
+and nothing is lost. **The lesson is about where a browser gate has to run**, not about CSS — a
+rendering property measured on one platform is a property of that platform, and this repository
+now has an instance where the difference was the whole verdict.
 
 Worth recording because it is the second time this feature's own gates found something a reading
 would not: the analysis pass caught the containment session excluding the new page, and the a11y
