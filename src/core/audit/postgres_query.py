@@ -103,11 +103,40 @@ class PostgresEvidenceQuery:
                 clauses.append(f"event_type IN ({placeholders})")
                 params.extend(sorted(str(e) for e in request.event_types))
 
+        # THE NEWEST WINDOW, RETURNED OLDEST-FIRST.
+        #
+        # The inner query takes the most recent `limit` rows; the outer one puts them back in
+        # ascending order. This was a single `ORDER BY timestamp, correlation_id, seq LIMIT %s`,
+        # which selects the **oldest** rows — on a tenant with a handful of records that is every
+        # record and the defect is invisible.
+        #
+        # Measured on a real tenant: 236,581 entries readable by one role against a limit of
+        # 1,000. The old window returned entries from three days earlier, so *every* question
+        # about recent activity was answered from stale evidence — honestly, and about the wrong
+        # period. Nothing looked wrong at any layer.
+        #
+        # **This does not fix "which runs were denied?"**, and the note matters because that is
+        # what sent somebody looking here. Denials are outside the `operator` role's scope
+        # entirely (`core.answering.scope.ROLE_VISIBILITY`), so that question is unanswerable for
+        # that role by design, at any limit and in any window. Recording the correction so the
+        # next reader does not inherit a false causal story from a comment.
+        #
+        # **This narrows nothing and widens nothing.** Every scope clause above is untouched, so
+        # the set a caller *may* see is identical; what changes is which slice of it arrives when
+        # the limit truncates. The returned order is still ascending, so no consumer sees a
+        # different shape — only a more current window.
+        #
+        # `tests/harness/memory_evidence.py` carries the same correction. They shared this
+        # defect, which is exactly why nothing caught it: a differential test between two
+        # implementations that are wrong in the same way passes.
         sql = (
             "SELECT tenant_id, correlation_id, seq, event_type, timestamp, payload, "
-            "       prev_hash, entry_hash "
-            f"FROM audit_entries WHERE {' AND '.join(clauses)} "
-            "ORDER BY timestamp, correlation_id, seq LIMIT %s"
+            "       prev_hash, entry_hash FROM ("
+            "  SELECT tenant_id, correlation_id, seq, event_type, timestamp, payload, "
+            "         prev_hash, entry_hash "
+            f"  FROM audit_entries WHERE {' AND '.join(clauses)} "
+            "  ORDER BY timestamp DESC, correlation_id DESC, seq DESC LIMIT %s"
+            ") AS newest ORDER BY timestamp, correlation_id, seq"
         )
         params.append(request.limit)
 

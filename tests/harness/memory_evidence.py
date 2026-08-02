@@ -37,7 +37,19 @@ class InMemoryEvidenceQuery:
         if request.event_types is not None:
             entries = [e for e in entries if e.event_type in request.event_types]
         entries.sort(key=lambda e: (e.timestamp, e.correlation_id, e.seq))
-        return entries[: request.limit]
+        # THE NEWEST WINDOW, RETURNED OLDEST-FIRST — and the slice is the whole fix.
+        #
+        # This was `entries[: request.limit]`: the OLDEST `limit` records. Measured on a real
+        # tenant, 236,581 entries readable by one role against a limit of 1,000, which meant every
+        # question about recent activity was answered from evidence three days stale.
+        #
+        # **It does not fix "which runs were denied?"** — denials are outside the `operator`
+        # role's scope entirely, so that question is unanswerable for that role at any limit.
+        # Noted because a wrong causal story in a comment outlives the person who wrote it.
+        #
+        # **The output order is unchanged.** Callers still receive ascending entries; what changed
+        # is which window they receive when the limit truncates.
+        return entries[-request.limit :] if request.limit else []
 
     def exists_outside_tenant(self, *, correlation_id: str, tenant_id: str) -> bool:
         return any(
