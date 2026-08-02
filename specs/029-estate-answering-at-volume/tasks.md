@@ -69,11 +69,24 @@ seen them disagree.
 **Independent test**: SC-007's questions route to estate; the guidance regression set stays
 guidance.
 
-- [ ] T008 [US1] Grow `ESTATE_TERMS` in `src/core/answering/routing.py` with the trail's nouns:
-      `tool`, `tools`, `agent`, `agents`, `secret`, `secrets`, `used`, `active` (research F1 —
-      drawn from `AuditEventType`'s own members, the discipline the module docstring already
-      prescribes; `did` deliberately excluded as too common). The mechanism — term overlap, ties
-      to estate — is untouched.
+- [ ] T008 [US1] Grow `ESTATE_TERMS` in `src/core/answering/routing.py` with **plural-only
+      nouns and the past-tense auxiliary**: `tools`, `agents`, `secrets`, `used`, `active`,
+      `did`. The mechanism — term overlap, ties to estate — is untouched.
+
+      **The first draft of this task was internally unsatisfiable, and the analysis pass measured
+      it** (C1): singular `tool`/`agent`/`secret` capture guidance questions under the
+      tie-to-estate rule — `agent` alone misrouted *"How does an AI agent obtain an identity with
+      Vault?"*, the platform's flagship guidance question — because how-to questions name things
+      in the singular (*read a secret*, *configure the vault agent*) while what-happened questions
+      name them in the plural (*were any secrets read*, *which agents are active*). That
+      asymmetry IS the discriminator, so the rule is **plural-only**, stated as a principle in
+      the code comment rather than left as a coincidence of the list.
+
+      And `did` — excluded by the first draft as "too common" — is precisely the *what-happened*
+      signal: it is what routes *"What did the planner agent do?"* (whose only other candidate
+      term is the forbidden singular `agent`), and no guidance question carries it. All eleven
+      test questions pass against this set with the mechanism untouched, verified before this
+      task was written.
 - [ ] T009 [US1] [GATE:conformance] The routing rows in `tests/component/test_ask_routing.py`:
       SC-007's five questions (*"Which tools were used?"*, *"What did the planner agent do?"*,
       *"Were any secrets read?"*, *"Which agents are active?"*, *"What ran today?"*) route to
@@ -106,7 +119,10 @@ records, and the answer carries the window note.
       visible (never widens, FR-005), an empty intersection falls back to `visible` (a role that
       cannot see the asked-about type must not masquerade as an empty estate while FR-009 is
       open), and an empty *visible* still refuses before any read (025's rule, re-asserted where
-      the new code could have eroded it).
+      the new code could have eroded it). **The empty-intersection instance is the concrete
+      one** (analysis A1): *"Which runs were denied?"* focuses `AUTHORITY_DENIED/REFUSED`, which
+      an `operator` cannot see — assert the fallback fires for exactly that question, because it
+      is the case FR-009 leaves standing and the one a future visibility decision will change.
 - [ ] T012 [US2] Wire the ask path in `src/surfaces/api/ask.py`: `estate_answer_for` computes
       `focus_types(question)`, passes `focus ∩ visible` (falling back to `visible` when the
       intersection is empty or focus is `None`) and `limit_per_type` (a named constant with the
