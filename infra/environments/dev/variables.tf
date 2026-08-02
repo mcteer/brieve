@@ -171,15 +171,55 @@ variable "model_matrix_cells" {
     # hold makes `make dev-up` produce a surface refusing `unqualified_cell`, which reads as
     # broken and sends whoever hits it to the matrix instead of to the missing provider.
     #
-    # The dev enclave wires no vendor provider (that posture is undecided and deferred), so a
-    # seeded ask still refuses — but it refuses `provider_unavailable`, which is only reachable
-    # once governance has PASSED. That progression is the served check.
+    # 027 decided the posture 026 deferred: the surfaces now broker a vendor credential per ask.
+    # This fixture cell stays — it is what keeps `make dev-up` meaningful with no vendor key, and
+    # what every hermetic row resolves against.
     {
       pack         = "fixture"
       model        = "fixture/scripted@1"
       role         = "ask"
       qualified_by = "fixture"
       judge        = "seed"
+    },
+
+    # THE FIRST CELLS THIS PLATFORM HAS EVER EARNED AGAINST A REAL MODEL.
+    #
+    # Every cell above says `qualified_by = "fixture"`: qualified against a recording, which is
+    # honest about what it proves and proves nothing about a vendor. `make evals-live` had never
+    # produced a clean full-lane run that anybody promoted from — 026 recorded the promotion as
+    # deferred, and 027's spec deferred it again as "unrelated to posture".
+    #
+    # **Earned 2026-08-02**, `make evals-live` exit 0, 10 rows in 23m39s:
+    #
+    # - Four suites — `must_deny`, `must_decline`, `citation_accuracy`, `estate_state` — scored
+    #   for BOTH packs against `anthropic/claude-opus@5`, every one under the `ask` role
+    #   (`_subject(pack, "ask")`), at **majority of three samples per case**. The majority rule is
+    #   not decoration: three single-sample runs once produced three different pass/fail sets.
+    # - The answering and estate suites drove the PRODUCT path — `answer_question` and
+    #   `answer_estate_question` — so what qualified is the platform answering, not the vendor
+    #   talking. Every citation resolved against the pin before a claim shipped.
+    # - `judge` names `anthropic/claude-opus@5` because the same run qualified it as the FIRST
+    #   judge, against the human-labelled seed set at the >=90% floor (ADR-0052). The first judge
+    #   chains to the seed and to no model above it, which is why naming it here is a provenance
+    #   record rather than a circular one.
+    #
+    # **Inert until something binds them.** The ask binding below still pins the fixture cell, and
+    # a surface with no `ASK_MODEL` offers no model to resolve against — so adding these changes
+    # no behaviour today. That is deliberate: promoting a cell and choosing to use it are separate
+    # decisions, and this is only the first.
+    {
+      pack         = "vault"
+      model        = "anthropic/claude-opus@5"
+      role         = "ask"
+      qualified_by = "live"
+      judge        = "anthropic/claude-opus@5"
+    },
+    {
+      pack         = "terraform"
+      model        = "anthropic/claude-opus@5"
+      role         = "ask"
+      qualified_by = "live"
+      judge        = "anthropic/claude-opus@5"
     },
   ]
 }
