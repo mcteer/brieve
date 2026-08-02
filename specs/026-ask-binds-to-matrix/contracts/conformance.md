@@ -127,3 +127,36 @@ than convenience:
 **SC-002's property is stronger than the spec wrote it.** `resolve_with_fallback` collapses
 absent, withdrawn and wrong-role alike to `no_qualified_fallback` once candidates are exhausted —
 so the three are indistinguishable *at the seam*, not merely mapped to one disposition afterwards.
+
+
+## What the served process showed (T027)
+
+**Ran 2026-08-02** against the dev enclave, with the binding and its `ask` cell seeded and the
+grant applied. One real ask through the served MCP surface:
+
+```
+403 — definition 'ask-binding' pinned 'fixture:fixture/scripted@1:ask' for role 'ask',
+      which is unavailable, and no other qualified cell exists for that role
+```
+
+and the record it wrote:
+
+```
+disposition=unqualified_cell  source=guidance  cell_disposition='refused:unqualified_cell'
+```
+
+**Governance ran end to end.** The surface read the binding record from the fabric, read the
+matrix, matched the named cell, and refused — the reason names the pinned cell, which it could
+only do having resolved the record. That is what the check exists to show.
+
+**The progression differs from the one quickstart predicted, and the difference is honest.**
+Quickstart §5 expected `unbound` → seeded → `provider_unavailable`. What happens is `unbound` →
+seeded → **`unqualified_cell`**, because the served surface wires no provider, so `available` is
+empty and *no* cell's model is reachable. Availability is checked **inside** resolution
+(`resolve_with_fallback` takes `available`), not after it — so with no provider there is nothing
+to fall through to `provider_unavailable` for.
+
+That is arguably the better answer: "the model this cell names is not reachable from this surface"
+is a fact about whether the ask can be authorised, and it belongs with the other authorisation
+refusals rather than downstream of them. Recorded rather than adjusted, because the prediction was
+wrong about a mechanism and the mechanism is right.

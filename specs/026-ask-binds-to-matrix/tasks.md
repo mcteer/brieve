@@ -204,10 +204,10 @@ contract names it.
       credential and wiring one is an undecided deployment posture, so the served check proves
       resolution by disposition progression instead; analysis U1) so the next planner finds
       them.
-- [ ] T026 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep
+- [X] T026 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep
       all green; then `make conformance` on a live enclave (includes T023's row). **Runner: Dan
       McTeer** for the enclave lane, as every feature.
-- [ ] T027 The served-process check per quickstart §5, **credential-free by design (analysis
+- [X] T027 The served-process check per quickstart §5, **credential-free by design (analysis
       U1)**: wire `ask_authority` (fabric-backed) into `src/surfaces/mcp/served.py` — which
       already holds workload identity and a Vault fabric client, but wires no ask collaborator
       (measured). Then the progression proves resolution without any vendor key in the service:

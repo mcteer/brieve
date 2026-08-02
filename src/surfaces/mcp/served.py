@@ -33,6 +33,7 @@ from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.reconcile_service import PostgresReconciler
+from core.authority.ask_binding import AskAuthority
 from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
@@ -113,6 +114,10 @@ def build_transport() -> McpTransport:
     run_index.migrate()
     thread_store.migrate()
 
+    _fabric = VaultIdentityFabric(
+        credentials=credentials, known_tools=KNOWN_TOOLS, known_actions=KNOWN_ACTIONS
+    )
+
     return McpTransport(
         # THE SCHEDULER'S ADDRESS IS CONFIGURATION, and leaving it defaulted is a defect
         # this repository has now made twice.
@@ -144,8 +149,17 @@ def build_transport() -> McpTransport:
         durability=PostgresDurabilityProvider(credentials=credentials, host=host),
         change_requests=PostgresChangeRequestStore(credentials=credentials, host=host),
         change_status=VaultChangeStatus(),
-        definitions=VaultIdentityFabric(
-            credentials=credentials, known_tools=KNOWN_TOOLS, known_actions=KNOWN_ACTIONS
+        definitions=_fabric,
+        # 026. The served surface reads the ask binding and the matrix from the fabric it
+        # already holds, so an unqualified model is unreachable here as everywhere.
+        #
+        # **No vendor provider is wired**, deliberately: putting a vendor credential inside the
+        # service is a deployment posture nobody has decided, and this feature does not decide it
+        # by accident. The consequence is legible rather than hidden — a seeded binding moves the
+        # refusal from `unbound` to `provider_unavailable`, which is only reachable once
+        # governance has PASSED, and that progression is what the served check observes.
+        ask_authority=AskAuthority(
+            read_binding=_fabric.read_ask_binding, read_matrix=_fabric.read_matrix
         ),
         thread_store=thread_store,
         reconciler=PostgresReconciler(
