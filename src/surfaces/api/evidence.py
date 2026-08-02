@@ -29,7 +29,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 
-from core.audit.query import EvidenceQuery, EvidenceQueryRequest
+from core.audit.query import EvidenceQuery, EvidenceQueryRequest, SearchResult
 from core.audit.reconcile import ReconcileReport, emit_reconciled, posture_reason
 from core.audit.reconcile_service import Reconciler
 from core.audit.schema import AuditEntry, AuditEventType, EvidenceDisposition
@@ -95,7 +95,9 @@ def read_evidence_for(
     entries = query.search(request)
     disposition = _disposition(entries, request, query)
     if disposition is EvidenceDisposition.OUT_OF_SCOPE:
-        entries = []
+        # Emptied, and the window accounting goes with it — a caller told nothing must not be
+        # told how much they were told nothing about.
+        entries = SearchResult()
 
     _record_access(
         audit=audit,

@@ -186,3 +186,237 @@ def test_a_zero_limit_returns_nothing_rather_than_everything() -> None:
     nothing.
     """
     assert _filled(20).search(EvidenceQueryRequest(tenant_id=TENANT, limit=0)) == []
+
+
+# ------------------------------------------------------------------ 029: the per-type window
+
+
+def _mixed(*, common: int, rare: int) -> InMemoryEvidenceQuery:
+    """The live tenant's shape: one loud type, one quiet one, interleaved in time.
+
+    The measured composition was 383 `effect_observed` against 60 `run_start` in a window of a
+    thousand. This reproduces the *ratio* rather than the counts, which is what decides whether
+    the quiet type survives a bound.
+    """
+    sink = InMemoryAuditSink()
+    index = 0
+    for i in range(max(common, rare)):
+        for _ in range(common // max(rare, 1)):
+            sink.append_event(
+                correlation_id=f"noise-{index:05d}",
+                tenant_id=TENANT,
+                event_type=AuditEventType.EFFECT_OBSERVED,
+                payload={"index": index},
+                timestamp=START + timedelta(seconds=index),
+            )
+            index += 1
+        if i < rare:
+            sink.append_event(
+                correlation_id=f"run-{index:05d}",
+                tenant_id=TENANT,
+                event_type=AuditEventType.RUN_START,
+                payload={"index": index},
+                timestamp=START + timedelta(seconds=index),
+            )
+            index += 1
+    return InMemoryEvidenceQuery(sink)
+
+
+def test_a_rare_type_is_not_crowded_out_by_a_common_one() -> None:
+    """SC-002, in the exact shape that failed on the deployed platform.
+
+    Under one shared bound the quiet type gets whatever slots the loud one leaves — measured at
+    60 run records in a window of 1,000. Raising the bound does not fix it, because the ratio is
+    what starves the question, so this row asserts the property a bigger number cannot buy.
+    """
+    query = _mixed(common=600, rare=60)
+
+    shared = query.search(
+        EvidenceQueryRequest(
+            tenant_id=TENANT,
+            limit=100,
+            event_types=frozenset({AuditEventType.EFFECT_OBSERVED, AuditEventType.RUN_START}),
+        )
+    )
+    per_type = query.search(
+        EvidenceQueryRequest(
+            tenant_id=TENANT,
+            limit_per_type=50,
+            event_types=frozenset({AuditEventType.EFFECT_OBSERVED, AuditEventType.RUN_START}),
+        )
+    )
+
+    starved = sum(1 for e in shared if e.event_type is AuditEventType.RUN_START)
+    served = sum(1 for e in per_type if e.event_type is AuditEventType.RUN_START)
+    assert served == 50, f"the per-type bound did not reach the quiet type: {served}"
+    assert served > starved, (
+        f"the per-type bound is no better than the shared one ({served} vs {starved}); the "
+        f"question's own records are still competing with the estate's noisiest activity"
+    )
+
+
+def test_each_type_gets_its_newest_and_the_whole_stays_oldest_first() -> None:
+    """The two halves that must both hold: selection per type, order overall."""
+    query = _mixed(common=200, rare=40)
+
+    result = query.search(
+        EvidenceQueryRequest(
+            tenant_id=TENANT,
+            limit_per_type=10,
+            event_types=frozenset({AuditEventType.EFFECT_OBSERVED, AuditEventType.RUN_START}),
+        )
+    )
+
+    runs = [e for e in result if e.event_type is AuditEventType.RUN_START]
+    assert len(runs) == 10
+    newest_run_index = max(
+        e.payload["index"]
+        for e in query.search(
+            EvidenceQueryRequest(
+                tenant_id=TENANT, limit=10_000, event_types=frozenset({AuditEventType.RUN_START})
+            )
+        )
+    )
+    assert runs[-1].payload["index"] == newest_run_index, "the newest of the type is missing"
+    timestamps = [e.timestamp for e in result]
+    assert timestamps == sorted(timestamps), "the combined window is not oldest-first"
+
+
+def test_the_accounting_says_what_arrived_against_what_existed() -> None:
+    """FR-006's raw material: the numbers the answer's window note is built from.
+
+    Counted per type, because that is the grain a person can act on — "the 10 most recent run
+    records of 40" tells them something; "10 of 240" across mixed types tells them nothing.
+    """
+    query = _mixed(common=200, rare=40)
+
+    result = query.search(
+        EvidenceQueryRequest(
+            tenant_id=TENANT,
+            limit_per_type=10,
+            event_types=frozenset({AuditEventType.EFFECT_OBSERVED, AuditEventType.RUN_START}),
+        )
+    )
+
+    assert result.window[AuditEventType.RUN_START] == (10, 40)
+    assert result.truncated, "a truncated read reported itself complete"
+    assert AuditEventType.RUN_START in result.truncated
+
+
+def test_an_untruncated_per_type_read_reports_itself_complete() -> None:
+    """The common case: a small estate answers wholly, and the answer says nothing about windows.
+
+    `truncated` empty is what makes the note absent, so this is the row that keeps a complete
+    answer from carrying a caveat it does not deserve.
+    """
+    result = _mixed(common=20, rare=5).search(
+        EvidenceQueryRequest(
+            tenant_id=TENANT,
+            limit_per_type=100,
+            event_types=frozenset({AuditEventType.EFFECT_OBSERVED, AuditEventType.RUN_START}),
+        )
+    )
+
+    assert result.truncated == {}
+    assert result.window[AuditEventType.RUN_START][0] == result.window[AuditEventType.RUN_START][1]
+
+
+def test_the_per_type_window_never_returns_a_type_that_was_not_requested() -> None:
+    """FR-005 where the new code could most easily have widened it.
+
+    The per-type path builds buckets from whatever the scope clause returned. If it built them
+    before narrowing — or ignored `event_types` — a caller would receive types their role does
+    not permit, which is a boundary defect rather than a windowing one.
+    """
+    sink = InMemoryAuditSink()
+    for i, kind in enumerate([AuditEventType.RUN_START, AuditEventType.AUTHORITY_DENIED] * 25):
+        sink.append_event(
+            correlation_id=f"e-{i}",
+            tenant_id=TENANT,
+            event_type=kind,
+            payload={"index": i},
+            timestamp=START + timedelta(minutes=i),
+        )
+
+    result = InMemoryEvidenceQuery(sink).search(
+        EvidenceQueryRequest(
+            tenant_id=TENANT,
+            limit_per_type=5,
+            event_types=frozenset({AuditEventType.RUN_START}),
+        )
+    )
+
+    assert {e.event_type for e in result} == {AuditEventType.RUN_START}
+    assert AuditEventType.AUTHORITY_DENIED not in result.window
+
+
+def test_an_empty_scope_still_matches_nothing_with_a_per_type_bound() -> None:
+    """025's fail-closed rule, re-asserted on the new path.
+
+    An empty type set means "no type is visible to this caller". A per-type bucket fill over an
+    unfiltered list would hand the newest of everything to somebody entitled to none — the same
+    inversion 025 found in merged code, arriving by a third route.
+    """
+    result = _filled(20).search(
+        EvidenceQueryRequest(tenant_id=TENANT, limit_per_type=5, event_types=frozenset())
+    )
+
+    assert result == []
+    assert result.window == {}
+
+
+def test_the_generated_sql_partitions_exactly_when_a_per_type_bound_is_set() -> None:
+    """The hermetic half of a differential that cannot honestly be hermetic (029, plan).
+
+    The Postgres implementation's *behaviour* can only be checked against a real Postgres, in the
+    enclave lane. What is checkable here is that the two paths exist and are chosen correctly: a
+    per-type request must partition, and a plain one must not — because a plain read that started
+    partitioning would silently change what every existing caller receives.
+
+    Asserted against the SQL the implementation builds, by capturing it at the connection seam
+    rather than by re-deriving it — a row that rebuilt the query would be testing its own copy.
+    """
+    from core.audit.postgres_query import PostgresEvidenceQuery
+
+    captured: list[str] = []
+
+    class _Cursor:
+        def execute(self, sql: str, params: tuple[object, ...]) -> None:
+            captured.append(sql)
+
+        def fetchall(self) -> list[object]:
+            return []
+
+    class _Conn:
+        def cursor(self) -> _Cursor:
+            return _Cursor()
+
+        def close(self) -> None:
+            pass
+
+    class _Credentials:
+        """Answers the one call the read makes before connecting."""
+
+        def fetch(self) -> object:
+            return type("Cred", (), {"username": "u", "password": "p"})()
+
+    query = PostgresEvidenceQuery(
+        credentials=_Credentials(),  # type: ignore[arg-type] — the seam, not the real fabric
+        connect=lambda **_: _Conn(),
+    )
+
+    query.search(EvidenceQueryRequest(tenant_id=TENANT, limit=10))
+    assert "PARTITION BY" not in captured[-1], (
+        "a plain read partitions; every existing caller's window would change silently"
+    )
+
+    query.search(
+        EvidenceQueryRequest(
+            tenant_id=TENANT, limit_per_type=5, event_types=frozenset({AuditEventType.RUN_START})
+        )
+    )
+    assert "PARTITION BY event_type" in captured[-1]
+    assert "ROW_NUMBER()" in captured[-1] and "COUNT(*)" in captured[-1], (
+        "the per-type query does not carry both the ranking and the accounting, so the window "
+        "note would need a second round-trip"
+    )

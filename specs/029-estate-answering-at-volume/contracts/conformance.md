@@ -9,9 +9,9 @@
 | --- | --- | --- | --- |
 | Routing: SC-007's five questions reach the estate; the guidance regression set stays guidance | `tests/component/test_answering_routing.py` (or the routing rows' home) | Nothing | Planned |
 | Focus: term→types mapping, intersection-only, empty-focus fallback | `tests/component/test_estate_focus.py` | Nothing | Planned |
-| Per-type window: rare types not crowded out, newest-first selection, oldest-first return, `None` = today | `tests/component/test_evidence_read_window.py`, parametrized over implementations | Nothing (in-memory) | Planned |
+| Per-type window: rare types not crowded out, newest-first selection, oldest-first return, `None` = today | `tests/component/test_evidence_read_window.py` | Nothing (in-memory) | **In force** — 14 rows |
 | The same property rows against Postgres, seeded volume | the enclave lane | `make conformance` | Planned |
-| SQL shape: `PARTITION BY` present exactly when `limit_per_type` is set | hermetic row beside the Postgres implementation | Nothing | Planned |
+| SQL shape: `PARTITION BY` present exactly when `limit_per_type` is set | same file, captured at the connection seam | Nothing | **In force** |
 | Window note: present when truncated, absent when not, rendered by both surfaces | component rows + `tests/component/test_portal_asks.py` | Nothing | Planned |
 | Scope untouched: focus never widens, tenant bound intact, access record unchanged | extended window rows | Nothing | Planned |
 | **SC-007 against the live tenant**: the five failed questions answer at 236k entries | The deployed portal | The enclave; **named runner: Dan McTeer** | **Owed** |
@@ -81,3 +81,18 @@ over, because finding three survived on exactly that kind of unstated gap.
   where no bound truncates and no type competes.
 - **Stale window**: already written (`test_evidence_read_window.py`), verified to fail against the
   old behaviour before being trusted.
+
+## The mutation check, performed 2026-08-02
+
+Required by T007 before the rows are trusted, because finding three survived on rows that could
+not have caught it.
+
+**Mutation**: the in-memory per-type window filled each bucket from the **oldest** end
+(`for entry in entries` rather than `reversed(entries)`) — the same class of defect as the
+original, one layer in.
+
+**Result**: `test_each_type_gets_its_newest_and_the_whole_stays_oldest_first` failed; the other
+thirteen passed, which is the correct shape — a mutation to *selection* should not disturb rows
+about *scope* or *accounting*. Reverted, all fourteen green.
+
+So the rows bite on the defect they exist for, rather than on the implementation being present.
