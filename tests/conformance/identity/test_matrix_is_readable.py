@@ -34,6 +34,9 @@ import pytest
 # host_enclave-only row runs in the fast lane with no stack.
 pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
+#: Where the workload-identity JWT backend is mounted (`vault_jwt_auth_backend.workload`).
+WORKLOAD_AUTH_PATH = "nomad"
+
 
 def _vault(path: str) -> dict[str, Any] | None:
     """An operator read. Requires the coordinates `make conformance` passes from .env."""
@@ -170,8 +173,12 @@ def test_both_model_calling_roles_carry_the_model_credential_policy_as_applied()
     demonstration — a host process holds no attested identity, which is the property this whole
     module opens by explaining.
     """
+    # The JWT auth backend is mounted at `nomad`, not at `workload`. Named as a constant
+    # because the first version of this row guessed `workload` from the resource name and
+    # failed against the live fabric — which is the row behaving correctly: a wrong path 404s,
+    # and `_vault` returns None for a 404, so the assertion fires rather than passing vacuously.
     for role in ("api", "mcp-surface", "agent-run"):
-        body = _vault(f"auth/workload/role/{role}")
+        body = _vault(f"auth/{WORKLOAD_AUTH_PATH}/role/{role}")
         assert body is not None, f"the {role!r} workload role does not exist in Vault"
         policies = body.get("data", {}).get("token_policies", []) or []
         assert "model-credential-read" in policies, (
