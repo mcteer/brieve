@@ -7,7 +7,7 @@
 
 | Group | Where | Needs | Status |
 | --- | --- | --- | --- |
-| The four shapes, patience, token relay, no-classification | `tests/component/test_portal_asks.py` | Nothing | **In force** — 11 rows |
+| The four shapes, patience, token relay, no-classification | `tests/component/test_portal_asks.py` | Nothing | **In force** — 13 rows |
 | Containment (egress, catalogued-operations, no credential, client size) | `tests/conformance/portal/test_containment.py` | Nothing | **In force** — 10 rows; the scripted session now drives the ask, so the newest page is inside the claim |
 | WCAG 2.2 AA + keyboard, for form / answered (both sources) / declined / refused | `tests/a11y/` | The browser lane CI already runs | **In force** — 27 rows green |
 | **A person asks through the deployed portal and reads a cited answer (SC-001)** | Browser, deployed portal | The enclave, `ASK_MODEL`, the credential, a qualified cell — all standing as of 2026-08-02 | **Owed — named runner: Dan McTeer** |
@@ -91,3 +91,16 @@ a person with imprecise pointing can hit the link, and the nav is on every page.
 Worth recording because it is the second time this feature's own gates found something a reading
 would not: the analysis pass caught the containment session excluding the new page, and the a11y
 lane caught the nav. Both were additions that looked complete and were not.
+
+**Two rows added beyond the plan**, both pinning properties the design has by construction and
+nothing asserted:
+
+- **The question travels in the body, never a URL.** A question in a query string is a question
+  in every access log, proxy log and browser history — none of them the append-only trail the
+  platform governs, all of them outliving it. The API keeps the question out of the record; a URL
+  on the way there would undo that outside the platform's reach. The tempting change is making an
+  answer bookmarkable by moving the ask to GET, and this row makes that an argument somebody has
+  to win rather than a convenience they add.
+- **A hostile refusal sentence renders as text.** Verbatim means the *sentence*, not the *markup*.
+  The template escapes; the row asserts it, because the feature rests on passing a string through
+  untouched and "untouched" is precisely the word that invites a `| safe` filter later.

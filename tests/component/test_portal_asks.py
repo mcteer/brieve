@@ -449,3 +449,53 @@ def test_a_refused_portal_ask_is_recorded_too() -> None:
     assert page.status_code == 503
     asks = [e for e in surface.audit.all_entries() if str(e.event_type) == "ask_answered"]
     assert [a.payload["disposition"] for a in asks] == ["credential_unavailable"]
+
+
+def test_the_question_travels_in_the_body_and_never_in_a_url() -> None:
+    """FR-013's portal half, and a property this design has by construction rather than by care.
+
+    A question in a query string is a question in every access log, every proxy log and the
+    browser's own history — none of which is the append-only trail the platform governs, and all
+    of which outlive it. The API deliberately keeps the question out of the record; putting it in
+    a URL on the way there would undo that outside the platform's reach.
+
+    The tempting change is making an answer bookmarkable by moving the ask to GET. This row is
+    what makes that a decision somebody has to argue for rather than a convenience they add.
+    """
+    surface = _answering_surface()
+    urls: list[str] = []
+    api = TestClient(surface.app)
+
+    def watching(*, method: str, url: str, token: str, json_body: object) -> ApiResponse:
+        urls.append(url)
+        assert json_body == {"question": GUIDANCE_QUESTION}, (
+            "the question did not travel in the request body"
+        )
+        response = api.request(
+            method,
+            url.replace("http://api.test", ""),
+            json=json_body,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        return ApiResponse(status=response.status_code, payload=response.json())
+
+    portal = _portal(surface, relay=ApiRelay(base_url="http://api.test", transport=watching))
+    portal.post("/ask", data={"question": GUIDANCE_QUESTION})
+
+    assert urls == ["http://api.test/ask"], f"the question leaked into a URL: {urls}"
+
+
+def test_a_hostile_refusal_sentence_is_rendered_as_text() -> None:
+    """The one risk that comes with rendering the platform's words verbatim.
+
+    Verbatim means *the sentence*, not *the markup*. The template escapes, so a detail string
+    carrying a tag reaches the reader as characters — asserted rather than assumed, because the
+    whole feature rests on passing a string through untouched and "untouched" is exactly the
+    word that invites an `| safe` filter later.
+    """
+    portal = _scripted(503, {"detail": "<script>alert(1)</script> was refused"})
+
+    page = portal.post("/ask", data={"question": GUIDANCE_QUESTION}).text
+
+    assert "<script>alert(1)</script>" not in page, "a refusal sentence was rendered as markup"
+    assert "&lt;script&gt;" in page, "the refusal sentence did not reach the reader at all"
