@@ -119,6 +119,10 @@ def test_an_estate_answer_meets_wcag_22_aa(page: Any, portal_server: PortalServe
 
     Audited separately from guidance because it renders different markup: inert `code` elements
     where the guidance page has anchors, and a11y failures live in exactly that difference.
+
+    029 adds the window note to this state when a read was bounded. It is plain page content in
+    the same register as the source line, so it is perceivable without a live region — which is
+    the property that makes "the answer says it was a window" reach a screen-reader user at all.
     """
     portal_server.surface.audit.append_event(
         correlation_id="a11y-estate-run",

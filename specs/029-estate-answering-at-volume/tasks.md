@@ -157,7 +157,7 @@ records, and the answer carries the window note.
 
 **Independent test**: T005's rows pass with the Postgres parameter against seeded volume.
 
-- [ ] T017 [US3] [GATE:conformance] The enclave half: the T005 property rows' Postgres parameter in
+- [X] T017 [US3] [GATE:conformance] The enclave half: the T005 property rows' Postgres parameter in
       the enclave lane (beside `tests/conformance/api`'s evidence rows, enclave-marked), seeded
       with thousands of entries at the measured skew — newest window, per-type bound, accounting,
       scope, all against the real store. This is the half of FR-008 a hermetic lane cannot
@@ -167,10 +167,10 @@ records, and the answer carries the window note.
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T018 [P] The a11y answered-state row covers the window note (the ask page's answered state
+- [X] T018 [P] The a11y answered-state row covers the window note (the ask page's answered state
       gains visible content): extend the estate-answer fixture in `tests/a11y/conftest.py` so the
       note renders, and confirm `tests/a11y/test_wcag.py`'s estate row still passes.
-- [ ] T019 [P] Update `specs/029-estate-answering-at-volume/contracts/conformance.md` status rows
+- [X] T019 [P] Update `specs/029-estate-answering-at-volume/contracts/conformance.md` status rows
       as they land (including T007's mutation-check record), and the ROADMAP entry for 029 — the
       three findings, the fix shape, and the **two recorded decisions still owed**: `operator`
       visibility of authority records (FR-009), and 025's `estate_state` suite scoring a question
