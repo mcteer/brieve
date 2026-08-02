@@ -44,10 +44,19 @@ all — the bound is in the query, and the trail's access record shows the narro
 than a broad one. The map's domain is the closed `AuditEventType` vocabulary, so an unknown role
 maps to nothing and *empty means refuse* applies unchanged.
 
-**What this deliberately is not**: a change to `GET /evidence`. 022's operator read stays
-tenant-bounded as shipped — an operator reading the trail directly is a different act from the
-platform assembling an answer on someone's behalf, and retrofitting role bounds onto 022's surface
-would change merged behaviour this feature has no mandate to change.
+**Corrected by analysis (I1), and the correction is a signature, not the design**:
+`read_evidence_for` builds the request internally and **exposes no `event_types` parameter** —
+measured at `evidence.py:60-69`, where the first draft of this finding assumed the field was
+reachable because the request model carries it. The one-door design therefore needs one additive
+parameter: `event_types: frozenset[AuditEventType] | None = None`, defaulting to the unnarrowed
+read. Same shape as 024's ask-provider fix — a collaborator the design requires must be a
+parameter, not an assumption.
+
+**What this deliberately is not**: a change to `GET /evidence` behaviour. The route never passes
+the new parameter, so 022's operator read stays tenant-bounded as shipped — asserted by a row, not
+by this paragraph (tasks T009a). An operator reading the trail directly is a different act from
+the platform assembling an answer on someone's behalf, and retrofitting role bounds onto 022's
+surface would change merged behaviour this feature has no mandate to change.
 
 **Alternatives considered**:
 

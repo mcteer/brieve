@@ -21,11 +21,12 @@ change carries its review obligation** (T007 → contract row, review before mer
 the two measurements the plan's claims rest on, pinned as executable checks before anything is
 built on them.
 
-- [ ] T001 Pin the substring-scorer finding: add a failing-by-design characterization note to
-      `tests/component/test_eval_gates.py` — a `match`-scored response containing the recorded
-      text **plus an invented workspace** passes today. One small test, marked xfail with the
-      reason string naming FR-011b, deleted by T026 when fidelity scoring replaces the verb.
-      Research F5's measurement, kept executable so the reauthoring provably fixes something.
+- [ ] T001 Pin the substring-scorer finding in `tests/component/test_eval_gates.py`: a test
+      asserting the FR-011b-**correct** behaviour — a `match`-scored response containing the
+      recorded text plus an invented workspace must fail — marked `xfail(strict=True)` with a
+      reason naming FR-011b, because today it passes (research F5's measurement). When T026
+      lands, strict xfail turns the xpass into an error, and T026 removes the **marker**, not the
+      test — the row then guards the fix forever.
 - [ ] T002 [P] Confirm the one-door premise: extend
       `tests/conformance/answering/test_asking_never_acts.py` with an import row asserting
       `core.answering` (as it stands, pre-estate) imports neither `core.audit.query` nor any
@@ -70,6 +71,13 @@ US3 scores what these produce.
       decline once T015 lands); every existing `record_ask` call site updated in the same change —
       `make check` is the sweep that proves none was missed.
 
+- [ ] T009a [GATE:conformance] The one-door parameter (analysis I1): `read_evidence_for` in
+      `src/surfaces/api/evidence.py` gains `event_types: frozenset[AuditEventType] | None = None`,
+      threaded into the request it builds; default `None` is byte-for-byte today's unnarrowed
+      read. In the same change, a row in `tests/conformance/api/` asserts `GET /evidence` and the
+      MCP evidence read behave identically before and after — the route never passes the
+      parameter, and 022's merged behaviour is asserted unchanged rather than declared unchanged.
+
 **Checkpoint**: routing and scope exist and are proven in isolation; the record can carry the
 route. No estate answer exists yet.
 
@@ -96,7 +104,10 @@ read.
       `tests/component/test_estate_answering.py`: resolvable references survive; one unresolvable
       reference drops its claim into `dropped`; all-dropped declines with the estate-naming
       reason; empty scoped read declines identically to not-yours (SC-008's response half);
-      provider fault raises.
+      provider fault raises; and the FR-006b row (analysis C2) — a product-configuration question
+      ("which secrets engines are mounted?") routed to estate declines plainly, naming the
+      records, because the eval suite structurally cannot carry decline cases (data-model.md §
+      Eval case shape) and this behaviour must be asserted somewhere.
 - [ ] T013 [P] [US1] [GATE:fail-closed] Verdict-vocabulary row in the same file: an answer citing
       violation records that contains *compliant / passing / healthy / safe* about the estate
       fails (SC-003, FR-005) — checked over the assembled answer, where the temptation lives, not
@@ -116,10 +127,19 @@ read.
       different roles, identical question — answers compared (not inspected) and differing
       exactly by scope; each claim's reference resolves into that subject's own read; the
       role-poorer subject's answer contains no shape of the other's records (FR-005a).
+- [ ] T016a [US1] [GATE:conformance] The SC-009 integration row (analysis C1) in
+      `tests/conformance/answering/test_ask_routes_by_shape.py`: through the **wired** `ask_for`
+      on both surfaces — an estate-shaped question never consults the corpus, and a
+      guidance-shaped question leaves the evidence-access stream **unchanged** (asserted by
+      absence of a new access record). T005 tests `route()` in isolation and cannot catch the
+      wiring bug where routing is consulted but the estate read happens anyway — this row can.
 - [ ] T017 [P] [US1] [GATE:conformance] The caller/investigator row (SC-008) in the same file:
       "no records in scope" and "records exist, not yours" produce byte-identical response
-      dispositions and reasons, while the trail's access records carry different dispositions —
-      both halves asserted, satisfying either alone fails.
+      dispositions and reasons, while the trail lets an investigator tell them apart via the
+      **narrowed request recorded on the access record** — NOT via disposition (analysis U1:
+      `_disposition` distinguishes only cross-tenant; both role-scope cases record `SCOPED`). The
+      row asserts the access record carries the narrowed `event_types`, and that re-running the
+      query unnarrowed surfaces what lay outside them. Both halves asserted; either alone fails.
 - [ ] T018 [P] [US1] [GATE:no-secret-leak] Row asserting the estate answer carries references and
       statements only — no payload content of the referenced entries beyond the claim's own text,
       and nothing credential-shaped, in `tests/conformance/answering/test_estate_bounded_by_asker.py`.
@@ -133,9 +153,11 @@ read.
       `tests/conformance/mcp/test_ask_parity.py`: estate answer, estate decline (reason
       compared, not just disposition), empty-roles refusal, and store-failure-is-not-a-decline —
       same verdict on both surfaces. Parity grows by zero operations.
-- [ ] T021 [US1] [GATE:correlation/evidence] The one-hop walk row: an estate ask's
-      `ask_answered` record's consulted-identity field leads to the evidence-access record for
-      exactly the narrowed read this question performed, in
+- [ ] T021 [US1] [GATE:correlation/evidence] The walk row: an estate ask's `ask_answered`
+      record's consulted-identity field leads to the evidence-access **stream**
+      (`evidence-access:{tenant}` — stable per 022, so one hop lands on the stream, not the
+      single record; analysis U2), and within it the read this question performed is **locatable
+      by subject and time and carries the narrowed request**. In
       `tests/conformance/answering/test_estate_bounded_by_asker.py` (data-model.md § ASK_ANSWERED).
 
 **Checkpoint**: US1 is a viable MVP — an entitlement-bounded, referenced, verdict-free estate
@@ -148,11 +170,14 @@ answer on both surfaces, fully rowed.
 **Independent test**: a window with known records in and out — the answer describes only what
 falls inside.
 
-- [ ] T022 [US2] Window handling in `src/core/answering/routing.py` + `ask_for`: an
-      estate-routed question's window narrows `start_time`/`end_time` on the same
-      `read_evidence_for` call (temporal vocabulary is already the router's estate signal;
-      unbounded questions get the read path's existing `limit` as the bound — the spec's
-      "enormous window" edge case, stated in the answer when truncation occurred).
+- [ ] T022 [US2] Window handling in `src/core/answering/routing.py` + `ask_for`, constrained
+      per analysis U4: a **small closed phrase vocabulary** ("last night", "today", "yesterday",
+      "this week") resolved against an **injected clock** — never ambient time, which is the
+      eval-lane determinism hazard; phrases outside the vocabulary and questions with no temporal
+      phrase both fall to the read path's existing `limit` as the bound (the spec's "enormous
+      window" edge case), with truncation stated in the answer. No general NL time parsing —
+      resolvable phrases narrow `start_time`/`end_time` on the same `read_evidence_for` call,
+      everything else gets the bounded default rather than a guess.
 - [ ] T023 [US2] [GATE:conformance] Window rows in
       `tests/component/test_estate_answering.py`: records inside/outside a window — only inside
       described (US2 scenario 1); empty-window answer indistinguishable from
@@ -171,7 +196,10 @@ the suite. Before this phase it cannot (T001 proves it).
 - [ ] T024 [US3] **Ordering: T031 (FR-012) must be recorded before this task merges.** Author
       `packs/vault/evals/estate_records.toml` and `packs/terraform/evals/estate_records.toml` —
       the arranged estates: entries with hashes, event types, and the payload shapes the
-      questions need. No digest pin, and the file header says why (authored fixture material has
+      questions need — each record carrying an **authored stable id** (`rec-vault-001`); the
+      loader computes entry hashes and maps id → hash, so authors never hand-write a hash and
+      editing one record never invalidates another case's labels (analysis U3). No digest pin,
+      and the file header says why (authored fixture material has
       no third party to drift from — contracts/conformance.md).
 - [ ] T025 [US3] Reauthor `packs/vault/evals/estate_state.toml` and
       `packs/terraform/evals/estate_state.toml`: records-answerable prompts only (FR-006a — the
@@ -181,9 +209,10 @@ the suite. Before this phase it cannot (T001 proves it).
 - [ ] T026 [US3] [GATE:eval] Estate scoring in `src/core/evals/scoring.py` +
       `src/core/evals/suites.py`: `EstateAnsweringScorer` drives `answer_estate_question` with
       `RecordedEstateProvider` over the pack's fixture estate; surviving references scored by
-      `score_fidelity` against `case.events` — precision fails invention, recall fails omission
-      (FR-011b); `estate_state` leaves `EXPECTED_OUTCOMES`'s `match` verb; `parse_cases` requires
-      `events` for it. **Delete T001's xfail here** — its reason no longer exists.
+      `score_fidelity` against `case.events` — the scorer translating authored ids to entry
+      hashes via the loader's map (analysis U3) — precision fails invention, recall fails
+      omission (FR-011b); `estate_state` leaves `EXPECTED_OUTCOMES`'s `match` verb; `parse_cases` requires
+      `events` for it. **Remove T001's xfail marker here** — the test stays and guards the fix.
 - [ ] T027 [P] [US3] [GATE:eval] Both-directions break rows in
       `tests/component/test_eval_gates.py`: an answer with one invented reference fails; an
       answer omitting one expected reference fails; and the scorer-identity assertion extends so
@@ -232,8 +261,8 @@ product.
 
 ```text
 Phase 1 (T001–T002)
-  → Phase 2 (T003–T009: routing ∥ scope, then schema T007→T008→T009)
-    → Phase 3 / US1 (T010→T011→{T012,T013} → T014→T015 → rows T016–T021)
+  → Phase 2 (T003–T009a: routing ∥ scope, then schema T007→T008→T009, then T009a's parameter)
+    → Phase 3 / US1 (T010→T011→{T012,T013} → T014→T015 → rows T016–T021 incl. T016a)
       → Phase 4 / US2 (T022→T023)                    [needs the estate branch, not US1's rows]
       → Phase 5 / US3 (T024→T025→T026→{T027,T028,T029})  [scores the path US1 built]
         → Phase 6 (T030 ∥ T032 anytime; T031 BEFORE T024/T025 merge; T033→T034→T035 last)
@@ -246,7 +275,7 @@ evidence of what failed with a suite that never contained it.
 ## Parallel opportunities
 
 - T003 ∥ T004 (different files); T005 ∥ T006 after their modules; T008 with T007's diff.
-- Within US1: T012 ∥ T013; T016–T018 and T021 are separate rows in two files; T019 ∥ T020.
+- Within US1: T012 ∥ T013; T016–T018 and T021 are separate rows in two files (T016a in a third); T019 ∥ T020.
 - Within US3: T027 ∥ T028 ∥ T029 after T026.
 - T030 and T032 anytime after Phase 5's shape is fixed.
 
@@ -259,9 +288,9 @@ first would recreate 013's original defect (a suite for a capability that does n
 
 ## Notes
 
-- **Gate types**: fail-closed (T005, T006, T012, T013), conformance (T007, T016, T017, T019,
-  T020, T021, T023, T033), correlation/evidence (T021), eval (T026, T027), no-secret-leak (T018).
-  None omitted — every type is implicated.
+- **Gate types**: fail-closed (T005, T006, T012, T013), conformance (T007, T009a, T016, T016a,
+  T017, T019, T020, T021, T023, T033), correlation/evidence (T021), eval (T026, T027),
+  no-secret-leak (T018). None omitted — every type is implicated.
 - **Sealed core**: exactly one task (T007), reviewed by name before merge.
 - **Nothing under `src/surfaces/portal/` changes** — 024's containment row already asserts the
   portal imports no `core.answering`; it keeps holding here without a new task.

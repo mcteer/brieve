@@ -44,7 +44,8 @@ the reauthored suite; `make evals-live` for the live half, named runner.
 estate question, bounded by the read path's existing `limit`.
 
 **Constraints**: blocking lanes stay vendor-free and enclave-free (FR-011a). No product credential
-in the answering path (FR-006). `GET /evidence` behaviour unchanged (research F2). No new
+in the answering path (FR-006). `GET /evidence` behaviour unchanged — the route never passes the read function's new
+`event_types` parameter, and a row asserts it (research F2, corrected by analysis I1). No new
 operation — parity grows by zero.
 
 **Scale/Scope**: `src/core/answering/` gains routing, scope, and estate modules;
@@ -113,6 +114,12 @@ src/core/evals/
 └── suites.py             # estate_state case shape: events = expected references
 
 src/surfaces/api/ask.py   # route first, then corpus path or estate path; decline names source
+src/surfaces/api/evidence.py  # ONE additive parameter: read_evidence_for gains
+                              #   event_types (default None = today's unnarrowed read).
+                              #   Analysis I1: the function builds its request internally
+                              #   and exposed no way to narrow by type — the design's key
+                              #   call was impossible as planned. GET /evidence never
+                              #   passes it; a row asserts the route is unchanged (T009a)
 src/surfaces/mcp/transport.py  # same, through the shared ask_for
 
 src/adapters/

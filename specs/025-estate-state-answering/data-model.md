@@ -63,8 +63,12 @@ outside scope enters the path), record payload content beyond what the claim sta
 points; the reader follows it through the governed read like anyone else).
 
 **The caller-indistinguishability rule (SC-008)**: "no records in scope" and "records exist but
-are not yours" produce the **same** declined answer. The difference lives where 022 put it — in
-the access record's disposition, readable by an investigator.
+are not yours" produce the **same** declined answer. The investigator's half is **not a
+disposition** — analysis U1: `_disposition` distinguishes only the cross-tenant case, and a
+role-scoped read that finds nothing is `SCOPED` like any other. What the trail carries instead is
+the **narrowed request itself**, recorded in the access record: an investigator sees exactly which
+event types were asked for and can re-run the unnarrowed query to see what lay outside them. The
+distinction is derivable from the record; it is not a field on it.
 
 ## EstateProvider (seam)
 
@@ -87,9 +91,12 @@ Same shape as 024's `AnswerProvider`, different material:
 | `source` **(new)** | `guidance` | `estate` (or `neither`, on an unroutable decline) |
 
 **Note on `corpus_digest` for estate asks**: the field generalises to "identity of what was
-consulted" rather than gaining a sibling — for an estate ask it carries the correlation id of the
-evidence-access record the read wrote, so the ask record points at the access record and the walk
-from "someone asked" to "here is exactly what was read" is one hop. **Principle V review covers
+consulted" rather than gaining a sibling — for an estate ask it carries the evidence-access
+**stream's** correlation id (`evidence-access:{tenant}`, deliberately stable per 022). One hop
+lands on the **stream, not the single record** — analysis U2: `_record_access` returns nothing to
+point at, and the stream id is stable by design so access records chain to each other. Within the
+stream the specific read is locatable by subject and time, and the narrowed request it recorded is
+what the investigator half of SC-008 rests on. **Principle V review covers
 both the new field and this generalisation** (Dan McTeer, before merge).
 
 ## Eval case shape — `estate_state`, reauthored
@@ -106,6 +113,17 @@ violation) and `invented` (precision — a workspace the estate does not contain
 (FR-011b). `packs/<pack>/evals/estate_records.toml` holds the arranged estate; no digest pin,
 because it is authored fixture material, not vendored third-party content — the contract records
 this distinction so the corpus analogy is not over-applied.
+
+**How authored cases name content-hash references (analysis U3)**: fixture records carry **authored
+stable ids** (`rec-vault-001`); the loader computes each record's entry hash at load and maps
+id → hash; `events` and `recorded` name the authored ids; the scorer translates ids to hashes
+before resolving and comparing. Authors never hand-write a hash, and editing one fixture record
+never invalidates another case's labels.
+
+**And why the suite carries no decline-expected cases (analysis C2)**: `events` is required
+non-empty for this suite, because fidelity over an empty expected set passes vacuously — the exact
+trap `parse_cases` already refuses for `report_fidelity`. Decline behaviour (FR-006b) is asserted
+by component rows instead (tasks T012).
 
 ## State transitions
 
