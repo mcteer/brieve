@@ -304,7 +304,7 @@ class AuditEventType(StrEnum):
     RUN_STOPPED = "run_stopped"
 
     #: Someone asked a question and was answered or declined (024, ADR-0039). Payload:
-    #: subject_user_id, corpus_digest, model, disposition, source.
+    #: subject_user_id, corpus_digest, evidence_stream, model, disposition, source.
     #:
     #: **`source` is 025's additive field** and names which material answered: ``guidance`` (the
     #: pinned corpus), ``estate`` (the tenant's own records, through the governed read), or
@@ -313,41 +313,23 @@ class AuditEventType(StrEnum):
     #: investigator cannot otherwise recover — two asks with identical dispositions may have
     #: consulted entirely different material.
     #:
-    #: **`corpus_digest` generalises to "identity of what was consulted"** rather than gaining a
-    #: sibling field. For a guidance ask it remains the corpus pin. For an estate ask it carries
-    #: the **evidence-access stream's** correlation id (``evidence-access:{tenant}``), so the walk
-    #: from *someone asked* to *here is what was read* is one hop to that stream — the stream, not
-    #: a single record, because 022 made the id stable per tenant on purpose so access records
-    #: chain to each other rather than each being a chain of one. Within the stream the read is
-    #: locatable by subject and time.
+    #: **`corpus_digest` and `evidence_stream` are separate fields, and the separation was the
+    #: outcome of this record's Principle V review.** An earlier version generalised
+    #: `corpus_digest` to mean "identity of what was consulted" — the corpus pin for a guidance
+    #: ask, the evidence-access stream id for an estate one. That made one column hold two kinds
+    #: of value depending on a sibling field, so a saved query over it returned digests and
+    #: stream ids interchangeably and an investigator had to read `source` to know which they
+    #: had. **They are different things and they get different names.**
     #:
-    #: **`cell`, `bound_cell` and `cell_disposition` are 026's additive fields**, and they answer
-    #: the question the rest of the payload cannot: the `model` says which model answered, and
-    #: nothing said whether it was *allowed to*. Principle VIII permits model use only through a
-    #: binding over eval-qualified Qualified Model Matrix cells; between 024 and 026 the answering
-    #: path consulted no binding at all, while 024's conformance contract asserted that an
-    #: unqualified cell refused before any provider call.
+    #: - ``corpus_digest`` — the pinned corpus's digest. Populated for a **guidance** ask; empty
+    #:   otherwise.
+    #: - ``evidence_stream`` — the evidence-access stream's correlation id
+    #:   (``evidence-access:{tenant}``, stable per tenant per 022). Populated for an **estate**
+    #:   ask, and it is what makes the walk from *someone asked* to *here is what was read* one
+    #:   hop — to the stream, not to a single record, because access records chain to each other.
+    #:   Within it the read is locatable by subject and time. Empty otherwise.
     #:
-    #: - ``cell`` — the cell that authorised the answer, i.e. the one actually used. Empty on a
-    #:   governance refusal, because none did.
-    #: - ``bound_cell`` — the cell the ask binding named for this source. Empty when nothing was
-    #:   bound. Equal to ``cell`` in the ordinary case; **different is the whole point** when a
-    #:   pinned model was unavailable and another qualified cell served.
-    #: - ``cell_disposition`` — ``pinned`` | ``fallback:<reason>`` | ``refused:<reason>`` |
-    #:   ``not_applicable``.
-    #:
-    #: **A substitution rides this record rather than `MATRIX_FALLBACK`.** That event's payload
-    #: carries ``run_id`` — an ask has no run, and fabricating one or generalising a second
-    #: sealed-core payload would both be worse than saying so here. An ask consults exactly one
-    #: model, so which cell authorised it is an *attribute of the ask*, the same argument that put
-    #: ``source`` here rather than in a routing event of its own.
-    #:
-    #: **`cell_disposition` describes the RESOLUTION outcome and only that.** A refusal that
-    #: happens *after* resolution succeeded — ``scope_empty``, ``provider_unavailable`` — keeps
-    #: ``pinned``/``fallback``: the ``disposition`` field already says the ask failed later, and
-    #: overwriting the resolution outcome would erase the fact that governance passed.
-    #: ``not_applicable`` is the unroutable decline, where no source was consulted and so no cell
-    #: question arose.
+    #: Both empty on an unroutable decline, where nothing was consulted at all.
     #:
     #: **The narrowed request is what the access record carries**, and it is how an investigator
     #: distinguishes "your scope contained nothing" from "records existed outside your scope" —

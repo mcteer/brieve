@@ -28,6 +28,7 @@ def record_ask(
     audit: AuditSink,
     subject: AuthenticatedSubject,
     corpus_digest: str,
+    evidence_stream: str,
     model: str,
     disposition: str,
     source: str,
@@ -46,8 +47,10 @@ def record_ask(
     same reason ``source`` is: a default would let every call site that forgot one silently claim
     an authorisation it never resolved. See `AuditEventType.ASK_ANSWERED`.
 
-    ``corpus_digest`` is the **identity of what was consulted**: the corpus pin for guidance, the
-    evidence-access stream's correlation id for estate. See `AuditEventType.ASK_ANSWERED`.
+    ``corpus_digest`` and ``evidence_stream`` name **different things** and are never
+    interchangeable: a corpus digest is content, a stream id is a location. One field holding
+    either — which an earlier version of this record did — made a query over it return two kinds
+    of value depending on ``source``. See `AuditEventType.ASK_ANSWERED`.
     """
     try:
         audit.append_event(
@@ -58,6 +61,7 @@ def record_ask(
                 "subject_user_id": subject.subject_user_id,
                 # WHICH corpus, not what it said.
                 "corpus_digest": corpus_digest,
+                "evidence_stream": evidence_stream,
                 # WHICH model the binding named. A model verdict, never an approval — ADR-0039
                 # and Principle IX, and `MODEL_GATE` already keeps that distinction for runs.
                 "model": model,

@@ -218,10 +218,14 @@ def test_row_the_ask_record_points_at_the_access_stream() -> None:
     asks = [e for e in surface.audit.all_entries() if str(e.event_type) == "ask_answered"]
     assert asks, "the estate ask wrote no ask record"
     assert asks[-1].payload["source"] == "estate"
-    assert asks[-1].payload["corpus_digest"] == evidence_stream_for("tenant-test")
+    assert asks[-1].payload["evidence_stream"] == evidence_stream_for("tenant-test")
+    # And the corpus field is EMPTY on an estate ask — the two are different things with
+    # different names, which is the outcome of this record's Principle V review. One column
+    # holding either made a query over it return digests and stream ids interchangeably.
+    assert asks[-1].payload["corpus_digest"] == ""
 
     # And the stream it names really is where the access record went.
-    assert surface.audit.list_by_correlation_id(asks[-1].payload["corpus_digest"])
+    assert surface.audit.list_by_correlation_id(asks[-1].payload["evidence_stream"])
 
 
 def test_row_the_answer_carries_references_and_statements_only() -> None:
