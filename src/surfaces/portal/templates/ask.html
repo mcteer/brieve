@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Ask a question — Harness Portal{% endblock %}
+{% block header_actions %}
+<form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+{% endblock %}
+{% block content %}
+<h1>Ask a question</h1>
+
+{#
+  ONE FORM, ONE FIELD. No source selector and no model selector: which corpus is pinned and
+  which model may answer are not the asker's to choose, and a control for either would be a
+  request to widen scope. The platform decides what the question needs.
+#}
+<form method="post" action="/ask" class="ask">
+  <label for="question">Your question</label>
+  <textarea id="question" name="question" rows="3" required
+            aria-describedby="ask-expectation">{{ question or "" }}</textarea>
+  <p id="ask-expectation" class="meta">
+    Answers come from the platform&rsquo;s pinned documentation or from your own records
+    &mdash; whichever fits what you asked. An answer usually takes a minute or two, so leave
+    this page open while it works.
+  </p>
+  <button type="submit" class="button">Ask</button>
+</form>
+
+{% if empty %}
+  <p class="notice">Type a question first &mdash; nothing was sent.</p>
+{% endif %}
+
+{% if response is defined %}
+  {#
+    DISPATCH ORDER IS LOAD-BEARING, and it is the relay's own vocabulary in order:
+    reachability is decided before any body exists, and a refusal has no disposition to read.
+    Reordering these would make an outage render as a refusal with a missing reason.
+  #}
+  {% if not response.reachable %}
+    <section class="answer" aria-labelledby="outcome">
+      <h2 id="outcome">The platform could not be asked</h2>
+      <p>Nothing about your access has changed, and nothing you have is lost. The platform did
+         not answer, so there is no decision here to read.</p>
+    </section>
+
+  {% elif not response.ok %}
+    {#
+      THE API'S OWN WORDS, VERBATIM.
+
+      Five features went into making these sentences precise, and each names a different
+      person to go to: a model nobody has qualified, a credential the platform does not hold,
+      a vendor that did not answer. Re-writing them here into something friendlier would put a
+      portal-authored guess where the platform's own answer belongs, and it would drift the
+      first time a reason was reworded — leaving this page confidently explaining the wrong
+      cause. The portal renders; it does not classify.
+    #}
+    <section class="answer refused" aria-labelledby="outcome">
+      <h2 id="outcome">The platform did not answer this</h2>
+      <p>{{ (response.payload or {}).get("detail")
+            or "The platform refused this request and gave no reason." }}</p>
+    </section>
+
+  {% elif (response.payload or {}).get("disposition") == "declined" %}
+    {#
+      A DECLINE IS AN ANSWER, not a failure — the platform being honest that what was asked
+      is not in what it may consult. Naming the source is what keeps somebody who asked about
+      their estate from being told the documentation does not cover it.
+    #}
+    <section class="answer declined" aria-labelledby="outcome">
+      <h2 id="outcome">No answer for this one</h2>
+      <p>{{ (response.payload or {}).get("declined_reason")
+             or "The platform found nothing it could rest an answer on." }}</p>
+      {% if (response.payload or {}).get("source") %}
+        <p class="meta">Consulted: {{ response.payload.source }}</p>
+      {% endif %}
+    </section>
+
+  {% else %}
+    <section class="answer" aria-labelledby="outcome">
+      <h2 id="outcome">Answer</h2>
+      <ol class="claims">
+        {% for claim in (response.payload or {}).get("claims") or [] %}
+          <li>
+            <p>{{ claim.statement }}</p>
+            {% if claim.get("citations") %}
+              <ul class="citations">
+                {% for citation in claim.citations %}
+                  <li><a href="{{ citation }}" rel="noopener">{{ citation }}</a></li>
+                {% endfor %}
+              </ul>
+            {% elif claim.get("references") %}
+              {#
+                A RECORD REFERENCE IS NOT A LINK, and rendering it as one would produce a dead
+                link that teaches the reader these references are decorative. Its job is to be
+                an identifier a person can carry to whoever can show them the record, so the
+                full value is present and none of it is an anchor.
+              #}
+              <ul class="references">
+                {% for reference in claim.references %}
+                  <li><code title="{{ reference }}">{{ reference[:16] }}&hellip;</code></li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+      {% if (response.payload or {}).get("source") %}
+        <p class="meta">Answered from: {{ response.payload.source }}</p>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endif %}
+{% endblock %}

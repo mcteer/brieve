@@ -22,7 +22,7 @@ exist. A setup task here would be ceremony.)*
 
 ## Phase 2: Foundational — the relay learns per-operation patience
 
-- [ ] T001 `ApiRelay.request` in `src/surfaces/portal/relay.py` gains
+- [X] T001 `ApiRelay.request` in `src/surfaces/portal/relay.py` gains
       `timeout: float | None = None` — `None` means the relay's own default, so every existing
       call site is untouched (SC-004's second half by construction). The docstring records
       research F2: per-operation patience is a parameter, not a second relay, because two relays
@@ -44,7 +44,7 @@ faithfully.
 **Independent test**: drive the portal over the real API fixture with a qualified authority and
 an available credential; an ask returns an answered page whose citations are anchors.
 
-- [ ] T002 [US1] The routes in `src/surfaces/portal/app.py`: `GET /ask` renders the form
+- [X] T002 [US1] The routes in `src/surfaces/portal/app.py`: `GET /ask` renders the form
       (session required — signed-out redirects to login, the pattern every page uses); 
       `POST /ask` strips the question, **re-renders the form with a message and zero relay calls
       when empty**, otherwise relays `POST /ask` with the session's own token and
@@ -53,7 +53,7 @@ an available credential; an ask returns an answered page whose citations are anc
       order is the data model's and is load-bearing: `reachable → status → disposition` —
       reachability is decided by the relay before any body exists, and a refusal has no
       disposition to read.
-- [ ] T003 [US1] The template `src/surfaces/portal/templates/ask.html`: the form with FR-005a's
+- [X] T003 [US1] The template `src/surfaces/portal/templates/ask.html`: the form with FR-005a's
       expectation text as plain page content ("an answer usually takes a minute or two — leave
       this page open"; no spinner, no live region, no new JS — research F6); the **answered**
       block shaped per source (guidance: each citation an anchor to its URL; estate: each
@@ -62,10 +62,10 @@ an available credential; an ask returns an answered page whose citations are anc
       rendering the API's `detail` **verbatim** with no portal-authored cause text (research F1 —
       this is the sentence the whole feature turns on); the **unaskable** block ("the platform
       could not be asked — nothing about your access has changed"), distinct from every refusal.
-- [ ] T004 [P] [US1] The nav link in `src/surfaces/portal/templates/base.html`: "Ask" beside the
+- [X] T004 [P] [US1] The nav link in `src/surfaces/portal/templates/base.html`: "Ask" beside the
       existing brand/threads navigation, visible when signed in. Accessible name is the a11y
       row's to judge (T011).
-- [ ] T005 [P] [US1] Component rows in `tests/component/test_portal_asks.py`, over the
+- [X] T005 [P] [US1] Component rows in `tests/component/test_portal_asks.py`, over the
       `_portal_over_api` pattern (`surface_under_test` + injected transport, the portal driving
       the **real** API fixture): an ask with `qualified_ask_authority()` and
       `available_credential()` returns 200 and the page carries each claim's statement with its
@@ -74,12 +74,12 @@ an available credential; an ask returns an answered page whose citations are anc
       signed-out GET and POST both redirect with **zero transport calls**; an empty question
       re-renders with **zero transport calls**; the transported `Authorization` header carries
       the signed-in session's own token (FR-011's portal half).
-- [ ] T006 [US1] The guidance-citation and estate-reference assertions are structural, not
+- [X] T006 [US1] The guidance-citation and estate-reference assertions are structural, not
       substring: parse the rendered page's anchors and assert the **set** of hrefs equals the
       citation URLs for guidance, and is **empty within the answer block** for estate — a page
       that wrapped a hash in a dead link would pass any substring check while teaching readers
       the references are decorative (FR-007's failure mode, pinned).
-- [ ] T007 [US1] The patience rows, observed at the relay seam: a recording `ApiRelay` subclass
+- [X] T007 [US1] The patience rows, observed at the relay seam: a recording `ApiRelay` subclass
       captures `(path, timeout)` per call and delegates; driving an ask then a thread listing
       through the same portal asserts `/ask` carried `ASK_PATIENCE` and `/threads` carried
       `None` (the relay default). **Both halves asserted** — the second is what keeps SC-004 a
@@ -95,7 +95,7 @@ an available credential; an ask returns an answered page whose citations are anc
 **Independent test**: arrange each failure with an injected transport and read the pages; they
 differ, and every refusal sentence is the API's own.
 
-- [ ] T008 [US2] [GATE:conformance] The four-outcomes rows in
+- [X] T008 [US2] [GATE:conformance] The four-outcomes rows in
       `tests/component/test_portal_asks.py`: transports returning (a) 403 with the unbound
       detail prose, (b) 503 with the credential detail prose ("the platform holds no authority to
       call this vendor"), (c) 503 with a provider-fault detail, (d) status 0 — each renders a
@@ -104,7 +104,7 @@ differ, and every refusal sentence is the API's own.
       fixtures, imported as literals with a comment naming their source functions — so if the API
       rewords a refusal, the row still passes (the portal renders whatever arrives) and the
       fixture is merely stale, not wrong.
-- [ ] T009 [US2] [GATE:conformance] **The no-classification row** — the contract's headline: the
+- [X] T009 [US2] [GATE:conformance] **The no-classification row** — the contract's headline: the
       refusal page contains the transported `detail` string verbatim and does **not** contain
       `refused.html`'s generic arm ("The platform refused this request"), nor any portal-authored
       cause vocabulary (assert the absence of a small named list: "credential problem",
@@ -120,7 +120,7 @@ differ, and every refusal sentence is the API's own.
 
 **Independent test**: ask through the portal-over-API harness and read `surface.audit`.
 
-- [ ] T010 [US3] [GATE:conformance] The trail rows in `tests/component/test_portal_asks.py`,
+- [X] T010 [US3] [GATE:conformance] The trail rows in `tests/component/test_portal_asks.py`,
       end-to-end through the real API fixture: an answered portal ask leaves an `ask_answered`
       record whose `subject_user_id` is the **signed-in person's** subject (not "portal", not
       the relay's identity — the portal has none, which containment separately asserts); a
@@ -133,14 +133,14 @@ differ, and every refusal sentence is the API's own.
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T011 [P] Accessibility rows in `tests/a11y/test_wcag.py` (and
+- [X] T011 [P] Accessibility rows in `tests/a11y/test_wcag.py` (and
       `tests/a11y/test_keyboard_and_screenreader.py` for the keyboard row): the ask form with its expectation text, an answered page for **each** source, a
       declined page, and a refused page each pass WCAG 2.2 AA. The a11y `portal_server` fixture
       builds `surface_under_test()` bare — arrange the answered states by constructing the
       surface with `qualified_ask_authority()` and `available_credential()` (a fixture parameter
       or a second server fixture, whichever the conftest wears better; the transport signature
       does not change — T001's constraint).
-- [ ] T012 [P] Containment green with the new route — and **the scripted session gains the
+- [X] T012 [P] Containment green with the new route — and **the scripted session gains the
       ask** (analysis C1). `test_row_every_request_the_portal_makes_is_a_catalogued_operation`
       drives "every page and every action this portal offers" and checks the request log against
       the snapshot; a route the session never drives is a route the row never observes, so its
@@ -150,7 +150,7 @@ differ, and every refusal sentence is the API's own.
       Every OTHER containment row passes unmodified (egress allowlist, no credential, client
       size); one of those needing an edit is still a finding to surface. Then `make check` and
       the hermetic conformance sweep.
-- [ ] T013 [P] Update this feature's `contracts/conformance.md` status rows as they land, and
+- [X] T013 [P] Update this feature's `contracts/conformance.md` status rows as they land, and
       the ROADMAP entry for 028 (closing 024's named deferral; standing deferrals restated:
       corpus refresh, team granularity, per-tenant model scope, further cell promotion,
       submit-then-poll as the recorded next shape).
