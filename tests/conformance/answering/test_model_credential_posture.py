@@ -557,3 +557,34 @@ def test_both_deployed_assemblies_wire_the_same_ask_collaborators() -> None:
             f"the parity rows cannot see it — they build both surfaces from one set of "
             f"collaborators"
         )
+
+
+def test_a_checkpoint_cannot_carry_the_credential_and_a_resume_refetches() -> None:
+    """The checkpoint half of *never persisted*, and FR-010 in its reconciled form.
+
+    **Two claims, and the second is why the first is not enough.** `CheckpointBlob` declares its
+    fields with `extra="forbid"`, so nothing can be smuggled onto it — but `payload` is an opaque
+    dict, and a chooser holding a key would reach it the moment somebody serialised run state
+    wholesale. What actually keeps the key out is that the chooser is built **per allocation** and
+    is not part of what a checkpoint holds.
+
+    **A resume re-authenticates rather than replaying.** Both the fresh path and the revive path
+    go through `_chooser_for`, so a resumed run fetches the credential again under its new
+    allocation's own attested identity. That is what makes FR-010 true in a posture where nothing
+    expires: a revived run cannot continue on authority obtained by a process that is gone, and if
+    the credential was withdrawn in between, the revival refuses.
+    """
+    import inspect
+
+    from core.durability.types import CheckpointBlob
+    from surfaces.dispatch import entrypoint
+
+    declared = set(CheckpointBlob.model_fields)
+    assert not {f for f in declared if "cred" in f or "secret" in f or "key" in f}
+    assert CheckpointBlob.model_config.get("extra") == "forbid"
+
+    source = inspect.getsource(entrypoint)
+    assert source.count("_chooser_for(") >= 3, (
+        "one of the run paths no longer builds its chooser through `_chooser_for`; a path that "
+        "constructed one directly would skip the credential fetch, or reuse one across allocations"
+    )
