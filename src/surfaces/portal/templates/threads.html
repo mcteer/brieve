@@ -1,10 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Your conversations — Harness Portal{% endblock %}
+{% block title %}Run an agent — Harness Portal{% endblock %}
 {% block header_actions %}
 <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
 {% endblock %}
 {% block content %}
-<h1>Your conversations</h1>
+<h1>Run an agent</h1>
+<p class="lede">An agent acts on your behalf here &mdash; every step governed, every effect
+   recorded. To get an answer without anything happening,
+   <a href="/ask">ask a question</a>.</p>
 <form method="post" action="/threads">
   <button type="submit" class="button">Start a conversation</button>
 </form>
