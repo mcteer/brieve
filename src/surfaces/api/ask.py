@@ -55,6 +55,7 @@ def ask_for(
     cell: str = "",
     bound_cell: str = "",
     cell_disposition: str = "",
+    model_authority: str = "",
 ) -> dict[str, Any]:
     """Answer or decline, and record that someone asked.
 
@@ -77,6 +78,7 @@ def ask_for(
         cell=cell,
         bound_cell=bound_cell,
         cell_disposition=cell_disposition,
+        model_authority=model_authority,
     )
 
     if answer.disposition != ANSWERED:
@@ -110,6 +112,7 @@ def estate_answer_for(
     cell: str = "",
     bound_cell: str = "",
     cell_disposition: str = "",
+    model_authority: str = "",
 ) -> dict[str, Any]:
     """Answer an estate question from the asker's own records, or decline.
 
@@ -139,6 +142,9 @@ def estate_answer_for(
             cell=cell,
             bound_cell=bound_cell,
             cell_disposition=cell_disposition,
+            # A credential may have been obtained before scope refused; carrying it keeps the
+            # record honest about what authority was in hand when the ask stopped.
+            model_authority=model_authority,
         )
         raise ScopeEmpty(
             "no records are visible to this subject's roles; an estate answer would have "
@@ -171,6 +177,7 @@ def estate_answer_for(
         cell=cell,
         bound_cell=bound_cell,
         cell_disposition=cell_disposition,
+        model_authority=model_authority,
     )
 
     if answer.disposition != ESTATE_ANSWERED:
@@ -305,6 +312,9 @@ def authorise_ask(
         cell="",
         bound_cell="",
         cell_disposition=f"refused:{disposition}",
+        # Governance refused BEFORE any credential was sought. Empty here is load-bearing: a
+        # reference would claim an authority the platform never exercised.
+        model_authority="",
     )
     raise AskNotQualified(disposition, detail)
 
@@ -409,6 +419,8 @@ def build_router(
                 bound_cell="",
                 # No source was consulted, so no cell question arose.
                 cell_disposition="not_applicable",
+                # No model was called, so no authority was exercised. Empty is the statement.
+                model_authority="",
             )
             return {
                 "disposition": "declined",
@@ -456,6 +468,8 @@ def build_router(
                 cell=cell,
                 bound_cell=bound_cell,
                 cell_disposition=cell_disposition,
+                # No provider, so no vendor call, so no credential was exercised.
+                model_authority="",
             )
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,

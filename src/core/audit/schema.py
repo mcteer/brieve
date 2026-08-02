@@ -304,7 +304,28 @@ class AuditEventType(StrEnum):
     RUN_STOPPED = "run_stopped"
 
     #: Someone asked a question and was answered or declined (024, ADR-0039). Payload:
-    #: subject_user_id, corpus_digest, evidence_stream, model, disposition, source.
+    #: subject_user_id, corpus_digest, evidence_stream, model, disposition, source, cell,
+    #: bound_cell, cell_disposition, model_authority.
+    #:
+    #: **`model_authority` is 027's additive field** and answers *how the call was permitted*, the
+    #: way the trail already answers *which cell allowed it*. It is a **reference and never a
+    #: value** — ``vault:model-credentials/<vendor>@v<version>`` — naming where the credential
+    #: lives and which rotation generation was in force. That version is the whole point: it makes
+    #: "was this call made before the leak or after the rotation" answerable from the record,
+    #: which a bare path would not.
+    #:
+    #: Empty on every refusal that precedes the fetch — an ask refused for an unqualified cell
+    #: never obtained a credential, and writing a reference there would claim an authority that
+    #: was never exercised. `cell_disposition` and this field together separate the three
+    #: failures 027 exists to keep apart: the cell was not qualified, the credential could not be
+    #: obtained, or the vendor did not answer. Three failures, three people to go to.
+    #:
+    #: **Never the key, and never a hash of the key.** A hash of a low-entropy-format secret is an
+    #: oracle, and the platform's rule everywhere else is references only.
+    #:
+    #: `MODEL_GATE` is deliberately **not** given the same field. No run has ever bound a real
+    #: model — every dev matrix cell is a fixture — so a run-side field would be written by
+    #: nothing and verified by nothing. It goes there when a run first needs it.
     #:
     #: **`source` is 025's additive field** and names which material answered: ``guidance`` (the
     #: pinned corpus), ``estate`` (the tenant's own records, through the governed read), or
@@ -336,7 +357,7 @@ class AuditEventType(StrEnum):
     #: `EvidenceDisposition` does not distinguish those (it separates only the cross-tenant case),
     #: and the caller is deliberately told the same thing either way.
     #:
-    #: **A SEALED-CORE ADDITION** (Principle V), the fourth feature running to make one, and the
+    #: **A SEALED-CORE ADDITION** (Principle V), the fifth feature running to make one, and the
     #: one whose review this feature's plan originally asserted was not needed. The plan hedged —
     #: *"if an audit event type turns out to be needed, that changes this verdict"* — and the
     #: condition had already fired when the data model was written. A conditional verdict reads as

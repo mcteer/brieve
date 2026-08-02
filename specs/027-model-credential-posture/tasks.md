@@ -19,20 +19,20 @@ provably caught rather than assumed absent.
 
 ## Phase 1: Setup — the measurements the design rests on
 
-- [ ] T001 Pin the reframing (research F1) as an executable note in
+- [X] T001 Pin the reframing (research F1) as an executable note in
       `tests/component/test_model_credential.py`: a test asserting `BrokeredMaterialSource` in
       `src/core/authority/entitlements.py` still has **no production implementation** — the
       premise 027 is the first to change. It documents that this feature *establishes* the
       broker rather than reusing one; when a real broker exists it becomes a real assertion about
       what implements the protocol.
-- [ ] T002 Pin the static-key finding (research F2): a comment-block test in the same file
+- [X] T002 Pin the static-key finding (research F2): a comment-block test in the same file
       recording that a vendor key is **not derivable** — no credential API to mint lesser
       material from — so the posture is "never persisted", not "derived". Kept executable so the
       next person tempted by response-wrapping ceremony finds the reason it buys nothing.
 
 ## Phase 2: Foundational — the reader and the record
 
-- [ ] T003 Create `src/core/authority/model_credential.py`: `BrokeredModelCredential` with
+- [X] T003 Create `src/core/authority/model_credential.py`: `BrokeredModelCredential` with
       `fetch(vendor) -> str` reading `model-credentials/<vendor>` (KV v2) **under the caller's own
       attested identity**, and a `credential_reference(vendor)` returning
       `vault:model-credentials/<vendor>@v<version>` — where `<version>` is read from **KV v2's
@@ -42,26 +42,26 @@ provably caught rather than assumed absent.
       `ResolutionRefused` (`credential_unavailable`). **Never caches** — no instance state
       carrying a key across calls. Module docstring carries research F1/F2: first broker, key not derivable, lives in
       `authority` because 025's never-acts rows forbid `answering` any `authority` import.
-- [ ] T004 [GATE:fail-closed] Register `credential_unavailable` in
+- [X] T004 [GATE:fail-closed] Register `credential_unavailable` in
       `src/core/authority/errors.py`'s `RESOLUTION_REASONS` with the distinction that earns it:
       the cell is qualified (026's checks passed) and the *credential* could not be obtained —
       distinct from `unqualified_cell` (matrix) and `fabric_unreachable` (the store itself down).
-- [ ] T005 [P] [GATE:fail-closed] Component rows in `tests/component/test_model_credential.py`:
+- [X] T005 [P] [GATE:fail-closed] Component rows in `tests/component/test_model_credential.py`:
       a present record fetches; the reference carries the KV version; absent refuses
       `credential_unavailable`; an unreadable store refuses distinguishably; **two fetches never
       share cached state** (mutate the backing store between calls, observe the second sees the
       change).
-- [ ] T006 [GATE:conformance] **SEALED CORE** — `AuditEventType.ASK_ANSWERED`'s payload in
+- [X] T006 [GATE:conformance] **SEALED CORE** — `AuditEventType.ASK_ANSWERED`'s payload in
       `src/core/audit/schema.py` gains `model_authority` (the reference — **never a value**;
       data-model.md). `MODEL_GATE` is deliberately **not** touched (plan, Complexity: no run has
       bound a real model, so a run-side field would be written and verified by nothing). Update
       `src/core/answering/record.py`'s `record_ask` to require it.
       **Principle V review: Dan McTeer, BEFORE merge** — gating this PR, per the discipline the
       just-closed review established.
-- [ ] T007 [P] Extend the exact-payload row in `tests/component/test_answering.py` by exactly
+- [X] T007 [P] Extend the exact-payload row in `tests/component/test_answering.py` by exactly
       `model_authority`, and annotate the pinned-digest row in `tests/unit/test_audit_chain.py`
       the way 025/026 did — the sealed-core diff and its test move together.
-- [ ] T008 Thread `model_authority` through every existing `record_ask` call site
+- [X] T008 Thread `model_authority` through every existing `record_ask` call site
       (`src/surfaces/api/ask.py`, `src/surfaces/mcp/transport.py`,
       `tests/component/test_answering.py`) with the interim value `""` and a comment naming T011
       as the task that makes it real — `make check` is the sweep that proves none was missed.

@@ -116,8 +116,12 @@ _INSTRUCTION: Final[str] = (
 class LiveAnswerProvider:
     """Asks a real model for cited claims. Behind `@pytest.mark.live_model`, never in a gate."""
 
-    def __init__(self, model: str = LIVE_MODEL) -> None:
+    def __init__(self, model: str = LIVE_MODEL, *, api_key: str | None = None) -> None:
         self._model = model
+        #: Supplied by a production caller that brokered it for this task; `None` in the eval
+        #: lane, where `client_and_model` reads the environment (FR-013). Held for the lifetime of
+        #: this provider — which is one ask, because the surface builds one per ask and drops it.
+        self._api_key = api_key
 
     def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
         sections = _relevant(question, corpus)
@@ -130,7 +134,7 @@ class LiveAnswerProvider:
             f"--- path: {path}\n--- anchor: {anchor}\n{text[:SECTION_CHARS]}"
             for path, anchor, text in sections
         )
-        client, api_model = client_and_model(self._model)
+        client, api_model = client_and_model(self._model, api_key=self._api_key)
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             # 4096 for the same reason the scorer uses it: Opus 5 reasons before it answers and
@@ -209,10 +213,19 @@ class LiveEstateProvider:
     the recorded provider does — a content hash is unwritable by hand and meaningless to a model.
     """
 
-    def __init__(self, *, ids_to_hashes: dict[str, str], model: str = LIVE_MODEL) -> None:
+    def __init__(
+        self,
+        *,
+        ids_to_hashes: dict[str, str],
+        model: str = LIVE_MODEL,
+        api_key: str | None = None,
+    ) -> None:
         self._ids = ids_to_hashes
         self._hashes_to_ids = {h: i for i, h in ids_to_hashes.items()}
         self._model = model
+        #: See `LiveAnswerProvider.__init__` — brokered per task by a production caller, `None`
+        #: in the eval lane.
+        self._api_key = api_key
 
     def answer(self, question: str, records: tuple[Any, ...]) -> list[dict[str, Any]]:
         if not records:
@@ -225,7 +238,7 @@ class LiveEstateProvider:
             f"--- payload: {json.dumps(record.payload, sort_keys=True)}"
             for record in records
         )
-        client, api_model = client_and_model(self._model)
+        client, api_model = client_and_model(self._model, api_key=self._api_key)
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             max_tokens=4096,

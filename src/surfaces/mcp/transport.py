@@ -271,6 +271,8 @@ class McpTransport:
                 cell="",
                 bound_cell="",
                 cell_disposition="not_applicable",
+                # No model was called, so no authority was exercised.
+                model_authority="",
             )
             return McpResult(
                 ok=True,
@@ -315,6 +317,8 @@ class McpTransport:
                 cell=guidance_cell,
                 bound_cell=guidance_bound,
                 cell_disposition=guidance_disposition,
+                # No provider, so no vendor call, so no credential exercised.
+                model_authority="",
             )
             return McpResult(
                 ok=False, status=503, payload={"reason": "no model is configured for `ask`"}
