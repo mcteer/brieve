@@ -59,8 +59,8 @@ US3 scores what these produce.
 - [ ] T007 [GATE:conformance] **SEALED CORE** — extend `AuditEventType.ASK_ANSWERED`'s docstring
       and payload contract in `src/core/audit/schema.py`: payload gains `source`
       (`guidance` / `estate` / `neither`), and `corpus_digest`'s documented meaning generalises to
-      *identity of what was consulted* (estate asks carry the evidence-access record's correlation
-      id — data-model.md § ASK_ANSWERED). Update `src/core/answering/record.py`'s `record_ask` to
+      *identity of what was consulted* (estate asks carry the evidence-access **stream's** correlation
+      id — data-model.md § ASK_ANSWERED, per analysis U2). Update `src/core/answering/record.py`'s `record_ask` to
       require `source`. **Principle V review: Dan McTeer, before merge** — already declared in
       plan.md and contracts/conformance.md; this task is the change it reviews.
 - [ ] T008 [P] Extend the pinned-digest row in `tests/unit/test_audit_chain.py` for the payload
@@ -123,7 +123,7 @@ read.
       (FR-004c, no access record because no access was attempted, SC-011), then call
       `read_evidence_for` with `event_types` narrowed by scope (research F2 — the one governed
       door, FR-008 free), then `answer_estate_question` over the result; `record_ask` with
-      `source="estate"` and the access record's correlation id as the consulted identity. On
+      `source="estate"` and the access stream's correlation id as the consulted identity (U2). On
       `neither` — decline naming both sources, `source="neither"`.
 - [ ] T015 [US1] The MCP side reaches the same implementation through the shared `ask_for` in
       `src/surfaces/mcp/transport.py` — parameter threading only; any logic difference between

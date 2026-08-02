@@ -10,6 +10,7 @@
 | Routing (both directions), scope narrowing, estate path, scorer | `tests/component/` | Nothing |
 | Never-acts over the estate path, differential entitlement, caller-indistinguishability | `tests/conformance/answering/` | Nothing — swept by the first conformance recipe line; **deliberately not on the host_enclave line**, whose markers would deselect these rows (the inert-entry lesson, learned in 024) |
 | Estate verdicts on both surfaces | `tests/conformance/mcp/test_ask_parity.py` | Nothing |
+| `GET /evidence` unchanged by the additive `event_types` parameter (analysis I1) | `tests/conformance/api/` | Nothing |
 | Reauthored `estate_state` via the product path | `make evals` | Nothing |
 | **FR-012 — name the 2026-08-01 failure** | Old suite, live model, per-case output | A paid credential, **Dan McTeer** |
 | **Live qualification of the reauthored suite** | `make evals-live` | A paid credential, **Dan McTeer** |

@@ -23,7 +23,8 @@ Expected: green, and the eval gate's scorer-identity assertion names the estate 
 
 ```sh
 uv run --extra adapters --extra surfaces --extra portal \
-  pytest tests/conformance/answering tests/conformance/mcp/test_ask_parity.py -q
+  pytest tests/conformance/answering tests/conformance/mcp/test_ask_parity.py \
+    tests/conformance/api -q
 ```
 
 Expected, by scenario:
