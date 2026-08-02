@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
 from core.evals.fidelity import score_fidelity
-from core.evals.suites import MEASURED_SUITES, EvalCase, UnrunnableSuite
+from core.evals.suites import ESTATE_SUITES, MEASURED_SUITES, EvalCase, UnrunnableSuite
 
 #: The ONE name for the live lane's credential. Asserted against by the no-secret-leak row
 #: as `scoring.EVAL_PROVIDER_KEY`, imported — a row matching a string literal that nothing
@@ -174,6 +174,79 @@ class AnsweringScorer:
 
 
 @dataclass(frozen=True)
+class _ReferenceSet:
+    """Adapts a reference set to what `score_fidelity` reads.
+
+    Fidelity was built for reports and takes anything with `.claims[].subject`. Reusing it rather
+    than writing a second precision/recall is the anti-fragmentation call: two implementations of
+    "what did this omit and what did it invent" would drift, and this one is already the threshold
+    the report gate uses.
+    """
+
+    ids: tuple[str, ...]
+
+    @property
+    def claims(self) -> tuple[Any, ...]:
+        return tuple(_Subject(subject=name) for name in self.ids)
+
+
+@dataclass(frozen=True)
+class _Subject:
+    subject: str
+
+
+class EstateAnsweringScorer:
+    """Drives the **estate** answering path and reports which references survived it.
+
+    **The last suite to stop scoring authored recordings.** 024 moved `citation_accuracy` and
+    `must_decline` onto the product path; `estate_state` stayed authored and was named as this
+    feature's obligation. Before now it replayed a string, so nothing the product does — narrowing
+    a read, resolving a reference, dropping an unsupported claim, deciding to decline — ever ran.
+
+    **It reports ids, not prose.** `run_suite`'s estate branch scores by precision and recall over
+    the reference set, because the `match` verb could not fail an answer that reproduced the record
+    *and* invented a workspace — measured, and pinned as an xfail until this landed. So this scorer
+    exposes `references()` rather than only `respond()`.
+
+    Deterministic and vendor-free: the recording is the model's proposed claims, and the fixture
+    estate is data in the pack.
+    """
+
+    def __init__(self, *, estate: Any, provider: Any = None) -> None:
+        self._estate = estate
+        # Built PER CASE when omitted, for the reason `AnsweringScorer` documents: one provider
+        # across a suite would answer every prompt with a single recording.
+        self._provider = provider
+
+    def _answer(self, case: EvalCase) -> Any:
+        from core.answering.estate import RecordedEstateProvider, answer_estate_question
+
+        provider = self._provider or RecordedEstateProvider(
+            case.recorded, self._estate.ids_to_hashes
+        )
+        return answer_estate_question(
+            question=case.prompt, records=self._estate.records, provider=provider
+        )
+
+    def references(self, case: EvalCase) -> tuple[str, ...]:
+        """The authored ids an answer actually rested on, after the path resolved every one."""
+        answer = self._answer(case)
+        return tuple(
+            self._estate.hashes_to_ids[ref.entry_hash]
+            for claim in answer.claims
+            for ref in claim.references
+            if ref.entry_hash in self._estate.hashes_to_ids
+        )
+
+    def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
+        """Kept so this satisfies `Scorer`; the estate branch scores `references()` instead."""
+        answer = self._answer(case)
+        if answer.disposition != "answered":
+            return f"Declined: {answer.declined_reason}"
+        return " ".join(claim.statement for claim in answer.claims)
+
+
+@dataclass(frozen=True)
 class SuiteResult:
     """A suite's outcome over a subject: every verdict, and which scorer produced them."""
 
@@ -248,8 +321,26 @@ def run_suite(
             f"way to compile one was supplied; a gate that cannot run must fail rather than pass"
         )
 
+    if suite in ESTATE_SUITES and not hasattr(scorer, "references"):
+        raise UnrunnableSuite(
+            f"suite {suite!r} is scored by which references survived the estate path, and the "
+            f"scorer supplied cannot report them; a gate that cannot run must fail rather than "
+            f"pass"
+        )
+
     verdicts = []
     for case in cases:
+        if suite in ESTATE_SUITES:
+            # The THIRD branch (025). No model is asked a verb: the path is driven, and what it
+            # rested on is compared to what the case says it should have — precision fails an
+            # invented reference, recall fails an omitted one. The `match` substring could do
+            # neither, which is why this suite could be green over a wrong answer.
+            surviving = scorer.references(case)  # type: ignore[attr-defined]
+            score = score_fidelity(_ReferenceSet(surviving), case.events)
+            verdicts.append(
+                Verdict(case_id=case.id, suite=suite, passed=score.passed, observed=score.explain())
+            )
+            continue
         if suite in MEASURED_SUITES:
             # No model is asked anything. Fidelity scores the COMPILER, which is the whole point
             # of ADR-0018: the artifact people read is built from records rather than composed.

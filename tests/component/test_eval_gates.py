@@ -23,6 +23,7 @@ from core.evals.scoring import (
 )
 from core.evals.suites import (
     ANSWERING_SUITES,
+    ESTATE_SUITES,
     MEASURED_SUITES,
     OWED,
     SUITES,
@@ -67,7 +68,15 @@ SUBJECT = GovernedSubject(
 )
 
 
-def _scorer_for(suite: str) -> Scorer:
+def _scorer_for(suite: str, pack: str = "vault") -> Scorer:
+    if suite in ESTATE_SUITES:
+        from core.evals.estate_fixtures import load_estate_records
+        from core.evals.scoring import EstateAnsweringScorer
+
+        # A DISTINCT branch from the answering one (analysis P4-1): membership in
+        # ANSWERING_SUITES would route this to the corpus scorer, whose provider parses
+        # documentation URLs out of recordings that contain none — every case would decline.
+        return EstateAnsweringScorer(estate=load_estate_records(PACKS / pack))
     if suite in ANSWERING_SUITES:
         from core.answering.corpus import load_corpus
         from core.evals.scoring import AnsweringScorer
@@ -75,6 +84,14 @@ def _scorer_for(suite: str) -> Scorer:
         # No provider: the scorer builds one per case from that case's recording.
         return AnsweringScorer(corpus=load_corpus())
     return FixtureScorer()
+
+
+def _expected_scorer(suite: str) -> str:
+    if suite in ESTATE_SUITES:
+        return "EstateAnsweringScorer"
+    if suite in ANSWERING_SUITES:
+        return "AnsweringScorer"
+    return "FixtureScorer"
 
 
 def test_all_five_suites_pass_against_both_shipped_packs() -> None:
@@ -91,12 +108,16 @@ def test_all_five_suites_pass_against_both_shipped_packs() -> None:
         for suite in SUITES:
             cases = load_pack_cases(PACKS / pack, suite)
             result = run_suite(
-                suite, cases, subject=SUBJECT, scorer=_scorer_for(suite), compile_for=_compile_for
+                suite,
+                cases,
+                subject=SUBJECT,
+                scorer=_scorer_for(suite, pack),
+                compile_for=_compile_for,
             )
             assert result.passed, (
                 f"{pack}/{suite} failed: {[v.case_id for v in result.verdicts if not v.passed]}"
             )
-            expected = "AnsweringScorer" if suite in ANSWERING_SUITES else "FixtureScorer"
+            expected = _expected_scorer(suite)
             assert result.scorer == expected, (
                 f"{suite} scored with {result.scorer}, expected {expected} — a suite that "
                 "silently reverts to replaying its recording stops testing the product"
@@ -248,45 +269,86 @@ def test_the_live_lane_scores_only_suites_it_can_score() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="FR-011b (025): `match` is a substring check, so it cannot fail an answer that "
-    "contains the recorded text PLUS an invention. 025's fidelity scoring makes this pass; "
-    "the marker is removed then, and the row stays to guard the fix.",
-)
-def test_match_scoring_fails_an_answer_that_invents() -> None:
-    """The measurement 025's plan rests on, kept executable rather than asserted.
+# ------------------------------------------------------------------ 025: both directions
 
-    **Precision has no representation in the `match` verb.** `_judge_response` asks whether
-    `case.recorded` appears in the response — so a response that reproduces the record faithfully
-    and then adds a workspace nobody has passes, and a suite scoring estate answers this way would
-    pass a platform that invents parts of your estate as long as it also said the true thing.
 
-    Recall is covered (omit the recorded text and the substring is absent); precision is not.
-    That asymmetry is why 025 scores surviving references with `score_fidelity` instead, where
-    `invented` and `missing` are separate outcomes.
+def _estate_scorer_returning(*ids: str) -> Scorer:
+    """A scorer whose answer rested on exactly these references.
+
+    Substituted for the real one so a wrong answer can be constructed deliberately — the break
+    fixtures below are the only way to know the suite would catch one.
     """
-    case = EvalCase(
-        id="precision-probe",
-        suite="estate_state",
-        prompt="Which workspaces violate the control?",
-        expected="match",
-        recorded="workspace-a violates the control, per the estate record.",
+
+    class _Fixed:
+        def references(self, case: EvalCase) -> tuple[str, ...]:
+            return ids
+
+        def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
+            return " ".join(ids)
+
+    return _Fixed()
+
+
+def _estate_case() -> EvalCase:
+    return load_pack_cases(PACKS / "vault", "estate_state")[0]
+
+
+def test_the_estate_suite_fails_an_answer_that_invents_a_reference() -> None:
+    """PRECISION. **The direction the old `match` verb could not fail.**
+
+    A substring check asks whether the recorded text appears; an answer reproducing the record and
+    then citing a record nobody has passes it. That is a platform inventing part of your estate
+    while also saying something true, and it is why this suite moved to fidelity scoring.
+    """
+    case = _estate_case()
+    result = run_suite(
+        "estate_state",
+        (case,),
+        subject=SUBJECT,
+        scorer=_estate_scorer_returning(*case.events, "rec-vault-does-not-exist"),
     )
-    invents = case.recorded + " So does workspace-zzz, which does not exist."
+    assert not result.passed
+    assert "invented" in result.verdicts[0].observed
 
-    result = run_suite("estate_state", (case,), subject=SUBJECT, scorer=_FixedResponse(invents))
-    assert not result.passed, (
-        "an answer containing the record AND an invention was scored as a pass — precision is "
-        "unrepresented in the `match` verb"
+
+def test_the_estate_suite_fails_an_answer_that_omits_a_reference() -> None:
+    """RECALL. A platform that under-reports your estate is as wrong as one that over-reports.
+
+    Scored separately from precision because they are different failures with different fixes,
+    and a suite catching only one passes a platform that quietly leaves things out.
+    """
+    case = load_pack_cases(PACKS / "vault", "estate_state")[1]
+    assert len(case.events) > 1, "this row needs a multi-reference case to have something to omit"
+    result = run_suite(
+        "estate_state",
+        (case,),
+        subject=SUBJECT,
+        scorer=_estate_scorer_returning(*case.events[:-1]),
     )
+    assert not result.passed
+    assert "missing" in result.verdicts[0].observed
 
 
-class _FixedResponse:
-    """Returns one response regardless of the case — the smallest scorer that can probe a verb."""
+def test_the_estate_suite_refuses_a_scorer_that_cannot_report_references() -> None:
+    """A gate that cannot run must FAIL rather than pass (FR-014, ADR-0047).
 
-    def __init__(self, response: str) -> None:
-        self._response = response
+    The shape this prevents: someone passes `FixtureScorer` for convenience, every case replays
+    its recording, and the suite goes green having tested nothing.
+    """
+    with pytest.raises(UnrunnableSuite):
+        run_suite("estate_state", (_estate_case(),), subject=SUBJECT, scorer=FixtureScorer())
 
-    def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
-        return self._response
+
+def test_estate_state_is_not_in_the_answering_or_measured_sets() -> None:
+    """Analysis P4-1, as a row so tidying cannot reintroduce the misfit.
+
+    `ANSWERING_SUITES` routes to the corpus scorer, whose provider parses documentation URLs out
+    of recordings — estate recordings have none, so every case would decline and fail for a reason
+    no message would explain. `MEASURED_SUITES` demands `compile_for` and would refuse the suite
+    as unrunnable. Both are near misses that look like tidy-ups.
+    """
+    from core.evals.suites import MEASURED_SUITES
+
+    assert not ESTATE_SUITES & ANSWERING_SUITES
+    assert not ESTATE_SUITES & MEASURED_SUITES
+    assert "estate_state" in ESTATE_SUITES

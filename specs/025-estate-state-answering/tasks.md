@@ -185,7 +185,7 @@ answer on both surfaces, fully rowed.
 **Independent test**: a window with known records in and out — the answer describes only what
 falls inside.
 
-- [ ] T022 [US2] Window handling in `src/core/answering/routing.py` + `ask_for`, constrained
+- [X] T022 [US2] Window handling in `src/core/answering/routing.py` + `ask_for`, constrained
       per analysis U4: a **small closed phrase vocabulary** ("last night", "today", "yesterday",
       "this week") resolved against an **injected clock** — a `now` parameter on `ask_for`
       defaulted at the surface boundary and overridden by tests, never ambient time read inside
@@ -194,7 +194,7 @@ falls inside.
       window" edge case), with truncation stated in the answer. No general NL time parsing —
       resolvable phrases narrow `start_time`/`end_time` on the same `read_evidence_for` call,
       everything else gets the bounded default rather than a guess.
-- [ ] T023 [US2] [GATE:conformance] Window rows in
+- [X] T023 [US2] [GATE:conformance] Window rows in
       `tests/component/test_estate_answering.py`: records inside/outside a window — only inside
       described (US2 scenario 1); empty-window answer indistinguishable from
       no-records-you-may-see (US2 scenario 2, the SC-008 discipline applied to time); the
@@ -209,7 +209,7 @@ falls inside.
 **Independent test**: a deliberately wrong answer — one invented reference, one omitted — fails
 the suite. Before this phase it cannot (T001 proves it).
 
-- [ ] T024 [US3] **Ordering: T031 (FR-012) must be recorded before this task merges.** Author
+- [X] T024 [US3] **Ordering: T031 (FR-012) must be recorded before this task merges.** Author
       `packs/vault/evals/estate_records.toml` and `packs/terraform/evals/estate_records.toml` —
       the arranged estates: entries with hashes, event types, and the payload shapes the
       questions need — each record carrying an **authored stable id** (`rec-vault-001`); the
@@ -217,7 +217,7 @@ the suite. Before this phase it cannot (T001 proves it).
       editing one record never invalidates another case's labels (analysis U3). No digest pin,
       and the file header says why (authored fixture material has
       no third party to drift from — contracts/conformance.md).
-- [ ] T025 [US3] Reauthor `packs/vault/evals/estate_state.toml` and
+- [X] T025 [US3] Reauthor `packs/vault/evals/estate_state.toml` and
       `packs/terraform/evals/estate_state.toml`: records-answerable prompts only (FR-006a — the
       mounted-engines and auth-methods questions are replaced), `recorded` = the model's proposed
       claims with references, `events` = the expected reference set (data-model.md § Eval case
@@ -225,7 +225,7 @@ the suite. Before this phase it cannot (T001 proves it).
       records show evaluated-with-no-violations (answerable, references the evaluation records)
       authored beside the component row's control-nobody-evaluated (declines) — different answers
       to the person asking, and only a pair proves they do not collapse (pass-2 P2-3).
-- [ ] T026 [US3] [GATE:eval] Estate scoring in `src/core/evals/scoring.py` +
+- [X] T026 [US3] [GATE:eval] Estate scoring in `src/core/evals/scoring.py` +
       `src/core/evals/suites.py`: `EstateAnsweringScorer` drives `answer_estate_question` with
       `RecordedEstateProvider` over the pack's fixture estate; surviving references scored by
       `score_fidelity` against `case.events` — the scorer translating authored ids to entry
@@ -245,12 +245,12 @@ the suite. Before this phase it cannot (T001 proves it).
       recordings that contain none, so every case would decline and fail after an implementer
       burns the time discovering why. All three sites gain the third arm, and the
       expected-scorer assertion names `EstateAnsweringScorer` for this suite. **Remove T001's xfail marker here** — the test stays and guards the fix.
-- [ ] T027 [P] [US3] [GATE:eval] Both-directions break rows in
+- [X] T027 [P] [US3] [GATE:eval] Both-directions break rows in
       `tests/component/test_eval_gates.py`: an answer with one invented reference fails; an
       answer omitting one expected reference fails; and the scorer-identity assertion extends so
       `estate_state` reverting to any other scorer fails hermetically (024's anti-reversion row,
       third member).
-- [ ] T028 [US3] Membership updates in `src/core/evals/suites.py` and the live lane:
+- [X] T028 [US3] Membership updates in `src/core/evals/suites.py` and the live lane:
       `estate_state` joins **`ESTATE_SUITES`** (T026's distinct classification — NOT
       `ANSWERING_SUITES`, per pass-4 P4-1 — its own scorer, asserted by name at the existing
       expected-scorer site);
@@ -258,7 +258,7 @@ the suite. Before this phase it cannot (T001 proves it).
       `LiveEstateProvider` in `src/adapters/anthropic_answering.py` offers the fixture records to
       the real model, path resolves, fidelity scores; `_grounding_for`'s special case for
       estate_state is deleted (the grounding is now the offered records, inside the path).
-- [ ] T029 [P] [US3] Extend `tests/evals_live/smoke.py` with one estate probe printing proposed
+- [X] T029 [P] [US3] Extend `tests/evals_live/smoke.py` with one estate probe printing proposed
       claims and per-reference resolves/DOES-NOT-RESOLVE — the same defect-shape 024's smoke
       probes exist for: a model inventing an entry hash reads as a confident answer that
       declines, invisible in a verdict.
@@ -270,7 +270,7 @@ product.
 
 - [ ] T030 [P] Glossary entries in `docs/glossary.md`: *estate reference*, *route*, *scope* —
       linking to *answer*, *citation*, *decline* from 024.
-- [ ] T031 **[FR-012 — owed by name, ordered before T024/T025 merge]** Run the OLD
+- [X] T031 **[FR-012 — owed by name, ordered before T024/T025 merge]** Run the OLD
       `estate_state`/vault suite against the live model with per-case output (evals-smoke
       discipline, ~15 calls): name the 2026-08-01 failing case id(s) and cause; record the
       finding in `specs/025-estate-state-answering/contracts/conformance.md` § *FR-012 finding*

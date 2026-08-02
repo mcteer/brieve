@@ -18,7 +18,7 @@ needed a suite, a majority vote, or a second pack. The full lane is for *qualify
 this is for finding out whether the harness works at all, and the two are different jobs
 that were being done by the same twenty-eight-minute tool.
 
-    make evals-smoke     # ~4 calls, ~20 seconds
+    make evals-smoke     # ~5 calls, ~25 seconds
     make evals-live      # ~180 calls, ~28 minutes — only once smoke is clean
 
 **024 added the third and fourth calls, and they probe a different thing.** The first two ask
@@ -37,15 +37,27 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from adapters.anthropic_answering import LiveAnswerProvider
+from adapters.anthropic_answering import LiveAnswerProvider, LiveEstateProvider
 from adapters.anthropic_scorer import LiveModelScorer
 from core.answering.answer import ANSWERED, DECLINED, ProviderUnavailable, answer_question
 from core.answering.corpus import load_corpus
+from core.answering.estate import answer_estate_question
+from core.evals.estate_fixtures import load_estate_records
 from core.evals.judge import load_seed_set
 from core.evals.scoring import LIVE_MODEL, GovernedSubject
 from core.evals.suites import EvalCase, load_pack_cases
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+class _Replay:
+    """Hands the path exactly what the live provider already returned, so one call serves both."""
+
+    def __init__(self, candidates: list[dict[str, object]]) -> None:
+        self._candidates = candidates
+
+    def answer(self, question: str, records: tuple[object, ...]) -> list[dict[str, object]]:
+        return self._candidates
 
 
 def main() -> int:
@@ -122,6 +134,40 @@ def main() -> int:
                 f"{suite}: the path {answer.disposition} where {expectation} was expected. "
                 f"Dropped claims: {list(answer.dropped)[:2]}. A declining citation case usually "
                 f"means invented anchors; an answering decline case means the pin is not binding"
+            )
+
+    # 5. The ESTATE path against a real model (025). A model that invents a record id reads as a
+    # confident answer that declines — invisible in a verdict, obvious here.
+    estate = load_estate_records(ROOT / "packs" / "vault")
+    estate_case = load_pack_cases(ROOT / "packs" / "vault", "estate_state")[0]
+    print(f"--- estate path, case {estate_case.id}")
+    print(f"    question : {estate_case.prompt}")
+    print(f"    expects  : {list(estate_case.events)}")
+    try:
+        candidates = LiveEstateProvider(ids_to_hashes=estate.ids_to_hashes).answer(
+            estate_case.prompt, estate.records
+        )
+    except ProviderUnavailable as exc:
+        print(f"    PROVIDER FAULT: {exc}\n")
+        failures.append(f"estate: the provider raised — {exc}")
+        candidates = []
+    for candidate in candidates[:3]:
+        print(f"    claim: {str(candidate.get('statement', ''))[:160]!r}")
+        for ref in candidate.get("references", []) or []:
+            digest = str(ref.get("entry_hash", ""))
+            name = estate.hashes_to_ids.get(digest, digest)
+            mark = "resolves" if digest in estate.hashes_to_ids else "DOES NOT RESOLVE"
+            print(f"      → {name}  [{mark}]")
+    if candidates:
+        estate_answer = answer_estate_question(
+            question=estate_case.prompt, records=estate.records, provider=_Replay(candidates)
+        )
+        reason = estate_answer.declined_reason or "answered"
+        print(f"    disposition: {estate_answer.disposition} ({reason})\n")
+        if estate_answer.disposition != "answered":
+            failures.append(
+                f"estate: the path {estate_answer.disposition} on a case the fixture estate "
+                f"supports — dropped {list(estate_answer.dropped)[:2]}. Usually an invented id"
             )
 
     if failures:

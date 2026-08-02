@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: Apache-2.0
+# terraform pack — the arranged estate the `estate_state` cases ask about.
+# See packs/vault/evals/estate_records.toml for why ids are authored and why there is no pin.
+
+[[records]]
+id = "rec-tf-001"
+event_type = "run_start"
+correlation_id = "run-staging-plan"
+payload = { subject_user_id = "alice", agent_definition_id = "planner" }
+
+[[records]]
+id = "rec-tf-002"
+event_type = "authority_denied"
+correlation_id = "run-staging-plan"
+payload = { subject_user_id = "alice", reason_code = "workspace_out_of_scope", tool = "terraform_apply" }
+
+[[records]]
+id = "rec-tf-003"
+event_type = "tool_outcome"
+correlation_id = "run-staging-plan"
+payload = { subject_user_id = "alice", tool = "terraform_plan", outcome = "allow" }
+
+[[records]]
+id = "rec-tf-004"
+event_type = "run_resumed"
+correlation_id = "run-prod-apply"
+payload = { subject_user_id = "bob", attempt = 1, awaiting = "terraform" }
+
+[[records]]
+id = "rec-tf-005"
+event_type = "effect_observed"
+correlation_id = "run-prod-apply"
+payload = { subject_user_id = "bob", tool = "terraform_apply", outcome = "allow" }

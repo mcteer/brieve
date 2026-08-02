@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+# vault pack — the arranged estate the `estate_state` cases ask about.
+#
+# **NEW IN 025, and it replaces a fiction.** The old suite had no estate at all: the live lane
+# built one by concatenating the cases' own `recorded` strings into an unlabelled list, and
+# FR-012's run found the model correctly refusing to answer from it — nothing said which line
+# described what. See contracts/conformance.md § FR-012 finding.
+#
+# **Authored ids, never content hashes.** `id` is what a case cites. The loader computes each
+# record's entry hash and maps id → hash; the scorer translates before resolving. A hash written
+# by hand would be unwritable in practice and invalidated by any edit to the record it names.
+#
+# **No digest pin, deliberately.** The corpus carries one because it is vendored from a third
+# party and can drift silently. This is authored fixture material — there is no third party to
+# drift from, and a pin would imply a provenance it does not have.
+
+[[records]]
+id = "rec-vault-001"
+event_type = "run_start"
+correlation_id = "run-nightly-apply"
+payload = { subject_user_id = "alice", agent_definition_id = "applier" }
+
+[[records]]
+id = "rec-vault-002"
+event_type = "authority_denied"
+correlation_id = "run-nightly-apply"
+payload = { subject_user_id = "alice", reason_code = "ceiling_exceeded", tool = "vault_write" }
+
+[[records]]
+id = "rec-vault-003"
+event_type = "tool_outcome"
+correlation_id = "run-nightly-apply"
+payload = { subject_user_id = "alice", tool = "vault_read", outcome = "allow" }
+
+[[records]]
+id = "rec-vault-004"
+event_type = "authority_issued"
+correlation_id = "run-rotation"
+payload = { subject_user_id = "bob", tool = "vault_write", ttl_seconds = 900 }
+
+[[records]]
+id = "rec-vault-005"
+event_type = "run_stopped"
+correlation_id = "run-rotation"
+payload = { subject_user_id = "bob", outcome = "stopped", reason_code = "operator_request" }

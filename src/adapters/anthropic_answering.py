@@ -173,4 +173,94 @@ class LiveAnswerProvider:
         return [item for item in parsed if isinstance(item, dict)]
 
 
-__all__ = ["LiveAnswerProvider", "SECTIONS_OFFERED"]
+__all__ = ["LiveAnswerProvider", "LiveEstateProvider", "SECTIONS_OFFERED"]
+
+
+_ESTATE_INSTRUCTION: Final[str] = (
+    "You answer questions about what a governed agent platform actually did, using ONLY the audit "
+    "records supplied below. You have no tools and take no actions.\n\n"
+    "Reply with a JSON array and nothing else. Each element is an object with:\n"
+    '  "statement": one factual sentence about what the records show\n'
+    '  "references": a list of {"id": ...} naming the records the statement rests on\n\n'
+    "Rules that matter more than being helpful:\n"
+    "- Cite only ids that appear below. Never invent one.\n"
+    "- REPORT, never adjudicate. Say what the records show; do not say anything is compliant, "
+    "passing, healthy, or safe — that judgement is the reader's and you have no standing to make "
+    "it.\n"
+    "- If the records do not support an answer, reply with exactly: []\n"
+    "- An empty array is a correct and expected answer.\n"
+    "- ANSWER THE QUESTION ASKED. Cite only the records the answer rests on; do not add "
+    "surrounding context, do not summarise the rest of the estate, and do not mention records "
+    "that merely happen to be nearby. Asked which runs were denied, cite the denials — not the "
+    "runs that were not denied, and not what else those runs did."
+)
+
+
+class LiveEstateProvider:
+    """Asks a real model about real records. Behind `@pytest.mark.live_model`, never in a gate.
+
+    **The records are offered as structured entries, not as prose.** The suite this replaces
+    grounded the model with an unlabelled list of sentences, and FR-012's run found it correctly
+    refusing to answer — nothing said which line described what. Each record here carries its id,
+    its event type and its payload, so a question about denials is answerable from an entry that
+    says it is a denial.
+
+    Ids in, hashes out: the model cites `rec-vault-002` and this translates, for the same reason
+    the recorded provider does — a content hash is unwritable by hand and meaningless to a model.
+    """
+
+    def __init__(self, *, ids_to_hashes: dict[str, str], model: str = LIVE_MODEL) -> None:
+        self._ids = ids_to_hashes
+        self._hashes_to_ids = {h: i for i, h in ids_to_hashes.items()}
+        self._model = model
+
+    def answer(self, question: str, records: tuple[Any, ...]) -> list[dict[str, Any]]:
+        if not records:
+            return []
+
+        offered = "\n\n".join(
+            f"--- id: {self._hashes_to_ids.get(record.entry_hash, '?')}\n"
+            f"--- event: {record.event_type}\n"
+            f"--- correlation: {record.correlation_id}\n"
+            f"--- payload: {json.dumps(record.payload, sort_keys=True)}"
+            for record in records
+        )
+        client, api_model = client_and_model(self._model)
+        response = client.messages.create(  # type: ignore[attr-defined]
+            model=api_model,
+            max_tokens=4096,
+            system=_ESTATE_INSTRUCTION,
+            messages=[
+                {"role": "user", "content": f"Question: {question}\n\nAudit records:\n\n{offered}"}
+            ],
+        )
+        text = "".join(str(getattr(block, "text", "")) for block in response.content)
+        if not text.strip():
+            raise ProviderUnavailable(
+                "the model returned no text; a provider fault is deliberately not shaped like a "
+                "decline"
+            )
+
+        start, end = text.find("["), text.rfind("]")
+        if start < 0 or end < start:
+            raise ProviderUnavailable("the model answered unusably: no JSON array in the response")
+        try:
+            parsed = json.loads(text[start : end + 1])
+        except json.JSONDecodeError as exc:
+            raise ProviderUnavailable(f"the model's JSON did not parse: {exc}") from exc
+        if not isinstance(parsed, list):
+            raise ProviderUnavailable("the model answered with something other than a JSON array")
+
+        claims: list[dict[str, Any]] = []
+        for item in parsed:
+            if not isinstance(item, dict):
+                continue
+            references = [
+                # An id the fixture does not contain resolves to nothing, and the path drops the
+                # claim — which is precision failing, exactly as it should.
+                {"entry_hash": self._ids.get(str(ref.get("id")), f"unresolvable:{ref.get('id')}")}
+                for ref in item.get("references", [])
+                if isinstance(ref, dict)
+            ]
+            claims.append({"statement": str(item.get("statement", "")), "references": references})
+        return claims
