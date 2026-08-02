@@ -98,7 +98,10 @@ never calling the vendor.
       `ask_authority` and deliberately no provider): per ask, fetch the key through
       `BrokeredModelCredential`, then construct `LiveAnswerProvider(model, api_key=key)` (and the
       estate provider likewise), used and dropped — no surface attribute ever holds a key.
-      `McpTransport` gains the same `credential_source`. Parity by construction (ADR-0033).
+      **The fetch is per ASK, not per surface construction** (analysis P4-2): a `served.py` that
+      built one reader result and reused it across asks would pass T005's isolated no-cache row
+      and still hold a key too long. `McpTransport` gains the same `credential_source`. Parity by
+      construction (ADR-0033).
 - [ ] T012 [US1] Fixture plumbing in `tests/harness/api_fixtures.py`: `surface_under_test` gains
       `credential_source`, shared by both surfaces; add `available_credential(key=...)` (a source
       returning a fixed key + reference) and the default `None`. **The default refuses** — a
@@ -108,7 +111,9 @@ never calling the vendor.
       `tests/conformance/answering/test_model_credential_posture.py`: with a qualified cell and
       **no** credential source, the ask refuses `credential_unavailable` and the provider is
       **never called** (counted at a `CountingProvider`); with a source, it answers and the record
-      carries the reference.
+      carries the reference. **And two asks produce two fetches** (analysis P4-2) — a counting
+      credential source observes one read per ask, so a surface caching a key across asks fails
+      here rather than only under a live enclave.
 - [ ] T014 [US1] [GATE:fail-closed] **The no-env-fallback row**, same file — and it is the row
       three features' silence would have needed: set `EVAL_PROVIDER_API_KEY` in the environment,
       arrange a qualified cell and **no** credential source, and assert the ask **still refuses
@@ -130,13 +135,21 @@ never calling the vendor.
       explicitly — never ambient env. A fixture model fetches nothing (the existing path,
       unchanged). This is the run half of "both paths, one reader"; without it T017 asserts a
       call site that does not exist.
-- [ ] T017 [US1] [GATE:conformance] Both-paths-one-**credential-mechanism** (analysis C1 — the
-      *providers* differ by path and always have: the ask path builds `LiveAnswerProvider`, the
-      run path uses `ModelChooser`; unifying those is not the design and no task should hunt for
-      it). What is one is the **credential reader**: an ask and a run binding a non-fixture model
-      both obtain their key through `BrokeredModelCredential`. The row reads the fetch call in
-      `ask.py`/`served.py` and in `entrypoint.py` and asserts one reader type — SC-002, FR-003,
-      scoped to the credential, not the provider.
+- [ ] T016b [US1] [GATE:conformance] The run-path fetch, **behaviourally, in the enclave lane**
+      (analysis P4-1 — `_run_task` needs an attested workload identity, so this cannot be
+      hermetic; it belongs beside `test_dispatched_end_to_end.py`'s enclave rows): a dispatched
+      run binding a **non-fixture** model fetches through `BrokeredModelCredential` before
+      `build_chooser`, and a fixture model fetches nothing. **Owed by name where the enclave lane
+      is run — Dan McTeer.** T017 asserts the reader is shared by inspection; this asserts the run
+      half actually fetches.
+- [ ] T017 [US1] [GATE:conformance] Both-paths-one-**credential-mechanism**, as a **hermetic
+      import/AST row** (analysis P4-1 — the run path only runs under `@pytest.mark.enclave`, so a
+      single conformance row cannot exercise both halves). The *providers* differ by path and
+      always have (`LiveAnswerProvider` vs `ModelChooser` — unifying them is not the design). What
+      is one is the **credential reader**: this row parses `served.py`/`ask.py` and
+      `entrypoint.py` and asserts both name `BrokeredModelCredential` and no other credential
+      source — the "one reader" claim, checkable without running either path (SC-002, FR-003,
+      scoped to the credential). The *behavioural* run-path half is T016a's, in the enclave lane.
 
 **Checkpoint**: the MVP — an ask obtains a credential per task, records its reference, and refuses
 without one, on both surfaces, never leaking and never falling back.
@@ -211,6 +224,7 @@ check.
       `provider_unavailable` or as a provider fault depending on how the vendor answers a bad key;
       the design depends only on the fetch succeeding and the call being attempted). Seeded-and-
       marked over absent, because it exercises one more link.
+
 - [ ] T026 [GATE:conformance] The readability row in `tests/conformance/identity/`: `mcp-surface`
       and the run role read `model-credentials/<vendor>` against the live fabric (as-applied,
       `test_matrix_is_readable` pattern).
@@ -233,7 +247,7 @@ check.
 ```text
 Phase 1 (T001-T002, measurements)
   → Phase 2 (T003→T004→T005 ∥ T006→T007→T008)
-    → Phase 3 / US1 (T009→T010→T011→T012 → T013,T014,T015,T016,T016a,T017)
+    → Phase 3 / US1 (T009→T010→T011→T012 → T013,T014,T015,T016,T016a,T016b,T017)
       → Phase 4 / US2 (T018→T019)                    [needs the wired fetch]
       → Phase 5 / US3 (T020→T021→T022, T023)          [the amendment, gated by T022]
         → Phase 6 (T024∥T025 → T026; T027∥T028; T029→T030 last)
@@ -263,7 +277,7 @@ makes the posture a stated and checked fact. The named runs (T029, T030) and the
 ## Notes
 
 - **Gate types**: fail-closed (T004, T005, T013, T014), conformance (T006, T015, T017, T018, T022,
-  T026, T029), no-secret-leak (T016). Run-path fetch: T016a. Eval gate: none — no suite changes, no cell qualified.
+  T026, T029), no-secret-leak (T016). Run-path fetch: T016a (wiring, hermetic) + T016b (behaviour, enclave lane). Eval gate: none — no suite changes, no cell qualified.
 - **Sealed core**: one task (T006), review gating the PR.
 - **The constitution amendment is a deliverable** (T020, T021, T022), not a follow-up — the single
   most important structural fact about this feature.
