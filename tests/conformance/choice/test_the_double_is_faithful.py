@@ -15,12 +15,13 @@ is recorded rather than closed.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import pytest
 
 from adapters.model_chooser import build_chooser, to_model_string
-from core.choice import ChoiceRequest, ChooserUnavailable
+from core.choice import CHOICE_ROLE, ChoiceRequest, ChooserUnavailable
 from core.evals.scoring import EVAL_PROVIDER_KEY, LIVE_MODEL
 from tests.harness.scripted_chooser import FIXTURE_MODEL, recording
 
@@ -42,10 +43,25 @@ def test_the_merge_lane_needs_no_provider() -> None:
     """FR-011, SC-006 — every model the blocking lane reaches replays a recording.
 
     Two things are checked, and the second is the one that could rot. The first: a fixture
-    chooser answers without a credential present. The second: the *matrix the enclave ships*
-    qualifies only `fixture/...` cells, so no dispatched row can reach a vendor even by
-    accident — a live cell added for a demonstration and left behind would make the merge
-    gate depend on a vendor without anyone changing a test.
+    chooser answers without a credential present. The second: the matrix the enclave ships
+    qualifies no live cell **in a role a dispatched run resolves**, so no dispatched row can
+    reach a vendor even by accident — a live cell added for a demonstration and left behind
+    would make the merge gate depend on a vendor without anyone changing a test.
+
+    **Narrowed from "no live cell at all" when the first one was earned** (2026-08-02). The
+    original wording forbade every live cell in the enclave, which read as the same protection
+    and is not: a dispatched run resolves `CHOICE_ROLE` — `plan` — and nothing else. An `ask`
+    cell is structurally unreachable from a dispatch, and role isolation is not assumed here,
+    it is asserted by `test_a_cell_qualified_for_another_role_authorises_nothing`.
+
+    The distinction matters because the broad form had a cost the narrow one does not: it made
+    *earning a cell* and *shipping the enclave* mutually exclusive, so the first clean
+    `make evals-live` run in this repository's history could not be recorded anywhere without
+    turning a merge gate red. A gate that forbids the outcome it was written to protect gets
+    deleted, and then nothing checks the thing that actually mattered.
+
+    What still fails: a live cell in `plan`, `write`, `judge` or `summarize`. `write` most of
+    all — a model permitted to make changes is the one the enclave must never reach by accident.
     """
     chooser = build_chooser(FIXTURE_MODEL, recording=recording("vault_write", "vault_read"))
     request = ChoiceRequest(task=FIXTURE_TASK, permitted=FIXTURE_PERMITTED, step_index=0, attempt=0)
@@ -54,10 +70,23 @@ def test_the_merge_lane_needs_no_provider() -> None:
     variables = (ROOT / "infra/environments/dev/variables.tf").read_text()
     matrix = variables.split('variable "model_matrix_cells"', 1)
     assert len(matrix) == 2, "the dev environment no longer declares model_matrix_cells"
-    assert 'qualified_by = "live"' not in matrix[1], (
-        "a LIVE matrix cell ships in the dev enclave, so a dispatched conformance row could "
-        "reach a vendor — the merge lane would then fail for reasons unrelated to the code, "
-        "which is how a gate stops being run"
+
+    # Each declared cell as a block, so `role` and `qualified_by` are read together rather than
+    # searched for independently. Reading them apart is what made the original check coarse.
+    blocks = re.findall(r"\{[^{}]*qualified_by[^{}]*\}", matrix[1])
+    assert blocks, "no matrix cells parsed; this check would pass over an empty enclave"
+
+    reachable = []
+    for block in blocks:
+        role = re.search(r'role\s*=\s*"([^"]+)"', block)
+        if 'qualified_by = "live"' in block and role and role.group(1) != "ask":
+            reachable.append(role.group(1))
+
+    assert not reachable, (
+        f"a LIVE matrix cell ships in the dev enclave for {reachable}, a role a dispatched run "
+        f"resolves ({CHOICE_ROLE!r} is the one it consults) — so a conformance row could reach a "
+        f"vendor and the merge lane would fail for reasons unrelated to the code, which is how a "
+        f"gate stops being run"
     )
 
 
