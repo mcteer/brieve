@@ -246,3 +246,47 @@ def test_the_live_lane_scores_only_suites_it_can_score() -> None:
         "the answering suites are the ask cell's qualification; dropping them from the live "
         "lane would leave that cell qualified by nothing"
     )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="FR-011b (025): `match` is a substring check, so it cannot fail an answer that "
+    "contains the recorded text PLUS an invention. 025's fidelity scoring makes this pass; "
+    "the marker is removed then, and the row stays to guard the fix.",
+)
+def test_match_scoring_fails_an_answer_that_invents() -> None:
+    """The measurement 025's plan rests on, kept executable rather than asserted.
+
+    **Precision has no representation in the `match` verb.** `_judge_response` asks whether
+    `case.recorded` appears in the response — so a response that reproduces the record faithfully
+    and then adds a workspace nobody has passes, and a suite scoring estate answers this way would
+    pass a platform that invents parts of your estate as long as it also said the true thing.
+
+    Recall is covered (omit the recorded text and the substring is absent); precision is not.
+    That asymmetry is why 025 scores surviving references with `score_fidelity` instead, where
+    `invented` and `missing` are separate outcomes.
+    """
+    case = EvalCase(
+        id="precision-probe",
+        suite="estate_state",
+        prompt="Which workspaces violate the control?",
+        expected="match",
+        recorded="workspace-a violates the control, per the estate record.",
+    )
+    invents = case.recorded + " So does workspace-zzz, which does not exist."
+
+    result = run_suite("estate_state", (case,), subject=SUBJECT, scorer=_FixedResponse(invents))
+    assert not result.passed, (
+        "an answer containing the record AND an invention was scored as a pass — precision is "
+        "unrepresented in the `match` verb"
+    )
+
+
+class _FixedResponse:
+    """Returns one response regardless of the case — the smallest scorer that can probe a verb."""
+
+    def __init__(self, response: str) -> None:
+        self._response = response
+
+    def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
+        return self._response

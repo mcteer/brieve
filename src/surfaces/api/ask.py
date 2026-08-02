@@ -19,9 +19,14 @@ from pydantic import BaseModel, ConfigDict
 from core.answering.answer import ANSWERED, ProviderUnavailable, answer_question
 from core.answering.corpus import Corpus, CorpusUnavailable
 from core.answering.record import record_ask
+from core.answering.routing import Route
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
 from surfaces.api.dependencies import AuditDep, SubjectDep
+
+#: The source an ask consulted, for the record. 025 adds estate routing; until the
+#: estate branch lands, every ask that reaches this module consulted the corpus.
+GUIDANCE_SOURCE = str(Route.GUIDANCE)
 
 
 def ask_for(
@@ -49,6 +54,7 @@ def ask_for(
         corpus_digest=answer.corpus_digest,
         model=model,
         disposition=answer.disposition,
+        source=GUIDANCE_SOURCE,
     )
 
     if answer.disposition != ANSWERED:
@@ -117,6 +123,7 @@ def build_router(*, provider: Any = None, model: str = "unconfigured") -> APIRou
                 corpus_digest=corpus.digest,
                 model="unconfigured",
                 disposition="provider_unavailable",
+                source=GUIDANCE_SOURCE,
             )
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,

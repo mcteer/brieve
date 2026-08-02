@@ -30,8 +30,18 @@ def record_ask(
     corpus_digest: str,
     model: str,
     disposition: str,
+    source: str,
 ) -> None:
-    """Write the ask record, or fail the ask."""
+    """Write the ask record, or fail the ask.
+
+    ``source`` is **required, with no default** (025). A default would mean every call site that
+    forgot it silently claimed the corpus, and the field exists precisely because asking now
+    happens in one place and the platform decides the door — which is unrecoverable from the rest
+    of the payload. 022 made audit dispositions required for the same reason.
+
+    ``corpus_digest`` is the **identity of what was consulted**: the corpus pin for guidance, the
+    evidence-access stream's correlation id for estate. See `AuditEventType.ASK_ANSWERED`.
+    """
     try:
         audit.append_event(
             correlation_id=ask_stream_for(subject.tenant_id),
@@ -45,6 +55,8 @@ def record_ask(
                 # and Principle IX, and `MODEL_GATE` already keeps that distinction for runs.
                 "model": model,
                 "disposition": disposition,
+                # WHICH door was opened. Not derivable from anything else in the payload.
+                "source": source,
             },
         )
     except Exception as exc:  # noqa: BLE001 — an unrecorded ask must not stand

@@ -80,3 +80,46 @@ def test_the_path_cannot_reach_a_tool_at_all() -> None:
 
     offending = [m for m in imported if any(w in m for w in ("registry", "authority", "tools"))]
     assert not offending, f"the answering path can reach {offending}"
+
+
+#: Every module of the answering path. Named individually rather than globbed, so a NEW module
+#: joining the package is a deliberate addition to this list rather than something the check
+#: silently starts or stops covering.
+ANSWERING_MODULES = (
+    "src/core/answering/answer.py",
+    "src/core/answering/corpus.py",
+    "src/core/answering/record.py",
+    "src/core/answering/streams.py",
+)
+
+
+def _imports_of(module: str) -> set[str]:
+    tree = ast.parse(pathlib.Path(module).read_text())
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+        elif isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+    return imported
+
+
+@pytest.mark.parametrize("module", ANSWERING_MODULES)
+def test_the_answering_path_fetches_nothing_for_itself(module: str) -> None:
+    """The one-door premise, as a permanent invariant rather than a passing observation (025 T002).
+
+    **The path is handed its material; it never goes and gets it.** `answer_question` receives a
+    `Corpus`; when 025 adds estate answering, `answer_estate_question` receives the *records* — the
+    result of a read the surface performed through the one governed door, bounded by the asker.
+
+    That is what makes the bounding structural. A module here that imported `core.audit.query` or a
+    store could read whatever it liked, and every scope guarantee would become a review of whether
+    it happened to. So this row is not a baseline that 025 moves — it is the property 025 depends
+    on, asserted before the feature that needs it exists.
+    """
+    forbidden = ("audit.query", "audit.postgres", "durability", "dependencies.store", "pg8000")
+    reaching = [m for m in _imports_of(module) if any(w in m for w in forbidden)]
+    assert not reaching, (
+        f"{module} fetches its own material ({reaching}) — the answering path must be HANDED "
+        f"what it may see, or scope becomes a matter of what it chose to read"
+    )

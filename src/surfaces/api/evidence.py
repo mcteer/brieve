@@ -67,6 +67,7 @@ def read_evidence_for(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
     limit: int = 1000,
+    event_types: frozenset[AuditEventType] | None = None,
 ) -> tuple[list[AuditEntry], EvidenceDisposition]:
     """The governed read, independent of transport.
 
@@ -74,6 +75,12 @@ def read_evidence_for(
     asks for the same verdict on every transport, and two implementations agreeing by
     inspection would make that a measure of how carefully they were written — which is
     exactly what a conformance row cannot check.
+
+    ``event_types`` (025) narrows the read to the entry types the caller may see, and it exists so
+    that **estate answering bounds the query rather than filtering the results**: out-of-scope
+    entries are never read, and the access record below shows the narrowed request an investigator
+    needs. Like every other field here it can only **narrow** — ``None`` is exactly today's read,
+    which is what `GET /evidence` and the MCP evidence operation continue to pass.
     """
     request = EvidenceQueryRequest(
         # From the subject. Not accepted from any caller, on any transport.
@@ -83,6 +90,7 @@ def read_evidence_for(
         start_time=start_time,
         end_time=end_time,
         limit=limit,
+        event_types=event_types,
     )
     entries = query.search(request)
     disposition = _disposition(entries, request, query)

@@ -21,13 +21,13 @@ change carries its review obligation** (T007 → contract row, review before mer
 the two measurements the plan's claims rest on, pinned as executable checks before anything is
 built on them.
 
-- [ ] T001 Pin the substring-scorer finding in `tests/component/test_eval_gates.py`: a test
+- [X] T001 Pin the substring-scorer finding in `tests/component/test_eval_gates.py`: a test
       asserting the FR-011b-**correct** behaviour — a `match`-scored response containing the
       recorded text plus an invented workspace must fail — marked `xfail(strict=True)` with a
       reason naming FR-011b, because today it passes (research F5's measurement). When T026
       lands, strict xfail turns the xpass into an error, and T026 removes the **marker**, not the
       test — the row then guards the fix forever.
-- [ ] T002 [P] Confirm the one-door premise: extend
+- [X] T002 [P] Confirm the one-door premise: extend
       `tests/conformance/answering/test_asking_never_acts.py` with an import row asserting
       `core.answering` (as it stands, pre-estate) imports neither `core.audit.query` nor any
       store — the baseline the estate path will deliberately change in one place only (via
@@ -39,11 +39,11 @@ built on them.
 **Blocking for every story**: US1 needs scope and routing; US2 needs routing and the estate path;
 US3 scores what these produce.
 
-- [ ] T003 Create `src/core/answering/routing.py`: `Route` (`guidance` / `estate` / `neither`),
+- [X] T003 Create `src/core/answering/routing.py`: `Route` (`guidance` / `estate` / `neither`),
       `route(question) -> Route`, closed vocabulary constants beside the router. Deterministic —
       no state, no randomness, no model. Ties break toward `estate`, with the plan's
       visible-failure rationale in the docstring (Complexity Tracking row 1).
-- [ ] T004 [P] Create `src/core/answering/scope.py`: the role → visible-`AuditEventType` map and
+- [X] T004 [P] Create `src/core/answering/scope.py`: the role → visible-`AuditEventType` map and
       `visible_event_types(roles) -> frozenset[AuditEventType]`. Union across roles; empty union
       is a refusal the caller performs (FR-004c) — this module computes, it does not raise, so the
       refusal lives beside the read where the trail can see it. **Initial keys, named with
@@ -54,31 +54,31 @@ US3 scores what these produce.
       events. Two keys with genuinely different visibility, because a map with one class would
       make SC-001's differential row unarrangeable — the map having at least two classes is what
       the row measures. Any role not in the map contributes nothing (already the FR-004c rule).
-- [ ] T005 [GATE:fail-closed] Component rows for routing in
+- [X] T005 [GATE:fail-closed] Component rows for routing in
       `tests/component/test_ask_routing.py`: estate-shaped → `estate`, guidance-shaped →
       `guidance`, fits-neither → `neither` (never coerced — the spec's "decline, not a coin flip"
       edge case), the both-shaped tie → `estate`, and determinism (same question, same route,
       repeated).
-- [ ] T006 [P] [GATE:fail-closed] Component rows for scope in
+- [X] T006 [P] [GATE:fail-closed] Component rows for scope in
       `tests/component/test_estate_scope.py`: union across roles; unknown role contributes
       nothing; **empty roles produce the empty set** that T014 must refuse on; the map's domain is
       the closed enum (a test that fails if a mapping names a nonexistent event type).
-- [ ] T007 [GATE:conformance] **SEALED CORE** — extend `AuditEventType.ASK_ANSWERED`'s docstring
+- [X] T007 [GATE:conformance] **SEALED CORE** — extend `AuditEventType.ASK_ANSWERED`'s docstring
       and payload contract in `src/core/audit/schema.py`: payload gains `source`
       (`guidance` / `estate` / `neither`), and `corpus_digest`'s documented meaning generalises to
       *identity of what was consulted* (estate asks carry the evidence-access **stream's** correlation
       id — data-model.md § ASK_ANSWERED, per analysis U2). Update `src/core/answering/record.py`'s `record_ask` to
       require `source`. **Principle V review: Dan McTeer, before merge** — already declared in
       plan.md and contracts/conformance.md; this task is the change it reviews.
-- [ ] T008 [P] Extend the pinned-digest row in `tests/unit/test_audit_chain.py` for the payload
+- [X] T008 [P] Extend the pinned-digest row in `tests/unit/test_audit_chain.py` for the payload
       contract change, the same way 024 pinned `ask_answered` itself — the sealed-core diff and
       its test move together or the review has nothing to hold.
-- [ ] T009 Thread `source` through the existing guidance path: `src/surfaces/api/ask.py` and
+- [X] T009 Thread `source` through the existing guidance path: `src/surfaces/api/ask.py` and
       `src/surfaces/mcp/transport.py` pass `source="guidance"` (and `"neither"` on the unroutable
       decline once T015 lands); every existing `record_ask` call site updated in the same change —
       `make check` is the sweep that proves none was missed.
 
-- [ ] T009a [GATE:conformance] The one-door parameter (analysis I1): `read_evidence_for` in
+- [X] T009a [GATE:conformance] The one-door parameter (analysis I1): `read_evidence_for` in
       `src/surfaces/api/evidence.py` gains `event_types: frozenset[AuditEventType] | None = None`,
       threaded into the request it builds; default `None` is byte-for-byte today's unnarrowed
       read. In the same change, a row in `tests/conformance/api/` asserts `GET /evidence` and the

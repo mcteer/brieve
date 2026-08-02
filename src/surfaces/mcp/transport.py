@@ -211,6 +211,7 @@ class McpTransport:
                 corpus_digest=corpus.digest,
                 model="unconfigured",
                 disposition="provider_unavailable",
+                source="guidance",
             )
             return McpResult(
                 ok=False, status=503, payload={"reason": "no model is configured for `ask`"}
