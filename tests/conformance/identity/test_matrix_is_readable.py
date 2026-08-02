@@ -135,21 +135,35 @@ def test_both_model_calling_roles_can_read_the_model_credential_path() -> None:
     )
 
 
-def test_the_model_credential_placeholder_is_seeded_and_says_it_is_not_a_credential() -> None:
-    """The dev seed, and the reason it is a dud rather than a real key or nothing at all.
+def test_the_model_credential_record_is_present_readable_and_versioned() -> None:
+    """What the enclave must hold for an ask to reach a vendor — and nothing about its value.
 
-    Seeded because it exercises one more link than absence does: the fetch succeeds, so the mount,
-    the policy, the attested read and the provider construction are all proven without a real key
-    existing in dev. Marked because a plausible-looking placeholder is worse than none — somebody
-    would eventually wonder whether it was real, and treat the path as sensitive when it is not.
+    **Rewritten when the enclave got a real credential.** The first version asserted the record
+    began with `PLACEHOLDER-NOT-A-CREDENTIAL`, which was right while Terraform seeded a dud and
+    became wrong the moment somebody wrote a working key: the row would have failed on the enclave
+    working correctly, and the obvious repair — put the dud back — would have broken the thing it
+    was meant to protect.
+
+    So it asserts the three properties an ask actually depends on, none of which is the value: the
+    record exists, it carries a non-empty `api_key`, and KV v2 is versioning it so the trail's
+    `@v<n>` reference means something. A row that read further would be a row that logs a
+    credential to make a point about credentials.
     """
     body = _vault("model-credentials/data/anthropic")
-    assert body is not None, "the dev placeholder credential is not seeded"
-    value = str(body.get("data", {}).get("data", {}).get("api_key", ""))
-    assert value.startswith("PLACEHOLDER-NOT-A-CREDENTIAL"), (
-        "the dev record holds something that is not the marked placeholder. If a real key was "
-        "written here deliberately, this row is the wrong place to find that out — rotate it and "
-        "keep dev on the dud"
+    assert body is not None, (
+        "no model credential is stored for anthropic; every ask through a configured surface "
+        "will refuse `credential_unavailable`"
+    )
+    data = body.get("data", {})
+    assert str(data.get("data", {}).get("api_key", "")).strip(), (
+        "the record exists and carries no key; the fetch refuses `credential_unavailable` rather "
+        "than handing an empty string to a vendor, which would report a credential problem as a "
+        "vendor problem"
+    )
+    version = data.get("metadata", {}).get("version")
+    assert isinstance(version, int) and version >= 1, (
+        "the record carries no KV version, so `model_authority` cannot say which rotation "
+        "generation authorised a call — which is the whole reason the reference carries one"
     )
 
 

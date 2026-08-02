@@ -588,3 +588,36 @@ def test_a_checkpoint_cannot_carry_the_credential_and_a_resume_refetches() -> No
         "one of the run paths no longer builds its chooser through `_chooser_for`; a path that "
         "constructed one directly would skip the credential fetch, or reuse one across allocations"
     )
+
+
+def test_both_surface_jobspecs_ship_the_corpus_a_guidance_ask_reads() -> None:
+    """The last link, and the fifth defect of the same class this feature found.
+
+    A deployed guidance ask loads the pinned corpus. Neither surface jobspec copied it into the
+    allocation — they copy `src` and nothing else — so **every guidance ask through a deployed
+    surface answered 503 naming `corpus-sync`**, no matter how correct the credential, the cell,
+    and the binding were. Found by asking the running surface a question, which is the only thing
+    that could have found it: the corpus loads from the repository root in every test process.
+
+    Optional on purpose. An enclave whose operator has not synced a corpus still starts, and the
+    ask says which command to run. Copying unconditionally under `set -e` would turn a legible
+    503 into a surface that will not start, which is a worse answer to the same situation.
+    """
+    root = pathlib.Path(__file__).resolve().parents[3]
+    served = [
+        (spec.name, spec.read_text(encoding="utf-8"))
+        for spec in sorted((root / "infra/jobs").glob("*.nomad.hcl"))
+        if "surfaces.mcp.served" in spec.read_text(encoding="utf-8")
+        or "surfaces.api.service" in spec.read_text(encoding="utf-8")
+    ]
+    assert len(served) == 2, f"expected both answering surfaces, found {[n for n, _ in served]}"
+
+    for name, text in served:
+        assert "/src/corpus" in text, (
+            f"{name} does not copy the corpus into the allocation; every guidance ask through "
+            f"this surface will answer 503 regardless of credential, cell or binding"
+        )
+        assert "|| true" in text, (
+            f"{name} copies the corpus without tolerating its absence; an enclave with no synced "
+            f"corpus would fail to START rather than answering a 503 that names the fix"
+        )

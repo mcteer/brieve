@@ -230,11 +230,22 @@ variable "ask_binding" {
     guidance_cell = optional(string, "")
     estate_cell   = optional(string, "")
   })
-  # Both sources bound to the one seeded `ask` cell above. Per-source binding is what the
-  # record supports; one cell serving both is what a dev enclave with one fixture model has.
+  # **Bound to the live cell the eval lane earned**, not the fixture one.
+  #
+  # This is the second of the two decisions 027's cell promotion deliberately kept apart:
+  # qualifying a model and choosing to use it. The first was evidence — a clean full-lane run.
+  # This one is a choice, and it is the line where the dev enclave stops answering from a
+  # recording and starts answering from a model.
+  #
+  # Per-source binding is what the record supports; one cell serving both is what this enclave
+  # has, and pointing estate at the `vault` pack's cell is honest because the pack qualifies the
+  # ROLE — the estate suites were scored under `ask` for both packs in the same run.
+  #
+  # Reverting to `fixture:fixture/scripted@1:ask` turns the enclave back into one that needs no
+  # vendor at all, and nothing else has to change for that to work.
   default = {
-    guidance_cell = "fixture:fixture/scripted@1:ask"
-    estate_cell   = "fixture:fixture/scripted@1:ask"
+    guidance_cell = "vault:anthropic/claude-opus@5:ask"
+    estate_cell   = "vault:anthropic/claude-opus@5:ask"
   }
 }
 
