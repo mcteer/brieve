@@ -78,7 +78,7 @@ and refuses `credential_unavailable` when it cannot — the three-refusal order 
 credential answers and records `model_authority`; with none, it refuses `credential_unavailable`,
 never calling the vendor.
 
-- [ ] T009 [US1] The provider seam, at the depth it actually lives (analysis U1 — measured: the
+- [X] T009 [US1] The provider seam, at the depth it actually lives (analysis U1 — measured: the
       key is taken at construction, not per call). `client_and_model` in
       `src/adapters/anthropic_scorer.py` gains `api_key: str | None = None` (None keeps the
       `EVAL_PROVIDER_API_KEY` env path — the eval lane's, unchanged, FR-013). Then **all three
@@ -87,13 +87,13 @@ never calling the vendor.
       `api_key: str | None = None` and pass it to `client_and_model`; the `LiveModelScorer` path
       in `anthropic_scorer.py` likewise. `test_gates_live.py` constructs all of them — the sweep
       that proves none was missed. No production caller relies on the env branch.
-- [ ] T010 [US1] Wire the fetch into `src/surfaces/api/ask.py`: **after** `authorise_ask`
+- [X] T010 [US1] Wire the fetch into `src/surfaces/api/ask.py`: **after** `authorise_ask`
       resolves a cell and **before** the provider is built, `estate_answer_for` and the guidance
       branch obtain the credential through an injected `credential_source` (default `None` =
       refuse `credential_unavailable`); the built provider carries the fetched key; the answered
       record sets `model_authority` to the reference (SC-005, FR-007). Order: cell → credential →
       vendor, three refusals recorded via `record_ask` (SC-006, SC-008).
-- [ ] T011 [US1] `build_router`/`create_app` gain `credential_source`; **`served.py` gains the
+- [X] T011 [US1] `build_router`/`create_app` gain `credential_source`; **`served.py` gains the
       provider construction it does not have today** (analysis C1 — measured: it wires
       `ask_authority` and deliberately no provider): per ask, fetch the key through
       `BrokeredModelCredential`, then construct `LiveAnswerProvider(model, api_key=key)` (and the
@@ -102,31 +102,31 @@ never calling the vendor.
       built one reader result and reused it across asks would pass T005's isolated no-cache row
       and still hold a key too long. `McpTransport` gains the same `credential_source`. Parity by
       construction (ADR-0033).
-- [ ] T012 [US1] Fixture plumbing in `tests/harness/api_fixtures.py`: `surface_under_test` gains
+- [X] T012 [US1] Fixture plumbing in `tests/harness/api_fixtures.py`: `surface_under_test` gains
       `credential_source`, shared by both surfaces; add `available_credential(key=...)` (a source
       returning a fixed key + reference) and the default `None`. **The default refuses** — a
       fixture that auto-supplied a key would rebuild the loophole 026's fixture work exists to
       prevent, one layer down.
-- [ ] T013 [US1] [GATE:fail-closed] The headline row in
+- [X] T013 [US1] [GATE:fail-closed] The headline row in
       `tests/conformance/answering/test_model_credential_posture.py`: with a qualified cell and
       **no** credential source, the ask refuses `credential_unavailable` and the provider is
       **never called** (counted at a `CountingProvider`); with a source, it answers and the record
       carries the reference. **And two asks produce two fetches** (analysis P4-2) — a counting
       credential source observes one read per ask, so a surface caching a key across asks fails
       here rather than only under a live enclave.
-- [ ] T014 [US1] [GATE:fail-closed] **The no-env-fallback row**, same file — and it is the row
+- [X] T014 [US1] [GATE:fail-closed] **The no-env-fallback row**, same file — and it is the row
       three features' silence would have needed: set `EVAL_PROVIDER_API_KEY` in the environment,
       arrange a qualified cell and **no** credential source, and assert the ask **still refuses
       `credential_unavailable`**. A production path that fell back to the env key would pass every
       other row and fail only this one.
-- [ ] T015 [US1] [GATE:conformance] The three-refusal row: `unqualified_cell` (no matrix cell) ≠
+- [X] T015 [US1] [GATE:conformance] The three-refusal row: `unqualified_cell` (no matrix cell) ≠
       `credential_unavailable` (cell green, no credential) ≠ `provider_unavailable` (credential in
       hand, vendor raises), each recorded with its disposition, in the fixed order (SC-006).
-- [ ] T016 [US1] [GATE:no-secret-leak] The never-persisted/never-leaked row: a full answered ask,
+- [X] T016 [US1] [GATE:no-secret-leak] The never-persisted/never-leaked row: a full answered ask,
       then assert the key value appears in **no** trail payload, **no** returned response body, and
       the record carries the `vault:model-credentials/...@v<n>` reference instead. The asker's
       `subject_user_id` is present beside it (SC-004a — as-platform, but for-whom is answerable).
-- [ ] T016a [US1] Thread `credential_source` to the run path's fetch site (pass-2 P2-2 —
+- [X] T016a [US1] Thread `credential_source` to the run path's fetch site (pass-2 P2-2 —
       measured: `_run_task` in `src/surfaces/dispatch/entrypoint.py:353` already holds
       `credentials` and an identity fabric, and `resolve_bound_model` → `build_chooser` at
       line ~409 is where a non-fixture model would need a key). For a non-fixture resolved model,
@@ -142,7 +142,7 @@ never calling the vendor.
       `build_chooser`, and a fixture model fetches nothing. **Owed by name where the enclave lane
       is run — Dan McTeer.** T017 asserts the reader is shared by inspection; this asserts the run
       half actually fetches.
-- [ ] T017 [US1] [GATE:conformance] Both-paths-one-**credential-mechanism**, as a **hermetic
+- [X] T017 [US1] [GATE:conformance] Both-paths-one-**credential-mechanism**, as a **hermetic
       import/AST row** (analysis P4-1 — the run path only runs under `@pytest.mark.enclave`, so a
       single conformance row cannot exercise both halves). The *providers* differ by path and
       always have (`LiveAnswerProvider` vs `ModelChooser` — unifying them is not the design). What

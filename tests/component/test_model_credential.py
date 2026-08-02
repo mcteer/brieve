@@ -158,7 +158,7 @@ def test_the_reference_never_contains_the_key() -> None:
 def test_an_absent_record_refuses_credential_unavailable() -> None:
     credential = BrokeredModelCredential(read=_reader(None))
     with pytest.raises(ResolutionRefused) as refused:
-        credential.obtain(VENDOR).secret
+        credential.obtain(VENDOR)
     assert refused.value.reason_code == "credential_unavailable"
 
 
@@ -166,7 +166,7 @@ def test_a_record_without_the_key_field_refuses_rather_than_returning_empty() ->
     """An empty string would sail into a provider and fail as a vendor error — the wrong cause."""
     credential = BrokeredModelCredential(read=_reader({"data": {}, "metadata": {"version": 1}}))
     with pytest.raises(ResolutionRefused) as refused:
-        credential.obtain(VENDOR).secret
+        credential.obtain(VENDOR)
     assert refused.value.reason_code == "credential_unavailable"
 
 
@@ -178,7 +178,7 @@ def test_an_unreadable_store_refuses_distinguishably_from_an_absent_record() -> 
     """
     credential = BrokeredModelCredential(read=_reader(None, raises=ConnectionError("vault down")))
     with pytest.raises(ResolutionRefused) as refused:
-        credential.obtain(VENDOR).secret
+        credential.obtain(VENDOR)
     assert refused.value.reason_code == "fabric_unreachable"
 
 
@@ -197,4 +197,4 @@ def test_two_fetches_are_two_reads_and_never_share_cached_state() -> None:
     record["data"]["api_key"] = "second"
     record["metadata"]["version"] = 2
     assert credential.obtain(VENDOR).secret == "second"
-    assert len(reader.calls) == 2  # type: ignore[attr-defined]
+    assert len(reader.calls) == 2

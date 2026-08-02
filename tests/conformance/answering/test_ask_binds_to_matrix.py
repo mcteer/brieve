@@ -20,7 +20,11 @@ from fastapi.testclient import TestClient
 
 from core.answering.corpus import Corpus
 from core.authority.ask_binding import AskAuthority
-from tests.harness.api_fixtures import qualified_ask_authority, surface_under_test
+from tests.harness.api_fixtures import (
+    available_credential,
+    qualified_ask_authority,
+    surface_under_test,
+)
 
 GUIDANCE_QUESTION = "How does an AI agent obtain an identity with Vault?"
 ESTATE_QUESTION = "Which runs were denied last night?"
@@ -207,6 +211,9 @@ def test_a_binding_for_one_source_does_not_license_the_other() -> None:
             {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
             _cells(f"vault:{MODEL}:ask"),
         ),
+        # Guidance is bound and must ANSWER here, so it needs the credential too — governance
+        # passing is not authority to call a vendor (027).
+        credential_source=available_credential(),
     )
     client = TestClient(surface.app)
 

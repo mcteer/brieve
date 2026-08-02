@@ -56,11 +56,15 @@ def create_app(
     reconciler: Any | None = None,
     # 024. Absent by default, and the route is mounted regardless: a surface with no model
     # answers 503 rather than answering from the corpus alone, which FR-011a forbids.
-    ask_provider: Any | None = None,
+    # 027: a FACTORY, `(source, secret) -> provider`, called per ask. Absent means no model.
+    ask_providers: Any | None = None,
     ask_model: str = "unconfigured",
     # 026. Absent means every ask refuses `unbound` — a configured provider is not a
     # qualification, and Principle VIII permits model use only through a binding.
     ask_authority: Any | None = None,
+    # 027. Absent means every ask refuses `credential_unavailable` — a qualified cell is not
+    # authority to call a vendor, and the platform holds that authority nowhere but the store.
+    credential_source: Any | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -108,13 +112,14 @@ def create_app(
     # would make the operation snapshot depend on assembly — which 011 already paid for once.
     app.include_router(
         ask.build_router(
-            provider=ask_provider,
+            providers=ask_providers,
             model=ask_model,
             # 025: the ask path's estate half reads through the SAME governed query the
             # evidence operation uses. Passed rather than resolved, so both surfaces can
             # be shown to share it.
             evidence_query=evidence_query,
             ask_authority=ask_authority,
+            credential_source=credential_source,
         )
     )
     app.include_router(threads.build_router())

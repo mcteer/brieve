@@ -89,9 +89,9 @@ class BrokeredModelCredential:
         - ``credential_unavailable`` — no record, or a record carrying no key. An empty key would
           reach the vendor and come back as an authentication error, reporting a credential problem
           as a vendor problem.
-        - ``fabric_unreachable`` — the store itself did not answer. **Deliberately distinguishable**:
-          an outage is not a governance state, and collapsing the two would send someone to write a
-          credential that already exists, during an incident.
+        - ``fabric_unreachable`` — the store itself did not answer. **Deliberately
+          distinguishable**: an outage is not a governance state, and collapsing the two would
+          send someone to write a credential that already exists, during an incident.
         """
         path = f"{CREDENTIAL_PATH}/data/{vendor}"
         try:

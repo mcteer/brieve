@@ -25,12 +25,13 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
-from adapters.model_chooser import build_chooser
+from adapters.model_chooser import FIXTURE_PROVIDER, build_chooser
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.schema import AuditEventType
 from core.authority.clock import Clock, SystemClock
 from core.authority.errors import ResolutionRefused
 from core.authority.grant import DEFAULT_MAX_RUN_DURATION, issue_grant
+from core.authority.model_credential import BrokeredModelCredential
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
 from core.choice import (
@@ -404,6 +405,17 @@ def _chooser_for(
     class of refusal `manufacture` records under that event for `unqualified_cell` and
     `cell_withdrawn`, and a refusal nobody can see is indistinguishable from a run nobody
     attempted.
+
+    **The credential is obtained between those two steps** (027): after the cell is validated and
+    before anything is constructed. A fixture cell fetches nothing — there is no vendor to hold
+    authority for — which is why every blocking lane in this repository still runs with no model
+    credential at all (FR-011). A vendor cell that cannot obtain one refuses the run, recorded the
+    same way and for the same reason: proceeding would mean an allocation reaching a vendor the
+    platform holds no authority to call.
+
+    This is the run half of *"both paths, one reader"*. The answering path fetches per ask; here an
+    allocation **is** one task, so per-allocation and per-task are the same thing and the material
+    evaporates when the process does.
     """
     try:
         model = resolve_bound_model(identity_fabric, agent_definition_id=agent_definition_id)
@@ -427,7 +439,29 @@ def _chooser_for(
     # grants nothing, because the branch that consults it is chosen by the *matrix*, not by
     # the presence of the variable.
     recording = os.environ.get("RUN_CHOICE_RECORDING", "").strip()
-    return build_chooser(model, recording=recording), model
+
+    secret = ""
+    if not model.startswith(f"{FIXTURE_PROVIDER}/"):
+        vendor = model.split("/", 1)[0]
+        try:
+            secret = (
+                BrokeredModelCredential(read=identity_fabric.read_versioned).obtain(vendor).secret
+            )
+        except ResolutionRefused as exc:
+            _emit(
+                audit_sink,
+                correlation_id=correlation_id,
+                tenant_id=tenant_id,
+                event=AuditEventType.AUTHORITY_REFUSED,
+                payload={
+                    "run_id": run_id,
+                    "reason_code": str(getattr(exc, "reason_code", "") or "authority_refused"),
+                    "role": CHOICE_ROLE,
+                },
+            )
+            raise
+
+    return build_chooser(model, recording=recording, secret=secret), model
 
 
 def resume_dispatched_run(

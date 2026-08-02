@@ -20,7 +20,11 @@ from fastapi.testclient import TestClient
 from core.answering.corpus import Corpus
 from core.audit.schema import AuditEntry
 from surfaces.api.evidence import evidence_stream_for
-from tests.harness.api_fixtures import qualified_ask_authority, surface_under_test
+from tests.harness.api_fixtures import (
+    available_credential,
+    qualified_ask_authority,
+    surface_under_test,
+)
 
 ESTATE_QUESTION = "Which runs were denied last night?"
 GUIDANCE_QUESTION = "How does an AI agent obtain an identity with Vault?"
@@ -79,6 +83,7 @@ def test_row_a_guidance_question_never_reads_the_records() -> None:
         ask_provider=provider,
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     _arrange(surface)
     before = _access_count(surface)
@@ -100,6 +105,7 @@ def test_row_an_estate_question_never_consults_the_corpus() -> None:
         ask_provider=provider,
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     _arrange(surface)
 
@@ -119,6 +125,7 @@ def test_row_the_same_routing_holds_on_mcp() -> None:
         ask_provider=provider,
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     _arrange(surface)
     before = _access_count(surface)
@@ -143,6 +150,7 @@ def test_row_a_question_fitting_no_source_declines_naming_both() -> None:
         ask_provider=provider,
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     _arrange(surface)
     before = _access_count(surface)
@@ -166,6 +174,7 @@ def test_row_the_route_is_recorded_on_every_ask() -> None:
         ask_provider=provider,
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     _arrange(surface)
     client = TestClient(surface.app)
@@ -188,6 +197,7 @@ def test_row_a_decline_never_names_the_wrong_door() -> None:
         ask_provider=provider,
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(),
+        credential_source=available_credential(),
     )
     # No records at all, so the estate question must decline.
     response = TestClient(surface.app).post(

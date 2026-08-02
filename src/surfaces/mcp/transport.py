@@ -67,9 +67,10 @@ class McpTransport:
         definitions: Any | None = None,
         thread_store: ThreadStore | None = None,
         reconciler: Any | None = None,
-        ask_provider: Any | None = None,
+        ask_providers: Any | None = None,
         ask_model: str = "unconfigured",
         ask_authority: Any | None = None,
+        credential_source: Any | None = None,
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
@@ -77,9 +78,15 @@ class McpTransport:
         # the corpus alone, which FR-011a forbids. Injected like the seven collaborators below,
         # because parity compares what the two surfaces DO and one they cannot be shown to share
         # is one they can silently differ on.
-        self._ask_provider: Any = ask_provider
+        # 027: a FACTORY, not a built provider — `(source, secret) -> provider`, called once per
+        # ask with material brokered for that ask. Holding a built provider would hold whatever
+        # credential built it for the life of the process.
+        self._ask_providers: Any = ask_providers
         self._ask_model: str = ask_model
         self._ask_authority: Any = ask_authority
+        # 027. `None` refuses `credential_unavailable`. A default that supplied one would rebuild
+        # "configured means permitted" one level below where 026 broke it.
+        self._credential_source: Any = credential_source
         self._evidence = evidence_query
         self._submitter = authority_submitter
         # Mirrors `create_app`'s collaborators exactly, and the mirroring is the point: the
@@ -202,13 +209,16 @@ class McpTransport:
         from core.answering.record import record_ask
         from core.answering.routing import Route, route
         from surfaces.api.ask import (
+            AskCredentialUnavailable,
             AskNotQualified,
             ScopeEmpty,
             _available,
             ask_for,
             authorise_ask,
             estate_answer_for,
+            obtain_ask_credential,
         )
+        from surfaces.api.evidence import evidence_stream_for
 
         question = str(args["question"])
         destination = route(question)
@@ -222,7 +232,7 @@ class McpTransport:
                     subject=subject,
                     audit=self._audit,
                     authority=self._ask_authority,
-                    available=_available(self._ask_model, self._ask_provider),
+                    available=_available(self._ask_model, self._ask_providers),
                 )
             except AskNotQualified as refused:
                 return McpResult(ok=False, status=403, payload={"reason": str(refused)})
@@ -233,10 +243,26 @@ class McpTransport:
                     status=503,
                     payload={"reason": "no evidence plane is configured"},
                 )
-            if self._ask_provider is None:
+            if self._ask_providers is None:
                 return McpResult(
                     ok=False, status=503, payload={"reason": "no model is configured for `ask`"}
                 )
+            # THE CREDENTIAL, between governance and the vendor — through the same shared
+            # function the API calls, so the two surfaces cannot refuse differently (ADR-0033).
+            try:
+                credential = obtain_ask_credential(
+                    credential_source=self._credential_source,
+                    model=self._ask_model,
+                    subject=subject,
+                    audit=self._audit,
+                    source=str(Route.ESTATE),
+                    cell=cell,
+                    bound_cell=bound_cell,
+                    cell_disposition=cell_disposition,
+                    evidence_stream=evidence_stream_for(subject.tenant_id),
+                )
+            except AskCredentialUnavailable as unavailable:
+                return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
             try:
                 return McpResult(
                     ok=True,
@@ -247,11 +273,12 @@ class McpTransport:
                         query=self._evidence,
                         audit=self._audit,
                         model=self._ask_model,
-                        provider=self._ask_provider,
+                        provider=self._ask_providers(str(Route.ESTATE), credential.secret),
                         now=datetime.now(UTC),
                         cell=cell,
                         bound_cell=bound_cell,
                         cell_disposition=cell_disposition,
+                        model_authority=credential.reference,
                     ),
                 )
             except ScopeEmpty as empty:
@@ -293,7 +320,7 @@ class McpTransport:
                 subject=subject,
                 audit=self._audit,
                 authority=self._ask_authority,
-                available=_available(self._ask_model, self._ask_provider),
+                available=_available(self._ask_model, self._ask_providers),
             )
         except AskNotQualified as refused:
             return McpResult(ok=False, status=403, payload={"reason": str(refused)})
@@ -303,7 +330,7 @@ class McpTransport:
         except CorpusUnavailable as unavailable:
             return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
 
-        if self._ask_provider is None:
+        if self._ask_providers is None:
             # Recorded anyway — see the API's note. Someone asked and the platform could not
             # attempt it, which is a fact about this surface worth having in the trail.
             record_ask(
@@ -324,16 +351,32 @@ class McpTransport:
                 ok=False, status=503, payload={"reason": "no model is configured for `ask`"}
             )
         try:
+            credential = obtain_ask_credential(
+                credential_source=self._credential_source,
+                model=self._ask_model,
+                subject=subject,
+                audit=self._audit,
+                source="guidance",
+                cell=guidance_cell,
+                bound_cell=guidance_bound,
+                cell_disposition=guidance_disposition,
+                corpus_digest=corpus.digest,
+            )
+        except AskCredentialUnavailable as unavailable:
+            return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
+
+        try:
             payload = ask_for(
                 question=question,
                 subject=subject,
                 corpus=corpus,
-                provider=self._ask_provider,
+                provider=self._ask_providers("guidance", credential.secret),
                 audit=self._audit,
                 model=self._ask_model,
                 cell=guidance_cell,
                 bound_cell=guidance_bound,
                 cell_disposition=guidance_disposition,
+                model_authority=credential.reference,
             )
         except (CorpusUnavailable, ProviderUnavailable) as unavailable:
             return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
