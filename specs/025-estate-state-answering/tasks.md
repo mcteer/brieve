@@ -46,7 +46,14 @@ US3 scores what these produce.
 - [ ] T004 [P] Create `src/core/answering/scope.py`: the role → visible-`AuditEventType` map and
       `visible_event_types(roles) -> frozenset[AuditEventType]`. Union across roles; empty union
       is a refusal the caller performs (FR-004c) — this module computes, it does not raise, so the
-      refusal lives beside the read where the trail can see it.
+      refusal lives beside the read where the trail can see it. **Initial keys, named with
+      provenance (pass-4 P4-2)**: `operator` — the one role the platform's own claim-mapping
+      examples produce (measured: `api_fixtures.py:64` is the only role name in the repository) —
+      seeing run-lifecycle and dependency events; and `compliance-analyst`, **introduced by this
+      feature**, seeing everything `operator` sees plus authority, mirroring, and record-access
+      events. Two keys with genuinely different visibility, because a map with one class would
+      make SC-001's differential row unarrangeable — the map having at least two classes is what
+      the row measures. Any role not in the map contributes nothing (already the FR-004c rule).
 - [ ] T005 [GATE:fail-closed] Component rows for routing in
       `tests/component/test_ask_routing.py`: estate-shaped → `estate`, guidance-shaped →
       `guidance`, fits-neither → `neither` (never coerced — the spec's "decline, not a coin flip"
@@ -130,7 +137,9 @@ read.
       the surfaces is a defect by construction (ADR-0033).
 - [ ] T016 [US1] [GATE:conformance] The differential-entitlement row (SC-001) in
       `tests/conformance/answering/test_estate_bounded_by_asker.py`: two subjects, same tenant,
-      different roles, identical question — answers compared (not inspected) and differing
+      different roles (`operator` vs `compliance-analyst` — the two visibility classes T004
+      seeds; subjects are **harness-constructed**, so no production claim-mapping change is
+      needed for the row — pass-4 P4-2), identical question — answers compared (not inspected) and differing
       exactly by scope; each claim's reference resolves into that subject's own read; the
       role-poorer subject's answer contains no shape of the other's records (FR-005a).
 - [ ] T016a [US1] [GATE:conformance] The SC-009 integration row (analysis C1) in
@@ -228,14 +237,23 @@ the suite. Before this phase it cannot (T001 proves it).
       gains a third, explicitly-named branch — the scorer drives the path and returns the
       surviving reference ids, `score_fidelity` compares them against `case.events` — with a
       component row asserting `estate_state` in `MEASURED_SUITES` would refuse, so the misfit
-      cannot be reintroduced by tidying. **Remove T001's xfail marker here** — the test stays and guards the fix.
+      cannot be reintroduced by tidying. **The classification is a distinct `ESTATE_SUITES`
+      beside `ANSWERING_SUITES`, never membership in it (pass-4 P4-1)**: `suite in
+      ANSWERING_SUITES` gates scorer selection at three measured sites
+      (`test_eval_gates.py:71,99`, `test_gates_live.py:92`), and membership there routes the
+      suite to the CORPUS scorer — whose `RecordedProvider` parses documentation URLs out of
+      recordings that contain none, so every case would decline and fail after an implementer
+      burns the time discovering why. All three sites gain the third arm, and the
+      expected-scorer assertion names `EstateAnsweringScorer` for this suite. **Remove T001's xfail marker here** — the test stays and guards the fix.
 - [ ] T027 [P] [US3] [GATE:eval] Both-directions break rows in
       `tests/component/test_eval_gates.py`: an answer with one invented reference fails; an
       answer omitting one expected reference fails; and the scorer-identity assertion extends so
       `estate_state` reverting to any other scorer fails hermetically (024's anti-reversion row,
       third member).
 - [ ] T028 [US3] Membership updates in `src/core/evals/suites.py` and the live lane:
-      `estate_state` joins the answering-scored set (its own scorer, asserted by name);
+      `estate_state` joins **`ESTATE_SUITES`** (T026's distinct classification — NOT
+      `ANSWERING_SUITES`, per pass-4 P4-1 — its own scorer, asserted by name at the existing
+      expected-scorer site);
       `tests/evals_live/test_gates_live.py` drives the live half through the product path — a
       `LiveEstateProvider` in `src/adapters/anthropic_answering.py` offers the fixture records to
       the real model, path resolves, fidelity scores; `_grounding_for`'s special case for
