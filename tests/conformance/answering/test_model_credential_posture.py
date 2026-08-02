@@ -22,6 +22,7 @@ credential source counts its reads too.
 from __future__ import annotations
 
 import os
+import pathlib
 from typing import Any
 
 import pytest
@@ -459,3 +460,66 @@ def test_the_run_path_fetches_after_the_cell_is_validated_and_before_anything_is
         < source.index("BrokeredModelCredential")
         < source.index("build_chooser(model")
     )
+
+
+# ------------------------------------------------------------------ parity and deployability
+
+
+def test_both_surfaces_refuse_the_missing_credential_identically() -> None:
+    """ADR-0033. One shared function, so the two surfaces cannot refuse differently.
+
+    Parity is asserted here rather than left to inspection because the credential step is new on
+    both paths at once, and a step added to one surface and *almost* added to the other is the
+    divergence surface parity exists to catch. Both must give the same status and record the same
+    disposition — a caller must not learn which transport they used from how they were refused.
+    """
+    surface = _qualified(ask_provider=CountingProvider(), credential_source=None)
+
+    api = TestClient(surface.app).post(
+        "/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer()
+    )
+    mcp = surface.mcp.call("ask", {"question": GUIDANCE_QUESTION}, subject=surface.subject())
+
+    assert api.status_code == mcp.status == 503
+    dispositions = {a.payload["disposition"] for a in _asks(surface)}
+    assert dispositions == {"credential_unavailable"}
+    assert len(_asks(surface)) == 2, "one surface refused without recording that someone asked"
+
+
+def test_the_vendor_sdk_ships_with_the_extra_the_surface_jobspecs_install() -> None:
+    """The defect a green test suite cannot see, pinned so it cannot come back.
+
+    Until 027 no production path called a vendor, so the SDK was genuinely eval-only. The moment a
+    served surface brokered a credential and built a provider, that stopped being true — and the
+    surface jobspecs install `--extra adapters --extra surfaces`, never `--extra evals`. Left as
+    it was, the first deployed ask would have fetched its credential, resolved its cell, and then
+    failed at `import anthropic` with a message telling the operator to install an **eval** extra:
+    a live-lane error, reported to somebody running the product, at the last step, after
+    everything else had worked.
+
+    Invisible to every row in this repository, because the developer venv has all extras. Only the
+    allocation would have found it. So the check is against the declared dependency set rather
+    than against what happens to be importable here.
+    """
+    import tomllib
+
+    root = pathlib.Path(__file__).resolve().parents[3]
+    extras = tomllib.loads((root / "pyproject.toml").read_text())["project"][
+        "optional-dependencies"
+    ]
+    assert any(dep.startswith("anthropic") for dep in extras["adapters"]), (
+        "the vendor SDK is not in the `adapters` extra. A served surface calls a vendor as of "
+        "027, and the surface jobspecs install `adapters` and `surfaces` — never `evals`"
+    )
+
+    installed = [
+        spec.read_text(encoding="utf-8")
+        for spec in sorted((root / "infra/jobs").glob("*.nomad.hcl"))
+        if "surfaces.mcp.served" in spec.read_text(encoding="utf-8")
+    ]
+    assert installed, "no jobspec runs the served surface; this row is checking nothing"
+    for spec in installed:
+        assert "--extra adapters" in spec, (
+            "the served-surface jobspec does not install the extra carrying the vendor SDK and "
+            "the provider adapter; the surface would fail at the vendor call"
+        )

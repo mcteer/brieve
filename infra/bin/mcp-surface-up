@@ -129,7 +129,13 @@ HARNESS_STARTED_BY="${HARNESS_STARTED_BY:-}"
 
 ok "issuer ${OIDC_ISSUER}"
 
+# 027. Which model `ask` may call, from .env. Unset leaves the surface with no model, which
+# answers 503 rather than answering from the corpus alone — an honest state, not a broken one.
+# The credential is never passed here; the surface reads it from the trust store per ask.
+ASK_MODEL="$(env_val ASK_MODEL)"
+
 nomad job run -detach -var="repo=$REPO" \
+  -var="ask_model=${ASK_MODEL}" \
   -var="oidc_issuer=${OIDC_ISSUER}" \
   -var="oidc_jwks_uri=${OIDC_JWKS_URI}" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \

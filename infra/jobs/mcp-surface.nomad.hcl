@@ -72,6 +72,19 @@ variable "oidc_audience" {
   default = "harness-api"
 }
 
+# Which model `ask` may call, as a Qualified-Matrix cell identifier
+# (`anthropic/claude-opus@5`). Empty means no model is configured and every ask answers 503,
+# which is what a deployment that has not chosen one actually has.
+#
+# **Not a credential and not a permission**, and the three-way split is the whole design: this
+# says what the surface is WIRED to call, the ask binding says whether it MAY, and the trust
+# store says whether the platform holds the authority to. An operator who sets this without
+# authoring a binding is told about the binding, because governance is checked first.
+variable "ask_model" {
+  type    = string
+  default = ""
+}
+
 variable "oidc_tenant_claim" {
   type    = string
   default = "tenant"
@@ -213,6 +226,13 @@ job "mcp-surface" {
         OIDC_TENANT_CLAIM = var.oidc_tenant_claim
 
         AUTHORITY_CONTROLLED_PATH = var.authority_controlled_path
+
+        # 027. The credential itself is NOT here and must never be: it is read from the trust
+        # store per ask under this surface's own attested identity. What a jobspec may carry is
+        # which model to call, which is configuration rather than authority — and
+        # `tests/conformance/identity/test_posture_matches_constitution.py` fails this file if a
+        # vendor key ever appears beside it.
+        ASK_MODEL = var.ask_model
 
         MCP_SURFACE_HOST = "0.0.0.0"
         MCP_SURFACE_PORT = var.surface_port

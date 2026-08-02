@@ -35,6 +35,22 @@ dependencies = [
 [project.optional-dependencies]
 adapters = [
     "pydantic-ai-slim==2.18.0",
+    # THE VENDOR SDK, moved here from `evals` by 027 — and the move is the fix for a defect
+    # that would have appeared only in a deployed allocation.
+    #
+    # Until 027 no production path called a vendor: `served.py` wired no provider and every
+    # matrix cell was a fixture, so the SDK really was eval-only. That stopped being true the
+    # moment a served surface brokered a credential and built a provider. The mcp-surface and
+    # agent-run jobspecs install `--extra adapters --extra surfaces` and NOT `--extra evals`, so
+    # with the SDK left where it was, the first deployed ask would have fetched its credential,
+    # resolved its cell, and then failed at `import anthropic` with a message telling the
+    # operator to install an eval extra — a live-lane error reported to somebody running the
+    # product, at the last step, after everything else worked.
+    #
+    # `pydantic-ai-slim` needs it too as of 027: the run path constructs an explicit
+    # `AnthropicProvider` so the brokered key travels as an argument rather than as process
+    # state, and that import is unavailable without this package.
+    "anthropic==0.120.2",
 ]
 
 # Northbound API surface (ADR-0033), optional so the core install stays free of a web
@@ -92,8 +108,12 @@ a11y = [
 # anthropic, MIT, and the only provider SDK here: `make evals` (fixtures) is the blocking
 # lane and never imports it. A second provider would be a second thing to keep qualified
 # without a second thing to qualify it for.
+# The vendor SDK now lives in `adapters` (see the note there — a deployed surface calls a
+# vendor as of 027, so it is no longer an eval-only dependency). This extra names it through
+# `adapters` rather than pinning it a second time: two pins for one package drift, and the
+# version that matters is the one the product uses.
 evals = [
-    "anthropic==0.120.2",
+    "harness[adapters]",
 ]
 
 
