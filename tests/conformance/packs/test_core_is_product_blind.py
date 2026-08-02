@@ -65,6 +65,16 @@ SUBSTRATE_ALLOWED = {
     # governed change rather than a product's state, which is the distinction this
     # allowlist tracks.
     "identity/mappings_store.py": "reads the gated claim-to-role records from the fabric",
+    # 027. Reads a KV path for the model vendor credential, and — the reason it appears here
+    # rather than passing silently — mints the `vault:model-credentials/<vendor>@v<n>` reference
+    # the audit trail carries. The prefix names *where the authority came from*, which is the
+    # whole content of the reference; a store-agnostic reference would say only that a credential
+    # existed somewhere, which nobody can act on.
+    #
+    # Beside `audit/destination_postgres.py` in kind: the core reaching the trust fabric for its
+    # OWN credential is the opposite of the core knowing a product, and that distinction is what
+    # this allowlist exists to keep deliberate.
+    "authority/model_credential.py": "reads the brokered model credential and names its store",
 }
 
 

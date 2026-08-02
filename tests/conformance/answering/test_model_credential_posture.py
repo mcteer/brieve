@@ -306,3 +306,156 @@ def test_both_paths_reach_one_credential_reader_and_no_other() -> None:
         )
         for rival in RIVALS:
             assert rival not in source, f"{path.name} names a second credential source: {rival}"
+
+
+# ------------------------------------------------------------------ T018/T019: revocation
+
+
+def test_deleting_the_credential_refuses_the_next_ask_with_no_restart() -> None:
+    """SC-003 — revocation is a store operation, and it binds immediately.
+
+    The same surface object, the same process, no reconstruction of anything: one ask answers, the
+    record is emptied, and the next ask refuses. That is what "no restart" means, and it is only
+    true because the reader refuses to cache — a surface that had kept the key would keep answering
+    after revocation and nothing would show it.
+
+    **The moment is locatable**: the last answered record and the first refused one are adjacent on
+    the ask stream, so an investigator can say when the platform stopped being able to call the
+    vendor without correlating against a deployment log.
+    """
+    credential = available_credential()
+    surface = _qualified(ask_provider=CountingProvider(), credential_source=credential)
+    client = TestClient(surface.app)
+
+    answered = client.post("/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer())
+    assert answered.status_code == 200
+
+    credential.revoke()
+
+    refused = client.post("/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer())
+    assert refused.status_code == 503
+
+    records = [a.payload for a in _asks(surface)]
+    # The first ask REACHED the model — whether the model's claims survived citation resolution is
+    # a different question and not this row's. What matters is that authority was exercised, which
+    # is exactly what a carried reference means.
+    assert records[-2]["disposition"] != "credential_unavailable"
+    assert records[-2]["model_authority"] == "vault:model-credentials/anthropic@v1"
+    assert records[-1]["disposition"] == "credential_unavailable"
+    assert records[-1]["model_authority"] == ""
+
+
+def test_rotation_moves_the_recorded_generation_without_interrupting_anything() -> None:
+    """The half of revocation that must NOT refuse: a rotation is not an outage.
+
+    The reference's version is what makes "before the leak or after the rotation" answerable from
+    the record. If rotation did not move it, the field would name a location and nothing else — and
+    a plain path is a fact nobody needs, since it is the same for every ask forever.
+    """
+    credential = available_credential()
+    surface = _qualified(ask_provider=CountingProvider(), credential_source=credential)
+    client = TestClient(surface.app)
+
+    client.post("/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer())
+    credential.rotate("the-new-generation")
+    assert (
+        client.post(
+            "/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer()
+        ).status_code
+        == 200
+    )
+
+    generations = [a.payload["model_authority"] for a in _asks(surface)]
+    assert generations == [
+        "vault:model-credentials/anthropic@v1",
+        "vault:model-credentials/anthropic@v2",
+    ]
+
+
+def test_an_ask_that_already_holds_a_credential_completes_after_it_is_revoked() -> None:
+    """The row that guards against satisfying revocation too literally.
+
+    Revocation binds the **next** task, exactly like every per-task grant this platform
+    manufactures. A fix that reached back into a task already in flight — re-checking the store
+    mid-answer, or invalidating a held credential — would be a different and worse guarantee: it
+    would make an ask's outcome depend on when an unrelated operator ran a command.
+
+    Emptying the store *after* the fetch and observing the ask still complete is the assertion.
+    The one after it refuses, which the row above proves.
+    """
+    credential = available_credential()
+
+    class RevokesMidAnswer:
+        """Empties the store at the moment the model would be called."""
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def answer(self, question: str, material: Any) -> list[dict[str, Any]]:
+            self.calls += 1
+            credential.revoke()
+            return [{"statement": "From the corpus.", "citations": []}]
+
+    provider = RevokesMidAnswer()
+    surface = _qualified(ask_provider=provider, credential_source=credential)
+
+    response = TestClient(surface.app).post(
+        "/ask", json={"question": GUIDANCE_QUESTION}, headers=surface.bearer()
+    )
+
+    assert response.status_code == 200, "revocation reached back into a task already in flight"
+    assert provider.calls == 1
+    record = _asks(surface)[-1].payload
+    assert record["disposition"] != "credential_unavailable"
+    # And it recorded the authority it ACTUALLY held, not the store's state at the end.
+    assert record["model_authority"] == "vault:model-credentials/anthropic@v1"
+
+
+# ------------------------------------------------------------------ T016a: the run half
+
+
+def test_a_fixture_model_never_reaches_the_credential_store() -> None:
+    """FR-011 at the branch that decides it, and the half most worth pinning.
+
+    Every blocking lane in this repository runs on `fixture:` cells, and they must keep running
+    with no model credential anywhere — which is the state a fresh enclave is in. A run path that
+    fetched unconditionally would break all of them the moment the store was empty, and a reader
+    that ran first and discarded its result for fixtures would satisfy any behavioural check while
+    doing exactly that.
+
+    Asserted against the branch rather than through a dispatch because `_run_task` needs an
+    attested workload identity, so a hermetic row cannot exercise it. The *behaviour* is owed in
+    the enclave lane; this is the structure, and it is what fails when somebody moves the fetch.
+    """
+    import inspect
+
+    from surfaces.dispatch import entrypoint
+
+    source = inspect.getsource(entrypoint._chooser_for)  # noqa: SLF001 — the branch IS the claim
+    assert source.index("FIXTURE_PROVIDER") < source.index("BrokeredModelCredential"), (
+        "the credential is fetched before the fixture branch is taken; a fixture run would then "
+        "require a vendor credential to exist, and every blocking lane runs on fixture cells"
+    )
+
+
+def test_the_run_path_fetches_after_the_cell_is_validated_and_before_anything_is_built() -> None:
+    """The same order as the ask path, for the same reason — and that sameness is the point.
+
+    `resolve_bound_model` validates the cell against the matrix; only then is the credential
+    sought; only then is a chooser constructed. Fetching first would send an operator looking for
+    authority to make a call the matrix had already refused.
+
+    Two paths with the same order is what "both paths, one reader" has to mean beyond sharing a
+    class: a reader shared by two call sites that check in different orders gives two different
+    answers to *which failure is this*.
+    """
+    import inspect
+
+    from surfaces.dispatch import entrypoint
+
+    source = inspect.getsource(entrypoint._chooser_for)  # noqa: SLF001
+    assert (
+        source.index("resolve_bound_model")
+        < source.index("BrokeredModelCredential")
+        < source.index("build_chooser(model")
+    )

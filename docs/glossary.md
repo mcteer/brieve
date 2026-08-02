@@ -567,3 +567,58 @@ because the record's `disposition` field already says the ask failed later, and 
 resolution outcome would erase the fact that governance passed.
 
 `not_applicable` is the unroutable decline: no source was consulted, so no cell question arose.
+
+## Model credential
+
+The static API key a model vendor requires, held **once, in the trust store**, at
+`model-credentials/<vendor>`. Operator-written, Control-Group-governed in production posture,
+rotated in place. The platform reads; it never writes.
+
+**The second of Principle IV's two named standing-credential exceptions** (ADR-0058, constitution
+v1.4.0). A model vendor validates no workload identity — there is no audience to present and no
+token to exchange — so [ADR-0044](adr/0044-authz-doctrine-and-credential-translation.md)'s
+federate-or-broker rule routes it to the broker branch.
+
+**Delivered, not derived.** Vault mints lesser material for products with a credential API; a
+vendor key has none, so there is nothing to derive from. What makes this safe is **lifetime**: it is
+obtained at task start under the reading workload's own attested identity, held in process for
+exactly one task, and never persisted — not to a checkpoint, a log, the trail, or model context.
+Two tasks are two reads.
+
+**Revocation is a store operation.** Delete or rotate the record and the next task's fetch refuses,
+with no restart. A task already in flight completes on the authority it holds, like every other
+per-task grant.
+
+Distinct from [brokered material](#brokered-material), which is the *derived*, lesser credential a
+product with a credential API can mint. Naming both "brokered" would hide the property that makes
+one need governance where the other needs only scope.
+
+## Model authority
+
+What the ask record carries to say **how a model call was permitted**:
+`vault:model-credentials/<vendor>@v<version>` — a location and a rotation generation, **never a
+value and never a hash of one**. A hash of a low-entropy-format secret is an oracle.
+
+The version is the whole point. It makes *was this call made before the leak or after the
+rotation* answerable from the record alone, which a bare path could not.
+
+Empty on every refusal that precedes the fetch. An ask refused for an unqualified cell never
+obtained a credential, and a reference there would claim an authority nobody exercised.
+
+Sits beside [cell disposition](#cell-disposition), which says *whether* the model was allowed to
+answer. Together they keep three failures apart: the cell was not qualified, the credential could
+not be obtained, or the vendor did not answer — three failures, three people to go to.
+
+## Brokered material
+
+The **derived, lesser** credential the platform obtains on a caller's behalf for a product that
+exposes a credential API — a scoped database role, a short-lived certificate. Compensated by
+scope: what is handed over is narrower than what the broker holds.
+
+Contrast [model credential](#model-credential), which is **shared-grain**: the vendor offers no way
+to derive anything lesser, so the compensation is lifetime and governance instead of scope. The
+protocol for one deliberately does not cover the other.
+
+As of 027 the model broker is the platform's **first working broker**; `BrokeredMaterialSource` in
+`core/authority/entitlements.py` remains a Protocol nothing implements, and the TFE path will
+inherit the shape built here rather than the other way round.

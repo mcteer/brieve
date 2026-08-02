@@ -157,6 +157,11 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
     # 013: the agent secret space pack tools read. Role-level by declared limitation —
     # see the policy's own comment; per-definition narrowing is ADR-0044's translation.
     vault_policy.agent_pack_secrets.name,
+    # 027: the vendor credential a run needs when its definition binds a NON-fixture model.
+    # Granted to the role rather than fetched by the surface and passed down, because the
+    # allocation must read it under its own attested identity — a key handed to an allocation
+    # is a key in the allocation's environment, which is what ADR-0058 exists to avoid.
+    vault_policy.model_credential_read.name,
   ]
   token_ttl  = 3600
   token_type = "service"
@@ -250,6 +255,10 @@ resource "vault_jwt_auth_backend_role" "mcp_surface" {
     vault_policy.harness_database.name,
     vault_policy.evidence_database.name,
     vault_policy.harness_authority_read.name,
+    # 027: the vendor credential `ask` brokers per question. This surface is the one with a
+    # person on the other end of it, so it is the first place the platform ever calls a model
+    # on somebody's behalf.
+    vault_policy.model_credential_read.name,
   ]
   token_ttl  = 3600
   token_type = "service"

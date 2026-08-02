@@ -161,11 +161,11 @@ without one, on both surfaces, never leaking and never falling back.
 **Independent test**: a working source, then a source whose backing record is deleted mid-session
 → the next ask refuses `credential_unavailable`, no restart.
 
-- [ ] T018 [US2] [GATE:conformance] The revocation row in the same file: a source over a mutable
+- [X] T018 [US2] [GATE:conformance] The revocation row in the same file: a source over a mutable
       backing store answers; delete the record; the **next** ask refuses `credential_unavailable`
       with no re-construction of the surface (SC-003). The moment is locatable — the last answered
       record and the first refused one are adjacent in the trail.
-- [ ] T019 [P] [US2] The in-flight row: a task that already fetched **completes** on the authority
+- [X] T019 [P] [US2] The in-flight row: a task that already fetched **completes** on the authority
       it holds even if the store is emptied after the fetch — revocation binds the *next* task,
       exactly like every per-task grant (contract: "what these rows refuse to assert"). This
       guards against a fix that reached back into a running task to satisfy revocation too
@@ -182,11 +182,11 @@ PR.
 **Independent test**: the constitution describes brokering; a deployment contradicting it fails a
 check.
 
-- [ ] T020 [US3] Write `docs/adr/0058-model-credential-brokering.md`: the decision (broker on the
+- [X] T020 [US3] Write `docs/adr/0058-model-credential-brokering.md`: the decision (broker on the
       first exception's pattern; ADR-0044's federate-or-broker rule routes models here; gateway
       and do-nothing rejected with the reasons from research). Status Accepted, dated, relating to
       ADR-0044/0022/0039/0026.
-- [ ] T021 [US3] Amend `.specify/memory/constitution.md` to **v1.4.0** with a Sync Impact Report.
+- [X] T021 [US3] Amend `.specify/memory/constitution.md` to **v1.4.0** with a Sync Impact Report.
       **Two sentences in two different paragraphs** (measured — line ~150 and line ~166 of the
       current file, not one place): the standing-credentials clause *"with exactly one named
       exception: the rotated, Control-Group-governed management token behind the TFE broker"* gains
@@ -197,7 +197,7 @@ check.
       other is the contradiction this feature exists to end, in miniature. MINOR (adds/expands);
       cite ADR-0058. Bump `**Version**` and `**Last Amended**`. **Security-maintainer review: Dan
       McTeer.**
-- [ ] T022 [US3] [GATE:conformance] The constitution-agreement check in
+- [X] T022 [US3] [GATE:conformance] The constitution-agreement check in
       `tests/conformance/identity/test_posture_matches_constitution.py`, **scoped to what a check
       can see** (analysis U3): (a) the amended text names two exceptions; (b) no jobspec under
       `infra/jobs/` passes a vendor key as a **workload env var** — a config leak, greppable in
@@ -212,11 +212,11 @@ check.
 
 ## Phase 6: Deployment, the enclave, and the named runs
 
-- [ ] T024 [P] Terraform in `infra/modules/trust-fabric/`: a `model-credentials/<vendor>` KV path,
+- [X] T024 [P] Terraform in `infra/modules/trust-fabric/`: a `model-credentials/<vendor>` KV path,
       granted read to `mcp-surface` and the run role — **exact-path AND glob** (020's trap, which
       026 also paid; a Vault glob does not match the empty remainder). Governance clause matching
       the first exception's in production posture.
-- [ ] T025 [P] Dev placeholder in `infra/environments/dev/`: seed a **clearly-marked
+- [X] T025 [P] Dev placeholder in `infra/environments/dev/`: seed a **clearly-marked
       non-functional** credential so `make dev-up`'s ask progression reaches **a fetch that
       succeeds and a vendor call that fails** — one link past `credential_unavailable`, proving
       the fetch path end to end without a real key. **The exact disposition the dud produces is
@@ -225,12 +225,12 @@ check.
       the design depends only on the fetch succeeding and the call being attempted). Seeded-and-
       marked over absent, because it exercises one more link.
 
-- [ ] T026 [GATE:conformance] The readability row in `tests/conformance/identity/`: `mcp-surface`
+- [X] T026 [GATE:conformance] The readability row in `tests/conformance/identity/`: `mcp-surface`
       and the run role read `model-credentials/<vendor>` against the live fabric (as-applied,
       `test_matrix_is_readable` pattern).
-- [ ] T027 [P] Glossary in `docs/glossary.md`: *model credential*, *model authority*, *brokered
+- [X] T027 [P] Glossary in `docs/glossary.md`: *model credential*, *model authority*, *brokered
       material* — linking *ask binding* and the matrix vocabulary.
-- [ ] T028 [P] ROADMAP entry for 027: the posture, the amendment, and the standing deferrals
+- [X] T028 [P] ROADMAP entry for 027: the posture, the amendment, and the standing deferrals
       (per-tenant model scope — new here — plus portal answering, corpus freshness, team scope).
 - [ ] T029 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep all
       green; then `make conformance` on a live enclave (includes T026). **Runner: Dan McTeer.**

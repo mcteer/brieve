@@ -6,15 +6,18 @@ authentication path in the surface and asserts what is **not** there.
 
 **Comments and docstrings are stripped before matching.** Prose about API keys is not an
 API key, and this file necessarily contains a great deal of prose about API keys. This
-repository has now had three checks match a comment instead of code — 006's boundary
-checker, 007's run-reference check, and this feature's own read-path isolation test — so
-the stripping is not defensive tidiness, it is the whole reliability of the check.
+repository has now had five checks match a comment instead of code — 006's boundary
+checker, 007's run-reference check, 024's read-path isolation test, 020's conformance-marker
+check, and the provider-key row — so the stripping is not defensive tidiness, it is the whole
+reliability of the check. The stripper itself moved to `tests/harness/source_reading.py` at
+the fifth occurrence; the rows below still exercise it, because it is load-bearing here.
 """
 
 from __future__ import annotations
 
-import ast
 import pathlib
+
+from tests.harness.source_reading import code_without_prose
 
 SURFACES = pathlib.Path(__file__).resolve().parents[2] / "src" / "surfaces"
 
@@ -55,26 +58,11 @@ EXEMPT: dict[str, frozenset[str]] = {
 }
 
 
-def _code_without_prose(path: pathlib.Path) -> str:
-    """Return the module's source with docstrings and comments removed.
-
-    `ast.unparse` of a parsed module drops comments entirely and lets us strip docstring
-    expressions explicitly, so what remains is code and string literals that actually
-    participate in behaviour.
-    """
-    tree = ast.parse(path.read_text())
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        body = getattr(node, "body", [])
-        if (
-            body
-            and isinstance(body[0], ast.Expr)
-            and isinstance(body[0].value, ast.Constant)
-            and isinstance(body[0].value.value, str)
-        ):
-            node.body = body[1:] or [ast.Pass()]
-    return ast.unparse(tree)
+#: Shared rather than kept here (027). This file grew the first stripper; by the fifth check to
+#: match prose instead of code it was clear the next one would need it too, and two copies means
+#: fixing the sixth occurrence twice. The rows below still exercise it, because it is load-bearing
+#: for this gate whoever owns it.
+_code_without_prose = code_without_prose
 
 
 def _surface_sources() -> list[pathlib.Path]:

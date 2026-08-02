@@ -1,5 +1,47 @@
 <!--
 Sync Impact Report
+- This revision (1.3.0 → 1.4.0, MINOR — one exception added and one absolute softened to a
+  bounded rule; no principle removed or redefined). Motivated by ADR-0058, Accepted in this
+  same change.
+
+  **Principle IV forbade something the platform now does, and saying so in the open is the
+  point.** Two sentences moved, in two different paragraphs, and they had to move together:
+
+  1. "with exactly one named exception" → "with exactly two named exceptions", the second
+     being the model vendor credential, carrying the same rotation and Control-Group
+     governance the first one does.
+  2. "static API keys are prohibited without exception" → "prohibited as workload
+     credentials", with the exceptions bounded by where they are held (the trust store only),
+     whose identity reads them (the reading workload's own, attested), how they are delivered
+     (per task), and what is forbidden regardless (persistence by any workload).
+
+  Amending only the first would have left the second flatly contradicting it — which is the
+  contradiction this amendment exists to end, reproduced in miniature.
+
+  **Why this was unavoidable rather than convenient.** ADR-0044's federate-or-broker rule
+  already decided it: a model vendor authenticates with a static key and validates no workload
+  identity, so it lands in the broker branch. The doctrine anticipated this; the constitution's
+  wording had not. Three consecutive features (024, 025, 026) built a governed answering
+  capability that no person could use, each recording the deferral rather than resolving it,
+  because resolving it required this edit.
+
+  **MINOR rather than MAJOR**, on the versioning rule that MINOR adds or expands: no principle
+  is removed and none is redefined. What changes is that a second exception is named, under the
+  same governance as the first. The record is honest that this is a real reduction in the
+  strength of the zero-standing-credentials guarantee — ADR-0058's Consequences says so
+  plainly — and MINOR reflects the shape of the edit, not a claim that it is free.
+
+  **Shipped WITH the capability, never after it.** A plan that merged the broker first would
+  have left the platform contradicting its own constitution in the interval, which is worse
+  than either state alone.
+
+  Propagation: `docs/adr/0058-model-credential-brokering.md` (new, motivating record),
+  `docs/glossary.md` (model credential, model authority, brokered material),
+  `tests/conformance/identity/test_posture_matches_constitution.py` (the deployment must not
+  contradict the amended text), `tests/unit/test_no_static_credentials.py` (one named module
+  exemption, at the same grain and in the same change).
+
+Prior Sync Impact Report
 - This revision (1.2.0 → 1.3.0, MINOR — one passage corrected to describe a mechanism that
   exists; no principle removed or redefined). Motivated by ADR-0056 and ADR-0057, both
   Accepted 2026-07-31.
@@ -144,11 +186,12 @@ packs use schema-based calling regardless of context-efficiency advantage.
 
 *Rationale*: Anything bypassable by external misconfiguration is not a guarantee.
 
-### Principle IV — Zero Standing Credentials; Authority Per Task (R2, R3, ADR-0015, ADR-0016, ADR-0025, ADR-0026, ADR-0033, ADR-0042, ADR-0044)
+### Principle IV — Zero Standing Credentials; Authority Per Task (R2, R3, ADR-0015, ADR-0016, ADR-0025, ADR-0026, ADR-0033, ADR-0042, ADR-0044, ADR-0058)
 
-The enclave holds no standing credentials to anything it manages — with exactly one
-named exception: the rotated, Control-Group-governed management token behind the TFE
-broker (ADR-0044). Authority is manufactured per task — attested workload identity →
+The enclave holds no standing credentials to anything it manages — with exactly two
+named exceptions, both rotated and Control-Group-governed: the management token behind
+the TFE broker (ADR-0044), and the model vendor credential behind the model broker
+(ADR-0058). Authority is manufactured per task — attested workload identity →
 control-plane Vault, bounded by the definition's ceiling and by a short lifetime — and
 evaporates with it; effective authority = user ∩ agent ceiling ∩ task scope ∩ policy, so an
 agent never exceeds its human. **Task scope may narrow the ceiling; it is not required to.**
@@ -163,7 +206,9 @@ are resolved and enforced pre-tool-use, before any shared-grain credential is wi
 reduction, harness and product checks independently agreeing. Humans authenticate on
 every surface via the organization's OIDC IdP (flows per ADR-0033); no local accounts,
 no credential store. Machines use workload identity federation; static API keys are
-prohibited without exception. IdP claim-to-role mapping is governed configuration
+prohibited as workload credentials — the two named exceptions above are held only in
+the trust store, read under the reading workload's own attested identity, delivered per
+task, and never persisted by any workload. IdP claim-to-role mapping is governed configuration
 behind Control Groups. Secret values never enter model context — references only.
 Cached or precedent results never carry authority: every requester runs their own
 token exchange, scope check, and approvals (ADR-0042). Checkpoints hold state, never
@@ -282,4 +327,4 @@ change.
   train for drift against newly Accepted decisions; `/speckit.analyze` findings that
   implicate a principle block `/speckit.implement`.
 
-**Version**: 1.3.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-07-31
+**Version**: 1.4.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-08-02

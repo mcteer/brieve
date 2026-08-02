@@ -281,6 +281,9 @@ def test_an_unavailable_pinned_cell_falls_back_and_the_record_says_so() -> None:
             {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
             _cells(f"vault:{MODEL}:ask", f"vault:{ALTERNATE}:ask"),
         ),
+        # The fallback must ANSWER for this row to observe the fallback record, so the credential
+        # is arranged too — governance passing is not authority to call a vendor (027).
+        credential_source=available_credential(),
     )
 
     response = TestClient(surface.app).post(
