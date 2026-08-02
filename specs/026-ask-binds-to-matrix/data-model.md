@@ -47,7 +47,7 @@ raise `ResolutionRefused`.
 | existing fields | unchanged (`subject_user_id`, `corpus_digest`, `model`, `disposition`, `source`) |
 | `cell` **(new)** | The cell that authorised the answer — the one actually used. Empty on refusal |
 | `bound_cell` **(new)** | The cell the binding named for this source. Empty when `unbound` |
-| `cell_disposition` **(new)** | `pinned` \| `fallback:<reason>` \| `refused:<reason>` |
+| `cell_disposition` **(new)** | `pinned` \| `fallback:<reason>` \| `refused:<reason>` \| `not_applicable` |
 
 - **Substitution is FR-006 satisfied in one record**: `bound_cell` is the pinned one, `cell` is
   the used one, `cell_disposition` carries the reason. No run id is fabricated and no second
