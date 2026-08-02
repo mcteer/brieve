@@ -401,7 +401,8 @@ def test_the_generated_sql_partitions_exactly_when_a_per_type_bound_is_set() -> 
             return type("Cred", (), {"username": "u", "password": "p"})()
 
     query = PostgresEvidenceQuery(
-        credentials=_Credentials(),  # type: ignore[arg-type] — the seam, not the real fabric
+        # The seam, not the real fabric: this row is about the SQL, not the credential path.
+        credentials=_Credentials(),  # type: ignore[arg-type]
         connect=lambda **_: _Conn(),
     )
 
