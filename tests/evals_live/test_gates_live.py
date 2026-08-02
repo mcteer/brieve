@@ -190,3 +190,37 @@ def test_live_judge_qualifies_against_the_seed() -> None:
     judge = qualify_first_judge(LIVE_MODEL, LiveJudgeVerdicts(), seed=seed)
     assert judge.agreement >= 0.9
     assert judge.qualified_by == "", "the first judge chains to the seed, not to a model"
+
+
+def test_the_eval_lane_keeps_the_environment_credential_and_027_did_not_take_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FR-013a — the exemption, **stated at the lane** rather than only in a contract.
+
+    027 moved every production path onto a brokered credential read from the trust store per task,
+    with no environment fallback. This lane is the named exception, and it is written here so the
+    boundary is legible to whoever is standing in front of the lane: `make evals-live` runs with a
+    named human present, against no enclave and no trust store, and the key comes from `.env` on
+    the command line.
+
+    **What the exemption is not.** It does not mean the eval lane may fall back *from* a supplied
+    credential — supplied always wins — and it does not extend to any module a run or a surface
+    reaches. `tests/conformance/packs/test_provider_key_is_dev_lane_only.py` holds that line:
+    exactly two modules in `src/` may name this variable, and neither is on the run path.
+
+    **An unset key raises rather than skipping** (SC-005a). A suite that cannot run must not report
+    the same green as one that ran — which is the defect the whole live lane was rebuilt to end.
+    """
+    from adapters.anthropic_scorer import client_and_model
+    from core.evals.scoring import EVAL_PROVIDER_KEY
+    from core.evals.suites import UnrunnableSuite
+
+    monkeypatch.delenv(EVAL_PROVIDER_KEY, raising=False)
+    with pytest.raises(UnrunnableSuite) as unrunnable:
+        client_and_model()
+    assert EVAL_PROVIDER_KEY in str(unrunnable.value)
+
+    # And a supplied credential wins outright — the production shape, exercised here so the two
+    # branches are proven by one row rather than asserted about each other.
+    client, api_model = client_and_model(api_key="supplied-not-from-the-environment")
+    assert api_model

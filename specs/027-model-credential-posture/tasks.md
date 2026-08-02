@@ -206,7 +206,7 @@ check.
       checkpoint. The cross-reference is stated so SC-007's "deployment contradicts the text" is
       honestly the config half, and SC-004/SC-005's persistence half lives where it is
       observable.
-- [ ] T023 [P] [US3] Update `specs/024-portal-answering/`… nothing — but DO update this feature's
+- [X] T023 [P] [US3] Update `specs/024-portal-answering/`… nothing — but DO update this feature's
       own `contracts/conformance.md` status rows as they land, and record the Principle V review
       outcome and the amendment review outcome when given.
 
