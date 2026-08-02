@@ -15,7 +15,7 @@
 
 | | What it is | Who | Status |
 | --- | --- | --- | --- |
-| Principle V review | Three additive payload fields on a sealed-core record — the third additive touch to this payload in three features | **Dan McTeer** | **Owed** |
+| Principle V review | Three additive payload fields on a sealed-core record — the third additive touch to this payload in three features | **Dan McTeer** | **Reviewed 2026-08-02 by Dan McTeer — APPROVED WITH ONE CHANGE, applied.** The review happened **after** these features merged, which the contracts had said it would precede; recorded plainly rather than backdated. Finding: `corpus_digest` had been generalised (025) to mean "identity of what was consulted", so one column held a content digest for guidance asks and a stream id for estate ones. Two different things sharing a name — split into `corpus_digest` and `evidence_stream`, each empty when not applicable. No leak finding: the payload carries cell references and closed vocabularies only, never question or answer text. All three fields approved unchanged. |
 
 ---
 

@@ -37,7 +37,7 @@ running, and this feature's whole subject is gates that stopped meaning anything
 | | What it is | Who | Status |
 | --- | --- | --- | --- |
 | Qualifying the `ask` matrix cell | `make evals-live` against a real model | **Dan McTeer** | **Run 2026-08-01 — the answering suites passed live through the product path; the cell stays `fixture` because `estate_state` failed under the same role. See *What the live lane found* below** |
-| **Principle V review** | One additive `AuditEventType` member for the ask record (T006a) | **Dan McTeer** | **Owed** — the plan originally asserted no review was needed; analysis pass 2 found the data model already required a member |
+| **Principle V review** | One additive `AuditEventType` member for the ask record (T006a) | **Dan McTeer** | **Reviewed 2026-08-02 by Dan McTeer — APPROVED WITH ONE CHANGE, applied.** The review happened **after** these features merged, which the contracts had said it would precede; recorded plainly rather than backdated. Finding: `corpus_digest` had been generalised (025) to mean "identity of what was consulted", so one column held a content digest for guidance asks and a stream id for estate ones. Two different things sharing a name — split into `corpus_digest` and `evidence_stream`, each empty when not applicable. No leak finding: the payload carries cell references and closed vocabularies only, never question or answer text. The member itself was approved unchanged. |
 
 ---
 
