@@ -6,11 +6,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Final
 import sys
 import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import Final
 
 REPO = Path(__file__).resolve().parents[2]
 CACHE = REPO / ".corpus-cache"
