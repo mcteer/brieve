@@ -112,7 +112,13 @@ read.
       violation records that contains *compliant / passing / healthy / safe* about the estate
       fails (SC-003, FR-005) — checked over the assembled answer, where the temptation lives, not
       the provider output.
-- [ ] T014 [US1] Wire the estate branch into `ask_for()` in `src/surfaces/api/ask.py`:
+- [ ] T014 [US1] Wire the estate branch into `ask_for()` in `src/surfaces/api/ask.py` — and the
+      collaborators are **parameters, injected end to end** (pass-2 P2-2): `build_router` and
+      `create_app` gain `evidence_query` for the ask path (the transport already holds
+      `self._evidence`), and `tests/harness/api_fixtures.py` shares ONE instance between both
+      surfaces the way 024's `ask_provider` is shared — 024 shipped a provider nothing could
+      inject and the operation was permanently 503; the same defect here would be an estate
+      branch no assembly can reach. Then, in order:
       `route()` first; on `estate` — **refuse on empty `visible_event_types` before any read**
       (FR-004c, no access record because no access was attempted, SC-011), then call
       `read_evidence_for` with `event_types` narrowed by scope (research F2 — the one governed
@@ -172,8 +178,9 @@ falls inside.
 
 - [ ] T022 [US2] Window handling in `src/core/answering/routing.py` + `ask_for`, constrained
       per analysis U4: a **small closed phrase vocabulary** ("last night", "today", "yesterday",
-      "this week") resolved against an **injected clock** — never ambient time, which is the
-      eval-lane determinism hazard; phrases outside the vocabulary and questions with no temporal
+      "this week") resolved against an **injected clock** — a `now` parameter on `ask_for`
+      defaulted at the surface boundary and overridden by tests, never ambient time read inside
+      core, which is the eval-lane determinism hazard; phrases outside the vocabulary and questions with no temporal
       phrase both fall to the read path's existing `limit` as the bound (the spec's "enormous
       window" edge case), with truncation stated in the answer. No general NL time parsing —
       resolvable phrases narrow `start_time`/`end_time` on the same `read_evidence_for` call,
@@ -205,14 +212,23 @@ the suite. Before this phase it cannot (T001 proves it).
       `packs/terraform/evals/estate_state.toml`: records-answerable prompts only (FR-006a — the
       mounted-engines and auth-methods questions are replaced), `recorded` = the model's proposed
       claims with references, `events` = the expected reference set (data-model.md § Eval case
-      shape).
+      shape). Case authoring MUST include the spec's control-pair edge case: a control the
+      records show evaluated-with-no-violations (answerable, references the evaluation records)
+      authored beside the component row's control-nobody-evaluated (declines) — different answers
+      to the person asking, and only a pair proves they do not collapse (pass-2 P2-3).
 - [ ] T026 [US3] [GATE:eval] Estate scoring in `src/core/evals/scoring.py` +
       `src/core/evals/suites.py`: `EstateAnsweringScorer` drives `answer_estate_question` with
       `RecordedEstateProvider` over the pack's fixture estate; surviving references scored by
       `score_fidelity` against `case.events` — the scorer translating authored ids to entry
       hashes via the loader's map (analysis U3) — precision fails invention, recall fails
       omission (FR-011b); `estate_state` leaves `EXPECTED_OUTCOMES`'s `match` verb; `parse_cases` requires
-      `events` for it. **Remove T001's xfail marker here** — the test stays and guards the fix.
+      `events` for it **without** joining `MEASURED_SUITES` (pass-2 P2-1: that set's `run_suite`
+      branch demands `compile_for` and would refuse the suite as unrunnable — measured, not
+      assumed: `run_suite` has exactly two branches today, and estate fits neither). `run_suite`
+      gains a third, explicitly-named branch — the scorer drives the path and returns the
+      surviving reference ids, `score_fidelity` compares them against `case.events` — with a
+      component row asserting `estate_state` in `MEASURED_SUITES` would refuse, so the misfit
+      cannot be reintroduced by tidying. **Remove T001's xfail marker here** — the test stays and guards the fix.
 - [ ] T027 [P] [US3] [GATE:eval] Both-directions break rows in
       `tests/component/test_eval_gates.py`: an answer with one invented reference fails; an
       answer omitting one expected reference fails; and the scorer-identity assertion extends so
