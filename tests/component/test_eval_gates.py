@@ -23,6 +23,7 @@ from core.evals.scoring import (
 )
 from core.evals.suites import (
     ANSWERING_SUITES,
+    MEASURED_SUITES,
     OWED,
     SUITES,
     EvalCase,
@@ -220,3 +221,28 @@ def test_both_packs_ship_at_or_above_the_case_floor() -> None:
             for c in load_pack_cases(PACKS / pack, suite)
         ]
         assert len(refusing) >= 2, f"{pack} ships fewer than two refuse/decline cases"
+
+
+def test_the_live_lane_scores_only_suites_it_can_score() -> None:
+    """A paid lane's parametrisation, guarded from the lane that runs on every commit.
+
+    **This row exists because its absence cost a 24-minute run.** `report_fidelity` scores a
+    compiled report and asks no model anything, so `run_suite` raises `UnrunnableSuite` when it
+    arrives in a lane with no way to compile one — correct behaviour, and it had been failing on
+    every invocation since 021 put that suite in force, because the live lane was written in 013
+    and nothing since had run it.
+
+    The guard belongs HERE rather than beside the constant it guards: a row inside
+    `tests/evals_live` carries that module's `live_model` mark, so it is deselected everywhere
+    except the lane it is meant to protect — which is 24 minutes and a vendor bill too late.
+    """
+    from tests.evals_live.test_gates_live import LIVE_SUITES
+
+    assert set(LIVE_SUITES) | MEASURED_SUITES == set(SUITES)
+    assert not set(LIVE_SUITES) & MEASURED_SUITES, (
+        "a measured suite in the live parametrisation fails deterministically, 24 minutes in"
+    )
+    assert ANSWERING_SUITES <= set(LIVE_SUITES), (
+        "the answering suites are the ask cell's qualification; dropping them from the live "
+        "lane would leave that cell qualified by nothing"
+    )

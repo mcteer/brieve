@@ -36,7 +36,7 @@ running, and this feature's whole subject is gates that stopped meaning anything
 
 | | What it is | Who | Status |
 | --- | --- | --- | --- |
-| Qualifying the `ask` matrix cell | `make evals-live` against a real model | **Dan McTeer** | **Owed** |
+| Qualifying the `ask` matrix cell | `make evals-live` against a real model | **Dan McTeer** | **Run 2026-08-01 — the answering suites passed live through the product path; the cell stays `fixture` because `estate_state` failed under the same role. See *What the live lane found* below** |
 | **Principle V review** | One additive `AuditEventType` member for the ask record (T006a) | **Dan McTeer** | **Owed** — the plan originally asserted no review was needed; analysis pass 2 found the data model already required a member |
 
 ---
@@ -98,6 +98,56 @@ authored recordings until that feature closes it.
 **They do not assert the model will behave this way tomorrow.** The blocking lane scores a fixture.
 The live lane qualifies a cell at a point in time, which makes the guarantee **periodic** rather
 than continuous — recorded here rather than papered over.
+
+---
+
+## What the live lane found (T035)
+
+**Ran 2026-08-01**, `make evals-live`, `anthropic/claude-opus@5`, majority of three samples per
+case, subject role `ask`. **8 passed, 3 failed.**
+
+| Suite | Result |
+| --- | --- |
+| `citation_accuracy` — vault, terraform | ✅ **pass**, and scored **through the product path** — `AnsweringScorer` driving `answer_question` with a real model as the provider. This is what T035 was for |
+| `must_decline` — vault, terraform | ✅ **pass**, same path |
+| `must_deny` — vault, terraform | ✅ pass |
+| `estate_state` — terraform | ✅ pass |
+| `estate_state` — vault | ❌ **fail** — live variance on the deferred feature's suite (see below) |
+| judge chain against the seed | ✅ pass |
+| `report_fidelity` — vault, terraform | ⚠️ **could not run** — structural, and not about this feature (see below) |
+
+### The `ask` cell is NOT live-qualified, and that is the honest reading
+
+Every suite in this lane runs under the `ask` role, so `estate_state`'s failure is a failure
+**under `vault:anthropic/claude-opus@5:ask`**. 013 set the rule and it applies here without
+adjustment: *a cell whose suite has a known live failure is not a live-qualified cell.* So the
+matrix column stays `fixture`.
+
+**What was earned is narrower and is the thing 024 was about**: the two answering suites passed
+against a real model *through the product path*, for both packs. Before this feature they could
+not have — no product path existed, and the live scorer asked the vendor directly.
+
+**The failing case ids were lost to a truncated capture** and are not reconstructed here, because
+guessing at them would be exactly the kind of unmeasured claim this repository keeps catching.
+Re-running costs 25 minutes and a vendor bill; `estate_state` belongs to the deferred estate-state
+feature, and identifying the cases is that feature's work rather than a debt this one leaves
+unstated.
+
+### `report_fidelity` could not run in this lane, and had not since 021
+
+`run_suite` raises `UnrunnableSuite` for a measured suite with no way to compile a report — a gate
+that cannot run must fail rather than pass. **Correct behaviour, firing on every invocation since
+021 put that suite in force**, because `tests/evals_live/test_gates_live.py` was written in 013 and
+nothing had run it since.
+
+**Fixed by exclusion rather than by wiring.** `report_fidelity` scores a compiled report and asks
+no model anything, so in a lane whose premise is *the same suites, against a real model* it has
+nothing to be live about; supplying `compile_for` would produce a row identical to the blocking
+lane's while wearing the word "live". The exclusion is guarded by a hermetic row in
+`tests/component/test_eval_gates.py` — beside the lane that runs on every commit, rather than
+inside the paid lane where the guard would be 24 minutes and a bill too late.
+
+**This is 024's own finding, one lane over**: a gate nobody had asked what it did.
 
 ---
 

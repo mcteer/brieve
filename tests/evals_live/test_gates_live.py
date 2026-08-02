@@ -38,7 +38,7 @@ from core.evals.scoring import (
     Scorer,
     run_suite,
 )
-from core.evals.suites import ANSWERING_SUITES, SUITES, load_pack_cases
+from core.evals.suites import ANSWERING_SUITES, MEASURED_SUITES, SUITES, load_pack_cases
 
 pytestmark = pytest.mark.live_model
 
@@ -66,8 +66,25 @@ def _grounding_for(pack: str, suite: str) -> str:
     )
 
 
+#: The suites this lane can actually score. **Measured suites are excluded, and the exclusion is
+#: the fix for a break nobody had run into.**
+#:
+#: `report_fidelity` scores a COMPILED REPORT against a run's material events — `run_suite` asks no
+#: model at all for it, by design (ADR-0018: the artifact people read is built from records rather
+#: than composed). So in a lane whose entire premise is *the same suites, against a real model*, it
+#: has nothing to be live about: wiring `compile_for` here would produce a row identical to the
+#: blocking lane's while wearing the word "live".
+#:
+#: **It was failing rather than passing wrongly**, which is the discipline working: `run_suite`
+#: raises `UnrunnableSuite` when a measured suite arrives with no way to compile, and a gate that
+#: cannot run must fail. But it had failed on every invocation since `report_fidelity` came into
+#: force in 021, because this file was written in 013 and nothing since had run it — the same shape
+#: as the finding 024 exists to close, one lane over.
+LIVE_SUITES: tuple[str, ...] = tuple(s for s in SUITES if s not in MEASURED_SUITES)
+
+
 @pytest.mark.parametrize("pack", ["vault", "terraform"])
-@pytest.mark.parametrize("suite", SUITES)
+@pytest.mark.parametrize("suite", LIVE_SUITES)
 def test_live_suite(pack: str, suite: str) -> None:
     """One suite, one pack, one real model. The per-cell table's `live` column is earned
     here or not at all."""

@@ -218,7 +218,7 @@ scoring authored strings.
 - [X] T033 Run `make check` and `make evals`.
 - [X] T034 Run `make conformance` on a live enclave. **Owed by name** — the enclave lane is
       `workflow_dispatch` only.
-- [ ] T035 Qualify the `ask` cell via `make evals-live` against a real model. **Owed by name** —
+- [X] T035 Qualify the `ask` cell via `make evals-live` against a real model. **Owed by name** —
       needs a paid credential, and is the only row here that touches a vendor.
 
 ---
