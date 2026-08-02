@@ -121,6 +121,15 @@ never calling the vendor.
       then assert the key value appears in **no** trail payload, **no** returned response body, and
       the record carries the `vault:model-credentials/...@v<n>` reference instead. The asker's
       `subject_user_id` is present beside it (SC-004a — as-platform, but for-whom is answerable).
+- [ ] T016a [US1] Thread `credential_source` to the run path's fetch site (pass-2 P2-2 —
+      measured: `_run_task` in `src/surfaces/dispatch/entrypoint.py:353` already holds
+      `credentials` and an identity fabric, and `resolve_bound_model` → `build_chooser` at
+      line ~409 is where a non-fixture model would need a key). For a non-fixture resolved model,
+      fetch through `BrokeredModelCredential` under the allocation's own identity **after**
+      `resolve_bound_model` validates the cell and **before** `build_chooser`, and pass the key
+      explicitly — never ambient env. A fixture model fetches nothing (the existing path,
+      unchanged). This is the run half of "both paths, one reader"; without it T017 asserts a
+      call site that does not exist.
 - [ ] T017 [US1] [GATE:conformance] Both-paths-one-**credential-mechanism** (analysis C1 — the
       *providers* differ by path and always have: the ask path builds `LiveAnswerProvider`, the
       run path uses `ModelChooser`; unifying those is not the design and no task should hunt for
@@ -164,12 +173,17 @@ check.
       first exception's pattern; ADR-0044's federate-or-broker rule routes models here; gateway
       and do-nothing rejected with the reasons from research). Status Accepted, dated, relating to
       ADR-0044/0022/0039/0026.
-- [ ] T021 [US3] Amend `.specify/memory/constitution.md` to **v1.4.0** with a Sync Impact Report:
-      *"exactly one named exception"* → *"exactly two"* (the second being the model vendor
-      credential, same governance clause); *"static API keys are prohibited without exception"* →
-      *"…prohibited as workload credentials; the named exceptions are held only in the trust store
-      and delivered per task."* MINOR (adds/expands); cite ADR-0058. **Security-maintainer review:
-      Dan McTeer.**
+- [ ] T021 [US3] Amend `.specify/memory/constitution.md` to **v1.4.0** with a Sync Impact Report.
+      **Two sentences in two different paragraphs** (measured — line ~150 and line ~166 of the
+      current file, not one place): the standing-credentials clause *"with exactly one named
+      exception: the rotated, Control-Group-governed management token behind the TFE broker"* gains
+      the model vendor credential as a second named exception with the same governance clause; and
+      the workload-identity clause *"static API keys are prohibited without exception"* becomes
+      *"…prohibited as workload credentials; the named exceptions above are held only in the trust
+      store and delivered per task."* **Both must move together** — amending one and leaving the
+      other is the contradiction this feature exists to end, in miniature. MINOR (adds/expands);
+      cite ADR-0058. Bump `**Version**` and `**Last Amended**`. **Security-maintainer review: Dan
+      McTeer.**
 - [ ] T022 [US3] [GATE:conformance] The constitution-agreement check in
       `tests/conformance/identity/test_posture_matches_constitution.py`, **scoped to what a check
       can see** (analysis U3): (a) the amended text names two exceptions; (b) no jobspec under
@@ -219,7 +233,7 @@ check.
 ```text
 Phase 1 (T001-T002, measurements)
   → Phase 2 (T003→T004→T005 ∥ T006→T007→T008)
-    → Phase 3 / US1 (T009→T010→T011→T012 → T013,T014,T015,T016,T017)
+    → Phase 3 / US1 (T009→T010→T011→T012 → T013,T014,T015,T016,T016a,T017)
       → Phase 4 / US2 (T018→T019)                    [needs the wired fetch]
       → Phase 5 / US3 (T020→T021→T022, T023)          [the amendment, gated by T022]
         → Phase 6 (T024∥T025 → T026; T027∥T028; T029→T030 last)
@@ -249,7 +263,7 @@ makes the posture a stated and checked fact. The named runs (T029, T030) and the
 ## Notes
 
 - **Gate types**: fail-closed (T004, T005, T013, T014), conformance (T006, T015, T017, T018, T022,
-  T026, T029), no-secret-leak (T016). Eval gate: none — no suite changes, no cell qualified.
+  T026, T029), no-secret-leak (T016). Run-path fetch: T016a. Eval gate: none — no suite changes, no cell qualified.
 - **Sealed core**: one task (T006), review gating the PR.
 - **The constitution amendment is a deliverable** (T020, T021, T022), not a follow-up — the single
   most important structural fact about this feature.
