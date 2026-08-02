@@ -41,6 +41,9 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     # parity across every implemented pair, so it is here as well as on the API. An operation on
     # one surface and not the other is a second authorization path wearing a friendlier name.
     "get_run_report": ("GET", "/runs/{run_id}/report"),
+    # 024. Answering is an API operation rather than portal logic (ADR-0034), which is exactly
+    # why it appears here too — ADR-0033 binds parity across every implemented pair.
+    "ask": ("POST", "/ask"),
     "stop_run": ("POST", "/runs/{run_id}/stop"),
     "list_agent_definitions": ("GET", "/agent-definitions"),
     "get_agent_definition": ("GET", "/agent-definitions/{agent_definition_id}"),
@@ -269,6 +272,26 @@ def operations() -> list[McpOperation]:
                 "type": "object",
                 "properties": {"run_id": {"type": "string", "minLength": 1}},
                 "required": ["run_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="ask",
+            audit_disposition=RECORDS,
+            method="POST",
+            path="/ask",
+            description=(
+                "Ask a question about the pinned guidance corpus. Every claim carries a "
+                "citation that resolves to a section, and a question the corpus does not "
+                "support is declined rather than answered. **Asking never acts** — no tool "
+                "is reachable from this path, whatever the question asks for."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"question": {"type": "string", "minLength": 1}},
+                "required": ["question"],
+                # No corpus parameter and no model parameter. Which corpus is pinned and which
+                # model the binding names are not the caller's to choose.
                 "additionalProperties": False,
             },
         ),

@@ -55,3 +55,8 @@ crash.log
 .vscode/
 *.iml
 .enclave/
+
+# 024: raw upstream HTML, kept only so `corpus-sync` can recompute digests. The corpus itself is
+# VENDORED as extracted sections under `corpus/documents/` and is committed; this is the markup
+# those were extracted from, which is fourteen megabytes of navigation nobody reads.
+.corpus-cache/

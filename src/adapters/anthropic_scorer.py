@@ -31,6 +31,38 @@ from core.evals.scoring import (
 from core.evals.suites import EvalCase, UnrunnableSuite
 
 
+def client_and_model(model: str = LIVE_MODEL) -> tuple[object, str]:
+    """The credential check, the import check, and the model-id derivation — once.
+
+    **Shared rather than copied**, because 024 added a second live caller (the answering provider)
+    and all three of these have already been wrong here at least once: an unset key that skipped
+    instead of raising, a missing extra, and a bare model name no API serves. Two copies would mean
+    fixing the next one twice, and Principle VII exists for exactly this.
+    """
+    key = os.environ.get(EVAL_PROVIDER_KEY, "").strip()
+    if not key:
+        raise UnrunnableSuite(
+            f"the live lane has no provider credential ({EVAL_PROVIDER_KEY} is unset); "
+            f"an unrunnable suite raises rather than skipping (SC-005a)"
+        )
+    try:
+        import anthropic
+    except ImportError as exc:
+        raise UnrunnableSuite(
+            "the anthropic SDK is not installed; the live lane needs the `evals` extra "
+            "(uv sync --extra evals)"
+        ) from exc
+
+    # provider/model@version → the provider's model id as "{model}-{version}":
+    # anthropic/claude-opus@5 → claude-opus-5. The first draft passed the bare model
+    # name — "claude-opus", which no API serves — and the pinned identifier's whole
+    # point is that the thing called is the thing recorded.
+    _, model_at_version = model.split("/", 1)
+    model_name, _, version = model_at_version.partition("@")
+    api_model = f"{model_name}-{version}" if version else model_name
+    return anthropic.Anthropic(api_key=key), api_model
+
+
 class LiveModelScorer:
     """Asks a real model. Behind `@pytest.mark.live_model`, never in a blocking lane."""
 
@@ -43,29 +75,8 @@ class LiveModelScorer:
         self._grounding = grounding
 
     def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
-        key = os.environ.get(EVAL_PROVIDER_KEY, "").strip()
-        if not key:
-            raise UnrunnableSuite(
-                f"the live lane has no provider credential ({EVAL_PROVIDER_KEY} is unset); "
-                f"an unrunnable suite raises rather than skipping (SC-005a)"
-            )
-        try:
-            import anthropic
-        except ImportError as exc:
-            raise UnrunnableSuite(
-                "the anthropic SDK is not installed; the live lane needs the `evals` extra "
-                "(uv sync --extra evals)"
-            ) from exc
-
-        # provider/model@version → the provider's model id as "{model}-{version}":
-        # anthropic/claude-opus@5 → claude-opus-5. The first draft passed the bare model
-        # name — "claude-opus", which no API serves — and the pinned identifier's whole
-        # point is that the thing called is the thing recorded.
-        _, model_at_version = self._model.split("/", 1)
-        model_name, _, version = model_at_version.partition("@")
-        api_model = f"{model_name}-{version}" if version else model_name
-        client = anthropic.Anthropic(api_key=key)
-        response = client.messages.create(
+        client, api_model = client_and_model(self._model)
+        response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             # 4096, because 1024 was the live lane's quietest defect: Opus 5 reasons
             # before it answers, the reasoning spends from the same budget, and a case
@@ -120,4 +131,4 @@ class LiveModelScorer:
         return text
 
 
-__all__ = ["LiveModelScorer"]
+__all__ = ["LiveModelScorer", "client_and_model"]

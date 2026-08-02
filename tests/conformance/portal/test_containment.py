@@ -290,3 +290,48 @@ def test_row_the_client_does_not_reload_unconditionally() -> None:
         "window.location.reload() is not inside a condition; an unconditional reload on "
         "stream close is an infinite loop"
     )
+
+
+def test_row_the_portal_holds_no_answering_logic() -> None:
+    """024's boundary (T032a), in the form that survives the merge that created it.
+
+    **The task asked for a diff against `main`, and a diff is the wrong shape for this.** It is
+    true for exactly as long as the branch exists: once 024 merges, `main` contains the change and
+    the assertion becomes vacuous — a scope boundary that stops checking on the day it starts
+    mattering. The one-time check was run and recorded in this feature's conformance contract;
+    what belongs in a row is the property that check was standing in for.
+
+    That property is ADR-0034's. Answering is an API operation, so the portal reaches it the way it
+    reaches every other one — through the relay, as a catalogued call. A portal module that
+    imported `core.answering` would be answering *itself*, which is the fourth authorization path
+    these rows exist to prevent, arriving as a helpful convenience rather than as a new surface.
+    """
+    offenders = []
+    for module in _modules():
+        tree = ast.parse(module.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""]
+            else:
+                continue
+            if any(name.startswith("core.answering") for name in names):
+                offenders.append(module.name)
+
+    assert not offenders, (
+        f"{offenders} import core.answering. The portal consumes the catalogue; it does not "
+        f"implement it (ADR-0034), and an answering path reachable here and absent from the API "
+        f"is a second answer to 'who may ask'"
+    )
+
+
+def test_break_fixture_a_portal_module_answering_for_itself_is_detected() -> None:
+    """The fixture that proves the row above is doing work rather than passing on absence."""
+    contrived = ast.parse("from core.answering.answer import answer_question\n")
+    found = [
+        node.module
+        for node in ast.walk(contrived)
+        if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("core.answering")
+    ]
+    assert found == ["core.answering.answer"]

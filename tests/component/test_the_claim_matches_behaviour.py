@@ -42,6 +42,7 @@ DRIVERS: dict[str, Any] = {
     "get_thread": lambda s, subj: s.mcp.call("get_thread", {"thread_id": "nope"}, subject=subj),
     "create_thread": lambda s, subj: s.mcp.call("create_thread", {}, subject=subj),
     "stop_run": lambda s, subj: s.mcp.call("stop_run", {"run_id": "nope"}, subject=subj),
+    "ask": lambda s, subj: s.mcp.call("ask", {"question": "anything"}, subject=subj),
 }
 
 
@@ -117,7 +118,15 @@ def test_every_operation_claiming_to_record_actually_does() -> None:
         # own stream (FR-005a). Either satisfies the claim; neither being present does not.
         assert any(
             e.event_type.value
-            in {"record_read", "record_read_refused", "thread_created", "run_stopped"}
+            in {
+                "record_read",
+                "record_read_refused",
+                "thread_created",
+                "run_stopped",
+                # 024. An ask writes its own entry to `ask:{tenant}` — including when the platform
+                # could not attempt it, because someone still asked.
+                "ask_answered",
+            }
             for e in written
         ), (
             f"{name} is declared `records` and wrote nothing — the surface tells every client "

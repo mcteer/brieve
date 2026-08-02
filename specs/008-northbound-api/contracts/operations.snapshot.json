@@ -11,6 +11,11 @@
   },
   {
     "method": "POST",
+    "name": "ask",
+    "path": "/ask"
+  },
+  {
+    "method": "POST",
     "name": "request_mapping_change",
     "path": "/claim-mappings"
   },

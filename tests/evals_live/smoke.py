@@ -18,8 +18,14 @@ needed a suite, a majority vote, or a second pack. The full lane is for *qualify
 this is for finding out whether the harness works at all, and the two are different jobs
 that were being done by the same twenty-eight-minute tool.
 
-    make evals-smoke     # ~2 calls, ~10 seconds
+    make evals-smoke     # ~4 calls, ~20 seconds
     make evals-live      # ~180 calls, ~28 minutes — only once smoke is clean
+
+**024 added the third and fourth calls, and they probe a different thing.** The first two ask
+whether the model answers usably. The answering probes ask whether the model's answer survives the
+*product path* — every citation resolved against the pin before a claim ships. A harness defect
+there looks nothing like an empty response: it looks like a confident answer that declines, because
+the model invented an anchor. That is invisible in a verdict and obvious in the printed candidates.
 
 The check is deliberately not a pytest row. A row reports pass or fail; what this needs to
 show is the **raw text**, because three of the four defects above were invisible in a
@@ -31,7 +37,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from adapters.anthropic_answering import LiveAnswerProvider
 from adapters.anthropic_scorer import LiveModelScorer
+from core.answering.answer import ANSWERED, DECLINED, ProviderUnavailable, answer_question
+from core.answering.corpus import load_corpus
 from core.evals.judge import load_seed_set
 from core.evals.scoring import LIVE_MODEL, GovernedSubject
 from core.evals.suites import EvalCase, load_pack_cases
@@ -86,12 +95,41 @@ def main() -> int:
             "spend 28 minutes telling you the same thing"
         )
 
+    # 3 & 4. The answering path against a real model. Both directions, because they fail
+    # differently: a citable question that declines means the model invented an anchor, and an
+    # uncitable question that answers means the pin is not being enforced.
+    corpus = load_corpus()
+    provider = LiveAnswerProvider()
+    for suite, expectation in (("citation_accuracy", ANSWERED), ("must_decline", DECLINED)):
+        probe = load_pack_cases(ROOT / "packs" / "vault", suite)[0]
+        print(f"--- answering path, case {probe.id} (expects {expectation})")
+        try:
+            candidates = provider.answer(probe.prompt, corpus)
+        except ProviderUnavailable as exc:
+            print(f"    PROVIDER FAULT: {exc}\n")
+            failures.append(f"{suite}: the provider raised — {exc}")
+            continue
+        for candidate in candidates[:3]:
+            print(f"    claim: {str(candidate.get('statement', ''))[:160]!r}")
+            for cite in candidate.get("citations", []) or []:
+                path, anchor = str(cite.get("path", "")), str(cite.get("anchor", ""))
+                mark = "resolves" if corpus.resolves(path, anchor) else "DOES NOT RESOLVE"
+                print(f"      → {path}#{anchor}  [{mark}]")
+        answer = answer_question(question=probe.prompt, corpus=corpus, provider=provider)
+        print(f"    disposition: {answer.disposition} ({answer.declined_reason or 'answered'})\n")
+        if answer.disposition != expectation:
+            failures.append(
+                f"{suite}: the path {answer.disposition} where {expectation} was expected. "
+                f"Dropped claims: {list(answer.dropped)[:2]}. A declining citation case usually "
+                f"means invented anchors; an answering decline case means the pin is not binding"
+            )
+
     if failures:
         print("SMOKE FAILED — do not spend the full lane:", file=sys.stderr)
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print("smoke clean: responses are non-empty and the judge discriminates.")
+    print("smoke clean: responses non-empty, the judge discriminates, the path resolves.")
     return 0
 
 

@@ -43,6 +43,8 @@ NEW_OPERATIONS = [
     # check working: an operation that skipped these rows would ship without the
     # authentication coverage every other one has, and nothing would have said so.
     ("GET", "/runs/r/report", "get_run_report", {"run_id": "r"}),
+    # 024. Answering is an API operation (ADR-0034), so it answers to these rows like any other.
+    ("POST", "/ask", "ask", {"question": "anything"}),
     ("POST", "/runs/r/stop", "stop_run", {"run_id": "r"}),
     ("GET", "/claim-mappings/a", "collect_mapping_change", {"accessor": "a"}),
     ("GET", "/agent-definitions", "list_agent_definitions", {}),

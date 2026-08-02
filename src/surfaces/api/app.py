@@ -20,8 +20,8 @@ from core.audit.sink import AuditSink
 from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
 from core.threads.store import InMemoryThreadStore, ThreadStore
+from surfaces.api import ask, evidence, mappings, reports, runs, threads
 from surfaces.api import definitions as definitions_routes
-from surfaces.api import evidence, mappings, reports, runs, threads
 from surfaces.api.verification import IdentityVerifier
 from surfaces.dispatch.types import RunDispatcher
 
@@ -54,6 +54,10 @@ def create_app(
     definitions: Any | None = None,
     thread_store: ThreadStore | None = None,
     reconciler: Any | None = None,
+    # 024. Absent by default, and the route is mounted regardless: a surface with no model
+    # answers 503 rather than answering from the corpus alone, which FR-011a forbids.
+    ask_provider: Any | None = None,
+    ask_model: str = "unconfigured",
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -96,6 +100,10 @@ def create_app(
     app.state.reconciler = reconciler if reconciler is not None else _AbsentReconciler()
 
     app.include_router(runs.build_router())
+    # 024. Mounted unconditionally: the operation exists on this surface whether or not a model is
+    # configured, and answers 503 when one is not. A route whose PRESENCE varied by configuration
+    # would make the operation snapshot depend on assembly — which 011 already paid for once.
+    app.include_router(ask.build_router(provider=ask_provider, model=ask_model))
     app.include_router(threads.build_router())
     if authority_submitter is not None:
         app.include_router(mappings.build_router())

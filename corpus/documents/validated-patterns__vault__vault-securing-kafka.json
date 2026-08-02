@@ -1,0 +1,66 @@
+{
+  "path": "/validated-patterns/vault/vault-securing-kafka",
+  "url": "https://developer.hashicorp.com/validated-patterns/vault/vault-securing-kafka",
+  "sections": [
+    {
+      "anchor": "target-audience",
+      "title": "Target audience",
+      "text": "This guide is intended for the following roles: Consumers who are running Java based applications using mTLS Vault platform team Automation team in charge of consumer infrastructure"
+    },
+    {
+      "anchor": "prerequisites",
+      "title": "Prerequisites",
+      "text": "To complete this guide, you will need the following: A Kafka cluster with mTLS configuration A Vault cluster configured as a PKI certificate authority Example code for this pattern Your development machine should include the following applications Vault Docker Docker Compose Git JDK to run keytool Openssl This guide has the following limitations: The demo environment included in the example repository is not highly available. The example uses self signed certificates. You should obtain certificates that are already trusted by your existing certificate authority. If you do not already have a Vault cluster configured, refer to the HashiCorp Validated Design for Vault. The example Vault container is not production ready. The TTLs in the example Vault Agent files are very short. When going to production, extend them to reflect your company's policies and avoid unnecessary load on the Vault cluster."
+    },
+    {
+      "anchor": "background-and-best-practices",
+      "title": "Background and best practices",
+      "text": "Mutual TLS certificates are essential for securing information, ensuring data integrity, and authenticating nodes in a clustered application environment. Best practices dictate that certificates should be rotated on a regular basis. In a traditional enterprise pattern, the team in charge of an application would make a request to the security team. The security team would then transfer the keys and certificates back to the application team, who installs the newly provided certificates and restarts their application. With this tedious manual process, there are many opportunities for error or misconfiguration. Considering the efforts from large organizations to shorten the lifespan of certificates to 90 or even 45 days, adopting an automated solution will become very important. In order to reduce the risk of expired or misconfigured certificates, we recommend adopting an automated certificate management workflow using Vault and Vault Agent. Vault Agent will allow for application servers to automatically connect to a Vault Cluster with the PKI Secret engine configured. When the expiration time is approaching, Vault Agent will automatically retrieve a new certificate from the Vault Cluster and write it to a file on the application server. This eliminates the manual step of the security team issuing a new certificate. After writing the new certificates and keys, Agent will restart the Kafka service, eliminating the manual step that the application team would traditionally fill. With this pattern in place, the entire system is automated and the certificate renewal process becomes part of routine instead of a special occasion. To enable automated mTLS certificate management for Kafka using Vault, you need to create and configure several objects in Vault: An authentication method A PKI secret engine Roles for each of the servers and clients (both for the PKI secrets engine and authentication method). These objects support secure certificate issuance, authentication, and role-based access control for Kafka servers and clients. Below is a complete checklist, with further documentation. The following is a list of high level steps required to complete this architecture: Configure the PKI Secret Engine in Vault Create two separate secret engine roles. One for your Kafka servers and one for your clients Configure an authentication method in Vault that Vault Agent will use to authenticate the Kafka servers and clients Create two separate roles on the auth method, one for servers and one for clients. Install Vault Agent on your Kafka servers and clients Configure Vault Agent Templates on your Kafka servers and clients"
+    },
+    {
+      "anchor": "validated-architecture",
+      "title": "Validated architecture",
+      "text": "The following diagram shows the workflow for this pattern: A Vault cluster that creates and revokes PKI certificates A Kafka cluster that uses the certificates to route network traffic through mTLS Vault Agent installed on the Kafka servers Producers and Consumers sending traffic to the Kafka Brokers"
+    },
+    {
+      "anchor": "people-and-process-considerations",
+      "title": "People and process considerations",
+      "text": "There are several existing processes that will likely exist within your organization. In order to be successful in implementing full TLS automation, be sure to consider the following items during planning: The Vault Agent is a binary that will need to be included in your machine image or configuration as code solution. You should ensure that there is an automated process in place to apply updates to Kafka, Zookeeper, Vault Agent, as well as any other binaries on the system. If you do not currently have a solution for building images, consider leveraging Packer to maintain an immutable image. The current approach your organization has for obtaining and renewing certificates. If the Vault PKI Secret Engine is not already an approved certificate authority, you will need to initiate discussions with your security team to gain approval. Highlight the benefits of short-lived certificates, automated issuance, and lifecycle management to support your case. In order to be aware of a certificate revocation list hosted in Vault, Kafka needs to be configured with the correct Java server properties . You can do this by configuring the KAFKA_OPTS: parameter with these values: \"-Dcom.sun.security.enableCRLDP=true -Dcom.sun.net.ssl.checkRevocation=true\""
+    },
+    {
+      "anchor": "workflow",
+      "title": "Workflow",
+      "text": "To follow this pattern, there are three general workflows that will need to be created and monitored. Vault PKI Secret Engine and certificate authority Vault Agent authentication and connection to Vault Vault Agent requesting/renewing certificates and restarting the Kafka services"
+    },
+    {
+      "anchor": "set-up-your-kafka-servers-with-prerequisite-software",
+      "title": "Set up your Kafka servers with prerequisite software",
+      "text": "The platform team needs to set up the Kafka servers with prerequisite software. Install Vault, Docker, Docker Compose, Git, JDK and OpenSSL as defined in the prerequisites Download the example code for this pattern $ git clone https://github.com/hashicorp-validated-designs/vault-mtls-kafka Review the Makefile targets to see how the example infrastructure is prepared. Review docker-compose.yml , which will launch a Vault, Kafka, and Zookeeper container, as well as a Docker network for all the containers to communicate. In the vault-agent directory, there are example template files, configured to request certificates and certificate authority chains from Vault, with a specific time to live. There is also a shell script that Vault Agent will use to restart the Kafka container, when the certificate is renewed. In the vault directory, there are two example Vault policies that are attached to the Vault roles for the Kafka servers and clients. This prevents a client from requesting a server certificate and maintains the best practice of least privilege."
+    },
+    {
+      "anchor": "configure-vault-pki-secret-engine-and-auth-method",
+      "title": "Configure Vault PKI secret engine and auth method",
+      "text": "The platform team needs to configure the Vault PKI secret engine and auth method. Create an example PKI secret engine, roles. This target in the Makefile contains a set of commands from our Build your own certificate authority (CA) tutorial. They will configure the Vault container with a sample certificate authority and roles, which will be used to generate certificates for Kafka. $ make vault_pki_and_keys"
+    },
+    {
+      "anchor": "run-vault-agent-and-launch-the-kafka-broker",
+      "title": "Run Vault Agent and launch the Kafka broker",
+      "text": "The platform team needs to run Vault Agent and launch the Kafka broker. Run the following command to start Vault Agent, get the certificate file from Vault, and start up Kafka $ make agent_kafka_and_topics Vault Agent will re-create the required certificate files in your local pki directory. The Kafka configuration will use them to encrypt its traffic with mTLS. Watching the output of Vault Agent, as it requests the new certificate and then runs the subsequent commands will help understand the process: $ tail -f vault-agent-kafka.log The example vault-agent/kafka-servers.tpl template has a TTL of only 3 minutes. In a production use case, you should increase the time to live to around a day, to ensure the certificate is frequently rotated, but also avoid unnecessary load on your Vault cluster and other infrastructure. Following the logic described in the template documentation , Vault Agent will renew the certificate and run a command to restart the Kafka broker. Line 21 of vault-agent/vault-agent-cert.hcl tells Vault Agent to run the vault-agent/kafka-service.sh script, which contains the logic to successfully restart Kafka."
+    },
+    {
+      "anchor": "run-kafka-clients",
+      "title": "Run Kafka clients",
+      "text": "The platform team needs to run the Kafka clients. Launch a Kafka client that takes your input and sends it to the Kafka broker. The expected result is a terminal that allows you to send messages by typing and pressing enter: $ make producer_run Launch a Kafka client checks the Kafka broker and displays the message that is received. The expected result is a terminal that displays the messages entered in on the producer terminal window: $ make consumer_run The Kafka clients' certificates are templated by Vault Agent using these template files: vault-agent/kafka-consumer.tpl and vault-agent/kafka-producer.tpl When the certificate files expire after the TTL, these producers and consumers will begin to throw SSL errors. These are basic commands launched in the terminal, so Vault Agent does not own or restart them. You can manually restart after certificate expiration, by pressing CTRL+c and running the make consumer_run or make producer_run command again. In a production environment, your clients should also be managed by Vault Agent in a similar method to the Kafka brokers."
+    },
+    {
+      "anchor": "clean-up-local-infrastructure",
+      "title": "Clean up local infrastructure",
+      "text": "Once you are done with this guide, the platform team should to clean up the local infrastructure. $ make destroy"
+    },
+    {
+      "anchor": "conclusion",
+      "title": "Conclusion",
+      "text": "In this guide, you have learned how to secure Kafka with Vault PKI. For more information on how to implement this pattern in your organization, refer to the following resources: Build your own certificate authority (CA) OpenCredo guide to securing Kafka using Vault PKI Previous Retrieve Vault secrets with GHA Next Query Vault secrets with Chef"
+    }
+  ]
+}

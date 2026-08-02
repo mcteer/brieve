@@ -1,0 +1,91 @@
+{
+  "path": "/validated-patterns/vault/integrate-vault-ssh-with-ansible-automation-platform",
+  "url": "https://developer.hashicorp.com/validated-patterns/vault/integrate-vault-ssh-with-ansible-automation-platform",
+  "sections": [
+    {
+      "anchor": "target-audience",
+      "title": "Target audience",
+      "text": "This guide references the following roles: Platform team: The team who manages your organization's platform. This may include security and platform teams. This role encompasses responsibilities of the Vault administrator and producer: Managing and configuring Vault and Ansible Automation Platform Maintaining golden image pipeline and image management, typically using HashiCorp Packer Application team: The team who consumes configuration management capabilities in Ansible Automation Platform"
+    },
+    {
+      "anchor": "prerequisites",
+      "title": "Prerequisites",
+      "text": "To complete this guide, you will need the following: A Vault Enterprise or HCP Vault Dedicated cluster A Red Hat Ansible Automation Platform deployment Administrative access to both platforms A golden image pipeline process using HashiCorp Packer For the platform team, you will need: Privileged access to a Vault Enterprise or HCP Vault Dedicated cluster with permissions to create auth mounts, configure auth roles, and create policies Administrative access to Ansible Automation Platform to configure credentials and job templates Access to the image pipeline process to configure public key authentication and SSHd configuration For the application team, you will need: Permissions to consume Ansible jobs/workflow templates that use pre-created credentials in Ansible Automation Platform"
+    },
+    {
+      "anchor": "limitations",
+      "title": "Limitations",
+      "text": "The Vault Signed SSH credentials plugin supports the following Vault auth methods: Token, TLS, Kubernetes and AppRole The Kubernetes authentication method is only supported when Ansible Automation Platform runs on Kubernetes (not VM-based). This method is limited to a single service account across the platform, reducing audit granularity. We do not recommend this method for production use This pattern uses AppRole as an example, though it is interchangeable with other supported authentication methods"
+    },
+    {
+      "anchor": "background-and-best-practices",
+      "title": "Background and best practices",
+      "text": "Before implementing this integration, establish a clear multi-tenancy and RBAC (Role-Based Access Control) strategy. Define clear mapping between tenants in Ansible Automation Platform and tenants in HashiCorp Vault to ensure operational security, scalability, and alignment with organizational structure. Best practices include: Map each application team to specific tenants in both platforms Align role-based access controls to maintain security boundaries across products Use Vault policy templating to simplify configuration and ongoing maintenance Implement least privilege principles for SSH credential access"
+    },
+    {
+      "anchor": "validated-architecture",
+      "title": "Validated architecture",
+      "text": "The following diagram shows the architecture for this pattern: A tenant in Vault operates in an isolated namespace or path with its own SSH secrets engine role and authentication method. Ansible Automation Platform dynamically retrieves signed SSH credentials from Vault via the HashiCorp Vault signed SSH credentials plugin, feeding them into machine credentials used by AAP job and workflow templates. This enables secure, just-in-time SSH access to remote hosts without managing static SSH keys. The workflow to automate the delivery of Vault-signed SSH credentials in Ansible Automation Platform spans three stages: Tenancy design - Maps consumer tenants and role-based access across products to enforce security boundaries Golden image workflow - Embeds integration prerequisites and public key SSH configuration to standardize deployment baseline in golden images Automated consumer onboarding - Automates HashiCorp Vault and Ansible Automation Platform configuration to enable consumption at scale"
+    },
+    {
+      "anchor": "design-tenancy-and-team-boundaries",
+      "title": "Design tenancy and team boundaries",
+      "text": "The platform team needs to establish clear tenant and permission mapping between both systems. This requires cross-team collaboration when HashiCorp Vault and Ansible Automation Platform are managed by separate teams. In this design, a tenant is an isolated organizational unit that represents a specific application team and describes security boundaries for resources, permissions, and access controls across both platforms."
+    },
+    {
+      "anchor": "define-ansible-automation-platform-tenants",
+      "title": "Define Ansible Automation Platform tenants",
+      "text": "In Ansible Automation Platform, a tenant typically maps to an AAP organization. Each tenant should represent a team, business unit, or environment (Dev, Test, Prod) depending on your organization's governance model."
+    },
+    {
+      "anchor": "align-credentials-with-least-privilege-principles",
+      "title": "Align credentials with least privilege principles",
+      "text": "Vault-signed SSH credentials should be scoped per team/tenant. Use dedicated Vault roles and identity per team, with Vault policies aligned to least privilege: Restrict Vault access via policies to relevant SSH roles only Use Vault policy templating to simplify configuration and ongoing maintenance Limit Vault secrets backend role to specific users using the allow_users attribute"
+    },
+    {
+      "anchor": "rbac-mapping-in-ansible-automation-platform",
+      "title": "RBAC mapping in Ansible Automation Platform",
+      "text": "Ansible Automation Platform entity Vault integration consideration Organization Tenant in AAP. Owns its credentials and job templates. Typically a Vault role will be defined per organization, per set of credentials Credentials - machine credentials (Vault signed SSH) Used during AAP job template execution for remote SSH authentication. Machine credentials source credentials via the Vault SSH credentials plugin AAP roles Grant access to credentials to users/groups within an AAP organization"
+    },
+    {
+      "anchor": "configure-golden-images",
+      "title": "Configure golden images",
+      "text": "The platform team needs to configure golden images for public key SSH authentication as a prerequisite for this pattern. This requires: Vault SSH public key embedded within your image SSHd configured for public key signed authentication with Vault SSH keys We recommend using HashiCorp Packer with the Ansible provisioner . Below is an example Ansible playbook task for configuring SSHd for Vault public key signed SSH. The example assumes your SSH secrets engine is mounted to the path ssh : # Vault SSH signing CA - name : Get Vault SSH CA public key ansible.builtin.get_url : url : \"{{ lookup('env', 'VAULT_URL') }}/v1/ssh/public_key\" headers : X-Vault-Namespace : \"admin/{{ lookup('env', 'VAULT_NAMESPACE') }}\" dest : /etc/ssh/trusted-user-ca-keys.pem mode : '0644' - name : Enable SSH public key authentication ansible.builtin.lineinfile : path : /etc/ssh/sshd_config regexp : '^#?PubkeyAuthentication' line : 'PubkeyAuthentication yes' - name : Configure SSH to trust Vault CA ansible.builtin.lineinfile : path : /etc/ssh/sshd_config line : \"TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem\" - name : Restart SSH ansible.builtin.service : name : sshd state : restarted"
+    },
+    {
+      "anchor": "automate-consumer-onboarding",
+      "title": "Automate consumer onboarding",
+      "text": "The platform team should use the Vault Terraform provider to automate tenant onboarding. This integration should be part of your broader tenant onboarding process for both Vault and Ansible Automation Platform to ensure consistent, scalable configuration. For each SSH secrets backend role, create a corresponding Vault entity and alias. The example below demonstrates configuring a Vault role for a tenant in Ansible Automation Platform to enable SSH key signing. This example intentionally limits allowed users using the allowed_users attribute and sets TTL for the signed SSH certificate."
+    },
+    {
+      "anchor": "configure-vault-with-terraform",
+      "title": "Configure Vault with Terraform",
+      "text": "Below is a Terraform example for configuring a single tenant in HashiCorp Vault using AppRole: resource \"vault_approle_auth_backend_role\" \"this\" { backend = var.auth_backend_approle_path role_name = var.tenant token_policies = [ \"aap\" ] } resource \"vault_approle_auth_backend_role_secret_id\" \"this\" { backend = vault_approle_auth_backend_role.this.backend role_name = var.tenant } resource \"vault_identity_entity\" \"this\" { name = var.tenant metadata = { ssh_role_name = var.tenant } } # Create entity alias for the role resource \"vault_identity_entity_alias\" \"this\" { name = vault_approle_auth_backend_role.this.role_id mount_accessor = var.approle_mount_accessor canonical_id = vault_identity_entity.this.id } resource \"vault_ssh_secret_backend_role\" \"this\" { backend = \"ssh\" name = var.tenant allow_user_certificates = true default_user = \"aap\" allowed_users = \"aap\" key_type = \"ca\" ttl = \"7200\" max_ttl = \"7200\" default_extensions = { \"permit-pty\" = \"\" } allowed_extensions = \"permit-pty,permit-port-forwarding\" } Example templated SSH secrets engine policy for Ansible Automation Platform SSH signing: # Allow access to SSH secrets engine for signing based on the entity name path \" ssh / sign /{{identity.entity.name}} \" { capabilities = [\" read \", \" update \"] }"
+    },
+    {
+      "anchor": "configure-ansible-automation-platform",
+      "title": "Configure Ansible Automation Platform",
+      "text": "To automate the Ansible Automation Platform configuration for HashiCorp Vault, use the certified Ansible Controller collections to configure a tenant within Ansible Automation Platform, including credentials, roles, and the required configuration for authentication and mapping to the SSH secret engine role in HashiCorp Vault. Note When calling Ansible Automation Platform job templates via Terraform or the API, use Ansible Automation Platform job template surveys to mark sensitive input values as password. This ensures sensitive inputs are masked in logs and job execution within Ansible Automation Platform. Below is an example for configuring Ansible Automation Platform Vault Signed SSH credentials plugin using the certified Ansible Automation Platform collections: - name : Configure AppRole for HashiCorp Vault SSH Credential ansible.controller.credential : name : \"hashicorp_vault_ssh_approle_{{ tenant }}\" description : \"Credential for HashiCorp Vault SSH AppRole integration {{ tenant }}\" organization : \"{{ organization_name }}\" credential_type : \"HashiCorp Vault Signed SSH\" state : \"{{ state }}\" inputs : url : \"{{ vault_url }}\" cacert : \"{{ ca_cert | default(None) }}\" role_id : \"{{ role_id }}\" secret_id : \"{{ secret_id }}\" default_auth_path : \"{{ auth_path | default('approle') }}\" namespace : \"{{ vault_namespace }}\" validate_certs : true controller_host : \"{{ aap_url }}\" controller_username : \"{{ lookup('env', 'CONTROLLER_USERNAME') }}\" controller_password : \"{{ lookup('env', 'CONTROLLER_PASSWORD') }}\" register : vault_ssh_auth_credentials Below is an example configuring machine credentials and credential plugin source via the Ansible Automation Platform controller collection: - name : Configure Machine Credentials using Vault Signed SSH ansible.controller.credential : name : \"hashicorp_vault_ssh_machine_creds_{{ tenant }}\" description : \"HashiCorp Vault signed dynamic SSH credentials\" organization : \"{{ organization_name }}\" credential_type : \"Machine\" state : \"{{ state }}\" inputs : username : \"{{ machine_user }}\" ssh_key_data : \"{{ ssh_private_key | default(None) }}\" controller_host : \"{{ aap_url }}\" controller_username : \"{{ lookup('env', 'CONTROLLER_USERNAME') }}\" controller_password : \"{{ lookup('env', 'CONTROLLER_PASSWORD') }}\" validate_certs : true register : ssh_vault_machine_credentials - name : Use HashiCorp Vault Signed SSH as Credential Source ansible.controller.credential_input_source : input_field_name : \"ssh_public_key_data\" target_credential : \"{{ ssh_vault_machine_credentials.id }}\" source_credential : \"hashicorp_vault_ssh_approle_{{ tenant }}\" state : \"{{ state | default('present') }}\" metadata : public_key : \"{{ ssh_public_key | default(None) }}\" auth_path : \"{{ auth_path | default('approle')}}\" role : \"{{ ssh_vault_role | default('aap_tenant') }}\" secret_path : \"{{ secret_path | default('ssh') }}\" controller_host : \"{{ aap_url }}\" controller_username : \"{{ lookup('env', 'CONTROLLER_USERNAME') }}\" controller_password : \"{{ lookup('env', 'CONTROLLER_PASSWORD') }}\" validate_certs : true register : vault_ssh_credential_source"
+    },
+    {
+      "anchor": "strategies-for-credential-rotation",
+      "title": "Strategies for credential rotation",
+      "text": "As the credentials to integrate with HashiCorp Vault (whether AppRole or TLS) are static, rotate these credentials on a regular basis. Some strategies to achieve this outcome are: Self-rotate credentials per organization using scheduled Ansible Automation Platform job templates. This requires a HashiCorp Vault policy that allows secret_id update : path \"auth/approle/role/<role_name>/secret-id\" { capabilities = [ \"update\" ] } Centralized pipeline using JWT authentication to Vault with privileged access to update/rotate Ansible Automation Platform credentials across organizations"
+    },
+    {
+      "anchor": "people-and-process-considerations",
+      "title": "People and process considerations",
+      "text": "This integration requires mapping security boundaries across multiple products\u2014Ansible Automation Platform and HashiCorp Vault\u2014and the downstream hosts these platforms manage. Cross-team collaboration is critical when these platforms are managed by separate teams to ensure: Consistent role-based access controls Aligned tenancy models Coordinated lifecycle management of Vault credentials Clear ownership of integration points Shared operational workflows and joint testing"
+    },
+    {
+      "anchor": "conclusion",
+      "title": "Conclusion",
+      "text": "Integrating HashiCorp Vault's SSH secrets engine with Ansible Automation Platform transforms traditional static credential management into a dynamic approach that uses SSH public key signing to address the core security challenges of managing remote hosts at scale. By using Vault for SSH key signing, organizations can eliminate credential sprawl, automate key rotation, and enforce granular access policies while maintaining comprehensive audit visibility. The combination of multi-tenant design and least-privilege role-based access creates a robust foundation for secure infrastructure automation."
+    },
+    {
+      "anchor": "related-resources",
+      "title": "Related resources",
+      "text": "For more information on implementing this pattern in your organization, refer to the following resources: Red Hat Ansible Automation Platform - HashiCorp Vault Signed SSH Credentials Vault SSH secrets engine documentation Managing SSH access at scale with HashiCorp Vault Previous Integrate Vault with Backstage and Okta Next Vault PKI with VSO on OpenShift"
+    }
+  ]
+}

@@ -134,6 +134,45 @@ class FixtureScorer:
         return case.recorded
 
 
+class AnsweringScorer:
+    """Drives the **product answering path** and scores what it produced.
+
+    **This is why 024 exists.** `FixtureScorer` replays a string somebody authored;
+    `LiveModelScorer` asks a vendor directly. Neither has ever touched product code — which is how
+    `citation_accuracy` and `must_decline` came to be green over a capability that did not exist,
+    for as long as it did not exist.
+
+    So this scorer asks the real path, with a provider injected. The suite then scores an answer
+    the product actually produced, deterministically, and with **no vendor credential** — which is
+    the only arrangement under which those gates mean anything and the blocking lane stays runnable.
+
+    It sits alongside `FixtureScorer` rather than replacing it: other suites use that one, and its
+    refusal to invent silence for an unrecorded case is a property worth keeping.
+    """
+
+    def __init__(self, *, corpus: Any, provider: Any = None) -> None:
+        self._corpus = corpus
+        # Built PER CASE when omitted, because the recording is that case's model output. One
+        # provider held across a suite would answer every prompt with a single recording — not a
+        # fixture of the suite, but a fixture of one case wearing the suite's name.
+        self._provider = provider
+
+    def respond(self, subject: GovernedSubject, case: EvalCase) -> str:
+        from core.answering.answer import ANSWERED, RecordedProvider, answer_question
+
+        provider = self._provider or RecordedProvider(case.recorded)
+        answer = answer_question(question=case.prompt, corpus=self._corpus, provider=provider)
+        if answer.disposition != ANSWERED:
+            # A decline is a real response and is scored as one — `must_decline` exists precisely
+            # to check that the platform declines when it should.
+            return f"Declined: {answer.declined_reason}"
+        return " ".join(
+            f"{claim.statement} [{citation.url(self._corpus)}]"
+            for claim in answer.claims
+            for citation in claim.citations
+        )
+
+
 @dataclass(frozen=True)
 class SuiteResult:
     """A suite's outcome over a subject: every verdict, and which scorer produced them."""
@@ -231,6 +270,7 @@ def run_suite(
 
 
 __all__ = [
+    "AnsweringScorer",
     "EVAL_PROVIDER_KEY",
     "LIVE_MODEL",
     "PROVIDER_REFUSAL",
