@@ -56,7 +56,9 @@ documentation does not cover it.
 because no access was attempted.
 
 **The caller cannot tell "no records" from "not yours"; the investigator can (SC-008).** Asserted
-on both halves: response equality for the caller, disposition difference in the trail.
+on both halves: response equality for the caller, and — per analysis U1 — the **narrowed request
+recorded on the access record** for the investigator, not a disposition: `_disposition`
+distinguishes only cross-tenant, and both role-scope cases record `SCOPED`.
 
 **A store failure is not a decline (FR-003).** Same raise-don't-shape discipline as 024's
 provider failures, same reason: the two send a reader to different people.
