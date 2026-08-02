@@ -23,7 +23,7 @@ evidence of what failed with a suite that never contained it.
 | | What it is | Who | Status |
 | --- | --- | --- | --- |
 | Principle V review | One additive payload field on a sealed-core record, plus the documented generalisation of `corpus_digest` | **Dan McTeer** | **Owed** |
-| FR-012 — the named failure | Old `estate_state`, vault pack, live model, per-case output printed; finding recorded here | **Dan McTeer** | **Owed** |
+| FR-012 — the named failure | Old `estate_state`, vault pack, live model, per-case output printed; finding recorded here | **Dan McTeer** | **Done 2026-08-02** — `vault-estate-state-004`; cause recorded below |
 | Live qualification | `make evals-live` over the reauthored suites | **Dan McTeer** | **Owed** — the `ask` matrix cell stays `fixture` until this passes |
 
 ---
@@ -102,4 +102,31 @@ outcome, and the reauthored suite's live run then starts from a named baseline r
 
 ### FR-012 finding
 
-*To be recorded by the run — case id(s), cause, and outcome either way.*
+**Run 2026-08-02**, old `estate_state`/vault, live model, one call per case with responses printed.
+
+**The failing case is `vault-estate-state-004`** — *"How many database roles exist?"*, requiring
+the verbatim string *"Three: brieve, evidence, and conformance, per the estate record."*
+
+**The cause is the grounding, not the model, and the model was right.** The live lane assembles
+its "estate record" by concatenating the five cases' own `recorded` strings into an unlabelled
+list. Nothing says which line describes what. Asked how many database roles exist, the model
+found a line reading *"Three: brieve, evidence, and conformance"* and **declined to attach it**:
+
+> *"But that line isn't labeled, and nothing in the record ties those three names to the database
+> secrets engine. They could equally be namespaces, enclaves, or something else entirely."*
+
+That is correct behaviour being scored as failure. The suite's `match` verb wants the required
+sentence to appear verbatim; the model quotes it *while explaining it cannot be relied on*, so
+whether the row passes depends on whether the hedge happens to include the quotation — a coin
+flip on a marginal case, which is exactly the variance the live lane's majority-of-three comment
+describes. Two probe samples both quoted it; the scored run did not.
+
+**Why this is the last time this case can fail this way.** The defect is structural: an estate
+built from five unlabelled sentences cannot support a question about which of them is which. 025's
+reauthored suite replaces it with *records* — typed entries with payloads and authored ids — so a
+question about database roles is answered from an entry that says it is about database roles, and
+a claim is scored by whether its **references resolve**, not by whether a sentence reappears.
+
+**Outcome**: the failure is understood, is not a model defect, and is fixed by the reauthoring
+rather than by tuning a prompt. The `ask` cell's matrix column stays `fixture` until the
+reauthored suite passes live (T035).

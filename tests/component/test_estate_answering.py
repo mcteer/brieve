@@ -205,3 +205,54 @@ def test_an_authored_id_with_no_mapping_does_not_resolve() -> None:
         question="What changed last night?", records=RECORDS, provider=provider
     )
     assert answer.disposition == DECLINED
+
+
+# --------------------------------------------------------------- US2: windows
+
+
+def test_a_window_phrase_narrows_against_the_injected_clock() -> None:
+    """US2. "Last night" is resolved from the clock the caller supplies, never from ambient time.
+
+    Ambient time inside an answering path is how an eval lane stops being reproducible — the same
+    hazard the workflow runtime bans `Date.now()` for. The caller passes `now`; core reads no clock.
+    """
+    from surfaces.api.ask import _window
+
+    now = datetime(2026, 8, 2, 12, tzinfo=UTC)
+    start, end = _window("What changed last night?", now)
+
+    assert start is not None and end is not None
+    assert start < end
+    assert start.date() == datetime(2026, 8, 1, tzinfo=UTC).date()
+
+
+def test_the_same_phrase_resolves_identically_for_the_same_clock() -> None:
+    """Determinism, which is what makes a window row scorable rather than flaky."""
+    from surfaces.api.ask import _window
+
+    now = datetime(2026, 8, 2, 12, tzinfo=UTC)
+    assert _window("What changed yesterday?", now) == _window("What changed yesterday?", now)
+
+
+def test_an_unrecognised_phrase_falls_back_to_the_reads_own_bound() -> None:
+    """No general time parsing (analysis U4).
+
+    A window guessed wrong returns records from the wrong period while looking entirely correct,
+    so an unrecognised phrase yields no bounds and the read's `limit` bounds it instead.
+    """
+    from surfaces.api.ask import _window
+
+    now = datetime(2026, 8, 2, 12, tzinfo=UTC)
+    assert _window("What changed during the last fiscal quarter?", now) == (None, None)
+    assert _window("Which runs were denied?", now) == (None, None)
+
+
+def test_a_question_about_all_time_is_bounded_rather_than_unbounded() -> None:
+    """The spec's "enormous window" edge case.
+
+    No bounds is not unbounded: the governed read carries `limit`, so the worst case is a bounded
+    read rather than a scan of the whole trail.
+    """
+    from core.audit.query import EvidenceQueryRequest
+
+    assert EvidenceQueryRequest(tenant_id="t").limit > 0
