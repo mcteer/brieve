@@ -523,3 +523,37 @@ def test_the_vendor_sdk_ships_with_the_extra_the_surface_jobspecs_install() -> N
             "the served-surface jobspec does not install the extra carrying the vendor SDK and "
             "the provider adapter; the surface would fail at the vendor call"
         )
+
+
+def test_both_deployed_assemblies_wire_the_same_ask_collaborators() -> None:
+    """ADR-0033 where it actually binds: the assemblies, which no other row constructs.
+
+    **This is the row the fourth analysis pass was doing by hand.** 026 wired `ask_authority` into
+    `served.py` and not into `service.py`; 027 was about to wire the credential the same way. Both
+    features' parity rows were green the whole time, and they were right to be — they compare two
+    surfaces built from ONE set of collaborators in a fixture, which is the correct thing to check
+    about the shared operation and says nothing about what a deployment stands up.
+
+    So the divergence had a place to hide for two features: the surfaces agree, the assemblies do
+    not, and the difference is only visible to somebody reading both files side by side. This row
+    reads them.
+
+    It checks that each collaborator is *named* in both, not that they resolve to the same object —
+    a deployment legitimately builds its own. What must not differ is whether a transport has one
+    at all, because that is the difference between a person getting an answer and a person getting
+    a 503 that depends on which client they picked.
+    """
+    root = pathlib.Path(__file__).resolve().parents[3] / "src" / "surfaces"
+    assemblies = {
+        "api/service.py": (root / "api" / "service.py").read_text(encoding="utf-8"),
+        "mcp/served.py": (root / "mcp" / "served.py").read_text(encoding="utf-8"),
+    }
+
+    for collaborator in ("ask_authority", "ask_providers", "credential_source", "ASK_MODEL"):
+        missing = [name for name, text in assemblies.items() if collaborator not in text]
+        assert not missing, (
+            f"{collaborator!r} is wired in one deployed assembly and not in {missing}. A person "
+            f"asking the same question through two transports would get different answers, and "
+            f"the parity rows cannot see it — they build both surfaces from one set of "
+            f"collaborators"
+        )

@@ -60,6 +60,19 @@ variable "oidc_workload_jwks_uri" {
   description = "JWKS for the workload issuer. Empty reuses `oidc_jwks_uri`, which is right when one issuer serves both."
 }
 
+# Which model `ask` may call, as a Qualified-Matrix cell identifier. Empty means no model is
+# configured and every ask answers 503. Mirrors the served MCP surface's variable exactly —
+# ADR-0033 is about what a deployment does, so the two assemblies take the same configuration or
+# surface parity becomes a claim about a test fixture.
+#
+# **The credential is deliberately not here** and must never be: it is read from the trust store
+# per ask under this surface's own attested identity, and the posture check fails this file if a
+# vendor key ever appears beside it.
+variable "ask_model" {
+  type    = string
+  default = ""
+}
+
 variable "oidc_tenant_claim" {
   type        = string
   default     = "tenant"
@@ -203,6 +216,8 @@ job "api" {
         # Named here rather than defaulted in code: a submitter pointed at an ungated path
         # would write changes that look approved.
         AUTHORITY_CONTROLLED_PATH = var.authority_controlled_path
+
+        ASK_MODEL = var.ask_model
 
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
 

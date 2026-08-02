@@ -153,17 +153,24 @@ def test_the_model_credential_placeholder_is_seeded_and_says_it_is_not_a_credent
 def test_both_model_calling_roles_carry_the_model_credential_policy_as_applied() -> None:
     """027, and the grant is asserted per ROLE rather than only per policy.
 
-    The policy existing and a role carrying it are two facts. `mcp-surface` and `agent-run` are the
-    two workloads that call a model, and each reads the credential under **its own** attested
-    identity — the surface per ask, the allocation per run. A key fetched by one and handed to the
-    other would be a key in an allocation's environment, which is what ADR-0058 exists to avoid, so
-    both roles need the grant independently and neither can stand in for the other.
+    The policy existing and a role carrying it are two facts. `api`, `mcp-surface` and `agent-run`
+    are the three workloads that call a model, and each reads the credential under **its own**
+    attested identity — the two surfaces per ask, the allocation per run. A key fetched by one and
+    handed to another would be a key in that workload's environment, which is what ADR-0058 exists
+    to avoid, so each role needs the grant independently and none can stand in for another.
+
+    **`api` is here because the fourth analysis pass found it missing.** 026 wired an ask authority
+    into the served MCP assembly and not the API's, and 027 was about to wire a credential the same
+    way — which would have delivered *a person asks and gets an answer* on one transport and not
+    the other, with every parity row green throughout. Those rows compare two surfaces built from
+    one set of collaborators in a fixture; the divergence lives in the assemblies, which no row
+    constructs.
 
     The read itself, performed by the run role inside an allocation, is owed at the deployed
     demonstration — a host process holds no attested identity, which is the property this whole
     module opens by explaining.
     """
-    for role in ("mcp-surface", "agent-run"):
+    for role in ("api", "mcp-surface", "agent-run"):
         body = _vault(f"auth/workload/role/{role}")
         assert body is not None, f"the {role!r} workload role does not exist in Vault"
         policies = body.get("data", {}).get("token_policies", []) or []

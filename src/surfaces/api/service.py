@@ -15,11 +15,14 @@ from __future__ import annotations
 
 import os
 
+from adapters.anthropic_answering import build_ask_provider
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.reconcile_service import PostgresReconciler
+from core.authority.ask_binding import AskAuthority
+from core.authority.model_credential import BrokeredModelCredential
 from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
@@ -78,6 +81,19 @@ def build() -> object:
     audit_sink = PostgresAuditSink(credentials=credentials)
     run_index = PostgresRunIndex(credentials=credentials)
     thread_store = PostgresThreadStore(credentials=credentials)
+
+    # WHICH model `ask` may call here — the same variable and the same meaning as the served MCP
+    # surface's. Unset means no model is configured and every ask answers 503.
+    #
+    # **This assembly is why the fourth analysis pass existed.** 026 wired an ask authority into
+    # `served.py` and not here, and 027 was about to wire a credential the same way — which would
+    # have shipped the feature's own headline claim, *a person asks and gets an answer*, true on
+    # one transport and false on the other. The parity rows would have stayed green throughout,
+    # because they compare two surfaces built from ONE set of collaborators in a fixture; the
+    # divergence lives in the assemblies, which no row constructs. ADR-0033 is about what a
+    # deployment does, so the collaborators are wired in both places or the guarantee is a claim
+    # about a test harness.
+    ask_model = os.environ.get("ASK_MODEL", "").strip()
     # Idempotent, and run at start rather than by a migration step: every one of these is
     # IF NOT EXISTS, and a surface that cannot create its own tables cannot serve anyway.
     audit_sink.migrate()
@@ -160,6 +176,27 @@ def build() -> object:
         reconciler=PostgresReconciler(
             connection_factory=run_connection_factory(credentials),
             destination=build_destination(),
+        ),
+        # 026 + 027, from the fabric this assembly already holds. Governance first: an
+        # unqualified model is unreachable here as everywhere, and a configured provider is not
+        # a qualification.
+        ask_authority=AskAuthority(
+            read_binding=fabric.read_ask_binding, read_matrix=fabric.read_matrix
+        ),
+        ask_model=ask_model or "unconfigured",
+        # A FACTORY, called once per question with material brokered for that question and
+        # dropped with the answer. A provider built here would hold the credential for the life
+        # of the process — the standing credential Principle IV forbids, moved rather than
+        # removed. The key never appears in this module: it travels inside a `ModelCredential`
+        # to `build_ask_provider`, which is what lets the no-static-credentials gate keep
+        # asserting, with no exemption, that no surface names one.
+        ask_providers=(
+            (lambda source, secret: build_ask_provider(source, secret, model=ask_model))
+            if ask_model
+            else None
+        ),
+        credential_source=(
+            BrokeredModelCredential(read=fabric.read_versioned) if ask_model else None
         ),
     )
 

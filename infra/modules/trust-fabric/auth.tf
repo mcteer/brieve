@@ -220,6 +220,11 @@ resource "vault_jwt_auth_backend_role" "api" {
     # Ceilings, role bindings, the model matrix — and the claim-to-role mappings, without
     # which `resolve_roles` returns empty and this surface refuses everyone.
     vault_policy.harness_authority_read.name,
+    # 027: the vendor credential `ask` brokers per question. Granted here as well as to the
+    # served MCP surface, because ADR-0033 is a statement about what a DEPLOYMENT does — a
+    # posture wired into one assembly and not the other would make surface parity a claim
+    # about a test fixture.
+    vault_policy.model_credential_read.name,
   ]
   # Long-lived by design, like the mcp service, and still a TTL rather than none — the
   # difference between a re-issued identity and a standing credential.
