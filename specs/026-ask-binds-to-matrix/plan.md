@@ -117,6 +117,11 @@ src/surfaces/api/ask.py   # ORDERING: resolve the cell BEFORE the provider is to
                           #   qualification (FR-004a)
 src/surfaces/api/app.py   # create_app gains ask_authority, passed through
 src/surfaces/mcp/transport.py  # same collaborator, same shared implementation
+src/surfaces/mcp/served.py    # assembly wires a fabric-backed ask_authority (it already
+                              #   holds workload identity and a Vault client — measured;
+                              #   analysis U1). NO vendor provider is wired: the served
+                              #   check proves resolution by disposition progression, and
+                              #   real served answering is a recorded deferral
 
 tests/harness/api_fixtures.py  # ask_authority shared by both surfaces;
                                #   qualified_ask_authority(model=...) — EXPLICIT in rows

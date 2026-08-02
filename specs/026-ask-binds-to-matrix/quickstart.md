@@ -50,7 +50,13 @@ read `data/ask-bindings` and `data/model-matrix` against the live fabric, on the
 
 ## 5. The served process (before calling it done)
 
-With the dev enclave up and an ask binding seeded: one real ask through the served surface.
-Expected — an answer whose `ask_answered` record names `cell`, `bound_cell`, and
-`cell_disposition: pinned`; then withdraw the cell in the matrix record and ask again — a refusal
-with `unqualified_cell`, and the provider untouched.
+**Credential-free by design** (analysis U1) — the served surface holds no vendor key, so the check
+proves resolution by how the refusal *moves*:
+
+1. Enclave up, nothing seeded → an ask refuses **`unbound`**.
+2. Seed the binding and its two cells (T022) → the same ask now refuses
+   **`provider_unavailable`** — which can only happen if governance resolution **passed**.
+3. Withdraw a cell in the matrix record → **`unqualified_cell`**, provider never in the picture.
+
+Each step's disposition lands in the `ask_answered` record. A real served *answer* would need a
+vendor credential inside the service — an undecided deployment posture, recorded as deferred.

@@ -61,9 +61,11 @@ right reason rather than edited pre-emptively.
       nothing to hold.
 - [ ] T008 Thread the three fields through every existing `record_ask` call site
       (`src/surfaces/api/ask.py` ×3 paths, `src/surfaces/mcp/transport.py`,
-      `tests/component/test_answering.py`) with honest interim values
-      (`cell="", bound_cell="", cell_disposition="refused:unbound"` where no resolution exists
-      yet) — `make check` is the sweep that proves none was missed.
+      `tests/component/test_answering.py`) with the interim value
+      `cell="", bound_cell="", cell_disposition=""` and a comment naming T010 as the task that
+      makes them real — an empty string is visibly "not yet wired", where a fabricated
+      `refused:unbound` on an answered record would be a contradictory record in the diff
+      (analysis A1). `make check` is the sweep that proves no call site was missed.
 
 **Checkpoint**: the record can carry authorisation and the resolver refuses correctly in
 isolation. Nothing consults it yet; T001 still xfails.
@@ -84,10 +86,14 @@ marker off).
 - [ ] T010 [US1] Wire the ordering into `src/surfaces/api/ask.py`: `build_router` and
       `estate_answer_for`/guidance branch gain `ask_authority` (default `None` = refuse
       `unbound` — **a configured provider is not a qualification**, FR-004a); resolution runs
-      **before any provider call in both branches**; the three refusals are **recorded via
-      `record_ask` then returned** (SC-008), with disposition values
-      `unbound` / `unqualified_cell` / `matrix_unreadable` (research F4); a produced answer
-      records `cell`, `bound_cell`, `cell_disposition` (SC-005).
+      **before any provider call in both branches**, and the refusal order is fixed (analysis
+      U3): **governance first** (`unbound` / `unqualified_cell` / `matrix_unreadable`), then
+      scope (`scope_empty`), then provider availability (`provider_unavailable`) — an unbound
+      surface refuses `unbound` even with no provider, because "nobody decided" is the answer an
+      operator needs before "nothing is wired". Today the provider-None check runs first
+      (measured, `ask.py:249,297`); this task inverts that. The three refusals are **recorded
+      via `record_ask` then returned** (SC-008); a produced answer records `cell`, `bound_cell`,
+      `cell_disposition` (SC-005).
 - [ ] T011 [US1] `create_app` in `src/surfaces/api/app.py` and `McpTransport` in
       `src/surfaces/mcp/transport.py` gain `ask_authority`, threaded to the one shared
       implementation — parity by construction, not by twin edits (ADR-0033).
@@ -103,7 +109,12 @@ marker off).
       surfaces, both sources); fixture-default-refuses (SC-003b — provider injected, no
       authority, `unbound`); withdrawn-refuses-like-absent and wrong-role-refuses through the
       wired surface (SC-002/SC-003); unreadable ≠ empty (SC-004); each refusal recorded with its
-      disposition (SC-008).
+      disposition (SC-008); **per-source** (SC-003a, analysis C1) — guidance bound + estate
+      unbound answers guidance and refuses estate in the same session; the **plain pinned
+      answer's record** carries `cell_disposition="pinned"` with `cell == bound_cell` (SC-005's
+      answered half, analysis C1 — T018 covers fallback, this covers the common case); and the
+      **combined-absence** case (analysis U3) — no authority AND no provider refuses `unbound`,
+      not `provider_unavailable`, proving governance precedes availability.
 - [ ] T014 [US1] Update the ~20 existing answering rows to arrange authority **explicitly**:
       `tests/conformance/answering/test_ask_routes_by_shape.py`,
       `tests/conformance/answering/test_estate_bounded_by_asker.py`,
@@ -127,17 +138,23 @@ marker off).
 **Independent test**: pinned model unavailable + qualified alternative → answer with
 `bound_cell` ≠ `cell` and a reason; no alternative → refusal.
 
-- [ ] T017 [US2] Thread `available` (the reachable-model set) from the surface's provider
-      configuration into `AskAuthority.resolve` in `src/core/authority/ask_binding.py` and
-      `src/surfaces/api/ask.py` — the set the run path already supplies to
-      `resolve_with_fallback`, derived here from what the assembly configured rather than
-      invented.
+- [ ] T017 [US2] Thread `available` into `AskAuthority.resolve` in
+      `src/core/authority/ask_binding.py` and `src/surfaces/api/ask.py`, and it is **exactly
+      `{the injected provider's model}`** — one element, the model the provider was constructed
+      for (analysis U2). Anything wider lets fallback select a cell for a model the provider
+      cannot call, and the ask record would then name cell X while the provider called model Y:
+      record/actual divergence on an attestation-relevant record, which is the worst available
+      outcome. The docstring says this in exactly those words.
 - [ ] T018 [US2] [GATE:conformance] Substitution rows in
       `tests/conformance/answering/test_ask_binds_to_matrix.py`: pinned unavailable + qualified
       alternative → answered, record carries `bound_cell`, `cell`,
       `cell_disposition="fallback:model_unavailable"` (SC-006, FR-006); **no alternative →
       refusal, provider never called** (FR-007); fallback never selects a withdrawn or
-      wrong-role cell — the no-third-branch property exercised for asks.
+      wrong-role cell — the no-third-branch property exercised for asks; and **record/actual
+      agreement** (analysis U2): the used cell's model equals the model the provider was
+      constructed for, asserted by comparing the record against the provider's own
+      configuration — divergence here would be the trail naming an authorisation for a model
+      that never ran.
 - [ ] T019 [P] [US2] [GATE:correlation/evidence] The investigator walk row: for a substituted
       answer, the ask record alone names what was asked for and what was used — no second
       event, no run id anywhere in the payload (research F3's claim, asserted).
@@ -175,13 +192,22 @@ contract names it.
       linking *scope*, *route*, and the matrix vocabulary.
 - [ ] T025 [P] ROADMAP entry for 026: the gap (a merged contract asserting an unperformed
       refusal), the fix, and the standing deferrals (portal answering, corpus freshness, team
-      scope) so the next planner finds them.
+      scope, **and — new here — real served answering**: the served surface holds no vendor
+      credential and wiring one is an undecided deployment posture, so the served check proves
+      resolution by disposition progression instead; analysis U1) so the next planner finds
+      them.
 - [ ] T026 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep
       all green; then `make conformance` on a live enclave (includes T023's row). **Runner: Dan
       McTeer** for the enclave lane, as every feature.
-- [ ] T027 The served-process check per quickstart §5: seeded binding → one real ask records
-      `cell_disposition: pinned`; withdraw the cell in the matrix record → refusal
-      `unqualified_cell`, provider untouched. **Runner: Dan McTeer.**
+- [ ] T027 The served-process check per quickstart §5, **credential-free by design (analysis
+      U1)**: wire `ask_authority` (fabric-backed) into `src/surfaces/mcp/served.py` — which
+      already holds workload identity and a Vault fabric client, but wires no ask collaborator
+      (measured). Then the progression proves resolution without any vendor key in the service:
+      unwired/unseeded → `unbound`; binding + cells seeded → the refusal **moves to
+      `provider_unavailable`**, which can only happen if governance resolution PASSED; withdraw
+      a cell → `unqualified_cell`. A real served ANSWER needs a vendor credential inside the
+      service, which no feature has decided — deferred, recorded in T025. **Runner: Dan
+      McTeer.**
 
 ---
 
