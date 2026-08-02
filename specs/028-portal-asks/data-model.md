@@ -13,7 +13,7 @@ own vocabulary imposes:
 
 | Order | State | Selected by | Renders |
 | --- | --- | --- | --- |
-| 1 | **Unaskable** | `not response.reachable` (relay status 0) | "The platform could not be asked." Distinct from every refusal — nothing about access changed. |
+| 1 | **Unaskable** (the spec's "unreachable API", FR-010) | `not response.reachable` (relay status 0) | "The platform could not be asked." Distinct from every refusal — nothing about access changed. |
 | 2 | **Refused** | HTTP status not 2xx | The API's own `detail` prose, **verbatim** (research F1). No portal-authored cause. |
 | 3 | **Declined** | `disposition == "declined"` | `declined_reason` and which `source` was consulted — presented as an answer, not a failure. |
 | 4 | **Answered** | `disposition == "answered"` | Claims, shaped per source (below). |
