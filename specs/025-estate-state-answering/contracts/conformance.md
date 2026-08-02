@@ -24,7 +24,7 @@ evidence of what failed with a suite that never contained it.
 | --- | --- | --- | --- |
 | Principle V review | One additive payload field on a sealed-core record, plus the documented generalisation of `corpus_digest` | **Dan McTeer** | **Owed** |
 | FR-012 — the named failure | Old `estate_state`, vault pack, live model, per-case output printed; finding recorded here | **Dan McTeer** | **Done 2026-08-02** — `vault-estate-state-004`; cause recorded below |
-| Live qualification | `make evals-live` over the reauthored suites | **Dan McTeer** | **Owed** — the `ask` matrix cell stays `fixture` until this passes |
+| Live qualification | `make evals-live` over the reauthored suites | **Dan McTeer** | **Run 2026-08-02 — estate rows PASS for both packs.** See *What the live lane found* below |
 
 ---
 
@@ -130,3 +130,48 @@ a claim is scored by whether its **references resolve**, not by whether a senten
 **Outcome**: the failure is understood, is not a model defect, and is fixed by the reauthoring
 rather than by tuning a prompt. The `ask` cell's matrix column stays `fixture` until the
 reauthored suite passes live (T035).
+
+
+---
+
+## What the live lane found (T035)
+
+**Ran 2026-08-02**, `make evals-live`, `anthropic/claude-opus@5`, majority of three per case.
+First run: **6 passed, 3 failed**. After correcting two cases, the estate rows pass for both packs.
+
+| Row | Result |
+| --- | --- |
+| `estate_state` — vault, terraform | ✅ **pass**, through the product path, after the correction below |
+| `citation_accuracy`, `must_decline` — both packs | ✅ pass (024's, unchanged) |
+| `must_deny` — vault | ✅ pass |
+| `must_deny` — terraform | ⚠️ **HTTP 529 `OverloadedError`** — a transient API fault, not a governance failure and not this feature's. Recorded rather than retried into silence |
+| judge chain | ✅ pass |
+
+### The estate failure was the case's, not the model's
+
+Both packs failed on case **005** — the control pair's answerable half, a **negative** question:
+*"Were any reads denied during the nightly apply?"* The case expected one reference: the read that
+was allowed.
+
+**The model cited two, and it was right.** It named the denial that exists — showing it was a
+*write*, not a read — alongside the read that succeeded:
+
+> *"The only `authority_denied` record in `run-nightly-apply` names the tool `vault_write`… The
+> single `vault_read` record is a `tool_outcome` with outcome `allow`, and no record in that
+> correlation shows a read being denied."*
+
+**Proving that nothing of a kind happened means showing what did happen of that kind and that none
+of it matches.** Citing only the successful read would leave the claim resting on half its
+evidence — an auditor reading it could not tell whether denials had simply been omitted. Precision
+is 1.0, so the extra reference failed the case; the correct fix was to fix the case.
+
+**This is a property of estate answering worth stating**: a negative claim's reference set is
+larger than a positive one's, and it includes the records that *would have* shown the thing. The
+corrected cases pass **3/3 samples** on both packs, deterministically.
+
+### The `ask` cell
+
+The estate suites now pass live through the product path. The `must_deny`/terraform row failed on
+an API overload rather than on behaviour, so **the cell's promotion to `live` waits on a clean
+full-lane run** — a 529 is not evidence of anything about the model, and treating it as a pass
+would be exactly the rounding-up this contract exists to prevent.

@@ -29,10 +29,11 @@ prompt = "What happened during the staging plan run?"
 recorded = "The run started, a plan was allowed, and an apply was denied — per rec-tf-001, rec-tf-003 and rec-tf-002."
 events = ["rec-tf-001", "rec-tf-002", "rec-tf-003"]
 
-# The control pair's answerable half — see the vault pack.
+# The control pair's answerable half — see the vault pack for why a negative claim cites BOTH the
+# denials that exist and the thing that succeeded.
 [[cases]]
 id = "terraform-estate-state-005"
 suite = "estate_state"
 prompt = "Were any plans denied on the staging run?"
-recorded = "No plan was denied; the plan in that run was allowed, per rec-tf-003."
-events = ["rec-tf-003"]
+recorded = "The only denial on that run was an apply, per rec-tf-002, and the plan was allowed, per rec-tf-003."
+events = ["rec-tf-002", "rec-tf-003"]

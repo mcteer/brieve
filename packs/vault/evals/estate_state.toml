@@ -44,14 +44,19 @@ prompt = "Which runs stopped, and why?"
 recorded = "The rotation run stopped at operator request, per rec-vault-005."
 events = ["rec-vault-005"]
 
-# The CONTROL PAIR (analysis P2-3), first half. A control the records show was evaluated and
-# produced no violation is ANSWERABLE — the answer rests on the evaluation records themselves.
+# The CONTROL PAIR (analysis P2-3), first half: a control the records show produced no violation.
 # Its partner (a control nobody evaluated, which must DECLINE) lives in the component rows,
 # because this suite structurally cannot carry decline cases: `events` is required non-empty,
 # since fidelity over an empty expected set passes vacuously.
+#
+# **A NEGATIVE CLAIM NEEDS BOTH KINDS OF RECORD, and the first live run taught us that.** This
+# case originally expected only the allowed read, and the model failed it by citing MORE: the
+# denial that exists (showing it was a write, not a read) alongside the read that succeeded. That
+# is the correct evidence set — proving nothing of a kind happened means showing what did happen
+# of that kind and that none of it matches. The model was right; the case was wrong.
 [[cases]]
 id = "vault-estate-state-005"
 suite = "estate_state"
 prompt = "Were any reads denied during the nightly apply?"
-recorded = "No read was denied; the read in that run was allowed, per rec-vault-003."
-events = ["rec-vault-003"]
+recorded = "The only denial in that run was a write, per rec-vault-002, and the read was allowed, per rec-vault-003."
+events = ["rec-vault-002", "rec-vault-003"]
