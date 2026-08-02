@@ -1,0 +1,238 @@
+# Tasks: How the platform holds a model credential
+
+**Input**: Design documents from `/specs/027-model-credential-posture/`
+
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/conformance.md
+
+**Tests**: included — every property here lands as a row, and the feature exists because a
+posture nobody stated let three features defer it.
+
+**Organization**: by user story. **Two orderings are load-bearing**: the constitution amendment
+(T024) merges *with* this feature, not after — a plan that shipped the capability first would have
+the platform contradicting its own constitution in the interval (US3's failure mode). And the
+no-env-fallback row (T004) is pinned *before* the reader is wired, so the convenient wrong fix is
+provably caught rather than assumed absent.
+
+## Format: `[ID] [P?] [Story] Description`
+
+---
+
+## Phase 1: Setup — the measurements the design rests on
+
+- [ ] T001 Pin the reframing (research F1) as an executable note in
+      `tests/component/test_model_credential.py`: a test asserting `BrokeredMaterialSource` in
+      `src/core/authority/entitlements.py` still has **no production implementation** — the
+      premise 027 is the first to change. It documents that this feature *establishes* the
+      broker rather than reusing one; when a real broker exists it becomes a real assertion about
+      what implements the protocol.
+- [ ] T002 Pin the static-key finding (research F2): a comment-block test in the same file
+      recording that a vendor key is **not derivable** — no credential API to mint lesser
+      material from — so the posture is "never persisted", not "derived". Kept executable so the
+      next person tempted by response-wrapping ceremony finds the reason it buys nothing.
+
+## Phase 2: Foundational — the reader and the record
+
+- [ ] T003 Create `src/core/authority/model_credential.py`: `BrokeredModelCredential` with
+      `fetch(vendor) -> str` reading `model-credentials/<vendor>` (KV v2) **under the caller's own
+      attested identity**, and a `credential_reference(vendor)` returning
+      `vault:model-credentials/<vendor>@v<version>`. Absent/unreadable → `ResolutionRefused`
+      (`credential_unavailable`). **Never caches** — no instance state carrying a key across
+      calls. Module docstring carries research F1/F2: first broker, key not derivable, lives in
+      `authority` because 025's never-acts rows forbid `answering` any `authority` import.
+- [ ] T004 [GATE:fail-closed] Register `credential_unavailable` in
+      `src/core/authority/errors.py`'s `RESOLUTION_REASONS` with the distinction that earns it:
+      the cell is qualified (026's checks passed) and the *credential* could not be obtained —
+      distinct from `unqualified_cell` (matrix) and `fabric_unreachable` (the store itself down).
+- [ ] T005 [P] [GATE:fail-closed] Component rows in `tests/component/test_model_credential.py`:
+      a present record fetches; the reference carries the KV version; absent refuses
+      `credential_unavailable`; an unreadable store refuses distinguishably; **two fetches never
+      share cached state** (mutate the backing store between calls, observe the second sees the
+      change).
+- [ ] T006 [GATE:conformance] **SEALED CORE** — `AuditEventType.ASK_ANSWERED`'s payload in
+      `src/core/audit/schema.py` gains `model_authority` (the reference — **never a value**;
+      data-model.md). `MODEL_GATE` is deliberately **not** touched (plan, Complexity: no run has
+      bound a real model, so a run-side field would be written and verified by nothing). Update
+      `src/core/answering/record.py`'s `record_ask` to require it.
+      **Principle V review: Dan McTeer, BEFORE merge** — gating this PR, per the discipline the
+      just-closed review established.
+- [ ] T007 [P] Extend the exact-payload row in `tests/component/test_answering.py` by exactly
+      `model_authority`, and annotate the pinned-digest row in `tests/unit/test_audit_chain.py`
+      the way 025/026 did — the sealed-core diff and its test move together.
+- [ ] T008 Thread `model_authority` through every existing `record_ask` call site
+      (`src/surfaces/api/ask.py`, `src/surfaces/mcp/transport.py`,
+      `tests/component/test_answering.py`) with the interim value `""` and a comment naming T011
+      as the task that makes it real — `make check` is the sweep that proves none was missed.
+
+**Checkpoint**: the credential can be read and refused, and the record can carry its reference.
+Nothing fetches yet on a real path.
+
+## Phase 3: User Story 1 — a person asks and gets an answer (P1) 🎯 MVP
+
+**Goal**: the ask path fetches a credential at task start, calls the model, records the reference,
+and refuses `credential_unavailable` when it cannot — the three-refusal order intact.
+
+**Independent test**: with a fixture credential source, an ask that resolves a cell then obtains a
+credential answers and records `model_authority`; with none, it refuses `credential_unavailable`,
+never calling the vendor.
+
+- [ ] T009 [US1] `client_and_model` in `src/adapters/anthropic_scorer.py` gains
+      `api_key: str | None = None`; when `None` it keeps reading `EVAL_PROVIDER_API_KEY` — **the
+      eval lane's path, unchanged** (FR-013). `src/adapters/anthropic_answering.py`'s providers
+      accept and pass the key. No production caller relies on the env branch.
+- [ ] T010 [US1] Wire the fetch into `src/surfaces/api/ask.py`: **after** `authorise_ask`
+      resolves a cell and **before** the provider is built, `estate_answer_for` and the guidance
+      branch obtain the credential through an injected `credential_source` (default `None` =
+      refuse `credential_unavailable`); the built provider carries the fetched key; the answered
+      record sets `model_authority` to the reference (SC-005, FR-007). Order: cell → credential →
+      vendor, three refusals recorded via `record_ask` (SC-006, SC-008).
+- [ ] T011 [US1] `build_router`/`create_app` gain `credential_source`; `served.py` builds the ask
+      provider **per ask** through `BrokeredModelCredential` (fetched, used, dropped — never a
+      surface attribute holding a key). `McpTransport` gains the same collaborator. Parity by
+      construction (ADR-0033).
+- [ ] T012 [US1] Fixture plumbing in `tests/harness/api_fixtures.py`: `surface_under_test` gains
+      `credential_source`, shared by both surfaces; add `available_credential(key=...)` (a source
+      returning a fixed key + reference) and the default `None`. **The default refuses** — a
+      fixture that auto-supplied a key would rebuild the loophole 026's fixture work exists to
+      prevent, one layer down.
+- [ ] T013 [US1] [GATE:fail-closed] The headline row in
+      `tests/conformance/answering/test_model_credential_posture.py`: with a qualified cell and
+      **no** credential source, the ask refuses `credential_unavailable` and the provider is
+      **never called** (counted at a `CountingProvider`); with a source, it answers and the record
+      carries the reference.
+- [ ] T014 [US1] [GATE:fail-closed] **The no-env-fallback row**, same file — and it is the row
+      three features' silence would have needed: set `EVAL_PROVIDER_API_KEY` in the environment,
+      arrange a qualified cell and **no** credential source, and assert the ask **still refuses
+      `credential_unavailable`**. A production path that fell back to the env key would pass every
+      other row and fail only this one.
+- [ ] T015 [US1] [GATE:conformance] The three-refusal row: `unqualified_cell` (no matrix cell) ≠
+      `credential_unavailable` (cell green, no credential) ≠ `provider_unavailable` (credential in
+      hand, vendor raises), each recorded with its disposition, in the fixed order (SC-006).
+- [ ] T016 [US1] [GATE:no-secret-leak] The never-persisted/never-leaked row: a full answered ask,
+      then assert the key value appears in **no** trail payload, **no** returned response body, and
+      the record carries the `vault:model-credentials/...@v<n>` reference instead. The asker's
+      `subject_user_id` is present beside it (SC-004a — as-platform, but for-whom is answerable).
+- [ ] T017 [US1] [GATE:conformance] Both-paths-one-mechanism: an ask and a run binding a
+      non-fixture model both reach `BrokeredModelCredential` — asserted by construction (the run
+      path's fetch site is the same reader), not by two doubles that agree (SC-002, FR-003). A
+      row reads `entrypoint.py`'s fetch call and `ask.py`'s and asserts one reader type.
+
+**Checkpoint**: the MVP — an ask obtains a credential per task, records its reference, and refuses
+without one, on both surfaces, never leaking and never falling back.
+
+## Phase 4: User Story 2 — revocation takes effect without a restart (P2)
+
+**Goal**: removing the credential from the store refuses the next ask, same process.
+
+**Independent test**: a working source, then a source whose backing record is deleted mid-session
+→ the next ask refuses `credential_unavailable`, no restart.
+
+- [ ] T018 [US2] [GATE:conformance] The revocation row in the same file: a source over a mutable
+      backing store answers; delete the record; the **next** ask refuses `credential_unavailable`
+      with no re-construction of the surface (SC-003). The moment is locatable — the last answered
+      record and the first refused one are adjacent in the trail.
+- [ ] T019 [P] [US2] The in-flight row: a task that already fetched **completes** on the authority
+      it holds even if the store is emptied after the fetch — revocation binds the *next* task,
+      exactly like every per-task grant (contract: "what these rows refuse to assert"). This
+      guards against a fix that reached back into a running task to satisfy revocation too
+      literally.
+
+**Checkpoint**: revocation is a store operation with immediate effect on new work and no effect on
+committed work.
+
+## Phase 5: User Story 3 — the platform can say what its posture is (P3)
+
+**Goal**: ADR-0058, constitution v1.4.0, and a check that the running system agrees — all in this
+PR.
+
+**Independent test**: the constitution describes brokering; a deployment contradicting it fails a
+check.
+
+- [ ] T020 [US3] Write `docs/adr/0058-model-credential-brokering.md`: the decision (broker on the
+      first exception's pattern; ADR-0044's federate-or-broker rule routes models here; gateway
+      and do-nothing rejected with the reasons from research). Status Accepted, dated, relating to
+      ADR-0044/0022/0039/0026.
+- [ ] T021 [US3] Amend `.specify/memory/constitution.md` to **v1.4.0** with a Sync Impact Report:
+      *"exactly one named exception"* → *"exactly two"* (the second being the model vendor
+      credential, same governance clause); *"static API keys are prohibited without exception"* →
+      *"…prohibited as workload credentials; the named exceptions are held only in the trust store
+      and delivered per task."* MINOR (adds/expands); cite ADR-0058. **Security-maintainer review:
+      Dan McTeer.**
+- [ ] T022 [US3] [GATE:conformance] The constitution-agreement check in
+      `tests/conformance/identity/test_posture_matches_constitution.py`: the amended text names
+      two exceptions AND no jobspec under `infra/jobs/` passes a vendor key as a workload env var
+      (grep the HCL). A deployment that contradicts the text fails (SC-007). This is the row that
+      makes the constitution a checkable claim rather than prose.
+- [ ] T023 [P] [US3] Update `specs/024-portal-answering/`… nothing — but DO update this feature's
+      own `contracts/conformance.md` status rows as they land, and record the Principle V review
+      outcome and the amendment review outcome when given.
+
+## Phase 6: Deployment, the enclave, and the named runs
+
+- [ ] T024 [P] Terraform in `infra/modules/trust-fabric/`: a `model-credentials/<vendor>` KV path,
+      granted read to `mcp-surface` and the run role — **exact-path AND glob** (020's trap, which
+      026 also paid; a Vault glob does not match the empty remainder). Governance clause matching
+      the first exception's in production posture.
+- [ ] T025 [P] Dev placeholder decision in `infra/environments/dev/`: seed a **clearly-marked
+      non-functional** credential so `make dev-up`'s ask progression reaches `provider_unavailable`
+      (the vendor rejects the dud) rather than `credential_unavailable` — proving the fetch path
+      end to end without a real key — OR leave it absent and document that dev asks refuse
+      `credential_unavailable`. **Seeded, marked non-functional**, is the choice (research open
+      item), because it exercises one more link than absent does.
+- [ ] T026 [GATE:conformance] The readability row in `tests/conformance/identity/`: `mcp-surface`
+      and the run role read `model-credentials/<vendor>` against the live fabric (as-applied,
+      `test_matrix_is_readable` pattern).
+- [ ] T027 [P] Glossary in `docs/glossary.md`: *model credential*, *model authority*, *brokered
+      material* — linking *ask binding* and the matrix vocabulary.
+- [ ] T028 [P] ROADMAP entry for 027: the posture, the amendment, and the standing deferrals
+      (per-tenant model scope — new here — plus portal answering, corpus freshness, team scope).
+- [ ] T029 [GATE:conformance] `make check`, `make evals`, and the hermetic conformance sweep all
+      green; then `make conformance` on a live enclave (includes T026). **Runner: Dan McTeer.**
+- [ ] T030 The thing three features could not do (SC-001, SC-003) — **named runner: Dan McTeer**.
+      Write a real key to `model-credentials/anthropic`, seed a live `ask` cell, and per
+      quickstart §5: ask through the served surface → a real answer with `model_authority`
+      recorded; rotate → next ask on the new generation; **delete → next ask refuses
+      `credential_unavailable`, no restart**. The same three steps prove SC-001 and SC-003.
+
+---
+
+## Dependencies
+
+```text
+Phase 1 (T001-T002, measurements)
+  → Phase 2 (T003→T004→T005 ∥ T006→T007→T008)
+    → Phase 3 / US1 (T009→T010→T011→T012 → T013,T014,T015,T016,T017)
+      → Phase 4 / US2 (T018→T019)                    [needs the wired fetch]
+      → Phase 5 / US3 (T020→T021→T022, T023)          [the amendment, gated by T022]
+        → Phase 6 (T024∥T025 → T026; T027∥T028; T029→T030 last)
+```
+
+**The two load-bearing rules**:
+1. **T014 before the reader is trusted** — the no-env-fallback row exists so the convenient wrong
+   fix is caught, and it must be written and failing-for-the-right-reason before T010's fetch is
+   relied upon.
+2. **T021's amendment ships in this PR** — never a follow-up. The capability (Phase 3) and the
+   constitution change (Phase 5) are one merge, or the platform contradicts itself in between.
+
+## Parallel opportunities
+
+- T005 ∥ (T006→T007); T001 ∥ T002.
+- Within US1: T013/T014/T015/T016/T017 are rows in one file after T012 — sequential only by
+  shared file, independent in logic.
+- T024 ∥ T025; T027 ∥ T028.
+
+## Implementation strategy
+
+**MVP = Phase 3.** A person gets an answer and the credential is obtained per task, recorded by
+reference, refused when absent, never leaked, never env-fallen-back. US2 proves revocation, US3
+makes the posture a stated and checked fact. The named runs (T029, T030) and the two reviews
+(Principle V, the amendment) are the merge gate.
+
+## Notes
+
+- **Gate types**: fail-closed (T004, T005, T013, T014), conformance (T006, T015, T017, T018, T022,
+  T026, T029), no-secret-leak (T016). Eval gate: none — no suite changes, no cell qualified.
+- **Sealed core**: one task (T006), review gating the PR.
+- **The constitution amendment is a deliverable** (T020, T021, T022), not a follow-up — the single
+  most important structural fact about this feature.
+- **`core.answering` gains no `authority` import** — the reader lives in `authority` and the
+  surface injects it, so 025's never-acts rows stay green and meaningful.
