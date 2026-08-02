@@ -127,3 +127,8 @@ form.inline { display: inline; }
 .citations, .references { list-style: none; padding-left: 0; font-size: 0.875rem; }
 .citations a { color: var(--accent); }
 .references code { color: var(--muted); word-break: break-all; }
+
+/* The one-line statement of what a page does, under its heading (028 follow-up). It carries
+   the never-acts distinction that the nav labels alone could not — a person who lands mid-flow
+   reads the page, not the header. */
+.lede { color: var(--muted); max-width: 40rem; }

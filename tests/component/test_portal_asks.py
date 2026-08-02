@@ -499,3 +499,28 @@ def test_a_hostile_refusal_sentence_is_rendered_as_text() -> None:
 
     assert "<script>alert(1)</script>" not in page, "a refusal sentence was rendered as markup"
     assert "&lt;script&gt;" in page, "the refusal sentence did not reach the reader at all"
+
+
+def test_the_two_surfaces_say_which_one_acts() -> None:
+    """The distinction 028 chose separate pages to make **visible rather than explained**.
+
+    Separate pages were the decision; labels that both read as "talk to the thing" defeated the
+    reason for it. The first person to use this went looking for the ask on a thread page and
+    found the composer's agent picker instead — which is the failure exactly, since that picker
+    starts governed runs and the ask can never start anything.
+
+    So both surfaces state their consequence, and this row keeps them from drifting back into
+    synonyms. It asserts the *property* — each page says whether anything happens — rather than
+    pinning particular wording, so the copy can improve without the guarantee eroding.
+    """
+    portal = _portal(_answering_surface())
+
+    ask = _visible(portal.get("/ask").text)
+    run = _visible(portal.get("/").text)
+
+    assert "never acts" in ask, "the ask page does not say that nothing happens"
+    assert "acts on your behalf" in run, "the run page does not say that something does"
+
+    # And each points at the other, so landing on the wrong one is a click rather than a search.
+    assert 'href="/"' in portal.get("/ask").text
+    assert 'href="/ask"' in portal.get("/").text

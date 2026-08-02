@@ -10,8 +10,18 @@
   <a class="skip" href="#main">Skip to main content</a>
   <header>
     <a href="/" class="brand">Harness</a>
+    {#
+      LABELLED BY THE VERB, because the difference between these two pages is whether
+      anything happens. "Conversations" and "Ask a question" both read as "talk to the
+      thing" — the first person to use this went looking for the ask on a thread page and
+      found the composer's agent picker instead.
+
+      028 chose separate pages so ADR-0039's never-acts rule would be *visible rather than
+      explained*, and labels that hid the distinction defeated the reason for the split.
+      Run does things; ask answers.
+    #}
     <nav aria-label="Main">
-      <a href="/">Conversations</a>
+      <a href="/">Run an agent</a>
       <a href="/ask">Ask a question</a>
     </nav>
     {% block header_actions %}{% endblock %}
