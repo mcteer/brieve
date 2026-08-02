@@ -20,8 +20,8 @@
 
 | | What it is | Who | Status |
 | --- | --- | --- | --- |
-| Constitution amendment | Two named exceptions; the static-key sentence rewritten. **Landed in this PR** (v1.4.0, ADR-0058) | **Dan McTeer** (security-maintainer review) | **Owed — review gates the merge; the text itself is in the diff** |
-| Principle V review | One additive reference field on a sealed-core record (`model_authority` on `ASK_ANSWERED`; `MODEL_GATE` untouched) | **Dan McTeer** | **Owed — gates this PR** |
+| Constitution amendment | Two named exceptions; the static-key sentence rewritten. Landed in this PR (v1.4.0, ADR-0058) | **Dan McTeer** (security-maintainer review) | **Approved 2026-08-02**, at merge |
+| Principle V review | One additive reference field on a sealed-core record (`model_authority` on `ASK_ANSWERED`; `MODEL_GATE` untouched) | **Dan McTeer** | **Approved 2026-08-02**, before merge |
 | SC-001 real answer + SC-003 revocation | Ask through the deployed surface, rotate, delete (quickstart §5) | **Dan McTeer** | **Owed — and blocked on out-of-scope work; see below** |
 | `make conformance` on a live enclave | Includes the readability and grant rows | **Dan McTeer** | **Done 2026-08-02, exit 0** |
 
@@ -142,6 +142,17 @@ deployed estate answer would have dropped every claim and read as *the records d
 answer*. And the conformance-lane marker check matched `mark.enclave` inside a docstring, which
 would have reported a row that does not exist while a real orphaned row elsewhere stayed findable
 only by luck.
+
+## The two reviews, and that they gated
+
+Both were approved by Dan McTeer on 2026-08-02, **before the merge rather than after it**. That
+ordering is the discipline the just-closed Principle V review established, and this is the first
+feature to hold to it: 024, 025 and 026 each merged with a review recorded as owed, and when it
+was finally performed it rejected `corpus_digest`'s generalisation — a defect that had been in
+merged code for three features because nobody had looked.
+
+The scope reviewed: one additive field on `ASK_ANSWERED`, carrying a reference and never a value,
+with `MODEL_GATE` deliberately untouched; and two sentences of Principle IV, moved together.
 
 ## SC-001 is not reachable inside this feature's stated scope
 
