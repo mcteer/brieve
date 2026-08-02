@@ -35,9 +35,12 @@ provably caught rather than assumed absent.
 - [ ] T003 Create `src/core/authority/model_credential.py`: `BrokeredModelCredential` with
       `fetch(vendor) -> str` reading `model-credentials/<vendor>` (KV v2) **under the caller's own
       attested identity**, and a `credential_reference(vendor)` returning
-      `vault:model-credentials/<vendor>@v<version>`. Absent/unreadable → `ResolutionRefused`
-      (`credential_unavailable`). **Never caches** — no instance state carrying a key across
-      calls. Module docstring carries research F1/F2: first broker, key not derivable, lives in
+      `vault:model-credentials/<vendor>@v<version>` — where `<version>` is read from **KV v2's
+      `data.metadata.version`** (analysis U2: the fabric's `_kv_data` returns the `data` dict and
+      the version is not in it; a `data/` read returns `{data, metadata}`, so the reader takes the
+      metadata explicitly rather than assuming it "for free"). Absent/unreadable →
+      `ResolutionRefused` (`credential_unavailable`). **Never caches** — no instance state
+      carrying a key across calls. Module docstring carries research F1/F2: first broker, key not derivable, lives in
       `authority` because 025's never-acts rows forbid `answering` any `authority` import.
 - [ ] T004 [GATE:fail-closed] Register `credential_unavailable` in
       `src/core/authority/errors.py`'s `RESOLUTION_REASONS` with the distinction that earns it:
@@ -75,20 +78,27 @@ and refuses `credential_unavailable` when it cannot — the three-refusal order 
 credential answers and records `model_authority`; with none, it refuses `credential_unavailable`,
 never calling the vendor.
 
-- [ ] T009 [US1] `client_and_model` in `src/adapters/anthropic_scorer.py` gains
-      `api_key: str | None = None`; when `None` it keeps reading `EVAL_PROVIDER_API_KEY` — **the
-      eval lane's path, unchanged** (FR-013). `src/adapters/anthropic_answering.py`'s providers
-      accept and pass the key. No production caller relies on the env branch.
+- [ ] T009 [US1] The provider seam, at the depth it actually lives (analysis U1 — measured: the
+      key is taken at construction, not per call). `client_and_model` in
+      `src/adapters/anthropic_scorer.py` gains `api_key: str | None = None` (None keeps the
+      `EVAL_PROVIDER_API_KEY` env path — the eval lane's, unchanged, FR-013). Then **all three
+      provider constructors** thread it: `LiveAnswerProvider.__init__` and
+      `LiveEstateProvider.__init__` in `src/adapters/anthropic_answering.py` gain
+      `api_key: str | None = None` and pass it to `client_and_model`; the `LiveModelScorer` path
+      in `anthropic_scorer.py` likewise. `test_gates_live.py` constructs all of them — the sweep
+      that proves none was missed. No production caller relies on the env branch.
 - [ ] T010 [US1] Wire the fetch into `src/surfaces/api/ask.py`: **after** `authorise_ask`
       resolves a cell and **before** the provider is built, `estate_answer_for` and the guidance
       branch obtain the credential through an injected `credential_source` (default `None` =
       refuse `credential_unavailable`); the built provider carries the fetched key; the answered
       record sets `model_authority` to the reference (SC-005, FR-007). Order: cell → credential →
       vendor, three refusals recorded via `record_ask` (SC-006, SC-008).
-- [ ] T011 [US1] `build_router`/`create_app` gain `credential_source`; `served.py` builds the ask
-      provider **per ask** through `BrokeredModelCredential` (fetched, used, dropped — never a
-      surface attribute holding a key). `McpTransport` gains the same collaborator. Parity by
-      construction (ADR-0033).
+- [ ] T011 [US1] `build_router`/`create_app` gain `credential_source`; **`served.py` gains the
+      provider construction it does not have today** (analysis C1 — measured: it wires
+      `ask_authority` and deliberately no provider): per ask, fetch the key through
+      `BrokeredModelCredential`, then construct `LiveAnswerProvider(model, api_key=key)` (and the
+      estate provider likewise), used and dropped — no surface attribute ever holds a key.
+      `McpTransport` gains the same `credential_source`. Parity by construction (ADR-0033).
 - [ ] T012 [US1] Fixture plumbing in `tests/harness/api_fixtures.py`: `surface_under_test` gains
       `credential_source`, shared by both surfaces; add `available_credential(key=...)` (a source
       returning a fixed key + reference) and the default `None`. **The default refuses** — a
@@ -111,10 +121,13 @@ never calling the vendor.
       then assert the key value appears in **no** trail payload, **no** returned response body, and
       the record carries the `vault:model-credentials/...@v<n>` reference instead. The asker's
       `subject_user_id` is present beside it (SC-004a — as-platform, but for-whom is answerable).
-- [ ] T017 [US1] [GATE:conformance] Both-paths-one-mechanism: an ask and a run binding a
-      non-fixture model both reach `BrokeredModelCredential` — asserted by construction (the run
-      path's fetch site is the same reader), not by two doubles that agree (SC-002, FR-003). A
-      row reads `entrypoint.py`'s fetch call and `ask.py`'s and asserts one reader type.
+- [ ] T017 [US1] [GATE:conformance] Both-paths-one-**credential-mechanism** (analysis C1 — the
+      *providers* differ by path and always have: the ask path builds `LiveAnswerProvider`, the
+      run path uses `ModelChooser`; unifying those is not the design and no task should hunt for
+      it). What is one is the **credential reader**: an ask and a run binding a non-fixture model
+      both obtain their key through `BrokeredModelCredential`. The row reads the fetch call in
+      `ask.py`/`served.py` and in `entrypoint.py` and asserts one reader type — SC-002, FR-003,
+      scoped to the credential, not the provider.
 
 **Checkpoint**: the MVP — an ask obtains a credential per task, records its reference, and refuses
 without one, on both surfaces, never leaking and never falling back.
@@ -158,10 +171,14 @@ check.
       and delivered per task."* MINOR (adds/expands); cite ADR-0058. **Security-maintainer review:
       Dan McTeer.**
 - [ ] T022 [US3] [GATE:conformance] The constitution-agreement check in
-      `tests/conformance/identity/test_posture_matches_constitution.py`: the amended text names
-      two exceptions AND no jobspec under `infra/jobs/` passes a vendor key as a workload env var
-      (grep the HCL). A deployment that contradicts the text fails (SC-007). This is the row that
-      makes the constitution a checkable claim rather than prose.
+      `tests/conformance/identity/test_posture_matches_constitution.py`, **scoped to what a check
+      can see** (analysis U3): (a) the amended text names two exceptions; (b) no jobspec under
+      `infra/jobs/` passes a vendor key as a **workload env var** — a config leak, greppable in
+      HCL. It does **not** assert the runtime persistence property (a workload writing a fetched
+      key to disk), which is not visible to a config grep — that is T016's job, at the trail and
+      checkpoint. The cross-reference is stated so SC-007's "deployment contradicts the text" is
+      honestly the config half, and SC-004/SC-005's persistence half lives where it is
+      observable.
 - [ ] T023 [P] [US3] Update `specs/024-portal-answering/`… nothing — but DO update this feature's
       own `contracts/conformance.md` status rows as they land, and record the Principle V review
       outcome and the amendment review outcome when given.
@@ -172,12 +189,14 @@ check.
       granted read to `mcp-surface` and the run role — **exact-path AND glob** (020's trap, which
       026 also paid; a Vault glob does not match the empty remainder). Governance clause matching
       the first exception's in production posture.
-- [ ] T025 [P] Dev placeholder decision in `infra/environments/dev/`: seed a **clearly-marked
-      non-functional** credential so `make dev-up`'s ask progression reaches `provider_unavailable`
-      (the vendor rejects the dud) rather than `credential_unavailable` — proving the fetch path
-      end to end without a real key — OR leave it absent and document that dev asks refuse
-      `credential_unavailable`. **Seeded, marked non-functional**, is the choice (research open
-      item), because it exercises one more link than absent does.
+- [ ] T025 [P] Dev placeholder in `infra/environments/dev/`: seed a **clearly-marked
+      non-functional** credential so `make dev-up`'s ask progression reaches **a fetch that
+      succeeds and a vendor call that fails** — one link past `credential_unavailable`, proving
+      the fetch path end to end without a real key. **The exact disposition the dud produces is
+      confirmed at run, not predicted** (analysis A1: a rejected key may surface as
+      `provider_unavailable` or as a provider fault depending on how the vendor answers a bad key;
+      the design depends only on the fetch succeeding and the call being attempted). Seeded-and-
+      marked over absent, because it exercises one more link.
 - [ ] T026 [GATE:conformance] The readability row in `tests/conformance/identity/`: `mcp-surface`
       and the run role read `model-credentials/<vendor>` against the live fabric (as-applied,
       `test_matrix_is_readable` pattern).
