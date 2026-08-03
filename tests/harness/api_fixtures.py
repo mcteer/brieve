@@ -84,6 +84,11 @@ class SurfaceUnderTest:
     submitter: ScriptedSubmitter
     thread_store: InMemoryThreadStore
 
+    #: The fake identity fabric the dispatcher resolves through. Exposed so a row can grant a
+    #: SECOND subject the same scope — the accessibility lane runs each theme as its own person
+    #: so they do not share one rate window, and it has to tell the fabric about them.
+    identity_fabric: Any = None
+
     #: The subject the identity fabric knows about. Tests naming anyone else are testing
     #: refusal, which is a different assertion.
     subject_name: str = "alice"
@@ -207,8 +212,13 @@ def surface_under_test(
     thread_store = InMemoryThreadStore()
     evidence = InMemoryEvidenceQuery(audit)
     definitions_fabric = fake_definitions_fabric(subject)
+    #: Named rather than inlined so a row can reach it — the accessibility lane runs each
+    #: theme as its own subject (a shared rate window makes the second theme's rows fail far
+    #: from the cause) and has to grant those subjects a scope. Exposed on the returned
+    #: object below.
+    identity_fabric = fake_identity_fabric(subject_user_id=subject)
     dispatcher = InProcessDispatcher(
-        identity_fabric=fake_identity_fabric(subject_user_id=subject),
+        identity_fabric=identity_fabric,
         registry=registry or ToolRegistry(),
         audit_sink=audit,
         run_index=index,
@@ -268,6 +278,7 @@ def surface_under_test(
         subject_name=subject,
         submitter=submitter,
         thread_store=thread_store,
+        identity_fabric=identity_fabric,
     )
 
 

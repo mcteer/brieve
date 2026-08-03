@@ -69,6 +69,7 @@
       <h2 id="outcome">No answer for this one</h2>
       <p>{{ (response.payload or {}).get("declined_reason")
              or "The platform found nothing it could rest an answer on." }}</p>
+      <div class="provenance">
       {% if (response.payload or {}).get("window_note") %}
         {# A decline drawn from a window is the case a reader most needs told. #}
         <p class="meta window">{{ response.payload.window_note }}</p>
@@ -84,6 +85,7 @@
       {% if (response.payload or {}).get("source") %}
         <p class="meta">Consulted: {{ response.payload.source }}</p>
       {% endif %}
+      </div>
     </section>
 
   {% else %}
@@ -96,7 +98,19 @@
             {% if claim.get("citations") %}
               <ul class="citations">
                 {% for citation in claim.citations %}
-                  <li><a href="{{ citation }}" rel="noopener">{{ citation }}</a></li>
+                  {#
+                    A CITATION IS A DESTINATION, NOT A STRING. Rendering the raw URL put a
+                    wrapping monospace line across the answer and made the page look broken —
+                    and it told the reader nothing the link's own words could not. The label
+                    is the document and its section, humanised; the href is untouched, and
+                    `title` keeps the exact URL one hover away, so nothing is hidden.
+                  #}
+                  {% set _url = citation.split("#") %}
+                  {% set _doc = _url[0].rstrip("/").split("/")[-1] | replace("-", " ") | title %}
+                  {% set _section = (_url[1] | replace("-", " ")) if _url | length > 1 else "" %}
+                  <li>
+                    <a href="{{ citation }}" rel="noopener" title="{{ citation }}">{{ _doc }}{% if _section %} <span class="citation-section">&rsaquo; {{ _section }}</span>{% endif %}</a>
+                  </li>
                 {% endfor %}
               </ul>
             {% elif claim.get("references") %}
@@ -115,6 +129,7 @@
           </li>
         {% endfor %}
       </ol>
+      <div class="provenance">
       {% if (response.payload or {}).get("window_note") %}
         {#
           WHAT THE ANSWER RESTS ON, when the read returned a window rather than everything.
@@ -137,6 +152,7 @@
         #}
         <p class="meta ground">{{ response.payload.ground_note }}</p>
       {% endif %}
+      </div>
       {% if (response.payload or {}).get("source") %}
         <p class="meta">Answered from: {{ response.payload.source }}</p>
       {% endif %}
