@@ -92,7 +92,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 ## Phase 6: Polish
 
 - [X] T010 [P] ROADMAP entry for 031 + contract status rows; note 027's T016b closed and where.
-- [ ] T011 `make check`, `make evals`, hermetic sweep, and `make conformance` green post-demo.
+- [X] T011 `make check`, `make evals`, hermetic sweep, and `make conformance` green post-demo.
 
 ---
 
