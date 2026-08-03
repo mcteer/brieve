@@ -21,7 +21,7 @@ from typing import Any
 
 import pg8000.dbapi
 
-from core.audit.query import EvidenceQueryRequest
+from core.audit.query import EvidenceQueryRequest, SearchResult
 from core.audit.schema import AuditEntry, AuditEventType
 from core.durability.credentials import DatabaseCredential, VaultDatabaseCredentials
 from core.errors import CoreError
@@ -65,7 +65,7 @@ class PostgresEvidenceQuery:
             password=cred.password,
         )
 
-    def search(self, request: EvidenceQueryRequest) -> list[AuditEntry]:
+    def search(self, request: EvidenceQueryRequest) -> SearchResult:
         """Return entries within the request's scope.
 
         The tenant predicate is applied unconditionally and first. It is taken from the
@@ -103,13 +103,71 @@ class PostgresEvidenceQuery:
                 clauses.append(f"event_type IN ({placeholders})")
                 params.extend(sorted(str(e) for e in request.event_types))
 
-        sql = (
-            "SELECT tenant_id, correlation_id, seq, event_type, timestamp, payload, "
-            "       prev_hash, entry_hash "
-            f"FROM audit_entries WHERE {' AND '.join(clauses)} "
-            "ORDER BY timestamp, correlation_id, seq LIMIT %s"
+        # THE NEWEST WINDOW, RETURNED OLDEST-FIRST.
+        #
+        # The inner query takes the most recent `limit` rows; the outer one puts them back in
+        # ascending order. This was a single `ORDER BY timestamp, correlation_id, seq LIMIT %s`,
+        # which selects the **oldest** rows — on a tenant with a handful of records that is every
+        # record and the defect is invisible.
+        #
+        # Measured on a real tenant: 236,581 entries readable by one role against a limit of
+        # 1,000. The old window returned entries from three days earlier, so *every* question
+        # about recent activity was answered from stale evidence — honestly, and about the wrong
+        # period. Nothing looked wrong at any layer.
+        #
+        # **This does not fix "which runs were denied?"**, and the note matters because that is
+        # what sent somebody looking here. Denials are outside the `operator` role's scope
+        # entirely (`core.answering.scope.ROLE_VISIBILITY`), so that question is unanswerable for
+        # that role by design, at any limit and in any window. Recording the correction so the
+        # next reader does not inherit a false causal story from a comment.
+        #
+        # **This narrows nothing and widens nothing.** Every scope clause above is untouched, so
+        # the set a caller *may* see is identical; what changes is which slice of it arrives when
+        # the limit truncates. The returned order is still ascending, so no consumer sees a
+        # different shape — only a more current window.
+        #
+        # `tests/harness/memory_evidence.py` carries the same correction. They shared this
+        # defect, which is exactly why nothing caught it: a differential test between two
+        # implementations that are wrong in the same way passes.
+        columns = (
+            "tenant_id, correlation_id, seq, event_type, timestamp, payload, prev_hash, entry_hash"
         )
-        params.append(request.limit)
+        where = " AND ".join(clauses)
+
+        if request.limit_per_type is None:
+            sql = (
+                f"SELECT {columns} FROM ("
+                f"  SELECT {columns} FROM audit_entries WHERE {where} "
+                "  ORDER BY timestamp DESC, correlation_id DESC, seq DESC LIMIT %s"
+                ") AS newest ORDER BY timestamp, correlation_id, seq"
+            )
+            params.append(request.limit)
+        else:
+            # PER TYPE (029), because the defect the bound above cannot fix is COMPETITION.
+            #
+            # A question about runs lost to whatever the estate does most: 60 `run_start` records
+            # in a window of 1,000, against 383 `effect_observed` and 302 `pre_decision`. Raising
+            # the limit would not have helped — at any row count the common types crowd out the
+            # rare ones, so each requested type gets its own newest-N instead.
+            #
+            # **One query, never one per type.** `ROW_NUMBER()` ranks within each type newest-first
+            # and `COUNT(*)` over the same partition gives how many existed — so the accounting
+            # FR-006 needs costs no second round-trip. The outer query restores ascending order,
+            # because selecting the newest is not the same as reversing and only the first was
+            # ever the defect.
+            sql = (
+                f"SELECT {columns}, matched FROM ("
+                f"  SELECT {columns},"
+                "         ROW_NUMBER() OVER ("
+                "           PARTITION BY event_type"
+                "           ORDER BY timestamp DESC, correlation_id DESC, seq DESC"
+                "         ) AS rank_in_type,"
+                "         COUNT(*) OVER (PARTITION BY event_type) AS matched "
+                f"  FROM audit_entries WHERE {where}"
+                ") AS ranked WHERE rank_in_type <= %s "
+                "ORDER BY timestamp, correlation_id, seq"
+            )
+            params.append(request.limit_per_type)
 
         try:
             conn = self._open(refresh=False)
@@ -118,7 +176,17 @@ class PostgresEvidenceQuery:
         try:
             cur = conn.cursor()
             cur.execute(sql, tuple(params))
-            return [_row_to_entry(r) for r in cur.fetchall()]
+            rows = cur.fetchall()
+            if request.limit_per_type is None:
+                return SearchResult([_row_to_entry(r) for r in rows])
+            # The windowed form carries `matched` as a trailing column; `_row_to_entry` reads
+            # only the leading eight, so the accounting rides along without a second query.
+            entries = [_row_to_entry(r) for r in rows]
+            window: dict[Any, tuple[int, int]] = {}
+            for row, entry in zip(rows, entries, strict=True):
+                returned, _ = window.get(entry.event_type, (0, int(row[8])))
+                window[entry.event_type] = (returned + 1, int(row[8]))
+            return SearchResult(entries, window=window)
         except Exception as exc:
             raise EvidenceReadError(f"evidence read failed: {exc}") from exc
         finally:

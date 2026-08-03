@@ -69,6 +69,10 @@
       <h2 id="outcome">No answer for this one</h2>
       <p>{{ (response.payload or {}).get("declined_reason")
              or "The platform found nothing it could rest an answer on." }}</p>
+      {% if (response.payload or {}).get("window_note") %}
+        {# A decline drawn from a window is the case a reader most needs told. #}
+        <p class="meta window">{{ response.payload.window_note }}</p>
+      {% endif %}
       {% if (response.payload or {}).get("source") %}
         <p class="meta">Consulted: {{ response.payload.source }}</p>
       {% endif %}
@@ -103,6 +107,17 @@
           </li>
         {% endfor %}
       </ol>
+      {% if (response.payload or {}).get("window_note") %}
+        {#
+          WHAT THE ANSWER RESTS ON, when the read returned a window rather than everything.
+
+          Present only when something truncated, so a complete answer carries no caveat — an
+          unconditional note would teach readers to skip it, which costs exactly the case it
+          exists for. A person told "3 runs failed" needs to know whether that is 3 of 3 or 3 of
+          the 200 most recent of 1,847.
+        #}
+        <p class="meta window">{{ response.payload.window_note }}</p>
+      {% endif %}
       {% if (response.payload or {}).get("source") %}
         <p class="meta">Answered from: {{ response.payload.source }}</p>
       {% endif %}

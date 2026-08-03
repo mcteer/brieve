@@ -524,3 +524,41 @@ def test_the_two_surfaces_say_which_one_acts() -> None:
     # And each points at the other, so landing on the wrong one is a click rather than a search.
     assert 'href="/"' in portal.get("/ask").text
     assert 'href="/ask"' in portal.get("/").text
+
+
+def test_the_portal_shows_what_a_bounded_answer_rests_on() -> None:
+    """029/FR-006 at the surface a person reads.
+
+    The platform decides when an answer was a window; the portal renders that decision and does
+    not compute it — the same thin-client discipline the refusal block follows. A note the portal
+    synthesised would drift from what the read actually did.
+    """
+    note = "Based on the 200 most recent run start records of 1,847."
+    portal = _scripted(
+        200,
+        {
+            "disposition": "answered",
+            "source": "estate",
+            "window_note": note,
+            "claims": [{"statement": "A run was recorded.", "references": ["a" * 64]}],
+        },
+    )
+
+    page = portal.post("/ask", data={"question": ESTATE_QUESTION}).text
+
+    assert note in _visible(page), "the answer did not tell the reader it was a window"
+
+
+def test_a_complete_answer_carries_no_window_caveat() -> None:
+    """An unconditional note would teach readers to skip it, costing the case it exists for."""
+    portal = _scripted(
+        200,
+        {
+            "disposition": "answered",
+            "source": "estate",
+            "window_note": "",
+            "claims": [{"statement": "A run was recorded.", "references": ["b" * 64]}],
+        },
+    )
+
+    assert "Based on" not in _visible(portal.post("/ask", data={"question": ESTATE_QUESTION}).text)

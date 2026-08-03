@@ -28,6 +28,7 @@ same rule 024 established for provider failures.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -99,6 +100,15 @@ class EstateAnswer:
     source: str = ESTATE_SOURCE
     claims: tuple[EstateClaim, ...] = ()
     declined_reason: str = ""
+    #: What the answer rests on, when the read returned a window rather than everything (029).
+    #:
+    #: Empty when nothing was truncated, which is the common case and renders as no caveat at all.
+    #: **On the answer, never on the `ASK_ANSWERED` record** — the trail's access record already
+    #: carries the narrowed request and serves the investigator; this serves the *asker*, who is
+    #: about to act on "3 runs failed" without otherwise knowing whether that is 3 of 3 or 3 of the
+    #: 200 examined out of 1,847. Keeping it here is also what keeps this feature out of sealed
+    #: core.
+    window_note: str = ""
     dropped: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -107,13 +117,39 @@ def _adjudicates(statement: str) -> bool:
     return bool(words & VERDICT_WORDS)
 
 
+def describe_window(window: Mapping[Any, tuple[int, int]]) -> str:
+    """What a bounded read left out, in words a person can act on (029, FR-006).
+
+    Empty string when nothing was truncated — the common case, which must render as no caveat at
+    all rather than as a reassurance nobody asked for.
+
+    **Per type, because that is the grain that helps.** "The 200 most recent run records of 1,847"
+    tells a reader whether "3 runs failed" means 3 of 3 or 3 of a sample; "1,000 of 63,947" across
+    mixed types tells them nothing they can use.
+    """
+    truncated = {kind: counts for kind, counts in window.items() if counts[0] < counts[1]}
+    if not truncated:
+        return ""
+    parts = [
+        f"the {returned} most recent {str(kind).replace('_', ' ')} records of {matched}"
+        for kind, (returned, matched) in sorted(truncated.items(), key=lambda kv: str(kv[0]))
+    ]
+    return "Based on " + ", ".join(parts) + "."
+
+
 def answer_estate_question(
     *,
     question: str,
     records: tuple[AuditEntry, ...],
     provider: EstateProvider,
+    window_note: str = "",
 ) -> EstateAnswer:
-    """Ask, keep only what the asker's own records support, and decline if that is nothing."""
+    """Ask, keep only what the asker's own records support, and decline if that is nothing.
+
+    ``window_note`` describes what the read left out, and is carried onto every outcome — an
+    answer, a decline and a refusal all rest on the same evidence, and a decline drawn from a
+    window is exactly the case a reader most needs told.
+    """
     try:
         candidates = provider.answer(question, records)
     except EstateProviderUnavailable:
@@ -155,8 +191,14 @@ def answer_estate_question(
                 else "every claim rested on a record that is not in what you may see"
             ),
             dropped=tuple(dropped),
+            window_note=window_note,
         )
-    return EstateAnswer(disposition=ANSWERED, claims=tuple(kept), dropped=tuple(dropped))
+    return EstateAnswer(
+        disposition=ANSWERED,
+        claims=tuple(kept),
+        dropped=tuple(dropped),
+        window_note=window_note,
+    )
 
 
 class RecordedEstateProvider:
@@ -195,6 +237,7 @@ class RecordedEstateProvider:
 
 
 __all__ = [
+    "describe_window",
     "ANSWERED",
     "DECLINED",
     "ESTATE_SOURCE",

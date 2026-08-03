@@ -76,6 +76,16 @@ def test_request_has_no_widening_parameter() -> None:
     from core.audit.query import EvidenceQueryRequest
 
     fields = set(EvidenceQueryRequest.model_fields)
+    # EXACT, not a superset — the row fires on a deliberate addition as loudly as an accidental
+    # one, which is why each arrival has had to argue for itself. `event_types` (025) narrows to
+    # what a role may see; `limit_per_type` (029) bounds the newest N of each requested type
+    # rather than N across all of them, after a question about runs received 60 run records in a
+    # window of 1,000 because the common types took the rest.
+    #
+    # **Both narrow, and neither can widen.** `event_types` decides what may be seen at all;
+    # `limit_per_type` only chooses a subset of what already passed that gate. A field that could
+    # widen would belong nowhere near this request, and that is the property this row exists to
+    # keep checkable.
     assert fields == {
         "tenant_id",
         "correlation_id",
@@ -84,4 +94,5 @@ def test_request_has_no_widening_parameter() -> None:
         "end_time",
         "event_types",
         "limit",
+        "limit_per_type",
     }

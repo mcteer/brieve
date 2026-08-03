@@ -47,28 +47,67 @@ class Route(StrEnum):
 #: Drawn from the trail's vocabulary rather than invented: these are the words that appear in
 #: `AuditEventType` and in the questions ADR-0035 names (*"which workspaces violate a control"*,
 #: *"what changed last night"*).
+#:
+#: **This is the STRONG set: words that appear only in what-happened questions** (029).
+#:
+#: Measured: 4 of 12 plainly estate-shaped questions declined without reading a record, because
+#: the list held the trail's verbs and not its nouns. The obvious repair — add `tool`, `agent`,
+#: `secret` — captures guidance questions instead, since ties break toward estate.
+#:
+#: Two things had to be true at once, and one rule delivers both. **Nouns are plural-only**:
+#: how-to questions name things in the singular (*read a secret*, *configure the vault agent*)
+#: while what-happened questions name them in the plural (*were any secrets read*). And the
+#: plurals still live in `ESTATE_NOUNS` below rather than here, because even plural they appear
+#: in guidance — *"the recommended pattern for dynamic secrets"* is documentation, and an
+#: existing row said so on the first run of the wider vocabulary.
+#:
+#: `did` is here against the instinct that it is too common: it is the *what-happened* auxiliary,
+#: it routes *"What did the planner agent do?"*, and it appears in no guidance question anyone
+#: has written.
 ESTATE_TERMS: Final[frozenset[str]] = frozenset(
     {
+        "active",
         "audit",
         "changed",
+        "did",
         "denied",
         "estate",
         "evidence",
         "failed",
         "granted",
         "happened",
-        "record",
-        "records",
         "refused",
         "resumed",
         "run",
         "runs",
         "stopped",
         "trail",
+        "used",
         "violate",
         "violates",
         "violation",
         "violations",
+    }
+)
+
+#: Nouns the estate and the documentation **both** own (029).
+#:
+#: `secrets`, `tools`, `agents` name things this platform records *and* things its documentation
+#: explains. Alone they mean the estate; beside an explicit guidance marker they do not, because
+#: *"the recommended pattern for dynamic secrets"* is a request for documentation that happens to
+#: name a noun the trail also uses.
+#:
+#: **This is not a softening of the tie-break.** That rule exists for genuine ties, and a question
+#: carrying two explicit guidance markers against one shared noun is not a tie — it is a guidance
+#: question with a noun in it. Strong estate terms still win outright, so the asymmetric-failure
+#: argument in the module docstring is untouched where it applies.
+ESTATE_NOUNS: Final[frozenset[str]] = frozenset(
+    {
+        "agents",
+        "record",
+        "records",
+        "secrets",
+        "tools",
         "workspace",
         "workspaces",
     }
@@ -128,15 +167,30 @@ def window_phrase(question: str) -> str | None:
 def route(question: str) -> Route:
     """Decide the source. Same question, same answer, always."""
     words = _words(question)
-    estate = bool(words & ESTATE_TERMS) or window_phrase(question) is not None
+    strong = bool(words & ESTATE_TERMS) or window_phrase(question) is not None
+    shared_noun = bool(words & ESTATE_NOUNS)
     guidance = bool(words & GUIDANCE_TERMS)
 
-    if estate:
-        # Including when BOTH match — see the module docstring on asymmetric failure.
+    if strong:
+        # Including when guidance also matches — see the module docstring on asymmetric failure.
+        # A what-happened word is not ambiguous, so the tie-break applies with its full force.
+        return Route.ESTATE
+    if shared_noun and not guidance:
+        # A noun both worlds own, with nothing pulling the other way: the estate, on the same
+        # asymmetric-failure reasoning.
         return Route.ESTATE
     if guidance:
         return Route.GUIDANCE
-    return Route.NEITHER
+    # A shared noun cannot reach here with guidance unset — the branch above took it.
+    return Route.ESTATE if shared_noun else Route.NEITHER
 
 
-__all__ = ["ESTATE_TERMS", "GUIDANCE_TERMS", "WINDOW_PHRASES", "Route", "route", "window_phrase"]
+__all__ = [
+    "ESTATE_NOUNS",
+    "ESTATE_TERMS",
+    "GUIDANCE_TERMS",
+    "WINDOW_PHRASES",
+    "Route",
+    "route",
+    "window_phrase",
+]

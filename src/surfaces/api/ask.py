@@ -20,7 +20,12 @@ from pydantic import BaseModel, ConfigDict
 from core.answering.answer import ANSWERED, ProviderUnavailable, answer_question
 from core.answering.corpus import Corpus, CorpusUnavailable
 from core.answering.estate import ANSWERED as ESTATE_ANSWERED
-from core.answering.estate import EstateProviderUnavailable, answer_estate_question
+from core.answering.estate import (
+    EstateProviderUnavailable,
+    answer_estate_question,
+    describe_window,
+)
+from core.answering.focus import focus_types
 from core.answering.record import record_ask
 from core.answering.routing import Route, route, window_phrase
 from core.answering.scope import visible_event_types
@@ -42,6 +47,18 @@ class ScopeEmpty(Exception):
 #: The source an ask consulted, for the record. 025 adds estate routing; until the
 #: estate branch lands, every ask that reaches this module consulted the corpus.
 GUIDANCE_SOURCE = str(Route.GUIDANCE)
+
+#: How many records of **each** requested type an estate answer may rest on.
+#:
+#: Per type rather than per read, because the defect a shared bound cannot fix is competition:
+#: measured on a real tenant, a question about runs received 60 run records in a window of 1,000
+#: while `effect_observed` took 383 and `pre_decision` 302. Raising a shared number would not have
+#: helped at any value.
+#:
+#: 200 is enough for a question about a day's activity to rest on something representative, and
+#: small enough that a handful of types stays inside a model's context. When it truncates, the
+#: answer says so (`describe_window`) rather than presenting a slice as the whole.
+RECORDS_PER_TYPE = 200
 
 
 def ask_for(
@@ -152,16 +169,35 @@ def estate_answer_for(
         )
 
     start, end = _window(question, now)
+    # FOCUS ∩ VISIBLE, and the intersection is the whole safety argument (029).
+    #
+    # `visible` decides what this subject may see at all; `focus` decides what the question is
+    # about. Intersecting means a question can only ever narrow an already-scoped read — a focus
+    # that could add a type would be a scope defect wearing a relevance feature's clothes.
+    #
+    # An empty intersection falls back to `visible` rather than refusing: "your role cannot see
+    # the thing you asked about" must read as an ordinary empty estate, not as a scope refusal,
+    # while the visibility question stays open (029 FR-009).
+    focus = focus_types(question)
+    narrowed = (focus & visible) or visible if focus is not None else visible
     entries, _disposition = read_evidence_for(
         query=query,
         audit=audit,
         subject=subject,
         start_time=start,
         end_time=end,
-        event_types=visible,
+        event_types=narrowed,
+        # PER TYPE, because one bound over undifferentiated types is a competition the estate's
+        # noisiest activity always wins: measured at 60 run records in a window of 1,000.
+        limit_per_type=RECORDS_PER_TYPE,
     )
 
-    answer = answer_estate_question(question=question, records=tuple(entries), provider=provider)
+    answer = answer_estate_question(
+        question=question,
+        records=tuple(entries),
+        provider=provider,
+        window_note=describe_window(getattr(entries, "window", {})),
+    )
 
     # Recorded before the answer is returned, pointing at the access STREAM (stable per tenant,
     # 022) rather than a single record — one hop, and the read is locatable within it by subject
@@ -185,10 +221,12 @@ def estate_answer_for(
             "disposition": answer.disposition,
             "source": answer.source,
             "declined_reason": answer.declined_reason,
+            "window_note": answer.window_note,
         }
     return {
         "disposition": answer.disposition,
         "source": answer.source,
+        "window_note": answer.window_note,
         "claims": [
             {
                 "statement": claim.statement,

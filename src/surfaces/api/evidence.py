@@ -29,7 +29,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 
-from core.audit.query import EvidenceQuery, EvidenceQueryRequest
+from core.audit.query import EvidenceQuery, EvidenceQueryRequest, SearchResult
 from core.audit.reconcile import ReconcileReport, emit_reconciled, posture_reason
 from core.audit.reconcile_service import Reconciler
 from core.audit.schema import AuditEntry, AuditEventType, EvidenceDisposition
@@ -68,7 +68,8 @@ def read_evidence_for(
     end_time: datetime | None = None,
     limit: int = 1000,
     event_types: frozenset[AuditEventType] | None = None,
-) -> tuple[list[AuditEntry], EvidenceDisposition]:
+    limit_per_type: int | None = None,
+) -> tuple[SearchResult, EvidenceDisposition]:
     """The governed read, independent of transport.
 
     Extracted from the route so MCP reaches *this* rather than reimplementing it. ADR-0033
@@ -91,11 +92,16 @@ def read_evidence_for(
         end_time=end_time,
         limit=limit,
         event_types=event_types,
+        # 029: bounds the newest N of EACH requested type. `None` is exactly today's read, which
+        # is why `GET /evidence` and the MCP evidence operation are untouched by its arrival.
+        limit_per_type=limit_per_type,
     )
     entries = query.search(request)
     disposition = _disposition(entries, request, query)
     if disposition is EvidenceDisposition.OUT_OF_SCOPE:
-        entries = []
+        # Emptied, and the window accounting goes with it — a caller told nothing must not be
+        # told how much they were told nothing about.
+        entries = SearchResult()
 
     _record_access(
         audit=audit,

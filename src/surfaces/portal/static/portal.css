@@ -132,3 +132,7 @@ form.inline { display: inline; }
    the never-acts distinction that the nav labels alone could not — a person who lands mid-flow
    reads the page, not the header. */
 .lede { color: var(--muted); max-width: 40rem; }
+
+/* What an answer rests on, when it rested on a window (029). Same register as the source line —
+   a caveat that shouted would be read as an error, and this is not one. */
+.meta.window { font-style: italic; }
