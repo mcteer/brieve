@@ -27,12 +27,36 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 
 QUESTION = "Which runs were denied?"
+
+#: The freshly submitted allocation installs its dependencies before serving — the same
+#: measured cold-start the deployment lane budgets for its surfaces.
+READY_BUDGET = 240.0
+
+
+def wait_for_surface(mcp) -> str:  # noqa: ANN001 — the harness module, passed to avoid a re-import
+    """ONE loop that resolves the allocation and probes the protocol (the api taught this:
+    placement and answering are separate waits, and they interleave with restarts)."""
+    token = mcp.caller_token(
+        subject="demo-operator", tenant="tenant-local", permissions=["platform:operator"]
+    )
+    deadline = time.monotonic() + READY_BUDGET
+    while time.monotonic() < deadline:
+        if mcp.allocation() is not None:
+            try:
+                if "ask" in mcp.list_operations(token):
+                    return token
+            except Exception:  # noqa: BLE001 — not-yet-serving looks like many exception types
+                pass
+        time.sleep(5.0)
+    print(f"FAIL: the served MCP surface never answered within {READY_BUDGET:.0f}s of submit")
+    raise SystemExit(2)
 
 
 def main() -> int:
@@ -41,15 +65,7 @@ def main() -> int:
     runs = json.loads(Path(sys.argv[1]).read_text())
     citable = set(runs["citable_hashes"])
 
-    if mcp.allocation() is None:
-        print("FAIL: the served MCP surface is not up — run `DEV_IDP=1 infra/bin/mcp-surface-up`")
-        return 2
-
-    token = mcp.caller_token(
-        subject="demo-operator",
-        tenant="tenant-local",
-        permissions=["platform:operator"],
-    )
+    token = wait_for_surface(mcp)
     answer = mcp.call("ask", {"question": QUESTION}, token=token)
 
     print(f"  operator asked: {QUESTION!r}")
