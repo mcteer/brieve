@@ -140,25 +140,14 @@ uv run --extra surfaces --extra adapters python infra/bin/model_run_demo_runs.py
 
 # ---------------------------------------------------------------- the operator asks
 say "US4: the operator asks the platform about the refusal"
-# The API allocation copies source at start, so a restart is what makes the branch's
-# visibility decision the one answering (run-the-served-process: the assembly is the one
-# path no test covers).
-#
-# BOUNDED WAIT, not a single look, and the first end-to-end execution is why: the api task
-# restarts itself whenever its Vault identity renews a token, and the demonstration's ~10
-# minutes of runs landed this check exactly inside one of those windows — no allocation was
-# "running" for the seconds it took the task to come back. A surface mid-restart is not a
-# surface that is down.
-api_alloc=""
-for _ in $(seq 1 24); do
-  api_alloc="$(nomad job status api 2>/dev/null | awk '$6 == "running" && length($1) == 8 { print $1; exit }')"
-  [ -n "$api_alloc" ] && break
-  sleep 5
-done
-[ -n "$api_alloc" ] || die "the api job has had no running allocation for two minutes — run \`infra/bin/portal-up\` first"
-say "Restarting the api allocation so the branch's code is the code answering"
-nomad alloc restart "$api_alloc" >/dev/null || die "could not restart the api allocation ${api_alloc}"
-uv run --extra surfaces python infra/bin/model_run_demo_ask.py "${CAPTURE}/runs.json" \
+# Through the served MCP surface with the development provider — the platform's supported
+# non-interactive human-shaped path. The Auth0-configured API refuses a machine credential
+# on the human path (subject_kind_mismatch, measured by this script's first wire attempt),
+# which is its own governance working; a browser sign-in remains the API's human path.
+# `mcp-surface-up` re-submits the job, so the served process runs THIS branch's visibility
+# decision (run-the-served-process: the assembly is the one path no test covers).
+DEV_IDP=1 "$REPO/infra/bin/mcp-surface-up" || die "the MCP surface did not come up"
+uv run --extra surfaces --extra adapters python infra/bin/model_run_demo_ask.py "${CAPTURE}/runs.json" \
   || die "the operator's question did not answer citing the refusal"
 
 # ---------------------------------------------------------------- tear down, and prove it
