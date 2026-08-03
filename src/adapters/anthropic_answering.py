@@ -34,14 +34,42 @@ from core.answering.answer import ProviderUnavailable
 from core.answering.corpus import Corpus
 from core.evals.scoring import LIVE_MODEL
 
-#: How many corpus sections the model is shown. Enough that a supportable question finds its
-#: support, small enough that the prompt stays a prompt — the corpus is 856K and no answer needs
-#: all of it.
-SECTIONS_OFFERED: Final[int] = 12
+#: How many corpus sections the model is shown.
+#:
+#: THIRTY, BECAUSE RETRIEVAL IS NOT THE PARTY THAT SHOULD BE DECIDING RELEVANCE. At twelve this
+#: retriever had to be right about the top twelve of ~2,500 sections, and when it was wrong the
+#: person got "the pinned corpus does not support an answer" about material the corpus plainly
+#: holds. Considerable effort went into making the ranking better — BM25, length normalisation,
+#: coordination, splitting the heading from the path — and every one of those was measured
+#: against the live model and every one made things worse or no better.
+#:
+#: What worked was giving the model more to read. Measured over six phrasings of questions this
+#: corpus answers, with two samples each:
+#:
+#:     12 sections → 3/12 empty        20 sections → 3/12 empty        30 sections → 0/12 empty
+#:
+#: and 0/24 on a confirmation run. The phrasing that failed at EVERY ranking configuration
+#: answers at thirty.
+#:
+#: That is the honest division of labour. Ranking picks what to look at and is imperfect; the
+#: model reads and judges, and it is the only party here that can tell whether a section bears
+#: on the question. Widening the aperture costs prompt tokens — about 2.5x, still well inside
+#: the 180s the portal waits — and buys the difference between a platform that answers and one
+#: that tells people it has nothing.
+SECTIONS_OFFERED: Final[int] = 30
 
 #: At most this many sections from any one document, so the offered set spans sources rather
 #: than exhausting the highest-scoring page. See `_relevant` for what this cost and bought.
 SECTIONS_PER_DOCUMENT: Final[int] = 3
+
+#: What a HEADING is worth against a mention in the body — the document path and the section
+#: anchor together.
+#:
+#: Splitting these was tried and measured worse. The argument for splitting was sound — a path
+#: term lifts every section of a document identically and so cannot say which of them answers
+#: the question — but against the live model it took empty answers from 2/12 to 4/12, and the
+#: measurement wins over the argument. Recorded so nobody re-derives it.
+HEADING_WEIGHT: Final[float] = 3.0
 
 #: Per-section character cap. A long section truncated still carries its own anchor, so a citation
 #: into it resolves; what truncation costs is the model's evidence, not the pin's integrity.
@@ -80,6 +108,45 @@ _STOPWORDS: Final[frozenset[str]] = frozenset(
         "for",
         "and",
         "how",
+        # WORDS THAT SAY WHAT THE ASKER WANTS, NOT WHAT THEY ARE ASKING ABOUT.
+        #
+        # These carry no topic, and left in they do active harm, because they collide with
+        # BOILERPLATE HEADINGS. Asked *"what's the best way to run a Vault cluster on AWS?"*
+        # the retriever scored `best` against every "Background and best practices" and
+        # "Operational best practices" section in the corpus — a heading that appears in
+        # nearly every document — and the heading boost floated them to the top. The offered
+        # set came back as five best-practice preambles and a Vault Radar CLI page, the model
+        # correctly found nothing in it about running a cluster, and the person was told the
+        # pinned corpus does not support an answer. Drop `best` and `way` from the same
+        # question and it returns seven cited claims.
+        #
+        # That is the whole class: a person's phrasing of INTENT ("the best way", "the
+        # prescribed approach", "how am I supposed to") matching a document's furniture. Every
+        # word here is one nobody would search for on its own, and none of them names anything
+        # this corpus is about — `deploy`, `install`, `size`, `upgrade` and the rest are topic
+        # words and stay.
+        "best",
+        "better",
+        "good",
+        "right",
+        "correct",
+        "proper",
+        "properly",
+        "prescribed",
+        "recommended",
+        "recommend",
+        "preferred",
+        "ideal",
+        "optimal",
+        "way",
+        "ways",
+        "approach",
+        "supposed",
+        "want",
+        "need",
+        "please",
+        "guide",
+        "explain",
     }
 )
 
@@ -151,7 +218,7 @@ def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
             weight = math.log(total / appearances) + 1.0
             if term in heading:
                 # Named for it, not merely mentioning it.
-                score += weight * 3.0
+                score += weight * HEADING_WEIGHT
             elif term in body:
                 score += weight
         if score:
