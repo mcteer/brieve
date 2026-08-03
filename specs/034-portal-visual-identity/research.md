@@ -105,19 +105,32 @@ so "which face does X use" has one answer and the token row covers it.
 
 ## F7 — Roboto enters the tree the way the terraform skill did
 
-**Decision**: two weights vendored — Regular (400) and Bold (700) — as woff2 under
-`src/surfaces/portal/static/fonts/`, declared via `@font-face` with `font-display: swap`.
-Weights 500/600 are not vendored; anything that wants medium emphasis uses 700 or stays 400.
-Italic is not vendored; the portal's copy uses italics only for the window note, which may
-keep synthetic italic or drop to normal — decided at implementation, recorded in the template
-comment either way.
+**Decision, as PLANNED**: two static weights (400, 700) as woff2, licence Apache-2.0.
 
-**Provenance** (FR-002a, ADR-0004's discipline): the files come from the pinned upstream
-release of the canonical Roboto repository; a `PROVENANCE.md` beside them records repository,
-release/commit, licence (Apache-2.0 — the same licence as this repository), retrieval date,
-the exact conversion command if the release ships TTF and woff2 was produced from it (tool
-and version pinned in the record), and the sha256 of each vendored file. A component row
-recomputes the digests against the record — the row is the verifier, exactly as the pack
+**Decision, as IMPLEMENTED — both halves of the plan were wrong, and vendoring is where that
+was caught** (2026-08-03):
+
+- **The licence is SIL OFL 1.1, not Apache-2.0.** Roboto was Apache-2.0 for years before the
+  Google Fonts collection moved to OFL, so the plan's claim was stale rather than invented. It
+  survived spec, plan, tasks and a PR body unchallenged and died the moment someone read
+  `OFL.txt` — which is exactly the failure mode the provenance discipline exists to catch, and
+  the second time in one day that a confidently-stated upstream fact turned out to be
+  assumption. `OFL.txt` is vendored verbatim; **no Reserved Font Name is declared**, recorded
+  because its absence is what leaves conversion and any future subsetting unencumbered.
+- **Upstream ships no static weights.** `google/fonts@2796410` holds `Roboto[wdth,wght].ttf`
+  and its italic, nothing else; the design repo ships UFO sources only. So ONE variable file
+  (wght 100–900, wdth 75–100) is vendored — every weight the portal can ask for, one digest to
+  verify instead of two — at 222 KB against the plan's ~90 KB estimate, stated rather than
+  buried. Italic is not vendored: one use (the window note), synthetic oblique suffices,
+  recorded so nobody wonders whether it was forgotten.
+- The only modification is the container format (TTF → WOFF2), which is what Google Fonts
+  itself serves and is not a Modified Version in OFL's sense.
+
+**Provenance** (FR-002a): `PROVENANCE.md` records repository + commit + upstream path, the
+licence and the RFN finding, retrieval date, the reproducible conversion command with its
+pinned tool version, and sha256 for the upstream source as well as each vendored file — the
+source digest included so the conversion is re-derivable end to end rather than trusted. A
+component row recomputes the vendored digests; the row is the verifier, exactly as the pack
 loader is for skill bytes.
 
 **Refused alternative**: fetching from Google Fonts' CDN at runtime (breaks offline and adds

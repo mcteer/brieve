@@ -20,12 +20,21 @@ reviewed act recorded in provenance — nothing fetches at runtime.
 
 ## Phase 1: Setup
 
-- [ ] T001 Vendor Roboto into `src/surfaces/portal/static/fonts/`: Regular (400) and Bold
-      (700) as woff2, from the pinned canonical upstream release. Write `PROVENANCE.md`
-      beside them recording repository + release/commit, licence (Apache-2.0 — the same as
-      this repository), retrieval date, the exact conversion command and tool version if
-      woff2 was produced from released TTF, and the sha256 of each vendored file (research
-      F7). This is the feature's ONE network act; it happens here, once, and is reviewed.
+- [X] T001 Vendor Roboto into `src/surfaces/portal/static/fonts/`. **Two planning
+      assumptions were wrong and vendoring is where that surfaced** — which is the point of
+      having the discipline. (1) The licence is **SIL OFL 1.1, not Apache-2.0**: Roboto was
+      Apache-2.0 for years before the Google Fonts collection relocensed, so the artifacts'
+      claim was stale rather than invented; `OFL.txt` is vendored verbatim beside the font
+      and no Reserved Font Name is declared, which is recorded because its absence is what
+      leaves format conversion unencumbered. (2) Upstream **no longer ships static Regular
+      and Bold** — `google/fonts@2796410` holds only `Roboto[wdth,wght].ttf`, so ONE variable
+      file (wght 100–900) covers every weight, with one digest to verify instead of two, at
+      222 KB rather than the plan's estimated ~90 KB. Italic is not vendored (one use, the
+      window note; synthetic oblique suffices) and that is recorded rather than silently
+      omitted. `PROVENANCE.md` carries repository + commit + upstream path, the licence, the
+      reproducible conversion command with its pinned tool version, and sha256 for the
+      upstream source as well as both vendored files — the source digest so the conversion is
+      re-derivable end to end. This was the feature's ONE network act.
 
 ## Phase 2: Foundational
 
