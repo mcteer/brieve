@@ -47,6 +47,17 @@ SECTIONS_PER_DOCUMENT: Final[int] = 3
 #: into it resolves; what truncation costs is the model's evidence, not the pin's integrity.
 SECTION_CHARS: Final[int] = 2400
 
+#: How many times the model is asked before the platform will say the corpus is silent.
+#:
+#: Three, and the shape of the arithmetic is why: an empty draw was measured at roughly one in
+#: six, so one attempt tells a person the corpus has nothing about 17% of the time it does,
+#: two gets that under 3%, and three under 0.5%. Beyond three the return is negligible against
+#: a latency a person is waiting through.
+#:
+#: The cost is paid ONLY on the failing path — an answer on the first draw is returned on the
+#: first draw — so the expected spend is about 1.2 calls per ask rather than 3.
+ATTEMPTS_BEFORE_SILENCE: Final[int] = 3
+
 _STOPWORDS: Final[frozenset[str]] = frozenset(
     {
         "what",
@@ -204,6 +215,33 @@ class LiveAnswerProvider:
         self._api_key = api_key
 
     def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+        """Candidate claims, or nothing — and *nothing* is asked more than once.
+
+        **A DECLINE IS A STATEMENT ABOUT THE CORPUS, SO ONE DRAW MUST NOT MAKE IT.** Told "the
+        pinned corpus does not support an answer to this question", a person concludes the
+        platform has no guidance on what they asked and stops asking. That sentence has to be
+        true. Taken from a single sample it frequently was not: measured on 2026-08-03 against
+        the 238-document corpus, *"the prescribed way to build a Vault cluster in AWS"* came
+        back empty roughly one time in six and returned six or seven well-cited claims the
+        rest — same question, same corpus, same model. The maintainer asked once, drew the
+        empty one, and was told the corpus was silent about the most documented thing we ship.
+
+        The eval lane already refuses to trust one draw; it scores each case by majority of
+        three, on the reasoning that *"a deterministic sample would still be one draw from the
+        distribution"*. That control belongs here more than it belongs there — a qualification
+        run that gets it wrong costs a retry, and this costs a person's belief that the
+        platform knows anything.
+
+        So an EMPTY answer is retried, and only an empty one. This never shops for a better
+        answer: any claims at all end it, including a single weak one, because re-asking a
+        model that answered is how a harness talks itself into the reply it wanted. And it
+        cannot manufacture support — every claim still has to cite a section that resolves in
+        the pin, so a retry can only find what was already there.
+
+        Temperature would be the other lever and is not available: these models reject the
+        parameter outright (see `anthropic_scorer`). Sampling again is the vendor-neutral form
+        of the same idea, which is what it needs to be — nothing here may assume a vendor.
+        """
         sections = _relevant(question, corpus)
         if not sections:
             # Nothing to look at. Returning no candidates makes the path decline, which is the
@@ -214,6 +252,14 @@ class LiveAnswerProvider:
             f"--- path: {path}\n--- anchor: {anchor}\n{text[:SECTION_CHARS]}"
             for path, anchor, text in sections
         )
+        for remaining in range(ATTEMPTS_BEFORE_SILENCE - 1, -1, -1):
+            claims = self._ask_once(question, offered)
+            if claims or not remaining:
+                return claims
+        return []  # pragma: no cover — the loop always returns
+
+    def _ask_once(self, question: str, offered: str) -> list[dict[str, Any]]:
+        """One draw. Raises on a provider fault; returns `[]` when the model found nothing."""
         client, api_model = client_and_model(self._model, api_key=self._api_key)
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
@@ -329,6 +375,13 @@ class LiveEstateProvider:
         return self._ids.get(cited, f"unresolvable:{cited}")
 
     def answer(self, question: str, records: tuple[Any, ...]) -> list[dict[str, Any]]:
+        """Candidate claims from the records, retried on empty for `LiveAnswerProvider`'s reason.
+
+        The same control, because the same sentence is at stake and it is arguably heavier here:
+        told the platform found nothing in their own records, a person concludes something did
+        not happen. Records that were read and not understood on one draw must not become
+        "there is nothing there".
+        """
         if not records:
             return []
 
@@ -339,6 +392,14 @@ class LiveEstateProvider:
             f"--- payload: {json.dumps(record.payload, sort_keys=True)}"
             for record in records
         )
+        for remaining in range(ATTEMPTS_BEFORE_SILENCE - 1, -1, -1):
+            claims = self._ask_once(question, offered)
+            if claims or not remaining:
+                return claims
+        return []  # pragma: no cover — the loop always returns
+
+    def _ask_once(self, question: str, offered: str) -> list[dict[str, Any]]:
+        """One draw. Raises on a provider fault; returns `[]` when the model found nothing."""
         client, api_model = client_and_model(self._model, api_key=self._api_key)
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
