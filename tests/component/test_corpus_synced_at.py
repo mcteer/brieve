@@ -44,14 +44,22 @@ def _load(manifest: Path) -> Corpus:
     return load_corpus(manifest=manifest, documents_dir=REAL_DOCUMENTS, verify=False)
 
 
-def test_the_committed_pin_loads_with_no_sync_time() -> None:
-    """FR-009. The 024 corpus answers on the day this lands, disclosing unknown age."""
+def test_the_committed_pin_loads_whatever_its_sync_time_is() -> None:
+    """FR-009, restated the day the first refresh landed — and the restatement is the record.
+
+    This row asserted `synced_at is None` against the COMMITTED manifest, which was true of the
+    024-era pin and stopped being true the moment anybody ran a refresh. That is over-specifying
+    a property onto an artifact: FR-009's claim is that *a manifest without a sync time still
+    loads and answers*, and the fixture rows below prove exactly that without depending on which
+    corpus happens to be checked in.
+
+    Found by the first real refresh, which is what a validation step is for.
+    """
     corpus = load_corpus()
 
     assert corpus.documents, "the committed corpus loaded empty"
-    assert corpus.synced_at is None, (
-        "the committed pin reports a sync time it does not carry — the unknown state is what "
-        "lets this feature merge before the first re-sync"
+    assert corpus.synced_at is None or corpus.synced_at.tzinfo is not None, (
+        "the committed pin carries a sync time with no timezone — not comparable to anything"
     )
 
 
