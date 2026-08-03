@@ -53,6 +53,14 @@ env_val() {
 
 AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"
 
+# `DEV_IDP=1` asks for the double even when `.env` names a real provider — the flag
+# `mcp-surface-up` has always honoured, and which this script silently ignored. Ignoring it
+# is worse than rejecting it: the operator gets a real sign-in page, concludes the flag is
+# spelled differently, and goes looking. The two bring-up scripts now take the same word.
+if [ -n "${DEV_IDP:-}" ]; then
+  AUTH0_DOMAIN=""
+fi
+
 if [ -n "$AUTH0_DOMAIN" ]; then
   say "Identity provider: Auth0 (${AUTH0_DOMAIN})"
 
@@ -88,7 +96,17 @@ else
   if curl -sf "http://127.0.0.1:${DEV_IDP_PORT}/jwks" >/dev/null 2>&1; then
     ok "already listening on ${DEV_IDP_PORT}"
   else
-    nohup uv run --extra adapters --extra surfaces --extra portal \
+    # Bound wide, as `mcp-surface-up` binds it, because the surfaces that must reach it are
+    # containers rather than host processes. Docker Desktop happens to forward
+    # `host.docker.internal` to a loopback-bound listener; a Linux engine does not.
+    #
+    # The ISSUER is pinned rather than derived, because the double derives it from the bind
+    # address: bound wide it minted `iss: http://0.0.0.0:8090`, the surfaces were configured
+    # with the loopback spelling, and every token came back `unverifiable_identity` — a
+    # message about the token, caused by the address it was bound to. Pinned, the two agree.
+    nohup env DEV_IDP_HOST=0.0.0.0 DEV_IDP_PORT="$DEV_IDP_PORT" \
+      DEV_IDP_ISSUER="http://127.0.0.1:${DEV_IDP_PORT}" \
+      uv run --extra adapters --extra surfaces --extra portal \
       python -m tests.harness.dev_idp >/tmp/brieve-dev-idp.log 2>&1 &
     # Recorded so whoever started it can stop it. This is a HOST process that outlives the
     # script, and left running it holds the uv cache lock — which fails an automated lane in
@@ -103,10 +121,22 @@ else
     ok "listening on ${DEV_IDP_PORT}"
   fi
 
+  # TWO AUDIENCES FOR THE SAME PROVIDER, AND THEY REACH IT BY DIFFERENT NAMES.
+  #
+  # `authorize` is followed by a BROWSER on the host, so it is `127.0.0.1`. `token` and
+  # `jwks` are fetched by the SURFACES, which are containers, and inside a container
+  # `127.0.0.1` is the container — the double is on the host and unreachable by that name.
+  # Written as one loopback address throughout, sign-in got as far as the callback and then
+  # failed `exchange_failed`, which names the exchange rather than the address that could not
+  # be dialled. Found 2026-08-03, the first time anything drove the deployed portal's dev
+  # sign-in end to end; every prior use of this branch was a person clicking a real Auth0.
+  #
+  # `iss` stays the loopback form because that is what the double MINTS, and a verifier
+  # configured with the other spelling refuses every token it is given.
   OIDC_ISSUER="http://127.0.0.1:${DEV_IDP_PORT}"
-  OIDC_JWKS_URI="http://127.0.0.1:${DEV_IDP_PORT}/jwks"
   OIDC_AUTHORIZE="http://127.0.0.1:${DEV_IDP_PORT}/authorize"
-  OIDC_TOKEN="http://127.0.0.1:${DEV_IDP_PORT}/token"
+  OIDC_JWKS_URI="http://host.docker.internal:${DEV_IDP_PORT}/jwks"
+  OIDC_TOKEN="http://host.docker.internal:${DEV_IDP_PORT}/token"
   OIDC_AUDIENCE="harness-api"
   OIDC_TENANT_CLAIM="tenant"
   PORTAL_CLIENT_ID="harness-portal"
