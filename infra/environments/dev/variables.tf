@@ -245,6 +245,38 @@ variable "model_matrix_cells" {
     # demonstration seeds `vault:anthropic/claude-opus@5:plan` OUT OF BAND — the credential's
     # posture, `infra/bin/model-run-demo` — and restores the estate from captured originals,
     # proving the restore by re-read. A plan cell appearing in this file is that gate's red row.
+
+    # THE SECOND MODEL, and the harness earned it rather than the threshold bending (032).
+    #
+    # **Earned 2026-08-03**, `make evals-live` exit 0, 10 rows in 18m20s, one clean invocation:
+    # every suite, both packs, both subject roles for the tool-choice pair, and
+    # `anthropic/claude-sonnet@5` qualified as its own judge against the human-labelled seed.
+    # Switched at the user's direction after Opus-priced lane runs; ~5x cheaper per run.
+    #
+    # Four lane runs of findings preceded the clean one, every fix model-agnostic and every
+    # threshold untouched: the refusal vocabulary became a mandatory response protocol
+    # (Sonnet refused correctly saying "I can't" — invisible to the platform's vocabulary);
+    # the protocol was scoped to agent roles after it bled into the judge and dropped seed
+    # agreement from 90%+ to 55%; the deny/decline boundary now follows the request's subject;
+    # and citation completeness joined the estate instruction as precision's twin. Customers
+    # will bring models this platform has never met — the harness carries that burden, not
+    # per-model branches, and not the gates.
+    #
+    # The Opus cells above STAY: evidence does not expire because a cheaper subject arrived.
+    {
+      pack         = "vault"
+      model        = "anthropic/claude-sonnet@5"
+      role         = "ask"
+      qualified_by = "live"
+      judge        = "anthropic/claude-sonnet@5"
+    },
+    {
+      pack         = "terraform"
+      model        = "anthropic/claude-sonnet@5"
+      role         = "ask"
+      qualified_by = "live"
+      judge        = "anthropic/claude-sonnet@5"
+    },
   ]
 }
 
@@ -267,9 +299,11 @@ variable "ask_binding" {
   #
   # Reverting to `fixture:fixture/scripted@1:ask` turns the enclave back into one that needs no
   # vendor at all, and nothing else has to change for that to work.
+  # Repointed to Sonnet 2026-08-03 (032): same role, same packs, evidence one clean lane run
+  # deep, ~5x cheaper per answer. The Opus cells remain qualified; reverting is one line.
   default = {
-    guidance_cell = "vault:anthropic/claude-opus@5:ask"
-    estate_cell   = "vault:anthropic/claude-opus@5:ask"
+    guidance_cell = "vault:anthropic/claude-sonnet@5:ask"
+    estate_cell   = "vault:anthropic/claude-sonnet@5:ask"
   }
 }
 
