@@ -33,7 +33,30 @@ from tests.harness.api_fixtures import (
 )
 
 MODEL = "anthropic/claude-opus@5"
-START = datetime(2026, 8, 2, 1, 0, tzinfo=UTC)
+
+
+def _within_today(count: int) -> list[datetime]:
+    """`count` ascending timestamps inside the window *"today"* resolves to, at run time.
+
+    **Not a fixed date, and the first version of this file was.** The question these rows exist
+    for is *"What ran today?"*, whose window resolves against the wall clock — so a fixture pinned
+    to a calendar date passes on the day it was written and fails afterwards. It did: green
+    locally, red in CI seven minutes past midnight UTC the next day, with the records a day
+    outside the window they were meant to be inside.
+
+    That is the same ambient-time hazard `routing.py` names when it explains why window phrases are
+    *recognised* in core and *resolved* by the caller against an injected clock. A row cannot
+    inject through HTTP, so it places its records relative to the clock the route will read.
+
+    The span is capped at the time actually elapsed since midnight, so the fixture stays inside
+    the window even when a run starts seconds after it.
+    """
+    now = datetime.now(UTC)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    span = min(timedelta(minutes=30), now - day_start)
+    step = span / max(count, 1)
+    return [now - span + step * i for i in range(count)]
+
 
 #: The live composition's ratio: the noisiest type against the one a runs question needs.
 #: Measured 383:60; rounded here to a clean 10:1, which is if anything gentler than reality.
@@ -68,6 +91,8 @@ class _CitesWhatItWasGiven:
 
 def _tenant_at_volume(surface: Any) -> None:
     """A day's activity with the live tenant's shape: loud step machinery, quieter runs."""
+    total = RUNS * (NOISE_PER_RUN + 1)
+    stamps = _within_today(total)
     index = 0
     for i in range(RUNS):
         for _ in range(NOISE_PER_RUN):
@@ -76,7 +101,7 @@ def _tenant_at_volume(surface: Any) -> None:
                 tenant_id="tenant-test",
                 event_type=AuditEventType.EFFECT_OBSERVED,
                 payload={"index": index},
-                timestamp=START + timedelta(seconds=index),
+                timestamp=stamps[index],
             )
             index += 1
         surface.audit.append_event(
@@ -84,7 +109,7 @@ def _tenant_at_volume(surface: Any) -> None:
             tenant_id="tenant-test",
             event_type=AuditEventType.RUN_START,
             payload={"index": index, "subject_user_id": "alice"},
-            timestamp=START + timedelta(seconds=index),
+            timestamp=stamps[index],
         )
         index += 1
 
@@ -140,13 +165,13 @@ def test_the_answer_says_when_it_rested_on_a_window() -> None:
 
     surface = _answering_surface(_CitesWhatItWasGiven())
     total_runs = RECORDS_PER_TYPE + 50
-    for i in range(total_runs):
+    for i, stamp in enumerate(_within_today(total_runs)):
         surface.audit.append_event(
             correlation_id=f"run-{i:05d}",
             tenant_id="tenant-test",
             event_type=AuditEventType.RUN_START,
             payload={"index": i, "subject_user_id": "alice"},
-            timestamp=START + timedelta(seconds=i),
+            timestamp=stamp,
         )
 
     body = (
@@ -172,13 +197,13 @@ def test_a_small_estate_answers_without_a_caveat() -> None:
     for.
     """
     surface = _answering_surface(_CitesWhatItWasGiven())
-    for i in range(3):
+    for i, stamp in enumerate(_within_today(3)):
         surface.audit.append_event(
             correlation_id=f"run-{i}",
             tenant_id="tenant-test",
             event_type=AuditEventType.RUN_START,
             payload={"index": i, "subject_user_id": "alice"},
-            timestamp=START + timedelta(minutes=i),
+            timestamp=stamp,
         )
 
     body = (
@@ -207,7 +232,7 @@ def test_the_read_never_returns_a_type_outside_the_askers_scope() -> None:
         tenant_id="tenant-test",
         event_type=AuditEventType.AUTHORITY_DENIED,
         payload={"subject_user_id": "alice"},
-        timestamp=START + timedelta(days=1),
+        timestamp=_within_today(1)[0],
     )
 
     TestClient(surface.app).post(
