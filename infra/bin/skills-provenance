@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Has the vendored skills' upstream moved? Reports; never adopts. See skills_provenance.py
+# for the reasoning — the short version is that pulling third-party instructions into an
+# agent's skill set on a schedule would be the supply-chain failure the pack mechanism
+# exists to prevent.
+set -euo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+exec uv run --project "$REPO" python "$REPO/infra/bin/skills_provenance.py" "$@"

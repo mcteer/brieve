@@ -85,12 +85,12 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
 
 ## Phase 5: User Story 3 — the refresh has a schedule, and landing it stays reviewed (P2)
 
-- [ ] T011 [US3] Deliberately empty, kept as the record (analyze C1 → D1): the draft added
+- [X] T011 [US3] Deliberately empty, kept as the record (analyze C1 → D1): the draft added
       a provenance table here; the record already exists as the loader's `UpstreamPin`, and
       the confirming row is T013's first. Nothing to build; the task ID stays so the
       numbering matches the analysis trail. PROVENANCE.md untouched throughout: it is the
       human review record (F6).
-- [ ] T012 [US3] `infra/bin/skills-provenance` (new): for each ADOPTED pack (the manifest's
+- [X] T012 [US3] `infra/bin/skills-provenance` (new): for each ADOPTED pack (the manifest's
       own `provenance` field), read `[upstream]`, compare `commit` against upstream HEAD
       (`git ls-remote`, no clone); on drift, REPORT it (recorded vs upstream, in the
       proposal's text) — **never vendor content** (F6: adoption stays a human act through
@@ -100,14 +100,14 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
       which are part of its record). An AUTHORED pack is refused by name with the reason
       (F7: `vault-secret-access` is written here and upstream-bound; a "refresh" from a
       name-colliding upstream would overwrite our own authorship).
-- [ ] T013 [P] [US3] Helper rows in `tests/component/test_skills_provenance.py` (fixture git
+- [X] T013 [P] [US3] Helper rows in `tests/component/test_skills_provenance.py` (fixture git
       data, no network): adopted pack checked through its existing `[upstream]` pin; drift
       reported not vendored (skills bytes and `commit` byte-identical after a drift run,
       only `retrieved` may move on a clean check); after a `retrieved` update the pack.toml
       is byte-identical EXCEPT that one line (the I3 row — comments survived); the loader's
       `UpstreamPin` is the record consumed (the C1 row); authored pack refused naming the
       reason; the vault pack specifically refused.
-- [ ] T014 [US3] `.github/workflows/corpus-refresh.yml` (new): weekly cron + workflow_dispatch;
+- [X] T014 [US3] `.github/workflows/corpus-refresh.yml` (new): weekly cron + workflow_dispatch;
       runs `infra/bin/corpus-sync` then `infra/bin/skills-provenance`; if the tree changed
       (a timestamp-only move counts — the no-op proposal is wanted, per clarify), force-push
       ONE STANDING BRANCH `chore/corpus-refresh` carrying one open PR (`corpus-refresh`
@@ -119,7 +119,7 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
       GitHub's recursion guard, the PR body says so and says why (a standing credential is
       refused by Principle IV), and the body names the reviewer's one keystroke that
       triggers CI (close/reopen or empty commit).
-- [ ] T015 [US3] The workflow-shape row (after T014 — it asserts that YAML; analyze O4) in
+- [X] T015 [US3] The workflow-shape row (after T014 — it asserts that YAML; analyze O4) in
       `tests/component/test_refresh_workflow_shape.py`: the YAML's RUN STEPS invoke exactly
       the two reviewed scripts plus git/gh plumbing and nothing else (analyze P3 — "no
       network-touching step" is not assertable when checkout itself fetches; the row proves
