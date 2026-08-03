@@ -1,0 +1,41 @@
+{
+  "path": "/validated-designs/boundary-operating-guides-standardization/accessing-private-resources",
+  "url": "https://developer.hashicorp.com/validated-designs/boundary-operating-guides-standardization/accessing-private-resources",
+  "sections": [
+    {
+      "anchor": "accessing-private-resources",
+      "title": "Accessing private resources",
+      "text": ""
+    },
+    {
+      "anchor": "multi-hop-sessions",
+      "title": "Multi-hop sessions",
+      "text": "Organizations with complex network topologies often require inbound traffic to route through multiple network enclaves to reach the target system. Even in complex networks with strict outbound-only policies, Multi-hop sessions allow you to chain two or more workers across numerous networks to form reverse proxy connections between the user and the target. When workers operate as part of a multi-hop chain, they have three distinct functions:"
+    },
+    {
+      "anchor": "ingress-worker",
+      "title": "Ingress worker",
+      "text": "An ingress worker is accessible by Boundary users and typically deployed on edge or public networks. Network requirements Outbound connectivity (TCP-9201) to an existing trusted Boundary control point, e.g., a Boundary worker or the Boundary control plane, or in other words, the cluster URL. Inbound connectivity (TCP-9202) from users establishing sessions"
+    },
+    {
+      "anchor": "intermediary-worker",
+      "title": "Intermediary worker",
+      "text": "An intermediary worker is optional and is deployed between ingress and egress workers. Network requirements Outbound connectivity (TCP-9202) to an upstream worker. An upstream worker may be an ingress worker or another intermediary worker. Any upstream or intermediary worker must eventually connect to an ingress worker. Inbound connectivity (TCP-9202) from a downstream worker. A downstream worker may be an egress worker or another downstream worker. Any downstream or intermediate worker must eventually connect to an egress worker."
+    },
+    {
+      "anchor": "egress-worker",
+      "title": "Egress worker",
+      "text": "An egress worker provides connectivity to the target. The worker initiates reverse proxy connections to the intermediary or ingress workers. Network requirements Outbound connectivity (TCP-9202) to an upstream worker Outbound connectivity (client target port) to the target."
+    },
+    {
+      "anchor": "redundancy",
+      "title": "Redundancy",
+      "text": "A recommendation is to create redundant or multiple ingress paths to ensure elasticity. Typically, a Boundary architecture might include multiple ingress paths to a particular target. By providing multiple paths to a target, worker ingress is moved away from a single point of failure, as workers are not highly available at this time."
+    },
+    {
+      "anchor": "references",
+      "title": "References",
+      "text": "Multi-hop sessions with HCP Boundary tutorial shows an example how targets can be configured to be accessed through the chain of Boundary workers. Previous Just-in-time approval Next Automated target discovery"
+    }
+  ]
+}

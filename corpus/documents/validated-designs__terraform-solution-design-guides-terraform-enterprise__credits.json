@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/terraform-solution-design-guides-terraform-enterprise/credits",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-solution-design-guides-terraform-enterprise/credits",
+  "sections": [
+    {
+      "anchor": "credits",
+      "title": "Credits",
+      "text": "Thank you to everyone who contributed to this validated design guidance. This cross-functional team, representing many departments within HashiCorp, authored, edited, reviewed, and iterated this content to provide prescription and recommendations for using HashiCorp software in enterprise scenarios. Adam Cavaliere Adeel Ahmad Alex Basista Amy Brown Anna Chen Brandon Ferguson Chris Steinmeyer Chris Stella CJ Obermaier Emmanuel Rousselle Fraser Pollock Jenna Degaust Judith Malnick Kalen Arndt Kranthi Katepalli Kyle Seneker Mark Lewis Michelle Roberts Prakash Manglanathan Purna Mehta Randy Keener Richard Russell Salil Subbakrishna Sean Doyle Sean Walker Simon Lynch Zeeshan Ratani Previous Changelog"
+    }
+  ]
+}

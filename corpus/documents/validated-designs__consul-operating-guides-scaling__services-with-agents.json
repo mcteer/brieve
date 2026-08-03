@@ -1,0 +1,66 @@
+{
+  "path": "/validated-designs/consul-operating-guides-scaling/services-with-agents",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-operating-guides-scaling/services-with-agents",
+  "sections": [
+    {
+      "anchor": "services-along-with-consul-client-agents-on-vms",
+      "title": "Services along with Consul client agents on VMs",
+      "text": "Organizations may run hundreds of services across thousands of instances. Managing such a dynamic environment requires automation. HashiCorp recommends an immutable infrastructure approach integrated with CI/CD tools."
+    },
+    {
+      "anchor": "immutable-infrastructure-approach",
+      "title": "Immutable infrastructure approach",
+      "text": "This immutable infrastructure approach is based on the following structure: Use an application image: All application dependencies are baked into this image. These dependencies can include the latest approved version of the OS (includes latest security patches); the application binaries & configuration files; the Consul agent binary & its configuration files; the application registration; health check configurations; security agents; scanners; logging; etc. Make use of a configuration template: Uses the above image and other configurations to create a template that can be used by the compute nodes (VMs). In the case of AWS, you would have a launch template. Use a scaling group: Utilizes the above configuration template to spin up compute nodes, as per its configuration. In AWS, you would use autoscaling groups. As new versions of the application are available, the configuration templates can be updated to use the latest images via CI pipelines. Additionally, new versions of applications can be deployed by refreshing the scale groups via a CD pipeline."
+    },
+    {
+      "anchor": "image-management",
+      "title": "Image management",
+      "text": "HashiCorp recommends HCP Packer to automate the creation and management of images. Using the OS golden image as the source, the application image is created using Packer. This image includes: IT/Security-approved OS (from the golden image), Application binaries and configuration files, Consul agent binaries and configuration files, Application service registration, and Health-check configurations."
+    },
+    {
+      "anchor": "cicd-implementation",
+      "title": "CI/CD implementation",
+      "text": "To demonstrate a CI/CD implementation, you will deploy an example service (app-1). The following tools will be used: Service Actor Cloud provider AWS Git repository GitHub Image builder Packer Image artifact registry HCP Packer Image registry AWS AMI Infrastructure code HCP Terraform CI/CD GitHub Actions, Vault GitHub Actions GitHub runner Self-hosted on AWS EC2 Secrets manager HashiCorp Vault The diagram presents a high-level overview of the CI/CD workflow: Note GitHub Actions execute workflows in runners. Runners could be GitHub-hosted or self-hosted. HashiCorp recommends using self-hosted runners to avoid external systems handling secrets, which could be a security risk. Refer to the \"About self-hosted runners\" document for details."
+    },
+    {
+      "anchor": "cicd-workflow",
+      "title": "CI/CD workflow",
+      "text": "The next set of steps and code snippets illustrate how to implement the workflow illustrated in the diagram above."
+    },
+    {
+      "anchor": "checkout-a-\"dev\"-branch",
+      "title": "Checkout a \"dev\" branch",
+      "text": "Developers should utilize a version-controlled repository like those found on GitHub to store application code. Code responsible for introducing new features, enhancements, bug fixes, etc... should always start on a \"dev\" branch. Use a local IDE to compile and test code, then push to the remote \"dev\" branch once the code is complete. The structure of your code directory should be a series of folders containing appropriately separated files: .github/workflows contains code pertinent to the CI/CD workflows. artifacts/ contains the compiled application binaries. packer/ contains the Packer configuration that creates the images and publishes to the HCP Packer artifact registry. src/ holds the application source code. terraform/ is responsible for the terraform configuration files that create/update the template, along with any infrastructure for the application test environment."
+    },
+    {
+      "anchor": "pull-request-process",
+      "title": "Pull request process",
+      "text": "The developer responsible for the new feature creates a pull request for code review. When the code is approved, merge the \"dev\" branch into a \"test\" branch. When the code is merged, the CI/CD workflow should be kicked off automatically."
+    },
+    {
+      "anchor": "ci-pipeline-kickoff",
+      "title": "CI pipeline kickoff",
+      "text": "Compile/build the application Build the application from the \"test\" branch. Save the application binaries and configuration file as a zip folder ( app-1.zip ) in the artifacts/ directory. .github/workflows/app-1.yaml name: app-1 workflow permissions: contents: write id-token: write on: pull_request: types: [ closed ] branches: [ test, main ] ... ... compile_and_build_app: if: github.event.pull_request.merged == true runs-on: self-hosted steps: - name: Checkout uses: actions/checkout@v4 with: ref: 'refs/heads/${{ env.branch }}' - name: build run: | cd src make ${{ vars.APP_NAME }} ${{ env.branch }} ... ... Retrieve secrets from HashiCorp Vault In this example, all secrets in Vault's KV secrets engine path kv/data/app-1/test are automatically saved as environment variables for the GitHub Actions. Secrets include HCP_CLIENT_ID , HCP_CLIENT_SECRET , and TF_API_TOKEN . Note Create a Vault token with permissions to access the static secrets in Vault, and save it as a GitHub Action Secret. Save the \"Vault URL\" and \"Secrets Engine Path\" values as GitHub Action variables. Refer to the \"Vault as secrets management for Consul\" tutorial for steps on creating and storing a Vault token. .github/workflows/app-1.yaml ... ... - name: Retrieve Secrets from HashiCorp Vault id: vault uses: hashicorp/vault-action@v2 with: url: ${{ env.vault_url }} tlsSkipVerify: true token: ${{ secrets.VAULT_TOKEN }} secrets: | ${{ env.vault_secrets_path }}/data/app-1/${{ env.branch }} * ; ... ... Get the golden OS image from HCP Packer Extract the AMI ID from the golden OS image and use it as the source image to create a new application image. Note Define the variables in a separate file variables.pkr.hcl , and set the values in a vault.auto.pkrvars.hcl file. packer/app-1.pkr.hcl ... ... // Get image metadata from HCP Packer to use as the source image to create the new AMI data \"hcp-packer-artifact\" \"source-image\" { bucket_name = var.packer_source_image_bucket platform = var.packer_source_image_platform region = var.region version_fingerprint = \"${data.hcp-packer-version.consul-client-source.fingerprint}\" } data \"hcp-packer-version\" \"consul-client-source\" { bucket_name = var.packer_source_image_bucket channel_name = var.env } source \"amazon-ebs\" \"amazon-linux\" { ami_name = \"${var.env}-${var.service_name}-${var.service_version}\" instance_type = var.instance_type region = var.region source_ami = data.hcp-packer-artifact.source-image.external_identifier ssh_username = var.ssh_username } ... ... Install the application binary and config file Run the Packer command with the branch name \"test\" passed in as the env.branch variable: .github/workflows/app-1.yaml ... ... - name: packer run: | cd packer packer init . packer build -var \"env=${{ env.branch }}\" . ... ... The application zip file is copied from the artifacts/ directory to the application image and extracted into the appropriate directory. Note This depends on how your application is build and the necessary runtime dependencies, so make the required changes. packer/app-1.pkr.hcl ... ... build { ... ... // Upload Application binary sources = [\"source.amazon-ebs.amazon-linux\"] provisioner \"file\" { source = \"../artifacts/${var.env}/latest/${var.service_name}.zip\" destination = \"~/${var.service_name}.zip\" } // Install application provisioner \"shell\" { inline = [ \"sudo unzip ${var.service_name}.zip\", \"sudo chmod a+x ${var.service_name}\", \"sudo cp ${var.service_name} /usr/bin/.\", \"sudo cp ${var.service_name}.service /etc/systemd/system/.\", \"sudo systemctl enable ${var.service_name}\" ] } ... ... Install the Consul binary and agent configuration file Install Consul agent via the install-consul.sh script, and place the Consul config template file in the /etc/consul.d/consul.hcl.tpl directory. Note You will update the config files with actual values while updating the launch template later in the workflow. packer/app-1.pkr.hcl ... ... // Install Consul Client provisioner \"shell\" { environment_vars = [ \"CONSUL_VERSION=${va"
+    },
+    {
+      "anchor": "check-test-results",
+      "title": "Check test results",
+      "text": "If the tests failed, a developer should go back and work on addressing any issues that arose, until all tests are in a passing state. If all of the tests pass, then the CI/CD workflow will continue."
+    },
+    {
+      "anchor": "pull-request-procedure",
+      "title": "Pull request procedure",
+      "text": "Create a new pull request, this time to review and merge code from the \"test\" branch into a \"main\" branch. After peer review is complete, approve the new changes. Then, merge the branch into \"main\", which will automatically kick off the workflow you walked through earlier, this time utilizing the \"main\" branch."
+    },
+    {
+      "anchor": "kick-off-the-ci-pipeline",
+      "title": "Kick off the CI pipeline",
+      "text": "The CI/CD workflow steps are similar to what is discussed above, but this time: The \"main\" branch is being used, An additional \"Create a release\" step is being executed, and Test-related steps are not required, and thus not executed. A sequence of steps will take place: Compile/Build the application. Create a release. The 'Create a release' step triggers a release. This creates a tag and uploads the application artifacts to GitHub as a release. .github/workflows/app-1.yaml ... ... release_app: needs: [ compile_and_build_app ] if: ${{ github.ref_name == 'main' }} # Execute only when merging to main branch runs-on: self-hosted steps: - name: Create a Release & Upload artifacts id: create_release uses: ncipollo/release-action@v1 with: tag: v-${{ github.run_number }} name: Release v-${{ github.run_number }} artifacts: \"./artifacts/${{ env.branch }}/latest/${{ vars.APP_NAME }}.zip\" makeLatest: \"true\" ... ... Retrieve secrets from HashiCorp Vault ( kv/app-1/prod ). Get a reference to the golden OS image from HCP Packer - 'prod' channel. Install the application binary and configuration file. Install the Consul binary and agent configuration file. Configure application registration with Consul. Configure health checks with Consul. Create an AMI and register it with HCP Packer. Assign the new image to HCP Packer - 'prod' channel. Update the \"prod\" AWS launch template with the new AMI. Deploy your application in the \"prod\" environment - refresh AWS ASG. Upon successful completion of the pipeline, the application in production will be running the latest version of the application, deployed on the most recently approved version of the operating system. Any future updates to the application will automatically trigger this CI/CD pipeline, ensuring seamless updates to the production environment."
+    },
+    {
+      "anchor": "references",
+      "title": "References",
+      "text": "\"Build a golden image pipeline with HCP Packer\" \"Terraform: Integration Guide for HCP Packer\" Previous Integrate with infrastructure tools Next Conclusion"
+    }
+  ]
+}

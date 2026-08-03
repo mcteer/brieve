@@ -1,0 +1,61 @@
+{
+  "path": "/validated-designs/consul-operating-guides-scaling/initial-configuration",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-operating-guides-scaling/initial-configuration",
+  "sections": [
+    {
+      "anchor": "initial-configuration",
+      "title": "Initial configuration",
+      "text": "This section describes how platform teams will need to prepare the infrastructure for a large-scale deployment spanning on-premises and multi-cloud environments. The platform team will be responsible for infrastructure deployment, maintaining DevOps tooling, monitoring, and maintaining several clouds. The following workflow outlines the key steps for deploying Consul across various environments, including Kubernetes, virtual machines (VMs), and Nomad. Each stage ensures that the necessary prerequisites are installed, Consul is deployed and configured, applications are launched, and communication between environments is established through Consul peering connections."
+    },
+    {
+      "anchor": "people",
+      "title": "People",
+      "text": ""
+    },
+    {
+      "anchor": "platform-team",
+      "title": "Platform team",
+      "text": "The platform team manages the deployment of VM-based, Nomad, and Kubernetes infrastructure. They should be responsible for the following actions: Infrastructure creation via Terraform. Consul installation via Terraform for VMs. Consul installation via Helm for Kubernetes using GitOps. Setting up admin partitions on-premises. Setting up cluster peering between on-premises, AWS, and Azure deployments."
+    },
+    {
+      "anchor": "development-teams",
+      "title": "Development teams",
+      "text": "Development teams deploy applications. On-premise, they should be responsible for installing a dashboard application on VMs and installing a counting application in Nomad. For cloud environments, they should look at installing a dashboard app on AWS and a counter app in Azure."
+    },
+    {
+      "anchor": "infrastructure-creation-using-terraform",
+      "title": "Infrastructure creation using Terraform",
+      "text": ""
+    },
+    {
+      "anchor": "on-premise-consul-install-on-vms",
+      "title": "On-premise Consul install on VMs",
+      "text": "Platform teams can follow the recommended deployment architecture discussed in the Consul Solution Design Guide to right-size the deployment, check component compatibility, and follow the deployment sequence using the provided Terraform modules."
+    },
+    {
+      "anchor": "on-premise-nomad-install",
+      "title": "On-premise Nomad install",
+      "text": "Nomad and Consul client installation steps are provided in the deployment section below. For reference, the HVD Operating Guide for Nomad provides initial configuration guidance."
+    },
+    {
+      "anchor": "infrastructure-creation-for-kubernetes-on-aws-and-azure",
+      "title": "Infrastructure creation for Kubernetes on AWS and Azure",
+      "text": "The Terraform Solution Design Guide provides platform-specific guidance for creation. Teams can choose the Kubernetes distribution they prefer. This documentation focuses on Elastic Kubernetes Service (EKS) and Azure Kubernetes Service (AKS) specifically."
+    },
+    {
+      "anchor": "consul-installation-via-helm-on-kubernetes",
+      "title": "Consul installation via Helm on Kubernetes",
+      "text": "Once the infrastructure is built, Consul can be installed on the Kubernetes cluster. HashiCorp publishes a Helm chart for Consul. The Helm values that will be used are discussed later on in the document."
+    },
+    {
+      "anchor": "setting-up-admin-partitions-on-premises",
+      "title": "Setting up admin partitions on-premises",
+      "text": "Admin partitions are discussed in detail in the Operating Guide for Standardization document. In this guide, you will set up admin partitions in the on-premises cloud. This is so separate frontend and backend teams can have full administrative control of their respective partitions. Each of these teams will operate autonomously within their partition without the burden of managing the Consul control plane."
+    },
+    {
+      "anchor": "setting-up-cluster-peering-between-multiple-clusters",
+      "title": "Setting up cluster peering between multiple clusters",
+      "text": "Cluster peering is also introduced in the Operating Guide for Standardization document. In this guide, you will connect on-premises and Kubernetes clusters running on AWS and Azure using cluster peering. Cluster peering is also discussed in detail in the following sections. Previous Introduction Next Scale services on multiple infrastructures"
+    }
+  ]
+}

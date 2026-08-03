@@ -1,0 +1,16 @@
+{
+  "path": "/validated-designs/terraform-operating-guides-scaling/introduction",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-operating-guides-scaling/introduction",
+  "sections": [
+    {
+      "anchor": "introduction",
+      "title": "Introduction",
+      "text": "This document gives recommendations on how to use HCP Terraform at scale as a shared service for your organization. When we talk about scaling Terraform, we are referring from the maturity standpoint where the platform team has established Terraform as a shared service across the organization and has streamlined the workflows for company wide adoption. This document doesn't cover \"scaling\" from the infrastructure standpoint (self hosted TFE) and those topics will be covered separately. If you have any feedback you can send it to email Note This is a beta document and may be subject to change. Please use the feedback link above to share any comments or suggestions"
+    },
+    {
+      "anchor": "prerequisites",
+      "title": "Prerequisites",
+      "text": "We recommend that you have completed the following steps before implementing the guidance in this document: Terraform Operating Guides ( Adoption & Standardization ) Terraform Solution Design guide for Terraform Enterprise Next Self-hosted Agents"
+    }
+  ]
+}

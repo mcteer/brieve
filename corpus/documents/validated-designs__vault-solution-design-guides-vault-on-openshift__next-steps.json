@@ -1,0 +1,16 @@
+{
+  "path": "/validated-designs/vault-solution-design-guides-vault-on-openshift/next-steps",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-solution-design-guides-vault-on-openshift/next-steps",
+  "sections": [
+    {
+      "anchor": "conclusion",
+      "title": "Conclusion",
+      "text": "Treat the deployment of Vault Enterprise on OpenShift as a platform engineering discipline, not a routine application installation. A production-ready deployment depends on informed, deliberate choices across topology, storage, networking, TLS, resource management, lifecycle operations, and observability. Manage Vault through Helm and GitOps, use explicit scheduling controls, align Raft topology with real failure domains, preserve end-to-end TLS wherever possible, with careful attention to monitoring, logging, audit forwarding, and health probes to reflect Vault's actual operating states. OpenShift supplies foundational primitives for ownership, isolation, scheduling, routing, and lifecycle management, while sound Vault system configuration addresses cluster quorum, cryptographic trust, auditability, and predictable recovery. A successful deployment reconciles both sets of concerns into a repeatable operating model: OpenShift becomes a durable platform for delivering Vault Enterprise as a resilient and supportable secrets management service."
+    },
+    {
+      "anchor": "next-steps",
+      "title": "Next steps",
+      "text": "Follow HashiCorp guidance for Vault production hardening (opens in new tab) to address OS-level and configuration-level security hardening for your containerized Vault deployment. Several recommendations \u2014 including audit device configuration, user lockout, least-privilege policies, short token lifetimes, and avoiding root tokens \u2014 apply directly to Vault on OpenShift. Previous Troubleshooting Next Changelog"
+    }
+  ]
+}

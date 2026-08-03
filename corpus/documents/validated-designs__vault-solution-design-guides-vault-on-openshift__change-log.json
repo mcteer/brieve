@@ -1,0 +1,21 @@
+{
+  "path": "/validated-designs/vault-solution-design-guides-vault-on-openshift/change-log",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-solution-design-guides-vault-on-openshift/change-log",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-06",
+      "title": "2026-06",
+      "text": "Add production hardening guide reference to Next steps"
+    },
+    {
+      "anchor": "2026-05",
+      "title": "2026-05",
+      "text": "Emerging guidance first release Previous Next steps Next Credits"
+    }
+  ]
+}

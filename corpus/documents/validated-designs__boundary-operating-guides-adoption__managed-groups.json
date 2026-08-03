@@ -1,0 +1,66 @@
+{
+  "path": "/validated-designs/boundary-operating-guides-adoption/managed-groups",
+  "url": "https://developer.hashicorp.com/validated-designs/boundary-operating-guides-adoption/managed-groups",
+  "sections": [
+    {
+      "anchor": "managed-groups",
+      "title": "Managed groups",
+      "text": ""
+    },
+    {
+      "anchor": "overview-of-managed-groups",
+      "title": "Overview of managed groups",
+      "text": "As organizations grow, the administrative tasks of manually managing users and group memberships becomes increasingly challenging. HashiCorp Boundary's managed groups feature provides significant benefits for enterprises to automatically manage OIDC and LDAP group membership at scale."
+    },
+    {
+      "anchor": "centralized-identity-management",
+      "title": "Centralized identity management",
+      "text": "By integrating with enterprise identity providers (IdP) like Okta, Auth0 via OIDC, or Active Directory via LDAP, Boundary allows enterprises to leverage their existing user directories and group structures. We recommend using the Terraform Boundary Provider for on-boarding and off-boarding of Boundary resources such as users, groups and managed groups, and so on."
+    },
+    {
+      "anchor": "automated-group-synchronization",
+      "title": "Automated group synchronization",
+      "text": "Managed groups automatically sync membership based on OIDC group claims from the identity provider (IdP). As your IdP administrator adds or removes users from groups in the central IdP, their access privileges update in Boundary accordingly without any manual intervention."
+    },
+    {
+      "anchor": "scalable-access-control",
+      "title": "Scalable access control",
+      "text": "With automated group management, enterprises can define role-based access controls (RBAC) in Boundary and map OIDC groups to these roles. By automatically revoking access when users leave the organization or change roles, managed groups help enforce the principle of least privilege and reduce the risk of unauthorized access. Please take note that the synchronization is only updated when users authenticate again to Boundary via OIDC/LDAP to reflect the changes. This allows for granular and consistent permissions management at scale across the entire organization. For off-boarding, when users leave the organization and removed from the IdP group, Boundary automatically removes them from the managed group, reducing the risk of unauthorized access. This process ensures compliance with regulatory requirements and internal security policies by providing audit trails and consistent policy enforcement. Moreover, the reduced need for manual intervention minimizes administrative overhead and potential for human error."
+    },
+    {
+      "anchor": "reduced-administrative-overhead",
+      "title": "Reduced administrative overhead",
+      "text": "By eliminating manual user and group provisioning, managed groups reduce the administrative burden on your teams. This is a particular benefit in large enterprises with thousands of users and dynamic team structures."
+    },
+    {
+      "anchor": "managed-groups-implementation-and-operations",
+      "title": "Managed groups implementation and operations",
+      "text": "Boundary organization administrators should consider the following guidelines to implement and operate managed groups. Integrate with enterprise IdP : The first step is to configure Boundary to authenticate users with the enterprise's OIDC-compliant identity provider (for example Okta, Auth0, Microsoft Entra ID). Do this with Terraform or through the Boundary UI or command-line tool. Defined managed group filters : Boundary admins should create managed groups with filters that select users based on OIDC claims from the IdP or LDAP account's group memberships. For example, a filter like engineering in /userinfo/groups would automatically add all users from the engineering group in the OIDC IdP to the corresponding managed group in Boundary. For LDAP, we can use group_filter queries to return groups objects and user objects to resolve group membership according to the structure of your directory schema. Map managed groups to roles : Assign managed groups as principals to Boundary roles, which define the specific permissions and access controls for that group of users. Automate with Infrastructure-as-Code : Enterprises operating at scale should use Terraform to define and manage Boundary resources, including OIDC auth methods, managed groups, and role mappings. This enables version control, automated deployments, and consistent configuration across multiple Boundary instances."
+    },
+    {
+      "anchor": "user-authentication-and-authorization-workflow-with-managed-groups",
+      "title": "User authentication and authorization workflow with managed groups",
+      "text": "The preceding diagram outlines the high level process of user authentication and authorization using Boundary managed groups and IdP providers such as LDAP Active Directory or OIDC providers such as Auth0 or Okta. The key steps involve user authentication via LDAP/OIDC provider, token issuance, claim extraction, managed group evaluation, and role-based access control within Boundary. User initiates authentication User logs onto Boundary using Boundary Desktop or command-line tool. Boundary redirects the user to the LDAP/OIDC provider login page. User authenticates with LDAP/OIDC provider The user enters their credentials on the LDAP/OIDC provider login page. LDAP/OIDC provider verifies the credentials and authenticates the user. LDAP/OIDC provider issues ID token Upon successful authentication, the LDAP/OIDC provider issues an ID token and redirects the user back to Boundary with the token. Boundary receives ID token Boundary receives the ID Token from LDAP/OIDC provider. Boundary extracts LDAP groups (or) OIDC claims from the ID Token and the UserInfo endpoint. Evaluate managed group membership Boundary evaluates the user's claims against the managed group filters. If the user's claims match the filter criteria, Boundary adds the user to the corresponding managed group. Assign roles and permissions Managed groups map to specific roles in Boundary. The user inherits the permissions associated with the roles of the managed groups they belong to. Access granted Boundary grants the user access to the requested resource based on the roles' assigned permissions."
+    },
+    {
+      "anchor": "configuring-managed-groups-with-the-ldap-or-oidc-providers",
+      "title": "Configuring managed groups with the LDAP or OIDC providers",
+      "text": "As a prerequisite, Boundary administrators need to set up managed groups using either LDAP authentication or OIDC authentication. Boundary then uses information from these identity providers to automatically create accounts and users within the same scope as the authentication method."
+    },
+    {
+      "anchor": "setup-ldap-auth-method",
+      "title": "Setup LDAP auth method",
+      "text": "Please refer to LDAP authentication for detailed instructions to configure the LDAP auth method, and an exhaustive list of LDAP auth method attributes configuration parameters."
+    },
+    {
+      "anchor": "setup-oidc-auth-method",
+      "title": "Setup OIDC auth method",
+      "text": "Please refer to the documents below for detailed instructions to configure the authentication method with your identity provider, and an exhaustive list of configuration parameters. OIDC authentication with Auth0 OIDC authentication with Okta OIDC authentication with Azure"
+    },
+    {
+      "anchor": "useful-resources",
+      "title": "Useful resources",
+      "text": "OIDC managed group information and attributes LDAP managed group information and attributes Filter managed groups Managed OIDC IdP groups Terraform Patterns for Boundary groups and RBAC Previous Integrating identity providers Next Assigning scopes, principals, roles and grants"
+    }
+  ]
+}

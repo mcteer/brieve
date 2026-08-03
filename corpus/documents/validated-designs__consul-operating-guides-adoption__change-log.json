@@ -1,0 +1,41 @@
+{
+  "path": "/validated-designs/consul-operating-guides-adoption/change-log",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-operating-guides-adoption/change-log",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-01",
+      "title": "2026-01",
+      "text": "Update meta descriptions Updated credits and contributors"
+    },
+    {
+      "anchor": "2025-06",
+      "title": "2025-06",
+      "text": "Use consistent guide names and descriptions"
+    },
+    {
+      "anchor": "2025-05",
+      "title": "2025-05",
+      "text": "Fix kubernetes example config"
+    },
+    {
+      "anchor": "2025-01",
+      "title": "2025-01",
+      "text": "Fix policies code Fix typos and documentation errors Updated documentation links Add new people process self service workflow diagram Add improved resolution graphic of Cloud Operating Model"
+    },
+    {
+      "anchor": "2024-08",
+      "title": "2024-08",
+      "text": "Minor fixes to improve readability"
+    },
+    {
+      "anchor": "2024-02",
+      "title": "2024-02",
+      "text": "GA release Previous Credits"
+    }
+  ]
+}
