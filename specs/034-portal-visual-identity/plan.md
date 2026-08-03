@@ -23,8 +23,10 @@ stays stripe-free, deferred and recorded, because its payload does not know the 
 two places (the definitions view's additive field; the portal passing it through to the
 thread template context)
 
-**Primary Dependencies**: none added. Playwright + vendored axe already power the lane;
-Roboto woff2 files are static assets, not dependencies
+**Primary Dependencies**: none added at runtime or in the lockfile. Playwright + vendored axe
+already power the lane; the Roboto woff2 is a static asset, not a dependency. `fonttools` is
+used once, ephemerally (`uv run --with`), to convert the vendored font and is recorded in the
+font's provenance rather than added to the project
 
 **Storage**: none — no record, no payload persisted, nothing in Vault or Postgres changes
 
@@ -38,8 +40,9 @@ additive `packs` field's shape
 
 **Project Type**: existing single project; presentation + one additive view field
 
-**Performance Goals**: none binding — two woff2 files (~90KB total) served locally is the
-entire cost delta
+**Performance Goals**: none binding — one variable woff2 (222 KB, all weights) served locally
+is the entire cost delta. Larger than the two-static estimate this plan first carried, because
+upstream ships no statics; stated in the font's provenance rather than buried
 
 **Constraints**: no third-party fetch at runtime (FR-002 — the fonts are self-hosted, so the
 offline property survives); both themes clear AA independently (FR-013 — dark is designed,
@@ -87,7 +90,7 @@ specs/034-portal-visual-identity/
 ```text
 src/surfaces/portal/static/portal.css        # rewritten around tokens: palette + type roles once,
                                              #   light and dark, every rule reads tokens
-src/surfaces/portal/static/fonts/            # NEW: Roboto woff2 (400, 700) + PROVENANCE.md
+src/surfaces/portal/static/fonts/            # NEW: roboto-variable.woff2 + OFL.txt + PROVENANCE.md
 src/surfaces/portal/templates/*.html         # eight templates onto the roles; decision-comments
                                              #   kept, premises updated where the restyle moves them
 src/surfaces/api/definitions.py              # AgentDefinitionView gains `packs` (additive, read-only,

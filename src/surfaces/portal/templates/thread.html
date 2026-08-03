@@ -5,20 +5,40 @@
 {% endblock %}
 {% block content %}
 <h1>{{ thread.title or "Untitled conversation" }}</h1>
-<p><a class="target" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a></p>
+{# A destructive action is a CONTROL, not a sentence. As an underlined link in body text it
+   read as prose and was one careless click from deleting a conversation. #}
+<p class="page-actions">
+  <a class="link-button link-button--danger" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a>
+</p>
 
+{#
+  THE PRODUCT'S IDENTITY, where the platform actually knows it (034). Each turn names the
+  definition that ran, and the definitions list already in this context carries that
+  definition's packs — so the stripe is a lookup, never a guess from the definition's NAME.
+  `vault-agent` happens to say its product in its id and the next definition will not; a
+  stripe derived from a string would be the platform pretending to know.
+
+  Exactly one pack draws a stripe. Several or none draws nothing — no attribute, no colour,
+  no reserved space, because an unknown product is not a visual defect to apologise for.
+#}
+{% set packs_by_definition = {} %}
+{% for d in definitions %}{% if packs_by_definition.update({d.agent_definition_id: d.packs}) %}{% endif %}{% endfor %}
 <ol class="turns" id="turns">
   {% for turn in turns %}
-  <li class="turn turn--{{ turn.disposition }}">
+  {% set turn_packs = packs_by_definition.get(turn.agent_definition_id) or [] %}
+  <li class="turn turn--{{ turn.disposition }}"
+      {%- if turn_packs | length == 1 %} data-pack="{{ turn_packs[0] }}"{% endif %}>
     <p class="message">{{ turn.message }}</p>
 
     {% if turn.disposition == "declined" %}
       <p class="disposition disposition--declined">
+        <span class="pill pill--declined">declined</span>
         This platform starts agents. It could not turn that into one &mdash; choose an
         agent below and send it again.
       </p>
     {% elif turn.disposition == "refused" %}
       <p class="disposition disposition--refused">
+        <span class="pill pill--refused">refused</span>
         You do not have access to start that agent. It exists, and someone who administers
         your access can grant it.
       </p>
@@ -32,7 +52,12 @@
            of interrupting; `atomic` so the whole status is read rather than the one word
            that changed, which out of context is just "completed". #}
         <span class="visually-hidden">Run status:</span>
-        <span class="state">{% if turn.run %}{{ turn.run.state }}{% else %}starting{% endif %}</span>
+        {# A PILL WITHOUT SEMANTIC COLOUR, deliberately. `portal.js` updates this element's
+           text in place and does not touch its classes, so a colour chosen at render time
+           would keep saying "running" green after the run failed — a lie the reader has no
+           way to catch. The static dispositions above cannot change after render, so they
+           carry colour; this one carries only the shape and the word. #}
+        <span class="state pill">{% if turn.run %}{{ turn.run.state }}{% else %}starting{% endif %}</span>
         {% if turn.run and turn.run.state not in ["completed", "failed", "stopped"] %}
           <form method="post" action="/runs/{{ turn.run_id }}/stop" class="inline">
             <input type="hidden" name="thread_id" value="{{ thread.thread_id }}">
@@ -41,7 +66,12 @@
         {% endif %}
       </p>
 
-      {% if turn.result_status == 200 and turn.result %}
+      {#
+        A RESULT ONLY RENDERS WHEN THERE IS ONE. The run's payload carries `result: None`
+        before anything has been produced, and Jinja printed that as the literal word "None"
+        inside a result block — a page telling a person their run returned the string None.
+      #}
+      {% if turn.result_status == 200 and turn.result and turn.result.result is not none %}
         <pre class="result">{{ turn.result.result }}</pre>
       {% elif turn.result_status == 409 %}
         <p class="pending">Still working. This updates on its own.</p>
@@ -73,8 +103,13 @@
   <select name="agent_definition_id" id="agent">
     <option value="">None &mdash; just leave a note</option>
     {% for d in definitions %}
+      {#
+        The product is named in TEXT rather than shown as colour here: a `<option>` cannot
+        carry a rule, and a colour a screen reader cannot announce would be the accessible
+        name losing information the sighted label has. Text keeps them the same.
+      #}
       <option value="{{ d.agent_definition_id }}" {% if not d.may_start %}disabled{% endif %}>
-        {{ d.agent_definition_id }}{% if not d.may_start %} (you do not have access){% endif %}
+        {{ d.agent_definition_id }}{% if d.packs %} &middot; {{ d.packs | join(", ") }}{% endif %}{% if not d.may_start %} (you do not have access){% endif %}
       </option>
     {% endfor %}
   </select>

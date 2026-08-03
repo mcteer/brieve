@@ -90,6 +90,13 @@ def portal_server() -> Iterator[PortalServer]:
         ask_authority=qualified_ask_authority(model="anthropic/claude-opus@5"),
         credential_source=available_credential(),
     )
+    # THE THEMES ARE TWO PEOPLE (034). Each parametrized run signs in as its own subject so the
+    # platform's per-subject rate window is not shared — see the `page` fixture for why. The
+    # fabric has to know them, and it knows exactly one by default, so the other themes are
+    # granted the same scope `alice` already has rather than a widened one.
+    fabric_users = surface.identity_fabric.users
+    for theme in THEMES:
+        fabric_users.setdefault(f"alice-{theme}", fabric_users["alice"])
     api = TestClient(surface.app)
 
     def transport(*, method: str, url: str, token: str, json_body: object) -> ApiResponse:
@@ -161,30 +168,54 @@ def browser() -> Iterator[Any]:
         instance.close()
 
 
-@pytest.fixture
-def page(browser: Any, portal_server: PortalServer) -> Iterator[Any]:
-    """A fresh, signed-in page. Each row starts from a clean browser context."""
-    context = browser.new_context()
+#: BOTH THEMES, EVERY ROW (034). The portal follows `prefers-color-scheme`, so a dark theme
+#: that nothing exercised would be an unverified surface — and this repository's posture is
+#: against exactly that. Parametrizing HERE rather than duplicating rows means every axe state
+#: and every keyboard criterion runs twice with no row edited, and a failure names its theme in
+#: the test id.
+#:
+#: The keyboard rows run in dark too rather than being assumed portable: focus visibility,
+#: target size and reflow are theme-independent claims, but the focus indicator's CONTRAST is
+#: not, and that is one of the things 2.4.13 is about.
+THEMES = ["light", "dark"]
+
+
+@pytest.fixture(params=THEMES)
+def page(request: Any, browser: Any, portal_server: PortalServer) -> Iterator[Any]:
+    """A fresh, signed-in page, once per theme. Each row starts from a clean context.
+
+    **Each theme signs in as its own person, and that is not cosmetic.** The platform rate-
+    limits a subject to `RATE_LIMIT_ACTS` in a five-minute window, counted across thread
+    creations and turns together. Running every row twice as one person doubles that count
+    past the limit, and the rows that then fail do so far from the cause: the composer simply
+    never renders, and the failure reads as a missing label rather than as a refused act.
+    Measured, not guessed — this is what the first doubled run did.
+
+    Two independent passes over the interface are two people's worth of work, so a subject
+    each is the honest model. Widening the platform's limit for the lane's convenience was the
+    alternative and is refused: it would loosen a real control to make a test comfortable.
+    """
+    context = browser.new_context(color_scheme=request.param)
     tab = context.new_page()
-    _sign_in(tab, portal_server)
+    _sign_in(tab, portal_server, subject=f"alice-{request.param}")
     yield tab
     context.close()
 
 
-@pytest.fixture
-def anonymous_page(browser: Any, portal_server: PortalServer) -> Iterator[Any]:
-    """A page with no session, for the signed-out state."""
-    context = browser.new_context()
+@pytest.fixture(params=THEMES)
+def anonymous_page(request: Any, browser: Any, portal_server: PortalServer) -> Iterator[Any]:
+    """A page with no session, for the signed-out state — once per theme."""
+    context = browser.new_context(color_scheme=request.param)
     tab = context.new_page()
     yield tab
     context.close()
 
 
-def _sign_in(tab: Any, server: PortalServer) -> None:
+def _sign_in(tab: Any, server: PortalServer, *, subject: str = "alice") -> None:
     state, _url = server.oidc.begin()
     code = server.idp.authorize(
         code_challenge=code_challenge_for(server.oidc._pending[state].verifier),
-        subject="alice",
+        subject=subject,
         claims={"groups": ["platform"]},
     )
     tab.goto(f"{server.base}/callback?code={code}&state={state}")

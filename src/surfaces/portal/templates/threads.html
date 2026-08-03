@@ -18,6 +18,14 @@
 {% elif refused %}
   <p class="notice">The platform refused to list your conversations.</p>
 {% elif threads %}
+  {#
+    NO PRODUCT COLOUR HERE, and the absence is deliberate (034). A thread record carries its
+    id, owner, tenant, creation time and title — it does not know which product its turns
+    touched, and deriving one would mean joining every thread through its turns to a
+    definition to its packs. That is API design, not presentation, so the stripe lives on the
+    thread page where each turn already names its definition. Deferred rather than
+    approximated: a stripe guessed from a title would be the platform pretending to know.
+  #}
   <ul class="threads">
     {% for thread in threads %}
       <li>
