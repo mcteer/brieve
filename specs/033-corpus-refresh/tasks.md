@@ -26,15 +26,15 @@ lives in the scheduled workflow, which is not a gate.
 
 ## Phase 3: User Story 2 — the pin records when it was made (P1)
 
-- [ ] T001 [US2] `infra/bin/corpus_sync.py`: write `synced_at` (ISO-8601 UTC, timezone-aware
+- [X] T001 [US2] `infra/bin/corpus_sync.py`: write `synced_at` (ISO-8601 UTC, timezone-aware
       `datetime.now(UTC)`) into the manifest at composition, beside `corpus_digest`. Mechanics
       otherwise untouched (F1 — the manifest is the pin's identity document; no sidecar).
-- [ ] T002 [US2] `src/core/answering/corpus.py`: `Corpus.synced_at: datetime | None = None`;
+- [X] T002 [US2] `src/core/answering/corpus.py`: `Corpus.synced_at: datetime | None = None`;
       the loader parses the manifest field with the four-state mapping from data-model.md —
       well-formed-past → parsed, absent/unparseable/future → `None`. **No exception path**:
       a bad timestamp must never take answering down over metadata (F2), and the 024 pin
       (no field at all) must load exactly as before.
-- [ ] T003 [P] [US2] Loader rows in `tests/component/test_corpus_synced_at.py`: the four
+- [X] T003 [P] [US2] Loader rows in `tests/component/test_corpus_synced_at.py`: the four
       manifest states map correctly; the committed 33-document manifest still loads with
       `synced_at is None`; a sync-shaped manifest with the field round-trips. Sync row: run
       `corpus_sync`'s manifest composition against fixture content twice — digest identical,
