@@ -189,7 +189,12 @@ variable "model_matrix_cells" {
     # produced a clean full-lane run that anybody promoted from — 026 recorded the promotion as
     # deferred, and 027's spec deferred it again as "unrelated to posture".
     #
-    # **Earned 2026-08-02**, `make evals-live` exit 0, 10 rows in 23m39s:
+    # **Earned 2026-08-02**, `make evals-live` exit 0, 10 rows in 23m39s — and **re-examined the
+    # same day under 030's role-scoped evidence, exit 0, 10 rows in 25m38s, CONFIRMED**. The
+    # original run's estate evidence was gathered without role narrowing, so six of ten cases
+    # scored records no operator can see (ADR-0059 carries the finding); the re-run scored each
+    # case under its declared asker's visibility and every suite held. These cells now stand on
+    # evidence a grantable role could actually receive.
     #
     # - Four suites — `must_deny`, `must_decline`, `citation_accuracy`, `estate_state` — scored
     #   for BOTH packs against `anthropic/claude-opus@5`, every one under the `ask` role

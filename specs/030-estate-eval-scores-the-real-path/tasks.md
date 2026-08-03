@@ -21,14 +21,14 @@ carrying one without the other turns the blocking gate red in between.
 
 ## Phase 2: Foundational — the case knows who could ask it
 
-- [ ] T002 `EvalCase` in `src/core/evals/suites.py` gains `asker_role: str = ""`, and
+- [X] T002 `EvalCase` in `src/core/evals/suites.py` gains `asker_role: str = ""`, and
       `parse_cases` validates it for estate cases only: absent → `UnrunnableSuite` naming the
       case; outside the platform's role vocabulary → likewise. The vocabulary is
       `ROLE_VISIBILITY`'s keys **imported from `core.answering.scope`**, never copied — a second
       role list is the fragmentation seam. Never defaulted, and the docstring says why: a
       defaulted role is the implicit assumption this feature removes, reappearing one field over.
       Non-estate suites ignore the field.
-- [ ] T003 Tag every estate case in `packs/vault/evals/estate_state.toml` and
+- [X] T003 Tag every estate case in `packs/vault/evals/estate_state.toml` and
       `packs/terraform/evals/estate_state.toml` with `asker_role`, following **the expected set,
       not the prompt** (research F3): vault 001/002/003/005 → `compliance-analyst` (002 expects
       `rec-vault-002`, an `authority_denied` record, among its three — the finding inside the
@@ -54,21 +54,21 @@ record, and a case expecting the invisible refuses to load.
 **Independent test**: a recording provider under an operator case receives no authority records;
 an operator case expecting one is `UnrunnableSuite`.
 
-- [ ] T004 [US2] The visibility check in `src/core/evals/scoring.py`, in
+- [X] T004 [US2] The visibility check in `src/core/evals/scoring.py`, in
       `EstateAnsweringScorer._answer` — **the place case and fixture actually meet** (analysis
       C2: the plan sited this at `__init__`, which never sees a case; cases arrive per call).
       Before narrowing, every id in the case's `events` must resolve to a record whose type the
       case's `asker_role` may see; a violation is `UnrunnableSuite` naming the case, the
       reference and the invisible type. Per-case and loud — a refusal mid-suite is still a
       refusal, never an exclusion-by-silence (FR-003).
-- [ ] T005 [US2] The narrowing in `EstateAnsweringScorer._answer`: records handed to
+- [X] T005 [US2] The narrowing in `EstateAnsweringScorer._answer`: records handed to
       `answer_estate_question` become the fixture's ∩ `visible_event_types({case.asker_role})`.
       The scorer's class docstring gains the honest-scope statement: what this drives (role
       visibility — this feature's finding) and what it deliberately does not (the governed read,
       windows, the per-type bound; driving those would put an evidence store and an access record
       per case inside the eval — research F1). This closes 024's "scores a path the product does
       not take", one layer in, for the piece the finding is about.
-- [ ] T006 [P] [US2] [GATE:fail-closed] The rows in
+- [X] T006 [P] [US2] [GATE:fail-closed] The rows in
       `tests/component/test_estate_eval_scores_visibility.py`: an estate case with no
       `asker_role` refuses at parse; an unknown role refuses at parse; an operator case expecting
       an authority reference refuses at scorer construction (the row that would have caught the
@@ -76,7 +76,7 @@ an operator case expecting one is `UnrunnableSuite`.
       record outside operator visibility (the row that fails when somebody deletes the narrowing
       — research F4 direction 1); a compliance-analyst case still receives all five; and the
       role vocabulary is asserted to be `ROLE_VISIBILITY`'s own keys, not a copy.
-- [ ] T007 [US2] [GATE:conformance] The blocking gate over the tagged suites:
+- [X] T007 [US2] [GATE:conformance] The blocking gate over the tagged suites:
       `tests/component/test_eval_gates.py` passes with identical verdicts — narrowing changes
       what the provider *could* see, and correctly tagged cases rest only on what their role
       sees, so no verdict moves. The contract's vacuous-mutation note is referenced from the row
@@ -93,7 +93,7 @@ directions have rows.
 **Independent test**: ADR-0059 exists, Accepted, and the suites' declared roles match what it
 says a cell's evidence spans.
 
-- [ ] T008 [US1] Write `docs/adr/0059-estate-eval-evidence-spans-asker-roles.md`: the matrix
+- [X] T008 [US1] Write `docs/adr/0059-estate-eval-evidence-spans-asker-roles.md`: the matrix
       schema is untouched (`role` stays the agent role); a cell's estate evidence **spans the
       asker roles its cases declare**; qualification requires **every declared role's subset to
       pass**. Context carries the finding (three-fifths of the estate evidence behind the first
@@ -101,7 +101,7 @@ says a cell's evidence spans.
       Rejected with reasons: per-visibility cells (combinatorial, and an ask serves whichever
       role asks) and visibility smuggled into `judge`. Status Accepted, relates to
       ADR-0022/0039/0035. **Review: Dan McTeer, merges with this feature.**
-- [ ] T009 [P] [US1] [GATE:conformance] The agreement row in
+- [X] T009 [P] [US1] [GATE:conformance] The agreement row in
       `tests/component/test_estate_eval_scores_visibility.py`: the set of roles declared across
       each pack's estate cases is exactly what ADR-0059 says the evidence spans
       (`{operator, compliance-analyst}` today) — so a case file quietly dropping a role, or
@@ -117,11 +117,11 @@ evidence — not grandfathered.
 
 **Independent test**: the matrix variables record the outcome with a date.
 
-- [ ] T010 [US3] `make evals-smoke` then `make evals-live` under the corrected suite — **named
+- [X] T010 [US3] `make evals-smoke` then `make evals-live` under the corrected suite — **named
       runner: Dan McTeer** (~25 min, vendor cost). The narrowing is already in the path both
       lanes share, so this is the same lane that earned the cells, now scoring what each role
       would receive.
-- [ ] T011 [US3] Record the outcome in `infra/environments/dev/variables.tf`: **pass** → the two
+- [X] T011 [US3] Record the outcome in `infra/environments/dev/variables.tf`: **pass** → the two
       cells' comments gain "re-examined 2026-08-0X under role-scoped evidence (030), confirmed";
       **fail for any role subset** → the affected cells gain `withdrawn = true` and the apply is
       run, with quickstart §3's consequence pre-stated (the deployed ask refuses
@@ -133,12 +133,12 @@ evidence — not grandfathered.
 
 ## Phase 6: Polish & cross-cutting
 
-- [ ] T012 [P] Update this feature's `contracts/conformance.md` status rows as they land, and the
+- [X] T012 [P] Update this feature's `contracts/conformance.md` status rows as they land, and the
       ROADMAP entry for 030: the finding (024's, one layer in), the four-of-five correction, the
       vacuous-mutation note, ADR-0059's shape, and the standing deferrals restated (operator
       visibility of authority records — still owed from 029; the un-scored path pieces, now
       stated at the suites).
-- [ ] T013 `make check`, `make evals`, and the hermetic conformance sweep green. (No enclave lane
+- [X] T013 `make check`, `make evals`, and the hermetic conformance sweep green. (No enclave lane
       needed — nothing in this feature touches a deployed surface or the store.)
 
 ---
