@@ -23,7 +23,17 @@ from surfaces.api.ask import estate_answer_for
 from surfaces.api.evidence import evidence_stream_for
 from tests.harness.api_fixtures import surface_under_test
 
-QUESTION = "Which runs were denied?"
+#: Deliberately WITHOUT a focus term, updated by 031 and the update is the record of why.
+#:
+#: This read *"Which runs were denied?"* while denials were analyst-only: the operator's
+#: focus∩visible came up empty, fell back to their whole visible set, and the analyst saw
+#: strictly more. 031 made denials operator-visible, so that question now narrows BOTH roles
+#: to the same denial records and their answers legitimately coincide — for a denials
+#: question, coincidence IS the feature (the person whose run was refused sees the refusal).
+#: What this file measures is the entitlement bound itself, and that comparison needs a
+#: question the focus vocabulary leaves alone, so scope — not narrowing — is the only thing
+#: that can differ.
+QUESTION = "What is recorded for this estate?"
 
 
 def _subject(*roles: str) -> AuthenticatedSubject:
@@ -70,9 +80,11 @@ def _arrange(surface: Any) -> None:
         )
 
 
-def _ask_as(surface: Any, subject: AuthenticatedSubject) -> dict[str, Any]:
+def _ask_as(
+    surface: Any, subject: AuthenticatedSubject, *, question: str = QUESTION
+) -> dict[str, Any]:
     return estate_answer_for(
-        question=QUESTION,
+        question=question,
         subject=subject,
         query=surface.evidence,
         audit=surface.audit,
@@ -110,6 +122,31 @@ def test_row_two_askers_get_answers_differing_exactly_by_entitlement() -> None:
     # And the difference is the ROLE MAP's, not an accident of ordering or limit.
     extra_types = visible_event_types(["compliance-analyst"]) - visible_event_types(["operator"])
     assert AuditEventType.AUTHORITY_ISSUED in extra_types
+
+
+def test_row_a_denials_question_coincides_across_the_roles_since_031() -> None:
+    """The question this file used to compare entitlement with, pinned to its NEW meaning.
+
+    031 made `AUTHORITY_DENIED`/`AUTHORITY_REFUSED` operator-visible, so a denials question
+    narrows both roles to the same records and their answers coincide — deliberately: the
+    person whose run was refused sees the refusal, and an analyst asking the same thing sees
+    the same refusal, not more. Grants stay analyst-only, which the row above still proves.
+    Asserted rather than tolerated, so a future visibility change meets this file on purpose.
+    """
+    surface = surface_under_test()
+    _arrange(surface)
+
+    operator = _ask_as(surface, _subject("operator"), question="Which runs were denied?")
+    analyst = _ask_as(surface, _subject("compliance-analyst"), question="Which runs were denied?")
+
+    operator_refs = {r for claim in operator["claims"] for r in claim["references"]}
+    analyst_refs = {r for claim in analyst["claims"] for r in claim["references"]}
+
+    assert operator_refs, "the denials question answered on nothing for the operator"
+    assert operator_refs == analyst_refs, (
+        "a denials question no longer coincides across the roles — if that is a deliberate "
+        "visibility change, this row and the boundary rows change together"
+    )
 
 
 def test_row_every_reference_resolves_into_that_askers_own_read() -> None:
