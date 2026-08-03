@@ -4,7 +4,24 @@
 
 **Created**: 2026-07-31
 
-**Status**: Draft
+**Status**: **PARKED by [ADR-0057](../../docs/adr/0057-context-hungry-agents-want-breadth-not-narrower-reads.md) (2026-08-01) — not abandoned, and not unfinished work waiting for a volunteer.**
+
+> **Read this before picking up any task below.** The 51 tasks in `tasks.md` are unchecked and
+> 19 of them were built; that combination looks like a feature somebody dropped, and it is not.
+> The work stopped because it was *answered*: ADR-0056 established by reading the substrate that
+> Vault is the resource server and cannot perform the RFC 8693 exchange, and ADR-0057 then
+> established that the read-scope narrowing this specifies is the wrong control for these agents
+> at all — they read widely before acting, so breadth of read is how the output gets informed,
+> and the property the narrowing was for (just-in-time, short-lived, attested) is already held by
+> per-allocation manufacture under a bounded TTL.
+>
+> **What is still live**: RAR remains the mechanism for **write** and **act** scopes, if those
+> ever enter a ceiling. Every ceiling in the estate is read-only today, so nothing needs it yet.
+> Resuming means re-specifying against that narrower question — not working down this task list.
+>
+> **Where the built substrate went**: preserved as the annotated tag
+> `archive/016-task-scoped-authority` (`git show archive/016-task-scoped-authority`). The
+> expensive knowledge is in `research.md` and stays there.
 
 **Input**: User description: "Task-scoped authority manufacture — narrow a run's credential to the task it was launched for, using RFC 8693 token exchange and RFC 9396 rich authorization requests that Vault validates as an OAuth resource server."
 

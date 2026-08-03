@@ -1,5 +1,12 @@
 # Tasks: Task-scoped authority manufacture
 
+> **PARKED — do not work down this list.** See [`spec.md`](spec.md)'s status header and
+> [ADR-0057](../../docs/adr/0057-context-hungry-agents-want-breadth-not-narrower-reads.md).
+> Nineteen of these were built and the rest were answered rather than dropped; the built
+> substrate is preserved as the tag `archive/016-task-scoped-authority`. Resuming means
+> re-specifying against write/act scopes, not ticking these boxes.
+
+
 **Input**: Design documents from `/specs/016-task-scoped-authority/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/

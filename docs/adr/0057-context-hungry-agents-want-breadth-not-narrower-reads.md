@@ -136,3 +136,16 @@ mount carrying `external_id` and `issuer`, which the typed Terraform resource ca
 bare 403; `use_jwks` defaults true so static keys need it set false explicitly.
 
 Whoever picks this up will not have to rediscover any of it.
+
+### Where the parked work lives — updated 2026-08-03
+
+The Decision above says "the substrate work exists on `feat/016-task-scoped-authority`". That
+branch was archived on 2026-08-03 and the branch itself deleted, so the sentence would have
+pointed at nothing. The two commits are preserved verbatim under the annotated tag
+**`archive/016-task-scoped-authority`** (`git show archive/016-task-scoped-authority`), whose
+message carries the same reasoning this record does.
+
+The Decision text is left exactly as written: what changed is where the evidence is kept, not
+what was decided. Recorded here because a governed record that points at a deleted branch is
+the kind of quiet inaccuracy this repository keeps paying to find — and this one was created by
+the cleanup that removed the branch, which makes it ours to correct in the same breath.
