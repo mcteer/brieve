@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# THE SECRET SCANNER, AND THE ONE PLACE IT IS TOLD SOMETHING IT CANNOT KNOW.
+#
+# Everything the default ruleset does still applies everywhere. This file adds exactly one
+# exemption, and it is deliberately the narrowest one that resolves the problem.
+#
+# `corpus/documents/` is ADOPTED CONTENT (ADR-0004): HashiCorp's published documentation,
+# fetched by `infra/bin/corpus_sync.py` and stored verbatim so that a citation resolves to
+# what the vendor actually wrote and the corpus digest means something. Their documentation
+# contains their own example values — an initial-admin token in a Terraform Enterprise setup
+# URL, elided recovery keys in a `vault operator init` transcript, a
+# `<hvs-TOKEN-value-from-key-ceremony>` placeholder. Fourteen of them tripped the entropy
+# heuristic on the 035 sync.
+#
+# Nothing of ours is ever written here — the directory is machine-populated from public pages
+# and nothing else may write to it. That is the whole basis for the exemption, and if it ever
+# stops being true this file becomes wrong rather than merely generous.
+#
+# EDITING THE DOCUMENTS WAS THE OTHER OPTION AND IT IS WORSE. Redacting a vendor's own example
+# would make our copy differ from the page it cites, break the digest that proves we did not
+# alter what we adopted, and be silently undone by the next sync.
+#
+# Scoped by RULE as well as by path. `generic-api-key` is the entropy heuristic — the one that
+# cannot tell an example from a credential. Every specific rule (private keys, AWS keys, GitHub
+# and Slack tokens, and the rest) still fires inside this directory, so a real credential of a
+# recognised shape appearing in adopted content is still a failure.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+paths = ['''corpus/documents/.*\.json''']
+regexTarget = "line"
