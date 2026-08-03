@@ -5,7 +5,7 @@ Before 031 this exact question declined for an operator — correctly, and the p
 was refused had to find a compliance analyst. The visibility decision moved `AUTHORITY_DENIED`
 and `AUTHORITY_REFUSED` inside the operator's set, and this script is the deployed proof: a
 token whose only mapped role is operator, the served API, and an answer that cites the very
-denial record Run 2 produced.
+refusal record the demonstration's over-scoped run produced.
 
 Two shapes this deployment forces, both measured rather than assumed:
 
@@ -143,7 +143,7 @@ def wait_until_answerable(alloc: str) -> None:
 
 def main() -> int:
     runs = json.loads(Path(sys.argv[1]).read_text())
-    denial_hashes = set(runs["denial_hashes"])
+    citable = set(runs["citable_hashes"])
 
     alloc = running_api_allocation()
     wait_until_answerable(alloc)
@@ -162,16 +162,20 @@ def main() -> int:
         for claim in answer.get("claims", [])
         for reference in claim.get("references", [])
     }
-    overlap = cited & denial_hashes
+    overlap = cited & citable
     for claim in answer.get("claims", []):
         print(f"  claim: {claim.get('statement')!r}")
     if not overlap:
         print(
-            f"FAIL: the answer cites {sorted(h[:16] for h in cited)} but none of Run 2's "
-            f"denial records {sorted(h[:16] for h in denial_hashes)} — the loop is not closed"
+            f"FAIL: the answer cites {sorted(h[:16] for h in cited)} but none of the "
+            f"demonstration's refusal records {sorted(h[:16] for h in citable)} — the loop "
+            f"is not closed"
         )
         return 2
-    print(f"  SC-003: the answer rests on Run 2's own denial record ({next(iter(overlap))[:16]}…)")
+    cited_hash = next(iter(overlap))
+    print(
+        f"  SC-003: the answer rests on the refusal the demonstration produced ({cited_hash[:16]}…)"
+    )
     return 0
 
 

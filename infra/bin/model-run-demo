@@ -23,8 +23,8 @@
 # would let a dispatched conformance row reach a vendor, and the lane re-run is what would
 # catch it doing so.
 #
-# **Cost bound (FR-009)**: two runs, ≤2 steps each, re-choice bound 3 — at most 12 vendor
-# calls, under the stated ceiling of 15.
+# **Cost bound (FR-009)**: Run 1 is 2 steps, Run 2 is 1 step with re-choice bound 3, and
+# Run 3 consults no model at all — at most 5 vendor calls, under the stated ceiling of 15.
 
 set -euo pipefail
 
@@ -130,9 +130,10 @@ PY
 done
 ok "live plan cell ${LIVE_PLAN_CELL} seeded; vault-agent and planner-agent point at it"
 
-# ---------------------------------------------------------------- the two bounded runs
+# ---------------------------------------------------------------- the three bounded runs
 say "Run 1: vault-agent, a clean read-shaped task (≤2 steps)"
-say "Run 2: planner-agent, worded toward 'apply' — expecting the ceiling to refuse"
+say "Run 2: planner-agent, its one permitted tool refused by governance (the doomed choice)"
+say "Run 3: the over-scoped dispatch — the ceiling refuses the run before any model call"
 cd "$REPO"
 uv run --extra surfaces --extra adapters python infra/bin/model_run_demo_runs.py "$CAPTURE" \
   || die "the runs did not produce the evidence — the output above says which claim failed"
