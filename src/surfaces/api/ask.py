@@ -112,15 +112,24 @@ def ask_for(
         model_authority=model_authority,
     )
 
+    # `source` on BOTH paths, which it was not until the third route went away.
+    #
+    # The estate path has always returned it; guidance never did, and nobody noticed because the
+    # `neither` branch returned it too — so every response a caller could receive without reading
+    # the corpus carried a source, and the one that did read it did not. With `neither` removed,
+    # a caller asking a documentation question got back a body that would not say what answered
+    # it. The record always knew (`record_ask` above); this makes the caller's copy agree.
     if answer.disposition != ANSWERED:
         return {
             "disposition": answer.disposition,
+            "source": GUIDANCE_SOURCE,
             "declined_reason": answer.declined_reason,
             "corpus_digest": answer.corpus_digest,
             "ground_note": answer.ground_note,
         }
     return {
         "disposition": answer.disposition,
+        "source": GUIDANCE_SOURCE,
         "corpus_digest": answer.corpus_digest,
         "ground_note": answer.ground_note,
         "claims": [

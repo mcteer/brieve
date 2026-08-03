@@ -282,15 +282,22 @@ def test_row_an_estate_decline_is_the_same_on_both_including_its_reason() -> Non
     assert api.json()["declined_reason"] == mcp.payload["declined_reason"]
 
 
-def test_row_an_unroutable_question_declines_the_same_on_both() -> None:
+def test_row_a_question_matching_no_keyword_takes_the_same_floor_on_both() -> None:
+    """ADR-0033 across the change of floor.
+
+    There is no longer an unroutable question: one that matches neither vocabulary goes to the
+    corpus, because the router knows which words were used and nothing about what the corpus
+    holds. The parity claim is unchanged in kind — both surfaces must reach the same source —
+    and this row asserts it for the case that used to be a third route.
+    """
     surface = _with_records(ask_provider=_AnswersFromRecords(), ask_model="anthropic/claude-opus@5")
     question = {"question": "What is the weather in Denver?"}
 
     api = TestClient(surface.app).post("/ask", json=question, headers=surface.bearer())
     mcp = surface.mcp.call("ask", question, subject=surface.subject())
 
-    assert api.json()["source"] == mcp.payload["source"] == "neither"
-    assert api.json()["declined_reason"] == mcp.payload["declined_reason"]
+    assert api.json()["source"] == mcp.payload["source"] == "guidance"
+    assert api.json()["disposition"] == mcp.payload["disposition"]
 
 
 def test_row_an_empty_scope_refuses_the_same_on_both() -> None:
