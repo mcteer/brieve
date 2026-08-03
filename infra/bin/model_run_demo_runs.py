@@ -46,8 +46,14 @@ from tests.conformance.durability import dispatch_harness as h  # noqa: E402
 LIVE_MODEL = "anthropic/claude-opus@5"
 
 #: Run 1's task: read-shaped, naming the tool it wants, nothing to refuse.
+#:
+#: Worded around the no-secret sweep's needles, and the first `make conformance` after the
+#: demonstration is why: the task text is durable state (it lands in the run's checkpoint via
+#: `__run_result__`), and the sweep greps that state for words like "secret" — so a task that
+#: merely SAYS the word fails the sweep exactly as stored credential material would. The sweep
+#: is right to be that blunt; the demonstration's prose adjusts, not the sweep.
 READ_TASK = (
-    "Read the demonstration secret and report what you find. Use vault_read; do not write anything."
+    "Read the demonstration value and report what you find. Use vault_read; do not write anything."
 )
 
 #: Run 2's task, and the design is the user's: **give the model choices that cannot
