@@ -98,7 +98,19 @@
             {% if claim.get("citations") %}
               <ul class="citations">
                 {% for citation in claim.citations %}
-                  <li><a href="{{ citation }}" rel="noopener">{{ citation }}</a></li>
+                  {#
+                    A CITATION IS A DESTINATION, NOT A STRING. Rendering the raw URL put a
+                    wrapping monospace line across the answer and made the page look broken —
+                    and it told the reader nothing the link's own words could not. The label
+                    is the document and its section, humanised; the href is untouched, and
+                    `title` keeps the exact URL one hover away, so nothing is hidden.
+                  #}
+                  {% set _url = citation.split("#") %}
+                  {% set _doc = _url[0].rstrip("/").split("/")[-1] | replace("-", " ") | title %}
+                  {% set _section = (_url[1] | replace("-", " ")) if _url | length > 1 else "" %}
+                  <li>
+                    <a href="{{ citation }}" rel="noopener" title="{{ citation }}">{{ _doc }}{% if _section %} <span class="citation-section">&rsaquo; {{ _section }}</span>{% endif %}</a>
+                  </li>
                 {% endfor %}
               </ul>
             {% elif claim.get("references") %}

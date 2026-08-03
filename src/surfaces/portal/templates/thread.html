@@ -5,7 +5,11 @@
 {% endblock %}
 {% block content %}
 <h1>{{ thread.title or "Untitled conversation" }}</h1>
-<p><a class="target" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a></p>
+{# A destructive action is a CONTROL, not a sentence. As an underlined link in body text it
+   read as prose and was one careless click from deleting a conversation. #}
+<p class="page-actions">
+  <a class="link-button link-button--danger" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a>
+</p>
 
 {#
   THE PRODUCT'S IDENTITY, where the platform actually knows it (034). Each turn names the
@@ -62,7 +66,12 @@
         {% endif %}
       </p>
 
-      {% if turn.result_status == 200 and turn.result %}
+      {#
+        A RESULT ONLY RENDERS WHEN THERE IS ONE. The run's payload carries `result: None`
+        before anything has been produced, and Jinja printed that as the literal word "None"
+        inside a result block — a page telling a person their run returned the string None.
+      #}
+      {% if turn.result_status == 200 and turn.result and turn.result.result is not none %}
         <pre class="result">{{ turn.result.result }}</pre>
       {% elif turn.result_status == 409 %}
         <p class="pending">Still working. This updates on its own.</p>

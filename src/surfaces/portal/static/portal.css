@@ -24,8 +24,9 @@
 
 :root {
   /* Ground and ink. Cool neutrals, near-black rather than pure black. */
-  --page: #ffffff;
-  --raised: #f7f8f9;
+  --page: #f6f7f9;
+  --surface: #ffffff;
+  --raised: #f2f4f6;
   --ink: #0c0c0e;
   --muted: #656a76;
   --rule: #dedfe3;
@@ -48,6 +49,16 @@
      Vault yellow is Vault yellow on any ground. */
   --vault: #ffcf25;
   --terraform: #7b42bc;
+
+  /* Depth, kept shallow on purpose: one ambient shadow for surfaces that sit on the page and
+     a stronger one for the things that float above it. A product that shadows everything
+     reads as decorated; one that shadows nothing reads as a document. */
+  --lift: 0 1px 2px rgb(12 12 14 / 0.06), 0 1px 1px rgb(12 12 14 / 0.04);
+  --inset: inset 0 1px 2px rgb(12 12 14 / 0.03);
+  --lift-strong: 0 4px 12px rgb(12 12 14 / 0.08);
+  --radius: 8px;
+  --radius-sm: 6px;
+  --control-height: 2.5rem;
 
   /* A SCALE, not a pile of one-off values. Every size and gap below reads one of these, so
      the page has a rhythm a reader feels rather than a set of numbers someone happened to
@@ -91,7 +102,8 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --page: #0c0c0e;
-    --raised: #17181c;
+    --surface: #141519;
+    --raised: #1c1e23;
     --ink: #f1f2f3;
     --muted: #a3a7b0;
     --rule: #2c2e33;
@@ -102,6 +114,9 @@
     --cta-ink: #0c0c0e;
     --allowed: #4fcb9b;
     --denied: #ff8a8a;
+    --lift: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 1px rgb(0 0 0 / 0.3);
+    --inset: inset 0 1px 2px rgb(0 0 0 / 0.25);
+    --lift-strong: 0 4px 14px rgb(0 0 0 / 0.5);
   }
 }
 
@@ -144,9 +159,15 @@ p:last-child { margin-bottom: 0; }
   font-family: var(--font-control);
 }
 
+/* THE SHELL. Before this the header was a hairline with text floating in it and the content
+   sat in a column adrift on a wide page — the look of a document rather than an application.
+   A solid bar the content scrolls under, and a spine that keeps the column deliberate. */
 header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem 1rem; border-bottom: 1px solid var(--rule);
+  gap: var(--space-2) var(--space-5);
+  padding: 0 var(--space-5); min-height: 3.5rem;
+  background: var(--surface); border-bottom: 1px solid var(--rule);
+  position: sticky; top: 0; z-index: 5;
   /* WRAPS, because a header that cannot is a page that scrolls sideways (028).
      Adding the nav pushed the row past 320px and broke WCAG 2.2 reflow — on CI's Linux
      Chromium first, where the same strings render wider than on macOS, which is why the
@@ -154,9 +175,17 @@ header {
      text: at 320px the header becomes two lines and nothing is lost. */
   flex-wrap: wrap; gap: 0.5rem 1rem;
 }
+/* The brand is a mark, not a word in a sentence: a small square in the ink colour gives the
+   header something to sit against, which is most of why a bare wordmark reads as unfinished. */
 .brand {
-  font-family: var(--font-control); font-weight: 650; font-size: 0.95rem;
-  letter-spacing: -0.01em; color: var(--ink); text-decoration: none;
+  font-family: var(--font-control); font-weight: 680; font-size: var(--text-sm);
+  letter-spacing: 0.01em; color: var(--ink); text-decoration: none;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+.brand::before {
+  content: ""; width: 0.875rem; height: 0.875rem; border-radius: 3px;
+  background: var(--ink); flex: none;
 }
 /* Main navigation (028). The links carry vertical padding rather than sitting at their
    text height, because WCAG 2.2's 24px minimum target applies to them and an 18px line
@@ -165,19 +194,22 @@ header nav {
   display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-right: auto;
   font-family: var(--font-control);
 }
+/* Nav items are pills that fill on hover rather than underlined text — an underline in a
+   header competes with the links inside the page, and the current page needs to read at a
+   glance rather than on inspection. */
 header nav a {
   color: var(--muted); min-height: 24px; display: inline-flex; align-items: center;
-  padding: 0.25rem 0; font-size: 0.9rem; text-decoration: none;
-  border-bottom: 2px solid transparent;
+  padding: var(--space-1) var(--space-3); font-size: var(--text-sm); text-decoration: none;
+  border-radius: var(--radius-sm); font-weight: 500;
 }
-header nav a:hover { color: var(--ink); }
-header nav a[aria-current] { color: var(--ink); border-bottom-color: var(--link-bright); }
+header nav a:hover { color: var(--ink); background: var(--raised); }
+header nav a[aria-current] { color: var(--ink); background: var(--raised); font-weight: 600; }
 
-main { max-width: 46rem; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); }
+main { max-width: 52rem; margin: 0 auto; padding: var(--space-6) var(--space-5) var(--space-7); }
 footer {
-  max-width: 46rem; margin: 0 auto; padding: var(--space-4);
+  max-width: 52rem; margin: 0 auto; padding: var(--space-5);
   color: var(--muted); font-size: var(--text-xs); line-height: var(--lead-snug);
-  border-top: 1px solid var(--rule); max-width: 46rem;
+  border-top: 1px solid var(--rule);
 }
 footer p { max-width: var(--measure); }
 
@@ -185,7 +217,11 @@ h1, h2, h3 {
   font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.012em;
   line-height: var(--lead-tight); text-wrap: balance; max-width: var(--measure);
 }
-h1 { font-size: var(--text-2xl); margin: 0 0 var(--space-2); }
+h1 {
+  font-size: var(--text-xl); margin: 0 0 var(--space-3); letter-spacing: -0.018em;
+  /* Down a step from the display size. At 28px the serif dominated every page and pushed a
+     two-line title into the content; a heading should announce the page, not become it. */
+}
 h2 { font-size: var(--text-xl); margin: var(--space-6) 0 var(--space-2); }
 h3 { font-size: var(--text-lg); margin: var(--space-5) 0 var(--space-2); }
 a { color: var(--link); text-underline-offset: 2px; }
@@ -197,15 +233,30 @@ a { color: var(--link); text-underline-offset: 2px; }
 /* Black in light, white in dark — the call to action inverts with its ground rather than
    holding one colour, and both tokens flip together so the label never chases the fill. */
 .button {
-  display: inline-block; padding: 0.5rem 0.9rem; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--control-height); padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
   background: var(--cta); color: var(--cta-ink); border: 1px solid transparent;
-  text-decoration: none; font-size: 0.875rem; font-weight: 550;
+  text-decoration: none; font-size: var(--text-sm); font-weight: 550;
+  box-shadow: var(--lift); transition: opacity 120ms ease;
 }
-.button--danger { background: var(--denied); color: var(--page); }
-button.link {
-  background: none; border: none; color: var(--link); text-decoration: underline;
-  padding: 0; font-size: 0.8125rem;
+.button:hover { opacity: 0.88; }
+.button--danger { background: var(--denied); color: var(--surface); }
+
+/* SECONDARY ACTIONS ARE BUTTONS, NOT RAW LINKS. "Delete this conversation", "Stop this run"
+   and "Sign out" were blue underlined text sitting in the page like prose — which is both
+   the strongest tell of an unstyled page and a real usability problem, because a destructive
+   action read as a sentence. They are bordered controls now, and they still meet the 24px
+   target the keyboard lane measures. */
+button.link, .link-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 2rem; padding: 0 var(--space-3);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-sm);
+  color: var(--ink); text-decoration: none;
+  font-family: var(--font-control); font-size: var(--text-sm); font-weight: 500;
 }
+button.link:hover, .link-button:hover { background: var(--raised); }
+.link-button--danger { color: var(--denied); border-color: var(--rule); }
 form.inline { display: inline; }
 
 .composer { display: grid; gap: 0.35rem; margin-top: 1.5rem; }
@@ -213,9 +264,21 @@ form.inline { display: inline; }
   font-family: var(--font-control); font-weight: 600; font-size: 0.8125rem;
 }
 .composer select, .composer textarea, .ask textarea {
-  font-family: var(--font-prose); font-size: 1rem; padding: 0.6rem 0.7rem;
-  border: 1px solid var(--rule); border-radius: 5px;
-  background: var(--page); color: var(--ink); width: 100%;
+  font-family: var(--font-prose); font-size: var(--text-base);
+  padding: var(--space-3); border: 1px solid var(--rule); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink); width: 100%;
+  box-shadow: var(--inset);
+}
+.composer select:hover, .composer textarea:hover, .ask textarea:hover { border-color: var(--muted); }
+/* The native select arrow is the other unmistakable default-browser tell. Replaced with a
+   drawn chevron so the control matches the ones beside it. */
+.composer select {
+  appearance: none; min-height: var(--control-height); padding-right: var(--space-6);
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 1.1rem) 55%, calc(100% - 0.75rem) 55%;
+  background-size: 0.375rem 0.375rem, 0.375rem 0.375rem;
+  background-repeat: no-repeat;
 }
 .composer .button { justify-self: start; margin-top: 0.5rem; }
 .ask label { display: block; margin-bottom: 0.25rem; }
@@ -224,12 +287,18 @@ form.inline { display: inline; }
 /* ---------------------------------------------------------------- lists and prose */
 
 .threads { list-style: none; padding: 0; margin: var(--space-5) 0 0; }
+/* The list is a surface with rows, not naked text with rules under it. */
+.threads {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+  box-shadow: var(--lift); overflow: hidden;
+}
 .threads li {
-  padding: var(--space-3) 0; border-bottom: 1px solid var(--rule-soft);
+  padding: var(--space-3) var(--space-4); border-top: 1px solid var(--rule-soft);
   display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4);
   align-items: baseline; justify-content: space-between;
 }
-.threads li:first-child { border-top: 1px solid var(--rule-soft); }
+.threads li:first-child { border-top: none; }
+.threads li:hover { background: var(--raised); }
 .threads a { color: var(--ink); text-decoration: none; }
 .threads a:hover { text-decoration: underline; text-decoration-color: var(--link-bright); }
 
@@ -239,8 +308,8 @@ form.inline { display: inline; }
 }
 .context { margin: var(--space-2) 0 0; }
 .empty, .notice {
-  background: var(--raised); border: 1px solid var(--rule);
-  padding: 0.75rem; border-radius: 5px;
+  background: var(--surface); border: 1px solid var(--rule);
+  padding: var(--space-4); border-radius: var(--radius); box-shadow: var(--lift);
 }
 /* The one-line statement of what a page does, under its heading (028 follow-up). It carries
    the never-acts distinction that the nav labels alone could not — a person who lands mid-flow
@@ -257,6 +326,7 @@ form.inline { display: inline; }
    check for a font size — the lede earns its hierarchy from colour, measure and the space
    below it, which is cheaper than a size that puts a focused link where a probe cannot find
    it. If this ever needs to grow, the link comes out of the sentence first. */
+.page-actions { margin: 0 0 var(--space-5); }
 .lede {
   color: var(--muted); max-width: var(--measure);
   line-height: var(--lead-prose);
@@ -267,7 +337,9 @@ form.inline { display: inline; }
 
 .turns { list-style: none; padding: 0; display: grid; gap: var(--space-4); }
 .turn {
-  border: 1px solid var(--rule); border-radius: 6px; padding: var(--space-4); margin: 0;
+  background: var(--surface); box-shadow: var(--lift);
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  padding: var(--space-4); margin: 0; overflow: hidden;
   /* The product's identity, when the platform knows it. `data-pack` is absent when it does
      not, so an unknown product costs no colour AND no reserved space — absence is not a
      visual defect. */
@@ -279,18 +351,25 @@ form.inline { display: inline; }
    holds two different things — a person's message and the platform's response — and reading
    them as one paragraph is the confusion this divider removes. */
 .message {
-  margin: 0 0 var(--space-3); white-space: pre-wrap; max-width: var(--measure);
+  margin: 0 0 var(--space-3); white-space: pre-wrap;
   padding-bottom: var(--space-3); border-bottom: 1px solid var(--rule-soft);
+  /* NO MEASURE HERE, deliberately: the divider is this element's own border, and constraining
+     the element to 34rem stopped the rule two-thirds of the way across the card — which reads
+     as a rendering fault rather than as a divider. A turn's message is short; the card's own
+     width is the constraint that matters. */
 }
 
 /* A VERDICT SURVIVES GREYSCALE, because colour alone would fail 1.4.1. The pill carries a
    border and the disposition word itself; the hue is the third signal, not the only one. */
 /* The pill sits on the same baseline as the sentence it labels, with the gap coming from
    flex rather than from a margin that would collapse differently per browser. */
+/* The verdict and the action that follows from it belong on one line — stacked, they read as
+   two unrelated things and the card grows for no reason. */
 .disposition {
   margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2);
-  align-items: baseline; max-width: var(--measure);
+  align-items: center;
 }
+.disposition form.inline { display: inline-flex; margin: 0; }
 .pill {
   font-family: var(--font-evidence); font-size: 0.6875rem; letter-spacing: 0.08em;
   text-transform: uppercase; padding: 0.15rem 0.45rem; border-radius: 3px;
@@ -304,7 +383,7 @@ form.inline { display: inline; }
 .result {
   font-family: var(--font-evidence); font-size: var(--text-sm);
   line-height: var(--lead-snug);
-  background: var(--raised); border: 1px solid var(--rule-soft);
+  background: var(--raised); border: 1px solid var(--rule);
   padding: var(--space-3); border-radius: 4px; margin: var(--space-3) 0 0;
   overflow-x: auto; white-space: pre-wrap; word-break: break-word;
 }
@@ -312,7 +391,19 @@ form.inline { display: inline; }
 
 /* ---------------------------------------------------------------- the answer */
 
-.answer { margin-top: var(--space-6); border-top: 1px solid var(--rule); padding-top: var(--space-5); }
+.answer {
+  margin-top: var(--space-6);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+  box-shadow: var(--lift); padding: var(--space-5);
+}
+/* A SECTION LABEL, not a headline. "Answer" at display size competed with the claims it
+   introduces — the reader already knows what they are looking at, so the word only needs to
+   mark where the answer starts. */
+.answer > h2 {
+  margin: 0 0 var(--space-4); font-family: var(--font-control);
+  font-size: var(--text-xs); font-weight: 650; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
 
 /* CLAIMS ARE STATEMENTS, EACH WITH ITS EVIDENCE ATTACHED — and the layout should say so.
    Before this they were list items whose citations ran on underneath at the same rhythm as
@@ -334,9 +425,21 @@ form.inline { display: inline; }
 .citations, .references {
   list-style: none; padding-left: 0; font-size: var(--text-xs);
   font-family: var(--font-evidence); line-height: var(--lead-snug);
-  margin: var(--space-2) 0 0; display: grid; gap: var(--space-1);
+  margin: var(--space-3) 0 0; display: grid; gap: var(--space-2);
 }
-.citations a { color: var(--link); word-break: break-all; }
+/* A CITATION IS A NAME, NOT AN IDENTIFIER — a refinement of the role assignment, learned by
+   looking at it. The evidence face is for things a person carries elsewhere: a hash, a
+   correlation id, a raw URL. A document's title is something they READ, and setting it in
+   monospace made a plain-English phrase look like a machine string. The exact URL is still
+   evidence and still exact — it lives in `title` and in the href. */
+.citations {
+  font-family: var(--font-control); font-size: var(--text-sm);
+}
+.citations a { text-decoration: none; border-bottom: 1px solid var(--rule); }
+.citations a:hover { border-bottom-color: var(--link); }
+.citation-section { color: var(--muted); font-weight: 400; }
+.citations a { font-weight: 500; }
+.citations a { color: var(--link); word-break: break-word; overflow-wrap: anywhere; }
 /* Long hashes break rather than push the page sideways — the evidence face renders them wider
    than the prose face did, so this matters more than it used to (320px reflow). */
 .references code, .stamp { color: var(--muted); word-break: break-all; }
@@ -349,7 +452,7 @@ form.inline { display: inline; }
 .provenance {
   margin-top: var(--space-5); padding: var(--space-3) var(--space-4);
   border: 1px solid var(--rule); border-left: 3px solid var(--link-bright);
-  border-radius: 0 5px 5px 0; background: var(--raised);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--raised);
   display: grid; gap: var(--space-1);
 }
 .provenance .meta { margin: 0; }
