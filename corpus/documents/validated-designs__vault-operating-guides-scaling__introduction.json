@@ -1,0 +1,26 @@
+{
+  "path": "/validated-designs/vault-operating-guides-scaling/introduction",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-operating-guides-scaling/introduction",
+  "sections": [
+    {
+      "anchor": "introduction",
+      "title": "Introduction",
+      "text": "This document gives recommendations on how to scale Vault Enterprise as a shared service for your organization. HashiCorp Validated Designs provide prescriptive guidance curated from our experience supporting numerous customer journeys with Vault Enterprise."
+    },
+    {
+      "anchor": "prerequisites",
+      "title": "Prerequisites",
+      "text": "We recommend that you have completed the following steps before implementing the guidance in this document: Review: Vault Enterprise Operating Guide for Adoption Review: Vault Enterprise Operating Guide for Standardization Have established the following: Configure desired authentication methods Establish a baseline of Vault policies for administration Implemented secrets management with Vault in Production."
+    },
+    {
+      "anchor": "checklist",
+      "title": "Checklist",
+      "text": "After completing the initial adoption and standardization of Vault, you are ready to implement advanced use cases in the scaling phase covered in this document. While some aspects of the scaling maturity phase are optional and will depend on the integrations your organization requires, we recommend that all customers consider adopting the following core capabilities due to the significant security benefits they provide: Automation of enterprise\u2019s public key infrastructure (PKI) lifecycle management with PKI secret engine Improve Resilience and Performance through Performance Replication Centralized key lifecycle management with Vault Key Management System (KMS) & Key Management Interoperability Protocol (KMIP) secret engine Encryption as a service with Transit and Transform secret engine"
+    },
+    {
+      "anchor": "use-cases-covered",
+      "title": "Use Cases Covered",
+      "text": "This document covers the \u201cScaling\u201d phase of operating Vault on the maturity scale and includes the following: Use Case Summary PKI Lifecycle Management Adopt a modern PKI strategy with full automation for lifecycle management using the PKI secrets engine Performance Replication Understand how performance replication is designed to ensure the overall scalability of Vault. Key Lifecycle Management Increase security by adopting centralized control over the organization\u2019s key lifecycle management. Next Public key Infrastructure management"
+    }
+  ]
+}

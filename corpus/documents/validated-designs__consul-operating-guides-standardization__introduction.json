@@ -1,0 +1,21 @@
+{
+  "path": "/validated-designs/consul-operating-guides-standardization/introduction",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-operating-guides-standardization/introduction",
+  "sections": [
+    {
+      "anchor": "introduction",
+      "title": "Introduction",
+      "text": "Warning Please note that this document is a work in progress and is subject to change. Hashicorp Validated Designs (HVDs) provide prescriptive guidance curated from our experience supporting numerous customer journeys with Consul Enterprise. In the adoption guide we mention the various maturity stages . This guide falls under the standardization stage. During the standardization stage, it's important to focus on the following key areas: Integration with infrastructure and operations tools : Enable application infrastructure tools like Datadog, Grafana, and Prometheus to provide end-to-end visibility into services. Additionally, ensure audit logs are integrated with log management platforms such as Splunk and Datadog to meet organizational compliance requirements. Multi-tenancy and multi-datacenter management : Implement multi-tenancy to provide autonomy between teams. Facilitate service discovery and connectivity across multiple clusters or enhance high availability by utilizing cluster peering for seamless service communication. This document gives recommendations on how to standardize Consul Enterprise as a shared service for your organization."
+    },
+    {
+      "anchor": "checklist",
+      "title": "Checklist",
+      "text": "After completing the maturity assessment at the end of the adopt phase, you are ready to implement core portions of the standardization phase covered in this document: Monitoring and observability Consul multi-cluster and multi-tenant deployment"
+    },
+    {
+      "anchor": "use-cases-covered",
+      "title": "Use cases covered",
+      "text": "This document covers the standardization phase of operating Consul on the maturity scale and includes the following use cases: Use Case Summary Monitoring and observability Maintaining visibility into the health and performance of your Consul environments is essential. We will explore HashiCorp\u2019s recommendations for effectively monitoring Consul in the following three pages: monitoring and observability , observability pillars , and additional observability elements . Consul multi-cluster and multi-tenant deployment To reduce cross-team dependencies and accelerate time-to-market, there is a growing demand for IT services to be self-serve. In this section, we will explore HashiCorp's recommendations for implementing multi-cluster and multi-tenant deployments to meet these goals. Next Monitoring and observability"
+    }
+  ]
+}

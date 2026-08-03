@@ -1,0 +1,51 @@
+{
+  "path": "/validated-designs/vault-operating-guides-adoption/change-log",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-operating-guides-adoption/change-log",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-06",
+      "title": "2026-06",
+      "text": "Add production hardening guide to prerequisites"
+    },
+    {
+      "anchor": "2026-01",
+      "title": "2026-01",
+      "text": "Fixed heading formatting in tabbed content for PDF generation Update meta descriptions Updated credits and contributors"
+    },
+    {
+      "anchor": "2025-12",
+      "title": "2025-12",
+      "text": "Updated credits and contributors"
+    },
+    {
+      "anchor": "2025-07",
+      "title": "2025-07",
+      "text": "Added observability and monitoring guidance"
+    },
+    {
+      "anchor": "2025-06",
+      "title": "2025-06",
+      "text": "Fixed broken links and added redirects Standardized operating guide naming conventions"
+    },
+    {
+      "anchor": "2025-05",
+      "title": "2025-05",
+      "text": "Removed document structure section Fixed typos and documentation errors Fix numbered list rendering"
+    },
+    {
+      "anchor": "2025-04",
+      "title": "2025-04",
+      "text": "Updated observability guidance Referenced patterns from other HVD documentation"
+    },
+    {
+      "anchor": "2024-02",
+      "title": "2024-02",
+      "text": "GA release Previous Appendix Next Credits"
+    }
+  ]
+}

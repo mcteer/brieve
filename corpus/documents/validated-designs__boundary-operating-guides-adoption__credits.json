@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/boundary-operating-guides-adoption/credits",
+  "url": "https://developer.hashicorp.com/validated-designs/boundary-operating-guides-adoption/credits",
+  "sections": [
+    {
+      "anchor": "credits",
+      "title": "Credits",
+      "text": "Thank you to everyone who contributed to this validated design guidance. This cross-functional team, representing many departments within HashiCorp, authored, edited, reviewed, and iterated this content to provide prescription and recommendations for using HashiCorp software in enterprise scenarios. Andrei Burd Danny Knights Jeff Mitchell Jim Lambert Mark Lewis Nick Wong Ravi Panchal Sai Linn Thu Shriram Rajaraman Theodore Marx Tony Phan Van Phan Previous Credential management"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "path": "/validated-designs/terraform-solution-design-guides-terraform-enterprise/change-log",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-solution-design-guides-terraform-enterprise/change-log",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-01",
+      "title": "2026-01",
+      "text": "Fixed heading formatting in tabbed content for PDF generation Update meta descriptions Updated credits and contributors"
+    },
+    {
+      "anchor": "2025-12",
+      "title": "2025-12",
+      "text": "Fixed typos and documentation errors Update title casing for disaster recovery document Add terraform enterprise failover recommendations Fix incorrect verbiage re ARM support for Terraform Enterprise"
+    },
+    {
+      "anchor": "2025-11",
+      "title": "2025-11",
+      "text": "Revise PostgreSQL and Redis descriptions in architecture guide Fixed typos and documentation errors"
+    },
+    {
+      "anchor": "2025-06",
+      "title": "2025-06",
+      "text": "Use consistent guide names and descriptions"
+    },
+    {
+      "anchor": "2025-05",
+      "title": "2025-05",
+      "text": "Removed document structure section"
+    },
+    {
+      "anchor": "2025-04",
+      "title": "2025-04",
+      "text": "Patch Redis Sentinel examples Update security hardening guidance Update private cloud installation guidance"
+    },
+    {
+      "anchor": "2025-03",
+      "title": "2025-03",
+      "text": "Simplify OS recommendation"
+    },
+    {
+      "anchor": "2025-02",
+      "title": "2025-02",
+      "text": "Fixed typos and documentation errors"
+    },
+    {
+      "anchor": "2025-01",
+      "title": "2025-01",
+      "text": "Update installation documentation Fix machine types for VM+container runtime based on 2048 MiB worker"
+    },
+    {
+      "anchor": "2024-04",
+      "title": "2024-04",
+      "text": "Updated Terraform Cloud to HCP Terraform"
+    },
+    {
+      "anchor": "2023-10",
+      "title": "2023-10",
+      "text": "GA Release Previous Appendix Next Credits"
+    }
+  ]
+}

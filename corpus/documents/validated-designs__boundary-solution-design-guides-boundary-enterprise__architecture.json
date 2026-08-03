@@ -1,0 +1,61 @@
+{
+  "path": "/validated-designs/boundary-solution-design-guides-boundary-enterprise/architecture",
+  "url": "https://developer.hashicorp.com/validated-designs/boundary-solution-design-guides-boundary-enterprise/architecture",
+  "sections": [
+    {
+      "anchor": "architecture",
+      "title": "Architecture",
+      "text": ""
+    },
+    {
+      "anchor": "recommended-deployment-architecture",
+      "title": "Recommended deployment architecture",
+      "text": "This section explores the recommended Boundary Enterprise architecture, which provides a highly available, scalable, and secure deployment suitable for production workloads. The primary components that make up a Boundary Enterprise cluster are: Controller nodes Worker nodes Load balancer PostgreSQL database KMS (Key management service) The following diagram shows the recommended architecture for deploying Boundary Enterprise within a single region."
+    },
+    {
+      "anchor": "controllers",
+      "title": "Controllers",
+      "text": "A minimum deployment consists of three controllers in three separate private subnets distributed across three availability zones to ensure high availability. Configure the controllers to run in a fault-tolerant setup, such as an auto-scaling group for a self-healing environment. Users authenticate with the controllers when using Boundary Enterprise. We recommend exposing the controller API and UI to your users through a layer 4 load balancer. See load balancing section for more information."
+    },
+    {
+      "anchor": "database",
+      "title": "Database",
+      "text": "Controllers are stateless, and manage all configuration through an external PostgreSQL database. We recommend configuring the PostgreSQL database for high availability. Please refer to the PostgreSQL high availability, load balancing, and replication documentation . If you use a managed service, refer to your provider's PostgreSQL high availability documentation."
+    },
+    {
+      "anchor": "workers",
+      "title": "Workers",
+      "text": "A minimum deployment consists of at least three workers across different availability zones within each network boundary to ensure high availability. In environments which restrict inbound connections, deploy both ingress and egress workers to enable multi-hop session proxying , which only requires outbound connectivity. Please refer to the recommended architecture for more details."
+    },
+    {
+      "anchor": "key-management-service",
+      "title": "Key management service",
+      "text": "Boundary controllers use KMS keys to encrypt data at rest and in transit. Before the Boundary worker can proxy user sessions to targets, it must authenticate and register with the Boundary control plane. We recommend using a KMS-led authorization and authentication flow to auto-register the worker. This method requires the controller and worker to share a KMS key to authenticate the worker with the controller. We recommend using Vault's Transit secret engine for key management. If you use a managed service, refer to your provider's key management documentation for guidance."
+    },
+    {
+      "anchor": "transport-layer-security",
+      "title": "Transport layer security",
+      "text": ""
+    },
+    {
+      "anchor": "client-to-controller-tls",
+      "title": "Client-to-controller TLS",
+      "text": "We recommend configuring the TLS (with a public certificate, private key, and certificate authority bundle from a trusted certificate authority) on the Boundary controller nodes. Configure the load balancer to pass through TLS connections to controller nodes. Do not manage the TLS certificate on the load balancer. Terminating TLS connections at the controller nodes offers enhanced security by ensuring that a client request remains encrypted end-to-end. This reduces the attack surface for potential eavesdropping or data tampering."
+    },
+    {
+      "anchor": "client-to-worker-tls",
+      "title": "Client-to-worker TLS",
+      "text": "Workers do not require any configuration for their client-facing listeners. Instead, they create the TLS configuration dynamically using Server Name Indication during session authorization, and the session is then mutually authenticated."
+    },
+    {
+      "anchor": "worker-to-upstream-tls",
+      "title": "Worker-to-upstream TLS",
+      "text": "Workers establish TLS connections to upstream services (controllers or other workers) dynamically during registration. For more information, refer to this document ."
+    },
+    {
+      "anchor": "load-balancing",
+      "title": "Load balancing",
+      "text": "Only the controller api listener requires a load balancer. The following table summarizes load balancing requirements by listener: Component Listener Load balancer required Controller api (TCP 9200) Yes Controller cluster (TCP 9201) No Worker proxy No Worker cluster No The api listener load balancer exposes the Boundary API and administrative console, and is the only load balancer in the recommended architecture. Use a layer 4 or 7 load balancer that polls the /health API endpoint to detect the node's status and direct traffic accordingly. Do not place workers behind a shared load balancer. The Boundary control plane manages session distribution across available workers when clients initiate sessions to a target. Workers must be individually addressable. Refer to the worker-to-worker (multi-hop sessions) section for guidance on multi-hop deployments. Previous Introduction Next Detailed Design"
+    }
+  ]
+}

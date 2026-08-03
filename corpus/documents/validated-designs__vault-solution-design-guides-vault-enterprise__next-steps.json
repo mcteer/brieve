@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/vault-solution-design-guides-vault-enterprise/next-steps",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-solution-design-guides-vault-enterprise/next-steps",
+  "sections": [
+    {
+      "anchor": "next-steps",
+      "title": "Next steps",
+      "text": "Follow HashiCorp guidance for Vault production hardening (opens in new tab) . For further information on adopting Vault Enterprise within your organization according to HashiCorp Validated Designs, visit Vault: Operating Guide for Adoption . Previous Deploying Vault Enterprise in a private datacenter Next Changelog"
+    }
+  ]
+}

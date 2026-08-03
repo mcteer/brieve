@@ -1,0 +1,16 @@
+{
+  "path": "/validated-designs/consul-operating-guides-standardization/changelog",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-operating-guides-standardization/changelog",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2024-09",
+      "title": "2024-09",
+      "text": "Beta Release Previous Credits"
+    }
+  ]
+}

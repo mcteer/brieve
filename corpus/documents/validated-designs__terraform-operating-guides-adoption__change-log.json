@@ -1,0 +1,76 @@
+{
+  "path": "/validated-designs/terraform-operating-guides-adoption/change-log",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-operating-guides-adoption/change-log",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-01",
+      "title": "2026-01",
+      "text": "Update meta descriptions Updated credits and contributors"
+    },
+    {
+      "anchor": "2025-11",
+      "title": "2025-11",
+      "text": "Updated Terraform Stacks guidance Fixed typos and documentation errors"
+    },
+    {
+      "anchor": "2025-10",
+      "title": "2025-10",
+      "text": "Add new Terraform Stacks content and adapt existing content"
+    },
+    {
+      "anchor": "2025-09",
+      "title": "2025-09",
+      "text": "Reorganized Terraform Stacks documentation structure"
+    },
+    {
+      "anchor": "2025-07",
+      "title": "2025-07",
+      "text": "Updated Terraform import guidance"
+    },
+    {
+      "anchor": "2025-05",
+      "title": "2025-05",
+      "text": "Removed document structure section"
+    },
+    {
+      "anchor": "2025-04",
+      "title": "2025-04",
+      "text": "Fixed code block formatting"
+    },
+    {
+      "anchor": "2025-03",
+      "title": "2025-03",
+      "text": "Updated documentation links"
+    },
+    {
+      "anchor": "2024-12",
+      "title": "2024-12",
+      "text": "Expanded section on VCS connection in post-installation tasks"
+    },
+    {
+      "anchor": "2024-04",
+      "title": "2024-04",
+      "text": "Updated Terraform Cloud to HCP Terraform"
+    },
+    {
+      "anchor": "2024-01",
+      "title": "2024-01",
+      "text": "Migrate to new repository with minor changes and corrections"
+    },
+    {
+      "anchor": "2023-11",
+      "title": "2023-11",
+      "text": "Update credits"
+    },
+    {
+      "anchor": "2023-10",
+      "title": "2023-10",
+      "text": "GA Release Previous Support Readiness Next Credits"
+    }
+  ]
+}

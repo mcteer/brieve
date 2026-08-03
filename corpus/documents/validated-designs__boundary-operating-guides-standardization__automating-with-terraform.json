@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/boundary-operating-guides-standardization/automating-with-terraform",
+  "url": "https://developer.hashicorp.com/validated-designs/boundary-operating-guides-standardization/automating-with-terraform",
+  "sections": [
+    {
+      "anchor": "automating-with-terraform",
+      "title": "Automating with Terraform",
+      "text": "The first milestones of standardizing your Boundary installation are automation and repeatability. None of your daily tasks should stay forgotten and unaudited because of manual processes. HashiCorp provides you with the official Boundary Terraform provider for you to be able to configure all the aspects of your Boundary using infrastructure-as-code (IaC) approach. Most of Boundary Tutorials include Terraform code examples to demonstrate you how typical integrations are made. Please remember that all the provided Terraform code is not intended to be used as is in your production environment and should only be used for reference. For details on how to use Terraform to set up Boundary resources and the best practices to be followed, refer to Terraform patterns for Boundary . Previous Introduction Next Credential management"
+    }
+  ]
+}

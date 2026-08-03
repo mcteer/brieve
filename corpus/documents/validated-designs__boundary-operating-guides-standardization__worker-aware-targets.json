@@ -1,0 +1,16 @@
+{
+  "path": "/validated-designs/boundary-operating-guides-standardization/worker-aware-targets",
+  "url": "https://developer.hashicorp.com/validated-designs/boundary-operating-guides-standardization/worker-aware-targets",
+  "sections": [
+    {
+      "anchor": "worker-aware-targets",
+      "title": "Worker aware targets",
+      "text": "In traditional multi-datacenter and multi-cloud operating models, it's common to deploy a control plane for each environment, complete with controllers and workers, to minimize latency or meet security standards. However, managing multiple controllers can increase complexity, costs and operational overhead. Boundary\u2019s control plane uses worker tags and filters to coordinate which workers can handle a target's session. A typical example is allowing a single set of controllers to live in one environment and placing workers in many other environments where their proxy targets live."
+    },
+    {
+      "anchor": "multi-region-deployments",
+      "title": "Multi-region deployments",
+      "text": "This section provides an example of a multi-region deployment of HCP Boundary across multi-datacenter and multi-cloud environments. The same concept can be applied to self-managed Boundary Enterprise. There is a publicly accessible ingress worker at each region's edge for user connectivity. The user session would transit through the appropriate ingress worker based on the target based on the target. Multi-hop sessions, where egress workers would proxy from one another to simplify connectivity requirements. Vault deployment in each region to comply with availability and regulatory requirements. The Vault cluster resides in a secure private network. Session recording data is stored locally within each region. Previous Automated target discovery"
+    }
+  ]
+}

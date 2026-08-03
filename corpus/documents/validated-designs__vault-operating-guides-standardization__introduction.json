@@ -1,0 +1,26 @@
+{
+  "path": "/validated-designs/vault-operating-guides-standardization/introduction",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-operating-guides-standardization/introduction",
+  "sections": [
+    {
+      "anchor": "introduction",
+      "title": "Introduction",
+      "text": "This document gives recommendations on how to standardize Vault Enterprise as a shared service for your organization. Note Unless specifically mentioned, concepts that apply to self-hosted Vault Enterprise also apply to HCP Vault Dedicated. However, they do not apply to HCP Vault Secrets. HashiCorp Validated Designs provide prescriptive guidance curated from our experience supporting numerous customer journeys with Vault Enterprise."
+    },
+    {
+      "anchor": "prerequisites",
+      "title": "Prerequisites",
+      "text": "We recommend that you have completed the following steps before implementing the guidance in this document: Review: Vault Enterprise Operating Guide for Adoption (opens in new tab) Perform a maturity assessment/Architecture review with our Solution Architecture team"
+    },
+    {
+      "anchor": "checklist",
+      "title": "Checklist",
+      "text": "After completing the maturity assessment at the end of the Adoption phase, you are ready to implement core portions of the Standardizing phase covered in this document. While some portions of the Standardizing maturity phase are optional and will be dictated by the kind of integrations your organization requires, we recommend that all customers at the minimum adopt the following core capabilities: Establish a workflow for onboarding application teams to Vault Enable Multi-Factor Authentication (MFA) for human access to Vault (if MFA is available) Identify and prioritize use cases for Vault integration: Integrate secrets management with legacy applications using Agent templating Implement Dynamic Credentials for databases Implement Dynamic Credentials for cloud access (AWS) Decide on a consumption pattern for Kubernetes-based applications interacting with secrets from Vault"
+    },
+    {
+      "anchor": "use-cases-covered",
+      "title": "Use Cases Covered",
+      "text": "This document covers the \u201cStandardize\u201d phase of operating Vault on the maturity scale and includes the following: Use Case Summary Secure remote access with MFA Increase security posture by adding a layer of security to human access Dynamic secrets Reduce the scope of exposure risk by moving from static secrets to short-lived credentials generated just-in-time Modernize legacy applications Retrofit existing application with Vault Agent without needing to modify the application code Integrate Vault with Kubernetes Multiple consumption patterns that can make integrating Vault and Kubernetes easier Implement policy-as-code with Sentinel Enforce policy guardrails for performing read/write activities in Vault. Advisory and mandatory enforcement to inform next steps Local account password rotation Govern rotation of RHEL local accounts outside centralized identity systems with onboarding, security, and recovery guardrails Next Secure Remote Access with MFA"
+    }
+  ]
+}
