@@ -70,6 +70,16 @@ class Answer:
     claims: tuple[Claim, ...] = ()
     declined_reason: str = ""
     dropped: tuple[str, ...] = field(default_factory=tuple)
+    #: How old the material behind this answer is (033), composed by the surface.
+    #:
+    #: **Carried on every disposition, like the estate answer's `window_note`.** A decline
+    #: rests on the same corpus an answer would have, and a reader deciding whether to go
+    #: looking elsewhere is exactly who needs to know the ground's age.
+    #:
+    #: Empty only when nobody composed one — `answer_question` does not, because the core has
+    #: no clock and should not grow one. The surfaces do, and a conformance row asserts they
+    #: did rather than trusting this default.
+    ground_note: str = ""
 
 
 ANSWERED = "answered"

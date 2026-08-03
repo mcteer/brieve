@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from core.answering.corpus import CorpusUnavailable, load_corpus
+from core.answering.corpus import Corpus, CorpusUnavailable, load_corpus
 
 ROOT = Path(__file__).resolve().parents[2]
 REAL_MANIFEST = ROOT / "corpus" / "manifest.json"
@@ -40,7 +40,7 @@ def _manifest_with(tmp_path: Path, **overrides: object) -> Path:
     return written
 
 
-def _load(manifest: Path) -> object:
+def _load(manifest: Path) -> Corpus:
     return load_corpus(manifest=manifest, documents_dir=REAL_DOCUMENTS, verify=False)
 
 

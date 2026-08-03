@@ -73,6 +73,14 @@
         {# A decline drawn from a window is the case a reader most needs told. #}
         <p class="meta window">{{ response.payload.window_note }}</p>
       {% endif %}
+      {% if (response.payload or {}).get("ground_note") %}
+        {#
+          A DECLINE CARRIES THE GROUND'S AGE TOO (033). Somebody told "the corpus does not
+          cover this" is deciding whether to go looking elsewhere, and whether the pin is a
+          week old or a year old changes that decision.
+        #}
+        <p class="meta ground">{{ response.payload.ground_note }}</p>
+      {% endif %}
       {% if (response.payload or {}).get("source") %}
         <p class="meta">Consulted: {{ response.payload.source }}</p>
       {% endif %}
@@ -117,6 +125,17 @@
           the 200 most recent of 1,847.
         #}
         <p class="meta window">{{ response.payload.window_note }}</p>
+      {% endif %}
+      {% if (response.payload or {}).get("ground_note") %}
+        {#
+          HOW OLD THE GROUND IS (033), and UNLIKE the window note this one is unconditional.
+
+          The two notes disclose opposite-shaped facts. A window note is present only when
+          something truncated, because a complete read has no caveat to make. An age is true of
+          every answer — so if this appeared only past a threshold, silence would come to mean
+          "recent", which is exactly the unfounded currency claim the note exists to remove.
+        #}
+        <p class="meta ground">{{ response.payload.ground_note }}</p>
       {% endif %}
       {% if (response.payload or {}).get("source") %}
         <p class="meta">Answered from: {{ response.payload.source }}</p>

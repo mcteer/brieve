@@ -46,37 +46,37 @@ lives in the scheduled workflow, which is not a gate.
 
 ## Phase 4: User Story 1 — an answer discloses the age of its ground (P1)
 
-- [ ] T004 [US1] `src/core/answering/ground.py` (new): `GROUND_FRESH_DAYS = 30`,
+- [X] T004 [US1] `src/core/answering/ground.py` (new): `GROUND_FRESH_DAYS = 30`,
       `GROUND_STALE_DAYS = 90` — the only place the tiers exist (F4) — and
       `describe_ground(synced_at: datetime | None, now: datetime) -> str`, a pure function
       returning the four wordings (plain / aging / stale-with-suggestion / unknown). Every
       wording carries the pinned date and age in days; the note never returns empty — a
       disclosure that appears only when things are bad trains readers that silence means
       fresh, which is the unfounded claim this feature removes.
-- [ ] T005 [US1] `src/core/answering/answer.py`: `Answer.ground_note: str = ""` — additive on
+- [X] T005 [US1] `src/core/answering/answer.py`: `Answer.ground_note: str = ""` — additive on
       the frozen dataclass, every existing constructor call stands. `answer_question` itself
       is untouched: the core has no clock, the surface owns "now" (F3, the window_note
       precedent exactly).
-- [ ] T006 [US1] `src/surfaces/api/ask.py`: `ask_for` GAINS `now: datetime | None = None`
+- [X] T006 [US1] `src/surfaces/api/ask.py`: `ask_for` GAINS `now: datetime | None = None`
       (analyze A2 — `estate_answer_for` already has it; guidance does not, and an inline
       `datetime.now()` would make the tier rows untestable, the exact midnight-CI trap the
       volume rows hit). Compose `describe_ground(corpus.synced_at, now)` where the estate
       branch composes `describe_window`, attach to the guidance `Answer`, serialize as
       `ground_note` beside `claims`. The estate branch is untouched.
-- [ ] T007 [P] [US1] `src/surfaces/portal/templates/ask.html`: render `ground_note` in the
+- [X] T007 [P] [US1] `src/surfaces/portal/templates/ask.html`: render `ground_note` in the
       same meta block that renders `window_note`, conditionally, same styling class family.
-- [ ] T008 [P] [US1] Tier rows in `tests/component/test_ground_note.py`: fixture times at
+- [X] T008 [P] [US1] Tier rows in `tests/component/test_ground_note.py`: fixture times at
       29/30/89/90/91 days word by the right tier (the contract's boundary rows); unknown and
       future-time word as unknown; the note names the pinned date and age; `describe_ground`
       never returns empty; and — FR-005's teeth — a stale pin's answer still has disposition
       `answered` through `answer_question` + the surface composition.
-- [ ] T009 [US1] [GATE:conformance] The full-path row in
+- [X] T009 [US1] [GATE:conformance] The full-path row in
       `tests/conformance/answering/test_the_ground_discloses.py`: a guidance question through
       `surface_under_test` carries a non-empty `ground_note` in the payload (SC-001, both
       packs); the committed 024-shaped manifest answers with the unknown wording (FR-009 —
       the row that lets this merge before the first re-sync); the estate path's
       `window_note` is unchanged by the addition.
-- [ ] T010 [US1] The no-fetch posture holds: run the existing no-network rows plus the
+- [X] T010 [US1] The no-fetch posture holds: run the existing no-network rows plus the
       hermetic sweep with `ground.py` imported everywhere it will be; assert no blocking
       lane gained network access (F8, SC-004). Asserted by running, not by reading.
 
