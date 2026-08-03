@@ -1,0 +1,26 @@
+{
+  "path": "/validated-designs/terraform-operating-guides-scaling/change-log",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-operating-guides-scaling/change-log",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-01",
+      "title": "2026-01",
+      "text": "Update meta descriptions Updated credits and contributors"
+    },
+    {
+      "anchor": "2025-06",
+      "title": "2025-06",
+      "text": "Use consistent guide names and descriptions Standardized operating guide naming conventions"
+    },
+    {
+      "anchor": "2024-09",
+      "title": "2024-09",
+      "text": "GA Release Previous Ephemeral Workspaces Next Credits"
+    }
+  ]
+}

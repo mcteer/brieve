@@ -1,0 +1,26 @@
+{
+  "path": "/validated-designs/vault-radar-operating-guides-hcp-vault-radar/initial-config",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-radar-operating-guides-hcp-vault-radar/initial-config",
+  "sections": [
+    {
+      "anchor": "vault-radar-secrets-detection-(saas)",
+      "title": "Vault Radar secrets detection (SaaS)",
+      "text": "Note The Terraform provider for Vault Radar is in private beta."
+    },
+    {
+      "anchor": "connect-data-sources",
+      "title": "Connect data sources",
+      "text": "Follow the documentation page for connecting a data source for the following supported platforms: GitHub GitLab Confluence Cloud and Confluence Server BitBucket Azure DevOps As mentioned within the Vault Radar documentation, there is a limit of 20,000 repositories per data source. If you have more than 5,000 repositories, Vault Radar selects the 5,000 repositories with the most recent activity. To onboard more repositories, you need to create more connections and select the remaining repositories. After connecting a data source, tune the secrets detection with regex patterns and rules: Custom Regex Global Ignore Rules Local Ignore Rules Event Rules"
+    },
+    {
+      "anchor": "configure-alerting",
+      "title": "Configure alerting",
+      "text": "Follow the documentation page for configuring alerting for the following supported platforms: PagerDuty Slack and Slack App Splunk Microsoft Teams"
+    },
+    {
+      "anchor": "configure-ticketing",
+      "title": "Configure ticketing",
+      "text": "Vault Radar integrates with ticketing and alerting systems to provide real-time alerting and automation. Alerting and automation enables faster time to resolution and fits directly into existing security and engineering workflows. Follow the documentation page for configuring ticketing for the following supported platforms: Jira ServiceNow Previous People and process considerations Next Deploy Vault agents"
+    }
+  ]
+}

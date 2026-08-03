@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/vault-operating-guides-scaling/credits",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-operating-guides-scaling/credits",
+  "sections": [
+    {
+      "anchor": "credits",
+      "title": "Credits",
+      "text": "Thank you to everyone who contributed to this validated design guidance. This cross-functional team, representing many departments within HashiCorp, authored, edited, reviewed, and iterated this content to provide prescription and recommendations for using HashiCorp software in enterprise scenarios. Allison Broski Andrew Thielen Theodore Marx John Duke Mauricio Afiuni Prakash Manglanathan Troy Fluegge Previous Appendix"
+    }
+  ]
+}

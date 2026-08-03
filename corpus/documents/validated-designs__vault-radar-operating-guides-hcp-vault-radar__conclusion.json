@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/vault-radar-operating-guides-hcp-vault-radar/conclusion",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-radar-operating-guides-hcp-vault-radar/conclusion",
+  "sections": [
+    {
+      "anchor": "conclusion",
+      "title": "Conclusion",
+      "text": "Vault Radar helps Security Operations (SecOps) teams with automated processes, risk detection rules and repeatable remediation steps. Accelerate SecOps agility : Centralize monitoring of events and quickly identify insecure secrets Streamline remediation processes : Efficiently triage security issues and seamlessly hand them off to development teams Prevent security breaches : Detect and eliminate leaked secrets in code repositories, collaboration tools, and other insecure locations Reduce business risk : Proactively secure sensitive credentials Minimize operational costs : Prevent application downtime and security incidents caused by compromised secrets Previous Remediation workflows Next Credits"
+    }
+  ]
+}

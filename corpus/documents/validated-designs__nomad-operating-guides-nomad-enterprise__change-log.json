@@ -1,0 +1,41 @@
+{
+  "path": "/validated-designs/nomad-operating-guides-nomad-enterprise/change-log",
+  "url": "https://developer.hashicorp.com/validated-designs/nomad-operating-guides-nomad-enterprise/change-log",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-01",
+      "title": "2026-01",
+      "text": "Update meta descriptions Updated credits and contributors Fix threshold descriptions"
+    },
+    {
+      "anchor": "2025-10",
+      "title": "2025-10",
+      "text": "Review of Nomad Operating Guide"
+    },
+    {
+      "anchor": "2025-07",
+      "title": "2025-07",
+      "text": "Updated documentation links"
+    },
+    {
+      "anchor": "2025-05",
+      "title": "2025-05",
+      "text": "Removed document structure section Fixed code block formatting"
+    },
+    {
+      "anchor": "2025-04",
+      "title": "2025-04",
+      "text": "Updated documentation links"
+    },
+    {
+      "anchor": "2025-02",
+      "title": "2025-02",
+      "text": "Update introduction Previous Secrets and Variables Next Credits"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/nomad-operating-guides-nomad-enterprise/credits",
+  "url": "https://developer.hashicorp.com/validated-designs/nomad-operating-guides-nomad-enterprise/credits",
+  "sections": [
+    {
+      "anchor": "credits",
+      "title": "Credits",
+      "text": "Thank you to everyone who contributed to this validated design guidance. This cross-functional team, representing many departments within HashiCorp, authored, edited, reviewed, and iterated this content to provide prescription and recommendations for using HashiCorp software in enterprise scenarios. Adrian Todorov Amber Reddy Andrei Burd Mark Lewis Prakash Manglanathan Shaun Coss Previous Changelog"
+    }
+  ]
+}

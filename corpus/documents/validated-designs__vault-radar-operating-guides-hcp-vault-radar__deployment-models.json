@@ -1,0 +1,31 @@
+{
+  "path": "/validated-designs/vault-radar-operating-guides-hcp-vault-radar/deployment-models",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-radar-operating-guides-hcp-vault-radar/deployment-models",
+  "sections": [
+    {
+      "anchor": "vault-radar-deployment-models",
+      "title": "Vault Radar deployment models",
+      "text": "Vault Radar offers multiple deployment models to accommodate your organizational needs and infrastructure requirements. Each model addresses specific use cases, from public cloud resources to private networks and development workflows. Understanding these deployment options helps you design a comprehensive secrets detection strategy. We recommend using a mix of all methods, especially If you have hybrid data source infrastructure."
+    },
+    {
+      "anchor": "software-as-a-service-(saas)",
+      "title": "Software as a service (SaaS)",
+      "text": "Using the HashiCorp Cloud Platform (HCP), scanning publicly available data sources such as GitHub Cloud, Confluence, and other services for risks. This model allows you to set up secrets detection quickly, but works best for data sources accessible via the internet."
+    },
+    {
+      "anchor": "hybrid-deployment-with-agents",
+      "title": "Hybrid deployment with agents",
+      "text": "If you have resources that are not publicly accessible by HCP, use hybrid scanning inside your private network. This model requires installation of Vault Radar agents and agent pools . There are two ways to do this: Vault Radar agents Vault Radar CLI and upload to HCP"
+    },
+    {
+      "anchor": "automation-pipelines",
+      "title": "Automation pipelines",
+      "text": "Vault Radar can scan incoming pull requests, development environments and CI/CD pipelines. This provides automatic preventative alerting in the case of new secret identification, and it then block commits and pull requests."
+    },
+    {
+      "anchor": "multi-model-example",
+      "title": "Multi-model example",
+      "text": "In the following diagram Vault Radar scans publicly available data sources (SaaS), and self-hosted data sources (hybrid) using an agent pool. Previous Introduction to Vault Radar Next People and process considerations"
+    }
+  ]
+}

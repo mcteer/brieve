@@ -1,0 +1,36 @@
+{
+  "path": "/validated-designs/boundary-operating-guides-standardization/automated-target-discovery",
+  "url": "https://developer.hashicorp.com/validated-designs/boundary-operating-guides-standardization/automated-target-discovery",
+  "sections": [
+    {
+      "anchor": "automated-target-discovery",
+      "title": "Automated target discovery",
+      "text": "Boundary administrators are responsible for configuring and managing host discovery workflows. They use various methods to ensure hosts and targets are accurately discovered and configured within Boundary."
+    },
+    {
+      "anchor": "overview-of-host-discovery-methods",
+      "title": "Overview of host discovery methods",
+      "text": "Boundary supports three primary workflows for target/host discovery: Manual configuration: Administrators manually configure static hosts and targets using the administrator GUI and CLI. This method requires knowledge of the IP address or endpoint used to connect to a host. Configuration-as-code with Terraform: Boundary integrates with Terraform to automate the discovery and configuration of new infrastructure targets. This allows for dynamic configuration without prior knowledge of the target's connection information. Dynamic host catalogs: Boundary automates the ingestion of computing instances and resources from infrastructure providers. Boundary currently supports a dynamic host catalog for AWS and Azure, and we will continue to grow this ecosystem to support additional providers. Hosts are automatically created, updated, and added to host sets, reflecting the connection information maintained by these providers."
+    },
+    {
+      "anchor": "dynamic-host-catalogs",
+      "title": "Dynamic host catalogs",
+      "text": "We recommend that boundary administrators use dynamic host/target catalogs to automate the discovery and configuration of hundreds of instances at a scale where infrastructure resources are highly dynamic and ephemeral. A recommendation is to have a proper tagging of your cloud resources based on organization, business units or product/services team, so that Boundary can discover automatically and manage dynamically."
+    },
+    {
+      "anchor": "dynamic-host-catalogs-workflow-with-aws",
+      "title": "Dynamic host catalogs workflow with AWS",
+      "text": "Boundary administrators leverage dynamic host catalogs to discover and configure AWS resources associated with tags based on tag:Name=Value . For example, instances within AWS could be deployed with tag names and values as follows: boundary-1-dev service-type:database environment:dev boundary-2-dev service-type:database environment:dev boundary-3-production service-type:database environment:production boundary-4-production service-type:database environment:production The host set would then be defined using filters that select the discovered hosts for membership based on the tags defined. boundary host-sets create plugin \\ -name database \\ -host-catalog-id $HOST_CATALOG_ID \\ -attr filters=tag:service-type=database We recommend to begin using dynamic host catalogs for AWS by following the respective setup tutorial guides: Dynamic host catalogs on AWS"
+    },
+    {
+      "anchor": "dynamic-host-catalogs-workflow-with-azure",
+      "title": "Dynamic host catalogs workflow with Azure",
+      "text": "Boundary administrators leverage dynamic host catalogs to seamlessly discover and configure Azure resources available through Azure Resource Manager (ARM), adding them as Boundary hosts. We recommend to begin using dynamic host catalogs for Azure by following the respective setup tutorial guides: Dynamic host catalogs on Azure"
+    },
+    {
+      "anchor": "useful-resources",
+      "title": "Useful resources",
+      "text": "Concepts: AWS dynamic host catalogs Concepts: Azure dynamic host catalogs Guided Tutorial: Dynamic host catalogs on AWS Guided Tutorial: Dynamic host catalogs on Azure Previous Accessing private resources Next Worker aware targets"
+    }
+  ]
+}
