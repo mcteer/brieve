@@ -51,7 +51,12 @@ PROVIDER_REFUSAL: Final[str] = "__provider_refusal__"
 #: Defined here, beside the credential name, so the gate's two configuration facts
 #: live in one module the conformance rows import. provider/model@version, like every
 #: cell — a live lane that called "latest" would be auto-tracking inside the gate itself.
-LIVE_MODEL: Final[str] = "anthropic/claude-opus@5"
+#: Switched to Sonnet 5 on 2026-08-03 at the user's direction after three Opus-priced
+#: full-lane runs in one day: the lane's evidence is model-scoped either way (a cell is
+#: pack × model × role), and Sonnet's runs cost roughly a fifth. The Opus cells already
+#: earned remain in the matrix — evidence does not expire because a cheaper subject
+#: arrived; what changes is which model NEW evidence is earned for.
+LIVE_MODEL: Final[str] = "anthropic/claude-sonnet@5"
 
 
 @dataclass(frozen=True)
