@@ -143,8 +143,19 @@ say "US4: the operator asks the platform about the refusal"
 # The API allocation copies source at start, so a restart is what makes the branch's
 # visibility decision the one answering (run-the-served-process: the assembly is the one
 # path no test covers).
-api_alloc="$(nomad job status api 2>/dev/null | awk '$6 == "running" && length($1) == 8 { print $1; exit }')"
-[ -n "$api_alloc" ] || die "the api job has no running allocation — run \`infra/bin/portal-up\` first"
+#
+# BOUNDED WAIT, not a single look, and the first end-to-end execution is why: the api task
+# restarts itself whenever its Vault identity renews a token, and the demonstration's ~10
+# minutes of runs landed this check exactly inside one of those windows — no allocation was
+# "running" for the seconds it took the task to come back. A surface mid-restart is not a
+# surface that is down.
+api_alloc=""
+for _ in $(seq 1 24); do
+  api_alloc="$(nomad job status api 2>/dev/null | awk '$6 == "running" && length($1) == 8 { print $1; exit }')"
+  [ -n "$api_alloc" ] && break
+  sleep 5
+done
+[ -n "$api_alloc" ] || die "the api job has had no running allocation for two minutes — run \`infra/bin/portal-up\` first"
 say "Restarting the api allocation so the branch's code is the code answering"
 nomad alloc restart "$api_alloc" >/dev/null || die "could not restart the api allocation ${api_alloc}"
 uv run --extra surfaces python infra/bin/model_run_demo_ask.py "${CAPTURE}/runs.json" \
