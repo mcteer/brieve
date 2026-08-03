@@ -102,13 +102,23 @@ def test_non_estate_suites_ignore_the_field() -> None:
 def test_an_operator_case_expecting_an_authority_record_refuses_to_load() -> None:
     """**The row that would have caught the original defect** (research F4, direction 2).
 
-    rec-vault-002 is `authority_denied`, which no operator can see. A case declaring `operator`
-    and expecting it is mis-tagged — the tag follows the expected set, not the prompt — and it
-    must refuse loudly rather than pass on records production would withhold.
+    Updated by 031's visibility decision: operators now see denials (their own runs' refusals),
+    so the exemplar of "a record no operator can see" moved from rec-vault-002
+    (`authority_denied`) to rec-vault-004 (`authority_issued`) — grants stayed analyst-only,
+    which is precisely the boundary this row keeps guarding. A case declaring `operator` and
+    expecting a grant record is mis-tagged, and it must refuse loudly rather than pass on
+    records production would withhold.
     """
     estate = load_estate_records(PACKS / "vault")
     scorer = EstateAnsweringScorer(estate=estate)
-    (case,) = _parse_one(_case(asker_role="operator"))
+    (case,) = _parse_one(
+        _case(
+            asker_role="operator",
+            prompt="Who was granted write authority?",
+            recorded="A grant was issued, per rec-vault-004.",
+            events=["rec-vault-004"],
+        )
+    )
 
     with pytest.raises(UnrunnableSuite, match="cannot see"):
         scorer.references(case)
@@ -142,8 +152,9 @@ def test_an_operator_cases_provider_never_receives_invisible_records() -> None:
     scorer.references(case)
 
     assert seen, "the provider received nothing at all"
-    operator_visible = {AuditEventType.AUTHORITY_DENIED, AuditEventType.AUTHORITY_ISSUED}
-    leaked = [k for k in seen if k in operator_visible]
+    # 031: denials became operator-visible (your runs' refusals are yours); grants did not.
+    operator_invisible = {AuditEventType.AUTHORITY_ISSUED}
+    leaked = [k for k in seen if k in operator_invisible]
     assert leaked == [], (
         f"an operator case's provider received {leaked} — records no operator can see, which is "
         f"the evidence this feature exists to keep out of a qualification"

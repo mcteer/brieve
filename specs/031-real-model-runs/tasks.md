@@ -20,7 +20,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 2: User Story 4 — the person who ran it can ask about it (P2, but lands first: hermetic)
 
-- [ ] T001 [US4] `ROLE_VISIBILITY` in `src/core/answering/scope.py`: `operator` gains
+- [X] T001 [US4] `ROLE_VISIBILITY` in `src/core/answering/scope.py`: `operator` gains
       `AUTHORITY_DENIED` and `AUTHORITY_REFUSED` — and only those (grants/issued/expired stay
       analyst-only; the comment carries the sensitivity distinction from the spec's decision).
       Update `test_an_empty_intersection_falls_back_to_the_visible_set` in
@@ -28,7 +28,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
       revisiting when this decision lands; it now asserts the intersection is non-empty and
       denials flow. Update ADR-0059's Notes with a dated line: the span is unchanged (no case
       moved), operator's visible set grew. **One commit.**
-- [ ] T002 [P] [US4] [GATE:fail-closed] Rows in `tests/component/test_operator_sees_denials.py`:
+- [X] T002 [P] [US4] [GATE:fail-closed] Rows in `tests/component/test_operator_sees_denials.py`:
       operator's visible set contains exactly the two new types and none of the other authority
       records; the estate-suite agreement row still passes untouched (asserted by running it —
       no span change was the measured claim, research F5); an operator's *"Which runs were
