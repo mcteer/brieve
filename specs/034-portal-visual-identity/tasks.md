@@ -131,7 +131,7 @@ product, and nowhere it would have to guess.
 ## Phase 5: Polish
 
 - [X] T010 [P] ROADMAP entry for 034; contract status rows flipped with dates.
-- [ ] T011 All gates green on the branch: `make check`, the hermetic sweep, the doubled a11y
+- [X] T011 All gates green on the branch: `make check`, the hermetic sweep, the doubled a11y
       lane, and `make evals` untouched. Then the human half (contract's named-runner row):
       agent brings the portal up (`DEV_IDP=1 infra/bin/portal-up`), walks it to every state
       in both themes, and hands Dan the link — **Dan's visual judgement and the
