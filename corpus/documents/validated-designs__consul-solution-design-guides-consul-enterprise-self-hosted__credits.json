@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/consul-solution-design-guides-consul-enterprise-self-hosted/credits",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-solution-design-guides-consul-enterprise-self-hosted/credits",
+  "sections": [
+    {
+      "anchor": "credits",
+      "title": "Credits",
+      "text": "Thank you to everyone who contributed to this validated design guidance. This cross-functional team, representing many departments within HashiCorp, authored, edited, reviewed, and iterated this content to provide prescription and recommendations for using HashiCorp software in enterprise scenarios. Abhishek Tiwari Adam Cavaliere Austin Workman Chris Dunlap David Ca\u00f1adillas Hari Sankaran Jan Repnak Josh Wolfer Kalen Arndt Kulpreet Singh Luke Kysow Mark Lewis Sean Doyle Tu Nguyen Previous Appendices Next Changelog"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "path": "/validated-designs/nomad-operating-guides-nomad-enterprise/initial-configuration",
+  "url": "https://developer.hashicorp.com/validated-designs/nomad-operating-guides-nomad-enterprise/initial-configuration",
+  "sections": [
+    {
+      "anchor": "initial-configuration",
+      "title": "Initial configuration",
+      "text": "This section describes how to configure the product after installation. It may take several weeks to work through all of the recommendations from each section, but this is the primary focus of the Nomad Enterprise platform operators after completing the initial deployment of Nomad Enterprise. Establishing these foundational configuration best practices before targeting consumer workflows is crucial. This ensures a stable foundation for both current and future growth. After deploying and bootstrapping Nomad Enterprise, follow these steps to configure the servers. Enable mTLS and gossip encryption (opens in new tab) Enable and configure access control lists and OIDC for RBAC Set up automated upgrades to ensure Nomad cluster stays up-to-date with the latest features and security patches Implement a robust backup strategy to protect your Nomad cluster's state and configuration Load balance and reverse proxy for Nomad's web UI (opens in new tab) Use Terraform to manage Nomad configuration as code, enabling version control and reproducibility"
+    },
+    {
+      "anchor": "configure-nomad-as-code",
+      "title": "Configure Nomad as code",
+      "text": "When managing Nomad Enterprise configurations, prioritize automation from the start. While organizations may adopt different GitOps and configuration management practices, avoiding manual changes to your production Nomad Enterprise environment to minimize inconsistencies and control change promotion across environments. Implement a Git-based workflow as the primary method for modifying Nomad configuration through pull or merge requests. Block direct commits to the main branch linked to production configuration. Require approvals and code reviews for pull requests. Restrict manual operator-level changes to reduce drift between code-defined configuration and real-world state. Stick to a single configuration style. There are two main approaches for configuring Nomad Enterprise:"
+    },
+    {
+      "anchor": "terraform",
+      "title": "Terraform",
+      "text": "Manages configuration state, maintaining a system of record and single source of truth, overwriting any changes made when using a different configuration method. HCP Terraform and Terraform Enterprise customers can leverage advanced self-service capabilities such as private module registry, no-code modules, and Sentinel. Preferred for automating day 2 resources, such as namespaces, node pools, and so on. Provides a single central place to manage configurations."
+    },
+    {
+      "anchor": "api-and-the-command-line-tool",
+      "title": "API and the command-line tool",
+      "text": "Covers all configuration options. Requires additional logic for dependencies, creation ordering, and existing state management. More challenging and time consuming to build configuration workflows. Choose Terraform as the primary method, as it simplifies management and provides better control. However, the API and the command-line tool are valuable for configurations not covered by Terraform or for specific use cases requiring fine-grained control."
+    },
+    {
+      "anchor": "gitops-repository-structure",
+      "title": "GitOps repository structure",
+      "text": "In the earlier stages of adoption, it is common for the Platform Team operating Nomad to store policies, roles and configuration values in one monolithic configuration repository. An example of this is below. nomad-config/ \u251c\u2500\u2500 main.tf \u251c\u2500\u2500 variables.tf \u251c\u2500\u2500 outputs.tf \u251c\u2500\u2500 node_pools/ \u2502 \u251c\u2500\u2500 general.tf \u2502 \u2514\u2500\u2500 gpu.tf \u251c\u2500\u2500 namespaces/ \u2502 \u251c\u2500\u2500 production.tf \u2502 \u251c\u2500\u2500 staging.tf \u2502 \u2514\u2500\u2500 development.tf \u251c\u2500\u2500 resource_quotas/ \u2502 \u251c\u2500\u2500 production_quota.tf \u2502 \u251c\u2500\u2500 staging_quota.tf \u2502 \u2514\u2500\u2500 development_quota.tf \u2514\u2500\u2500 sentinel_policies/ \u251c\u2500\u2500 enforce_docker.tf \u2514\u2500\u2500 restrict_job_priority.tf As adoption matures, consider splitting your repository based on specific components or teams. Organizations anticipating significant Nomad adoption must implement a distributed repository structure from the beginning. This approach involves creating separate repositories for different components or teams, rather than starting with a monolithic configuration repository. This strategy provides better scalability and delegation of responsibilities as your Nomad usage expands. nomad-core-config/ \u251c\u2500\u2500 main.tf \u251c\u2500\u2500 variables.tf \u251c\u2500\u2500 outputs.tf \u251c\u2500nomad-sentinel-policies/ | \u251c\u2500\u2500 main.tf | \u251c\u2500\u2500 enforce_docker.tf | \u2514\u2500\u2500 restrict_job_priority.tf \u2514\u2500nomad-node-pools/ \u251c\u2500\u2500 general.tf \u2514\u2500\u2500 gpu.tf nomad-team-namespaces/ \u251c\u2500\u2500 main.tf \u251c\u2500\u2500 team_alpha.tf \u251c\u2500\u2500 team_beta.tf \u2514\u2500\u2500 team_gamma.tf nomad-team-resource-quotas/ \u251c\u2500\u2500 main.tf \u251c\u2500\u2500 team_alpha_quota.tf \u251c\u2500\u2500 team_beta_quota.tf \u2514\u2500\u2500 team_gamma_quota.tf These repository structures are basic examples to get started. Refer to the Terraform Style Guide for Terraform implementation best practices. For more detailed information on Terraform modules and workflows, visit the Terraform Validated Design pages at Infrastructure-as-code and cloud provisioning (opens in new tab) and Terraform Workflows (opens in new tab) . Previous Introduction Next Identity & Access Management"
+    }
+  ]
+}

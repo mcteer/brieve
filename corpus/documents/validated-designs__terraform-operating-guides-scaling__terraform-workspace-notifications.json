@@ -1,0 +1,31 @@
+{
+  "path": "/validated-designs/terraform-operating-guides-scaling/terraform-workspace-notifications",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-operating-guides-scaling/terraform-workspace-notifications",
+  "sections": [
+    {
+      "anchor": "terraform-workspace-notifications",
+      "title": "Terraform Workspace Notifications",
+      "text": "Workspace notifications are a mechanism to notify external systems of significant events happening with an HCP Terraform workspace. We recommend that at the minimum a team specific channel (e.g Microsoft Teams/Slack) or email group is created for each admin team and critical notifications are sent to those channels. Notification events are broken down into two categories: workspace events and run events. Workspace events that can trigger a notification are: Check failed: \u200b\u200bWhen a continuous validation check returns unknown or failed. Drift detected: Every time drift is detected on this workspace. Health assessment errored: When a health assessment cannot complete successfully. Auto-destroy reminder: Sends a reminder 12 and 24 hours before an auto-destroy run. Auto-destroy results: The results of an auto-destroy run. All of the above events are considered critical. If you consider the amount of notifications generated is too many, consider \u201cCheck failed\u201d, \u201cHealth assessment errored\u201d and \u201cAuto-destroy reminder\u201d at the minimum to be important where admins are notified. Run events that can trigger a notification are: Created: Every time a run is created and enters the \"Pending\" state . Planning: When a run acquires the lock and starts to execute. Needs attention: Human decision required. When a plan has changed and is not auto-applied, or requires a policy override. Applying: After a plan is confirmed or auto-applied. Completed: When the run has been completed successfully. Errored: If the run has terminated early due to error or cancelation. Needs attention and Errored are considered critical run events and notifications should be enabled for those at the minimum. The notification includes information about the event that provides more context to the external system."
+    },
+    {
+      "anchor": "implementation-guidance",
+      "title": "Implementation guidance",
+      "text": "Notifications can be configured using the WebUI, the API , or using Terraform configuration ( tfe_notification_configuration ). HashiCorp recommends using the Terraform TFE provider to configure notifications on your HCP Terraform or Terraform Enterprise instance as part of the project/workspace creation process."
+    },
+    {
+      "anchor": "permissions-required",
+      "title": "Permissions required",
+      "text": "To configure notifications on a workspace a user needs Admin access to that workspace."
+    },
+    {
+      "anchor": "notification-strategy",
+      "title": "Notification strategy",
+      "text": "When designing your notification strategy, consider the following factors: Choose the Appropriate Destination: Pick communication channels that fit your team's workflow. Slack is popular, but you can also use email or other platforms based on your needs. Granular Notifications: Avoid broad notifications that can cause alert fatigue. Focus on critical events and changes that need immediate attention. For example, you might want alerts only for failed runs or significant changes to critical resources. Integration with Incident Management: Integrate with incident management tools to streamline responses, ensuring alerts lead to actionable items and quick incident resolution."
+    },
+    {
+      "anchor": "maintenance",
+      "title": "Maintenance",
+      "text": "Once notifications are in use, they do not require a lot of work, but you should still consider the practices below: Regular Reviews: Periodically review your notification settings and adjust them based on changing infrastructure needs and team feedback. Test and Validate: When making changes or adding new notifications, test your notification setup to make sure it works. Trigger events manually and check if notifications are received in the chosen destination. Monitor and Adjust: Continuously monitor and solicit feedback on the effectiveness of your notifications. Use this information to tweak the configuration to reduce noise and improve relevance. Previous Continuous Validation Next No-code Provisioning"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "path": "/validated-designs/terraform-solution-design-guides-terraform-enterprise",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-solution-design-guides-terraform-enterprise",
+  "sections": [
+    {
+      "anchor": "introduction",
+      "title": "Introduction",
+      "text": "Note This document provides helpful recommendations for implementing Terraform infrastructure-as-code (IaC) as a shared service for your organization. The team responsible for this task has different names, such as the Platform Team or cloud center of excellence (CCoE). Regardless of the name, this guide aims to assist teams responsible for owning, implementing, and operating Terraform IaC in their organization. For more detailed information on platform teams, refer to the Operating Guides. Our objective in providing HashiCorp Validated Designs is to offer prescriptive guidance based on our experience partnering with hundreds of organizations. We understand that the industry is complex and that there are many permutations and combinations for implementing solutions. However, we believe that the most important thing is that you are able to provision and manage cloud resources at scale and experience the business benefits and value that automated Terraform Enterprise workflows provide. This version covers installation of Terraform Enterprise on RHEL with Podman and Ubuntu with Docker on AWS, GCP and Azure. It also provides guidance on deployment on EKS, AKS and GKE. HashiCorp introduced the Validated Designs program to give enterprise customers and partners a set of recommendations to deliver a resilient, secure, and high-performance deployment of HashiCorp solutions. The purpose of this document is to provide the Platform Team with HashiCorp's validated design for deploying Terraform Enterprise, enabling your organization to embrace and accelerate infrastructure automation practices. By following this approach, you eliminate ambiguity in deployment options and are able to make project-level decisions with confidence."
+    },
+    {
+      "anchor": "audience",
+      "title": "Audience",
+      "text": "This document is for platform engineers, infrastructure architects, DevOps administrators, and cloud operators who want to design, deploy, and administer a highly scalable, resilient infrastructure-as-code platform with Terraform Enterprise."
+    },
+    {
+      "anchor": "supported-versions",
+      "title": "Supported versions",
+      "text": "This guide covers the following versions of Terraform Enterprise: Terraform Enterprise v202309-1 (opens in new tab) and later."
+    },
+    {
+      "anchor": "language-and-definitions",
+      "title": "Language and definitions",
+      "text": "HashiCorp is an enabler of multi-cloud strategies, and as such we take this into account when writing designs. While we aim to use technology-agnostic terminology, the document primarily supports the three largest cloud service providers (CSPs) together with an on-premise/datacenter architecture. There are some terms which do not translate between the public cloud and the datacenter. For the sake of clarity, our definitions for these terms are below. Term Definition Availability zone A separate failure domain within a logical datacenter. Region A separate logical datacenter. Public subnet A network accessible from the public Internet, containing publicly addressable infrastructure. Private subnet A network not accessible from the public Internet and whose infrastructural objects are either blocked from connecting to the public Internet or do through a NAT gateway. Next Architecture"
+    }
+  ]
+}

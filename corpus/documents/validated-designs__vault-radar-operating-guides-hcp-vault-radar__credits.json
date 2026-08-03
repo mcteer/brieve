@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/vault-radar-operating-guides-hcp-vault-radar/credits",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-radar-operating-guides-hcp-vault-radar/credits",
+  "sections": [
+    {
+      "anchor": "credits",
+      "title": "Credits",
+      "text": "Thank you to everyone who contributed to this validated design guidance. This cross-functional team, representing many departments within HashiCorp, authored, edited, reviewed, and iterated this content to provide prescription and recommendations for using HashiCorp software in enterprise scenarios. Andre Pimentel Cami Cano Gomez David Mills Mark Lewis Previous Conclusion"
+    }
+  ]
+}

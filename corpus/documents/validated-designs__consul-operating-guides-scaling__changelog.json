@@ -1,0 +1,26 @@
+{
+  "path": "/validated-designs/consul-operating-guides-scaling/changelog",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-operating-guides-scaling/changelog",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-01",
+      "title": "2026-01",
+      "text": "Update meta descriptions Updated credits and contributors"
+    },
+    {
+      "anchor": "2025-06",
+      "title": "2025-06",
+      "text": "Updated credits and contributors Use consistent guide names and descriptions Standardized operating guide naming conventions"
+    },
+    {
+      "anchor": "2024-11",
+      "title": "2024-11",
+      "text": "Beta Release Previous Credits"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/vault-operating-guides-adoption/support-readiness",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-operating-guides-adoption/support-readiness",
+  "sections": [
+    {
+      "anchor": "support-readiness",
+      "title": "Support readiness",
+      "text": "To ensure smooth communication and efficient support, make sure that these guidelines are followed. Each team member has an account created through the HashiCorp Support portal (opens in new tab) . Each team member that should be permitted to create support tickets on behalf of your company must be configured as an authorized technical contact in the support portal. Please provide a list of applicable team members to your company's assigned solutions engineer so that they can configure this. Have your team familiarize themselves with HashiCorp support documentation (opens in new tab) on how to open a support ticket with HashiCorp Support and generate/upload a support bundle, whenever applicable. Be aware of the support plan level your company has purchased to manage expectations of response times. Also, understand the definitions for each severity level when opening a support ticket through our documentation (opens in new tab) . Previous Standard operational procedures Next Appendix"
+    }
+  ]
+}

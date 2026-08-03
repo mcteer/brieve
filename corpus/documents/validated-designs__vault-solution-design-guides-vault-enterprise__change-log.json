@@ -1,0 +1,56 @@
+{
+  "path": "/validated-designs/vault-solution-design-guides-vault-enterprise/change-log",
+  "url": "https://developer.hashicorp.com/validated-designs/vault-solution-design-guides-vault-enterprise/change-log",
+  "sections": [
+    {
+      "anchor": "changelog",
+      "title": "Changelog",
+      "text": ""
+    },
+    {
+      "anchor": "2026-06",
+      "title": "2026-06",
+      "text": "Add production hardening guide reference to Software section in detailed design"
+    },
+    {
+      "anchor": "2026-03",
+      "title": "2026-03",
+      "text": "Add mlock configuration to config file examples"
+    },
+    {
+      "anchor": "2026-01",
+      "title": "2026-01",
+      "text": "Fixed heading formatting in tabbed content for PDF generation Update meta descriptions Updated credits and contributors Remove AWS KMS seal configuration"
+    },
+    {
+      "anchor": "2025-12",
+      "title": "2025-12",
+      "text": "Vault design updates"
+    },
+    {
+      "anchor": "2025-10",
+      "title": "2025-10",
+      "text": "Update mlock guidance to match docs"
+    },
+    {
+      "anchor": "2025-05",
+      "title": "2025-05",
+      "text": "Removed document structure section"
+    },
+    {
+      "anchor": "2025-04",
+      "title": "2025-04",
+      "text": "Update init command to use correct pgp keys argument"
+    },
+    {
+      "anchor": "2025-01",
+      "title": "2025-01",
+      "text": "Fixed systemd configuration file paths"
+    },
+    {
+      "anchor": "2024-02",
+      "title": "2024-02",
+      "text": "GA release Previous Next steps Next Credits"
+    }
+  ]
+}

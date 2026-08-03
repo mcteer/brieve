@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/consul-operating-guides-scaling/conclusion",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-operating-guides-scaling/conclusion",
+  "sections": [
+    {
+      "anchor": "conclusion",
+      "title": "Conclusion",
+      "text": "Automating the deployment and management of Consul through CI/CD pipelines or GitOps workflows offers numerous advantages, and HashiCorp strongly advocates for this approach. Key benefits include: Increased Velocity: Enables rapid updates and deployment of new services. Standardization: Allows operations and security teams to enforce consistent standards across environments. Enhanced Security: Improves the security posture by streamlining the patching and updating of systems, addressing vulnerabilities (CVEs) more effectively. Cost Reduction: Reduces the time and effort needed to update and maintain systems, resulting in significant cost savings. By adopting automation, organizations can build a scalable, secure, and efficient Consul platform. Previous Services along with Consul client agents on VMs Next Credits"
+    }
+  ]
+}

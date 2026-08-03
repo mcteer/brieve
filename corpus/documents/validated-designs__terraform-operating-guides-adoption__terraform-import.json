@@ -1,0 +1,101 @@
+{
+  "path": "/validated-designs/terraform-operating-guides-adoption/terraform-import",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-operating-guides-adoption/terraform-import",
+  "sections": [
+    {
+      "anchor": "import-existing-resources-to-terraform",
+      "title": "Import existing resources to Terraform",
+      "text": ""
+    },
+    {
+      "anchor": "introduction",
+      "title": "Introduction",
+      "text": "The Terraform import operation lets you add existing resources to your Terraform state. This is helpful if you have resources created outside of Terraform (using a cloud portal, or another tool) and want to manage them with Terraform. Importing these resources allows Terraform to track and manage their state, simplifying the management of your infrastructure. As of Terraform 1.5.0, there are two distinct workflows to import existing resources into Terraform state. The command line interface (Terraform 0.7.0 or greater) The import block (Terraform 1.5.0 or greater) While straight forward to use, the command line interface method can be time-consuming and carries risk if not handled properly. Terraform 1.5.0 introduced the import block to address these issues by: Allowing you to declare the resources to import in the Terraform configuration. Enabling you to import resources in bulk through the use of for_each . Adding a planning phase to the import process prior to importing the resource. Adding a sub-command to generate the configuration for imported resources. The import block is the logical progression of the import workflow and the one we recommend. If you are using an earlier version of Terraform and unable to upgrade, see below for guidance. There are also some use cases where it may be better to use the command line interface rather than the import block."
+    },
+    {
+      "anchor": "people-and-process",
+      "title": "People and process",
+      "text": "We make the following assumptions which may need adapting to your specific organisation. There are two distinct teams who work on infrastructure imports. The platform team: Responsible for setting up and maintaining the Terraform workspaces, projects, organizations, policy sets, cloud authentication, and so on. Develops best practices around imports, module usage, which resources to import into modules or root configurations. Provides training to the application team on best practices identifying Import use cases. Converts repeated configurations into Terraform modules, for use by Waypoint/no code or child modules depending on the responsibilities. The application team: Identifies which resources would be beneficial or non-beneficial to import. Works with the platform team to ensure accurate like-for-like transition from non-Terraform-managed to Terraform-managed infrastructure. Provides all information to the platform team regarding which resources need which attributes configured or not, and whether they would be reusable as a module. Runs the day-to-day Terraform plans/applies through the standardized use of modules or best practices provided by the platform team."
+    },
+    {
+      "anchor": "hashicorp-guidance",
+      "title": "HashiCorp guidance",
+      "text": "We recommend adding import blocks in a dedicated imports.tf file, similar to defining variables in a variables.tf ."
+    },
+    {
+      "anchor": "what-to-import",
+      "title": "What to import",
+      "text": "Resources created by other methods, be it other IaC, other tooling, or manual click ops. Resources that cannot be rebuilt with downtime using snapshot, imaging or backup methods."
+    },
+    {
+      "anchor": "what-not-to-import",
+      "title": "What not to import",
+      "text": "Dynamic infrastructure where the future changes are outside of Terraform. Temporary or experimental resources, or ephemeral workspaces. Resources unsupported by providers that would necessitate using null_resource . Resources managed by teams who do not use Terraform or are not yet ready to use Terraform. Resources that can be rebuilt with downtime. It may be easier to create a new configuration and decommission existing resources."
+    },
+    {
+      "anchor": "following-a-phased-approach",
+      "title": "Following a phased approach",
+      "text": "Phase 1: The application team needs guidance from the platform team on which resources to manage with Terraform, paying close attention to the examples in the what not to import section. Once you decide on an initial pilot project with a small set of resources, finish this to completion, documenting the process for future teams. Gradually expand more resources from the same team, or when the team exhausts its resources, move on to other teams with sufficient knowledge. Continuously review and refine the process, making sure the application teams maintain the day 2 and onward responsibilities, and any and all module suggestions. The platform team enables features such as drift detection to ensure changes made are within Terraform itself. Phase 2: After completing phase one, you may have noted some common configurations forming. Placing common resources together into modules helps scale the Terraform maturity and consumption. We advise adding some granularity between your modules, accounting for permissions and security. You cannot partially instantiate a module in a configuration file. Splitting into more than one module may add flexibility. Using projects, variable sets and Sentinel policy sets may help you in setting out your new configuration files. Turning on drift detection and health checks may provide good oversight as to if and when resources are being manually tampered with."
+    },
+    {
+      "anchor": "a-comparison-of-the-two-methods",
+      "title": "A comparison of the two methods",
+      "text": "The following table provides a comparison of the two methods, helping you understand the differences. Characteristic Terraform import command Terraform import block How many resources can you import at once? One resource per command execution. One or more resources per command execution. Where is the resource ingested? Terraform adds the resource to the state file Terraform first adds the resource to the configuration and then adds it to the state (and marks it as imported). Is writing resource configuration required? Yes Yes, but the process is greatly sped up by the -generate-config-out sub-command. Driven by? The practitioner (manually). Configuration and the Terraform workflow."
+    },
+    {
+      "anchor": "using-the-terraform-import-block",
+      "title": "Using the Terraform import block",
+      "text": "Tip The Import Terraform configuration (opens in new tab) tutorial also provides example steps for using the import block."
+    },
+    {
+      "anchor": "import-block-overview",
+      "title": "Import block overview",
+      "text": ""
+    },
+    {
+      "anchor": "building-a-configuration-file",
+      "title": "Building a configuration file",
+      "text": "The infrastructure must already exist, and your credentials must allow you to access the resource. You now need to define the scope of your configuration file. Including more resources in your configuration file increases the risk of blast radius and privilege issues. Review best practices (opens in new tab) for guidance on logical granularity when defining configurations. You can also use the import block to directly import into a module call. If your configuration uses modules, you can do this in a single step, rather than first importing into a root configuration and later transitioning to a module structure."
+    },
+    {
+      "anchor": "adding-the-import-block",
+      "title": "Adding the import block",
+      "text": "The import block has two required inputs, to and id . For each Terraform resource, there is a unique ID. In the case of the aws_iot_thing resource, this is the name, for the aws_instance , it uses the instance ID. Each resource's documentation page lists the required identifier with an example import block. `aws_instance` resource documentation (opens in new tab) `aws_iot_thing` resource documentation (opens in new tab) If you need to import multiple instances of the same resource, you can use the for_each argument within the import block. At the end of this section there are examples demonstrating how to use for_each to import multiple instances of the same resource into root configurations or modules. Note that this approach only applies to resources of the same type. If you need to import multiple different resource types, you need to use separate import blocks for each type."
+    },
+    {
+      "anchor": "planning-changes",
+      "title": "Planning changes",
+      "text": "The application team is ready to run the first terraform plan . We would expect to see the output only contain import actions. For example: Plan: 1 to import, 0 to add, 0 to change, 0 to destroy. If you expect any changes to add, change, or destroy, review these changes and update your configuration file to reflect them. For example, a configuration change made to a manually created resource which needs an explicit attribute set in Terraform. You repeat this until all you see in the plan is an expected number of imports."
+    },
+    {
+      "anchor": "applying-changes",
+      "title": "Applying changes",
+      "text": "Once the plan shows one or more imports, with zero additions, changes, and destroys you can continue with an apply command. $ terraform apply aws_iot_thing.bar: Importing... [id=foo] aws_iot_thing.bar: Refreshing state... [id=foo] Terraform will perform the following actions: # aws_iot_thing.bar will be imported resource \"aws_iot_thing\" \"bar\" { arn = \"arn:aws:iot:eu-west-1:1234567890:thing/foo\" attributes = {} default_client_id = \"foo\" id = \"foo\" name = \"foo\" version = 1 } Plan: 1 to import, 0 to add, 0 to change, 0 to destroy. Do you want to perform these actions? Terraform will perform the actions described above. Only 'yes' will be accepted to approve. Enter a value: yes aws_iot_thing.bar: Importing... [id=foo] aws_iot_thing.bar: Import complete [id=foo] aws_iot_thing.bar: Refreshing state... [id=foo] Apply complete! Resources: 1 imported, 0 added, 0 changed, 0 destroyed."
+    },
+    {
+      "anchor": "final-steps",
+      "title": "Final steps",
+      "text": "With the resources imported, remove the import blocks. The import process is complete. Make all subsequent changes in Terraform code rather than manual interventions/other tools. This avoids drift which can be a problem in itself. Enabling drift detection (opens in new tab) on your workspace can help diagnose teams or processes making changes outside of Terraform."
+    },
+    {
+      "anchor": "import-block-examples",
+      "title": "Import block examples",
+      "text": "Import one resource into a base configuration file ## main.tf resource \"aws_iot_thing\" \"bar\" { name = \"foo\" } Create imports.tf with the following code block. ## imports.tf import { to = aws_iot_thing.bar id = \"foo\" } Run terraform plan . $ terraform plan aws_iot_thing.bar: Preparing import... [id=foo] aws_iot_thing.bar: Refreshing state... [id=foo] Terraform will perform the following actions: # aws_iot_thing.bar will be imported resource \"aws_iot_thing\" \"bar\" { arn = \"arn:aws:iot:eu-west-1:1234567890:thing/foo\" attributes = {} default_client_id = \"foo\" id = \"foo\" name = \"foo\" version = 1 } Plan: 1 to import, 0 to add, 0 to change, 0 to destroy. Check there are no unexpected outputs to the plan, then run terraform apply . $ terraform apply aws_iot_thing.bar: Importing... [id=foo] aws_iot_thing.bar: Refreshing state... [id=foo] Terraform will perform the following actions: # aws_iot_thing.bar will be imported resource \"aws_iot_thing\" \"bar\" { arn = \"arn:aws:iot:eu-west-1:1234567890:thing/foo\" attributes = {} default_client_id = \"foo\" id = \"foo\" name = \"foo\" version = 1 } Plan: 1 to import, 0 to add, 0 to change, 0 to destroy. Do you want to perform these actions? Terraform will perform the actions described above. Only 'yes' will be accepted to approve. Enter a value: yes aws_iot_thing.bar: Importing... [id=foo] aws_iot_thing.bar: Import complete [id=foo] aws_iot_thing.bar: Refreshing state... [id=foo] Apply complete! Resources: 1 imported, 0 added, 0 changed, 0 destroyed. Remove the imports.tf file and make all subsequent changes using this Terraform configuration file. Import one resource into a module ## ./main.tf import { to = module.helloworld.aws_iot_thing.bar id = \"foo\" } module \"helloworld\" { source = \"./modules/iot_thing\" } ## ./modules/iot_thing resource \"aws_iot_thing\" \"bar\" { name = \"foo\" } The preceding configuration would produce the following plan output. $ terraform plan module.helloworld.aws_iot_thing.bar: Preparing import... [id=foo] module.helloworld.aws_iot_thing.bar: Refreshing state... [id=foo] Terraform will perform the following actions: # module.helloworld.aws_iot_thing.bar will be imported resource \"aws_iot_thing\" \"bar\" { arn = \"arn:aws:iot:us-east-1:1234567890:thing/foo\" attributes = {} default_client_id = \"foo\" id = \"foo\" name = \"foo\" thing_type_name = null version = 1 } Plan: 1 to import, 0 to add, 0 to change, 0 to destroy. Import the state with terraform apply . $ terraform apply module.helloworld.aws_iot_thing.bar: Preparing import... [id=foo] module.helloworld.aws_iot_thing.bar: Refreshing state... [id=foo] Terraform will perform the following actions: # module.helloworld.aws_iot_thing.bar will be imported resource \"aws_iot_thing\" \"bar\" { arn = \"arn:aws:iot:us-east-1:1234567890:thing/foo\" attributes = {} default_client_id = \"foo\" id = \"foo\" name = \"foo\" thing_type_name = null version = 1 } Plan: 1 to import, 0 to add, 0 to change, 0 to destroy. Do you want to perform these actions? Terraform will perform the actions described above. Only 'yes' will be accepted to approve. Enter a value: yes module.helloworld.aws_iot_thing.bar: Importing... [id=foo] module.helloworld.aws_iot_thing.bar: Import complete [id=foo] Apply complete! Resources: 1 imported, 0 added, 0 changed, 0 destroyed. Import multiple of the same resource into a root configuration The following configuration assumes you have created three aws_iot_thing resources with the names foo1, foo2 and foo3, and you want to import them all into a root configuration. #./main.tf locals { iot_things = { iot1 = \"foo1\" iot2 = \"foo2\" iot3 = \"foo3\" } } resource \"aws_iot_thing\" \"this\" { for_each = local.iot_things name = each.value } import { for_each = local.iot_things id = each.value to = aws_iot_thing.this[each.key] } The preceding configuration would produce the following plan output. $ terraform plan aws_iot_thing.this[ \"iot3\" ]: Preparing import... [id=foo3] aws_iot_thing.this[ \"iot2\" ]: Preparing import... [id=foo2] aws_iot_thing.this[ \"iot1\" ]: "
+    },
+    {
+      "anchor": "using-the-terraform-import-command",
+      "title": "Using the Terraform import command",
+      "text": "The terraform import command introduced in Terraform 0.7 adds existing resources to Terraform state for ongoing management. The process has two main steps: Import the resource to state. Update the Terraform configuration file to define the newly imported resource. The terraform import command works by passing the resource address and resource ID as command line arguments. Once the command has completed, the Terraform state includes the imported resource. The second step is to update the Terraform configuration to match the new state. Add the resource and any known attribute values to the configuration file and use terraform plan to identify any missing resource attribute values. Use the provider's documentation to help this step. Add those attribute values to the resource block and repeat the planning process until the Terraform plan command proposes no changes. This means the resource definition in the code matches the resource state. It is crucial that terraform apply is not run on the configuration until the resource definition matches the state. Otherwise Terraform might reconfigure the resource in-place, or delete the resource and re-create it based on the code. Both unwanted outcomes."
+    },
+    {
+      "anchor": "terraform-import-overview",
+      "title": "Terraform import overview",
+      "text": ""
+    },
+    {
+      "anchor": "import-command-examples",
+      "title": "Import command examples",
+      "text": "Import an AWS EC2 instance Identify the EC2 instance to import and note the instance ID. Write a Terraform configuration file with a resource block for the imported EC2 instance. provider \"aws\" { } resource \"aws_instance\" \"example\" { ami = \"ami-0c101f26f147fa7fd\" instance_type = \"t3.micro\" tags = { Name = \"HelloWorld\" } } Run the import command to add the EC2 instance into Terraform state. terraform import aws_instance.example i-01ddb56f1c97a17e5 aws_instance.example: Importing from ID \"i-01ddb56f1c97a17e5\"... aws_instance.example: Import prepared! Prepared aws_instance for import aws_instance.example: Refreshing state... [id=i-01ddb56f1c97a17e5] Import successful! The command output shows the imported resources. Manage imported resources with Terraform from this point on. This example shows there are many resource attributes to account for before the EC2 instance is fully managed Terraform. There are more complex cases, where the attributes to configure are more complicated or more numerous than ami , instance_type , and tags . Previous Terraform Workflows Next Backup Terraform Enterprise"
+    }
+  ]
+}
