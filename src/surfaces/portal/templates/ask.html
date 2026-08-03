@@ -25,138 +25,24 @@
   <button type="submit" class="button">Ask</button>
 </form>
 
-{% if empty %}
-  <p class="notice">Type a question first &mdash; nothing was sent.</p>
-{% endif %}
+{#
+  WHERE AN ANSWER LANDS.
 
-{% if response is defined %}
-  {#
-    DISPATCH ORDER IS LOAD-BEARING, and it is the relay's own vocabulary in order:
-    reachability is decided before any body exists, and a refusal has no disposition to read.
-    Reordering these would make an outage render as a refusal with a missing reason.
-  #}
-  {% if not response.reachable %}
-    <section class="answer" aria-labelledby="outcome">
-      <h2 id="outcome">The platform could not be asked</h2>
-      <p>Nothing about your access has changed, and nothing you have is lost. The platform did
-         not answer, so there is no decision here to read.</p>
-    </section>
-
-  {% elif not response.ok %}
-    {#
-      THE API'S OWN WORDS, VERBATIM.
-
-      Five features went into making these sentences precise, and each names a different
-      person to go to: a model nobody has qualified, a credential the platform does not hold,
-      a vendor that did not answer. Re-writing them here into something friendlier would put a
-      portal-authored guess where the platform's own answer belongs, and it would drift the
-      first time a reason was reworded — leaving this page confidently explaining the wrong
-      cause. The portal renders; it does not classify.
-    #}
-    <section class="answer refused" aria-labelledby="outcome">
-      <h2 id="outcome">The platform did not answer this</h2>
-      <p>{{ (response.payload or {}).get("detail")
-            or "The platform refused this request and gave no reason." }}</p>
-    </section>
-
-  {% elif (response.payload or {}).get("disposition") == "declined" %}
-    {#
-      A DECLINE IS AN ANSWER, not a failure — the platform being honest that what was asked
-      is not in what it may consult. Naming the source is what keeps somebody who asked about
-      their estate from being told the documentation does not cover it.
-    #}
-    <section class="answer declined" aria-labelledby="outcome">
-      <h2 id="outcome">No answer for this one</h2>
-      <p>{{ (response.payload or {}).get("declined_reason")
-             or "The platform found nothing it could rest an answer on." }}</p>
-      <div class="provenance">
-      {% if (response.payload or {}).get("window_note") %}
-        {# A decline drawn from a window is the case a reader most needs told. #}
-        <p class="meta window">{{ response.payload.window_note }}</p>
-      {% endif %}
-      {% if (response.payload or {}).get("ground_note") %}
-        {#
-          A DECLINE CARRIES THE GROUND'S AGE TOO (033). Somebody told "the corpus does not
-          cover this" is deciding whether to go looking elsewhere, and whether the pin is a
-          week old or a year old changes that decision.
-        #}
-        <p class="meta ground">{{ response.payload.ground_note }}</p>
-      {% endif %}
-      {% if (response.payload or {}).get("source") %}
-        <p class="meta">Consulted: {{ response.payload.source }}</p>
-      {% endif %}
-      </div>
-    </section>
-
-  {% else %}
-    <section class="answer" aria-labelledby="outcome">
-      <h2 id="outcome">Answer</h2>
-      <ol class="claims">
-        {% for claim in (response.payload or {}).get("claims") or [] %}
-          <li>
-            <p>{{ claim.statement }}</p>
-            {% if claim.get("citations") %}
-              <ul class="citations">
-                {% for citation in claim.citations %}
-                  {#
-                    A CITATION IS A DESTINATION, NOT A STRING. Rendering the raw URL put a
-                    wrapping monospace line across the answer and made the page look broken —
-                    and it told the reader nothing the link's own words could not. The label
-                    is the document and its section, humanised; the href is untouched, and
-                    `title` keeps the exact URL one hover away, so nothing is hidden.
-                  #}
-                  {% set _url = citation.split("#") %}
-                  {% set _doc = _url[0].rstrip("/").split("/")[-1] | replace("-", " ") | title %}
-                  {% set _section = (_url[1] | replace("-", " ")) if _url | length > 1 else "" %}
-                  <li>
-                    <a href="{{ citation }}" rel="noopener" title="{{ citation }}">{{ _doc }}{% if _section %} <span class="citation-section">&rsaquo; {{ _section }}</span>{% endif %}</a>
-                  </li>
-                {% endfor %}
-              </ul>
-            {% elif claim.get("references") %}
-              {#
-                A RECORD REFERENCE IS NOT A LINK, and rendering it as one would produce a dead
-                link that teaches the reader these references are decorative. Its job is to be
-                an identifier a person can carry to whoever can show them the record, so the
-                full value is present and none of it is an anchor.
-              #}
-              <ul class="references">
-                {% for reference in claim.references %}
-                  <li><code title="{{ reference }}">{{ reference[:16] }}&hellip;</code></li>
-                {% endfor %}
-              </ul>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ol>
-      <div class="provenance">
-      {% if (response.payload or {}).get("window_note") %}
-        {#
-          WHAT THE ANSWER RESTS ON, when the read returned a window rather than everything.
-
-          Present only when something truncated, so a complete answer carries no caveat — an
-          unconditional note would teach readers to skip it, which costs exactly the case it
-          exists for. A person told "3 runs failed" needs to know whether that is 3 of 3 or 3 of
-          the 200 most recent of 1,847.
-        #}
-        <p class="meta window">{{ response.payload.window_note }}</p>
-      {% endif %}
-      {% if (response.payload or {}).get("ground_note") %}
-        {#
-          HOW OLD THE GROUND IS (033), and UNLIKE the window note this one is unconditional.
-
-          The two notes disclose opposite-shaped facts. A window note is present only when
-          something truncated, because a complete read has no caveat to make. An age is true of
-          every answer — so if this appeared only past a threshold, silence would come to mean
-          "recent", which is exactly the unfounded currency claim the note exists to remove.
-        #}
-        <p class="meta ground">{{ response.payload.ground_note }}</p>
-      {% endif %}
-      </div>
-      {% if (response.payload or {}).get("source") %}
-        <p class="meta">Answered from: {{ response.payload.source }}</p>
-      {% endif %}
-    </section>
-  {% endif %}
-{% endif %}
+  Two regions, deliberately, because they carry different kinds of thing. `ask-status` holds a
+  SHORT sentence about what is happening and is a live region, so a screen-reader user is told
+  the question went and later that it came back. `ask-outcome` holds the answer itself and is
+  NOT live: announcing a page of claims the instant it arrives talks over somebody who is still
+  reading. Focus moves to its heading instead, which is how a person gets there on purpose.
+#}
+<p id="ask-status" role="status" class="meta ask-status"></p>
+<div id="ask-outcome">
+{% include "_outcome.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+{#
+  Loaded only where it has work to do. The ask page is the one page whose action takes long
+  enough that a blank browser tab is a usability problem worth a script.
+#}
+<script src="/static/portal-ask.js" defer></script>
 {% endblock %}

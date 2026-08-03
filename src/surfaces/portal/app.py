@@ -169,6 +169,18 @@ def create_portal(
         if session is None:
             return _login_redirect(request, "/ask")
 
+        # WHOLE PAGE OR JUST THE OUTCOME — the same render either way.
+        #
+        # `portal-ask.js` posts this form without navigating and swaps the result into the page,
+        # so an answer that takes a minute no longer costs a person their scroll position and a
+        # blank tab. It sends this header; a browser with no JavaScript sends nothing and gets
+        # the full page, which is why the form still works with the script removed.
+        #
+        # The branch chooses an ENVELOPE, never a rendering. Both arms end at `_outcome.html`,
+        # because two templates that agree today are two templates that drift, and the one that
+        # drifts is the one nobody opens without JavaScript.
+        page = "_outcome.html" if request.headers.get("x-portal-fragment") else "ask.html"
+
         asked = question.strip()
         if not asked:
             # THE CHEAPEST REFUSAL IN THE FEATURE, and it costs no API call and no model call.
@@ -176,7 +188,7 @@ def create_portal(
             # record to be told what this line already knows.
             return templates.TemplateResponse(
                 request=request,
-                name="ask.html",
+                name=page,
                 context={"empty": True},
                 status_code=400,
             )
@@ -191,7 +203,7 @@ def create_portal(
         )
         return templates.TemplateResponse(
             request=request,
-            name="ask.html",
+            name=page,
             context={"question": asked, "response": answered},
             # The API's own status, carried rather than reinterpreted. A refusal is an answer.
             status_code=answered.status if answered.reachable else 503,
