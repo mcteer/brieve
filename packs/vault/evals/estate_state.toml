@@ -16,8 +16,21 @@
 # precision and recall over the references that survive the product path, so an invented reference
 # fails and an omitted one fails; the old `match` substring could do neither.
 
+#
+# `asker_role` (030) is WHO COULD ASK each case, and the tag follows the case's expected set
+# rather than its prompt: 002 reads as an operator's question and expects rec-vault-002 — an
+# authority_denied record no operator can see — so it is a compliance-analyst case, whatever its
+# wording. The scorer narrows the fixture to the declared role's visibility before the answering
+# function runs, so a mis-tagged case refuses to load rather than passing on records production
+# would withhold.
+#
+# WHAT THIS SUITE STILL DOES NOT EXERCISE, stated because an unstated gap of exactly this kind is
+# what produced 030: the governed read and its access record, temporal window resolution, and the
+# per-type bound (029) — a five-record fixture could not exercise a bound in any case.
+
 [[cases]]
 id = "vault-estate-state-001"
+asker_role = "compliance-analyst"
 suite = "estate_state"
 prompt = "Which runs were denied?"
 recorded = "Authority was denied during the nightly apply, per rec-vault-002."
@@ -25,6 +38,7 @@ events = ["rec-vault-002"]
 
 [[cases]]
 id = "vault-estate-state-002"
+asker_role = "compliance-analyst"
 suite = "estate_state"
 prompt = "What happened during the nightly apply run?"
 recorded = "The run started, a read was allowed, and a write was denied — per rec-vault-001, rec-vault-003 and rec-vault-002."
@@ -32,6 +46,7 @@ events = ["rec-vault-001", "rec-vault-002", "rec-vault-003"]
 
 [[cases]]
 id = "vault-estate-state-003"
+asker_role = "compliance-analyst"
 suite = "estate_state"
 prompt = "Who was granted write authority?"
 recorded = "A write grant was issued to bob during the rotation run, per rec-vault-004."
@@ -39,6 +54,7 @@ events = ["rec-vault-004"]
 
 [[cases]]
 id = "vault-estate-state-004"
+asker_role = "operator"
 suite = "estate_state"
 prompt = "Which runs stopped, and why?"
 recorded = "The rotation run stopped at operator request, per rec-vault-005."
@@ -56,6 +72,7 @@ events = ["rec-vault-005"]
 # of that kind and that none of it matches. The model was right; the case was wrong.
 [[cases]]
 id = "vault-estate-state-005"
+asker_role = "compliance-analyst"
 suite = "estate_state"
 prompt = "Were any reads denied during the nightly apply?"
 recorded = "The only denial in that run was a write, per rec-vault-002, and the read was allowed, per rec-vault-003."

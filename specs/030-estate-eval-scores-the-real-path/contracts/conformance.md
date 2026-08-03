@@ -7,13 +7,13 @@
 
 | Group | Where | Needs | Status |
 | --- | --- | --- | --- |
-| Parse: an estate case without a role, or with an unknown one, refuses to load | `tests/component/test_estate_eval_scores_visibility.py` | Nothing | Planned |
-| Visibility: an operator case expecting an authority reference refuses at scorer construction | same file | Nothing | Planned |
-| Narrowing: an operator case's provider never receives a record outside operator visibility | same file (recording provider) | Nothing | Planned |
-| The tagged suites still pass the blocking gate | `tests/component/test_eval_gates.py` | Nothing | Planned |
+| Parse: an estate case without a role, or with an unknown one, refuses to load | `tests/component/test_estate_eval_scores_visibility.py` | Nothing | **In force** |
+| Visibility: an operator case expecting an authority reference refuses at `_answer` (where case and fixture meet — analysis C2) | same file | Nothing | **In force** |
+| Narrowing: an operator case's provider never receives a record outside operator visibility | same file (recording provider) | Nothing | **In force** — mutation-verified: deleting the narrowing fails exactly this row |
+| The tagged suites still pass the blocking gate | `tests/component/test_eval_gates.py` | Nothing | **In force** — identical verdicts |
 | **The live re-run of the corrected suite (US3)** | `make evals-live` | Vendor credential, ~25 min, **named runner: Dan McTeer** | **Owed** |
 | **Matrix outcome recorded** — confirm / re-earn / withdraw, in the matrix variables | `infra/environments/dev/variables.tf` | The re-run's verdict | **Owed** |
-| **ADR-0059** — what a cell's estate evidence asserts | `docs/adr/0059-*.md` | Review: **Dan McTeer** | Planned — merges with the feature |
+| **ADR-0059** — what a cell's estate evidence asserts | `docs/adr/0059-estate-eval-evidence-spans-asker-roles.md` | Review: **Dan McTeer** | **Written — review gates the merge** |
 
 No sealed core; no Principle V review (fourth feature running).
 
@@ -56,3 +56,10 @@ owed exactly as 029 recorded it.
 
 **They do not grandfather the live cells.** US3's re-run decides; until it runs, the cells stand
 on their 2026-08-02 evidence *with this feature's finding attached to it in the ADR*.
+
+## The mutation check, performed 2026-08-02
+
+Deleting the narrowing (`narrowed = tuple(self._estate.records)`) failed exactly one row —
+`test_an_operator_cases_provider_never_receives_invisible_records` — while the other seven stayed
+green, which is the correct shape: a mutation to the narrowing should not disturb rows about
+parsing or agreement. Restored, all eight green.

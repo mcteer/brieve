@@ -127,6 +127,19 @@ class EvalCase:
     #: For `report_fidelity` only: the material events a faithful report of this run must
     #: mention. Empty for the other four, which score a verb rather than a set.
     events: tuple[str, ...] = ()
+    #: **Who could ask this** — required for estate cases, ignored by every other suite (030).
+    #:
+    #: An estate answer is bounded by the asker's role, and until this field existed the suite's
+    #: role was implicit — which let three vault cases and three terraform cases score records no
+    #: `operator` can see, and let that evidence qualify this platform's first two live cells.
+    #: The tag follows the case's EXPECTED SET, not its prompt: a question can be asked by
+    #: anyone, but a case expecting an `authority_denied` reference is a compliance-analyst case
+    #: whatever its wording, and twice now a case's prompt read as operator-shaped while its
+    #: references did not.
+    #:
+    #: Never defaulted. A defaulted role would be the implicit assumption 030 removes,
+    #: reappearing one field over — `parse_cases` refuses instead.
+    asker_role: str = ""
 
 
 def parse_cases(document: dict[str, object], *, source: str) -> tuple[EvalCase, ...]:
@@ -146,6 +159,7 @@ def parse_cases(document: dict[str, object], *, source: str) -> tuple[EvalCase, 
                 expected=str(entry.get("expected", "")),
                 recorded=str(entry.get("recorded", "")),
                 events=tuple(str(e) for e in (entry.get("events") or ())),
+                asker_role=str(entry.get("asker_role", "")),
             )
         except KeyError as exc:
             raise UnrunnableSuite(f"{source}: case missing required field {exc}") from exc
@@ -161,6 +175,23 @@ def parse_cases(document: dict[str, object], *, source: str) -> tuple[EvalCase, 
                 raise UnrunnableSuite(
                     f"{source}: case {case.id!r} is an {case.suite!r} case and names no expected "
                     f"references; fidelity over an empty expected set passes for any answer"
+                )
+            # The asker's role, from the platform's OWN vocabulary — imported, never copied,
+            # because a second role list is the fragmentation seam (030). Absent refuses rather
+            # than defaults: a defaulted role is the implicit assumption this field exists to
+            # remove, and an implicit role is how three cases scored records no operator can see.
+            from core.answering.scope import ROLE_VISIBILITY
+
+            if not case.asker_role:
+                raise UnrunnableSuite(
+                    f"{source}: case {case.id!r} is an estate case and declares no asker_role; "
+                    f"an estate answer is bounded by who is asking, and a case that does not "
+                    f"say is scored under an assumption nobody wrote down"
+                )
+            if case.asker_role not in ROLE_VISIBILITY:
+                raise UnrunnableSuite(
+                    f"{source}: case {case.id!r} declares asker_role {case.asker_role!r}, which "
+                    f"the platform does not grant; known roles: {sorted(ROLE_VISIBILITY)}"
                 )
         elif case.suite in MEASURED_SUITES:
             # A measured suite scores a SET, not a verb, so `expected` has nothing to validate

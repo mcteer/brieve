@@ -220,13 +220,48 @@ class EstateAnsweringScorer:
 
     def _answer(self, case: EvalCase) -> Any:
         from core.answering.estate import RecordedEstateProvider, answer_estate_question
+        from core.answering.scope import visible_event_types
 
+        # THE CASE'S DECLARED ROLE BOUNDS WHAT THE ANSWER MAY REST ON (030).
+        #
+        # This scorer used to hand the fixture's records over whole — so role scoping never
+        # narrowed anything, and three vault cases plus three terraform cases scored records no
+        # `operator` can see. That evidence qualified this platform's first two live cells,
+        # which is what made it governance rather than tidiness: a qualified cell is supposed to
+        # mean evaluation demonstrated this combination, for a role the platform grants.
+        #
+        # The check and the narrowing live HERE, in `_answer`, because this is where case and
+        # fixture actually meet — `__init__` never sees a case (the plan sited it there and the
+        # analysis pass measured that wrong). Per-case and loud is still a refusal, never an
+        # exclusion-by-silence.
+        #
+        # WHAT THIS STILL DOES NOT EXERCISE, stated because an unstated gap of exactly this kind
+        # produced 030: the governed read and its access record, temporal window resolution, and
+        # the per-type bound (029). Driving those would put an evidence store inside the eval and
+        # write an access record per scored case — a change to what a scoring run *does*, decided
+        # against in the spec's Clarifications.
+        visible = visible_event_types(frozenset({case.asker_role}))
+        by_hash = {h: i for i, h in self._estate.ids_to_hashes.items()}
+        types_by_id = {by_hash[r.entry_hash]: r.event_type for r in self._estate.records}
+        invisible = [
+            (ref, str(types_by_id[ref]))
+            for ref in case.events
+            if ref in types_by_id and types_by_id[ref] not in visible
+        ]
+        if invisible:
+            raise UnrunnableSuite(
+                f"case {case.id!r} declares asker_role {case.asker_role!r} but expects "
+                f"{invisible} — records that role cannot see. Production would never hand them "
+                f"over, so a pass here would qualify an answer no such asker could receive. "
+                f"Either the tag is wrong (the tag follows the expected set, not the prompt) or "
+                f"the case belongs to a role that can see its references."
+            )
+
+        narrowed = tuple(r for r in self._estate.records if r.event_type in visible)
         provider = self._provider or RecordedEstateProvider(
             case.recorded, self._estate.ids_to_hashes
         )
-        return answer_estate_question(
-            question=case.prompt, records=self._estate.records, provider=provider
-        )
+        return answer_estate_question(question=case.prompt, records=narrowed, provider=provider)
 
     def references(self, case: EvalCase) -> tuple[str, ...]:
         """The authored ids an answer actually rested on, after the path resolved every one."""

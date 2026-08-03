@@ -1,8 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
 # terraform pack — estate_state suite. REAUTHORED BY 025; see the vault pack's header for why.
 
+#
+# `asker_role` (030): the tag follows the EXPECTED SET, not the prompt — measured, twice. 004,
+# "What happened during the staging plan run?", reads operator-shaped and expects an
+# authority_denied record among its three, exactly the way vault-002 does; the analysis pass
+# caught the plan assigning it to operator by skimming the prompt. Three of five cases here are
+# compliance-analyst cases.
+#
+# WHAT THIS SUITE STILL DOES NOT EXERCISE (see 030): the governed read and its access record,
+# temporal windows, and the per-type bound.
+
 [[cases]]
 id = "terraform-estate-state-001"
+asker_role = "compliance-analyst"
 suite = "estate_state"
 prompt = "Which runs were denied?"
 recorded = "An apply was denied on the staging plan run, per rec-tf-002."
@@ -10,6 +21,7 @@ events = ["rec-tf-002"]
 
 [[cases]]
 id = "terraform-estate-state-002"
+asker_role = "operator"
 suite = "estate_state"
 prompt = "What changed during the production apply?"
 recorded = "The run was resumed and an apply effect was observed, per rec-tf-004 and rec-tf-005."
@@ -17,6 +29,7 @@ events = ["rec-tf-004", "rec-tf-005"]
 
 [[cases]]
 id = "terraform-estate-state-003"
+asker_role = "operator"
 suite = "estate_state"
 prompt = "Which runs were resumed?"
 recorded = "The production apply was resumed on its first attempt, per rec-tf-004."
@@ -24,6 +37,7 @@ events = ["rec-tf-004"]
 
 [[cases]]
 id = "terraform-estate-state-004"
+asker_role = "compliance-analyst"
 suite = "estate_state"
 prompt = "What happened during the staging plan run?"
 recorded = "The run started, a plan was allowed, and an apply was denied — per rec-tf-001, rec-tf-003 and rec-tf-002."
@@ -33,6 +47,7 @@ events = ["rec-tf-001", "rec-tf-002", "rec-tf-003"]
 # denials that exist and the thing that succeeded.
 [[cases]]
 id = "terraform-estate-state-005"
+asker_role = "compliance-analyst"
 suite = "estate_state"
 prompt = "Were any plans denied on the staging run?"
 recorded = "The only denial on that run was an apply, per rec-tf-002, and the plan was allowed, per rec-tf-003."
