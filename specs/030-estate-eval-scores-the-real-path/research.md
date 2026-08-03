@@ -27,9 +27,10 @@ loader (`load_estate_records`) computes id→hash and holds the records with the
 **Decision**: `EvalCase.asker_role: str = ""`. `parse_cases` validates what the case file alone
 can prove: an estate case MUST declare a role, and the role must be in the platform's vocabulary
 (`ROLE_VISIBILITY`'s keys — imported, not copied). The **visibility check** — every expected
-reference resolvable by the declared role — needs the fixture too, so it lives beside the scorer
-and runs at scorer construction: an operator case expecting an authority record is
-`UnrunnableSuite`, naming the case and the invisible type. Both checks are refusals, never
+reference resolvable by the declared role — needs the fixture too, so it lives beside the scorer,
+in `_answer` where case and fixture actually meet (`__init__` never sees a case — analysis C2):
+an operator case expecting an authority record is `UnrunnableSuite`, naming the case and the
+invisible type, per case and loud. Both checks are refusals, never
 defaults — the same discipline `events` already has, for the same reason: a defaulted role would
 be the implicit assumption this feature exists to remove, re-established one field over.
 
@@ -44,8 +45,15 @@ Per the fixture types and `ROLE_VISIBILITY`:
 | vault 003 granted | `authority_issued` | compliance-analyst |
 | vault 004 stopped | `run_stopped` | **operator** |
 | vault 005 reads denied | `authority_denied` | compliance-analyst |
-| terraform: denied ×2 | `authority_denied` | compliance-analyst |
-| terraform: changed / resumed / staging-plan | run/effect types | **operator** |
+| terraform 001 denied | `authority_denied` | compliance-analyst |
+| terraform 004 staging plan | run/tool + `authority_denied` among its three | compliance-analyst |
+| terraform 005 plans denied | `authority_denied` | compliance-analyst |
+| terraform 002 changed / 003 resumed | effect/run types | **operator** |
+
+**Corrected by the analysis pass**: the first draft said "denied ×2" for terraform, and measuring
+the expected sets found three — terraform-004 carries an `authority_denied` reference exactly the
+way vault-002 does. The same trap, one pack over, caught the same way: by reading the expected
+set rather than the prompt.
 
 **A finding inside the finding**: vault-002 — *"What happened during the nightly apply?"* — expects
 rec-001, rec-002, rec-003, and rec-002 is `authority_denied`. So **four of five** vault cases are

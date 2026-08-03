@@ -32,8 +32,14 @@ carrying one without the other turns the blocking gate red in between.
       `packs/terraform/evals/estate_state.toml` with `asker_role`, following **the expected set,
       not the prompt** (research F3): vault 001/002/003/005 → `compliance-analyst` (002 expects
       `rec-vault-002`, an `authority_denied` record, among its three — the finding inside the
-      finding), vault 004 → `operator`; terraform's two denied-cases → `compliance-analyst`, its
-      other three → `operator`. **Same commit as T002.** Each file's header gains the statement of
+      finding), vault 004 → `operator`; terraform 001/004/005 → `compliance-analyst`, 002/003 →
+      `operator`. **The terraform assignment was corrected by the analysis pass** (C1): the plan
+      said two denied-cases, and measuring the expected sets found three — terraform-004, *"What
+      happened during the staging plan run?"*, expects an `authority_denied` record among its
+      three, which is vault-002's finding-inside-the-finding recurring one pack over. Tagged the
+      plan's way, the visibility check would have refused it at load and turned the gate red —
+      the tag follows the expected set, and the expected set has to be *measured*, not skimmed.
+      **Same commit as T002.** Each file's header gains the statement of
       what this suite still does not exercise (research F5): the governed read and its access
       record, temporal windows, the per-type bound.
 
@@ -48,11 +54,13 @@ record, and a case expecting the invisible refuses to load.
 **Independent test**: a recording provider under an operator case receives no authority records;
 an operator case expecting one is `UnrunnableSuite`.
 
-- [ ] T004 [US2] The visibility check in `src/core/evals/scoring.py`, at
-      `EstateAnsweringScorer.__init__` — the one place cases and the fixture estate are both in
-      hand: every id in each case's `events` must resolve to a record whose type the case's
-      `asker_role` may see; a violation is `UnrunnableSuite` naming the case, the reference and
-      the invisible type. A refusal, never an exclusion-by-silence (FR-003).
+- [ ] T004 [US2] The visibility check in `src/core/evals/scoring.py`, in
+      `EstateAnsweringScorer._answer` — **the place case and fixture actually meet** (analysis
+      C2: the plan sited this at `__init__`, which never sees a case; cases arrive per call).
+      Before narrowing, every id in the case's `events` must resolve to a record whose type the
+      case's `asker_role` may see; a violation is `UnrunnableSuite` naming the case, the
+      reference and the invisible type. Per-case and loud — a refusal mid-suite is still a
+      refusal, never an exclusion-by-silence (FR-003).
 - [ ] T005 [US2] The narrowing in `EstateAnsweringScorer._answer`: records handed to
       `answer_estate_question` become the fixture's ∩ `visible_event_types({case.asker_role})`.
       The scorer's class docstring gains the honest-scope statement: what this drives (role
