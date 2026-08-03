@@ -67,8 +67,28 @@ aspiration into a failing test.
 reserved for non-text), CTA black-on-white; dark — page `#0C0C0E`, raised `#17181C`, ink
 `#F1F2F3`, muted `#A3A7B0`, rules `#2C2E33`/`#212328`, link `#7FA9FF`, CTA white-on-black.
 Verdicts: `#00764F` / `#BA2525` light, `#4FCB9B` / `#FF8A8A` dark. Products: Vault `#FFCF25`,
-Terraform `#7B42BC`, both themes (identity colours don't invert). Every text/ground pair is
-checked at implementation and then held by axe in both themes.
+Terraform `#7B42BC`, both themes (identity colours don't invert).
+
+**Every text/ground pair computed during analyze pass 2, not deferred to implementation** —
+all 22 pass, so T006's iteration budget starts from a known-green palette and any future
+token tweak has a baseline to diff against:
+
+| Pair | Light | Dark | Floor |
+| --- | --- | --- | --- |
+| ink / page | 19.54:1 | 17.44:1 | 4.5 |
+| muted / page | 5.42:1 | 8.11:1 | 4.5 |
+| muted / raised | **5.09:1** (weakest) | 7.36:1 | 4.5 |
+| link / page | 6.50:1 | 8.40:1 | 4.5 |
+| link / raised | 6.12:1 | 7.62:1 | 4.5 |
+| cta-ink / cta | 19.54:1 | 17.44:1 | 4.5 |
+| allowed / page | 5.67:1 | 9.63:1 | 4.5 |
+| denied / page | 6.21:1 | 8.61:1 | 4.5 |
+| allowed / raised | 5.33:1 | 8.74:1 | 4.5 |
+| denied / raised | 5.84:1 | 7.82:1 | 4.5 |
+| focus ring (non-text) | 4.93:1 | 7.60:1 | 3.0 |
+
+Axe then holds these at runtime in both themes — the computation is the design check, the
+lane is the regression check.
 
 ## F6 — Type roles, and where each face comes from
 
