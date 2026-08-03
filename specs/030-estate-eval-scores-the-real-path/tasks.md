@@ -117,11 +117,11 @@ evidence — not grandfathered.
 
 **Independent test**: the matrix variables record the outcome with a date.
 
-- [ ] T010 [US3] `make evals-smoke` then `make evals-live` under the corrected suite — **named
+- [X] T010 [US3] `make evals-smoke` then `make evals-live` under the corrected suite — **named
       runner: Dan McTeer** (~25 min, vendor cost). The narrowing is already in the path both
       lanes share, so this is the same lane that earned the cells, now scoring what each role
       would receive.
-- [ ] T011 [US3] Record the outcome in `infra/environments/dev/variables.tf`: **pass** → the two
+- [X] T011 [US3] Record the outcome in `infra/environments/dev/variables.tf`: **pass** → the two
       cells' comments gain "re-examined 2026-08-0X under role-scoped evidence (030), confirmed";
       **fail for any role subset** → the affected cells gain `withdrawn = true` and the apply is
       run, with quickstart §3's consequence pre-stated (the deployed ask refuses

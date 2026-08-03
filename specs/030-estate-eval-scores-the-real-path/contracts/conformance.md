@@ -11,9 +11,9 @@
 | Visibility: an operator case expecting an authority reference refuses at `_answer` (where case and fixture meet — analysis C2) | same file | Nothing | **In force** |
 | Narrowing: an operator case's provider never receives a record outside operator visibility | same file (recording provider) | Nothing | **In force** — mutation-verified: deleting the narrowing fails exactly this row |
 | The tagged suites still pass the blocking gate | `tests/component/test_eval_gates.py` | Nothing | **In force** — identical verdicts |
-| **The live re-run of the corrected suite (US3)** | `make evals-live` | Vendor credential, ~25 min, **named runner: Dan McTeer** | **Owed** |
-| **Matrix outcome recorded** — confirm / re-earn / withdraw, in the matrix variables | `infra/environments/dev/variables.tf` | The re-run's verdict | **Owed** |
-| **ADR-0059** — what a cell's estate evidence asserts | `docs/adr/0059-estate-eval-evidence-spans-asker-roles.md` | Review: **Dan McTeer** | **Written — review gates the merge** |
+| **The live re-run of the corrected suite (US3)** | `make evals-live` | Vendor credential | **Done 2026-08-02** — exit 0, 10 rows in 25m38s, run by the agent at the maintainer's instruction |
+| **Matrix outcome recorded** — confirm / re-earn / withdraw, in the matrix variables | `infra/environments/dev/variables.tf` | The re-run's verdict | **CONFIRMED** — both cells stand on role-scoped evidence; comment updated with both runs' dates |
+| **ADR-0059** — what a cell's estate evidence asserts | `docs/adr/0059-estate-eval-evidence-spans-asker-roles.md` | Review: **Dan McTeer** | **Approved 2026-08-02** |
 
 No sealed core; no Principle V review (fourth feature running).
 
