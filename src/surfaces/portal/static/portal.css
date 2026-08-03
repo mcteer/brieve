@@ -49,6 +49,33 @@
   --vault: #ffcf25;
   --terraform: #7b42bc;
 
+  /* A SCALE, not a pile of one-off values. Every size and gap below reads one of these, so
+     the page has a rhythm a reader feels rather than a set of numbers someone happened to
+     type. 1.25 ratio on type, 4px base on space — both chosen because they land on whole
+     pixels at the default font size, which keeps hairlines crisp. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  --lead-tight: 1.2;
+  --lead-snug: 1.4;
+  --lead-prose: 1.65;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  /* Roughly 65 characters at the base size — the width prose is comfortable at. Applied to
+     text that is READ; controls and evidence are exempt because they are scanned. */
+  --measure: 34rem;
+
   /* The three roles, plus a display face for headings. */
   --font-heading: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --font-prose: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -94,11 +121,19 @@
 body {
   margin: 0;
   font-family: var(--font-prose);
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: var(--text-base);
+  line-height: var(--lead-prose);
   color: var(--ink);
   background: var(--page);
+  /* Roboto's default figures are proportional; tabular keeps timestamps and counts from
+     shifting as digits change, which matters on a page that updates a run's state in place. */
+  font-variant-numeric: tabular-nums;
 }
+
+/* Paragraph rhythm comes from the scale rather than from browser defaults, so the space
+   between a statement and the next one is a decision. */
+p { margin: 0 0 var(--space-4); }
+p:last-child { margin-bottom: 0; }
 
 /* ---------------------------------------------------------------- structure */
 
@@ -138,15 +173,21 @@ header nav a {
 header nav a:hover { color: var(--ink); }
 header nav a[aria-current] { color: var(--ink); border-bottom-color: var(--link-bright); }
 
-main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+main { max-width: 46rem; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); }
 footer {
-  max-width: 46rem; margin: 0 auto; padding: 1rem;
-  color: var(--muted); font-size: 0.8125rem; border-top: 1px solid var(--rule);
+  max-width: 46rem; margin: 0 auto; padding: var(--space-4);
+  color: var(--muted); font-size: var(--text-xs); line-height: var(--lead-snug);
+  border-top: 1px solid var(--rule); max-width: 46rem;
 }
+footer p { max-width: var(--measure); }
 
-h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.012em; }
-h1 { font-size: 1.75rem; margin-top: 0; line-height: 1.2; text-wrap: balance; }
-h2 { font-size: 1.3rem; }
+h1, h2, h3 {
+  font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.012em;
+  line-height: var(--lead-tight); text-wrap: balance; max-width: var(--measure);
+}
+h1 { font-size: var(--text-2xl); margin: 0 0 var(--space-2); }
+h2 { font-size: var(--text-xl); margin: var(--space-6) 0 var(--space-2); }
+h3 { font-size: var(--text-lg); margin: var(--space-5) 0 var(--space-2); }
 a { color: var(--link); text-underline-offset: 2px; }
 :focus-visible { outline: 3px solid var(--link-bright); outline-offset: 2px; }
 
@@ -182,12 +223,21 @@ form.inline { display: inline; }
 
 /* ---------------------------------------------------------------- lists and prose */
 
-.threads { list-style: none; padding: 0; }
-.threads li { padding: 0.6rem 0; border-bottom: 1px solid var(--rule-soft); }
+.threads { list-style: none; padding: 0; margin: var(--space-5) 0 0; }
+.threads li {
+  padding: var(--space-3) 0; border-bottom: 1px solid var(--rule-soft);
+  display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4);
+  align-items: baseline; justify-content: space-between;
+}
+.threads li:first-child { border-top: 1px solid var(--rule-soft); }
 .threads a { color: var(--ink); text-decoration: none; }
 .threads a:hover { text-decoration: underline; text-decoration-color: var(--link-bright); }
 
-.meta, .note, .context { color: var(--muted); font-size: 0.8125rem; }
+.meta, .note, .context {
+  color: var(--muted); font-size: var(--text-sm); line-height: var(--lead-snug);
+  max-width: var(--measure);
+}
+.context { margin: var(--space-2) 0 0; }
 .empty, .notice {
   background: var(--raised); border: 1px solid var(--rule);
   padding: 0.75rem; border-radius: 5px;
@@ -195,13 +245,29 @@ form.inline { display: inline; }
 /* The one-line statement of what a page does, under its heading (028 follow-up). It carries
    the never-acts distinction that the nav labels alone could not — a person who lands mid-flow
    reads the page, not the header. */
-.lede { color: var(--muted); max-width: 34rem; }
+/* The lede is read, so it takes the measure and a size above the meta text — it is the
+   sentence that orients somebody who landed mid-flow, not a caption. */
+/* THE LEDE STAYS AT READING SIZE, and the reason is worth keeping.
+   Enlarging it to `--text-lg` made its inline link wrap across two lines — and a wrapped
+   inline element's bounding box spans both lines, so its CENTRE falls between them, on
+   whatever text is there instead. The focus-not-obscured check samples that centre with
+   `elementFromPoint` and correctly reported it was not looking at the link.
+   Nothing was actually obscured: 2.4.11 is about overlays covering focus, and the check's
+   centre-point sampling cannot see a multi-line inline box. But the fix is not to weaken the
+   check for a font size — the lede earns its hierarchy from colour, measure and the space
+   below it, which is cheaper than a size that puts a focused link where a probe cannot find
+   it. If this ever needs to grow, the link comes out of the sentence first. */
+.lede {
+  color: var(--muted); max-width: var(--measure);
+  line-height: var(--lead-prose);
+  margin: 0 0 var(--space-5);
+}
 
 /* ---------------------------------------------------------------- turns and verdicts */
 
-.turns { list-style: none; padding: 0; }
+.turns { list-style: none; padding: 0; display: grid; gap: var(--space-4); }
 .turn {
-  border: 1px solid var(--rule); border-radius: 6px; padding: 0.85rem; margin: 0 0 1rem;
+  border: 1px solid var(--rule); border-radius: 6px; padding: var(--space-4); margin: 0;
   /* The product's identity, when the platform knows it. `data-pack` is absent when it does
      not, so an unknown product costs no colour AND no reserved space — absence is not a
      visual defect. */
@@ -209,11 +275,22 @@ form.inline { display: inline; }
 }
 .turn[data-pack="vault"] { border-left-color: var(--vault); }
 .turn[data-pack="terraform"] { border-left-color: var(--terraform); }
-.message { margin: 0 0 0.5rem; white-space: pre-wrap; }
+/* WHAT YOU SAID, separated from WHAT HAPPENED by a rule rather than by spacing alone. A turn
+   holds two different things — a person's message and the platform's response — and reading
+   them as one paragraph is the confusion this divider removes. */
+.message {
+  margin: 0 0 var(--space-3); white-space: pre-wrap; max-width: var(--measure);
+  padding-bottom: var(--space-3); border-bottom: 1px solid var(--rule-soft);
+}
 
 /* A VERDICT SURVIVES GREYSCALE, because colour alone would fail 1.4.1. The pill carries a
    border and the disposition word itself; the hue is the third signal, not the only one. */
-.disposition { margin: 0.25rem 0; }
+/* The pill sits on the same baseline as the sentence it labels, with the gap coming from
+   flex rather than from a margin that would collapse differently per browser. */
+.disposition {
+  margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2);
+  align-items: baseline; max-width: var(--measure);
+}
 .pill {
   font-family: var(--font-evidence); font-size: 0.6875rem; letter-spacing: 0.08em;
   text-transform: uppercase; padding: 0.15rem 0.45rem; border-radius: 3px;
@@ -225,25 +302,39 @@ form.inline { display: inline; }
 .disposition--declined, .disposition--refused { color: var(--denied); }
 
 .result {
-  font-family: var(--font-evidence); font-size: 0.8125rem;
+  font-family: var(--font-evidence); font-size: var(--text-sm);
+  line-height: var(--lead-snug);
   background: var(--raised); border: 1px solid var(--rule-soft);
-  padding: 0.6rem; border-radius: 4px;
+  padding: var(--space-3); border-radius: 4px; margin: var(--space-3) 0 0;
   overflow-x: auto; white-space: pre-wrap; word-break: break-word;
 }
 .context--dropped { color: var(--denied); }
 
 /* ---------------------------------------------------------------- the answer */
 
-.answer { margin-top: 2rem; border-top: 1px solid var(--rule); padding-top: 1rem; }
-.claims { padding-left: 1.25rem; }
-.claims li { margin-bottom: 1rem; }
+.answer { margin-top: var(--space-6); border-top: 1px solid var(--rule); padding-top: var(--space-5); }
+
+/* CLAIMS ARE STATEMENTS, EACH WITH ITS EVIDENCE ATTACHED — and the layout should say so.
+   Before this they were list items whose citations ran on underneath at the same rhythm as
+   the prose, so a reader scanning for "what does this rest on" had to parse rather than
+   glance. Now each claim is a block: the sentence at reading size, its sources indented
+   beneath in the evidence face, and real space between claims so two never blur into one. */
+.claims { padding-left: 0; list-style: none; display: grid; gap: var(--space-5); }
+.claims li { margin: 0; }
+.claims li > p, .claims li { max-width: var(--measure); }
+/* The marker is a rule rather than a number: claims are a set, not a sequence, and numbering
+   them would assert an order the answer does not have. */
+.claims li {
+  border-left: 2px solid var(--rule); padding-left: var(--space-4);
+}
 /* EVIDENCE, not prose. Citations and record references are things a person carries
    elsewhere, so they take the evidence face — and a record hash stays `code` rather than `a`,
    because it resolves to nothing a browser can fetch and a dead link teaches readers the
    references are decorative. */
 .citations, .references {
-  list-style: none; padding-left: 0; font-size: 0.75rem;
-  font-family: var(--font-evidence);
+  list-style: none; padding-left: 0; font-size: var(--text-xs);
+  font-family: var(--font-evidence); line-height: var(--lead-snug);
+  margin: var(--space-2) 0 0; display: grid; gap: var(--space-1);
 }
 .citations a { color: var(--link); word-break: break-all; }
 /* Long hashes break rather than push the page sideways — the evidence face renders them wider
@@ -256,10 +347,10 @@ form.inline { display: inline; }
    the window note appears only when a read truncated, while the ground note is on every answer,
    because an age is true of every answer and silence would imply recency. */
 .provenance {
-  margin-top: 1.5rem; padding: 0.75rem 0.9rem;
+  margin-top: var(--space-5); padding: var(--space-3) var(--space-4);
   border: 1px solid var(--rule); border-left: 3px solid var(--link-bright);
   border-radius: 0 5px 5px 0; background: var(--raised);
-  display: grid; gap: 0.25rem;
+  display: grid; gap: var(--space-1);
 }
 .provenance .meta { margin: 0; }
 .meta.window { font-style: italic; }
