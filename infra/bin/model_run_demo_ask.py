@@ -69,7 +69,7 @@ def operator_token() -> str:
     return token
 
 
-def running_api_allocation() -> str:
+def running_api_allocation() -> str | None:
     status = subprocess.run(
         ["nomad", "job", "status", "api"], capture_output=True, text=True, check=True
     ).stdout
@@ -77,8 +77,7 @@ def running_api_allocation() -> str:
         parts = line.split()
         if len(parts) >= 6 and parts[5] == "running" and len(parts[0]) == 8:
             return parts[0]
-    print("FAIL: the api job has no running allocation — run `infra/bin/portal-up`")
-    raise SystemExit(2)
+    return None
 
 
 def ask_from_inside(alloc: str, token: str) -> dict[str, object]:
@@ -109,12 +108,14 @@ except urllib.error.HTTPError as e:
     return json.loads(result.stdout[marker + 1 :].splitlines()[0])
 
 
-def wait_until_answerable(alloc: str) -> None:
+def wait_until_answerable() -> str:
     """A readiness poll, not a retry: wait for the surface to answer, then assert once.
 
-    The restarted allocation reinstalls its dependencies before binding, so the first
-    minutes of silence are a young deployment, not a broken one — the deployment lane's
-    distinction, applied here.
+    ONE loop that re-resolves the allocation and probes it, because the two failure modes
+    arrive interleaved: the restarted task shows no `running` allocation for a window (the
+    second end-to-end execution died on a single-shot lookup exactly there), and once
+    running it reinstalls its dependencies before binding. Silence inside the budget is a
+    young deployment, not a broken one — the deployment lane's distinction, applied.
     """
     probe = (
         "import urllib.request, urllib.error\n"
@@ -127,15 +128,17 @@ def wait_until_answerable(alloc: str) -> None:
     )
     deadline = time.monotonic() + READY_BUDGET
     while time.monotonic() < deadline:
-        result = subprocess.run(
-            ["nomad", "alloc", "exec", "-task", "server", alloc, "python3", "-c", probe],
-            capture_output=True,
-            text=True,
-            timeout=60.0,
-            check=False,
-        )
-        if "\x00up" in result.stdout:
-            return
+        alloc = running_api_allocation()
+        if alloc is not None:
+            result = subprocess.run(
+                ["nomad", "alloc", "exec", "-task", "server", alloc, "python3", "-c", probe],
+                capture_output=True,
+                text=True,
+                timeout=60.0,
+                check=False,
+            )
+            if "\x00up" in result.stdout:
+                return alloc
         time.sleep(5.0)
     print(f"FAIL: the api never became answerable within {READY_BUDGET:.0f}s of its restart")
     raise SystemExit(2)
@@ -145,8 +148,7 @@ def main() -> int:
     runs = json.loads(Path(sys.argv[1]).read_text())
     citable = set(runs["citable_hashes"])
 
-    alloc = running_api_allocation()
-    wait_until_answerable(alloc)
+    alloc = wait_until_answerable()
     response = ask_from_inside(alloc, operator_token())
     answer = response["body"]
     assert isinstance(answer, dict)
