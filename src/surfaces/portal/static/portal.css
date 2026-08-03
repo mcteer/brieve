@@ -1,36 +1,117 @@
 /* SPDX-License-Identifier: Apache-2.0
  *
+ * The portal's visual identity (034): HashiCorp's ramp carrying a reading surface.
+ *
+ * **Two rules govern this file.** Every colour and every typeface is a TOKEN, declared once
+ * below and referenced everywhere — a component row fails on a colour literal outside the
+ * token blocks, which is what makes "no page invents its own colour" checkable rather than
+ * aspirational. And saturated colour MEANS something: a product identity or a verdict.
+ * Nothing here is decorative.
+ *
+ * **Three type roles, because this platform has three kinds of content.** Prose is an argument
+ * you weigh. A control is something you operate. Evidence is an identifier you carry to
+ * somebody else — a record hash, a disposition, a timestamp. Before 034 all three shared one
+ * face and the reader did the sorting; now the page does it.
+ *
  * Hand-written, no build step. Colours are chosen for WCAG 2.2 AA contrast against the
- * backgrounds they sit on; focus styles are visible rather than removed, because 2.4.13
- * (focus appearance) is one of the criteria a person has to check by eye and a removed
- * outline makes that check fail before it starts.
+ * backgrounds they sit on, in BOTH themes — every pair was computed before a rule was written
+ * (the table is in the feature's research), and axe holds them at runtime. Focus styles are
+ * visible rather than removed, because 2.4.13 (focus appearance) is one of the criteria a
+ * person has to check by eye and a removed outline makes that check fail before it starts.
  */
+
+/* ---------------------------------------------------------------- the tokens */
+
 :root {
-  --ink: #14171a;
-  --muted: #55606b;
-  --line: #cbd3da;
-  --accent: #0b4f9e;
-  --danger: #98221b;
-  --warn-bg: #fff6e5;
+  /* Ground and ink. Cool neutrals, near-black rather than pure black. */
   --page: #ffffff;
+  --raised: #f7f8f9;
+  --ink: #0c0c0e;
+  --muted: #656a76;
+  --rule: #dedfe3;
+  --rule-soft: #ebedee;
+
+  /* Action. `--link` clears AA on both grounds; `--link-bright` is the brand tone and is
+     NON-TEXT ONLY (focus ring, active-nav underline), where the 3:1 floor applies instead.
+     The CTA pair flips together so a label never chases its fill. */
+  --link: #0f52d9;
+  --link-bright: #1563ff;
+  --cta: #0c0c0e;
+  --cta-ink: #ffffff;
+
+  /* Verdicts. Semantic, deliberately NOT the accent — a refusal must not read as a link. */
+  --allowed: #00764f;
+  --denied: #ba2525;
+
+  /* Product identity. The only other saturated colour on any page, and it appears only where
+     the platform genuinely knows the product. Identity colours do not invert between themes:
+     Vault yellow is Vault yellow on any ground. */
+  --vault: #ffcf25;
+  --terraform: #7b42bc;
+
+  /* The three roles, plus a display face for headings. */
+  --font-heading: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-prose: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-control: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-evidence: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+/* DESIGNED, NOT INVERTED. The accent that clears AA on white is not the one that clears it on
+   near-black, so the dark theme names its own values rather than filtering the light ones.
+   Driven by the system preference alone: the portal holds no client state and gains none here
+   — a toggle would need a home, and every home (cookie, storage) is behaviour in a change that
+   promised presentation. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0c0c0e;
+    --raised: #17181c;
+    --ink: #f1f2f3;
+    --muted: #a3a7b0;
+    --rule: #2c2e33;
+    --rule-soft: #212328;
+    --link: #7fa9ff;
+    --link-bright: #6ba1ff;
+    --cta: #f1f2f3;
+    --cta-ink: #0c0c0e;
+    --allowed: #4fcb9b;
+    --denied: #ff8a8a;
+  }
+}
+
+/* Vendored, never fetched: the portal serves its own assets and works offline. One variable
+   file carries every weight — see fonts/PROVENANCE.md for the pin, the licence (OFL 1.1) and
+   the digests. `swap` so text is readable before the font arrives. */
+@font-face {
+  font-family: Roboto;
+  src: url("fonts/roboto-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 * { box-sizing: border-box; }
+
 body {
   margin: 0;
-  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-prose);
+  font-size: 16px;
+  line-height: 1.6;
   color: var(--ink);
   background: var(--page);
 }
-.skip {
-  position: absolute; left: -9999px;
-}
+
+/* ---------------------------------------------------------------- structure */
+
+.skip { position: absolute; left: -9999px; }
 .skip:focus {
   left: 0.5rem; top: 0.5rem; z-index: 10; padding: 0.5rem 0.75rem;
-  background: var(--page); border: 2px solid var(--accent);
+  background: var(--page); border: 2px solid var(--link);
+  font-family: var(--font-control);
 }
+
 header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem 1rem; border-bottom: 1px solid var(--line);
+  padding: 0.75rem 1rem; border-bottom: 1px solid var(--rule);
   /* WRAPS, because a header that cannot is a page that scrolls sideways (028).
      Adding the nav pushed the row past 320px and broke WCAG 2.2 reflow — on CI's Linux
      Chromium first, where the same strings render wider than on macOS, which is why the
@@ -38,62 +119,152 @@ header {
      text: at 320px the header becomes two lines and nothing is lost. */
   flex-wrap: wrap; gap: 0.5rem 1rem;
 }
-.brand { font-weight: 700; color: var(--ink); text-decoration: none; }
+.brand {
+  font-family: var(--font-control); font-weight: 650; font-size: 0.95rem;
+  letter-spacing: -0.01em; color: var(--ink); text-decoration: none;
+}
 /* Main navigation (028). The links carry vertical padding rather than sitting at their
    text height, because WCAG 2.2's 24px minimum target applies to them and an 18px line
    box fails it — caught by the keyboard lane on the first run of the ask page. */
-header nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-right: auto; }
-header nav a {
-  color: var(--ink); min-height: 24px; display: inline-flex; align-items: center;
-  padding: 0.25rem 0;
+header nav {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-right: auto;
+  font-family: var(--font-control);
 }
+header nav a {
+  color: var(--muted); min-height: 24px; display: inline-flex; align-items: center;
+  padding: 0.25rem 0; font-size: 0.9rem; text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+header nav a:hover { color: var(--ink); }
+header nav a[aria-current] { color: var(--ink); border-bottom-color: var(--link-bright); }
+
 main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 footer {
   max-width: 46rem; margin: 0 auto; padding: 1rem;
-  color: var(--muted); font-size: 0.875rem; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 0.8125rem; border-top: 1px solid var(--rule);
 }
-h1 { font-size: 1.5rem; margin-top: 0; }
-a { color: var(--accent); }
-:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-.button, button.link {
-  font: inherit; cursor: pointer;
-}
+h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.012em; }
+h1 { font-size: 1.75rem; margin-top: 0; line-height: 1.2; text-wrap: balance; }
+h2 { font-size: 1.3rem; }
+a { color: var(--link); text-underline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--link-bright); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------- controls */
+
+.button, button.link { font-family: var(--font-control); cursor: pointer; }
+/* Black in light, white in dark — the call to action inverts with its ground rather than
+   holding one colour, and both tokens flip together so the label never chases the fill. */
 .button {
-  display: inline-block; padding: 0.5rem 0.9rem; border-radius: 4px;
-  background: var(--accent); color: #fff; border: 1px solid transparent;
-  text-decoration: none;
+  display: inline-block; padding: 0.5rem 0.9rem; border-radius: 5px;
+  background: var(--cta); color: var(--cta-ink); border: 1px solid transparent;
+  text-decoration: none; font-size: 0.875rem; font-weight: 550;
 }
-.button--danger { background: var(--danger); }
+.button--danger { background: var(--denied); color: var(--page); }
 button.link {
-  background: none; border: none; color: var(--accent); text-decoration: underline;
-  padding: 0;
+  background: none; border: none; color: var(--link); text-decoration: underline;
+  padding: 0; font-size: 0.8125rem;
 }
 form.inline { display: inline; }
 
-.threads { list-style: none; padding: 0; }
-.threads li { padding: 0.6rem 0; border-bottom: 1px solid var(--line); }
-.meta, .note, .context { color: var(--muted); font-size: 0.875rem; }
-.empty, .notice { background: var(--warn-bg); padding: 0.75rem; border-radius: 4px; }
-
-.turns { list-style: none; padding: 0; }
-.turn { border: 1px solid var(--line); border-radius: 6px; padding: 0.85rem; margin: 0 0 1rem; }
-.message { margin: 0 0 0.5rem; white-space: pre-wrap; }
-.disposition { margin: 0.25rem 0; }
-.disposition--declined, .disposition--refused { color: var(--danger); }
-.result {
-  background: #f4f6f8; padding: 0.6rem; border-radius: 4px;
-  overflow-x: auto; white-space: pre-wrap; word-break: break-word;
-}
-.context--dropped { color: var(--danger); }
-
 .composer { display: grid; gap: 0.35rem; margin-top: 1.5rem; }
-.composer label { font-weight: 600; }
-.composer select, .composer textarea {
-  font: inherit; padding: 0.5rem; border: 1px solid var(--line); border-radius: 4px;
-  width: 100%;
+.composer label, .ask label {
+  font-family: var(--font-control); font-weight: 600; font-size: 0.8125rem;
+}
+.composer select, .composer textarea, .ask textarea {
+  font-family: var(--font-prose); font-size: 1rem; padding: 0.6rem 0.7rem;
+  border: 1px solid var(--rule); border-radius: 5px;
+  background: var(--page); color: var(--ink); width: 100%;
 }
 .composer .button { justify-self: start; margin-top: 0.5rem; }
+.ask label { display: block; margin-bottom: 0.25rem; }
+.ask button { margin-top: 0.75rem; }
+
+/* ---------------------------------------------------------------- lists and prose */
+
+.threads { list-style: none; padding: 0; }
+.threads li { padding: 0.6rem 0; border-bottom: 1px solid var(--rule-soft); }
+.threads a { color: var(--ink); text-decoration: none; }
+.threads a:hover { text-decoration: underline; text-decoration-color: var(--link-bright); }
+
+.meta, .note, .context { color: var(--muted); font-size: 0.8125rem; }
+.empty, .notice {
+  background: var(--raised); border: 1px solid var(--rule);
+  padding: 0.75rem; border-radius: 5px;
+}
+/* The one-line statement of what a page does, under its heading (028 follow-up). It carries
+   the never-acts distinction that the nav labels alone could not — a person who lands mid-flow
+   reads the page, not the header. */
+.lede { color: var(--muted); max-width: 34rem; }
+
+/* ---------------------------------------------------------------- turns and verdicts */
+
+.turns { list-style: none; padding: 0; }
+.turn {
+  border: 1px solid var(--rule); border-radius: 6px; padding: 0.85rem; margin: 0 0 1rem;
+  /* The product's identity, when the platform knows it. `data-pack` is absent when it does
+     not, so an unknown product costs no colour AND no reserved space — absence is not a
+     visual defect. */
+  border-left: 3px solid transparent;
+}
+.turn[data-pack="vault"] { border-left-color: var(--vault); }
+.turn[data-pack="terraform"] { border-left-color: var(--terraform); }
+.message { margin: 0 0 0.5rem; white-space: pre-wrap; }
+
+/* A VERDICT SURVIVES GREYSCALE, because colour alone would fail 1.4.1. The pill carries a
+   border and the disposition word itself; the hue is the third signal, not the only one. */
+.disposition { margin: 0.25rem 0; }
+.pill {
+  font-family: var(--font-evidence); font-size: 0.6875rem; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 0.15rem 0.45rem; border-radius: 3px;
+  border: 1px solid currentColor; display: inline-block;
+  min-height: 24px; line-height: 22px;
+}
+.pill--answered, .pill--completed { color: var(--allowed); }
+.pill--declined, .pill--refused, .pill--failed { color: var(--denied); }
+.disposition--declined, .disposition--refused { color: var(--denied); }
+
+.result {
+  font-family: var(--font-evidence); font-size: 0.8125rem;
+  background: var(--raised); border: 1px solid var(--rule-soft);
+  padding: 0.6rem; border-radius: 4px;
+  overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+}
+.context--dropped { color: var(--denied); }
+
+/* ---------------------------------------------------------------- the answer */
+
+.answer { margin-top: 2rem; border-top: 1px solid var(--rule); padding-top: 1rem; }
+.claims { padding-left: 1.25rem; }
+.claims li { margin-bottom: 1rem; }
+/* EVIDENCE, not prose. Citations and record references are things a person carries
+   elsewhere, so they take the evidence face — and a record hash stays `code` rather than `a`,
+   because it resolves to nothing a browser can fetch and a dead link teaches readers the
+   references are decorative. */
+.citations, .references {
+  list-style: none; padding-left: 0; font-size: 0.75rem;
+  font-family: var(--font-evidence);
+}
+.citations a { color: var(--link); word-break: break-all; }
+/* Long hashes break rather than push the page sideways — the evidence face renders them wider
+   than the prose face did, so this matters more than it used to (320px reflow). */
+.references code, .stamp { color: var(--muted); word-break: break-all; }
+.stamp { font-family: var(--font-evidence); font-variant-numeric: tabular-nums; }
+
+/* What an answer rests on, and how old its ground is (029, 033). The two notes share one block
+   because a reader weighing an answer wants both at once — but they remain different claims:
+   the window note appears only when a read truncated, while the ground note is on every answer,
+   because an age is true of every answer and silence would imply recency. */
+.provenance {
+  margin-top: 1.5rem; padding: 0.75rem 0.9rem;
+  border: 1px solid var(--rule); border-left: 3px solid var(--link-bright);
+  border-radius: 0 5px 5px 0; background: var(--raised);
+  display: grid; gap: 0.25rem;
+}
+.provenance .meta { margin: 0; }
+.meta.window { font-style: italic; }
+
+/* ---------------------------------------------------------------- accessibility utilities */
 
 /* Available to a screen reader, absent from the page. Used for status prefixes that a
  * sighted person reads from context and an assistive-technology user does not get. */
@@ -114,25 +285,3 @@ form.inline { display: inline; }
   min-height: 24px;
   line-height: 24px;
 }
-
-/* The ask page (028). The answer's own regions, and the reference identifiers that are
-   deliberately not links — `code` rather than `a`, because a record hash resolves to
-   nothing a browser can fetch and a dead link teaches readers the references are decorative. */
-.ask textarea { width: 100%; font: inherit; padding: 0.5rem; border: 1px solid var(--line); }
-.ask label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
-.ask button { margin-top: 0.75rem; }
-.answer { margin-top: 2rem; border-top: 1px solid var(--line); padding-top: 1rem; }
-.claims { padding-left: 1.25rem; }
-.claims li { margin-bottom: 1rem; }
-.citations, .references { list-style: none; padding-left: 0; font-size: 0.875rem; }
-.citations a { color: var(--accent); }
-.references code { color: var(--muted); word-break: break-all; }
-
-/* The one-line statement of what a page does, under its heading (028 follow-up). It carries
-   the never-acts distinction that the nav labels alone could not — a person who lands mid-flow
-   reads the page, not the header. */
-.lede { color: var(--muted); max-width: 40rem; }
-
-/* What an answer rests on, when it rested on a window (029). Same register as the source line —
-   a caveat that shouted would be read as an error, and this is not one. */
-.meta.window { font-style: italic; }

@@ -21,8 +21,12 @@
       Run does things; ask answers.
     #}
     <nav aria-label="Main">
-      <a href="/">Run an agent</a>
-      <a href="/ask">Ask a question</a>
+      {# `aria-current` from the request path rather than from route context: it tells a
+         screen-reader user which page they are on, and the nav's underline reads from the
+         same attribute so the visual and the announced state cannot drift. Template-only,
+         so no route had to learn about presentation. #}
+      <a href="/"{% if request.url.path == "/" %} aria-current="page"{% endif %}>Run an agent</a>
+      <a href="/ask"{% if request.url.path.startswith("/ask") %} aria-current="page"{% endif %}>Ask a question</a>
     </nav>
     {% block header_actions %}{% endblock %}
   </header>

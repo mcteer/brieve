@@ -42,7 +42,7 @@ reviewed act recorded in provenance — nothing fetches at runtime.
 
 ## Phase 3: User Story 1 + User Story 3 — the identity, behind the doubled gate (P1)
 
-- [ ] T002 [US1] Rewrite `src/surfaces/portal/static/portal.css` as a token sheet: the F5
+- [X] T002 [US1] Rewrite `src/surfaces/portal/static/portal.css` as a token sheet: the F5
       palette as custom properties in `:root` (light) and `@media (prefers-color-scheme:
       dark)` (dark, designed not inverted — FR-013), the four type-role tokens
       (`--font-heading` serif stack, `--font-prose` Roboto with system fallback,
@@ -53,7 +53,7 @@ reviewed act recorded in provenance — nothing fetches at runtime.
       rules restyled, and the focus ring moves to `--link-bright` where contrast rules do not
       bind (FR-008). Long-hash `word-break` is kept and extended to every evidence context —
       the mono face makes this worse before better (spec edge case).
-- [ ] T003 [US1] Apply the role assignment table (data-model) across all eight templates in
+- [X] T003 [US1] Apply the role assignment table (data-model) across all eight templates in
       `src/surfaces/portal/templates/`: headings to the heading face; body prose inherits
       Roboto from `body`; controls (buttons, nav, form labels, composer chrome) explicitly on
       the control face; evidence (record hashes, timestamps, citations, result blocks) on the
@@ -64,20 +64,20 @@ reviewed act recorded in provenance — nothing fetches at runtime.
       in research F9 is re-read in the same edit**: verb-labelled nav, references as `code`
       not `a`, conditional window note vs unconditional ground note — kept, with premises
       updated where the restyle moves them (FR-009).
-- [ ] T004 [US3] Parametrize the a11y fixtures in `tests/a11y/conftest.py`: `page` and
+- [X] T004 [US3] Parametrize the a11y fixtures in `tests/a11y/conftest.py`: `page` and
       `anonymous_page` gain `params=["light", "dark"]` and create their browser context with
       `color_scheme=<param>`, so every existing axe state AND every keyboard row runs once
       per theme with zero row edits (research F4) and a failure names its theme in the test
       id. No row is edited; the doubling is entirely fixture-side. (Verified during analyze:
       no row creates its own context, so nothing escapes the parametrization.)
-- [ ] T004a [US3] Two templates ship restyled with no axe state today (analyze G2), which is
+- [X] T004a [US3] Two templates ship restyled with no axe state today (analyze G2), which is
       exactly the untested surface the dark-theme decision refused: add states in
       `tests/a11y/test_wcag.py` for `login_failed.html` (the harness IdP refuses a callback)
       and `refused.html` (the harness transport refuses a thread open — distinct from the
       already-covered ask-form refusal). If either state proves unreachable through the
       lane's session-scoped surface, it is NAMED in the contract's human-walk row rather
       than left unlisted — an unlisted gap reads as coverage.
-- [ ] T005 [P] [US1] [GATE:fail-closed] Component rows in
+- [X] T005 [P] [US1] [GATE:fail-closed] Component rows in
       `tests/component/test_portal_identity.py`: token discipline — no hex/rgb/hsl literal in
       `portal.css` outside the token blocks and no `style=` attribute carrying colour in any
       template (SC-004, the row that makes the discipline enforceable); dispositions survive
@@ -88,7 +88,7 @@ reviewed act recorded in provenance — nothing fetches at runtime.
       the portal's own origin (SC-006; sharpened by analyze A3, because the offline property
       is about what the browser fetches, not what a person may click — citation anchors are
       payload-derived links and legitimately external).
-- [ ] T006 [US1] Run the doubled lane to green:
+- [X] T006 [US1] Run the doubled lane to green:
       `uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y -q`.
       Contrast findings are fixed **by adjusting token values** in their theme's block — never
       by excluding a state, never by narrowing the lane (SC-001's "no exclusions added").

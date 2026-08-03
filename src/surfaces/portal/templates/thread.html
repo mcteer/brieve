@@ -14,11 +14,13 @@
 
     {% if turn.disposition == "declined" %}
       <p class="disposition disposition--declined">
+        <span class="pill pill--declined">declined</span>
         This platform starts agents. It could not turn that into one &mdash; choose an
         agent below and send it again.
       </p>
     {% elif turn.disposition == "refused" %}
       <p class="disposition disposition--refused">
+        <span class="pill pill--refused">refused</span>
         You do not have access to start that agent. It exists, and someone who administers
         your access can grant it.
       </p>
@@ -32,7 +34,12 @@
            of interrupting; `atomic` so the whole status is read rather than the one word
            that changed, which out of context is just "completed". #}
         <span class="visually-hidden">Run status:</span>
-        <span class="state">{% if turn.run %}{{ turn.run.state }}{% else %}starting{% endif %}</span>
+        {# A PILL WITHOUT SEMANTIC COLOUR, deliberately. `portal.js` updates this element's
+           text in place and does not touch its classes, so a colour chosen at render time
+           would keep saying "running" green after the run failed — a lie the reader has no
+           way to catch. The static dispositions above cannot change after render, so they
+           carry colour; this one carries only the shape and the word. #}
+        <span class="state pill">{% if turn.run %}{{ turn.run.state }}{% else %}starting{% endif %}</span>
         {% if turn.run and turn.run.state not in ["completed", "failed", "stopped"] %}
           <form method="post" action="/runs/{{ turn.run_id }}/stop" class="inline">
             <input type="hidden" name="thread_id" value="{{ thread.thread_id }}">
