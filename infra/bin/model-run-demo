@@ -96,9 +96,30 @@ restore_estate() {
   vault kv put -mount=harness-authority definition-bindings/planner-agent @"${CAPTURE}/planner-agent.json" >/dev/null
   ok "originals written back"
 }
+
+# 017's ownership rule, learned here the hard way: the first post-demo `make conformance`
+# found this script's leftover mcp-surface, re-submitted over it, matched "ready" in the OLD
+# allocation's logs, and ran its rows into the replacement window. A lane stops what it
+# started — so the surface this demo submits carries this run's mark, and only a surface
+# still carrying it is stopped.
+MARK="model-run-demo-$$"
+stop_what_we_started() {
+  if [ "$(nomad job inspect mcp-surface 2>/dev/null | python3 -c 'import json,sys
+try: print((json.load(sys.stdin)["Job"]["Meta"] or {}).get("harness_started_by",""))
+except Exception: print("")' 2>/dev/null)" = "$MARK" ]; then
+    nomad job stop -purge mcp-surface >/dev/null 2>&1 || true
+    ok "stopped the mcp-surface this demonstration started"
+  fi
+}
+
+demo_cleanup() {
+  restore_estate
+  stop_what_we_started
+}
 # The trap is the whole reason an interruption cannot strand a live plan cell where a
-# dispatched conformance row would later find it.
-trap restore_estate EXIT
+# dispatched conformance row would later find it — nor a demonstration surface where the
+# next lane would trip over it.
+trap demo_cleanup EXIT
 
 # ---------------------------------------------------------------- seed, out of band
 say "Seeding the demonstration cell (out of band — never Terraform state)"
@@ -146,7 +167,7 @@ say "US4: the operator asks the platform about the refusal"
 # which is its own governance working; a browser sign-in remains the API's human path.
 # `mcp-surface-up` re-submits the job, so the served process runs THIS branch's visibility
 # decision (run-the-served-process: the assembly is the one path no test covers).
-DEV_IDP=1 "$REPO/infra/bin/mcp-surface-up" || die "the MCP surface did not come up"
+DEV_IDP=1 HARNESS_STARTED_BY="$MARK" "$REPO/infra/bin/mcp-surface-up" || die "the MCP surface did not come up"
 uv run --extra surfaces --extra adapters python infra/bin/model_run_demo_ask.py "${CAPTURE}/runs.json" \
   || die "the operator's question did not answer citing the refusal"
 
