@@ -20,12 +20,21 @@ reviewed act recorded in provenance — nothing fetches at runtime.
 
 ## Phase 1: Setup
 
-- [ ] T001 Vendor Roboto into `src/surfaces/portal/static/fonts/`: Regular (400) and Bold
-      (700) as woff2, from the pinned canonical upstream release. Write `PROVENANCE.md`
-      beside them recording repository + release/commit, licence (Apache-2.0 — the same as
-      this repository), retrieval date, the exact conversion command and tool version if
-      woff2 was produced from released TTF, and the sha256 of each vendored file (research
-      F7). This is the feature's ONE network act; it happens here, once, and is reviewed.
+- [X] T001 Vendor Roboto into `src/surfaces/portal/static/fonts/`. **Two planning
+      assumptions were wrong and vendoring is where that surfaced** — which is the point of
+      having the discipline. (1) The licence is **SIL OFL 1.1, not Apache-2.0**: Roboto was
+      Apache-2.0 for years before the Google Fonts collection relocensed, so the artifacts'
+      claim was stale rather than invented; `OFL.txt` is vendored verbatim beside the font
+      and no Reserved Font Name is declared, which is recorded because its absence is what
+      leaves format conversion unencumbered. (2) Upstream **no longer ships static Regular
+      and Bold** — `google/fonts@2796410` holds only `Roboto[wdth,wght].ttf`, so ONE variable
+      file (wght 100–900) covers every weight, with one digest to verify instead of two, at
+      222 KB rather than the plan's estimated ~90 KB. Italic is not vendored (one use, the
+      window note; synthetic oblique suffices) and that is recorded rather than silently
+      omitted. `PROVENANCE.md` carries repository + commit + upstream path, the licence, the
+      reproducible conversion command with its pinned tool version, and sha256 for the
+      upstream source as well as both vendored files — the source digest so the conversion is
+      re-derivable end to end. This was the feature's ONE network act.
 
 ## Phase 2: Foundational
 
@@ -33,7 +42,7 @@ reviewed act recorded in provenance — nothing fetches at runtime.
 
 ## Phase 3: User Story 1 + User Story 3 — the identity, behind the doubled gate (P1)
 
-- [ ] T002 [US1] Rewrite `src/surfaces/portal/static/portal.css` as a token sheet: the F5
+- [X] T002 [US1] Rewrite `src/surfaces/portal/static/portal.css` as a token sheet: the F5
       palette as custom properties in `:root` (light) and `@media (prefers-color-scheme:
       dark)` (dark, designed not inverted — FR-013), the four type-role tokens
       (`--font-heading` serif stack, `--font-prose` Roboto with system fallback,
@@ -44,7 +53,7 @@ reviewed act recorded in provenance — nothing fetches at runtime.
       rules restyled, and the focus ring moves to `--link-bright` where contrast rules do not
       bind (FR-008). Long-hash `word-break` is kept and extended to every evidence context —
       the mono face makes this worse before better (spec edge case).
-- [ ] T003 [US1] Apply the role assignment table (data-model) across all eight templates in
+- [X] T003 [US1] Apply the role assignment table (data-model) across all eight templates in
       `src/surfaces/portal/templates/`: headings to the heading face; body prose inherits
       Roboto from `body`; controls (buttons, nav, form labels, composer chrome) explicitly on
       the control face; evidence (record hashes, timestamps, citations, result blocks) on the
@@ -55,20 +64,20 @@ reviewed act recorded in provenance — nothing fetches at runtime.
       in research F9 is re-read in the same edit**: verb-labelled nav, references as `code`
       not `a`, conditional window note vs unconditional ground note — kept, with premises
       updated where the restyle moves them (FR-009).
-- [ ] T004 [US3] Parametrize the a11y fixtures in `tests/a11y/conftest.py`: `page` and
+- [X] T004 [US3] Parametrize the a11y fixtures in `tests/a11y/conftest.py`: `page` and
       `anonymous_page` gain `params=["light", "dark"]` and create their browser context with
       `color_scheme=<param>`, so every existing axe state AND every keyboard row runs once
       per theme with zero row edits (research F4) and a failure names its theme in the test
       id. No row is edited; the doubling is entirely fixture-side. (Verified during analyze:
       no row creates its own context, so nothing escapes the parametrization.)
-- [ ] T004a [US3] Two templates ship restyled with no axe state today (analyze G2), which is
+- [X] T004a [US3] Two templates ship restyled with no axe state today (analyze G2), which is
       exactly the untested surface the dark-theme decision refused: add states in
       `tests/a11y/test_wcag.py` for `login_failed.html` (the harness IdP refuses a callback)
       and `refused.html` (the harness transport refuses a thread open — distinct from the
       already-covered ask-form refusal). If either state proves unreachable through the
       lane's session-scoped surface, it is NAMED in the contract's human-walk row rather
       than left unlisted — an unlisted gap reads as coverage.
-- [ ] T005 [P] [US1] [GATE:fail-closed] Component rows in
+- [X] T005 [P] [US1] [GATE:fail-closed] Component rows in
       `tests/component/test_portal_identity.py`: token discipline — no hex/rgb/hsl literal in
       `portal.css` outside the token blocks and no `style=` attribute carrying colour in any
       template (SC-004, the row that makes the discipline enforceable); dispositions survive
@@ -79,7 +88,7 @@ reviewed act recorded in provenance — nothing fetches at runtime.
       the portal's own origin (SC-006; sharpened by analyze A3, because the offline property
       is about what the browser fetches, not what a person may click — citation anchors are
       payload-derived links and legitimately external).
-- [ ] T006 [US1] Run the doubled lane to green:
+- [X] T006 [US1] Run the doubled lane to green:
       `uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y -q`.
       Contrast findings are fixed **by adjusting token values** in their theme's block — never
       by excluding a state, never by narrowing the lane (SC-001's "no exclusions added").
@@ -90,7 +99,7 @@ portal guards the new one — at twice the states.
 
 ## Phase 4: User Story 2 — the page says which product it is about (P2)
 
-- [ ] T007 [US2] `src/surfaces/api/definitions.py`: `AgentDefinitionView` gains
+- [X] T007 [US2] `src/surfaces/api/definitions.py`: `AgentDefinitionView` gains
       `packs: tuple[str, ...] = ()`, resolved from the fabric beside the ceiling with the
       same fail-shape — a definition whose packs cannot be read shows `()` rather than being
       hidden or failing (unknown is a state, research F2). **The mechanism is designed for
@@ -102,7 +111,7 @@ portal guards the new one — at twice the states.
       every hermetic row's accident. The view is transport-shared, so MCP and the API expose
       the field by construction; the existing definitions conformance coverage grows a shape
       row asserting the field, the unknown-as-empty behaviour, and the absent-resolver case.
-- [ ] T008 [US2] `src/surfaces/portal/templates/thread.html` + `app.py`'s thread context
+- [X] T008 [US2] `src/surfaces/portal/templates/thread.html` + `app.py`'s thread context
       (the one portal Python touch): each turn's stripe is looked up template-side from its
       `agent_definition_id` against the `definitions` list already in context — a
       `data-pack="<pack>"` attribute styled by the product tokens; exactly one known pack
@@ -111,7 +120,7 @@ portal guards the new one — at twice the states.
       definition. `threads.html` gains the deferral comment: the LIST carries no product
       because its payload does not know one, and a stripe from a name heuristic would be the
       platform pretending to know (spec US2 scenario 4).
-- [ ] T009 [P] [US2] Component render rows (in `test_portal_identity.py` or beside it): a
+- [X] T009 [P] [US2] Component render rows (in `test_portal_identity.py` or beside it): a
       turn with a known pack renders the stripe attribute; an unknown or multi-pack
       definition renders none and no gap; the thread LIST renders no product colour at all;
       the composer shows identity beside startable definitions.
@@ -121,8 +130,8 @@ product, and nowhere it would have to guess.
 
 ## Phase 5: Polish
 
-- [ ] T010 [P] ROADMAP entry for 034; contract status rows flipped with dates.
-- [ ] T011 All gates green on the branch: `make check`, the hermetic sweep, the doubled a11y
+- [X] T010 [P] ROADMAP entry for 034; contract status rows flipped with dates.
+- [X] T011 All gates green on the branch: `make check`, the hermetic sweep, the doubled a11y
       lane, and `make evals` untouched. Then the human half (contract's named-runner row):
       agent brings the portal up (`DEV_IDP=1 infra/bin/portal-up`), walks it to every state
       in both themes, and hands Dan the link — **Dan's visual judgement and the
