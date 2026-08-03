@@ -13,8 +13,9 @@ exactly — same composition point, same surface plumbing, never an audit payloa
 tier wording, unknown as its own wording, decline never). And the refresh learns to *happen*
 (a weekly scheduled workflow runs the corpus sync and the vendored-skills check, and opens a
 reviewable PR even when only the timestamp moved — landing stays Dan's act). The vendored
-skills gain machine-readable provenance in `pack.toml` beside their existing digests; the
-vault skill is authored here and upstream-bound, so it is explicitly out of the sync's scope.
+skills' provenance already exists as the loader-parsed `[upstream]` pin (analyze C1); the
+helper consumes it and moves only `retrieved`, and the vault skill — authored here,
+upstream-bound — is refused by the manifest's own `provenance = "authored"` field.
 
 ## Technical Context
 
