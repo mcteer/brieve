@@ -44,6 +44,14 @@ platform knows: a pack is Vault's or Terraform's.
   extends to cover dark.** Nothing ships untested: the axe-core page states run twice, once per
   theme, rather than dark being an unverified surface in a repository whose posture is against
   exactly that.
+- Q: Where can the product stripe actually appear? → A: **Where the platform already tells
+  the page which definition acted** — the thread page's turns and composer. Measured: the
+  thread LIST payload carries no product (a thread record is id, subject, tenant, created,
+  title), and deriving one would mean joining every thread through its turns to a definition
+  to its packs — API redesign, not presentation. The definitions payload gains ONE additive
+  read-only field naming each definition's packs (the same additive-payload shape as 029's
+  window note and 033's ground note; the view is transport-shared, so parity holds by
+  construction), and the list's stripe is deferred until a thread carries its product.
 - Q: Roboto is not a system face on macOS or Windows — how does the portal get it? → A:
   **Self-hosted, with the provenance discipline adopted content already gets.** A font stack
   naming Roboto would silently resolve to San Francisco on the maintainer's own machine, which
@@ -89,18 +97,23 @@ Terraform, because the platform already knows and the page now says so.
 **Why this priority**: Real orientation for anyone with more than a handful of conversations, and
 cheap — but the page is usable without it, which is why it follows US1.
 
-**Independent Test**: Render a thread list spanning both packs; the product is identifiable
-without reading the titles, and a conversation whose product is unknown renders with no stripe
-and no gap where one should be.
+**Independent Test**: Render a thread whose turns span agents of both packs; the product is
+identifiable per turn without reading the agent names, and a turn whose definition declares no
+pack renders with no stripe and no gap where one should be.
 
 **Acceptance Scenarios**:
 
-1. **Given** a conversation belonging to a known pack, **When** the list renders, **Then** that
-   pack's identity colour appears as a rule against the entry.
-2. **Given** a conversation with no known pack, **When** the list renders, **Then** the entry
-   renders cleanly with no colour and no reserved empty space — absence is not a visual defect.
-3. **Given** a person who cannot distinguish those colours, **When** they read the entry, **Then**
-   nothing is lost: the colour is redundant with text that is already there.
+1. **Given** a turn run by a definition whose pack is known, **When** the thread renders,
+   **Then** that pack's identity colour appears as a rule against the turn, and the composer's
+   agent picker shows the same identity beside each startable definition.
+2. **Given** a turn whose definition declares no pack, **When** the thread renders, **Then** the
+   turn renders cleanly with no colour and no reserved empty space — absence is not a visual
+   defect.
+3. **Given** a person who cannot distinguish those colours, **When** they read the turn, **Then**
+   nothing is lost: the colour is redundant with the agent name that is already there.
+4. **Given** the thread LIST, **When** it renders, **Then** it carries no product colour at all —
+   deferred, recorded rather than approximated, because the list's payload does not know the
+   product and a stripe derived from a name heuristic would be the platform pretending to know.
 
 ---
 
@@ -167,7 +180,11 @@ every page state, plus the keyboard and screen-reader rows.
 - **FR-009**: The templates' explanatory comments — which record *decisions* rather than describe
   markup — MUST survive the restyle. Where a comment's premise changes, the comment changes with
   it rather than being deleted.
-- **FR-010**: No route, payload, or Python behaviour may change. This feature is presentation.
+- **FR-010**: No route may change and no behaviour may change, with exactly ONE stated payload
+  exception: the definitions listing gains an additive, read-only field naming each definition's
+  packs — the same additive shape as the window note (029) and the ground note (033), served
+  from the transport-shared view so parity holds by construction. Everything else is
+  presentation: templates and the stylesheet.
 - **FR-011**: The portal MUST offer a light and a dark theme, following the reader's system
   preference, and the accessibility lane MUST cover BOTH — every page state it checks today is
   checked in each theme. A theme that ships unverified is the shape this repository refuses.
