@@ -1,0 +1,36 @@
+{
+  "path": "/validated-designs/nomad-operating-guides-nomad-enterprise/workload-orchestration",
+  "url": "https://developer.hashicorp.com/validated-designs/nomad-operating-guides-nomad-enterprise/workload-orchestration",
+  "sections": [
+    {
+      "anchor": "containerized-orchestration",
+      "title": "Containerized orchestration",
+      "text": ""
+    },
+    {
+      "anchor": "docker",
+      "title": "Docker",
+      "text": "Nomad supports Docker workloads natively as it comes bundled with Nomad. Refer to these resources to configure the Docker task driver and use it in your jobs: Configure the Docker task driver Use the Docker task driver in a job"
+    },
+    {
+      "anchor": "podman",
+      "title": "Podman",
+      "text": "Unlike Docker, Nomad operators need to download the Podman driver separately and ensure its availability on the client's nodes. Podman supports OCI containers and its command-line tool aims to be a drop-in replacement for Docker and support most of the same options as Docker. To use Podman in a job task, refer to the task configuration section of the Podman task driver documentation."
+    },
+    {
+      "anchor": "non-containerized-orchestration",
+      "title": "Non-containerized orchestration",
+      "text": "In addition to containers, Nomad supports non-containerized workloads as well. Below we discuss the various task drivers that can be used and recommendations for each."
+    },
+    {
+      "anchor": "exec2",
+      "title": "Exec2",
+      "text": "Used to execute a command for a task. It offers a security model optimized for running 'ordinary' processes with low startup times and minimal overhead in terms of CPU, disk, and memory utilization. It also uses kernel features such as the Landlock LSM , cgroups v2, and the unshare system utility. This is great for running batch jobs, legacy workloads, or other workloads that are executable on the underlying host. The exec2 task driver is not built into Nomad Enterprise. Install this using a package manager or downloaded onto the client host in the configured plugin directory. Refer to the plugin page for client requirements and capabilities By default the exec2 driver exposes a set of default paths . Customize these or specify additional, allowable paths at the plugin level, which applies to all tasks making use of the exec2 task driver, or at the task level, which applies specifically to each task. If a path is not exposed within the driver, it cannot feature in job files."
+    },
+    {
+      "anchor": "raw-exec",
+      "title": "Raw exec",
+      "text": "Unlike Exec2, use the raw exec driver to execute a command for a task without any isolation. Further, the task started is as the same user as the Nomad process. As such, use it with extreme care and it is off by default. Consider raw exec under any of the following conditions. Are confident in your node isolation and security posture Do not like the overhead of managing paths with Exec2 Prefer to manage cgroups For both exec2 and raw exec, Nomad Enterprise is effectively executing a command as if you were on the terminal for that machine. Any dependencies must exist on the host. Consider the tradeoff with having standardized client images and node pools, versus using lifecycle blocks and artifact blocks within your job files. Meaning, if a job has a large list of dependencies, it may take a long time to download and clean up all the artifacts needed. Refer to the [dependency] section for more information. Previous Self-Service Application Deployment Next Application scaling"
+    }
+  ]
+}

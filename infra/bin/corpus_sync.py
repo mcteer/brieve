@@ -18,7 +18,22 @@ CACHE = REPO / ".corpus-cache"
 MANIFEST = REPO / "corpus" / "manifest.json"
 DOCS = REPO / "corpus" / "documents"
 BASE = "https://developer.hashicorp.com"
-INDEXES = ("boundary", "nomad", "packer", "terraform", "vault")
+
+#: Validated PATTERNS — integration recipes, one page each. "Use Vault with Kubernetes."
+PATTERN_INDEXES = ("boundary", "nomad", "packer", "terraform", "vault")
+
+#: Validated DESIGNS — reference architecture, and the reason 035 exists.
+#:
+#: **The corpus answered the wrong family of question.** Patterns tell you how to integrate two
+#: things; a person asking "what is the prescribed way to build a Vault cluster in AWS" wants a
+#: DESIGN, and the platform had none — so it declined, correctly and uselessly. A guidance
+#: platform that cannot answer the most obvious question about a product has failed at the
+#: thing it is for, whatever its decline message says.
+#:
+#: Designs are two levels deep where patterns are one: an index lists guides, and each guide
+#: lists its own pages (`/architecture`, `/detailed-design`, `/deploying-vault-using-terraform`).
+#: Both levels carry content, so both are pinned.
+DESIGNS_INDEX = "/validated-designs"
 
 
 #: Credential-shaped strings that appear in IDENTITY documentation and must not be vendored.
@@ -167,12 +182,38 @@ def _get(url: str) -> str:
         return str(r.read().decode("utf-8", "replace"))
 
 
-def _discover() -> list[str]:
+def _discover_patterns() -> set[str]:
     paths: set[str] = set()
-    for index in INDEXES:
+    for index in PATTERN_INDEXES:
         html = _get(f"{BASE}/validated-patterns/{index}")
         paths.update(re.findall(rf"/validated-patterns/{index}/[a-z0-9\-]+", html))
-    return sorted(paths)
+    return paths
+
+
+def _discover_designs() -> set[str]:
+    """Every validated-design guide AND every page inside it.
+
+    Two fetches deep rather than one, because a guide's landing page is a table of contents and
+    the architecture lives on its children. Discovering only the guides would pin 19 introductions
+    and none of the content somebody actually asked for — which is a subtler version of the gap
+    035 exists to close.
+    """
+    paths: set[str] = set()
+    index_html = _get(BASE + DESIGNS_INDEX)
+    guides = set(re.findall(rf"{DESIGNS_INDEX}/[a-z0-9\-]+", index_html))
+    for guide in sorted(guides):
+        paths.add(guide)
+        try:
+            guide_html = _get(BASE + guide)
+        except Exception as exc:  # noqa: BLE001 — one unreachable guide must not lose the rest
+            print(f"  SKIP {guide}: {type(exc).__name__}", file=sys.stderr)
+            continue
+        paths.update(re.findall(rf"{re.escape(guide)}/[a-z0-9\-]+", guide_html))
+    return paths
+
+
+def _discover() -> list[str]:
+    return sorted(_discover_patterns() | _discover_designs())
 
 
 def main() -> int:

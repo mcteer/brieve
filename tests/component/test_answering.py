@@ -201,10 +201,25 @@ def test_the_pinned_corpus_has_the_properties_the_design_assumes() -> None:
     different shape — far cheaper to learn from a row than from an implementation.
     """
     corpus = load_corpus(verify=False)
-    assert len(corpus.documents) == 33
+
+    # A FLOOR AND THE PROPERTIES, not a count. This asserted exactly 33 — true of the corpus
+    # 024 pinned and false the moment 035 added Validated Designs. The claims worth holding are
+    # that the pin is not empty or collapsed, that every document carries usable anchors, and
+    # that page chrome stays out; the size is a fact about today's corpus, not a design property.
+    assert len(corpus.documents) >= 33, "the corpus shrank — a pin this small answers nothing"
     assert all(doc.anchors for doc in corpus.documents.values())
     # Chrome is excluded structurally: `sidebar-label` appeared in all 33 before the fix.
     assert not any("sidebar-label" in doc.anchors for doc in corpus.documents.values())
+
+    # BOTH FAMILIES, which is 035's whole claim. Patterns tell you how to integrate two things;
+    # designs tell you how to build one. A corpus holding only the first declines every question
+    # about architecture — correctly, and uselessly.
+    paths = set(corpus.documents)
+    assert any("/validated-patterns/" in p for p in paths), "no integration guidance is pinned"
+    assert any("/validated-designs/" in p for p in paths), (
+        "no reference architecture is pinned — this is the gap that made 'how do I build a "
+        "Vault cluster in AWS' unanswerable"
+    )
 
 
 def test_an_ask_record_carries_shape_and_never_content() -> None:
@@ -272,3 +287,103 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
     # generation, and nothing that could be presented to a vendor.
     assert payload["model_authority"] == "vault:model-credentials/anthropic@v3"
     assert "question" not in payload and "answer" not in payload
+
+
+# ------------------------------------------------------------------ 035: retrieval at scale
+
+
+def test_short_but_distinctive_terms_survive_extraction() -> None:
+    """The four-character floor dropped exactly the words that make a question specific.
+
+    "AWS", "PKI", "KMS", "IAM", "SSH" — every one is the most informative token in the question
+    it appears in, and every one was discarded before scoring began. Measured on the question
+    that started 035: "build a Vault cluster in AWS" lost "aws" and retrieved landing-zone pages
+    for other clouds.
+    """
+    from adapters.anthropic_answering import _terms
+
+    assert "aws" in _terms("How do I build a Vault cluster in AWS?")
+    assert "pki" in _terms("What is the PKI guidance?")
+    # Still no noise: two-character and stopword tokens stay out.
+    assert _terms("What is it in the a?") == set()
+
+
+def test_a_rare_term_outranks_a_common_one() -> None:
+    """Rarity weighting, asserted on a corpus where the answer is obvious.
+
+    Counting how many query terms appear treats "vault" — in nearly every section — as worth
+    the same as the one word that distinguishes the question. At 33 documents that was
+    survivable; at 238 it meant ties everywhere, broken alphabetically, so the winner was
+    decided by path order rather than by relevance.
+    """
+    from adapters.anthropic_answering import _relevant
+    from core.answering.corpus import Corpus, Document
+
+    common = Document(
+        path="/a-common",
+        url="https://example.test/a",
+        digest="d" * 64,
+        anchors=frozenset({"s"}),
+        sections={"s": "vault vault vault"},
+    )
+    rare = Document(
+        path="/z-rare",
+        url="https://example.test/z",
+        digest="e" * 64,
+        anchors=frozenset({"s"}),
+        sections={"s": "vault autopilot redundancy zones"},
+    )
+    filler = {
+        f"/filler-{n}": Document(
+            path=f"/filler-{n}",
+            url=f"https://example.test/{n}",
+            digest="f" * 64,
+            anchors=frozenset({"s"}),
+            sections={"s": "vault"},
+        )
+        for n in range(20)
+    }
+    corpus = Corpus(
+        digest="c" * 64,
+        documents={common.path: common, rare.path: rare, **filler},
+    )
+
+    best = _relevant("vault autopilot", corpus)[0]
+
+    assert best[0] == "/z-rare", (
+        "the section sharing the RARE term lost to one repeating the common term — which is "
+        "what alphabetical tie-breaking did across the whole corpus"
+    )
+
+
+def test_no_single_document_takes_every_offered_slot() -> None:
+    """Diversity. One document's twelve sections are worse evidence than four documents' three.
+
+    Measured: "build a Vault cluster in AWS" filled every slot from a single Terraform
+    landing-zone page, so the model saw one document's view of the question and the Vault
+    architecture guide never reached it.
+    """
+    from adapters.anthropic_answering import SECTIONS_PER_DOCUMENT, _relevant
+    from core.answering.corpus import Corpus, Document
+
+    hog = Document(
+        path="/hog",
+        url="https://example.test/hog",
+        digest="d" * 64,
+        anchors=frozenset(f"s{n}" for n in range(20)),
+        sections={f"s{n}": "vault cluster architecture" for n in range(20)},
+    )
+    other = Document(
+        path="/other",
+        url="https://example.test/other",
+        digest="e" * 64,
+        anchors=frozenset({"s"}),
+        sections={"s": "vault cluster architecture"},
+    )
+    corpus = Corpus(digest="c" * 64, documents={hog.path: hog, other.path: other})
+
+    offered = _relevant("vault cluster architecture", corpus)
+    from_hog = [row for row in offered if row[0] == "/hog"]
+
+    assert len(from_hog) <= SECTIONS_PER_DOCUMENT
+    assert any(row[0] == "/other" for row in offered), "a second source never got a slot"

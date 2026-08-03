@@ -5,8 +5,16 @@ Routing exists because asking happens in **one place** (spec FR-010): a person a
 platform works out what the question needs. That makes routing a component with its own failure
 modes rather than a detail, so it is tested like one.
 
-**The `NEITHER` rows are the fail-closed ones.** A router that always returned a source would look
-better in every demo and would answer questions from material that was never about them.
+**The estate rows are the fail-closed ones.** Nothing reaches somebody's audit trail without a
+positive estate signal, and that is the property the removed `NEITHER` outcome was really
+protecting — a weather question must not perform a scoped read of the records. It still cannot.
+
+**What `NEITHER` actually did was different, and it was measured.** Guidance required one of
+thirteen keywords, so a question lacking them was declined with "this matches neither source" —
+a claim about coverage that nothing had checked. Three plausible questions in eight failed that
+way, including "best practices for Terraform module structure", which lost to the list holding
+only the singular "practice". A router can tell an estate question from a guidance one; it
+cannot know what the corpus covers, and now it does not pretend to.
 """
 
 from __future__ import annotations
@@ -30,12 +38,38 @@ GUIDANCE_QUESTIONS = [
     "How do I configure the reference pattern?",
 ]
 
-#: Fit neither vocabulary. **Not nonsense** — plausible questions this platform simply has no
-#: source for, which is the case a coercing router answers wrongly and confidently.
-NEITHER_QUESTIONS = [
+#: Off-topic. These reach the corpus now and are declined BY IT — which is the difference
+#: between "we looked and have nothing" and "we did not look".
+OFF_TOPIC_QUESTIONS = [
     "What is the weather in Denver?",
     "Please summarise the quarterly earnings call.",
     "Who won the match?",
+]
+
+#: **The regression rows.** Every one of these was declined before the corpus was opened, and
+#: every one is a question this platform exists to answer. They are listed individually rather
+#: than as a property because each was a real refusal a person would have hit.
+PREVIOUSLY_REFUSED = [
+    "What is the prescribed way to build a Vault cluster in AWS?",
+    "What are the best practices for Terraform module structure?",
+    "Tell me about Vault namespaces",
+    # Not refused but MIS-SENT: "secrets" is a noun both worlds own, and with no guidance marker
+    # recognised, 029's tie-break sent a how-to question to somebody's audit trail. The rule is
+    # unchanged and right; its vocabulary was too small to do the job.
+    "Walk me through setting up dynamic secrets",
+    "Vault cluster sizing guidance",
+]
+
+#: The estate side of the same change, and the reason it is safe. Widening the guidance
+#: vocabulary could have pulled real estate questions toward the corpus — the asymmetric failure
+#: 029 chose against. It does not: strong estate terms still win outright, and nothing here
+#: contains an instructional word by accident.
+STILL_ESTATE = [
+    "Were any secrets read?",
+    "Which tools were used?",
+    "What policies were applied to my runs?",
+    "Show me the records for the failed run.",
+    "What changed last night?",
 ]
 
 
@@ -49,14 +83,36 @@ def test_guidance_shaped_questions_route_to_the_corpus(question: str) -> None:
     assert route(question) is Route.GUIDANCE
 
 
-@pytest.mark.parametrize("question", NEITHER_QUESTIONS)
-def test_a_question_that_fits_no_source_is_not_coerced_into_one(question: str) -> None:
-    """The spec's *"decline, not a coin flip"* edge case.
+@pytest.mark.parametrize("question", OFF_TOPIC_QUESTIONS)
+def test_an_off_topic_question_reaches_the_corpus_rather_than_the_records(question: str) -> None:
+    """The property the removed outcome was really protecting, kept.
 
-    A router that picked a source here would send a weather question to somebody's audit trail —
-    performing a scoped read for a question that was never about the records.
+    A weather question must never perform a scoped read of somebody's audit trail. It does not:
+    the estate needs a positive signal, and this has none. What changed is where the question
+    goes INSTEAD — to the corpus, which declines for itself. The cost is one model call to be
+    told the corpus does not cover the weather; the thing bought is that no question is refused
+    on the strength of a word list.
     """
-    assert route(question) is Route.NEITHER
+    assert route(question) is not Route.ESTATE
+    assert route(question) is Route.GUIDANCE
+
+
+@pytest.mark.parametrize("question", PREVIOUSLY_REFUSED)
+def test_a_real_question_is_never_refused_before_the_corpus_is_opened(question: str) -> None:
+    """THE REGRESSION ROWS. Each was declined with "this matches neither source" while the
+    corpus sat unread, or sent to the records for a noun — the defect the maintainer hit."""
+    assert route(question) is Route.GUIDANCE
+
+
+@pytest.mark.parametrize("question", STILL_ESTATE)
+def test_widening_guidance_did_not_pull_estate_questions_away(question: str) -> None:
+    """The other direction, asserted rather than assumed.
+
+    A vocabulary change that fixed guidance by breaking the estate would be a worse trade than
+    the defect it fixed: an estate question answered from generic documentation is a confident
+    wrong answer about somebody's own system.
+    """
+    assert route(question) is Route.ESTATE
 
 
 def test_a_question_matching_both_vocabularies_goes_to_the_estate() -> None:
@@ -77,7 +133,7 @@ def test_routing_is_deterministic() -> None:
     A router whose answer drifted would make every downstream row flaky, and the flake would look
     like a model problem rather than a routing one.
     """
-    for question in ESTATE_QUESTIONS + GUIDANCE_QUESTIONS + NEITHER_QUESTIONS:
+    for question in ESTATE_QUESTIONS + GUIDANCE_QUESTIONS + OFF_TOPIC_QUESTIONS:
         assert len({route(question) for _ in range(10)}) == 1
 
 
@@ -187,7 +243,13 @@ def test_a_shared_noun_alone_still_means_the_estate() -> None:
     assert route("What is the recommended pattern for dynamic secrets?") is Route.GUIDANCE
 
 
-def test_an_unroutable_question_still_declines() -> None:
-    """The widening must not have made the estate a default destination (FR-002)."""
-    assert route("What is the capital of France?") is Route.NEITHER
-    assert route("Hello there") is Route.NEITHER
+def test_the_estate_never_becomes_the_default_destination() -> None:
+    """The widening must not have made the estate a default destination (FR-002).
+
+    This row is why removing `NEITHER` is safe. The old fallback protected the records by
+    refusing everything unrecognised; the new one protects them by requiring a positive estate
+    signal — which is the stronger guarantee, because it does not depend on a keyword list
+    being complete.
+    """
+    for question in ("What is the capital of France?", "Hello there", "asdf"):
+        assert route(question) is not Route.ESTATE

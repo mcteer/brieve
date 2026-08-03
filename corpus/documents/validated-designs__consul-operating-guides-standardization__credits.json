@@ -1,0 +1,11 @@
+{
+  "path": "/validated-designs/consul-operating-guides-standardization/credits",
+  "url": "https://developer.hashicorp.com/validated-designs/consul-operating-guides-standardization/credits",
+  "sections": [
+    {
+      "anchor": "credits",
+      "title": "Credits",
+      "text": "List of key team members who contributed to the development of this guide. Hailing from various functional areas and representing diverse departments within HashiCorp, these experienced professionals have played pivotal roles in writing, editing, reviewing, and ensuring the completion of this material. Their collective efforts have been instrumental in shaping the final output. Blake Covarrubias Cooper Melgreen Gerald Dykeman Hari Sankaran Mara Hammond Mark Lewis Srini Nagaraju Previous Multi-cluster and multi-tenant deployments Next Changelog"
+    }
+  ]
+}

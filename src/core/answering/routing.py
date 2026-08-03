@@ -32,14 +32,27 @@ from typing import Final
 
 
 class Route(StrEnum):
-    """Where a question's answer must come from. Closed, and `NEITHER` is a real answer."""
+    """Where a question's answer must come from. Two sources, and both get consulted.
+
+    **`NEITHER` was removed after it was measured.** It existed so a weather question would not
+    trigger a scoped read of somebody's audit trail — a real concern, and one this enum still
+    honours, because ESTATE requires positive estate signals and nothing reaches the records by
+    default. What it did in practice was different: guidance required one of thirteen keywords,
+    so *absence* of those words was treated as proof the platform had no source. Measured on
+    plausible questions, that rejected three in eight before the corpus was ever opened —
+    including "best practices for Terraform module structure", which failed because only the
+    singular "practice" was listed.
+
+    A router can tell an estate question from a guidance one. It cannot know whether the corpus
+    covers a topic; only the corpus can answer that, and it does, honestly. So the fallback is
+    now GUIDANCE and the decline a person sees comes from the source that actually looked.
+    """
 
     GUIDANCE = "guidance"
     ESTATE = "estate"
     #: Fits no source. **Declines** — the router never coerces a question into a source to avoid
     #: saying it does not know, because a coerced route produces a confident answer from material
     #: that was never about the question.
-    NEITHER = "neither"
 
 
 #: The estate's own nouns and verbs — the vocabulary of *what this platform did*.
@@ -125,19 +138,57 @@ WINDOW_PHRASES: Final[tuple[str, ...]] = (
 )
 
 #: How something works, as opposed to what happened. The corpus's territory.
+#: Words that mark a question as asking for GUIDANCE rather than about the estate.
+#:
+#: **This set has one job now, and it is the harder one.** It no longer gates whether a question
+#: may reach the corpus at all — anything not estate-shaped goes there. What it still decides is
+#: the tie-break in `route()`: a noun both worlds own ("secrets", "policies") goes to the estate
+#: unless something here pulls the other way.
+#:
+#: **It was too small for that job, and the gap was measured**: "Walk me through setting up
+#: dynamic secrets" went to somebody's audit trail because "walk", "setting" and "through" were
+#: all unknown, leaving only the shared noun. So instructional vocabulary is included here, and
+#: PLURALS ARE LISTED EXPLICITLY — "best practices" failed against a list holding only
+#: "practice", which is the kind of defect that is invisible until a person hits it.
+#:
+#: What is deliberately NOT here: words common to both worlds ("show", "list", "read", "used"),
+#: because a term that appears in estate questions would pull real estate questions toward the
+#: corpus — the asymmetric failure 029 chose against, and the reason strong estate terms still
+#: win outright above.
 GUIDANCE_TERMS: Final[frozenset[str]] = frozenset(
     {
         "architecture",
+        "best",
+        "build",
+        "building",
         "configure",
+        "deploy",
+        "deploying",
+        "design",
+        "explain",
+        "guidance",
         "guide",
         "how",
         "pattern",
+        "patterns",
         "practice",
+        "practices",
+        "prescribed",
         "recommend",
         "recommended",
+        "recommendation",
+        "recommendations",
         "reference",
+        "set",
+        "setting",
+        "setup",
         "should",
+        "sizing",
+        "structure",
         "supposed",
+        "tutorial",
+        "walk",
+        "walkthrough",
         "why",
     }
 )
@@ -179,10 +230,16 @@ def route(question: str) -> Route:
         # A noun both worlds own, with nothing pulling the other way: the estate, on the same
         # asymmetric-failure reasoning.
         return Route.ESTATE
-    if guidance:
-        return Route.GUIDANCE
-    # A shared noun cannot reach here with guidance unset — the branch above took it.
-    return Route.ESTATE if shared_noun else Route.NEITHER
+    # GUIDANCE IS THE FLOOR, not a keyword match. `GUIDANCE_TERMS` still exists and still does
+    # real work above — it is what pulls a SHARED noun away from the estate — but it is no
+    # longer a gate a question must pass to be answered at all. Anything that is not
+    # estate-shaped goes to the corpus, and the corpus declines for itself when it cannot help.
+    #
+    # The cost is honest and small: an off-topic question now spends one model call to be told
+    # the corpus does not cover it. The alternative cost was refusing real questions with a
+    # confident claim about coverage that nothing had checked, which is worse in every case
+    # somebody actually cares about.
+    return Route.GUIDANCE
 
 
 __all__ = [

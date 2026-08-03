@@ -1,0 +1,46 @@
+{
+  "path": "/validated-designs/boundary-operating-guides-standardization/just-in-time-approval",
+  "url": "https://developer.hashicorp.com/validated-designs/boundary-operating-guides-standardization/just-in-time-approval",
+  "sections": [
+    {
+      "anchor": "just-in-time-approval-workflow",
+      "title": "Just-in-time approval workflow",
+      "text": ""
+    },
+    {
+      "anchor": "overview",
+      "title": "Overview",
+      "text": "Enterprises are increasingly looking to improve their enterprise digital workflows by integrating Just-in-Time (JIT) approval workflows with HashiCorp Boundary to enhance their security, compliance, and operational efficiency. For example, a site reliability engineer might need higher permissions to fix an issue on sensitive systems, or an external contractor could need temporary access to an application. By integrating with approval workflow tools like PagerDuty, ServiceNow, and Slack, enterprises can enable just-in-time requests and approvals for time-limited access. This ensures that privileged roles are only active when a request is made and approved. Here are key reasons why Enterprises integrate just-in-time approval workflow with Boundary:"
+    },
+    {
+      "anchor": "1.-enhanced-security-and-compliance",
+      "title": "1. Enhanced security and compliance",
+      "text": "Minimized Access Windows: JIT approval workflows ensure that access is granted only when needed and for a limited duration. This reduces the risk of unauthorized access and potential security breaches. Audit and compliance: Integrating JIT workflows allows for detailed logging and the context of who accessed what purpose and when, which is crucial for compliance with industry regulations and internal security audit policies."
+    },
+    {
+      "anchor": "2.-operational-efficiency",
+      "title": "2. Operational efficiency",
+      "text": "On-Demand Access: With JIT workflows, platform teams, partners and contractors can request access as needed, eliminating the need for standing permissions that might not be necessary at all times. Streamlined Approvals: Integrating with digital workflow platforms like PagerDuty, ServiceNow, and Slack enables seamless and rapid approval processes. Approvals can be managed directly within the tools that teams are already using, reducing friction and speeding up operations."
+    },
+    {
+      "anchor": "3.-integration-with-approval-workflow-platforms",
+      "title": "3. Integration with approval workflow platforms",
+      "text": "PagerDuty: Integrating with PagerDuty allows for automated incident response workflows. When an incident occurs, necessary personnel can request and receive access to critical systems immediately, ensuring a quick and efficient resolution. ServiceNow: Service Now is widely used for IT service management. Integrating JIT workflows with ServiceNow allows for access requests to be part of existing ITSM processes, enhancing visibility and control. Slack: Slack integration allows for real-time communication and approval. Teams can manage and approve access requests directly within their Slack channels, leveraging the collaboration platform for immediate action."
+    },
+    {
+      "anchor": "4.-improved-user-experience",
+      "title": "4. Improved user experience",
+      "text": "Simplified Access Requests: Users can request access through their existing approval workflow platforms, reducing the learning curve and making the process more intuitive. Real-Time Notifications: Integration with these platforms ensures that approvers are notified in real-time, enabling faster responses and reducing wait times for users."
+    },
+    {
+      "anchor": "how-just-in-time-approval-works-with-boundary",
+      "title": "How just-in-time approval works with Boundary",
+      "text": "The diagram above outlines the high level process of how just-in-time (JIT) approval works with Boundary. Request access submission The user submits a request to access target resources through approval workflow platforms such as ServiceNow, PagerDuty, Slack, etc The request will include the context such as the purpose of the request, the required access time window, and the target resource. Manager approval The manager reviews the change request and makes the decision to either approve or deny the access request. Approval workflow execution (upon approval) Upon approval of the request, the workflow process is executed. E.g: The workflow will update to IdP managed groups (which is our recommended approach) to grant access to the user. Access granted and time-bounded The user is added to the appropriate group within HashiCorp Boundary for a specific time period, and access is granted to the target resource in the specified project. The access granted to the user is time-bounded and will expire after a predefined number of hours. Approval workflow execution (upon expiry) Once the time period expires, the approval workflow is executed again. The flow updates the HashiCorp Boundary configuration to remove the user from the group. Access removal The user\u2019s access to the target resource is revoked. And the user is removed from the specific group in the HashiCorp Boundary. Close the change The change request is closed in the approval workflow platform, completing the workflow process."
+    },
+    {
+      "anchor": "useful-resources",
+      "title": "Useful resources",
+      "text": "HashiConf 2024: Building a break glass solution with HashiCorp Boundary + Vault and ServiceNow integration HashiCorp Blog: Just-in-time approval workflow with Boundary and Azure Previous Data encryption and key rotation Next Accessing private resources"
+    }
+  ]
+}

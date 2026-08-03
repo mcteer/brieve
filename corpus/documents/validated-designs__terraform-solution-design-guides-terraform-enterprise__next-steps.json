@@ -1,0 +1,16 @@
+{
+  "path": "/validated-designs/terraform-solution-design-guides-terraform-enterprise/next-steps",
+  "url": "https://developer.hashicorp.com/validated-designs/terraform-solution-design-guides-terraform-enterprise/next-steps",
+  "sections": [
+    {
+      "anchor": "next-steps",
+      "title": "Next steps",
+      "text": "Please review the Terraform Enterprise: Operating Guide for Adoption in the HVD series."
+    },
+    {
+      "anchor": "product-support",
+      "title": "Product support",
+      "text": "Please ensure that all members of your Terraform Enterprise administration team do the following. Ensure access to a HashiCorp support portal account. Are setup to be an authorized technical contact for your organization in the HashiCorp support portal. Authorized technical contacts are the members of your team permitted to open support tickets on behalf of your company. Understand the guidance we prescribe through support for Terraform Enterprise documentation as to how to open a support ticket with HashiCorp Support, as well as generating and uploading a support bundle, when applicable. Please see the Terraform Enterprise support webpage (opens in new tab) for more details. Are aware of what support plan level your company has purchased to manage expectations of response times, as well as the definitions in our documentation for each selectable severity level for a ticket when opening one. Please see the Customer Success Enterprise Support (opens in new tab) web page for severity definitions. Previous Multiple regions Next Appendix"
+    }
+  ]
+}
