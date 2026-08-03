@@ -31,19 +31,21 @@ REVIEWED_SCRIPTS = ("infra/bin/corpus-sync", "infra/bin/skills-provenance")
 
 
 @pytest.fixture(scope="module")
-def workflow() -> dict[str, Any]:
+def workflow() -> dict[Any, Any]:
+    """Keys are `Any` on purpose: PyYAML parses the bare `on:` key as the BOOLEAN True, so a
+    `dict[str, Any]` annotation is a lie about this document's actual shape."""
     return dict(yaml.safe_load(WORKFLOW.read_text()))
 
 
 @pytest.fixture(scope="module")
-def steps(workflow: dict[str, Any]) -> list[dict[str, Any]]:
+def steps(workflow: dict[Any, Any]) -> list[dict[str, Any]]:
     return list(workflow["jobs"]["refresh"]["steps"])
 
 
-def test_it_runs_weekly_and_on_demand(workflow: dict[str, Any]) -> None:
+def test_it_runs_weekly_and_on_demand(workflow: dict[Any, Any]) -> None:
     # PyYAML parses the bare key `on` as the boolean True — a footgun worth naming, since a
     # row reading workflow["on"] would KeyError against a correct file.
-    triggers = workflow.get(True) or workflow.get("on")
+    triggers: dict[str, Any] = workflow.get(True) or workflow.get("on") or {}
     assert "schedule" in triggers, "the refresh has no schedule — the half 024 left undone"
     assert "workflow_dispatch" in triggers, "no manual trigger; the dispatched row could not run"
     assert triggers["schedule"][0]["cron"].split()[-1] == "1", "not a weekly Monday cron"
@@ -69,7 +71,7 @@ def test_the_only_repository_code_it_runs_is_the_two_reviewed_scripts(
     )
 
 
-def test_its_permissions_are_exactly_what_the_proposal_needs(workflow: dict[str, Any]) -> None:
+def test_its_permissions_are_exactly_what_the_proposal_needs(workflow: dict[Any, Any]) -> None:
     """Commit the pin, open the PR. Nothing else — and `write` is not the default, so an
     absent block would fail at `git push` rather than here."""
     assert workflow["permissions"] == {"contents": "write", "pull-requests": "write"}

@@ -5,14 +5,14 @@
 
 | Group | Where | Needs | Status |
 | --- | --- | --- | --- |
-| Loader posture: timestamp parsed; absent/unparseable/future → unknown; 024 pin loads and answers | component rows (`test_ground_note.py` + loader rows) | Nothing | Planned |
-| Tier boundaries: 29/30/89/90/91-day fixture times word correctly; unknown wording; never a decline | component rows | Nothing | Planned |
-| Every guidance answer carries the note — full ask path, both packs | conformance answering row | Nothing | Planned |
-| The served surfaces carry it: API payload field, portal render, MCP proxy | conformance rows (hermetic where possible; served MCP row in its lane) | Enclave for the served row | Planned |
-| The workflow invokes exactly the reviewed scripts (prose-stripper row) | workflow-shape row over the YAML | Nothing | Planned |
-| No blocking lane gained a fetch | existing no-network posture rows stay green | Nothing | Planned (asserted, not edited) |
-| Sync writes `synced_at`; unchanged upstream moves timestamp only | sync rows against fixture upstream | Nothing (fixture HTTP) | Planned |
-| `skills-provenance`: declared pack checked, undeclared pack refused with the reason, drift reported not vendored | component rows | Nothing (fixture git data) | Planned |
+| Loader posture: timestamp parsed; absent/unparseable/future → unknown; 024 pin loads and answers | component rows (`test_ground_note.py` + loader rows) | Nothing | **Green** |
+| Tier boundaries: 29/30/89/90/91-day fixture times word correctly; unknown wording; never a decline | component rows | Nothing | **Green** |
+| Every guidance answer carries the note — full ask path, both packs | conformance answering row | Nothing | **Green** |
+| The served surfaces carry it: API payload field, portal render, MCP proxy | conformance rows (hermetic where possible; served MCP row in its lane) | Enclave for the served row | **Green** (hermetic halves; served row with the conformance run) |
+| The workflow invokes exactly the reviewed scripts (prose-stripper row) | workflow-shape row over the YAML | Nothing | **Green** |
+| No blocking lane gained a fetch | existing no-network posture rows stay green | Nothing | **Green** (asserted, not edited) |
+| Sync writes `synced_at`; unchanged upstream moves timestamp only | sync rows against fixture upstream | Nothing (fixture HTTP) | **Green** |
+| `skills-provenance`: declared pack checked, undeclared pack refused with the reason, drift reported not vendored | component rows | Nothing (fixture git data) | **Green** |
 | The weekly proposal end-to-end: dispatch the workflow, observe the PR, observe nothing merged | manual dispatch once, observed | GitHub Actions; **named runner: Dan McTeer** (agent drives the dispatch and reads back the PR; Dan's review of that PR is the act only he can perform) | Planned |
 | Failure posture: unreachable upstream → clean tree, no PR, red run, pin untouched | sync row with refused fixture + the workflow's own failure branch observed once | As above | Planned |
 

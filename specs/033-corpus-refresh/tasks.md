@@ -143,7 +143,7 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
 
 ## Phase 6: Polish
 
-- [ ] T017 [P] ROADMAP entry for 033; contract status rows flipped to green with dates; the
+- [X] T017 [P] ROADMAP entry for 033; contract status rows flipped to green with dates; the
       024 deferral marked closed where it is recorded.
 - [ ] T018 `make check`, the hermetic sweep, `make evals`, and `make conformance` green;
       the served-MCP ask row observed carrying `ground_note` through the proxy (the
