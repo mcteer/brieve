@@ -126,7 +126,10 @@ def test_the_identifier_the_matrix_pins_is_the_one_called() -> None:
     inexpressible.
     """
     assert to_model_string("anthropic/claude-opus@5") == "anthropic:claude-opus-5"
-    assert to_model_string(LIVE_MODEL) == "anthropic:claude-opus-5"
+    # The lane's own pin, whatever it currently is — 032 moved it to Sonnet and this line
+    # asserted the Opus literal, which was the worked example above doing double duty. The
+    # property is the derivation; the example row keeps the concrete mapping readable.
+    assert to_model_string(LIVE_MODEL) == "anthropic:claude-sonnet-5"
 
 
 @pytest.mark.live_model
