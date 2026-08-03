@@ -64,8 +64,14 @@ unfounded claim this feature removes.
 **Decision**: `.github/workflows/corpus-refresh.yml`, `schedule: cron` weekly plus
 `workflow_dispatch` for manual runs. It runs `corpus-sync` and `skills-provenance`, and if
 `git status` shows changes (a timestamp move counts), opens a PR with `gh pr create` using
-the workflow's default `GITHUB_TOKEN`. Branch name carries the date; an existing open
-refresh PR is updated, not duplicated.
+the workflow's default `GITHUB_TOKEN` under an explicit `permissions: contents: write,
+pull-requests: write` block (the default token is read-only — analyze P1). ONE standing
+branch, `chore/corpus-refresh`, force-pushed by each run and carrying one open PR until it
+is reviewed; a merged or closed PR gets a fresh one next run (analyze P2 — a dated branch
+per week stacks stale proposals, which contradicts update-don't-duplicate). One repo-side
+precondition is named rather than discovered: "Allow GitHub Actions to create and approve
+pull requests" defaults off, and enabling it is the maintainer's act, recorded when the
+first dispatch happens.
 
 **Rationale**: the repo's CI is GitHub Actions (ci.yml, enclave.yml measured present); the
 sync is already a committed-artifact producer, so "prepare a reviewable change" is exactly

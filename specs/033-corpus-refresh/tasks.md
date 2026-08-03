@@ -109,23 +109,33 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
       reason; the vault pack specifically refused.
 - [ ] T014 [US3] `.github/workflows/corpus-refresh.yml` (new): weekly cron + workflow_dispatch;
       runs `infra/bin/corpus-sync` then `infra/bin/skills-provenance`; if the tree changed
-      (a timestamp-only move counts — the no-op proposal is wanted, per clarify), commit to
-      a dated branch and `gh pr create` with the `corpus-refresh` label, updating an existing
-      open refresh PR rather than duplicating; on sync failure the run goes red with the tree
-      clean and no PR (FR-007 — the sync already dies before writing). **No PAT** (analyze
-      I2): the default token's PR is checkless by GitHub's recursion guard, the PR body says
-      so and says why (a standing credential is refused by Principle IV), and the body names
-      the reviewer's one keystroke that triggers CI (close/reopen or empty commit).
+      (a timestamp-only move counts — the no-op proposal is wanted, per clarify), force-push
+      ONE STANDING BRANCH `chore/corpus-refresh` carrying one open PR (`corpus-refresh`
+      label) until reviewed — a merged or closed PR gets a fresh one next run; never a
+      stack of dated branches (analyze P2). Explicit `permissions: contents: write,
+      pull-requests: write` block — the default token is read-only (analyze P1). On sync
+      failure the run goes red with the tree clean and no PR (FR-007 — the sync already
+      dies before writing). **No PAT** (analyze I2): the default token's PR is checkless by
+      GitHub's recursion guard, the PR body says so and says why (a standing credential is
+      refused by Principle IV), and the body names the reviewer's one keystroke that
+      triggers CI (close/reopen or empty commit).
 - [ ] T015 [US3] The workflow-shape row (after T014 — it asserts that YAML; analyze O4) in
-      `tests/component/test_refresh_workflow_shape.py`: the YAML invokes exactly the two
-      reviewed scripts and contains no other network-touching step — via the shared
-      prose-stripper (`tests/harness/source_reading.py`), because five prior features found
-      gates matching comments instead of code (F8).
+      `tests/component/test_refresh_workflow_shape.py`: the YAML's RUN STEPS invoke exactly
+      the two reviewed scripts plus git/gh plumbing and nothing else (analyze P3 — "no
+      network-touching step" is not assertable when checkout itself fetches; the row proves
+      what the stripper can see), and the permissions block grants exactly
+      contents+pull-requests write — via the shared prose-stripper
+      (`tests/harness/source_reading.py`), because five prior features found gates matching
+      comments instead of code (F8).
 - [ ] T016 [US3] The dispatch, end to end: agent runs `gh workflow run corpus-refresh.yml`,
       watches the run, and reads back the proposal PR (exists, labelled, unmerged, diff is
       manifest-timestamp plus any provenance `retrieved` move; skills drift reported in the
       body if upstream moved; the body carries the checkless-PR explanation and the CI
-      trigger instruction — analyze I2). Record the outcome in `contracts/conformance.md`.
+      trigger instruction — analyze I2). **Known precondition, named rather than
+      discovered** (analyze P1): the repo setting "Allow GitHub Actions to create and
+      approve pull requests" defaults OFF and `gh pr create` fails 403 until it is on —
+      flipping it is a maintainer act, recorded in the outcome when it happens. Record the
+      outcome in `contracts/conformance.md`.
       **Named runner: Dan McTeer** — the review of that PR is the act only he performs;
       merging or closing it is his call and either resolution completes the row.
 

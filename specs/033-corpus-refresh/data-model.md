@@ -69,6 +69,7 @@ The helper reads it and updates only `retrieved`.
 ## The prepared refresh (a PR, not a table)
 
 Produced by `.github/workflows/corpus-refresh.yml` weekly or on dispatch: new manifest (+
-documents if changed) + provenance updates, on a dated branch, as a PR that cannot merge
-itself. A no-change-upstream run still moves `synced_at` — that diff IS the "we checked"
-record. A failed sync writes nothing and leaves a red workflow run as the signal.
+documents if changed) + provenance updates, force-pushed to the ONE standing branch
+`chore/corpus-refresh` as the one open PR that cannot merge itself (analyze P2). A
+no-change-upstream run still moves `synced_at` — that diff IS the "we checked" record. A
+failed sync writes nothing and leaves a red workflow run as the signal.

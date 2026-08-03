@@ -145,8 +145,9 @@ that finds nothing upstream changed still refreshes the timestamp.
   absent case (unknown), never crashes, and the conformance row for US1-2 covers it.
 - The upstream index disappears entirely (site restructure): the sync fails loudly with the
   existing pin intact; the staleness note keeps disclosing the last good sync's age.
-- Two syncs race (scheduled and manual): both are git commits; the second is a trivial rebase
-  or an identical no-op — the git artifact property makes this a review-time non-event.
+- Two syncs race (scheduled and manual): both target the one standing proposal branch; the
+  later force-push simply wins with the fresher pin — the git artifact property makes this a
+  review-time non-event.
 
 ## Requirements *(mandatory)*
 
