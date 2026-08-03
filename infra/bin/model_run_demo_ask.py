@@ -28,11 +28,16 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 QUESTION = "Which runs were denied?"
+
+#: The deployment lane's measured cold-start budget: the allocation installs its
+#: dependencies before serving, so a restarted API is legitimately slow.
+READY_BUDGET = 180.0
 
 
 def env_value(name: str) -> str:
@@ -104,11 +109,45 @@ except urllib.error.HTTPError as e:
     return json.loads(result.stdout[marker + 1 :].splitlines()[0])
 
 
+def wait_until_answerable(alloc: str) -> None:
+    """A readiness poll, not a retry: wait for the surface to answer, then assert once.
+
+    The restarted allocation reinstalls its dependencies before binding, so the first
+    minutes of silence are a young deployment, not a broken one — the deployment lane's
+    distinction, applied here.
+    """
+    probe = (
+        "import urllib.request, urllib.error\n"
+        "try:\n"
+        "    urllib.request.urlopen('http://127.0.0.1:8081/runs', timeout=5)\n"
+        "except urllib.error.HTTPError:\n"
+        "    print('\\x00up')\n"
+        "except Exception:\n"
+        "    pass\n"
+    )
+    deadline = time.monotonic() + READY_BUDGET
+    while time.monotonic() < deadline:
+        result = subprocess.run(
+            ["nomad", "alloc", "exec", "-task", "server", alloc, "python3", "-c", probe],
+            capture_output=True,
+            text=True,
+            timeout=60.0,
+            check=False,
+        )
+        if "\x00up" in result.stdout:
+            return
+        time.sleep(5.0)
+    print(f"FAIL: the api never became answerable within {READY_BUDGET:.0f}s of its restart")
+    raise SystemExit(2)
+
+
 def main() -> int:
     runs = json.loads(Path(sys.argv[1]).read_text())
     denial_hashes = set(runs["denial_hashes"])
 
-    response = ask_from_inside(running_api_allocation(), operator_token())
+    alloc = running_api_allocation()
+    wait_until_answerable(alloc)
+    response = ask_from_inside(alloc, operator_token())
     answer = response["body"]
     assert isinstance(answer, dict)
 
