@@ -193,7 +193,12 @@ _ESTATE_INSTRUCTION: Final[str] = (
     "- ANSWER THE QUESTION ASKED. Cite only the records the answer rests on; do not add "
     "surrounding context, do not summarise the rest of the estate, and do not mention records "
     "that merely happen to be nearby. Asked which runs were denied, cite the denials — not the "
-    "runs that were not denied, and not what else those runs did."
+    "runs that were not denied, and not what else those runs did.\n"
+    "- Completeness is that rule's twin, and it cuts within the question's subject: cite EVERY "
+    "supplied record that bears on the answer, not only the single most direct one. A question "
+    "about what happened during a run covers all of that run's records that show it — the steps "
+    "and resumptions as much as the final effect — and omitting one understates what the "
+    "records show. 'Nearby' means outside the question's subject, never inside it."
 )
 
 
