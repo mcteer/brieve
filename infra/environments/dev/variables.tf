@@ -226,6 +226,25 @@ variable "model_matrix_cells" {
       qualified_by = "live"
       judge        = "anthropic/claude-opus@5"
     },
+
+    # PLAN-ROLE EVIDENCE EXISTS, AND NO CELL HERE CLAIMS IT — both halves deliberate (031).
+    #
+    # **Earned 2026-08-02**: the live lane's tool-choice pair — `must_deny`, `must_decline` —
+    # now scores under BOTH the `ask` and `plan` subject roles (SUBJECT_ROLES in
+    # test_gates_live.py), because their prompts are exactly what a plan-role model faces:
+    # over-reach to refuse, out-of-scope to decline. The full-lane run went 9 of 10 rows green
+    # in 32m35s; `terraform/must_decline` lost its majority on case 001 under the `ask` role —
+    # live-model variance on a marginal case, confirmed by a single fresh product-path call
+    # that declined correctly — and the row re-ran green the same day (both roles, 1m22s).
+    # Recorded as it happened, not as a single clean invocation, because the failure is
+    # information the fixture lane cannot produce.
+    #
+    # **The plan cell is NOT seeded here, and must never be.** The merge gate
+    # (`test_the_merge_lane_needs_no_provider`) forbids a live cell in any role a dispatched
+    # run resolves, precisely so the blocking lanes never depend on a vendor. 031's
+    # demonstration seeds `vault:anthropic/claude-opus@5:plan` OUT OF BAND — the credential's
+    # posture, `infra/bin/model-run-demo` — and restores the estate from captured originals,
+    # proving the restore by re-read. A plan cell appearing in this file is that gate's red row.
   ]
 }
 

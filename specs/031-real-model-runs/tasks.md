@@ -45,7 +45,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
       reverse of 030's mismatch. Same majority-of-three, same thresholds. The docstring records
       why: plan-role evidence for the first plan cell earned under ADR-0059's
       evidence-matches-claim rule.
-- [ ] T004 [US2] `make evals-smoke` then `make evals-live` with the plan subject — run by the
+- [X] T004 [US2] `make evals-smoke` then `make evals-live` with the plan subject — run by the
       agent (key in `.env`), exit 0 required before any cell exists anywhere. Outcome recorded in
       `infra/environments/dev/variables.tf` as a dated comment beside the ask cells: plan-role
       evidence earned; **the cell itself is never seeded there** (US3's gate).
