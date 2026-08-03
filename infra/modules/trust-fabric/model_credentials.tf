@@ -76,6 +76,17 @@ resource "vault_kv_secret_v2" "model_credential_dev_placeholder" {
   data_json = jsonencode({
     api_key = "PLACEHOLDER-NOT-A-CREDENTIAL-dev-only-vendor-calls-will-fail"
   })
+
+  # SEED ONCE, THEN LEAVE THE RECORD ALONE. The variable's own description promises "an apply
+  # can never overwrite a real credential with a dud" — and in the dev enclave, where seeding
+  # is on, exactly that happened: 027's demonstration wrote the real key out of band, a later
+  # estate apply reverted it to this placeholder, and the first symptom was three layers away
+  # (served asks answering 503 AuthenticationError). The record's purpose is to EXIST — the
+  # readability row reads it, the mount and policy are proven — and that purpose is served at
+  # create time. What an operator writes over it afterwards is theirs.
+  lifecycle {
+    ignore_changes = [data_json]
+  }
 }
 
 variable "seed_model_credential_placeholder" {
