@@ -6,6 +6,7 @@
 | Group | Where | Needs | Status |
 | --- | --- | --- | --- |
 | Every existing axe state × BOTH themes (the lane's doubling — SC-001) | `tests/a11y`, fixtures parametrized over colour scheme | Chromium (the lane's own CI job) | Planned |
+| The two previously-uncovered templates gain states: `login_failed`, relay-`refused` (analyze G2) | `tests/a11y/test_wcag.py`, same parametrization | as above | Planned |
 | Keyboard rows × both themes: focus drawn + unobscured, 24×24 targets, 320px reflow, text-spacing | same lane, same parametrization | as above | Planned |
 | Token discipline: no colour literal outside token blocks; no `style=` colour in templates | `tests/component/test_portal_identity.py` | Nothing | Planned |
 | Dispositions survive greyscale by structure (pill + border + text — SC-003) | component rows | Nothing | Planned |

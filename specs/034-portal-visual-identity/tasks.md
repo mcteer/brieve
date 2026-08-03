@@ -59,15 +59,26 @@ reviewed act recorded in provenance — nothing fetches at runtime.
       `anonymous_page` gain `params=["light", "dark"]` and create their browser context with
       `color_scheme=<param>`, so every existing axe state AND every keyboard row runs once
       per theme with zero row edits (research F4) and a failure names its theme in the test
-      id. No row is edited; the doubling is entirely fixture-side.
+      id. No row is edited; the doubling is entirely fixture-side. (Verified during analyze:
+      no row creates its own context, so nothing escapes the parametrization.)
+- [ ] T004a [US3] Two templates ship restyled with no axe state today (analyze G2), which is
+      exactly the untested surface the dark-theme decision refused: add states in
+      `tests/a11y/test_wcag.py` for `login_failed.html` (the harness IdP refuses a callback)
+      and `refused.html` (the harness transport refuses a thread open — distinct from the
+      already-covered ask-form refusal). If either state proves unreachable through the
+      lane's session-scoped surface, it is NAMED in the contract's human-walk row rather
+      than left unlisted — an unlisted gap reads as coverage.
 - [ ] T005 [P] [US1] [GATE:fail-closed] Component rows in
       `tests/component/test_portal_identity.py`: token discipline — no hex/rgb/hsl literal in
       `portal.css` outside the token blocks and no `style=` attribute carrying colour in any
       template (SC-004, the row that makes the discipline enforceable); dispositions survive
       greyscale by structure — the pill exists, carries the disposition word as text, has a
       border (SC-003, asserted on the DOM not a screenshot); the vendored font files' sha256
-      match `PROVENANCE.md` (the row is the verifier — research F7); and no third-party URL
-      appears in the stylesheet or any template (SC-006, the offline property).
+      match `PROVENANCE.md` (the row is the verifier — research F7); and no FETCH-CAUSING
+      external reference exists — `src=`, `<link href>`, CSS `url()`, `@import` pointing off
+      the portal's own origin (SC-006; sharpened by analyze A3, because the offline property
+      is about what the browser fetches, not what a person may click — citation anchors are
+      payload-derived links and legitimately external).
 - [ ] T006 [US1] Run the doubled lane to green:
       `uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y -q`.
       Contrast findings are fixed **by adjusting token values** in their theme's block — never
@@ -82,9 +93,15 @@ portal guards the new one — at twice the states.
 - [ ] T007 [US2] `src/surfaces/api/definitions.py`: `AgentDefinitionView` gains
       `packs: tuple[str, ...] = ()`, resolved from the fabric beside the ceiling with the
       same fail-shape — a definition whose packs cannot be read shows `()` rather than being
-      hidden or failing (unknown is a state, research F2). The view is transport-shared, so
-      MCP and the API expose the field by construction; the existing definitions conformance
-      coverage grows a shape row asserting the field and its unknown-as-empty behaviour.
+      hidden or failing (unknown is a state, research F2). **The mechanism is designed for
+      the fabric that lacks it** (analyze C1): the hermetic harness fabric has
+      `list_definitions` and no `resolve_definition_bindings`, so the view reads the resolver
+      via `getattr` — absent method, refused resolution, and empty bindings all land on `()`
+      — and the harness fabric GAINS the method in `tests/harness/api_fixtures.py` where
+      rows need real packs, so the fail-shape is exercised deliberately rather than being
+      every hermetic row's accident. The view is transport-shared, so MCP and the API expose
+      the field by construction; the existing definitions conformance coverage grows a shape
+      row asserting the field, the unknown-as-empty behaviour, and the absent-resolver case.
 - [ ] T008 [US2] `src/surfaces/portal/templates/thread.html` + `app.py`'s thread context
       (the one portal Python touch): each turn's stripe is looked up template-side from its
       `agent_definition_id` against the `definitions` list already in context — a
@@ -118,7 +135,7 @@ product, and nowhere it would have to guess.
 
 ```text
 Phase 1 (T001)                                  [one network act, reviewed]
-  → Phase 3 (T002 → T003 → T004 → T005∥T006)    [hermetic + browser lane]
+  → Phase 3 (T002 → T003 → T004 → T004a → T005∥T006)  [hermetic + browser lane]
     → Phase 4 (T007 → T008 → T009)              [the only Python touches]
       → Phase 5 (T010 ∥ T011)
 ```
