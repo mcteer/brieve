@@ -54,7 +54,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 4: User Story 3 — the gates never meet the live cell (P1)
 
-- [ ] T005 [US3] `infra/bin/model-run-demo`: capture the matrix and `planner-agent`/`vault-agent`
+- [X] T005 [US3] `infra/bin/model-run-demo`: capture the matrix and `planner-agent`/`vault-agent`
       binding records from Vault; seed (out of band, the credential's posture — never Terraform
       state) a `vault:anthropic/claude-opus@5:plan` live cell and point the demo definitions at
       it; **restore from the captured originals in a trap** so interruption cannot strand the
@@ -62,7 +62,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
       conformance lane against the restored fixture cells. Honest limit in the script header
       (research F3): the merge gate reads `variables.tf` and cannot see a Vault-side leftover —
       the compare-to-captured check IS the enclave safety net, plus the choice lane's dispatch.
-- [ ] T006 [P] [US3] [GATE:conformance] The gate half: `make conformance`'s choice lane passes
+- [X] T006 [P] [US3] [GATE:conformance] The gate half: `make conformance`'s choice lane passes
       before the demo (fixture estate) and the script's final step re-runs it after restore. The
       merge-lane row (`test_the_merge_lane_needs_no_provider`) is asserted **unchanged** —
       `git diff` clean on that file — because a demonstration that widened it would trade the
@@ -72,18 +72,18 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 5: User Story 1 — the demonstration (P1)
 
-- [ ] T007 [US1] The two bounded runs inside `model-run-demo`: **Run 1** dispatches vault-agent
+- [X] T007 [US1] The two bounded runs inside `model-run-demo`: **Run 1** dispatches vault-agent
       (bound to the live cell) on a clean read-shaped task, ≤5 steps; **Run 2** dispatches
       planner-agent on a task worded toward `apply` — the ceiling 020 built to be refused in —
       expecting ≥1 refusal from the existing enforcement. Both under the existing step caps;
       terminal stops honoured (a `ChooserUnavailable` or absent credential ends the run with the
       cause, never a fixture fallback — asserted from the trail, FR-003).
-- [ ] T008 [US1] The read-back, in the script: print the trail lines proving SC-001/002/005 —
+- [X] T008 [US1] The read-back, in the script: print the trail lines proving SC-001/002/005 —
       `TOOL_CHOSEN` naming `anthropic/claude-opus@5`, the run's `AUTHORITY_REFUSED`/denial for
       Run 2, and the credential exercised under the allocation's identity (the fetch that closes
       027's T016b, observed live). Then the US4 closure: ask *"Which runs were denied?"* through
       the API as the operator and require the answer to cite Run 2's refusal.
-- [ ] T009 [US1] Execute `bash infra/bin/model-run-demo` against the live enclave — run by the
+- [X] T009 [US1] Execute `bash infra/bin/model-run-demo` against the live enclave — run by the
       agent; ≤15 vendor calls. Record the outcome (trail excerpts, restore proof, the operator's
       answer) in this feature's `contracts/conformance.md`.
 
@@ -91,7 +91,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 6: Polish
 
-- [ ] T010 [P] ROADMAP entry for 031 + contract status rows; note 027's T016b closed and where.
+- [X] T010 [P] ROADMAP entry for 031 + contract status rows; note 027's T016b closed and where.
 - [ ] T011 `make check`, `make evals`, hermetic sweep, and `make conformance` green post-demo.
 
 ---
