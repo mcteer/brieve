@@ -82,10 +82,10 @@ surface-parity row grows across API and MCP. Inherited work, not a discovery.
 
 </details>
 
-**016 task-scoped authority is PARKED** (`specs/016-task-scoped-authority`, branch
-`feat/016-task-scoped-authority`, 19 of 51 tasks). Specified, planned, and the substrate built
-and demonstrated end to end — then stopped, because implementation established that the
-narrowing it delivers is one the workload does not want.
+**016 task-scoped authority is PARKED** (`specs/016-task-scoped-authority`, tag
+`archive/016-task-scoped-authority`, 19 of 51 tasks built). Specified, planned, and the
+substrate built and demonstrated end to end — then stopped, because implementation established
+that the narrowing it delivers is one the workload does not want.
 
 These agents are HashiCorp experts who read widely before acting: skills, HVDs, internal
 policy, prior art. Breadth of read is how the output gets informed, and an agent denied
@@ -96,7 +96,10 @@ identity and expires in an hour.
 [ADR-0057](docs/adr/0057-context-hungry-agents-want-breadth-not-narrower-reads.md) records the
 decision and the three triggers for re-opening it. The research — Vault is the resource server
 and cannot perform the exchange, the entity-alias binding, the `jti` trap — is kept in
-`specs/016-task-scoped-authority/research.md`.
+`specs/016-task-scoped-authority/research.md`, alongside the spec and a README that says what
+was pruned. The rest of that feature's planning artifacts were removed on 2026-08-03: a
+fifty-one-item task list for work that was answered reads as fifty-one dropped obligations,
+which is the opposite of what happened.
 
 > **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
 > work by name. Guessing the next number reads as a fact, propagates into merged documents, and
