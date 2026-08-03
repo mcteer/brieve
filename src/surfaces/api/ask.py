@@ -112,15 +112,24 @@ def ask_for(
         model_authority=model_authority,
     )
 
+    # `source` on BOTH paths, which it was not until the third route went away.
+    #
+    # The estate path has always returned it; guidance never did, and nobody noticed because the
+    # `neither` branch returned it too — so every response a caller could receive without reading
+    # the corpus carried a source, and the one that did read it did not. With `neither` removed,
+    # a caller asking a documentation question got back a body that would not say what answered
+    # it. The record always knew (`record_ask` above); this makes the caller's copy agree.
     if answer.disposition != ANSWERED:
         return {
             "disposition": answer.disposition,
+            "source": GUIDANCE_SOURCE,
             "declined_reason": answer.declined_reason,
             "corpus_digest": answer.corpus_digest,
             "ground_note": answer.ground_note,
         }
     return {
         "disposition": answer.disposition,
+        "source": GUIDANCE_SOURCE,
         "corpus_digest": answer.corpus_digest,
         "ground_note": answer.ground_note,
         "claims": [
@@ -574,31 +583,11 @@ def build_router(
                     status.HTTP_503_SERVICE_UNAVAILABLE, str(unreachable)
                 ) from unreachable
 
-        if destination is Route.NEITHER:
-            # Declined, not coerced. Both doors are named so the asker can rephrase toward one.
-            record_ask(
-                audit=audit,
-                subject=subject,
-                corpus_digest="",
-                evidence_stream="",
-                model=model,
-                disposition="declined",
-                source=str(Route.NEITHER),
-                cell="",
-                bound_cell="",
-                # No source was consulted, so no cell question arose.
-                cell_disposition="not_applicable",
-                # No model was called, so no authority was exercised. Empty is the statement.
-                model_authority="",
-            )
-            return {
-                "disposition": "declined",
-                "source": str(Route.NEITHER),
-                "declined_reason": (
-                    "this question matches neither the pinned guidance corpus nor your estate "
-                    "records; those are the two sources available"
-                ),
-            }
+        # NO THIRD BRANCH ANY MORE. A question that is not estate-shaped falls through to
+        # guidance, which consults the corpus and declines for itself when it cannot help.
+        # The branch that used to sit here declined WITHOUT consulting anything, on the
+        # strength of a keyword list — and told the asker "this matches neither source", which
+        # was a claim about coverage that nothing had checked.
 
         # GOVERNANCE FIRST here too — the corpus is not even loaded for an ask nobody permitted.
         try:

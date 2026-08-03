@@ -183,14 +183,35 @@ def test_an_estate_answer_renders_references_that_are_not_links() -> None:
 
 
 def test_a_decline_reads_as_an_answer_and_names_the_door_that_was_opened() -> None:
-    """FR-008, SC-002. The platform being honest must not look like the platform failing."""
-    portal = _portal(_answering_surface())
+    """FR-008, SC-002. The platform being honest must not look like the platform failing.
+
+    **The door changed, and the row is better for it.** This asserted the word "neither" — the
+    old routing decline, which named two sources while consulting neither of them. A question
+    that is not estate-shaped now reaches the corpus, so the decline comes from the source that
+    actually looked and says what it looked at. That is the same requirement, met honestly
+    rather than by a claim about coverage nothing had checked.
+
+    It also needs a provider that CANNOT answer. The shared stub answers everything, so under
+    the new routing an off-topic question reaches the corpus and gets a (fake) answer — which
+    would have made this row pass while testing nothing. A provider returning no claims is what
+    produces the decline the page must render well.
+    """
+
+    class _FindsNothing:
+        def answer(self, question: str, corpus: Any) -> list[dict[str, Any]]:
+            return []
+
+    portal = _portal(_answering_surface(ask_provider=_FindsNothing()))
 
     page = portal.post("/ask", data={"question": "What is the capital of France?"})
 
     text = _visible(page.text)
-    assert "neither" in text, "the decline does not name which sources were considered"
+    assert "corpus" in text, "the decline does not name the source that was consulted"
     assert "could not be asked" not in text, "a decline rendered as an outage"
+    assert "neither" not in text, (
+        "the decline still claims no source matched — that sentence described a router that "
+        "had not looked, and nothing says it any more"
+    )
 
 
 # ------------------------------------------------------------------ T005: nothing is spent early
