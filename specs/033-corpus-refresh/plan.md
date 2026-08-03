@@ -84,15 +84,16 @@ specs/033-corpus-refresh/
 ```text
 corpus/manifest.json                       # gains "synced_at" (written by sync, optional on read)
 infra/bin/corpus_sync.py                   # writes synced_at; mechanics otherwise untouched
-infra/bin/skills-provenance                # NEW: checks vendored skills against upstream revision,
-                                           #   updates pack.toml provenance; refuses to touch authored skills
+infra/bin/skills-provenance                # NEW: checks adopted packs' existing [upstream] pin against
+                                           #   upstream HEAD; updates only `retrieved`; refuses authored packs
 src/core/answering/corpus.py               # Corpus.synced_at (None default); loader parses/refuses-to-crash
 src/core/answering/ground.py               # NEW: describe_ground(synced_at, now) → the tiered note; the
                                            #   30/90-day constants live here and only here
 src/core/answering/answer.py               # Answer.ground_note: str = "" (additive, frozen-safe)
-src/surfaces/api/ask.py                    # composes the note at answer time (now injected), serializes it
+src/surfaces/api/ask.py                    # ask_for GAINS `now: datetime | None = None` (estate already has
+                                           #   it; guidance does not — analyze A2); composes + serializes note
 src/surfaces/portal/templates/ask.html     # renders ground_note beside the existing window_note block
-packs/terraform/pack.toml                  # [skills.provenance]: source_repo, source_commit, retrieved
+packs/terraform/pack.toml                  # [upstream].retrieved moves on check — NO new fields (analyze C1)
 .github/workflows/corpus-refresh.yml       # NEW: weekly cron + manual dispatch → sync both → open PR
 tests/component/test_ground_note.py        # NEW: tiers, unknown, future-time, absent-manifest rows
 tests/conformance/answering/…              # the full-path row: every guidance answer carries the note

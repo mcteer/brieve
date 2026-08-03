@@ -78,18 +78,24 @@ fetch or redaction failure — means a failed run leaves the tree clean, no PR o
 workflow run itself is red in the Actions tab, which is where the maintainer already looks.
 A red scheduled run IS the visibility; the pin is untouched by construction.
 
-## F6 — The vendored skills' provenance is pack.toml's, not markdown's
+## F6 — The vendored skills' provenance ALREADY EXISTS, and the helper consumes it
 
-**Decision**: machine-readable provenance joins `packs/terraform/pack.toml` —
-`[skills.provenance]` with `source_repo`, `source_commit`, `retrieved` — written by a new
-`infra/bin/skills-provenance` helper that compares the recorded commit against upstream
-`hashicorp/agent-skills` HEAD (a git ls-remote, no clone needed for the no-change case).
+**Decision — corrected by analyze (C1), and the correction is the finding**: the plan's
+first draft invented `[skills.provenance]`; the analysis pass compared it against the code
+and found the machine-readable record already there. `packs/terraform/pack.toml` carries
+`[upstream]` — `repository`, `commit`, `licence`, `retrieved` — parsed by
+`src/core/packs/loader.py` into `UpstreamPin` and REQUIRED for adopted packs ("the pinned
+commit is what makes provenance checkable rather than asserted", ADR-0004). The new
+`infra/bin/skills-provenance` helper therefore ADDS NO FIELDS: it reads the existing pin,
+compares `commit` against upstream HEAD (`git ls-remote`, no clone for the no-change case),
+and updates `retrieved` when it checks. The proposed table name would also have collided
+with the existing `[[skills]]` array of tables — a TOML shape error waiting in review.
 `PROVENANCE.md` stays exactly what it is: the human review record, including the
 injection-lens review, which no script regenerates.
 
-**Rationale**: the human document already carries commit + retrieved date, but prose is not
-a seam — the loader and the rows need fields. The digests over skill bytes already live in
-pack.toml, so provenance beside them keeps *what* and *where-from* in one reviewed file.
+**Rationale**: Principle VI — the lean answer is the record the loader already enforces. A
+second provenance table would drift from the first exactly when a bump happened, which is
+when it matters.
 
 **The bump path is not bypassed**: if upstream moved, the helper does NOT vendor the new
 content. It reports the drift in the proposal (recorded commit vs upstream HEAD), because
@@ -101,15 +107,17 @@ diff to review", never "here is new third-party content, pre-merged".
 
 ## F7 — The vault skill is outbound and the sync must refuse it
 
-**Decision**: `skills-provenance` operates only on packs whose pack.toml declares a
-provenance source. `packs/vault/skills/vault-secret-access` was AUTHORED here (013) and is
-intended as an upstream PR — it has no source to sync from, and a helper that "refreshed" it
-from upstream would overwrite our own authorship with whatever name-collides there. The
-helper refuses packs without a declared source, naming the reason.
+**Decision — sharpened by the same analyze finding**: the refusal keys off the manifest
+field the loader already enforces. `packs/vault/pack.toml` declares
+`provenance = "authored"`; the helper refuses any authored pack by that field, naming the
+reason — `vault-secret-access` was written here (013) and is upstream-bound, and a helper
+that "refreshed" it from upstream would overwrite our own authorship with whatever
+name-collides there. Adopted packs (which the loader already requires to carry `[upstream]`)
+are exactly the checkable set.
 
-**Rationale**: measured — vault skills have no PROVENANCE.md because there is no provenance;
-the memory record from 013 says upstream-bound. The distinction (inbound-vendored vs
-outbound-authored) is load-bearing and this feature writes it down where the mechanism reads.
+**Rationale**: measured — the adopted/authored distinction is load-bearing, and it is
+already written down where the mechanism reads. This feature consumes it rather than
+restating it.
 
 ## F8 — What the conformance rows must pin (the drift traps, named up front)
 

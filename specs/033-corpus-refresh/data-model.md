@@ -43,22 +43,27 @@ Tiers (constants live in `ground.py` only):
 State rule: the note NEVER suppresses itself and NEVER causes a decline (FR-005). The
 disposition machinery is untouched.
 
-## The skills provenance (extended pack metadata)
+## The skills provenance (existing pack metadata, consumed)
 
-`packs/<pack>/pack.toml` gains, for packs with vendored skills only:
+**No new fields** (analyze C1): `packs/terraform/pack.toml` already carries the
+loader-parsed pin —
 
 ```toml
-[skills.provenance]
-source_repo   = "hashicorp/agent-skills"
-source_commit = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
-retrieved     = "2026-07-29"
+[upstream]
+repository = "https://github.com/hashicorp/agent-skills"
+commit     = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
+licence    = "MPL-2.0"
+retrieved  = "2026-07-29"
 ```
+
+— required for adopted packs and parsed into `UpstreamPin` by `src/core/packs/loader.py`.
+The helper reads it and updates only `retrieved`.
 
 | Rule | Enforcement |
 | --- | --- |
-| Declared source ⇒ eligible for the weekly drift check | `skills-provenance` operates only on declared packs |
-| No declared source (vault: authored, outbound) ⇒ refused by the helper, reason named | F7 — never "refreshed" from a name-colliding upstream |
-| Upstream moved ⇒ the proposal REPORTS drift (recorded vs HEAD); content adoption stays a human act through the existing promotion/injection lens | F6 — the bump path is not bypassed |
+| `provenance = "adopted"` ⇒ `[upstream]` exists (loader-enforced) ⇒ eligible for the weekly drift check | `skills-provenance` operates on adopted packs only |
+| `provenance = "authored"` (vault: outbound) ⇒ refused by the helper, reason named | F7 — never "refreshed" from a name-colliding upstream |
+| Upstream moved ⇒ the proposal REPORTS drift (`commit` vs upstream HEAD); content adoption stays a human act through the existing promotion/injection lens | F6 — the bump path is not bypassed |
 | Skill bytes digests | unchanged, already in pack.toml, already verified at load |
 
 ## The prepared refresh (a PR, not a table)

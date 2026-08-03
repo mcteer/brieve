@@ -39,6 +39,8 @@ lives in the scheduled workflow, which is not a gate.
       `synced_at is None`; a sync-shaped manifest with the field round-trips. Sync row: run
       `corpus_sync`'s manifest composition against fixture content twice — digest identical,
       `synced_at` moved (US2 scenario 2: "we checked" is distinguishable from "we changed").
+      And the failure half (FR-007's component row, analyze G3): against a refused fixture
+      the sync dies before writing — manifest and documents byte-identical afterwards.
 
 **Checkpoint**: the pin can say when; nothing consumes it yet; every existing row green.
 
@@ -55,10 +57,12 @@ lives in the scheduled workflow, which is not a gate.
       the frozen dataclass, every existing constructor call stands. `answer_question` itself
       is untouched: the core has no clock, the surface owns "now" (F3, the window_note
       precedent exactly).
-- [ ] T006 [US1] `src/surfaces/api/ask.py`: compose `describe_ground(corpus.synced_at, now)`
-      at the same point `describe_window` composes for estate, attach to the guidance
-      `Answer`, serialize as `ground_note` in the guidance payload beside `claims`. The
-      estate branch is untouched.
+- [ ] T006 [US1] `src/surfaces/api/ask.py`: `ask_for` GAINS `now: datetime | None = None`
+      (analyze A2 — `estate_answer_for` already has it; guidance does not, and an inline
+      `datetime.now()` would make the tier rows untestable, the exact midnight-CI trap the
+      volume rows hit). Compose `describe_ground(corpus.synced_at, now)` where the estate
+      branch composes `describe_window`, attach to the guidance `Answer`, serialize as
+      `ground_note` beside `claims`. The estate branch is untouched.
 - [ ] T007 [P] [US1] `src/surfaces/portal/templates/ask.html`: render `ground_note` in the
       same meta block that renders `window_note`, conditionally, same styling class family.
 - [ ] T008 [P] [US1] Tier rows in `tests/component/test_ground_note.py`: fixture times at
@@ -81,21 +85,24 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
 
 ## Phase 5: User Story 3 — the refresh has a schedule, and landing it stays reviewed (P2)
 
-- [ ] T011 [US3] `packs/terraform/pack.toml`: add `[skills.provenance]` — `source_repo`,
-      `source_commit` (the value already recorded in PROVENANCE.md), `retrieved`
-      ("2026-07-29"). PROVENANCE.md is untouched: it stays the human review record (F6).
-- [ ] T012 [US3] `infra/bin/skills-provenance` (new): for each pack whose pack.toml declares
-      `[skills.provenance]`, compare `source_commit` against upstream HEAD
+- [ ] T011 [US3] NO new pack.toml fields (analyze C1): confirm by row that the loader's
+      `UpstreamPin` (`[upstream]`: repository, commit, licence, retrieved — required for
+      adopted packs) is the provenance record the helper consumes, in
+      `tests/component/test_skills_provenance.py`'s first row. PROVENANCE.md untouched: it
+      stays the human review record (F6).
+- [ ] T012 [US3] `infra/bin/skills-provenance` (new): for each ADOPTED pack (the manifest's
+      own `provenance` field), read `[upstream]`, compare `commit` against upstream HEAD
       (`git ls-remote`, no clone); on drift, REPORT it (recorded vs upstream, in the
       proposal's text) — **never vendor content** (F6: adoption stays a human act through
-      the promotion/injection lens); on no drift, update `retrieved`. A pack without a
-      declared source is refused by name with the reason (F7: `vault-secret-access` is
-      authored here and upstream-bound; a "refresh" from a name-colliding upstream would
-      overwrite our own authorship).
+      the promotion/injection lens); on no drift, update only `retrieved`. An AUTHORED pack
+      is refused by name with the reason (F7: `vault-secret-access` is written here and
+      upstream-bound; a "refresh" from a name-colliding upstream would overwrite our own
+      authorship).
 - [ ] T013 [P] [US3] Helper rows in `tests/component/test_skills_provenance.py` (fixture git
-      data, no network): declared pack checked; drift reported not vendored (the tree is
-      byte-identical after a drift run); undeclared pack refused naming the reason; the
-      vault pack specifically refused.
+      data, no network): adopted pack checked through its existing `[upstream]` pin; drift
+      reported not vendored (skills bytes and `commit` byte-identical after a drift run,
+      only `retrieved` may move on a clean check); authored pack refused naming the reason;
+      the vault pack specifically refused.
 - [ ] T014 [US3] `.github/workflows/corpus-refresh.yml` (new): weekly cron + workflow_dispatch;
       runs `infra/bin/corpus-sync` then `infra/bin/skills-provenance`; if the tree changed
       (a timestamp-only move counts — the no-op proposal is wanted, per clarify), commit to
