@@ -99,7 +99,7 @@ portal guards the new one — at twice the states.
 
 ## Phase 4: User Story 2 — the page says which product it is about (P2)
 
-- [ ] T007 [US2] `src/surfaces/api/definitions.py`: `AgentDefinitionView` gains
+- [X] T007 [US2] `src/surfaces/api/definitions.py`: `AgentDefinitionView` gains
       `packs: tuple[str, ...] = ()`, resolved from the fabric beside the ceiling with the
       same fail-shape — a definition whose packs cannot be read shows `()` rather than being
       hidden or failing (unknown is a state, research F2). **The mechanism is designed for
@@ -111,7 +111,7 @@ portal guards the new one — at twice the states.
       every hermetic row's accident. The view is transport-shared, so MCP and the API expose
       the field by construction; the existing definitions conformance coverage grows a shape
       row asserting the field, the unknown-as-empty behaviour, and the absent-resolver case.
-- [ ] T008 [US2] `src/surfaces/portal/templates/thread.html` + `app.py`'s thread context
+- [X] T008 [US2] `src/surfaces/portal/templates/thread.html` + `app.py`'s thread context
       (the one portal Python touch): each turn's stripe is looked up template-side from its
       `agent_definition_id` against the `definitions` list already in context — a
       `data-pack="<pack>"` attribute styled by the product tokens; exactly one known pack
@@ -120,7 +120,7 @@ portal guards the new one — at twice the states.
       definition. `threads.html` gains the deferral comment: the LIST carries no product
       because its payload does not know one, and a stripe from a name heuristic would be the
       platform pretending to know (spec US2 scenario 4).
-- [ ] T009 [P] [US2] Component render rows (in `test_portal_identity.py` or beside it): a
+- [X] T009 [P] [US2] Component render rows (in `test_portal_identity.py` or beside it): a
       turn with a known pack renders the stripe attribute; an unknown or multi-pack
       definition renders none and no gap; the thread LIST renders no product colour at all;
       the composer shows identity beside startable definitions.

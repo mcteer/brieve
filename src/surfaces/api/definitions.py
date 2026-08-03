@@ -38,6 +38,15 @@ class AgentDefinitionView(BaseModel):
     description: str = ""
     owner: str = ""
     may_start: bool
+    #: Which products this definition works on — additive, read-only, empty when unknown (034).
+    #:
+    #: The portal draws a product identity from this, which is the whole reason it exists: the
+    #: platform already knows a definition's packs, and the page had no way to say so. It is a
+    #: DISPLAY fact and grants nothing; `may_start` above remains the only authority claim here.
+    #:
+    #: Defaulted so every existing constructor stands, and served from this transport-shared
+    #: view so MCP carries it by construction rather than by a second implementation agreeing.
+    packs: tuple[str, ...] = ()
 
 
 class AgentDefinitionListResponse(BaseModel):
@@ -86,9 +95,32 @@ def definition_views(
             AgentDefinitionView(
                 agent_definition_id=definition_id,
                 may_start=_may_start(scope, ceiling),
+                packs=_packs(fabric, definition_id),
             )
         )
     return views
+
+
+def _packs(fabric: Any, definition_id: str) -> tuple[str, ...]:
+    """Which products this definition works on, or empty when that is not knowable (034).
+
+    **Every way of not knowing is the same answer**, and the shape is deliberate. A fabric
+    that has no binding resolver at all (the hermetic harness had none until this landed), a
+    resolution that refuses, and a definition that genuinely declares no pack all return `()`.
+    The portal draws a product stripe from this, so unknown must mean *no stripe* rather than
+    *a wrong stripe* — and it must never mean an exception, because a definition list is not
+    the place to discover that a binding record is unreadable.
+
+    Read-only and additive: this tells a reader which product a definition is about. It grants
+    nothing, and `may_start` above remains the only authority claim on this view.
+    """
+    resolve = getattr(fabric, "resolve_definition_bindings", None)
+    if resolve is None:
+        return ()
+    try:
+        return tuple(sorted(resolve(definition_id).packs))
+    except Exception:  # noqa: BLE001 — see the docstring: unknown is a state, not a failure
+        return ()
 
 
 def build_router() -> APIRouter:

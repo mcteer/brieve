@@ -183,3 +183,113 @@ def test_the_stylesheet_fetches_nothing_external() -> None:
     assert urls == ["fonts/roboto-variable.woff2"], (
         f"unexpected asset references: {urls} — every one is a fetch a reader pays for"
     )
+
+
+# ------------------------------------------------------------------ US2: the product stripe
+
+
+def _render_thread(turns: list[dict[str, object]], definitions: list[dict[str, object]]) -> str:
+    """The real template, rendered with the real environment — not a string built here."""
+    from fastapi.templating import Jinja2Templates  # noqa: PLC0415
+
+    from surfaces.portal.app import TEMPLATES as TEMPLATE_DIR  # noqa: PLC0415
+
+    environment = Jinja2Templates(directory=str(TEMPLATE_DIR)).env
+    return environment.get_template("thread.html").render(
+        request=_FakeRequest(),
+        thread={"thread_id": "t-1", "title": "A conversation"},
+        turns=turns,
+        definitions=definitions,
+        definitions_reachable=True,
+    )
+
+
+class _FakeRequest:
+    """Enough request for the templates: a path, for `aria-current`."""
+
+    class _Url:
+        path = "/threads/t-1"
+
+    url = _Url()
+
+
+def _turn(definition: str | None) -> dict[str, object]:
+    return {
+        "turn_id": "x",
+        "message": "do the thing",
+        "disposition": "dispatched",
+        "agent_definition_id": definition,
+        "run_id": "r-1",
+        "run": None,
+        "result_status": None,
+        "context_run_ids": (),
+        "context_dropped": (),
+    }
+
+
+def test_a_turn_shows_the_product_its_definition_declares() -> None:
+    """US2. The platform knows; the page now says so."""
+    html = _render_thread(
+        turns=[_turn("vault-agent")],
+        definitions=[
+            {"agent_definition_id": "vault-agent", "may_start": True, "packs": ("vault",)}
+        ],
+    )
+
+    assert 'data-pack="vault"' in html
+
+
+def test_an_unknown_product_costs_no_colour_and_no_space() -> None:
+    """FR-006. Absence is not a visual defect to apologise for — there is no attribute at all,
+    so the stylesheet has nothing to style and no placeholder is reserved."""
+    for definitions in (
+        [{"agent_definition_id": "mystery", "may_start": True, "packs": ()}],
+        [],  # the definition is not in the list at all
+    ):
+        html = _render_thread(turns=[_turn("mystery")], definitions=definitions)
+        assert "data-pack" not in html
+
+
+def test_a_definition_spanning_products_draws_no_stripe() -> None:
+    """One identity or none. Two packs have no single colour, and picking the first would be
+    the page asserting something the record does not say."""
+    html = _render_thread(
+        turns=[_turn("both-agent")],
+        definitions=[
+            {
+                "agent_definition_id": "both-agent",
+                "may_start": True,
+                "packs": ("terraform", "vault"),
+            }
+        ],
+    )
+
+    assert "data-pack" not in html
+
+
+def test_the_stripe_is_a_lookup_not_a_guess_from_the_name() -> None:
+    """The row that would catch the tempting shortcut.
+
+    `vault-agent` says its product in its own id, so a name heuristic would pass every happy
+    case and be wrong the first time a definition was named for its team. Here the definition
+    is NAMED for one product and DECLARES another: the record wins.
+    """
+    html = _render_thread(
+        turns=[_turn("vault-agent")],
+        definitions=[
+            {"agent_definition_id": "vault-agent", "may_start": True, "packs": ("terraform",)}
+        ],
+    )
+
+    assert 'data-pack="terraform"' in html
+    assert 'data-pack="vault"' not in html
+
+
+def test_the_thread_list_carries_no_product_at_all() -> None:
+    """Deferred, and asserted so the deferral cannot rot into an accidental implementation."""
+    threads_template = (TEMPLATES / "threads.html").read_text()
+
+    assert "data-pack" not in threads_template
+    assert "does not know which product" in threads_template, (
+        "the deferral lost its reason — a future reader would see only an absence"
+    )

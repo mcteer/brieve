@@ -7,9 +7,23 @@
 <h1>{{ thread.title or "Untitled conversation" }}</h1>
 <p><a class="target" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a></p>
 
+{#
+  THE PRODUCT'S IDENTITY, where the platform actually knows it (034). Each turn names the
+  definition that ran, and the definitions list already in this context carries that
+  definition's packs — so the stripe is a lookup, never a guess from the definition's NAME.
+  `vault-agent` happens to say its product in its id and the next definition will not; a
+  stripe derived from a string would be the platform pretending to know.
+
+  Exactly one pack draws a stripe. Several or none draws nothing — no attribute, no colour,
+  no reserved space, because an unknown product is not a visual defect to apologise for.
+#}
+{% set packs_by_definition = {} %}
+{% for d in definitions %}{% if packs_by_definition.update({d.agent_definition_id: d.packs}) %}{% endif %}{% endfor %}
 <ol class="turns" id="turns">
   {% for turn in turns %}
-  <li class="turn turn--{{ turn.disposition }}">
+  {% set turn_packs = packs_by_definition.get(turn.agent_definition_id) or [] %}
+  <li class="turn turn--{{ turn.disposition }}"
+      {%- if turn_packs | length == 1 %} data-pack="{{ turn_packs[0] }}"{% endif %}>
     <p class="message">{{ turn.message }}</p>
 
     {% if turn.disposition == "declined" %}
@@ -80,8 +94,13 @@
   <select name="agent_definition_id" id="agent">
     <option value="">None &mdash; just leave a note</option>
     {% for d in definitions %}
+      {#
+        The product is named in TEXT rather than shown as colour here: a `<option>` cannot
+        carry a rule, and a colour a screen reader cannot announce would be the accessible
+        name losing information the sighted label has. Text keeps them the same.
+      #}
       <option value="{{ d.agent_definition_id }}" {% if not d.may_start %}disabled{% endif %}>
-        {{ d.agent_definition_id }}{% if not d.may_start %} (you do not have access){% endif %}
+        {{ d.agent_definition_id }}{% if d.packs %} &middot; {{ d.packs | join(", ") }}{% endif %}{% if not d.may_start %} (you do not have access){% endif %}
       </option>
     {% endfor %}
   </select>
