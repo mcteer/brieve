@@ -90,10 +90,18 @@ def test_the_delete_confirmation_meets_wcag_22_aa(page: Any, portal_server: Port
 
 
 def _ask(page: Any, portal_server: PortalServer, question: str) -> None:
+    """Ask, and wait for the answer to ARRIVE rather than for a page to load.
+
+    The form no longer navigates — it posts in place and swaps the server-rendered outcome in,
+    so `wait_for_load_state` returns instantly on a page that is already loaded and the audit
+    would run against an empty outcome region. Waiting on the outcome itself is both correct
+    for the enhanced form and correct if the script is ever removed, since a full page load
+    produces the same element.
+    """
     page.goto(f"{portal_server.base}/ask")
     page.fill("#question", question)
     page.click("form.ask button[type=submit]")
-    page.wait_for_load_state()
+    page.wait_for_selector("#ask-outcome section.answer", timeout=30_000)
 
 
 def test_the_ask_form_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:

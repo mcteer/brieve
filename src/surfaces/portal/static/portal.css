@@ -479,3 +479,20 @@ form.inline { display: inline; }
   min-height: 24px;
   line-height: 24px;
 }
+
+/* THE ASK, IN FLIGHT.
+   A reserved line rather than a box that appears: text arriving in empty space shifts the
+   answer down as it lands, and the thing that moves is the thing somebody is reading. Empty
+   it occupies its own height and says nothing. */
+.ask-status {
+  min-height: var(--space-5);
+  margin-block: var(--space-3) 0;
+}
+
+/* The button while the platform is working. It keeps its size and its label position — only
+   the word changes — so the target stays over 24x24 and focus stays on something real. */
+.ask[aria-busy="true"] .button,
+.button[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.75;
+}
