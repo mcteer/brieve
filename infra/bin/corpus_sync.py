@@ -8,6 +8,7 @@ import json
 import re
 import sys
 import urllib.request
+from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Final
@@ -205,18 +206,29 @@ def main() -> int:
         )
         print(f"  {path}  {len(sections)} sections")
     corpus_digest = hashlib.sha256("".join(d["digest"] for d in documents).encode()).hexdigest()
+    # WHEN, beside WHAT (033). The digest answers "which content is pinned"; this answers "how
+    # old is that answer's ground", which nothing could ask before — the manifest carried no
+    # timestamp of any kind, so no layer above it could compute an age even if it wanted to.
+    #
+    # **The sync's own clock, not git's.** A commit time is rewritten by squashes and rebases,
+    # which would make provenance depend on repository surgery. This is when the fetch happened.
+    #
+    # It moves on EVERY run, including one where upstream changed nothing — that diff is the
+    # "we checked" record, and it is the whole reason a no-op refresh is still proposed.
+    synced_at = datetime.now(UTC).isoformat()
     MANIFEST.write_text(
         json.dumps(
             {
                 "corpus_digest": corpus_digest,
                 "document_count": len(documents),
+                "synced_at": synced_at,
                 "documents": documents,
             },
             indent=2,
         )
         + "\n"
     )
-    print(f"\n{len(documents)} documents, corpus digest {corpus_digest[:16]}…")
+    print(f"\n{len(documents)} documents, corpus digest {corpus_digest[:16]}…, synced {synced_at}")
     return 0
 
 

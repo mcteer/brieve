@@ -1,0 +1,127 @@
+# SPDX-License-Identifier: Apache-2.0
+# The weekly corpus refresh (033) — it PROPOSES; a person lands it.
+#
+# 024 pinned the guidance corpus and left the scheduling half undone: `corpus-sync` could
+# re-discover upstream on demand and nothing ever ran it, so the pin never moved and no answer
+# could say how old its ground was. This is the half that was missing.
+#
+# **A no-change week still opens a proposal**, deliberately. The manifest's `synced_at` moves on
+# every run, and that one-line diff is the evidence that somebody looked — reviewed and merged
+# like any other claim this platform makes. A silent "nothing to do" would leave the answer notes
+# ageing while the check was, in fact, happening.
+#
+# **No PAT, and the consequence is accepted rather than worked around.** A PR opened with the
+# default GITHUB_TOKEN does not trigger CI (GitHub's recursion guard), so this proposal arrives
+# with no checks. The fix everyone reaches for — a personal access token in a repository secret —
+# is a standing credential, which is the one thing Principle IV exists to keep out of this
+# platform, and a weekly convenience does not buy one. Instead the PR body says why it has no
+# checks and names the keystroke that starts them.
+
+name: corpus-refresh
+
+on:
+  schedule:
+    # Mondays, 06:00 UTC. Early enough in the week that a real upstream change has five working
+    # days to be reviewed before the next proposal supersedes it.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+# The default token is READ-ONLY in this repository's generation. Both grants are needed and
+# neither is more than needed: commit the refreshed pin, open the pull request for it.
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  # One refresh at a time. A dispatch racing the schedule would otherwise force-push the same
+  # branch twice with two different pins.
+  group: corpus-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: refresh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+
+      - name: Sync the guidance corpus
+        run: bash infra/bin/corpus-sync
+
+      - name: Check the vendored skills' upstream
+        id: skills
+        run: |
+          bash infra/bin/skills-provenance | tee /tmp/skills-report.txt
+
+      - name: Open or update the proposal
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "corpus-refresh"
+          git config user.email "noreply@github.com"
+
+          if git diff --quiet; then
+            # Nothing moved at all — not even the timestamp. That means the sync did not write,
+            # which the sync only does when it failed, and a failing sync has already exited
+            # non-zero above. Reaching here is a shape nobody predicted; say so rather than
+            # reporting success.
+            echo "::warning::the sync changed nothing, including the timestamp — investigate"
+            exit 0
+          fi
+
+          # ONE standing branch, force-pushed. A dated branch per week stacks stale proposals
+          # nobody closes; this keeps exactly one open question in front of the reviewer.
+          git checkout -B chore/corpus-refresh
+          git add corpus packs
+          git commit -m "chore(corpus): weekly refresh — $(date -u +%Y-%m-%d)"
+          git push --force origin chore/corpus-refresh
+
+          if gh pr view chore/corpus-refresh --json number >/dev/null 2>&1; then
+            echo "the open proposal was updated in place"
+            exit 0
+          fi
+
+          gh pr create \
+            --base main \
+            --head chore/corpus-refresh \
+            --label corpus-refresh \
+            --title "chore(corpus): weekly refresh" \
+            --body "$(cat <<'BODY'
+          The scheduled corpus refresh. **Nothing here is adopted until you merge it.**
+
+          - `corpus/manifest.json` — `synced_at` always moves; a diff of only that line means
+            upstream was checked and had not changed, which is itself the record worth keeping.
+          - `packs/*/pack.toml` — `retrieved` moves when a pack's upstream was checked and
+            matched. If upstream MOVED, nothing was vendored: the report below names the
+            recorded and current commits, and adopting the change is a reviewed act through the
+            promotion path, not this workflow's business.
+
+          ### Skills report
+
+          ```
+          SKILLS_REPORT_PLACEHOLDER
+          ```
+
+          ### Why this PR has no checks
+
+          It was opened by the workflow's own `GITHUB_TOKEN`, and GitHub does not trigger
+          workflows from token-created PRs (a recursion guard). The usual fix is a personal
+          access token in a repository secret — **refused here**: that is a standing credential,
+          and this platform's whole posture is that none exist. Close and reopen this PR (or
+          push an empty commit) to start the checks before merging.
+          BODY
+          )"
+
+          # The report is substituted after creation rather than interpolated into the heredoc,
+          # so nothing in third-party output can be read as shell.
+          gh pr edit chore/corpus-refresh --body "$(gh pr view chore/corpus-refresh --json body -q .body | python3 -c '
+          import sys, pathlib
+          body = sys.stdin.read()
+          report = pathlib.Path("/tmp/skills-report.txt").read_text().strip() or "(no report)"
+          print(body.replace("SKILLS_REPORT_PLACEHOLDER", report))
+          ')"

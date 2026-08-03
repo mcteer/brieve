@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -50,6 +51,14 @@ class Corpus:
 
     digest: str
     documents: dict[str, Document]
+    #: When the pin was made, or `None` when that is not knowable (033).
+    #:
+    #: **`None` is a real state, not a defect.** The corpus this field was added to has no
+    #: timestamp and never will — it was pinned before anything recorded one — and it must keep
+    #: answering. Every unknown case (absent, unparseable, or a future time from a skewed clock)
+    #: arrives here as `None`, and the answering path discloses "age unknown" rather than
+    #: inventing a date or, worse, saying nothing and letting silence imply freshness.
+    synced_at: datetime | None = None
 
     def resolves(self, path: str, anchor: str) -> bool:
         """Whether a citation points at a section that exists.
@@ -63,6 +72,33 @@ class Corpus:
 
     def url_for(self, path: str, anchor: str) -> str:
         return f"{self.documents[path].url}#{anchor}"
+
+
+def _parse_synced_at(raw: object, *, now: datetime | None = None) -> datetime | None:
+    """The manifest's sync time, or `None` — and there is deliberately no third outcome.
+
+    **No exception path, and the reasoning is fail-closed rather than against it.** The failure
+    being guarded is *an answer claiming currency it has not earned*. Refusing to load over a
+    malformed date would take answering down for a metadata field; returning `None` makes the
+    answer disclose that it cannot vouch for its ground's age, which fails toward MORE disclosure.
+
+    A FUTURE timestamp is unknown too. Clock skew at sync produces one, a negative age is
+    nonsense, and reading it as "very fresh" would be the one direction that lets an unfounded
+    currency claim through.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        # A naive timestamp is not comparable to an aware `now`, and guessing its zone would be
+        # inventing provenance. UTC is what the sync writes; anything else is unknown.
+        return None
+    if parsed > (now or datetime.now(UTC)):
+        return None
+    return parsed
 
 
 def load_corpus(
@@ -111,7 +147,11 @@ def load_corpus(
             anchors=frozenset(entry["anchors"]),
             sections=sections,
         )
-    return Corpus(digest=str(data["corpus_digest"]), documents=documents)
+    return Corpus(
+        digest=str(data["corpus_digest"]),
+        documents=documents,
+        synced_at=_parse_synced_at(data.get("synced_at")),
+    )
 
 
 __all__ = ["Corpus", "CorpusUnavailable", "Document", "load_corpus"]

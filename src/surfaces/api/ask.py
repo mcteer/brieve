@@ -11,6 +11,7 @@ instruction given to a model — see `core.answering.answer`.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -26,6 +27,7 @@ from core.answering.estate import (
     describe_window,
 )
 from core.answering.focus import focus_types
+from core.answering.ground import describe_ground
 from core.answering.record import record_ask
 from core.answering.routing import Route, route, window_phrase
 from core.answering.scope import visible_event_types
@@ -73,6 +75,7 @@ def ask_for(
     bound_cell: str = "",
     cell_disposition: str = "",
     model_authority: str = "",
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Answer or decline, and record that someone asked.
 
@@ -81,6 +84,17 @@ def ask_for(
     those send them to different places.
     """
     answer = answer_question(question=question, corpus=corpus, provider=provider)
+
+    # HOW OLD THE GROUND IS (033), composed HERE for the same reason the estate window note is:
+    # `answer_question` has no clock and should not grow one, and a module that calls the clock
+    # itself cannot be tested at the boundaries where this wording changes. `now` is injected —
+    # the volume rows learned that lesson against a calendar date and a CI run at 00:07 UTC.
+    #
+    # Carried on the decline as well as the answer: a decline rests on the same corpus, and a
+    # reader deciding whether to look elsewhere is exactly who needs the age.
+    answer = replace(
+        answer, ground_note=describe_ground(corpus.synced_at, now or datetime.now(UTC))
+    )
 
     # Recorded before the answer is returned. An answer delivered while its record failed is the
     # state 022 spent a feature removing.
@@ -103,10 +117,12 @@ def ask_for(
             "disposition": answer.disposition,
             "declined_reason": answer.declined_reason,
             "corpus_digest": answer.corpus_digest,
+            "ground_note": answer.ground_note,
         }
     return {
         "disposition": answer.disposition,
         "corpus_digest": answer.corpus_digest,
+        "ground_note": answer.ground_note,
         "claims": [
             {
                 "statement": claim.statement,
