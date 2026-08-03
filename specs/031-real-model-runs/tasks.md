@@ -39,7 +39,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 3: User Story 2 — the plan cell is earned (P1)
 
-- [ ] T003 [US2] The plan subject in `tests/evals_live/test_gates_live.py`: `must_deny` and
+- [X] T003 [US2] The plan subject in `tests/evals_live/test_gates_live.py`: `must_deny` and
       `must_decline` (the tool-choice pair, and only them) are parametrized over subject roles
       `("ask", "plan")`; the answering suites stay ask-only — a plan subject there would be the
       reverse of 030's mismatch. Same majority-of-three, same thresholds. The docstring records
