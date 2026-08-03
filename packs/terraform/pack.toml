@@ -33,7 +33,7 @@ probe = "terraform_probe"
 repository = "https://github.com/hashicorp/agent-skills"
 commit     = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
 licence    = "MPL-2.0"
-retrieved  = "2026-07-29"
+retrieved  = "2026-08-03"
 
 # Transport is MCP because a mature server exists — `hashicorp/terraform-mcp-server`, which
 # upstream's own plugin manifest declares. Principle II: transport is a tool PROPERTY, and

@@ -76,24 +76,78 @@ def test_an_unchanged_upstream_moves_only_the_retrieved_line(tmp_path: Path) -> 
 
     assert moved is False
     assert "unchanged" in line
+
+    # Asserted as an OUTCOME rather than as "exactly one line differs", because the committed
+    # manifest's `retrieved` moves whenever a real check runs — and a row that assumed it
+    # differed from TODAY failed the first time the two coincided. Binding a property to a
+    # mutable artifact is the same mistake the corpus row made, one file over.
     after = manifest.read_text()
-    differing = [
-        (a, b) for a, b in zip(before.splitlines(), after.splitlines(), strict=True) if a != b
-    ]
-    assert len(differing) == 1, f"more than one line moved: {differing}"
-    assert differing[0][1].strip() == f'retrieved  = "{TODAY}"'
+    before_lines = before.splitlines()
+    after_lines = after.splitlines()
+    assert len(before_lines) == len(after_lines), "the line count changed — this is not an edit"
+    for index, (was, now) in enumerate(zip(before_lines, after_lines, strict=True)):
+        if now.strip().startswith("retrieved"):
+            assert now.strip() == f'retrieved  = "{TODAY}"', "the retrieved line is not today's"
+        else:
+            assert was == now, f"line {index + 1} moved and should not have: {was!r} → {now!r}"
     assert "# Transport is MCP because a mature server exists" in after, (
         "the manifest's comments did not survive — a TOML re-serialization erased the reasoning "
         "that makes this file reviewable"
     )
 
 
-def test_drift_is_reported_and_nothing_is_vendored(tmp_path: Path) -> None:
-    """The row with teeth. Upstream moved; the pack is byte-identical afterwards."""
+def test_a_repository_that_moved_without_touching_our_skills_is_not_news(tmp_path: Path) -> None:
+    """**The row the first real run earned.** The first implementation compared repository HEAD
+    and reported UPSTREAM MOVED against hashicorp/agent-skills — for a README commit about npx
+    installation, in a plugin this platform does not vendor. The skill actually adopted here was
+    untouched, and the maintainer caught the false alarm before the proposal was believed.
+
+    A weekly report that cries wolf is worse than no report: it trains the reviewer to skim past
+    the week it matters. So drift means OUR content moved, and a repository that moved without
+    touching it says so plainly.
+    """
+    module = _module()
+    manifest = _pack_copy(tmp_path, "terraform")
+    module._upstream_head = lambda repository: "f" * 40
+    module._paths_changed_between = lambda repository, old, new, paths: []
+
+    line, moved = module.check_pack(manifest, today=TODAY)
+
+    assert moved is False, "an unrelated upstream commit was reported as something to review"
+    assert "NOT the skills we vendored" in line
+    assert "nothing to review" in line
+
+
+def test_the_check_is_scoped_to_the_paths_the_pack_declares(tmp_path: Path) -> None:
+    """Scoped from the pack's own `[[skills]]` entries — not a list maintained beside them,
+    which would drift from what is actually vendored exactly when a skill was added."""
+    module = _module()
+    manifest = _pack_copy(tmp_path, "terraform")
+    module._upstream_head = lambda repository: "f" * 40
+    seen: list[list[str]] = []
+
+    def _record(repository: str, old: str, new: str, paths: list[str]) -> list[str]:
+        seen.append(list(paths))
+        return []
+
+    module._paths_changed_between = _record
+    module.check_pack(manifest, today=TODAY)
+
+    assert seen, "the check never scoped to a path"
+    assert any("terraform-style-guide" in pattern for pattern in seen[0]), (
+        f"the check did not scope to the vendored skill: {seen[0]}"
+    )
+
+
+def test_drift_in_our_own_content_is_reported_and_nothing_is_vendored(tmp_path: Path) -> None:
+    """The row with teeth. Our skill moved; the pack is byte-identical afterwards."""
     module = _module()
     pack_dir = tmp_path / "terraform"
     manifest = _pack_copy(tmp_path, "terraform")
     module._upstream_head = lambda repository: "f" * 40
+    module._paths_changed_between = lambda repository, old, new, paths: [
+        "terraform/code-generation/skills/terraform-style-guide/SKILL.md"
+    ]
 
     before = {
         path.relative_to(pack_dir): path.read_bytes()
@@ -104,7 +158,8 @@ def test_drift_is_reported_and_nothing_is_vendored(tmp_path: Path) -> None:
     line, moved = module.check_pack(manifest, today=TODAY)
 
     assert moved is True
-    assert "UPSTREAM MOVED" in line
+    assert "OUR VENDORED CONTENT MOVED" in line
+    assert "SKILL.md" in line, "the report does not name what changed"
     assert "Nothing was vendored" in line
     assert "reviewed act" in line, "the report must point at the promotion path, not just a diff"
 
@@ -126,6 +181,7 @@ def test_an_authored_pack_is_refused_by_the_field_the_loader_enforces(tmp_path: 
         raise AssertionError("an authored pack reached the network")
 
     module._upstream_head = _must_not_be_called
+    module._paths_changed_between = _must_not_be_called
     before = manifest.read_text()
 
     line, moved = module.check_pack(manifest, today=TODAY)
