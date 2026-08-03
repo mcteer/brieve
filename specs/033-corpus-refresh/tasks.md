@@ -127,7 +127,11 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
       contents+pull-requests write — via the shared prose-stripper
       (`tests/harness/source_reading.py`), because five prior features found gates matching
       comments instead of code (F8).
-- [ ] T016 [US3] The dispatch, end to end: agent runs `gh workflow run corpus-refresh.yml`,
+- [ ] T016 [US3] **POST-MERGE by necessity, measured 2026-08-03**: `workflow_dispatch` is
+      only available for a workflow that exists on the DEFAULT branch — dispatching from the
+      feature branch answers `HTTP 404: workflow not found on the default branch`. So this row
+      runs after the implementation PR merges, which is also when the repo setting below can be
+      exercised for real. The dispatch, end to end: agent runs `gh workflow run corpus-refresh.yml`,
       watches the run, and reads back the proposal PR (exists, labelled, unmerged, diff is
       manifest-timestamp plus any provenance `retrieved` move; skills drift reported in the
       body if upstream moved; the body carries the checkless-PR explanation and the CI
@@ -145,7 +149,7 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
 
 - [X] T017 [P] ROADMAP entry for 033; contract status rows flipped to green with dates; the
       024 deferral marked closed where it is recorded.
-- [ ] T018 `make check`, the hermetic sweep, `make evals`, and `make conformance` green;
+- [X] T018 `make check`, the hermetic sweep, `make evals`, and `make conformance` green;
       the served-MCP ask row observed carrying `ground_note` through the proxy (the
       surfaces half of SC-001) during the conformance run. Noted where it is observed
       (analyze L5): `load_corpus` runs at service start, so a merged refresh reaches served
