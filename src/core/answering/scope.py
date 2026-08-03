@@ -58,6 +58,14 @@ ROLE_VISIBILITY: Final[dict[str, frozenset[AuditEventType]]] = {
             AuditEventType.ENFORCEMENT_ERROR,
             AuditEventType.MODEL_GATE,
             AuditEventType.MATRIX_FALLBACK,
+            # 031, the decision 029 recorded and 030 held open: what happened to YOUR runs is
+            # yours to ask about. An operator's dispatched run can be refused by governance, and
+            # until this line the person who caused the refusal could not see it through the ask
+            # path — a correct decline that read as a half-proof. DENIED and REFUSED only:
+            # ISSUED, EXPIRED and the grant/change records stay analyst-only, because
+            # who-holds-what-authority is a different sensitivity than what-was-refused.
+            AuditEventType.AUTHORITY_DENIED,
+            AuditEventType.AUTHORITY_REFUSED,
         }
     ),
     "compliance-analyst": frozenset(

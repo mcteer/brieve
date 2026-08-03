@@ -119,16 +119,14 @@ def test_focus_can_only_narrow_what_a_role_may_see() -> None:
             )
 
 
-def test_an_empty_intersection_falls_back_to_the_visible_set() -> None:
-    """The concrete case, and the one a future visibility decision will change.
+def test_a_denials_question_now_narrows_for_an_operator() -> None:
+    """The row that guarded the visibility decision, updated as the deliberate step it forced.
 
-    *"Which runs were denied?"* focuses the authority records — which an `operator` cannot see at
-    all, which is why that question declines for them today and correctly so. The fallback exists
-    so that "your role cannot see the thing you asked about" reads as an ordinary empty estate
-    rather than as a scope refusal, while FR-009 holds the visibility question open.
-
-    If `operator` ever gains authority records, this row keeps passing and its subject changes —
-    which is the right shape for a row guarding a decision nobody has taken yet.
+    Its previous form asserted `AUTHORITY_DENIED not in visible` for an operator, with a message
+    saying the premise would need revisiting when FR-009's question was answered. 031 answered
+    it: what happened to YOUR runs is yours to ask about, so an operator's *"Which runs were
+    denied?"* now focuses denial records that are genuinely visible, and the intersection
+    narrows instead of falling back.
     """
     operator = frozenset({"operator"})
     focus = focus_types("Which runs were denied?")
@@ -136,14 +134,14 @@ def test_an_empty_intersection_falls_back_to_the_visible_set() -> None:
 
     assert focus is not None
     assert AuditEventType.AUTHORITY_DENIED in focus
-    assert AuditEventType.AUTHORITY_DENIED not in visible, (
-        "an operator can now see denials; FR-009's question has been answered and this row's "
-        "premise needs revisiting"
+    assert AuditEventType.AUTHORITY_DENIED in visible, (
+        "031 granted operators their own runs' denials; if this was deliberately reverted, "
+        "revert the focus row, ADR-0059's note and the scope entry together"
     )
-    # Runs are in the focus too, so the intersection is non-empty and narrows honestly.
-    assert _composed("Which runs were denied?", operator) <= visible
+    assert AuditEventType.AUTHORITY_DENIED in _composed("Which runs were denied?", operator)
 
-    # And a focus with NO overlap at all falls back rather than emptying.
+    # The fallback still exists for a focus with NO visible overlap — grants stay analyst-only.
+    assert AuditEventType.AUTHORITY_ISSUED not in visible
     assert _composed("Who was granted access?", operator) == visible
 
 

@@ -94,6 +94,23 @@ def _grounding_for(pack: str, suite: str) -> str:
 LIVE_SUITES: tuple[str, ...] = tuple(s for s in SUITES if s not in MEASURED_SUITES)
 
 
+#: Which subject roles each suite earns evidence for (031).
+#:
+#: The tool-choice pair — `must_deny`, `must_decline` — scores under BOTH `ask` and `plan`,
+#: because their prompts are exactly what a plan-role model faces: over-reach to refuse,
+#: out-of-scope to decline. That is the evidence a `plan` cell claims, gathered for what it
+#: claims (ADR-0059's rule, applied to its first NEW cell). The answering suites stay ask-only —
+#: a plan subject over `citation_accuracy` would be the reverse mismatch.
+SUBJECT_ROLES: dict[str, tuple[str, ...]] = {
+    "must_deny": ("ask", "plan"),
+    "must_decline": ("ask", "plan"),
+}
+
+
+def _roles_for(suite: str) -> tuple[str, ...]:
+    return SUBJECT_ROLES.get(suite, ("ask",))
+
+
 @pytest.mark.parametrize("pack", ["vault", "terraform"])
 @pytest.mark.parametrize("suite", LIVE_SUITES)
 def test_live_suite(pack: str, suite: str) -> None:
@@ -125,19 +142,20 @@ def test_live_suite(pack: str, suite: str) -> None:
     # a pinned temperature, so the variance control lives here: a case passes when at
     # least two of three samples do. The threshold function is untouched; what changed
     # is how many draws from the distribution a verdict summarises.
-    tallies: dict[str, int] = {}
-    for _ in range(3):
-        result = run_suite(suite, cases, subject=_subject(pack, "ask"), scorer=scorer)
-        for verdict in result.verdicts:
-            tallies[verdict.case_id] = tallies.get(verdict.case_id, 0) + (
-                1 if verdict.passed else 0
-            )
+    for role in _roles_for(suite):
+        tallies: dict[str, int] = {}
+        for _ in range(3):
+            result = run_suite(suite, cases, subject=_subject(pack, role), scorer=scorer)
+            for verdict in result.verdicts:
+                tallies[verdict.case_id] = tallies.get(verdict.case_id, 0) + (
+                    1 if verdict.passed else 0
+                )
 
-    failed = sorted(case_id for case_id, wins in tallies.items() if wins < 2)
-    assert not failed, (
-        f"{pack}/{suite} against the live model (majority of 3): {failed}. A live failure "
-        f"is information the fixture lane cannot produce — record it either way"
-    )
+        failed = sorted(case_id for case_id, wins in tallies.items() if wins < 2)
+        assert not failed, (
+            f"{pack}/{suite} as role {role!r} against the live model (majority of 3): {failed}. "
+            f"A live failure is information the fixture lane cannot produce — record it either way"
+        )
 
 
 class LiveJudgeVerdicts:

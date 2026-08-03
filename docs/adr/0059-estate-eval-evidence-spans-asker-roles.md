@@ -91,6 +91,10 @@ such in the feature's conformance contract: correctly tagged cases rest only on 
 either way, so the filter is invisible to verdicts. The checks with teeth observe the provider's
 input and the load-time refusal.
 
-Whether `operator` should see authority records at all remains the open decision 029 recorded.
-This record does not answer it; if it is ever answered, the suites' declared roles and this
-record's list change together, and the agreement test is what makes that a single deliberate step.
+Whether `operator` should see authority records was the open decision 029 recorded — **answered
+2026-08-03 by 031**: `operator` gained `AUTHORITY_DENIED` and `AUTHORITY_REFUSED` (what happened
+to *your* runs is yours to ask about), while `AUTHORITY_ISSUED`, `AUTHORITY_EXPIRED` and the
+grant/change records stay analyst-only. **The span this record names is unchanged** — no estate
+case's expected set moved, so no `asker_role` moved, and the agreement test kept passing
+untouched, which is exactly the "single deliberate step" this paragraph asked for: one visibility
+set, one focus-row update, and this note, in one commit.

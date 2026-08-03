@@ -145,7 +145,7 @@ nomad job run -detach -var="repo=$REPO" \
   && ok "mcp-surface submitted (bridge mode; the port is published to this machine)" \
   || die "could not submit the mcp-surface job"
 
-cat <<NOTE
+cat <<'NOTE'
 
     The surface answers on http://127.0.0.1:8083/mcp once its allocation is healthy.
 

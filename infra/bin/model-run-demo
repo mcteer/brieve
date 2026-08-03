@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# 031 — a real model drives a governed run, demonstrated, and the estate is handed back.
+#
+# The founding promise, executed once and read back from the trail: an allocation resolves
+# `anthropic/claude-opus@5` from its binding map, brokers the vendor credential under its own
+# attested identity (027's owed behavioural half, observed live here), asks the model to choose
+# each step's tool, is refused where the ceiling says no, and the person who ran it asks the
+# platform "Which runs were denied?" and gets an answer citing the refusal (031's visibility
+# decision, closed end to end).
+#
+# **Seed → run → tear down → prove** (the clarified shape). The live plan cell exists for the
+# demonstration and never for the gates: it is seeded out of band — the credential's posture,
+# ADR-0058's precedent, never Terraform state — and restored from captured originals in a trap,
+# so an interruption cannot strand the estate. Restoration is then PROVEN by re-reading and
+# comparing to the capture, and the choice conformance lane runs against the restored fixture
+# cells.
+#
+# **Honest limit (research F3)**: the merge gate `test_the_merge_lane_needs_no_provider` reads
+# `variables.tf` and cannot see a Vault-side leftover. The compare-to-captured check below IS
+# the enclave safety net, together with the choice lane's dispatch — a leftover live plan cell
+# would let a dispatched conformance row reach a vendor, and the lane re-run is what would
+# catch it doing so.
+#
+# **Cost bound (FR-009)**: Run 1 is 2 steps, Run 2 is 1 step with re-choice bound 3, and
+# Run 3 consults no model at all — at most 5 vendor calls, under the stated ceiling of 15.
+
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+JOB_ID="agent-run"
+LIVE_MODEL="anthropic/claude-opus@5"
+LIVE_PLAN_CELL="vault:${LIVE_MODEL}:plan"
+
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+ok() { printf '    \033[32mok\033[0m %s\n' "$*"; }
+die() {
+  printf '\033[31mthe demonstration could not run:\033[0m %s\n' "$*" >&2
+  exit 1
+}
+
+# ---------------------------------------------------------------- preconditions
+say "The enclave"
+command -v nomad >/dev/null 2>&1 || die "nomad is not on PATH — run \`make dev-up\`"
+case "$(nomad job status "$JOB_ID" 2>&1 || true)" in
+*"No job(s) with prefix"* | "") die "the parameterized job ${JOB_ID} is not registered — run \`make dev-up\`" ;;
+esac
+ok "${JOB_ID} is registered"
+
+VAULT_ADDR="$(grep '^VAULT_ADDR=' "$REPO/.env" | cut -d= -f2- | tr -d '"')"
+VAULT_CACERT="$(grep '^VAULT_CACERT=' "$REPO/.env" | cut -d= -f2- | tr -d '"')"
+VAULT_TOKEN="$(grep '^VAULT_ROOT_TOKEN=' "$REPO/.env" | cut -d= -f2- | tr -d '"')"
+export VAULT_ADDR VAULT_CACERT VAULT_TOKEN
+[ -n "$VAULT_ADDR" ] && [ -n "$VAULT_TOKEN" ] || die "no VAULT_ADDR/VAULT_ROOT_TOKEN in .env — run \`make dev-up\`"
+
+# The vendor credential the runs will broker — present in the trust store, never read here.
+# The demonstration proves the ALLOCATION can obtain it under its own identity; this check
+# only proves there is something to obtain, so a missing record fails in one sentence rather
+# than as a mid-run AUTHORITY_REFUSED.
+vault kv get -mount=model-credentials anthropic >/dev/null 2>&1 \
+  || die "model-credentials/anthropic holds no record — the runs would refuse for credential_unavailable. Seed it as 027's demonstration did."
+ok "the brokered credential record exists (unread)"
+
+# ---------------------------------------------------------------- the gate half, before
+# T006's other assertion: the merge-lane row is UNCHANGED by this feature. A demonstration
+# that widened `test_the_merge_lane_needs_no_provider` to make room for itself would trade
+# the proof for the demo — the entire reason the cell is seeded out of band is so that row
+# never has to move.
+say "The merge-lane row is untouched"
+git -C "$REPO" diff --quiet HEAD -- tests/conformance/choice/test_the_double_is_faithful.py \
+  || die "tests/conformance/choice/test_the_double_is_faithful.py has local changes — the demonstration must not move the merge gate"
+ok "test_the_double_is_faithful.py has no local changes"
+
+say "Choice lane BEFORE the demonstration (fixture estate)"
+"$REPO/infra/bin/choice-conformance" || die "the choice lane is not green on the fixture estate — fix that before demonstrating anything"
+
+# ---------------------------------------------------------------- capture, and the trap
+CAPTURE="$(mktemp -d "${TMPDIR:-/tmp}/model-run-demo.XXXXXX")"
+say "Capturing the records the demonstration will touch → ${CAPTURE}"
+for record in model-matrix definition-bindings/vault-agent definition-bindings/planner-agent; do
+  out="${CAPTURE}/$(basename "$record").json"
+  vault kv get -format=json -mount=harness-authority "$record" \
+    | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['data']['data'], sort_keys=True))" \
+      >"$out" || die "could not capture ${record}"
+done
+ok "matrix and both binding records captured"
+
+RESTORED=0
+restore_estate() {
+  [ "$RESTORED" = 1 ] && return 0
+  RESTORED=1
+  say "Restoring the estate from the captured originals"
+  vault kv put -mount=harness-authority model-matrix @"${CAPTURE}/model-matrix.json" >/dev/null
+  vault kv put -mount=harness-authority definition-bindings/vault-agent @"${CAPTURE}/vault-agent.json" >/dev/null
+  vault kv put -mount=harness-authority definition-bindings/planner-agent @"${CAPTURE}/planner-agent.json" >/dev/null
+  ok "originals written back"
+}
+
+# 017's ownership rule, learned here the hard way: the first post-demo `make conformance`
+# found this script's leftover mcp-surface, re-submitted over it, matched "ready" in the OLD
+# allocation's logs, and ran its rows into the replacement window. A lane stops what it
+# started — so the surface this demo submits carries this run's mark, and only a surface
+# still carrying it is stopped.
+MARK="model-run-demo-$$"
+stop_what_we_started() {
+  if [ "$(nomad job inspect mcp-surface 2>/dev/null | python3 -c 'import json,sys
+try: print((json.load(sys.stdin)["Job"]["Meta"] or {}).get("harness_started_by",""))
+except Exception: print("")' 2>/dev/null)" = "$MARK" ]; then
+    nomad job stop -purge mcp-surface >/dev/null 2>&1 || true
+    ok "stopped the mcp-surface this demonstration started"
+  fi
+}
+
+demo_cleanup() {
+  restore_estate
+  stop_what_we_started
+}
+# The trap is the whole reason an interruption cannot strand a live plan cell where a
+# dispatched conformance row would later find it — nor a demonstration surface where the
+# next lane would trip over it.
+trap demo_cleanup EXIT
+
+# ---------------------------------------------------------------- seed, out of band
+say "Seeding the demonstration cell (out of band — never Terraform state)"
+python3 - "$CAPTURE" "$LIVE_MODEL" <<'PY' >"${CAPTURE}/seeded-matrix.json"
+import json, sys
+capture, model = sys.argv[1], sys.argv[2]
+data = json.load(open(f"{capture}/model-matrix.json"))
+cells = json.loads(data["cells"]) if isinstance(data["cells"], str) else data["cells"]
+cells.append({
+    "judge": model, "model": model, "pack": "vault",
+    "qualified_by": "live", "role": "plan", "withdrawn": False,
+})
+data["cells"] = cells
+print(json.dumps(data, sort_keys=True))
+PY
+vault kv put -mount=harness-authority model-matrix @"${CAPTURE}/seeded-matrix.json" >/dev/null
+
+for agent in vault-agent planner-agent; do
+  python3 - "$CAPTURE" "$agent" "$LIVE_PLAN_CELL" <<'PY' >"${CAPTURE}/seeded-${agent}.json"
+import json, sys
+capture, agent, cell = sys.argv[1], sys.argv[2], sys.argv[3]
+data = json.load(open(f"{capture}/{agent}.json"))
+bmap = json.loads(data["binding_map"]) if isinstance(data["binding_map"], str) else data["binding_map"]
+bmap["plan"] = cell
+data["binding_map"] = bmap
+print(json.dumps(data, sort_keys=True))
+PY
+  vault kv put -mount=harness-authority "definition-bindings/${agent}" @"${CAPTURE}/seeded-${agent}.json" >/dev/null
+done
+ok "live plan cell ${LIVE_PLAN_CELL} seeded; vault-agent and planner-agent point at it"
+
+# ---------------------------------------------------------------- the three bounded runs
+say "Run 1: vault-agent, a clean read-shaped task (≤2 steps)"
+say "Run 2: planner-agent, its one permitted tool refused by governance (the doomed choice)"
+say "Run 3: the over-scoped dispatch — the ceiling refuses the run before any model call"
+cd "$REPO"
+uv run --extra surfaces --extra adapters python infra/bin/model_run_demo_runs.py "$CAPTURE" \
+  || die "the runs did not produce the evidence — the output above says which claim failed"
+
+# ---------------------------------------------------------------- the operator asks
+say "US4: the operator asks the platform about the refusal"
+# Through the served MCP surface with the development provider — the platform's supported
+# non-interactive human-shaped path. The Auth0-configured API refuses a machine credential
+# on the human path (subject_kind_mismatch, measured by this script's first wire attempt),
+# which is its own governance working; a browser sign-in remains the API's human path.
+# `mcp-surface-up` re-submits the job, so the served process runs THIS branch's visibility
+# decision (run-the-served-process: the assembly is the one path no test covers).
+DEV_IDP=1 HARNESS_STARTED_BY="$MARK" "$REPO/infra/bin/mcp-surface-up" || die "the MCP surface did not come up"
+uv run --extra surfaces --extra adapters python infra/bin/model_run_demo_ask.py "${CAPTURE}/runs.json" \
+  || die "the operator's question did not answer citing the refusal"
+
+# ---------------------------------------------------------------- tear down, and prove it
+restore_estate
+
+say "Proving restoration: re-read and compare to the capture"
+for record in model-matrix definition-bindings/vault-agent definition-bindings/planner-agent; do
+  name="$(basename "$record")"
+  now="$(vault kv get -format=json -mount=harness-authority "$record" \
+    | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['data']['data'], sort_keys=True))")"
+  want="$(cat "${CAPTURE}/${name}.json")"
+  [ "$now" = "$want" ] || die "restored ${record} differs from the capture — the estate is NOT clean; fix before merging anything"
+  ok "${record} matches its capture byte for byte"
+done
+
+say "Choice lane AFTER restore (the dispatch half of the safety net)"
+"$REPO/infra/bin/choice-conformance" || die "the choice lane went red after restore — the demonstration left something behind"
+
+say "Done. A real model chose, governance refused it, the operator saw the refusal, and the estate is back."

@@ -20,7 +20,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 2: User Story 4 — the person who ran it can ask about it (P2, but lands first: hermetic)
 
-- [ ] T001 [US4] `ROLE_VISIBILITY` in `src/core/answering/scope.py`: `operator` gains
+- [X] T001 [US4] `ROLE_VISIBILITY` in `src/core/answering/scope.py`: `operator` gains
       `AUTHORITY_DENIED` and `AUTHORITY_REFUSED` — and only those (grants/issued/expired stay
       analyst-only; the comment carries the sensitivity distinction from the spec's decision).
       Update `test_an_empty_intersection_falls_back_to_the_visible_set` in
@@ -28,7 +28,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
       revisiting when this decision lands; it now asserts the intersection is non-empty and
       denials flow. Update ADR-0059's Notes with a dated line: the span is unchanged (no case
       moved), operator's visible set grew. **One commit.**
-- [ ] T002 [P] [US4] [GATE:fail-closed] Rows in `tests/component/test_operator_sees_denials.py`:
+- [X] T002 [P] [US4] [GATE:fail-closed] Rows in `tests/component/test_operator_sees_denials.py`:
       operator's visible set contains exactly the two new types and none of the other authority
       records; the estate-suite agreement row still passes untouched (asserted by running it —
       no span change was the measured claim, research F5); an operator's *"Which runs were
@@ -39,13 +39,13 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 3: User Story 2 — the plan cell is earned (P1)
 
-- [ ] T003 [US2] The plan subject in `tests/evals_live/test_gates_live.py`: `must_deny` and
+- [X] T003 [US2] The plan subject in `tests/evals_live/test_gates_live.py`: `must_deny` and
       `must_decline` (the tool-choice pair, and only them) are parametrized over subject roles
       `("ask", "plan")`; the answering suites stay ask-only — a plan subject there would be the
       reverse of 030's mismatch. Same majority-of-three, same thresholds. The docstring records
       why: plan-role evidence for the first plan cell earned under ADR-0059's
       evidence-matches-claim rule.
-- [ ] T004 [US2] `make evals-smoke` then `make evals-live` with the plan subject — run by the
+- [X] T004 [US2] `make evals-smoke` then `make evals-live` with the plan subject — run by the
       agent (key in `.env`), exit 0 required before any cell exists anywhere. Outcome recorded in
       `infra/environments/dev/variables.tf` as a dated comment beside the ask cells: plan-role
       evidence earned; **the cell itself is never seeded there** (US3's gate).
@@ -54,7 +54,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 4: User Story 3 — the gates never meet the live cell (P1)
 
-- [ ] T005 [US3] `infra/bin/model-run-demo`: capture the matrix and `planner-agent`/`vault-agent`
+- [X] T005 [US3] `infra/bin/model-run-demo`: capture the matrix and `planner-agent`/`vault-agent`
       binding records from Vault; seed (out of band, the credential's posture — never Terraform
       state) a `vault:anthropic/claude-opus@5:plan` live cell and point the demo definitions at
       it; **restore from the captured originals in a trap** so interruption cannot strand the
@@ -62,7 +62,7 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
       conformance lane against the restored fixture cells. Honest limit in the script header
       (research F3): the merge gate reads `variables.tf` and cannot see a Vault-side leftover —
       the compare-to-captured check IS the enclave safety net, plus the choice lane's dispatch.
-- [ ] T006 [P] [US3] [GATE:conformance] The gate half: `make conformance`'s choice lane passes
+- [X] T006 [P] [US3] [GATE:conformance] The gate half: `make conformance`'s choice lane passes
       before the demo (fixture estate) and the script's final step re-runs it after restore. The
       merge-lane row (`test_the_merge_lane_needs_no_provider`) is asserted **unchanged** —
       `git diff` clean on that file — because a demonstration that widened it would trade the
@@ -72,18 +72,18 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 5: User Story 1 — the demonstration (P1)
 
-- [ ] T007 [US1] The two bounded runs inside `model-run-demo`: **Run 1** dispatches vault-agent
+- [X] T007 [US1] The two bounded runs inside `model-run-demo`: **Run 1** dispatches vault-agent
       (bound to the live cell) on a clean read-shaped task, ≤5 steps; **Run 2** dispatches
       planner-agent on a task worded toward `apply` — the ceiling 020 built to be refused in —
       expecting ≥1 refusal from the existing enforcement. Both under the existing step caps;
       terminal stops honoured (a `ChooserUnavailable` or absent credential ends the run with the
       cause, never a fixture fallback — asserted from the trail, FR-003).
-- [ ] T008 [US1] The read-back, in the script: print the trail lines proving SC-001/002/005 —
+- [X] T008 [US1] The read-back, in the script: print the trail lines proving SC-001/002/005 —
       `TOOL_CHOSEN` naming `anthropic/claude-opus@5`, the run's `AUTHORITY_REFUSED`/denial for
       Run 2, and the credential exercised under the allocation's identity (the fetch that closes
       027's T016b, observed live). Then the US4 closure: ask *"Which runs were denied?"* through
       the API as the operator and require the answer to cite Run 2's refusal.
-- [ ] T009 [US1] Execute `bash infra/bin/model-run-demo` against the live enclave — run by the
+- [X] T009 [US1] Execute `bash infra/bin/model-run-demo` against the live enclave — run by the
       agent; ≤15 vendor calls. Record the outcome (trail excerpts, restore proof, the operator's
       answer) in this feature's `contracts/conformance.md`.
 
@@ -91,8 +91,8 @@ first; US2 (plan evidence) unlocks the cell; US3's harness carries US1's demonst
 
 ## Phase 6: Polish
 
-- [ ] T010 [P] ROADMAP entry for 031 + contract status rows; note 027's T016b closed and where.
-- [ ] T011 `make check`, `make evals`, hermetic sweep, and `make conformance` green post-demo.
+- [X] T010 [P] ROADMAP entry for 031 + contract status rows; note 027's T016b closed and where.
+- [X] T011 `make check`, `make evals`, hermetic sweep, and `make conformance` green post-demo.
 
 ---
 
