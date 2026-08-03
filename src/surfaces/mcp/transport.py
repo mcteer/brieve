@@ -286,33 +286,9 @@ class McpTransport:
             except EstateProviderUnavailable as unreachable:
                 return McpResult(ok=False, status=503, payload={"reason": str(unreachable)})
 
-        if destination is Route.NEITHER:
-            record_ask(
-                audit=self._audit,
-                subject=subject,
-                corpus_digest="",
-                evidence_stream="",
-                model=self._ask_model,
-                disposition="declined",
-                source=str(Route.NEITHER),
-                cell="",
-                bound_cell="",
-                cell_disposition="not_applicable",
-                # No model was called, so no authority was exercised.
-                model_authority="",
-            )
-            return McpResult(
-                ok=True,
-                status=200,
-                payload={
-                    "disposition": "declined",
-                    "source": str(Route.NEITHER),
-                    "declined_reason": (
-                        "this question matches neither the pinned guidance corpus nor your "
-                        "estate records; those are the two sources available"
-                    ),
-                },
-            )
+        # NO THIRD BRANCH ANY MORE — see the same removal in `surfaces/api/ask.py`. Parity is
+        # kept by both surfaces losing it together, which is what ADR-0033 asks of a change to
+        # what a transport answers.
 
         try:
             guidance_cell, guidance_bound, guidance_disposition = authorise_ask(

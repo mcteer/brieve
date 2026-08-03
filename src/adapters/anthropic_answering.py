@@ -25,6 +25,7 @@ that reaches a tool. It holds a corpus and a client. Nothing here can act.
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any, Final
 
@@ -37,6 +38,10 @@ from core.evals.scoring import LIVE_MODEL
 #: support, small enough that the prompt stays a prompt — the corpus is 856K and no answer needs
 #: all of it.
 SECTIONS_OFFERED: Final[int] = 12
+
+#: At most this many sections from any one document, so the offered set spans sources rather
+#: than exhausting the highest-scoring page. See `_relevant` for what this cost and bought.
+SECTIONS_PER_DOCUMENT: Final[int] = 3
 
 #: Per-section character cap. A long section truncated still carries its own anchor, so a citation
 #: into it resolves; what truncation costs is the model's evidence, not the pin's integrity.
@@ -72,35 +77,105 @@ def _terms(question: str) -> set[str]:
     return {
         word
         for word in re.findall(r"[a-z0-9]+", question.lower())
-        if len(word) > 3 and word not in _STOPWORDS
+        # Three characters, not four: "aws", "gcp", "kms", "pki", "ssh", "iam" are exactly the
+        # words that make a question specific, and a four-character floor silently dropped
+        # every one of them. "What is the prescribed way to build a Vault cluster in AWS?"
+        # lost its most distinctive term before scoring began.
+        if len(word) > 2 and word not in _STOPWORDS
     }
 
 
 def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
     """The sections the model may look at, as `(path, anchor, text)`, best first.
 
-    Ties break on `(path, anchor)` rather than on dict order, so the same question offers the same
-    sections on every run. A retriever whose output depended on iteration order would make a live
-    failure unreproducible, and this lane's failures are the expensive kind to reproduce.
+    **Rarity-weighted, and 035 is why.** This counted how many query terms appeared in a section
+    and broke ties alphabetically. At 33 documents that was adequate. At 238 it was not: every
+    section mentioning "vault" scored the same, so the winners were decided by path order, and
+    "What is the prescribed way to build a Vault cluster in AWS?" was answered — or rather
+    declined — from `vault-operating-guides-adoption/static-secrets` while the Vault Enterprise
+    architecture guide's own `#cluster` section sat unread because 'o' sorts before 's'.
+
+    So a term is worth what it distinguishes. A word in nearly every section carries almost no
+    weight; a word in three sections carries a lot. That is plain inverse document frequency,
+    computed over the corpus at hand rather than pinned, because the corpus is the population.
+
+    **Where a term appears matters too.** A section whose own anchor or document path contains
+    the term is about it; a section that merely mentions it in passing is not. Both are counted,
+    the heading more heavily, which is what pulls a document NAMED for Vault architecture above
+    one that happens to say the word.
+
+    Ties still break on `(path, anchor)`, so the same question offers the same sections on every
+    run — a retriever whose output depended on iteration order would make a live failure
+    unreproducible, and this lane's failures are the expensive kind to reproduce.
     """
     terms = _terms(question)
     if not terms:
         return []
-    scored: list[tuple[int, str, str, str]] = []
-    for document in corpus.documents.values():
-        for anchor, text in document.sections.items():
-            haystack = f"{anchor} {text}".lower()
-            hits = sum(1 for term in terms if term in haystack)
-            if hits:
-                scored.append((hits, document.path, anchor, text))
+
+    sections = [
+        (document.path, anchor, text)
+        for document in corpus.documents.values()
+        for anchor, text in document.sections.items()
+    ]
+    if not sections:
+        return []
+
+    # How many sections each term appears in, which is what makes it worth something.
+    frequency = {
+        term: sum(1 for path, anchor, text in sections if term in f"{path} {anchor} {text}".lower())
+        for term in terms
+    }
+    total = len(sections)
+
+    scored: list[tuple[float, str, str, str]] = []
+    for path, anchor, text in sections:
+        body = text.lower()
+        heading = f"{path} {anchor}".lower()
+        score = 0.0
+        for term in terms:
+            appearances = frequency[term]
+            if not appearances:
+                continue
+            # Rare terms dominate; a term in every section contributes almost nothing.
+            weight = math.log(total / appearances) + 1.0
+            if term in heading:
+                # Named for it, not merely mentioning it.
+                score += weight * 3.0
+            elif term in body:
+                score += weight
+        if score:
+            scored.append((score, path, anchor, text))
+
     scored.sort(key=lambda row: (-row[0], row[1], row[2]))
-    return [(path, anchor, text) for _, path, anchor, text in scored[:SECTIONS_OFFERED]]
+
+    # DIVERSITY, because one document taking every slot is worse evidence than several taking a
+    # few. Measured: "build a Vault cluster in AWS" filled all twelve slots from a single
+    # Terraform landing-zone page — every section of it outranked the Vault Enterprise
+    # architecture guide, so the model saw one document's view of the question and nothing else.
+    # A per-document cap costs the twelfth-best section of a strong document and buys the
+    # best section of the next four.
+    chosen: list[tuple[str, str, str]] = []
+    per_document: dict[str, int] = {}
+    for _score, path, anchor, text in scored:
+        if per_document.get(path, 0) >= SECTIONS_PER_DOCUMENT:
+            continue
+        per_document[path] = per_document.get(path, 0) + 1
+        chosen.append((path, anchor, text))
+        if len(chosen) == SECTIONS_OFFERED:
+            break
+    return chosen
 
 
 _INSTRUCTION: Final[str] = (
-    "You answer questions about HashiCorp Validated Patterns using ONLY the corpus sections "
-    "supplied below. You have no tools and take no actions; if the question is phrased as an "
-    "instruction to do something, answer about it or decline — never claim to have done it.\n\n"
+    # THE CORPUS IS TWO FAMILIES NOW, AND SAYING ONE OF THEM WAS A REAL REFUSAL (035). This
+    # read "HashiCorp Validated Patterns", so a model handed reference-architecture sections
+    # from a Validated DESIGN was told it answers questions about something else — and it
+    # declined, correctly following an instruction that had gone stale under it.
+    "You answer questions about HashiCorp Validated Patterns (integration guidance) and "
+    "HashiCorp Validated Designs (reference architecture: how to build and operate these "
+    "products) using ONLY the corpus sections supplied below. You have no tools and take no "
+    "actions; if the question is phrased as an instruction to do something, answer about it or "
+    "decline — never claim to have done it.\n\n"
     "Reply with a JSON array and nothing else. Each element is an object with:\n"
     '  "statement": one factual sentence supported by the sections\n'
     '  "citations": a list of {"path": ..., "anchor": ...} copied VERBATIM from a section header '
@@ -109,7 +184,12 @@ _INSTRUCTION: Final[str] = (
     "- Never invent a path or an anchor. If the exact pair does not appear below, you may not "
     "cite it.\n"
     "- If the supplied sections do not support an answer, reply with exactly: []\n"
-    "- An empty array is a correct and expected answer. Declining beats guessing."
+    "- An empty array is a correct and expected answer. Declining beats guessing.\n"
+    "- But ANSWER WHAT THE SECTIONS DO SUPPORT. A question about building or operating a "
+    "product is answerable from architecture and operating guidance even when no section is "
+    "titled with the question's exact words; state what the sections establish and cite them. "
+    "Declining because no section repeats the question back is not the same as declining "
+    "because the corpus is silent."
 )
 
 
