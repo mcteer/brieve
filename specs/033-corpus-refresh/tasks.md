@@ -85,31 +85,38 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
 
 ## Phase 5: User Story 3 — the refresh has a schedule, and landing it stays reviewed (P2)
 
-- [ ] T011 [US3] NO new pack.toml fields (analyze C1): confirm by row that the loader's
-      `UpstreamPin` (`[upstream]`: repository, commit, licence, retrieved — required for
-      adopted packs) is the provenance record the helper consumes, in
-      `tests/component/test_skills_provenance.py`'s first row. PROVENANCE.md untouched: it
-      stays the human review record (F6).
+- [ ] T011 [US3] Deliberately empty, kept as the record (analyze C1 → D1): the draft added
+      a provenance table here; the record already exists as the loader's `UpstreamPin`, and
+      the confirming row is T013's first. Nothing to build; the task ID stays so the
+      numbering matches the analysis trail. PROVENANCE.md untouched throughout: it is the
+      human review record (F6).
 - [ ] T012 [US3] `infra/bin/skills-provenance` (new): for each ADOPTED pack (the manifest's
       own `provenance` field), read `[upstream]`, compare `commit` against upstream HEAD
       (`git ls-remote`, no clone); on drift, REPORT it (recorded vs upstream, in the
       proposal's text) — **never vendor content** (F6: adoption stays a human act through
-      the promotion/injection lens); on no drift, update only `retrieved`. An AUTHORED pack
-      is refused by name with the reason (F7: `vault-secret-access` is written here and
-      upstream-bound; a "refresh" from a name-colliding upstream would overwrite our own
-      authorship).
+      the promotion/injection lens); on no drift, update only `retrieved` — as a TARGETED
+      single-line edit, never a re-serialization (analyze I3: `tomllib` cannot write, a TOML
+      writer is a new dependency, and regenerating the file erases pack.toml's comments,
+      which are part of its record). An AUTHORED pack is refused by name with the reason
+      (F7: `vault-secret-access` is written here and upstream-bound; a "refresh" from a
+      name-colliding upstream would overwrite our own authorship).
 - [ ] T013 [P] [US3] Helper rows in `tests/component/test_skills_provenance.py` (fixture git
       data, no network): adopted pack checked through its existing `[upstream]` pin; drift
       reported not vendored (skills bytes and `commit` byte-identical after a drift run,
-      only `retrieved` may move on a clean check); authored pack refused naming the reason;
-      the vault pack specifically refused.
+      only `retrieved` may move on a clean check); after a `retrieved` update the pack.toml
+      is byte-identical EXCEPT that one line (the I3 row — comments survived); the loader's
+      `UpstreamPin` is the record consumed (the C1 row); authored pack refused naming the
+      reason; the vault pack specifically refused.
 - [ ] T014 [US3] `.github/workflows/corpus-refresh.yml` (new): weekly cron + workflow_dispatch;
       runs `infra/bin/corpus-sync` then `infra/bin/skills-provenance`; if the tree changed
       (a timestamp-only move counts — the no-op proposal is wanted, per clarify), commit to
       a dated branch and `gh pr create` with the `corpus-refresh` label, updating an existing
       open refresh PR rather than duplicating; on sync failure the run goes red with the tree
-      clean and no PR (FR-007 — the sync already dies before writing).
-- [ ] T015 [P] [US3] The workflow-shape row in
+      clean and no PR (FR-007 — the sync already dies before writing). **No PAT** (analyze
+      I2): the default token's PR is checkless by GitHub's recursion guard, the PR body says
+      so and says why (a standing credential is refused by Principle IV), and the body names
+      the reviewer's one keystroke that triggers CI (close/reopen or empty commit).
+- [ ] T015 [US3] The workflow-shape row (after T014 — it asserts that YAML; analyze O4) in
       `tests/component/test_refresh_workflow_shape.py`: the YAML invokes exactly the two
       reviewed scripts and contains no other network-touching step — via the shared
       prose-stripper (`tests/harness/source_reading.py`), because five prior features found
@@ -117,9 +124,10 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
 - [ ] T016 [US3] The dispatch, end to end: agent runs `gh workflow run corpus-refresh.yml`,
       watches the run, and reads back the proposal PR (exists, labelled, unmerged, diff is
       manifest-timestamp plus any provenance `retrieved` move; skills drift reported in the
-      body if upstream moved). Record the outcome in `contracts/conformance.md`. **Named
-      runner: Dan McTeer** — the review of that PR is the act only he performs; merging or
-      closing it is his call and either resolution completes the row.
+      body if upstream moved; the body carries the checkless-PR explanation and the CI
+      trigger instruction — analyze I2). Record the outcome in `contracts/conformance.md`.
+      **Named runner: Dan McTeer** — the review of that PR is the act only he performs;
+      merging or closing it is his call and either resolution completes the row.
 
 **Checkpoint**: the second sync in the platform's history exists as a reviewed proposal.
 
@@ -129,7 +137,10 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
       024 deferral marked closed where it is recorded.
 - [ ] T018 `make check`, the hermetic sweep, `make evals`, and `make conformance` green;
       the served-MCP ask row observed carrying `ground_note` through the proxy (the
-      surfaces half of SC-001) during the conformance run.
+      surfaces half of SC-001) during the conformance run. Noted where it is observed
+      (analyze L5): `load_corpus` runs at service start, so a merged refresh reaches served
+      answers on the next restart — SC-002's "next time the serving process reads the pin"
+      is a deploy fact, not a hot reload.
 
 ---
 
@@ -138,7 +149,7 @@ API payload and the portal render; MCP inherits by proxy and Phase 5 asserts it.
 ```text
 Phase 3 (T001 → T002 → T003)                  [hermetic]
   → Phase 4 (T004 → T005 → T006 → T007∥T008 → T009 → T010)   [hermetic]
-    → Phase 5 (T011 → T012 → T013∥T014∥T015 → T016)           [T016 touches GitHub]
+    → Phase 5 (T011(record) → T012 → T013∥T014 → T015 → T016) [T016 touches GitHub]
       → Phase 6 (T017 ∥ T018)
 ```
 

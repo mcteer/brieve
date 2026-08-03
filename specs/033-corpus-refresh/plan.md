@@ -43,7 +43,12 @@ known trap here — five prior instances, shared stripper)
 weekly workflow is the ONLY thing that fetches, and it is not a gate); `Answer` and `Corpus`
 are frozen dataclasses — new fields are additive with empty/None defaults so every existing
 constructor call stands; no sealed-core audit payload changes (Principle V — the note rides
-the answer object, the exact `window_note` precedent)
+the answer object, the exact `window_note` precedent); stdlib-only holds even though
+`tomllib` cannot write (analyze I3) — the helper's `retrieved` update is a targeted
+single-line edit, never a re-serialization, because pack.toml's comments are part of its
+record and a TOML writer would erase them; no PAT anywhere (analyze I2 — the proposal PR is
+checkless by GitHub's recursion guard, and the review triggers CI rather than a standing
+credential being minted)
 
 **Scale/Scope**: ~6 source files touched, 1 new workflow, 1 new sync helper for skills
 provenance; the 33-document pin untouched until the first real re-sync lands by review

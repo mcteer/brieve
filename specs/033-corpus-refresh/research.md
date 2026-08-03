@@ -73,6 +73,16 @@ sync is already a committed-artifact producer, so "prepare a reviewable change" 
 FR-004's hermeticity is untouched because the only fetching code runs in a non-blocking,
 scheduled context.
 
+**The proposal arrives CHECKLESS, and the fix is a posture, not a token** (analyze I2). A PR
+created with the workflow's default `GITHUB_TOKEN` does not trigger CI — GitHub's own
+recursion guard — so the refresh PR shows no fast-lane run. The tempting fix is a personal
+access token in a repository secret, and it is refused here by name: a PAT is a standing
+credential, the exact thing Principle IV exists to keep out of this platform, and a weekly
+convenience does not buy one. Instead: the PR's body states why checks are absent, and the
+maintainer's review includes the one keystroke that triggers them (close/reopen, or an empty
+commit). The merge discipline — wait for checks — is preserved by making the checks startable
+in review, not by minting authority.
+
 **Failure posture (FR-007)**: the sync script's existing behavior — die before writing on
 fetch or redaction failure — means a failed run leaves the tree clean, no PR opens, and the
 workflow run itself is red in the Actions tab, which is where the maintainer already looks.
