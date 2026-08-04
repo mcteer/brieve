@@ -253,3 +253,76 @@ def test_the_estate_never_becomes_the_default_destination() -> None:
     """
     for question in ("What is the capital of France?", "Hello there", "asdf"):
         assert route(question) is not Route.ESTATE
+
+
+# ------------------------------------------- the ordinary English of operating software (036)
+
+
+#: Documentation questions built from the verbs a person actually uses. Every one of these
+#: routed to the ESTATE before the strong set was measured against its own rule — read the
+#: asker's records, found nothing, and told them their records do not show it.
+#:
+#: The maintainer's own question is the first row. He asked it three times over a day and was
+#: told each time that the platform had nothing, which is how a routing table becomes a report
+#: that the product does not work.
+ORDINARY_QUESTIONS = [
+    "How do I run a Vault cluster in AWS?",
+    "What's the best way to run a Vault cluster on AWS?",
+    "How do I run Terraform Enterprise in a private cloud?",
+    "Which ports are used by Consul?",
+    "How many active nodes should a Nomad cluster have?",
+    "What changed in Vault Enterprise 1.15?",
+    "What happens when a Vault node has failed?",
+    "How is a stopped Nomad allocation resumed?",
+]
+
+
+@pytest.mark.parametrize("question", ORDINARY_QUESTIONS)
+def test_a_documentation_question_is_not_a_question_about_your_records(question: str) -> None:
+    """The words `run`, `used`, `active`, `changed`, `failed`, `resumed`, `stopped`.
+
+    They are how software is discussed, not how a trail is queried, and holding them as strong
+    estate terms meant the most basic question this platform exists to answer performed a scoped
+    read of somebody's audit records and then declined.
+    """
+    assert route(question) is Route.GUIDANCE, (
+        f"{question!r} was routed to the estate. A documentation question must not read records"
+    )
+
+
+#: What-happened questions that must keep working. Removing the seven ambiguous words cost the
+#: estate nothing, and this is where that is checked rather than asserted — each of these rests
+#: on a word that genuinely appears only in questions about the record.
+RECORD_QUESTIONS = [
+    "Which runs were denied last night?",
+    "What did the planner agent do?",
+    "Show me the audit trail for yesterday",
+    "Which workspaces violate a control?",
+    "Were any secrets read?",
+    "What happened to my last run?",
+    "Which runs failed?",
+    "Was anything refused?",
+]
+
+
+@pytest.mark.parametrize("question", RECORD_QUESTIONS)
+def test_the_estate_is_still_reachable_without_the_ambiguous_words(question: str) -> None:
+    """The other half, and the one that would make this change a regression if it failed."""
+    assert route(question) is Route.ESTATE, (
+        f"{question!r} no longer reaches the records — narrowing the strong set went too far"
+    )
+
+
+def test_no_ordinary_operating_verb_is_a_strong_estate_term() -> None:
+    """The rule itself, so a future addition has to face it.
+
+    `ESTATE_TERMS` is defined as words appearing ONLY in what-happened questions. These seven
+    were measured against that definition and failed it. Re-adding one should mean re-arguing
+    it here, not quietly widening a frozenset.
+    """
+    ordinary = {"run", "used", "active", "changed", "failed", "resumed", "stopped", "running"}
+
+    assert not (ESTATE_TERMS & ordinary), (
+        f"{sorted(ESTATE_TERMS & ordinary)} is ordinary English for operating software. A "
+        f"question containing it is not evidence that somebody is asking about their records"
+    )
