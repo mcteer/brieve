@@ -133,6 +133,9 @@ class McpTransport:
             "list_agent_definitions": self._list_agent_definitions,
             "get_agent_definition": self._get_agent_definition,
             "create_thread": self._create_thread,
+            "ask_conversations": self._ask_conversations_list,
+            "ask_conversation": self._ask_conversation,
+            "delete_ask_conversation": self._delete_ask_conversation,
             "list_threads": self._list_threads,
             "get_thread": self._get_thread,
             "delete_thread": self._delete_thread,
@@ -538,6 +541,69 @@ class McpTransport:
         except OperationRefused as refused:
             return self._refused(refused)
         return McpResult(ok=True, status=201, payload=_thread_view(record).model_dump(mode="json"))
+
+    def _ask_conversations_list(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        """035. The same function the API route calls — parity by construction (ADR-0033)."""
+        from core.answering.conversations.postgres import ConversationStoreError
+        from surfaces.api.ask_conversations import list_conversations
+
+        try:
+            listed = list_conversations(subject=subject, store=self._ask_conversations)
+        except ConversationStoreError:
+            # Never an empty list. Telling somebody they have no conversations when nobody
+            # could look is a claim about their history the platform cannot make.
+            return McpResult(
+                ok=False,
+                status=503,
+                payload={
+                    "reason": "your conversations could not be read just now; nothing is lost"
+                },
+            )
+        return McpResult(ok=True, status=200, payload=listed.model_dump(mode="json"))
+
+    def _ask_conversation(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from core.answering.conversations.postgres import ConversationStoreError
+        from surfaces.api.ask_conversations import NO_SUCH_CONVERSATION, read_conversation
+
+        try:
+            found = read_conversation(
+                conversation_id=str(args["conversation_id"]),
+                subject=subject,
+                store=self._ask_conversations,
+            )
+        except ConversationStoreError:
+            return McpResult(
+                ok=False,
+                status=503,
+                payload={"reason": "that conversation could not be read just now"},
+            )
+        if found is None:
+            return McpResult(ok=False, status=404, payload={"detail": NO_SUCH_CONVERSATION})
+        return McpResult(ok=True, status=200, payload=found.model_dump(mode="json"))
+
+    def _delete_ask_conversation(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        from core.answering.conversations.postgres import ConversationStoreError
+        from surfaces.api.ask_conversations import NO_SUCH_CONVERSATION, remove_conversation
+
+        try:
+            removed = remove_conversation(
+                conversation_id=str(args["conversation_id"]),
+                subject=subject,
+                store=self._ask_conversations,
+            )
+        except ConversationStoreError:
+            return McpResult(
+                ok=False,
+                status=503,
+                payload={"reason": "that conversation could not be deleted just now"},
+            )
+        if not removed:
+            return McpResult(ok=False, status=404, payload={"detail": NO_SUCH_CONVERSATION})
+        return McpResult(ok=True, status=204, payload={})
 
     def _list_threads(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         from surfaces.api.threads import list_threads_for

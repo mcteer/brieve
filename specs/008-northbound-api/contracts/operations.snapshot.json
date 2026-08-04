@@ -15,6 +15,21 @@
     "path": "/ask"
   },
   {
+    "method": "GET",
+    "name": "get_conversations",
+    "path": "/ask-conversations"
+  },
+  {
+    "method": "DELETE",
+    "name": "delete_conversation",
+    "path": "/ask-conversations/{conversation_id}"
+  },
+  {
+    "method": "GET",
+    "name": "get_conversation",
+    "path": "/ask-conversations/{conversation_id}"
+  },
+  {
     "method": "POST",
     "name": "request_mapping_change",
     "path": "/claim-mappings"

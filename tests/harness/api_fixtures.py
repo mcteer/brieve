@@ -253,7 +253,7 @@ def surface_under_test(
         # the ABSENT reconciler, which is what an estate with no second copy actually
         # has — the parity rows then compare two surfaces giving that same answer.
         reconciler=reconciler,
-        ask_conversations=ask_conversations
+        ask_conversations_store=ask_conversations
         if ask_conversations is not None
         else MemoryConversationStore(),
         ask_providers=_providers_of(ask_provider),

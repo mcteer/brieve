@@ -1,0 +1,16 @@
+{#
+  ONE EXCHANGE — a question and what came back — rendered in exactly one place.
+
+  This is what the composer swaps in and what a reopened conversation is built from, so the
+  transcript a person scrolls and the answer that just arrived cannot look different. The same
+  argument `_outcome.html` was split out for, one level up: two renderers that agree today are
+  two renderers that drift, and the one that drifts is the one only reachable without
+  JavaScript.
+
+  The QUESTION is rendered as the person's own words, above the answer, because a transcript
+  where you cannot see what you asked is a list of answers to nothing.
+#}
+<article class="exchange">
+  <p class="asked"><span class="asked-label">You asked</span>{{ question }}</p>
+  {% include "_outcome.html" %}
+</article>

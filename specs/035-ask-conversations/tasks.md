@@ -53,9 +53,9 @@ on-subject, signalled estate question still reaches the estate; page never navig
 - [X] T013 [US1] [GATE:fail-closed] Unknown / foreign / cross-tenant `conversation_id` answers `404 no_such_conversation` before routing, context, or any model call — identical wording both transports; rows in `tests/conformance/answering/test_ask_conversations.py`
 - [X] T014 [US1] Hermetic conformance rows for SC-010/SC-010a in `tests/conformance/answering/test_ask_conversations.py` (same file as T013/T015 — sequential): signalled question routes identically standalone vs in-conversation; signal-less follow-up inherits, both directions (docs→docs, estate→estate)
 - [X] T015 [US1] Context rows in `tests/conformance/answering/test_ask_conversations.py` (same file as T013/T014, so deliberately not parallel): decline carried as question-only (FR-014a), bound trips at 7th exchange with `context_note` present (SC-012), first-ask-carries-nothing — and the SC-011 row: a scripted provider that cites something said in history has that claim dropped, because history is structurally uncitable
-- [ ] T016 [US1] Portal transcript: `_exchange.html` (question + included `_outcome.html`), `ask.html` reworked to transcript + sticky composer, `app.py` ask routes carry conversation state; fragment envelope becomes `X-Portal-Fragment: exchange`; `_outcome.html` renders `context_note` conditionally (present only when exchanges were dropped — the window-note reasoning: an unconditional caveat gets skipped)
-- [ ] T017 [US1] `portal-ask.js`: append the returned exchange fragment instead of replacing the outcome region; focus to the new answer's heading; stays ≤ 90 lines and remains the only markup-inserting script (trim, never raise the budget)
-- [ ] T018 [US1] Component rows in `tests/component/test_ask_answers_in_place.py` (amended): fragment carries one exchange, full page carries the transcript, fragment is literally contained in the full page, no-JS POST still renders everything
+- [X] T016 [US1] Portal transcript: `_exchange.html` (question + included `_outcome.html`), `ask.html` reworked to transcript + sticky composer, `app.py` ask routes carry conversation state; fragment envelope becomes `X-Portal-Fragment: exchange`; `_outcome.html` renders `context_note` conditionally (present only when exchanges were dropped — the window-note reasoning: an unconditional caveat gets skipped)
+- [X] T017 [US1] `portal-ask.js`: append the returned exchange fragment instead of replacing the outcome region; focus to the new answer's heading; stays ≤ 90 lines and remains the only markup-inserting script (trim, never raise the budget)
+- [X] T018 [US1] Component rows in `tests/component/test_ask_answers_in_place.py` (amended): fragment carries one exchange, full page carries the transcript, fragment is literally contained in the full page, no-JS POST still renders everything
 - [ ] T019 [P] [US1] a11y rows: populated transcript, exchange in flight, declined and refused exchanges in transcript, focus lands on the newest answer — extend `tests/a11y/test_wcag.py` and its `_ask` helper
 
 **Checkpoint**: quickstart steps 1–3 pass through the served portal.
@@ -67,10 +67,10 @@ on-subject, signalled estate question still reaches the estate; page never navig
 **Independent test**: quickstart steps 4 and 6 — reload lists the conversation, reopen shows
 every exchange in order, delete removes it via confirmation.
 
-- [ ] T020 [US2] `src/surfaces/api/ask_conversations.py`: `GET /ask-conversations`, `GET /ask-conversations/{id}`, `DELETE /ask-conversations/{id}` per contracts/ask-conversations-api.md, wired in the API assembly
+- [X] T020 [US2] `src/surfaces/api/ask_conversations.py`: `GET /ask-conversations`, `GET /ask-conversations/{id}`, `DELETE /ask-conversations/{id}` per contracts/ask-conversations-api.md, wired in the API assembly
 - [ ] T021 [US2] [GATE:fail-closed] An unreadable store answers 503 on list — never an empty list; same 404 discipline on get/delete; rows beside T013's
-- [ ] T022 [US2] MCP tools `ask_conversations`, `ask_conversation`, `delete_ask_conversation` through the same shared functions
-- [ ] T023 [US2] `operations.snapshot.json` in `specs/008-northbound-api/contracts/` gains the three operations; `/ask` entry reflects its amendment
+- [X] T022 [US2] MCP tools `ask_conversations`, `ask_conversation`, `delete_ask_conversation` through the same shared functions
+- [X] T023 [US2] `operations.snapshot.json` in `specs/008-northbound-api/contracts/` gains the three operations; `/ask` entry reflects its amendment
 - [ ] T024 [US2] [GATE:conformance] Parity rows in `tests/conformance/mcp/test_ask_parity.py`: list/get/delete/ask-in-conversation produce the same outcome, disposition and wording on both transports (SC-013)
 - [ ] T025 [US2] [GATE:conformance] The portal containment session in `tests/conformance/portal/test_containment.py` grows to: list (empty), ask (new), ask (follow-up), list (populated), get, delete-confirm, delete — uncatalogued requests still zero
 - [ ] T026 [US2] [GATE:conformance] Cross-owner and cross-tenant rows: a second subject and a second tenant get the identical 404 on get and delete, and their lists never contain the other's conversation (SC-004)
