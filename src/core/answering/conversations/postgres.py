@@ -100,10 +100,38 @@ class PostgresConversationStore:
                     pass
 
     def migrate(self) -> None:
-        """Apply the schema. Idempotent — every statement is IF NOT EXISTS."""
+        """Apply the schema **as the shared role**, so the next credential can still alter it.
+
+        Idempotent — every statement is IF NOT EXISTS — and that is not sufficient on its own.
+        Vault issues a FRESH Postgres user per credential, so a table created under one
+        allocation is owned by a user the next allocation is not. `CREATE TABLE IF NOT EXISTS`
+        then no-ops harmlessly while `CREATE INDEX IF NOT EXISTS` needs ownership, and a
+        migration interrupted between the two wedges every later start with `must be owner of
+        table`. Measured on the served estate: the first deployment created the tables, the
+        restart could not index them, and the API crash-looped.
+
+        `infra/modules/trust-fabric/database.tf` already anticipates this — every dynamic user
+        is `GRANT`ed the bootstrap role, and revocation reassigns objects to it — but membership
+        only helps for objects the shared role ALREADY owns. `SET ROLE` closes the window by
+        making it the owner from the first statement.
+
+        The role is discovered rather than configured: it is the login role this user was made
+        a member of, which is exactly the grant that jobspec relies on. Configuration would be a
+        second place for the name to be wrong.
+        """
 
         def work(conn: Any) -> None:
             cur = conn.cursor()
+            cur.execute(
+                "SELECT r.rolname FROM pg_auth_members m "
+                "JOIN pg_roles r ON r.oid = m.roleid "
+                "JOIN pg_roles me ON me.oid = m.member "
+                "WHERE me.rolname = current_user AND r.rolcanlogin LIMIT 1"
+            )
+            row = cur.fetchone()
+            if row:
+                # Quoted, because the role name comes from the database rather than from us.
+                cur.execute(f'SET ROLE "{row[0]}"')
             cur.execute(SCHEMA_PATH.read_text())
             conn.commit()
 

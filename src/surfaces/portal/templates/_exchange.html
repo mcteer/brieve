@@ -10,7 +10,17 @@
   The QUESTION is rendered as the person's own words, above the answer, because a transcript
   where you cannot see what you asked is a list of answers to nothing.
 #}
-<article class="exchange">
+{#
+  The conversation this exchange landed in, stated by the SERVER. The composer is rendered
+  before a first question has been asked, so its action cannot know the conversation that
+  question will create — and without this the follow-up posted to `/ask` with no id and
+  started a second conversation. Measured through the served portal: the rail showed "what
+  about multi-region?" as its own conversation and reopening it held one exchange.
+
+  A data attribute rather than logic: the portal still decides nothing, it just puts the
+  platform's answer where the next post can read it.
+#}
+<article class="exchange" data-conversation="{{ (response.payload or {}).get("conversation_id", "") }}">
   <p class="asked"><span class="asked-label">You asked</span>{{ question }}</p>
   {% include "_outcome.html" %}
 </article>

@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 
 from adapters.anthropic_answering import build_ask_provider
+from core.answering.conversations.postgres import PostgresConversationStore
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
@@ -81,6 +82,8 @@ def build() -> object:
     audit_sink = PostgresAuditSink(credentials=credentials)
     run_index = PostgresRunIndex(credentials=credentials)
     thread_store = PostgresThreadStore(credentials=credentials)
+    # 035. Under the same brokered credential as every other store here.
+    ask_conversations = PostgresConversationStore(credentials=credentials)
 
     # WHICH model `ask` may call here — the same variable and the same meaning as the served MCP
     # surface's. Unset means no model is configured and every ask answers 503.
@@ -99,6 +102,7 @@ def build() -> object:
     audit_sink.migrate()
     run_index.migrate()
     thread_store.migrate()
+    ask_conversations.migrate()
 
     # The approved claim-to-role mappings, read back from the same gated path the submit
     # endpoint writes to. Without this the verifier holds no mappings, `resolve_roles`
@@ -169,6 +173,7 @@ def build() -> object:
         change_status=VaultChangeStatus(),
         definitions=fabric,
         thread_store=thread_store,
+        ask_conversations_store=ask_conversations,
         # 015. The comparison runs under the platform's own run-role credential and is
         # authorized by the caller's evidence scope — see `reconcile_evidence_for`. The
         # destination is built from the same config the mcp service reads, and `None`

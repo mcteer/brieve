@@ -85,9 +85,9 @@ every exchange in order, delete removes it via confirmation.
 **Independent test**: quickstart's psql check — descriptor present, three states
 distinguishable, trail unchanged by delete.
 
-- [ ] T028 [US3] [GATE:correlation] `record_ask` in `src/core/answering/record.py` gains `conversation_id` and `carried_context`; both threaded from the shared ask path; `AuditEntry` schema untouched
-- [ ] T029 [US3] [GATE:correlation] Rows asserting the three states (key absent / `exchanges: []` / seqs listed), `dropped` count, and `inherited_route` — in `tests/conformance/answering/test_ask_conversations.py` (FR-020–022, SC-005)
-- [ ] T030 [US3] [GATE:correlation] Delete-vs-trail row: capture every `ask_answered` entry, delete the conversation, assert the entries byte-identical (FR-023, SC-006)
+- [X] T028 [US3] [GATE:correlation] `record_ask` in `src/core/answering/record.py` gains `conversation_id` and `carried_context`; both threaded from the shared ask path; `AuditEntry` schema untouched
+- [X] T029 [US3] [GATE:correlation] Rows asserting the three states (key absent / `exchanges: []` / seqs listed), `dropped` count, and `inherited_route` — in `tests/conformance/answering/test_ask_conversations.py` (FR-020–022, SC-005)
+- [X] T030 [US3] [GATE:correlation] Delete-vs-trail row: capture every `ask_answered` entry, delete the conversation, assert the entries byte-identical (FR-023, SC-006)
 
 ## Phase 6: User Story 4 — the chat surface looks like the rest of the platform (P3)
 
@@ -104,7 +104,7 @@ distinguishable, trail unchanged by delete.
 - [X] T034 a11y sticky-composer rows: focused element never obscured by the composer with a long transcript; 320px reflow with 10+ exchanges; text-spacing override does not clip the composer (the named 028/034 traps)
 - [ ] T035 [P] `docs/` note or template comments carrying the two load-bearing decisions where future readers live: history-not-citable in the provider module, mirror-not-share at the store
 - [ ] T036 Full local gates: `make check`, `make conformance-hermetic`, `make a11y` all green
-- [ ] T037 Served verification per quickstart through `DEV_IDP=1 bash infra/bin/portal-up`: the six-step walk-through, zero navigations after sign-in, fresh allocation confirmed by identity age (not by grepping the mount)
+- [X] T037 Served verification per quickstart through `DEV_IDP=1 bash infra/bin/portal-up`: the six-step walk-through, zero navigations after sign-in, fresh allocation confirmed by identity age (not by grepping the mount)
 - [ ] T038 [GATE:eval] SC-002 + SC-011a live check: ten signal-less follow-ups across corpus families at the provider seam, of which at least three follow a DECLINED exchange, plus two through the served portal; pass ≥ 9/10 answered on-subject AND the after-decline subset answers at a rate no worse than the after-answer subset; both splits recorded in the PR body — run by Dan McTeer before promotion, never in CI
 - [ ] T039 MCP served-surface spot check via `infra/bin/mcp-surface-up`: one conversation held over the MCP transport end to end
 - [ ] T040 Update `specs/008-northbound-api/contracts/` conformance contract notes naming the SC-002 runner (constitution v1.1.0 blocking-row ownership)
