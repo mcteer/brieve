@@ -16,6 +16,7 @@ from fastapi import Depends, Header, HTTPException, Request, status
 
 from core.audit.query import EvidenceQuery
 from core.audit.sink import AuditSink
+from core.identity.mappings_store import ClaimMappingsUnavailable
 from core.identity.types import AuthenticatedSubject
 from surfaces.api.verification import AuthenticationRefused, TokenVerifier
 from surfaces.dispatch.types import RunDispatcher
@@ -59,6 +60,22 @@ def current_subject(
         raise HTTPException(
             _STATUS_BY_REASON.get(exc.reason_code, status.HTTP_401_UNAUTHORIZED),
             exc.reason_code,
+        ) from exc
+    except ClaimMappingsUnavailable as exc:
+        # NOT KNOWING WHO SOMEBODY IS, IS NOT THE SAME AS KNOWING THEY MAY NOT.
+        #
+        # Verification needs the claim mappings, and the mappings live in the trust store. When
+        # that read fails — an expired workload identity, a Vault that is down — this raised
+        # through the stack as an unhandled 500 with no body, the portal read a failure with no
+        # reason as a refusal, and a person was told *"the platform refused this request and gave
+        # no reason"*. Nothing had refused them. Their access was intact and the platform could
+        # not check it.
+        #
+        # Nothing is weakened by naming it: this still denies, executes nothing, and reaches no
+        # record. What changes is that the answer is now classified — 503 says come back, 401
+        # and 403 say take it up with somebody — and those send a person to different places.
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "identity_mappings_unavailable"
         ) from exc
 
 

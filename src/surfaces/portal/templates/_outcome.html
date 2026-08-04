@@ -15,7 +15,27 @@
     reachability is decided before any body exists, and a refusal has no disposition to read.
     Reordering these would make an outage render as a refusal with a missing reason.
   #}
-  {% if not response.reachable %}
+  {% if not response.reachable
+        or (not response.ok and not (response.payload or {}).get("detail")) %}
+    {#
+      A PLATFORM THAT SAID NOTHING HAS NOT REFUSED ANYBODY.
+
+      This tested reachability alone, so a failure with no body fell through to the arm below
+      and rendered its fallback: *"The platform refused this request and gave no reason."* The
+      maintainer read that sentence, and it was false in both halves — nothing had refused him,
+      and there WAS a reason, sitting in the API's log where verification had failed reading the
+      trust store on an expired workload identity. A body-less 500 is the platform failing to
+      function, which is not a decision about the person waiting.
+
+      THE TEST IS THE DETAIL, NOT THE STATUS, and the first attempt at this got that wrong. It
+      branched on `status >= 500` and swallowed *"no model credential source is configured for
+      this surface"* — a 503 carrying one of the precise sentences this page exists to relay,
+      each naming a different person to go to. Three rows caught it. Whether the platform SAID
+      something is the question worth asking; a status code is not.
+
+      So: the API spoke, the API's words are rendered, whatever the status. The API said
+      nothing, and the portal says only what it can honestly say — that it could not be asked.
+    #}
     <section class="answer" aria-labelledby="outcome">
       <h2 id="outcome">The platform could not be asked</h2>
       <p>Nothing about your access has changed, and nothing you have is lost. The platform did
@@ -33,10 +53,10 @@
       first time a reason was reworded — leaving this page confidently explaining the wrong
       cause. The portal renders; it does not classify.
     #}
+    {# The detail is guaranteed present — a failure without one took the branch above. #}
     <section class="answer refused" aria-labelledby="outcome">
       <h2 id="outcome">The platform did not answer this</h2>
-      <p>{{ (response.payload or {}).get("detail")
-            or "The platform refused this request and gave no reason." }}</p>
+      <p>{{ (response.payload or {}).get("detail") }}</p>
     </section>
 
   {% elif (response.payload or {}).get("disposition") == "declined" %}
