@@ -106,7 +106,7 @@ distinguishable, trail unchanged by delete.
 - [X] T036 Full local gates: `make check`, `make conformance-hermetic`, `make a11y` all green
 - [X] T037 Served verification per quickstart through `DEV_IDP=1 bash infra/bin/portal-up`: the six-step walk-through, zero navigations after sign-in, fresh allocation confirmed by identity age (not by grepping the mount)
 - [X] T038 [GATE:eval] SC-002 + SC-011a live check: ten signal-less follow-ups across corpus families at the provider seam, of which at least three follow a DECLINED exchange, plus two through the served portal; pass ≥ 9/10 answered on-subject AND the after-decline subset answers at a rate no worse than the after-answer subset; both splits recorded in the PR body — run by Dan McTeer before promotion, never in CI
-- [ ] T039 MCP served-surface spot check via `infra/bin/mcp-surface-up`: one conversation held over the MCP transport end to end
+- [X] T039 MCP served-surface spot check via `infra/bin/mcp-surface-up`: one conversation held over the MCP transport end to end
 - [X] T040 Update `specs/008-northbound-api/contracts/` conformance contract notes naming the SC-002 runner (constitution v1.1.0 blocking-row ownership)
 
 ## Dependencies
