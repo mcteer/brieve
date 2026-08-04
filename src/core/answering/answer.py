@@ -41,8 +41,15 @@ class AnswerProvider(Protocol):
     those gates back onto authored material.
     """
 
-    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
-        """Candidate claims, each with the citations it rests on."""
+    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
+        """Candidate claims, each with the citations it rests on.
+
+        `context` is earlier conversation, supplied so a follow-up has a subject (035). It is
+        **not material**: nothing in it may be cited, and citation resolution below is
+        unchanged by its presence. Optional and defaulted so a provider that predates
+        conversations is still a provider — `answer_question` passes it only when there is
+        some, so every existing two-argument implementation keeps working untouched.
+        """
         ...
 
 
@@ -86,10 +93,27 @@ ANSWERED = "answered"
 DECLINED = "declined"
 
 
-def answer_question(*, question: str, corpus: Corpus, provider: AnswerProvider) -> Answer:
-    """Ask, keep only what the corpus supports, and decline if that is nothing."""
+def answer_question(
+    *, question: str, corpus: Corpus, provider: AnswerProvider, context: str = ""
+) -> Answer:
+    """Ask, keep only what the corpus supports, and decline if that is nothing.
+
+    **`context` changes what is ASKED, never what is KEPT.** Everything below this call is
+    untouched by it: a claim ships only when every citation resolves against the pin, and
+    conversation history has no citations in it to resolve (they are stripped upstream in
+    `core.answering.context`). So a follow-up gets its subject and the corpus keeps its
+    monopoly on what is true.
+
+    Passed to the provider only when there is some, which is what keeps every two-argument
+    provider — including the fixtures the blocking eval lane drives this path with — working
+    exactly as before.
+    """
     try:
-        candidates = provider.answer(question, corpus)
+        candidates = (
+            provider.answer(question, corpus, context)
+            if context
+            else provider.answer(question, corpus)
+        )
     except ProviderUnavailable:
         raise
     except Exception as exc:  # noqa: BLE001 — any provider fault is a provider fault
@@ -146,7 +170,10 @@ class RecordedProvider:
     def __init__(self, recorded: str) -> None:
         self._recorded = recorded
 
-    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
+        # `context` is accepted and IGNORED, deliberately. A recording is a recording: replaying
+        # it under different conversation history would produce the same claims while implying
+        # the history mattered, and the eval lane's determinism rests on it not mattering.
         import re as _re
 
         urls = _re.findall(

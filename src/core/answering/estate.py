@@ -70,7 +70,9 @@ class EstateProvider(Protocol):
     gates score what the product produced rather than authored material.
     """
 
-    def answer(self, question: str, records: tuple[AuditEntry, ...]) -> list[dict[str, Any]]:
+    def answer(
+        self, question: str, records: tuple[AuditEntry, ...], context: str = ""
+    ) -> list[dict[str, Any]]:
         """Candidate claims, each with the entry hashes it rests on."""
         ...
 
@@ -143,15 +145,24 @@ def answer_estate_question(
     records: tuple[AuditEntry, ...],
     provider: EstateProvider,
     window_note: str = "",
+    context: str = "",
 ) -> EstateAnswer:
     """Ask, keep only what the asker's own records support, and decline if that is nothing.
 
     ``window_note`` describes what the read left out, and is carried onto every outcome — an
     answer, a decline and a refusal all rest on the same evidence, and a decline drawn from a
     window is exactly the case a reader most needs told.
+
+    ``context`` is earlier conversation (035), so a follow-up in a records conversation has a
+    subject. It changes what is ASKED and never what is KEPT: a reference still has to resolve
+    to a record actually read, and history carries no references to resolve.
     """
     try:
-        candidates = provider.answer(question, records)
+        candidates = (
+            provider.answer(question, records, context)
+            if context
+            else provider.answer(question, records)
+        )
     except EstateProviderUnavailable:
         raise
     except Exception as exc:  # noqa: BLE001 — any provider fault is a provider fault
@@ -218,7 +229,9 @@ class RecordedEstateProvider:
         self._recorded = recorded
         self._ids = ids_to_hashes or {}
 
-    def answer(self, question: str, records: tuple[AuditEntry, ...]) -> list[dict[str, Any]]:
+    def answer(
+        self, question: str, records: tuple[AuditEntry, ...], context: str = ""
+    ) -> list[dict[str, Any]]:
         import re as _re
 
         cited = _re.findall(r"\brec-[a-z0-9-]+\b", self._recorded)

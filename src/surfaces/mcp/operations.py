@@ -288,7 +288,13 @@ def operations() -> list[McpOperation]:
             ),
             input_schema={
                 "type": "object",
-                "properties": {"question": {"type": "string", "minLength": 1}},
+                "properties": {
+                    "question": {"type": "string", "minLength": 1},
+                    # 035. Absent starts a conversation; present appends to it. An id that is
+                    # not the caller's own is a 404 before anything else happens — grouping
+                    # somebody's own questions grants no source, model or scope.
+                    "conversation_id": {"type": "string", "minLength": 1},
+                },
                 "required": ["question"],
                 # No corpus parameter and no model parameter. Which corpus is pinned and which
                 # model the binding names are not the caller's to choose.

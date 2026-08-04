@@ -9,6 +9,8 @@ would be both a leak and a licensing problem.
 
 from __future__ import annotations
 
+from typing import Any
+
 from core.answering.streams import ask_stream_for
 from core.audit.schema import AuditEventType
 from core.audit.sink import AuditSink
@@ -36,6 +38,8 @@ def record_ask(
     bound_cell: str,
     cell_disposition: str,
     model_authority: str,
+    conversation_id: str = "",
+    carried_context: dict[str, Any] | None = None,
 ) -> None:
     """Write the ask record, or fail the ask.
 
@@ -58,6 +62,19 @@ def record_ask(
     that never obtained a credential claim one silently, which is the exact inversion of what the
     field is for. Pass ``""`` deliberately when no credential was obtained; that is a statement,
     not an omission. It is a **reference, never a key value**.
+
+    ``conversation_id`` and ``carried_context`` are **defaulted, unlike the four above** (035),
+    and the asymmetry is deliberate. Those four describe authority, where a silent default would
+    let a call site claim something it never obtained. These describe what the model was SHOWN,
+    and a standalone ask genuinely has neither — so absence is the honest answer for the ask that
+    belongs to no conversation, and only a conversational ask carries them.
+
+    THREE STATES, AND AN AUDITOR MUST TELL THEM APART (FR-020–022). No keys at all: the ask
+    belonged to no conversation. ``carried_context`` with an empty ``exchanges`` list: a
+    conversation existed and nothing from it was carried. Seqs listed: exactly those exchanges
+    were supplied. The seqs resolve against ``ask_exchanges``; the text is deliberately NOT
+    duplicated here, because each carried exchange already has its own record and two copies of
+    evidence are two things that can disagree.
     """
     try:
         audit.append_event(
@@ -83,6 +100,11 @@ def record_ask(
                 # HOW the call was permitted: where the credential lives and which rotation
                 # generation was in force. A reference — never the key, never a hash of it.
                 "model_authority": model_authority,
+                # WHAT THE MODEL WAS SHOWN beyond the question (035). Written only when the ask
+                # belonged to a conversation, so their absence is itself the statement that it
+                # did not.
+                **({"conversation_id": conversation_id} if conversation_id else {}),
+                **({"carried_context": carried_context} if carried_context is not None else {}),
             },
         )
     except Exception as exc:  # noqa: BLE001 — an unrecorded ask must not stand

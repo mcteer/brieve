@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 
+from core.answering.conversations.store import MemoryConversationStore
 from core.audit.sink import InMemoryAuditSink
 from core.authority.ask_binding import AskAuthority
 from core.authority.changes import BlockedPendingApprovalError, ChangeDisposition
@@ -198,6 +199,12 @@ def surface_under_test(
     # exact equation this feature exists to break. Rows that answer call
     # `qualified_ask_authority()` explicitly.
     ask_authority: object | None = None,
+    # 035's collaborator, shared like the ten before it. A REAL memory store by default rather
+    # than `None`, because unlike a credential or a qualification a conversation store grants
+    # nothing — it groups a person's own questions. Defaulting it absent would leave every
+    # parity row comparing two surfaces that both forget, which is not the behaviour either
+    # deployment has.
+    ask_conversations: object | None = None,
 ) -> SurfaceUnderTest:
     idp = FakeOIDCProvider()
     audit = InMemoryAuditSink()
@@ -246,6 +253,9 @@ def surface_under_test(
         # the ABSENT reconciler, which is what an estate with no second copy actually
         # has — the parity rows then compare two surfaces giving that same answer.
         reconciler=reconciler,
+        ask_conversations=ask_conversations
+        if ask_conversations is not None
+        else MemoryConversationStore(),
         ask_providers=_providers_of(ask_provider),
         ask_model=ask_model,
         ask_authority=ask_authority,
@@ -263,6 +273,9 @@ def surface_under_test(
         definitions=definitions_fabric,
         thread_store=thread_store,
         reconciler=reconciler,
+        ask_conversations=ask_conversations
+        if ask_conversations is not None
+        else MemoryConversationStore(),
         ask_providers=_providers_of(ask_provider),
         ask_model=ask_model,
         ask_authority=ask_authority,

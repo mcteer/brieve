@@ -56,7 +56,9 @@ class _Replay:
     def __init__(self, candidates: list[dict[str, object]]) -> None:
         self._candidates = candidates
 
-    def answer(self, question: str, records: tuple[object, ...]) -> list[dict[str, object]]:
+    def answer(
+        self, question: str, records: tuple[object, ...], context: str = ""
+    ) -> list[dict[str, object]]:
         return self._candidates
 
 

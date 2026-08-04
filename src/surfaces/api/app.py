@@ -65,6 +65,11 @@ def create_app(
     # 027. Absent means every ask refuses `credential_unavailable` — a qualified cell is not
     # authority to call a vendor, and the platform holds that authority nowhere but the store.
     credential_source: Any | None = None,
+    # 035. Where a person's own asks are grouped so they can come back to them. Absent means
+    # asks are answered and recorded exactly as before and remembered by no transcript —
+    # deliberately not fatal, because the evidence record is the platform's memory and this
+    # store is only the asker's.
+    ask_conversations: Any | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -120,6 +125,9 @@ def create_app(
             evidence_query=evidence_query,
             ask_authority=ask_authority,
             credential_source=credential_source,
+            # 035. Absent in an assembly with no store, and an ask then behaves exactly as it
+            # did before conversations existed — answered, recorded, and remembered by nobody.
+            conversations=ask_conversations,
         )
     )
     app.include_router(threads.build_router())

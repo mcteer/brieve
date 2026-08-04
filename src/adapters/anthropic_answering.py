@@ -281,8 +281,13 @@ class LiveAnswerProvider:
         #: this provider — which is one ask, because the surface builds one per ask and drops it.
         self._api_key = api_key
 
-    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
         """Candidate claims, or nothing — and *nothing* is asked more than once.
+
+        `context` is earlier conversation (035), placed BEFORE the question and clearly
+        labelled as not-corpus. Retrieval deliberately ignores it: the sections offered are
+        chosen by the question's own words, because a follow-up's subject belongs in the
+        model's understanding and not in the search that decides what it may read.
 
         **A DECLINE IS A STATEMENT ABOUT THE CORPUS, SO ONE DRAW MUST NOT MAKE IT.** Told "the
         pinned corpus does not support an answer to this question", a person concludes the
@@ -320,14 +325,17 @@ class LiveAnswerProvider:
             for path, anchor, text in sections
         )
         for remaining in range(ATTEMPTS_BEFORE_SILENCE - 1, -1, -1):
-            claims = self._ask_once(question, offered)
+            claims = self._ask_once(question, offered, context)
             if claims or not remaining:
                 return claims
         return []  # pragma: no cover — the loop always returns
 
-    def _ask_once(self, question: str, offered: str) -> list[dict[str, Any]]:
+    def _ask_once(self, question: str, offered: str, context: str = "") -> list[dict[str, Any]]:
         """One draw. Raises on a provider fault; returns `[]` when the model found nothing."""
         client, api_model = client_and_model(self._model, api_key=self._api_key)
+        # History first, then the question, then the material. The order is the reading order:
+        # what we were talking about, what is being asked now, and what may be cited.
+        prologue = f"{context}\n\n" if context else ""
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             # 4096 for the same reason the scorer uses it: Opus 5 reasons before it answers and
@@ -339,7 +347,7 @@ class LiveAnswerProvider:
             messages=[
                 {
                     "role": "user",
-                    "content": f"Question: {question}\n\nCorpus sections:\n\n{offered}",
+                    "content": (f"{prologue}Question: {question}\n\nCorpus sections:\n\n{offered}"),
                 }
             ],
         )
@@ -441,8 +449,14 @@ class LiveEstateProvider:
             return cited
         return self._ids.get(cited, f"unresolvable:{cited}")
 
-    def answer(self, question: str, records: tuple[Any, ...]) -> list[dict[str, Any]]:
+    def answer(
+        self, question: str, records: tuple[Any, ...], context: str = ""
+    ) -> list[dict[str, Any]]:
         """Candidate claims from the records, retried on empty for `LiveAnswerProvider`'s reason.
+
+        `context` is earlier conversation (035), for the same reason and with the same limit as
+        the guidance path: it gives a follow-up its subject and is never evidence. References
+        still resolve against records actually read.
 
         The same control, because the same sentence is at stake and it is arguably heavier here:
         told the platform found nothing in their own records, a person concludes something did
@@ -460,20 +474,24 @@ class LiveEstateProvider:
             for record in records
         )
         for remaining in range(ATTEMPTS_BEFORE_SILENCE - 1, -1, -1):
-            claims = self._ask_once(question, offered)
+            claims = self._ask_once(question, offered, context)
             if claims or not remaining:
                 return claims
         return []  # pragma: no cover — the loop always returns
 
-    def _ask_once(self, question: str, offered: str) -> list[dict[str, Any]]:
+    def _ask_once(self, question: str, offered: str, context: str = "") -> list[dict[str, Any]]:
         """One draw. Raises on a provider fault; returns `[]` when the model found nothing."""
         client, api_model = client_and_model(self._model, api_key=self._api_key)
+        prologue = f"{context}\n\n" if context else ""
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             max_tokens=4096,
             system=_ESTATE_INSTRUCTION,
             messages=[
-                {"role": "user", "content": f"Question: {question}\n\nAudit records:\n\n{offered}"}
+                {
+                    "role": "user",
+                    "content": (f"{prologue}Question: {question}\n\nAudit records:\n\n{offered}"),
+                }
             ],
         )
         text = "".join(str(getattr(block, "text", "")) for block in response.content)

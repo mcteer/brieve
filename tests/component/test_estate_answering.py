@@ -46,7 +46,9 @@ class _Provider:
     def __init__(self, *candidates: dict[str, Any]) -> None:
         self._candidates = list(candidates)
 
-    def answer(self, question: str, records: tuple[AuditEntry, ...]) -> list[dict[str, Any]]:
+    def answer(
+        self, question: str, records: tuple[AuditEntry, ...], context: str = ""
+    ) -> list[dict[str, Any]]:
         return self._candidates
 
 
@@ -123,7 +125,9 @@ def test_a_provider_fault_raises_rather_than_declining() -> None:
     """FR-003. "The records do not show this" and "we could not read them" differ."""
 
     class _Broken:
-        def answer(self, question: str, records: tuple[AuditEntry, ...]) -> list[dict[str, Any]]:
+        def answer(
+            self, question: str, records: tuple[AuditEntry, ...], context: str = ""
+        ) -> list[dict[str, Any]]:
             raise RuntimeError("the store went away")
 
     with pytest.raises(EstateProviderUnavailable):
