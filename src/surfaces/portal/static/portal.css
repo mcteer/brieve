@@ -511,6 +511,9 @@ form.inline { display: inline; }
 /* THE RAIL COLLAPSES, IT DOES NOT SHRINK. 028 learned that CI's Linux Chromium renders
    wider than macOS and broke reflow there first; a rail that narrows keeps a second
    column at 320px and takes the transcript below the horizontal-scroll line with it. */
+/* Nothing to list, so nothing to reserve a column for. */
+.ask-layout--alone { grid-template-columns: minmax(0, 1fr); }
+
 @media (max-width: 45rem) {
   .ask-layout { grid-template-columns: minmax(0, 1fr); }
   .ask-rail { border-right: none; padding-right: 0; }

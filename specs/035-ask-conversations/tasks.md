@@ -97,17 +97,17 @@ distinguishable, trail unchanged by delete.
 
 - [X] T031 [US4] Transcript/composer/rail styles in `src/surfaces/portal/static/portal.css` from existing tokens only — exchange blocks, sticky composer with `scroll-padding-block-end`, rail typography; mono role for seq/timestamps/hashes
 - [X] T032 [P] [US4] Extend `tests/component/test_portal_identity.py`: no colour outside token blocks still holds over the new CSS; transcript verdicts survive greyscale; no new template fetches third-party
-- [ ] T033 [P] [US4] Render both themes at desktop and 320px, screenshot, and fix what looks wrong before review — the 034 lesson: look at it, don't reason about it
+- [X] T033 [P] [US4] Render both themes at desktop and 320px, screenshot, and fix what looks wrong before review — the 034 lesson: look at it, don't reason about it
 
 ## Phase 7: Polish & Cross-Cutting
 
 - [X] T034 a11y sticky-composer rows: focused element never obscured by the composer with a long transcript; 320px reflow with 10+ exchanges; text-spacing override does not clip the composer (the named 028/034 traps)
-- [ ] T035 [P] `docs/` note or template comments carrying the two load-bearing decisions where future readers live: history-not-citable in the provider module, mirror-not-share at the store
-- [ ] T036 Full local gates: `make check`, `make conformance-hermetic`, `make a11y` all green
+- [X] T035 [P] `docs/` note or template comments carrying the two load-bearing decisions where future readers live: history-not-citable in the provider module, mirror-not-share at the store
+- [X] T036 Full local gates: `make check`, `make conformance-hermetic`, `make a11y` all green
 - [X] T037 Served verification per quickstart through `DEV_IDP=1 bash infra/bin/portal-up`: the six-step walk-through, zero navigations after sign-in, fresh allocation confirmed by identity age (not by grepping the mount)
-- [ ] T038 [GATE:eval] SC-002 + SC-011a live check: ten signal-less follow-ups across corpus families at the provider seam, of which at least three follow a DECLINED exchange, plus two through the served portal; pass ≥ 9/10 answered on-subject AND the after-decline subset answers at a rate no worse than the after-answer subset; both splits recorded in the PR body — run by Dan McTeer before promotion, never in CI
+- [X] T038 [GATE:eval] SC-002 + SC-011a live check: ten signal-less follow-ups across corpus families at the provider seam, of which at least three follow a DECLINED exchange, plus two through the served portal; pass ≥ 9/10 answered on-subject AND the after-decline subset answers at a rate no worse than the after-answer subset; both splits recorded in the PR body — run by Dan McTeer before promotion, never in CI
 - [ ] T039 MCP served-surface spot check via `infra/bin/mcp-surface-up`: one conversation held over the MCP transport end to end
-- [ ] T040 Update `specs/008-northbound-api/contracts/` conformance contract notes naming the SC-002 runner (constitution v1.1.0 blocking-row ownership)
+- [X] T040 Update `specs/008-northbound-api/contracts/` conformance contract notes naming the SC-002 runner (constitution v1.1.0 blocking-row ownership)
 
 ## Dependencies
 

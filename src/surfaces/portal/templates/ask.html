@@ -4,7 +4,11 @@
 <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
 {% endblock %}
 {% block content %}
-<div class="ask-layout">
+{# The rail is omitted when there is nothing to list, so the layout has to stop reserving a
+   column for it — otherwise a first-time visitor gets the whole page squeezed into 14rem with
+   the rest of the screen empty. Found by looking at a screenshot; no row would have caught it,
+   because it is correct markup that reads badly. #}
+<div class="ask-layout{% if not conversations %} ask-layout--alone{% endif %}">
 
 {#
   THE RAIL — this person's own conversations, most recently used first.
