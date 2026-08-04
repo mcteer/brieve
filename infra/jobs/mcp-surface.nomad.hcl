@@ -209,7 +209,10 @@ job "mcp-surface" {
         }
 
         args = [
-          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cp -a /src/corpus /repo/ 2>/dev/null || true; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.mcp.served"
+          # Same watchdog as the API, for the same wedge and the same reason — this surface
+          # holds an identical hour-long identity, so it wedges identically. See
+          # `infra/bin/identity-watchdog`.
+          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cp -a /src/corpus /repo/ 2>/dev/null || true; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; sh /src/infra/bin/identity-watchdog /secrets/nomad_vault.jwt 60 surfaces.mcp.served & uv run --extra adapters --extra surfaces python -m surfaces.mcp.served"
         ]
       }
 

@@ -74,8 +74,21 @@ def current_subject(
         # Nothing is weakened by naming it: this still denies, executes nothing, and reaches no
         # record. What changes is that the answer is now classified — 503 says come back, 401
         # and 403 say take it up with somebody — and those send a person to different places.
+        #
+        # A SENTENCE, NOT A REASON CODE, BECAUSE OF WHO READS THIS ONE.
+        #
+        # The other details here — `absent_identity`, `unmapped_claim` — answer 401s and 403s,
+        # which a program collects and a person almost never sees. This is a 503 on the path a
+        # human is sitting in front of, and the portal relays the API's words verbatim by
+        # design, so `identity_mappings_unavailable` is what the maintainer read on the page.
+        # That is not better than the sentence it replaced; it is the same failure in a worse
+        # register. What a person needs here is whether their access changed (no), whether they
+        # lost anything (no), and whether to try again (yes).
         raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE, "identity_mappings_unavailable"
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The platform cannot check identities at the moment, so it stopped rather than "
+            "guess. Nothing about your access has changed and nothing is lost — try again in "
+            "a moment.",
         ) from exc
 
 

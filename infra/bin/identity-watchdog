@@ -1,0 +1,91 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+#
+# THE ATTESTED IDENTITY OUTLIVES ITS OWN RENEWAL, AND NOTHING NOTICED.
+#
+# Nomad issues these surfaces a workload identity with `ttl = "1h"` and renews it in place;
+# the code re-reads the file on every use, so a renewal needs no restart. Observed on this dev
+# agent over 2026-08-03/04: renewal happens once and then stops. The file goes stale, Vault
+# rejects it — `invalid expiration time (exp) claim: token is expired` — and the surface keeps
+# serving, answering every request with a failure it cannot recover from on its own.
+#
+# The failure is invisible in the worst way. The process is healthy, the port is open, Nomad
+# shows the allocation running, and every ask fails somewhere deep in the trust store. It cost
+# the maintainer three separate reports across a day, each one looking like a different bug.
+#
+# So this watches the one fact that decides it: whether the token on disk has expired. If it
+# has, the task is killed, and that is the WHOLE repair — a task restart makes Nomad render a
+# fresh identity, which is exactly what replacing the allocation by hand was doing. The restart
+# stanza (`attempts = 3, interval = 5m, delay = 15s, mode = delay`) never gives up, so this
+# recovers on its own however long the wedge lasts.
+#
+# Deliberately NOT a fix for whatever is wrong inside Nomad's renewal — that is upstream and
+# unproven. This is the estate noticing that its own attestation died and doing the one thing
+# that brings it back, rather than serving failures until somebody complains.
+#
+# Runs in the background beside the service, checks once a minute, and reads nothing but the
+# token's own expiry claim. It never logs the token.
+set -eu
+
+TOKEN_FILE="${1:?usage: identity-watchdog <jwt-file> <interval-seconds> <process-marker>}"
+INTERVAL="${2:-60}"
+#: A substring of the served process's command line — how the surface is identified for the
+#: restart. NOT optional and not defaulted: a watchdog that cannot find what to stop would sit
+#: there logging that it noticed, which is the failure it exists to end.
+MARKER="${3:?a process marker is required, e.g. surfaces.api.service}"
+
+# Seconds remaining on the token, or empty if it cannot be read. Base64url with padding
+# restored; `awk` does the padding because `base64 -d` in this image rejects an unpadded string.
+remaining_seconds() {
+  [ -f "$TOKEN_FILE" ] || return 1
+  claims=$(
+    cut -d. -f2 "$TOKEN_FILE" \
+      | tr '_-' '/+' \
+      | awk '{ while (length($0) % 4) $0 = $0 "="; print }' \
+      | base64 -d 2>/dev/null
+  ) || return 1
+  exp=$(printf '%s' "$claims" | tr ',' '\n' | grep -o '"exp":[0-9]*' | cut -d: -f2)
+  [ -n "$exp" ] || return 1
+  echo $((exp - $(date +%s)))
+}
+
+while :; do
+  sleep "$INTERVAL"
+
+  left=$(remaining_seconds) || continue  # Unreadable is not the same as expired; say nothing.
+
+  if [ "$left" -le 0 ]; then
+    echo "identity-watchdog: workload identity expired $(( -left / 60 ))m ago — stopping the" \
+         "surface so Nomad restarts the task and issues a fresh one." >&2
+
+    # THE SERVED PROCESS, NOT PID 1.
+    #
+    # The obvious target is PID 1, the task's own shell, and it does not work: the kernel
+    # refuses to deliver a signal to the init process of a PID namespace FROM INSIDE that
+    # namespace unless it has installed a handler, and `/bin/sh` has not. Measured — the
+    # watchdog logged that it had noticed and the task went right on serving failures, which
+    # is precisely the silent-wedge shape this exists to end.
+    #
+    # Stopping the SERVER instead works and is better anyway: it is the foreground command of
+    # an entrypoint running under `set -e`, so when it goes the shell goes, the task ends, and
+    # Nomad's restart stanza brings it back with a freshly rendered identity.
+    stopped=""
+    for proc in /proc/[0-9]*; do
+      [ -r "$proc/cmdline" ] || continue
+      case "$(tr '\0' ' ' < "$proc/cmdline")" in
+        *"$MARKER"*)
+          pid=${proc#/proc/}
+          [ "$pid" = "1" ] && continue
+          kill -TERM "$pid" 2>/dev/null && stopped="yes"
+          ;;
+      esac
+    done
+
+    if [ -z "$stopped" ]; then
+      echo "identity-watchdog: nothing matching '$MARKER' to stop — the surface is wedged and" \
+           "this cannot repair it. Replace the allocation." >&2
+      exit 1
+    fi
+    exit 0
+  fi
+done
