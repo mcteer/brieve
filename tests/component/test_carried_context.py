@@ -227,3 +227,38 @@ def test_context_never_reaches_for_anything_but_what_it_was_given() -> None:
         assert reachable not in source, (
             f"build_context reaches for {reachable!r} — it must only see the exchanges passed in"
         )
+
+
+# ------------------------------------- retrieval sees the subject, not only the model (035)
+
+
+def test_the_retrieval_query_is_widened_by_the_earlier_questions() -> None:
+    """The plan said retrieval should ignore context. The live check said otherwise.
+
+    Measured: "and the clients?" carries one word, retrieved Consul DNS and Windows containers,
+    and three of ten follow-ups came back empty because the model was handed material about
+    neither. Widening the query with the earlier QUESTIONS took SC-002 from 6/10 to 9/10.
+
+    Only the questions — claim statements are prose and swamp the few terms that name the
+    subject. This row is what stops somebody restoring the tidier design without re-measuring.
+    """
+    from adapters.anthropic_answering import _retrieval_query  # noqa: PLC0415
+
+    context = build_context(
+        (_answered(1, "How should I size a Nomad cluster for production?", "Six servers."),)
+    )
+
+    widened = _retrieval_query("and the clients?", context.text)
+
+    assert "and the clients?" in widened
+    assert "Nomad" in widened, "the conversation's subject did not reach the retriever"
+    assert "Six servers." not in widened, (
+        "claim prose reached the retriever and will swamp the terms that name the subject"
+    )
+
+
+def test_a_standalone_question_retrieves_exactly_as_it_always_did() -> None:
+    """No conversation, no widening — the path an ask took before 035 is byte-identical."""
+    from adapters.anthropic_answering import _retrieval_query  # noqa: PLC0415
+
+    assert _retrieval_query("How do I run a Vault cluster?", "") == "How do I run a Vault cluster?"

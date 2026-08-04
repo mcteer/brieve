@@ -39,6 +39,15 @@ MAX_CARRIED_EXCHANGES: Final[int] = 6
 #: FR-018 requires of something that is not a source.
 MAX_CARRIED_CHARS: Final[int] = 6_000
 
+#: How a carried question is introduced in the block.
+#:
+#: Shared rather than spelled twice, because the RETRIEVER reads these lines back out (see
+#: `_retrieval_query` in the Anthropic adapter). A follow-up like "and the clients?" carries one
+#: word, and a search on that word alone returns Consul DNS and Windows containers — measured.
+#: The subject has to reach the search, not only the model, so the marker is part of the
+#: contract between them rather than an incidental piece of wording.
+QUESTION_MARKER: Final[str] = "Earlier question: "
+
 
 @dataclass(frozen=True)
 class CarriedContext:
@@ -93,7 +102,7 @@ def _statements(outcome: dict[str, Any]) -> list[str]:
 
 def _render(exchange: ExchangeRecord) -> str:
     """One exchange as history. Question always; answers as statements; verdicts never."""
-    lines = [f"Earlier question: {exchange.question.strip()}"]
+    lines = [f"{QUESTION_MARKER}{exchange.question.strip()}"]
     if exchange.disposition is ExchangeDisposition.ANSWERED:
         for statement in _statements(exchange.outcome):
             lines.append(f"  - {statement}")
@@ -150,6 +159,7 @@ def build_context(
 __all__ = [
     "MAX_CARRIED_CHARS",
     "MAX_CARRIED_EXCHANGES",
+    "QUESTION_MARKER",
     "CarriedContext",
     "build_context",
 ]

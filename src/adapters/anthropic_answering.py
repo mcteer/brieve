@@ -31,6 +31,7 @@ from typing import Any, Final
 
 from adapters.anthropic_scorer import client_and_model
 from core.answering.answer import ProviderUnavailable
+from core.answering.context import QUESTION_MARKER
 from core.answering.corpus import Corpus
 from core.evals.scoring import LIVE_MODEL
 
@@ -163,6 +164,24 @@ def _terms(question: str) -> set[str]:
     }
 
 
+def _retrieval_query(question: str, context: str) -> str:
+    """The question, widened by the subject of the conversation it sits in (035).
+
+    Only the earlier QUESTIONS are added. Claim statements are prose and would swamp the few
+    terms that actually name the subject; a question is the shortest thing that says what is
+    being talked about. Empty context returns the question untouched, so a standalone ask
+    retrieves exactly as it always has.
+    """
+    if not context:
+        return question
+    asked = [
+        line.partition(QUESTION_MARKER)[2].strip()
+        for line in context.splitlines()
+        if QUESTION_MARKER in line
+    ]
+    return " ".join([question, *asked]) if asked else question
+
+
 def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
     """The sections the model may look at, as `(path, anchor, text)`, best first.
 
@@ -285,9 +304,19 @@ class LiveAnswerProvider:
         """Candidate claims, or nothing — and *nothing* is asked more than once.
 
         `context` is earlier conversation (035), placed BEFORE the question and clearly
-        labelled as not-corpus. Retrieval deliberately ignores it: the sections offered are
-        chosen by the question's own words, because a follow-up's subject belongs in the
-        model's understanding and not in the search that decides what it may read.
+        labelled as not-corpus.
+
+        **Retrieval sees the conversation's SUBJECT, and the plan said it should not.** The
+        argument for keeping it out was that a follow-up's subject belongs in the model's
+        understanding rather than in the search. Measured against the live model it was wrong
+        in the only way that counts: "and the clients?" carries one word, retrieved Consul DNS
+        and Windows containers, and the model — correctly — could not answer about Nomad
+        clients from material about neither. Three of ten follow-ups came back empty.
+
+        So the earlier QUESTIONS widen the query, and only the questions: claim statements are
+        long enough to swamp the terms that matter, and the question is what names the subject.
+        Nothing about what may be CITED changes — the sections still have to resolve, and
+        history still carries no citations to resolve through.
 
         **A DECLINE IS A STATEMENT ABOUT THE CORPUS, SO ONE DRAW MUST NOT MAKE IT.** Told "the
         pinned corpus does not support an answer to this question", a person concludes the
@@ -314,7 +343,7 @@ class LiveAnswerProvider:
         parameter outright (see `anthropic_scorer`). Sampling again is the vendor-neutral form
         of the same idea, which is what it needs to be — nothing here may assume a vendor.
         """
-        sections = _relevant(question, corpus)
+        sections = _relevant(_retrieval_query(question, context), corpus)
         if not sections:
             # Nothing to look at. Returning no candidates makes the path decline, which is the
             # honest outcome — and it is NOT a provider failure, so it must not raise.
