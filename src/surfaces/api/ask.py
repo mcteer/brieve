@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict
 
 from core.answering.answer import ANSWERED, ProviderUnavailable, answer_question
 from core.answering.context import MAX_CARRIED_EXCHANGES, build_context
+from core.answering.conversations.postgres import ConversationStoreError
 from core.answering.conversations.records import ExchangeDisposition
 from core.answering.corpus import Corpus, CorpusUnavailable
 from core.answering.estate import ANSWERED as ESTATE_ANSWERED
@@ -663,6 +664,17 @@ def build_router(
             )
         except ConversationNotFound as missing:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "no_such_conversation") from missing
+        except ConversationStoreError as unavailable:
+            # NOT a 404, and not a context-free answer either. "Could not look" and "not yours"
+            # send a person to different places — one waits, the other goes and asks who owns
+            # it. And answering the follow-up as though it had no history would hand them an
+            # answer read in isolation with nothing saying so, which is the quietest wrong
+            # answer this feature could produce.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "this conversation could not be read just now, so the question was not asked. "
+                "Nothing is lost — try again in a moment.",
+            ) from unavailable
 
         # EXPLICIT SIGNAL WINS; SILENCE INHERITS (FR-017/017a).
         #

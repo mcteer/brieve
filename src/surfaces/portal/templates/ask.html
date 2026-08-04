@@ -30,6 +30,9 @@
     {% endfor %}
   </ul>
   <a class="link-button" href="/ask">New conversation</a>
+  {% if conversation_id %}
+    <a class="link-button" href="/ask/{{ conversation_id }}/delete">Delete this conversation</a>
+  {% endif %}
 </nav>
 {% endif %}
 
@@ -50,7 +53,17 @@
   has added since it loaded. Rendered through `_exchange.html`, the same include the composer
   swaps in, so a reopened conversation and a fresh answer cannot look different.
 #}
-<div id="ask-transcript" class="transcript">
+{#
+  `tabindex="0"` because the transcript scrolls, and a scrollable region a keyboard cannot
+  reach is unreachable content — axe names it `scrollable-region-focusable` and it failed here
+  the moment the region gained its own scroll.
+
+  Labelled, so the new tab stop announces what it is rather than arriving as an unnamed group.
+  NOT `role="log"` and not `aria-live`: announcing a page of claims the instant it arrives
+  talks over somebody who is still reading. Focus moves to the new answer's heading instead.
+#}
+<div id="ask-transcript" class="transcript" tabindex="0" role="region"
+     aria-label="Conversation transcript">
   {% for exchange in exchanges %}
     {% with question = exchange.question, response = exchange.rendered %}
       {% include "_exchange.html" %}

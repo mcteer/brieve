@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Delete this conversation? — Harness Portal{% endblock %}
+{% block header_actions %}
+<form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+{% endblock %}
+{% block content %}
+<h1>Delete this conversation?</h1>
+
+{#
+  ITS OWN PAGE, mirroring the thread confirmation and sharing no template with it (ADR-0039).
+  A destructive action reached by one click from a list is a destructive action somebody
+  performs by accident.
+
+  THE SENTENCE THAT MATTERS IS THE SECOND ONE. A person deleting a conversation is often
+  trying to remove a record, and cannot: the platform's trail is evidence and this removes a
+  view of it. Saying so here is the only place they will read it before acting, and leaving it
+  unsaid would let somebody believe they had erased something they had not.
+#}
+<p class="lede">&ldquo;{{ title }}&rdquo; &mdash; {{ exchanges }} exchange{{ "" if exchanges == 1 else "s" }}.</p>
+
+<p>This removes the conversation from your list. <strong>It does not remove the platform&rsquo;s
+   record of the questions you asked</strong> &mdash; those are evidence, kept on their own
+   terms, and nothing here can alter them.</p>
+
+<form method="post" action="/ask/{{ conversation_id }}/delete">
+  <button type="submit" class="button">Delete conversation</button>
+</form>
+<a class="link-button" href="/ask/{{ conversation_id }}">Keep it</a>
+{% endblock %}

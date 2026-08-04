@@ -496,3 +496,139 @@ form.inline { display: inline; }
   cursor: progress;
   opacity: 0.75;
 }
+
+/* ── THE ASK, AS A CONVERSATION (035) ──────────────────────────────────────────────
+   Rail beside transcript at width, stacked below it. Every value below is a token —
+   the identity rows fail on a literal, which is what keeps one design system. */
+
+.ask-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* THE RAIL COLLAPSES, IT DOES NOT SHRINK. 028 learned that CI's Linux Chromium renders
+   wider than macOS and broke reflow there first; a rail that narrows keeps a second
+   column at 320px and takes the transcript below the horizontal-scroll line with it. */
+@media (max-width: 45rem) {
+  .ask-layout { grid-template-columns: minmax(0, 1fr); }
+  .ask-rail { border-right: none; padding-right: 0; }
+}
+
+.ask-rail {
+  border-right: 1px solid var(--rule);
+  padding-right: var(--space-4);
+}
+
+.rail-heading {
+  font-family: var(--font-control);
+  font-size: var(--text-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-block-end: var(--space-3);
+}
+
+.ask-rail ul { list-style: none; margin: 0; padding: 0; }
+
+.ask-rail li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  /* 24x24 minimum target, met by padding rather than by a fixed height so the row still
+     grows with a long title instead of clipping it. */
+  padding-block: var(--space-2);
+}
+
+.ask-rail a { text-decoration: none; }
+.ask-rail a:hover { text-decoration: underline; }
+.ask-rail a[aria-current="page"] { font-weight: 600; color: var(--ink); }
+
+/* A count is something a person would quote, so it takes the role reserved for that. */
+.rail-count {
+  font-family: var(--font-evidence);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ROOM AT THE END, so nothing can come to rest under the composer.
+   `scroll-padding` alone is not enough and the a11y row proved it: it governs where the
+   browser scrolls a target TO, and a browser does not scroll at all for an element it already
+   considers visible — including one sitting behind a sticky element. Reserving the composer's
+   own height at the end of the transcript means the last citation can always be scrolled
+   clear, which is what makes 2.4.11 true rather than usually true. */
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* And when focus DOES cause a scroll, land it clear of the composer rather than against it. */
+.transcript a,
+.transcript button,
+.transcript code {
+  scroll-margin-block-end: 12rem;
+}
+
+.exchange { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* THE QUESTION, ABOVE ITS ANSWER. Indented rather than coloured: a transcript whose two
+   voices differ only by hue is a transcript that stops working in greyscale, which is the
+   same 1.4.1 argument the verdict pills answer. */
+.asked {
+  border-left: 3px solid var(--rule);
+  padding-left: var(--space-3);
+  margin: 0;
+}
+
+.asked-label {
+  display: block;
+  font-family: var(--font-control);
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+/* THE COMPOSER SITS BELOW THE TRANSCRIPT, AND OVERLAPS NOTHING — which is a retreat from
+   `position: sticky` and the a11y lane is why.
+   
+   Sticky was the plan and it fails 2.4.11 in a way no amount of scroll-padding fixes: a
+   browser does not scroll for an element it already considers visible, and an element behind
+   a sticky overlay IS visible to it. Measured — a focused citation ended at y=447 with the
+   composer starting at y=393, and reserving space at the end of the transcript did not help
+   because nothing scrolled.
+   
+   So the transcript scrolls in its own region and the composer follows it in normal flow.
+   Nothing can come to rest under anything, the composer is always on screen, and 2.4.11 holds
+   by construction rather than by arithmetic. The nested scroll region is keyboard-reachable
+   and collapses to the page's own scroll below 45rem, where a viewport that short makes a
+   fixed-height transcript worse than a document. */
+.ask-main {
+  display: flex;
+  flex-direction: column;
+  /* The header is the only thing above it; the rest of the column is transcript + composer. */
+  max-height: calc(100vh - 3.5rem);
+}
+
+.transcript {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ask {
+  flex: 0 0 auto;
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+  padding-block: var(--space-3);
+  margin-block-start: var(--space-5);
+}
+
+@media (max-width: 45rem) {
+  .ask-main { max-height: none; }
+  .transcript { overflow-y: visible; }
+}

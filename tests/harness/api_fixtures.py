@@ -94,17 +94,21 @@ class SurfaceUnderTest:
     #: refusal, which is a different assertion.
     subject_name: str = "alice"
 
-    def subject(self) -> AuthenticatedSubject:
+    def subject(self, name: str | None = None) -> AuthenticatedSubject:
         """The same identity `bearer()` produces, as the core sees it.
 
         Built here rather than by verifying a token, because MCP's parity claim is about
         what happens *after* authentication — and constructing it directly keeps a token
         problem from presenting as a parity failure.
+
+        `name` names a DIFFERENT person in the same tenant, mirroring `bearer(subject=…)`.
+        Ownership rows need two people, and a parity row needs both transports to disagree
+        with the same second person rather than with two different ones.
         """
         from core.identity.types import AuthenticatedSubject, SubjectKind
 
         return AuthenticatedSubject(
-            subject_user_id=self.subject_name,
+            subject_user_id=name or self.subject_name,
             tenant_id="tenant-test",
             roles=frozenset({"operator"}),
             subject_kind=SubjectKind.HUMAN,
@@ -224,6 +228,13 @@ def surface_under_test(
     #: from the cause) and has to grant those subjects a scope. Exposed on the returned
     #: object below.
     identity_fabric = fake_identity_fabric(subject_user_id=subject)
+    # ONE conversation store for BOTH surfaces (035). Two `MemoryConversationStore()`
+    # expressions would build two, and the parity rows would compare a surface that
+    # remembered against one that did not — which is precisely the asymmetry this fixture
+    # exists to prevent, and which it caught on the first run.
+    conversation_store = (
+        ask_conversations if ask_conversations is not None else MemoryConversationStore()
+    )
     dispatcher = InProcessDispatcher(
         identity_fabric=identity_fabric,
         registry=registry or ToolRegistry(),
@@ -253,9 +264,7 @@ def surface_under_test(
         # the ABSENT reconciler, which is what an estate with no second copy actually
         # has — the parity rows then compare two surfaces giving that same answer.
         reconciler=reconciler,
-        ask_conversations_store=ask_conversations
-        if ask_conversations is not None
-        else MemoryConversationStore(),
+        ask_conversations_store=conversation_store,
         ask_providers=_providers_of(ask_provider),
         ask_model=ask_model,
         ask_authority=ask_authority,
@@ -273,9 +282,7 @@ def surface_under_test(
         definitions=definitions_fabric,
         thread_store=thread_store,
         reconciler=reconciler,
-        ask_conversations=ask_conversations
-        if ask_conversations is not None
-        else MemoryConversationStore(),
+        ask_conversations=conversation_store,
         ask_providers=_providers_of(ask_provider),
         ask_model=ask_model,
         ask_authority=ask_authority,

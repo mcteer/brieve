@@ -230,6 +230,44 @@ def create_portal(
             },
         )
 
+    @app.get("/ask/{conversation_id}/delete", response_class=HTMLResponse)
+    def ask_delete_confirm(request: Request, conversation_id: str) -> Response:
+        """Ask before deleting, on its own page — the thread pattern, not the thread template."""
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, f"/ask/{conversation_id}/delete")
+        found = app.state.relay.request(
+            "GET", f"/ask-conversations/{conversation_id}", token=session.access_token
+        )
+        if not found.reachable or not found.ok:
+            return templates.TemplateResponse(
+                request=request,
+                name="ask.html",
+                context={"conversations": [], "exchanges": [], "missing": True},
+                status_code=found.status if found.reachable else 503,
+            )
+        payload = found.payload or {}
+        return templates.TemplateResponse(
+            request=request,
+            name="ask_delete_confirm.html",
+            context={
+                "conversation_id": conversation_id,
+                "title": payload.get("title", ""),
+                "exchanges": len(payload.get("exchanges", [])),
+            },
+        )
+
+    @app.post("/ask/{conversation_id}/delete")
+    def ask_delete(request: Request, conversation_id: str) -> Response:
+        """Delete, then take the person somewhere that still exists."""
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/ask")
+        app.state.relay.request(
+            "DELETE", f"/ask-conversations/{conversation_id}", token=session.access_token
+        )
+        return RedirectResponse("/ask", status_code=303)
+
     @app.post("/ask")
     def ask(request: Request, question: str = Form("")) -> Response:
         """Relay the question and render what came back. **Decide nothing.**

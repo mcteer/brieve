@@ -56,7 +56,7 @@ on-subject, signalled estate question still reaches the estate; page never navig
 - [X] T016 [US1] Portal transcript: `_exchange.html` (question + included `_outcome.html`), `ask.html` reworked to transcript + sticky composer, `app.py` ask routes carry conversation state; fragment envelope becomes `X-Portal-Fragment: exchange`; `_outcome.html` renders `context_note` conditionally (present only when exchanges were dropped — the window-note reasoning: an unconditional caveat gets skipped)
 - [X] T017 [US1] `portal-ask.js`: append the returned exchange fragment instead of replacing the outcome region; focus to the new answer's heading; stays ≤ 90 lines and remains the only markup-inserting script (trim, never raise the budget)
 - [X] T018 [US1] Component rows in `tests/component/test_ask_answers_in_place.py` (amended): fragment carries one exchange, full page carries the transcript, fragment is literally contained in the full page, no-JS POST still renders everything
-- [ ] T019 [P] [US1] a11y rows: populated transcript, exchange in flight, declined and refused exchanges in transcript, focus lands on the newest answer — extend `tests/a11y/test_wcag.py` and its `_ask` helper
+- [X] T019 [P] [US1] a11y rows: populated transcript, exchange in flight, declined and refused exchanges in transcript, focus lands on the newest answer — extend `tests/a11y/test_wcag.py` and its `_ask` helper
 
 **Checkpoint**: quickstart steps 1–3 pass through the served portal.
 
@@ -68,13 +68,13 @@ on-subject, signalled estate question still reaches the estate; page never navig
 every exchange in order, delete removes it via confirmation.
 
 - [X] T020 [US2] `src/surfaces/api/ask_conversations.py`: `GET /ask-conversations`, `GET /ask-conversations/{id}`, `DELETE /ask-conversations/{id}` per contracts/ask-conversations-api.md, wired in the API assembly
-- [ ] T021 [US2] [GATE:fail-closed] An unreadable store answers 503 on list — never an empty list; same 404 discipline on get/delete; rows beside T013's
+- [X] T021 [US2] [GATE:fail-closed] An unreadable store answers 503 on list — never an empty list; same 404 discipline on get/delete; rows beside T013's
 - [X] T022 [US2] MCP tools `ask_conversations`, `ask_conversation`, `delete_ask_conversation` through the same shared functions
 - [X] T023 [US2] `operations.snapshot.json` in `specs/008-northbound-api/contracts/` gains the three operations; `/ask` entry reflects its amendment
-- [ ] T024 [US2] [GATE:conformance] Parity rows in `tests/conformance/mcp/test_ask_parity.py`: list/get/delete/ask-in-conversation produce the same outcome, disposition and wording on both transports (SC-013)
-- [ ] T025 [US2] [GATE:conformance] The portal containment session in `tests/conformance/portal/test_containment.py` grows to: list (empty), ask (new), ask (follow-up), list (populated), get, delete-confirm, delete — uncatalogued requests still zero
-- [ ] T026 [US2] [GATE:conformance] Cross-owner and cross-tenant rows: a second subject and a second tenant get the identical 404 on get and delete, and their lists never contain the other's conversation (SC-004)
-- [ ] T027 [US2] Portal rail + list + delete confirmation: conversation `nav` with `aria-current`, a **New conversation** control that opens the empty composer without disturbing existing conversations (FR-010), `ask.html` rail (collapsing under 720px), `ask_delete_confirm.html` mirroring the thread pattern without sharing its template; a11y rows for list, empty state, delete confirmation
+- [X] T024 [US2] [GATE:conformance] Parity rows in `tests/conformance/mcp/test_ask_parity.py`: list/get/delete/ask-in-conversation produce the same outcome, disposition and wording on both transports (SC-013)
+- [X] T025 [US2] [GATE:conformance] The portal containment session in `tests/conformance/portal/test_containment.py` grows to: list (empty), ask (new), ask (follow-up), list (populated), get, delete-confirm, delete — uncatalogued requests still zero
+- [X] T026 [US2] [GATE:conformance] Cross-owner and cross-tenant rows: a second subject and a second tenant get the identical 404 on get and delete, and their lists never contain the other's conversation (SC-004)
+- [X] T027 [US2] Portal rail + list + delete confirmation: conversation `nav` with `aria-current`, a **New conversation** control that opens the empty composer without disturbing existing conversations (FR-010), `ask.html` rail (collapsing under 720px), `ask_delete_confirm.html` mirroring the thread pattern without sharing its template; a11y rows for list, empty state, delete confirmation
 
 **Checkpoint**: full quickstart walk-through passes; both transports verified.
 
@@ -95,13 +95,13 @@ distinguishable, trail unchanged by delete.
 
 **Independent test**: identity rows green; both themes rendered and screenshotted.
 
-- [ ] T031 [US4] Transcript/composer/rail styles in `src/surfaces/portal/static/portal.css` from existing tokens only — exchange blocks, sticky composer with `scroll-padding-block-end`, rail typography; mono role for seq/timestamps/hashes
-- [ ] T032 [P] [US4] Extend `tests/component/test_portal_identity.py`: no colour outside token blocks still holds over the new CSS; transcript verdicts survive greyscale; no new template fetches third-party
+- [X] T031 [US4] Transcript/composer/rail styles in `src/surfaces/portal/static/portal.css` from existing tokens only — exchange blocks, sticky composer with `scroll-padding-block-end`, rail typography; mono role for seq/timestamps/hashes
+- [X] T032 [P] [US4] Extend `tests/component/test_portal_identity.py`: no colour outside token blocks still holds over the new CSS; transcript verdicts survive greyscale; no new template fetches third-party
 - [ ] T033 [P] [US4] Render both themes at desktop and 320px, screenshot, and fix what looks wrong before review — the 034 lesson: look at it, don't reason about it
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T034 a11y sticky-composer rows: focused element never obscured by the composer with a long transcript; 320px reflow with 10+ exchanges; text-spacing override does not clip the composer (the named 028/034 traps)
+- [X] T034 a11y sticky-composer rows: focused element never obscured by the composer with a long transcript; 320px reflow with 10+ exchanges; text-spacing override does not clip the composer (the named 028/034 traps)
 - [ ] T035 [P] `docs/` note or template comments carrying the two load-bearing decisions where future readers live: history-not-citable in the provider module, mirror-not-share at the store
 - [ ] T036 Full local gates: `make check`, `make conformance-hermetic`, `make a11y` all green
 - [ ] T037 Served verification per quickstart through `DEV_IDP=1 bash infra/bin/portal-up`: the six-step walk-through, zero navigations after sign-in, fresh allocation confirmed by identity age (not by grepping the mount)

@@ -335,3 +335,62 @@ def test_a_conversation_answers_a_question_asking_for_action_without_acting() ->
     assert "run_id" not in body and "turn_id" not in body, (
         "an ask inside a conversation produced something that looks like a started run"
     )
+
+
+# ------------------------------------------- [GATE:fail-closed] an unreadable store (T021)
+
+
+class _Unreadable:
+    """A store that cannot be reached. Every method raises the store's own error."""
+
+    def _fail(self, *_args: Any, **_kwargs: Any) -> Any:
+        from core.answering.conversations.postgres import ConversationStoreError
+
+        raise ConversationStoreError("conversation store unavailable: simulated")
+
+    get = list_for = delete = recent = start = append = _fail
+
+
+def test_an_unreadable_store_answers_503_and_never_an_empty_list() -> None:
+    """FR-008's fail-closed half, and the sharpest wording question in the feature.
+
+    An empty list is a CLAIM: it says this person has no conversations. When the truth is that
+    nobody could look, that claim is false and unrecoverable — they conclude their history is
+    gone. 503 says come back.
+    """
+    surface = surface_under_test(ask_conversations=_Unreadable())
+
+    response = TestClient(surface.app).get("/ask-conversations", headers=surface.bearer())
+
+    assert response.status_code == 503
+    assert response.json()["detail"] != []
+    assert "try again" in response.json()["detail"].lower()
+
+
+def test_an_unreadable_store_does_not_pretend_a_conversation_is_missing() -> None:
+    """503, not 404. "Could not look" and "not yours" send a person to different places —
+    one waits, the other goes and asks who owns it."""
+    surface = surface_under_test(ask_conversations=_Unreadable())
+
+    response = TestClient(surface.app).get("/ask-conversations/c-1", headers=surface.bearer())
+
+    assert response.status_code == 503
+
+
+def test_an_unreadable_store_refuses_the_ask_rather_than_answering_without_context() -> None:
+    """The subtle one. A conversation that cannot be read must not fall through to a
+    context-free answer that looks like a normal one — the person asked a follow-up and would
+    get an answer to it read in isolation, with nothing saying so."""
+    surface = surface_under_test(
+        ask_provider=_Remembers(),
+        ask_model=MODEL,
+        ask_authority=qualified_ask_authority(model=MODEL),
+        credential_source=available_credential(),
+        ask_conversations=_Unreadable(),
+    )
+
+    response = _ask(surface, BARE_FOLLOW_UP, "c-1")
+
+    assert response.status_code in (404, 503), (
+        "an unreadable conversation answered the follow-up as though it had no history"
+    )
