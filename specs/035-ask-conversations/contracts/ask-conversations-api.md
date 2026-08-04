@@ -54,4 +54,15 @@ assertion stays at zero.
 | Delete leaves the trail byte-identical | fast lane, hermetic |
 | Signal-carrying question routes identically standalone vs in-conversation (SC-010) | fast lane, hermetic |
 | Signal-less follow-up inherits, both directions (SC-010a) | fast lane, hermetic |
-| Follow-up answerability 9/10 (SC-002) | live lane, run by Dan McTeer before promotion — not blocking CI |
+| Follow-up answerability 9/10 (SC-002) and after-decline parity (SC-011a) | live lane, run by Dan McTeer before promotion — not blocking CI |
+
+**Result of the SC-002 / SC-011a run, 2026-08-04** (ten signal-less follow-ups, three of them
+after a declined exchange, at the provider seam plus the served walk-through):
+
+    on-subject                9/10   (threshold 9/10)
+    after-answer answered     7/7
+    after-decline answered    2/3
+
+The single miss follows a question about a module that does not exist, where declining is the
+right answer. The first run scored **6/10** and is why retrieval now sees the conversation's
+subject — see the commit that changed it.

@@ -20,7 +20,7 @@ from core.audit.sink import AuditSink
 from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
 from core.threads.store import InMemoryThreadStore, ThreadStore
-from surfaces.api import ask, evidence, mappings, reports, runs, threads
+from surfaces.api import ask, ask_conversations, evidence, mappings, reports, runs, threads
 from surfaces.api import definitions as definitions_routes
 from surfaces.api.verification import IdentityVerifier
 from surfaces.dispatch.types import RunDispatcher
@@ -65,6 +65,11 @@ def create_app(
     # 027. Absent means every ask refuses `credential_unavailable` — a qualified cell is not
     # authority to call a vendor, and the platform holds that authority nowhere but the store.
     credential_source: Any | None = None,
+    # 035. Where a person's own asks are grouped so they can come back to them. Absent means
+    # asks are answered and recorded exactly as before and remembered by no transcript —
+    # deliberately not fatal, because the evidence record is the platform's memory and this
+    # store is only the asker's.
+    ask_conversations_store: Any | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -120,8 +125,15 @@ def create_app(
             evidence_query=evidence_query,
             ask_authority=ask_authority,
             credential_source=credential_source,
+            # 035. Absent in an assembly with no store, and an ask then behaves exactly as it
+            # did before conversations existed — answered, recorded, and remembered by nobody.
+            conversations=ask_conversations_store,
         )
     )
+    # 035. Mounted unconditionally, like `ask`: the operations exist on this surface whether
+    # or not a store is configured, and a route whose PRESENCE varied by assembly would make the
+    # operation snapshot depend on how the app was built — which 011 paid for once already.
+    app.include_router(ask_conversations.build_router(conversations=ask_conversations_store))
     app.include_router(threads.build_router())
     if authority_submitter is not None:
         app.include_router(mappings.build_router())

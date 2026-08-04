@@ -489,9 +489,13 @@ def test_the_question_travels_in_the_body_and_never_in_a_url() -> None:
 
     def watching(*, method: str, url: str, token: str, json_body: object) -> ApiResponse:
         urls.append(url)
-        assert json_body == {"question": GUIDANCE_QUESTION}, (
-            "the question did not travel in the request body"
-        )
+        # Asserted on the ASK, not on every call: 035 added a rail that reads the person's own
+        # conversations, and a GET with no body is not evidence about where a question travelled.
+        # The stronger half of this row is the URL check below, which covers every call there is.
+        if url.endswith("/ask"):
+            assert json_body == {"question": GUIDANCE_QUESTION}, (
+                "the question did not travel in the request body"
+            )
         response = api.request(
             method,
             url.replace("http://api.test", ""),
@@ -503,7 +507,12 @@ def test_the_question_travels_in_the_body_and_never_in_a_url() -> None:
     portal = _portal(surface, relay=ApiRelay(base_url="http://api.test", transport=watching))
     portal.post("/ask", data={"question": GUIDANCE_QUESTION})
 
-    assert urls == ["http://api.test/ask"], f"the question leaked into a URL: {urls}"
+    # EVERY url, not just the ask's — the property is that the question appears in none of them,
+    # and 035's rail means there is now more than one call to check.
+    assert "/ask" in urls[-1], f"the ask was not the last call: {urls}"
+    for url in urls:
+        assert GUIDANCE_QUESTION not in url, f"the question leaked into a URL: {url}"
+        assert "question=" not in url, f"a question parameter appeared in a URL: {url}"
 
 
 def test_a_hostile_refusal_sentence_is_rendered_as_text() -> None:

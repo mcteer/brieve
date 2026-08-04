@@ -89,6 +89,7 @@ def test_the_fragment_carries_the_answer_and_not_the_page(portal: TestClient) ->
     assert "A Vault cluster spans availability zones." in body
     assert "<html" not in body.lower(), "the fragment carried a whole document"
     assert "<form" not in body.lower(), "the fragment carried the form it was posted from"
+    assert "You asked" in body, "the fragment carried the answer without the question"
 
 
 def test_a_request_without_the_header_still_gets_the_whole_page(portal: TestClient) -> None:
@@ -128,5 +129,7 @@ def test_the_ask_page_offers_somewhere_for_an_answer_to_land(portal: TestClient)
     body = portal.get("/ask").text
 
     assert "/static/portal-ask.js" in body
-    assert 'id="ask-outcome"' in body, "there is nowhere for the answer to land"
+    # `ask-outcome` became `ask-transcript` in 035: the region stopped being where THE answer
+    # goes and became where EVERY answer accumulates. The name change is the behaviour change.
+    assert 'id="ask-transcript"' in body, "there is nowhere for answers to accumulate"
     assert 'id="ask-status"' in body, "there is nothing to say the question is in flight"

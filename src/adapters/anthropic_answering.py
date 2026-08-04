@@ -31,6 +31,7 @@ from typing import Any, Final
 
 from adapters.anthropic_scorer import client_and_model
 from core.answering.answer import ProviderUnavailable
+from core.answering.context import QUESTION_MARKER
 from core.answering.corpus import Corpus
 from core.evals.scoring import LIVE_MODEL
 
@@ -163,6 +164,24 @@ def _terms(question: str) -> set[str]:
     }
 
 
+def _retrieval_query(question: str, context: str) -> str:
+    """The question, widened by the subject of the conversation it sits in (035).
+
+    Only the earlier QUESTIONS are added. Claim statements are prose and would swamp the few
+    terms that actually name the subject; a question is the shortest thing that says what is
+    being talked about. Empty context returns the question untouched, so a standalone ask
+    retrieves exactly as it always has.
+    """
+    if not context:
+        return question
+    asked = [
+        line.partition(QUESTION_MARKER)[2].strip()
+        for line in context.splitlines()
+        if QUESTION_MARKER in line
+    ]
+    return " ".join([question, *asked]) if asked else question
+
+
 def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
     """The sections the model may look at, as `(path, anchor, text)`, best first.
 
@@ -281,8 +300,23 @@ class LiveAnswerProvider:
         #: this provider — which is one ask, because the surface builds one per ask and drops it.
         self._api_key = api_key
 
-    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
         """Candidate claims, or nothing — and *nothing* is asked more than once.
+
+        `context` is earlier conversation (035), placed BEFORE the question and clearly
+        labelled as not-corpus.
+
+        **Retrieval sees the conversation's SUBJECT, and the plan said it should not.** The
+        argument for keeping it out was that a follow-up's subject belongs in the model's
+        understanding rather than in the search. Measured against the live model it was wrong
+        in the only way that counts: "and the clients?" carries one word, retrieved Consul DNS
+        and Windows containers, and the model — correctly — could not answer about Nomad
+        clients from material about neither. Three of ten follow-ups came back empty.
+
+        So the earlier QUESTIONS widen the query, and only the questions: claim statements are
+        long enough to swamp the terms that matter, and the question is what names the subject.
+        Nothing about what may be CITED changes — the sections still have to resolve, and
+        history still carries no citations to resolve through.
 
         **A DECLINE IS A STATEMENT ABOUT THE CORPUS, SO ONE DRAW MUST NOT MAKE IT.** Told "the
         pinned corpus does not support an answer to this question", a person concludes the
@@ -309,7 +343,7 @@ class LiveAnswerProvider:
         parameter outright (see `anthropic_scorer`). Sampling again is the vendor-neutral form
         of the same idea, which is what it needs to be — nothing here may assume a vendor.
         """
-        sections = _relevant(question, corpus)
+        sections = _relevant(_retrieval_query(question, context), corpus)
         if not sections:
             # Nothing to look at. Returning no candidates makes the path decline, which is the
             # honest outcome — and it is NOT a provider failure, so it must not raise.
@@ -320,14 +354,17 @@ class LiveAnswerProvider:
             for path, anchor, text in sections
         )
         for remaining in range(ATTEMPTS_BEFORE_SILENCE - 1, -1, -1):
-            claims = self._ask_once(question, offered)
+            claims = self._ask_once(question, offered, context)
             if claims or not remaining:
                 return claims
         return []  # pragma: no cover — the loop always returns
 
-    def _ask_once(self, question: str, offered: str) -> list[dict[str, Any]]:
+    def _ask_once(self, question: str, offered: str, context: str = "") -> list[dict[str, Any]]:
         """One draw. Raises on a provider fault; returns `[]` when the model found nothing."""
         client, api_model = client_and_model(self._model, api_key=self._api_key)
+        # History first, then the question, then the material. The order is the reading order:
+        # what we were talking about, what is being asked now, and what may be cited.
+        prologue = f"{context}\n\n" if context else ""
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             # 4096 for the same reason the scorer uses it: Opus 5 reasons before it answers and
@@ -339,7 +376,7 @@ class LiveAnswerProvider:
             messages=[
                 {
                     "role": "user",
-                    "content": f"Question: {question}\n\nCorpus sections:\n\n{offered}",
+                    "content": (f"{prologue}Question: {question}\n\nCorpus sections:\n\n{offered}"),
                 }
             ],
         )
@@ -441,8 +478,14 @@ class LiveEstateProvider:
             return cited
         return self._ids.get(cited, f"unresolvable:{cited}")
 
-    def answer(self, question: str, records: tuple[Any, ...]) -> list[dict[str, Any]]:
+    def answer(
+        self, question: str, records: tuple[Any, ...], context: str = ""
+    ) -> list[dict[str, Any]]:
         """Candidate claims from the records, retried on empty for `LiveAnswerProvider`'s reason.
+
+        `context` is earlier conversation (035), for the same reason and with the same limit as
+        the guidance path: it gives a follow-up its subject and is never evidence. References
+        still resolve against records actually read.
 
         The same control, because the same sentence is at stake and it is arguably heavier here:
         told the platform found nothing in their own records, a person concludes something did
@@ -460,20 +503,24 @@ class LiveEstateProvider:
             for record in records
         )
         for remaining in range(ATTEMPTS_BEFORE_SILENCE - 1, -1, -1):
-            claims = self._ask_once(question, offered)
+            claims = self._ask_once(question, offered, context)
             if claims or not remaining:
                 return claims
         return []  # pragma: no cover — the loop always returns
 
-    def _ask_once(self, question: str, offered: str) -> list[dict[str, Any]]:
+    def _ask_once(self, question: str, offered: str, context: str = "") -> list[dict[str, Any]]:
         """One draw. Raises on a provider fault; returns `[]` when the model found nothing."""
         client, api_model = client_and_model(self._model, api_key=self._api_key)
+        prologue = f"{context}\n\n" if context else ""
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
             max_tokens=4096,
             system=_ESTATE_INSTRUCTION,
             messages=[
-                {"role": "user", "content": f"Question: {question}\n\nAudit records:\n\n{offered}"}
+                {
+                    "role": "user",
+                    "content": (f"{prologue}Question: {question}\n\nAudit records:\n\n{offered}"),
+                }
             ],
         )
         text = "".join(str(getattr(block, "text", "")) for block in response.content)

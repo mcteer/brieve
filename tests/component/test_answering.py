@@ -44,12 +44,12 @@ class _Provider:
     def __init__(self, claims: list[dict[str, Any]]) -> None:
         self._claims = claims
 
-    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
         return self._claims
 
 
 class _Unreachable:
-    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
         raise ConnectionError("no route to provider")
 
 

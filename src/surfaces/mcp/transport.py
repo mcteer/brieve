@@ -67,6 +67,7 @@ class McpTransport:
         definitions: Any | None = None,
         thread_store: ThreadStore | None = None,
         reconciler: Any | None = None,
+        ask_conversations: Any | None = None,
         ask_providers: Any | None = None,
         ask_model: str = "unconfigured",
         ask_authority: Any | None = None,
@@ -81,6 +82,7 @@ class McpTransport:
         # 027: a FACTORY, not a built provider — `(source, secret) -> provider`, called once per
         # ask with material brokered for that ask. Holding a built provider would hold whatever
         # credential built it for the life of the process.
+        self._ask_conversations: Any = ask_conversations
         self._ask_providers: Any = ask_providers
         self._ask_model: str = ask_model
         self._ask_authority: Any = ask_authority
@@ -131,6 +133,9 @@ class McpTransport:
             "list_agent_definitions": self._list_agent_definitions,
             "get_agent_definition": self._get_agent_definition,
             "create_thread": self._create_thread,
+            "ask_conversations": self._ask_conversations_list,
+            "ask_conversation": self._ask_conversation,
+            "delete_ask_conversation": self._delete_ask_conversation,
             "list_threads": self._list_threads,
             "get_thread": self._get_thread,
             "delete_thread": self._delete_thread,
@@ -204,15 +209,19 @@ class McpTransport:
         from datetime import UTC, datetime
 
         from core.answering.answer import ProviderUnavailable
+        from core.answering.context import build_context
         from core.answering.corpus import CorpusUnavailable, load_corpus
         from core.answering.estate import EstateProviderUnavailable
         from core.answering.record import record_ask
-        from core.answering.routing import Route, route
+        from core.answering.routing import Route, route_with_signal
         from surfaces.api.ask import (
             AskCredentialUnavailable,
             AskNotQualified,
+            ConversationNotFound,
             ScopeEmpty,
             _available,
+            _remember,
+            _resolve_conversation,
             ask_for,
             authorise_ask,
             estate_answer_for,
@@ -221,7 +230,27 @@ class McpTransport:
         from surfaces.api.evidence import evidence_stream_for
 
         question = str(args["question"])
-        destination = route(question)
+        conversation_id = args.get("conversation_id") or None
+
+        # THE SAME THREE STEPS THE API TAKES, THROUGH THE SAME FUNCTIONS (035, ADR-0033).
+        # Resolution before anything else, inheritance only where the question is silent, and
+        # a bounded history block — imported rather than restated, because two implementations
+        # agreeing by inspection is what parity rows exist to distrust.
+        try:
+            prior = _resolve_conversation(
+                conversations=self._ask_conversations,
+                conversation_id=conversation_id,
+                subject=subject,
+            )
+        except ConversationNotFound:
+            return McpResult(ok=False, status=404, payload={"detail": "no_such_conversation"})
+
+        destination, had_signal = route_with_signal(question)
+        inherited = False
+        if not had_signal and prior:
+            destination = Route(prior[-1].source)
+            inherited = True
+        context = build_context(prior, inherited_route=inherited)
 
         if destination is Route.ESTATE:
             # GOVERNANCE FIRST, through the same shared function the API calls — parity by
@@ -264,21 +293,33 @@ class McpTransport:
             except AskCredentialUnavailable as unavailable:
                 return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
             try:
+                answered = estate_answer_for(
+                    question=question,
+                    subject=subject,
+                    query=self._evidence,
+                    audit=self._audit,
+                    model=self._ask_model,
+                    provider=self._ask_providers(str(Route.ESTATE), credential.secret),
+                    context=context.text,
+                    conversation_id=conversation_id or "",
+                    carried_context=context.descriptor if conversation_id else None,
+                    now=datetime.now(UTC),
+                    cell=cell,
+                    bound_cell=bound_cell,
+                    cell_disposition=cell_disposition,
+                    model_authority=credential.reference,
+                )
                 return McpResult(
                     ok=True,
                     status=200,
-                    payload=estate_answer_for(
-                        question=question,
+                    payload=_remember(
+                        conversations=self._ask_conversations,
+                        conversation_id=conversation_id,
                         subject=subject,
-                        query=self._evidence,
-                        audit=self._audit,
-                        model=self._ask_model,
-                        provider=self._ask_providers(str(Route.ESTATE), credential.secret),
-                        now=datetime.now(UTC),
-                        cell=cell,
-                        bound_cell=bound_cell,
-                        cell_disposition=cell_disposition,
-                        model_authority=credential.reference,
+                        question=question,
+                        source=str(Route.ESTATE),
+                        body=answered,
+                        context=context,
                     ),
                 )
             except ScopeEmpty as empty:
@@ -353,6 +394,18 @@ class McpTransport:
                 bound_cell=guidance_bound,
                 cell_disposition=guidance_disposition,
                 model_authority=credential.reference,
+                context=context.text,
+                conversation_id=conversation_id or "",
+                carried_context=context.descriptor if conversation_id else None,
+            )
+            payload = _remember(
+                conversations=self._ask_conversations,
+                conversation_id=conversation_id,
+                subject=subject,
+                question=question,
+                source="guidance",
+                body=payload,
+                context=context,
             )
         except (CorpusUnavailable, ProviderUnavailable) as unavailable:
             return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
@@ -488,6 +541,69 @@ class McpTransport:
         except OperationRefused as refused:
             return self._refused(refused)
         return McpResult(ok=True, status=201, payload=_thread_view(record).model_dump(mode="json"))
+
+    def _ask_conversations_list(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        """035. The same function the API route calls — parity by construction (ADR-0033)."""
+        from core.answering.conversations.postgres import ConversationStoreError
+        from surfaces.api.ask_conversations import list_conversations
+
+        try:
+            listed = list_conversations(subject=subject, store=self._ask_conversations)
+        except ConversationStoreError:
+            # Never an empty list. Telling somebody they have no conversations when nobody
+            # could look is a claim about their history the platform cannot make.
+            return McpResult(
+                ok=False,
+                status=503,
+                payload={
+                    "reason": "your conversations could not be read just now; nothing is lost"
+                },
+            )
+        return McpResult(ok=True, status=200, payload=listed.model_dump(mode="json"))
+
+    def _ask_conversation(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        from core.answering.conversations.postgres import ConversationStoreError
+        from surfaces.api.ask_conversations import NO_SUCH_CONVERSATION, read_conversation
+
+        try:
+            found = read_conversation(
+                conversation_id=str(args["conversation_id"]),
+                subject=subject,
+                store=self._ask_conversations,
+            )
+        except ConversationStoreError:
+            return McpResult(
+                ok=False,
+                status=503,
+                payload={"reason": "that conversation could not be read just now"},
+            )
+        if found is None:
+            return McpResult(ok=False, status=404, payload={"detail": NO_SUCH_CONVERSATION})
+        return McpResult(ok=True, status=200, payload=found.model_dump(mode="json"))
+
+    def _delete_ask_conversation(
+        self, args: dict[str, Any], subject: AuthenticatedSubject
+    ) -> McpResult:
+        from core.answering.conversations.postgres import ConversationStoreError
+        from surfaces.api.ask_conversations import NO_SUCH_CONVERSATION, remove_conversation
+
+        try:
+            removed = remove_conversation(
+                conversation_id=str(args["conversation_id"]),
+                subject=subject,
+                store=self._ask_conversations,
+            )
+        except ConversationStoreError:
+            return McpResult(
+                ok=False,
+                status=503,
+                payload={"reason": "that conversation could not be deleted just now"},
+            )
+        if not removed:
+            return McpResult(ok=False, status=404, payload={"detail": NO_SUCH_CONVERSATION})
+        return McpResult(ok=True, status=204, payload={})
 
     def _list_threads(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         from surfaces.api.threads import list_threads_for

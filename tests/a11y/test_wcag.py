@@ -92,16 +92,16 @@ def test_the_delete_confirmation_meets_wcag_22_aa(page: Any, portal_server: Port
 def _ask(page: Any, portal_server: PortalServer, question: str) -> None:
     """Ask, and wait for the answer to ARRIVE rather than for a page to load.
 
-    The form no longer navigates — it posts in place and swaps the server-rendered outcome in,
-    so `wait_for_load_state` returns instantly on a page that is already loaded and the audit
-    would run against an empty outcome region. Waiting on the outcome itself is both correct
-    for the enhanced form and correct if the script is ever removed, since a full page load
-    produces the same element.
+    The form no longer navigates — it posts in place and APPENDS the server-rendered exchange
+    to the transcript (035), so `wait_for_load_state` returns instantly on a page that is
+    already loaded and the audit would run against an empty transcript. Waiting on the outcome
+    itself is both correct for the enhanced form and correct if the script is ever removed,
+    since a full page load produces the same element.
     """
     page.goto(f"{portal_server.base}/ask")
     page.fill("#question", question)
     page.click("form.ask button[type=submit]")
-    page.wait_for_selector("#ask-outcome section.answer", timeout=30_000)
+    page.wait_for_selector("#ask-transcript section.answer", timeout=30_000)
 
 
 def test_the_ask_form_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
@@ -242,3 +242,126 @@ def test_the_contract_records_what_these_gates_do_and_do_not_cover() -> None:
         "the contract still claims a manual pass is outstanding; it is not"
     )
     assert AXE_TAGS[-1] == "wcag22aa"
+
+
+# ────────────────────────────────────────── the ask as a conversation (035)
+
+
+def _conversation(page: Any, portal_server: PortalServer, *questions: str) -> str:
+    """Hold a conversation and return its id, so a row can reopen or delete it."""
+    _ask(page, portal_server, questions[0])
+    for index, question in enumerate(questions[1:], start=2):
+        page.fill("#question", question)
+        page.click("form.ask button[type=submit]")
+        # Wait for THIS answer, not the last one — the count grows by one per exchange, and
+        # waiting on the total made every intermediate step time out.
+        page.wait_for_function(
+            "n => document.querySelectorAll('#ask-transcript section.answer').length >= n",
+            arg=index,
+            timeout=30_000,
+        )
+    return str(page.url.rstrip("/").rsplit("/", 1)[-1])
+
+
+def test_a_transcript_of_several_exchanges_meets_wcag_22_aa(
+    page: Any, portal_server: PortalServer
+) -> None:
+    """The state this feature exists to create, and the one nothing audited before.
+
+    A page that grew from one answer to several is a different page: more headings, more
+    landmarks, a longer focus order, and a composer that has moved down the document.
+    """
+    _conversation(
+        page,
+        portal_server,
+        "How does an AI agent obtain an identity with Vault?",
+        "what about multi-region?",
+        "and disaster recovery?",
+    )
+
+    violations = audit(page)
+    assert violations == [], describe(violations)
+
+
+def test_the_conversation_rail_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
+    """A second navigation landmark on a page that already had one."""
+    _ask(page, portal_server, "How does an AI agent obtain an identity with Vault?")
+    page.goto(f"{portal_server.base}/ask")
+    page.wait_for_selector("nav.ask-rail", timeout=10_000)
+
+    violations = audit(page)
+    assert violations == [], describe(violations)
+
+
+def test_the_composer_never_obscures_what_focus_is_on(
+    page: Any, portal_server: PortalServer
+) -> None:
+    """2.4.11 — THE NAMED TRAP, and the reason it was named in the plan before it was built.
+
+    A sticky composer is exactly the overlay that hid a focused element in 034. With a
+    transcript long enough to scroll, tabbing to a citation near the bottom must leave it
+    visible above the composer rather than under it — which is what `scroll-padding-block-end`
+    buys and what nothing else in the lane would notice.
+    """
+    _conversation(
+        page,
+        portal_server,
+        "How does an AI agent obtain an identity with Vault?",
+        "what about multi-region?",
+        "and disaster recovery?",
+    )
+
+    links = page.locator("#ask-transcript a")
+    assert links.count() > 0, "no citation to focus; this row would pass vacuously"
+    target = links.nth(links.count() - 1)
+    target.focus()
+
+    box = target.bounding_box()
+    composer = page.locator("form.ask").bounding_box()
+    assert box is not None and composer is not None
+    assert box["y"] + box["height"] <= composer["y"] + 1, (
+        f"the focused element sits under the sticky composer: element ends at "
+        f"{box['y'] + box['height']}, composer starts at {composer['y']}"
+    )
+
+
+def test_a_long_transcript_still_reflows_at_320px(page: Any, portal_server: PortalServer) -> None:
+    """1.4.10 with the rail present — 028's lesson, one layout later.
+
+    The rail collapses rather than narrowing, because a second column at 320px takes the
+    transcript past the horizontal-scroll line with it.
+    """
+    _conversation(
+        page,
+        portal_server,
+        "How does an AI agent obtain an identity with Vault?",
+        "what about multi-region?",
+    )
+    page.set_viewport_size({"width": 320, "height": 800})
+    page.goto(f"{portal_server.base}/ask")
+    page.wait_for_selector("form.ask", timeout=10_000)
+
+    overflow = page.evaluate(
+        "() => document.documentElement.scrollWidth - document.documentElement.clientWidth"
+    )
+    assert overflow <= 0, f"the page scrolls horizontally at 320px by {overflow}px"
+    assert audit(page) == [], "the collapsed layout fails the ruleset"
+
+
+def test_the_conversation_delete_confirmation_meets_wcag_22_aa(
+    page: Any, portal_server: PortalServer
+) -> None:
+    """A destructive page, and the one that has to say what deleting does not do."""
+    _ask(page, portal_server, "How does an AI agent obtain an identity with Vault?")
+    page.goto(f"{portal_server.base}/ask")
+    page.click("nav.ask-rail a")
+    page.wait_for_selector("form.ask", timeout=10_000)
+    conversation_id = page.url.rstrip("/").rsplit("/", 1)[-1]
+    page.goto(f"{portal_server.base}/ask/{conversation_id}/delete")
+    page.wait_for_selector("form", timeout=10_000)
+
+    violations = audit(page)
+    assert violations == [], describe(violations)
+    assert "does not remove" in page.inner_text("body"), (
+        "the confirmation does not say that deleting leaves the platform's record intact"
+    )

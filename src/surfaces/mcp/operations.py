@@ -288,7 +288,13 @@ def operations() -> list[McpOperation]:
             ),
             input_schema={
                 "type": "object",
-                "properties": {"question": {"type": "string", "minLength": 1}},
+                "properties": {
+                    "question": {"type": "string", "minLength": 1},
+                    # 035. Absent starts a conversation; present appends to it. An id that is
+                    # not the caller's own is a 404 before anything else happens — grouping
+                    # somebody's own questions grants no source, model or scope.
+                    "conversation_id": {"type": "string", "minLength": 1},
+                },
                 "required": ["question"],
                 # No corpus parameter and no model parameter. Which corpus is pinned and which
                 # model the binding names are not the caller's to choose.
@@ -388,6 +394,62 @@ def operations() -> list[McpOperation]:
                 # No subject and no tenant. Both come from the authenticated caller, and a
                 # parameter for either would be a request to start someone else's thread.
                 "properties": {},
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="ask_conversations",
+            # UNRECORDED, DELIBERATELY (035). Every ask in every conversation already writes
+            # `ask_answered`; a conversation is a READING of those, grouped for the person who
+            # made them. Recording the reading would add entries that say "somebody looked at
+            # their own questions" — the least informative rows in a trail that is never
+            # sampled — and would not make a single ask more accountable than it already is.
+            #
+            # Deleting one is the same argument at its sharpest: it removes a view and provably
+            # cannot touch the record (FR-023), so what would be recorded is the disappearance
+            # of something that was never evidence. Recording it properly would need a new
+            # `AuditEventType`, and the audit schema is sealed core — a change that needs its
+            # own spec and security review rather than a line in this one.
+            audit_disposition=NO_RECORD,
+            method="GET",
+            path="/ask-conversations",
+            description=(
+                "The ask conversations you have held, most recently used first. Grouping your "
+                "own questions — it starts nothing and grants nothing."
+            ),
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        ),
+        McpOperation(
+            tool_name="ask_conversation",
+            audit_disposition=NO_RECORD,  # See `ask_conversations` above.
+            method="GET",
+            path="/ask-conversations/{conversation_id}",
+            description=(
+                "One ask conversation and every exchange in it, with the outcome each ask "
+                "returned. A conversation that is not yours answers the same way one that does "
+                "not exist does."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"conversation_id": {"type": "string", "minLength": 1}},
+                "required": ["conversation_id"],
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="delete_ask_conversation",
+            audit_disposition=NO_RECORD,  # See `ask_conversations` above.
+            method="DELETE",
+            path="/ask-conversations/{conversation_id}",
+            description=(
+                "Remove one of your ask conversations. This removes your view of it and **not "
+                "the platform's record** of the asks it contained — the trail is evidence and "
+                "is not yours or anyone's to delete."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"conversation_id": {"type": "string", "minLength": 1}},
+                "required": ["conversation_id"],
                 "additionalProperties": False,
             },
         ),

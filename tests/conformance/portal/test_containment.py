@@ -168,6 +168,19 @@ def test_row_every_request_the_portal_makes_is_a_catalogued_operation() -> None:
     # reporting green — the shape 010, 014 and 018 each paid for, one surface over.
     portal.get("/ask")
     portal.post("/ask", data={"question": "how does this work?"}, follow_redirects=False)
+    # 035's conversation surface. A page this session never drives is a page this row never
+    # observes — the same reason 028's ask was added here, one feature later.
+    listed = api.get("/ask-conversations", headers=surface.bearer()).json()["conversations"]
+    if listed:
+        conversation_id = listed[0]["conversation_id"]
+        portal.get(f"/ask/{conversation_id}")
+        portal.post(
+            f"/ask?conversation_id={conversation_id}",
+            data={"question": "what about multi-region?"},
+            follow_redirects=False,
+        )
+        portal.get(f"/ask/{conversation_id}/delete")
+        portal.post(f"/ask/{conversation_id}/delete", follow_redirects=False)
 
     assert seen, "the scripted session reached nothing; the row proves nothing"
     uncatalogued = [

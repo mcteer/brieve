@@ -49,7 +49,7 @@ class _EagerToHelp:
     The path must still not act — and here it cannot, which is the point.
     """
 
-    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
         return [{"statement": f"Certainly — {question}", "citations": []}]
 
 

@@ -26,7 +26,7 @@ from fastapi.templating import Jinja2Templates
 
 from surfaces.portal.events import thread_event_stream
 from surfaces.portal.oidc import LoginRefused, OidcClient
-from surfaces.portal.relay import ApiRelay
+from surfaces.portal.relay import ApiRelay, ApiResponse
 from surfaces.portal.session import COOKIE_NAME, SessionStore, cookie_attributes
 
 TEMPLATES = Path(__file__).parent / "templates"
@@ -143,18 +143,130 @@ def create_portal(
 
     # ------------------------------------------------------------------- ask
 
+    def _rendered(exchanges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Stored exchanges in the shape `_outcome.html` already renders.
+
+        The template speaks the RELAY's vocabulary — reachable, ok, payload — because that is
+        what a live answer arrives as. A stored exchange is the same payload after the fact, so
+        it is wrapped rather than given a second template: one renderer is the property this
+        feature keeps paying for, and a `{% if stored %}` arm in the outcome would be the
+        second one wearing a condition.
+        """
+        return [
+            {
+                "question": exchange.get("question", ""),
+                "rendered": ApiResponse(status=200, payload=exchange.get("outcome") or {}),
+            }
+            for exchange in exchanges
+        ]
+
+    def _conversations(session: Any) -> list[dict[str, Any]]:
+        """This person's own conversations for the rail, or nothing to show.
+
+        A list the platform could not read is rendered as absent rather than as empty: the API
+        answers 503 for an unreadable store precisely so nobody is told they have no
+        conversations when the truth is that nobody could look.
+        """
+        listed = app.state.relay.request("GET", "/ask-conversations", token=session.access_token)
+        if not listed.reachable or not listed.ok:
+            return []
+        conversations: list[dict[str, Any]] = (listed.payload or {}).get("conversations", [])
+        return conversations
+
     @app.get("/ask", response_class=HTMLResponse)
     def ask_form(request: Request) -> Response:
-        """The question box. Its own page, and that is a decision rather than layout.
+        """A new conversation: the composer, and the rail of earlier ones.
 
         A thread is where turns **act**; an ask never does (ADR-0039). Putting them in one
         surface would make that difference a property of which button was pressed — legible to
-        whoever wrote the code and invisible to the person using it.
+        whoever wrote the code and invisible to the person using it. 035 gives asking a
+        transcript of its own and still keeps it a different room.
         """
         session = _session(request)
         if session is None:
             return _login_redirect(request, "/ask")
-        return templates.TemplateResponse(request=request, name="ask.html", context={})
+        return templates.TemplateResponse(
+            request=request,
+            name="ask.html",
+            context={"conversations": _conversations(session), "exchanges": []},
+        )
+
+    @app.get("/ask/{conversation_id}", response_class=HTMLResponse)
+    def ask_conversation(request: Request, conversation_id: str) -> Response:
+        """One conversation, reopened — every exchange as the person left it.
+
+        The stored outcome is rendered rather than re-derived, so what comes back is what they
+        saw, not what the corpus would say about the same question today.
+        """
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, f"/ask/{conversation_id}")
+
+        found = app.state.relay.request(
+            "GET", f"/ask-conversations/{conversation_id}", token=session.access_token
+        )
+        if not found.reachable or not found.ok:
+            # The API's verdict, carried. A conversation that is not this person's answers 404
+            # there and the portal must not soften that into an empty page.
+            return templates.TemplateResponse(
+                request=request,
+                name="ask.html",
+                context={
+                    "conversations": _conversations(session),
+                    "exchanges": [],
+                    "missing": True,
+                },
+                status_code=found.status if found.reachable else 503,
+            )
+        payload = found.payload or {}
+        return templates.TemplateResponse(
+            request=request,
+            name="ask.html",
+            context={
+                "conversations": _conversations(session),
+                "conversation_id": conversation_id,
+                "title": payload.get("title", ""),
+                "exchanges": _rendered(payload.get("exchanges", [])),
+            },
+        )
+
+    @app.get("/ask/{conversation_id}/delete", response_class=HTMLResponse)
+    def ask_delete_confirm(request: Request, conversation_id: str) -> Response:
+        """Ask before deleting, on its own page — the thread pattern, not the thread template."""
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, f"/ask/{conversation_id}/delete")
+        found = app.state.relay.request(
+            "GET", f"/ask-conversations/{conversation_id}", token=session.access_token
+        )
+        if not found.reachable or not found.ok:
+            return templates.TemplateResponse(
+                request=request,
+                name="ask.html",
+                context={"conversations": [], "exchanges": [], "missing": True},
+                status_code=found.status if found.reachable else 503,
+            )
+        payload = found.payload or {}
+        return templates.TemplateResponse(
+            request=request,
+            name="ask_delete_confirm.html",
+            context={
+                "conversation_id": conversation_id,
+                "title": payload.get("title", ""),
+                "exchanges": len(payload.get("exchanges", [])),
+            },
+        )
+
+    @app.post("/ask/{conversation_id}/delete")
+    def ask_delete(request: Request, conversation_id: str) -> Response:
+        """Delete, then take the person somewhere that still exists."""
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/ask")
+        app.state.relay.request(
+            "DELETE", f"/ask-conversations/{conversation_id}", token=session.access_token
+        )
+        return RedirectResponse("/ask", status_code=303)
 
     @app.post("/ask")
     def ask(request: Request, question: str = Form("")) -> Response:
@@ -179,32 +291,57 @@ def create_portal(
         # The branch chooses an ENVELOPE, never a rendering. Both arms end at `_outcome.html`,
         # because two templates that agree today are two templates that drift, and the one that
         # drifts is the one nobody opens without JavaScript.
-        page = "_outcome.html" if request.headers.get("x-portal-fragment") else "ask.html"
+        page = "_exchange.html" if request.headers.get("x-portal-fragment") else "ask.html"
 
         asked = question.strip()
+        conversation_id = (request.query_params.get("conversation_id") or "").strip()
         if not asked:
             # THE CHEAPEST REFUSAL IN THE FEATURE, and it costs no API call and no model call.
             # An empty question relayed would spend a governed ask, a vendor call and a trail
             # record to be told what this line already knows.
             return templates.TemplateResponse(
                 request=request,
-                name=page,
-                context={"empty": True},
+                name="_notice.html" if page == "_exchange.html" else page,
+                context={
+                    "empty": True,
+                    "conversations": _conversations(session) if page == "ask.html" else [],
+                    "exchanges": [],
+                    "conversation_id": conversation_id,
+                },
                 status_code=400,
             )
 
+        # Fetched before the ask and only for a whole page. The fragment envelope re-renders one
+        # exchange and never the rail, so a follow-up costs exactly one call — and doing it
+        # first keeps the ask itself the last thing this handler does, which is what the
+        # containment session reads.
+        rail = _conversations(session) if page == "ask.html" else []
+
+        body: dict[str, Any] = {"question": asked}
+        if conversation_id:
+            body["conversation_id"] = conversation_id
         answered = app.state.relay.request(
             "POST",
             "/ask",
             token=session.access_token,
-            json_body={"question": asked},
+            json_body=body,
             # The one call in the portal that waits longer, and only this one.
             timeout=ASK_PATIENCE,
         )
+        # The conversation this exchange landed in — the API's answer, not the portal's guess.
+        # A first ask has no id going in and gets one coming back, which is what the composer
+        # posts to from then on.
+        landed = (answered.payload or {}).get("conversation_id", conversation_id)
         return templates.TemplateResponse(
             request=request,
             name=page,
-            context={"question": asked, "response": answered},
+            context={
+                "question": asked,
+                "response": answered,
+                "conversation_id": landed,
+                "conversations": rail,
+                "exchanges": [],
+            },
             # The API's own status, carried rather than reinterpreted. A refusal is an answer.
             status_code=answered.status if answered.reachable else 503,
         )

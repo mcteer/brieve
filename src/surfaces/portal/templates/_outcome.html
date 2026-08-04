@@ -5,10 +5,6 @@
   than agreeing to look alike. Two copies of this markup would drift, and the copy that
   drifted would be the one nobody opens in a browser without JavaScript.
 #}
-{% if empty %}
-  <p class="notice">Type a question first &mdash; nothing was sent.</p>
-{% endif %}
-
 {% if response is defined %}
   {#
     DISPATCH ORDER IS LOAD-BEARING, and it is the relay's own vocabulary in order:

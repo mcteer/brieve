@@ -21,7 +21,14 @@ from __future__ import annotations
 
 import pytest
 
-from core.answering.routing import ESTATE_NOUNS, ESTATE_TERMS, Route, route, window_phrase
+from core.answering.routing import (
+    ESTATE_NOUNS,
+    ESTATE_TERMS,
+    Route,
+    route,
+    route_with_signal,
+    window_phrase,
+)
 
 ESTATE_QUESTIONS = [
     "Which workspaces violate the control?",
@@ -326,3 +333,98 @@ def test_no_ordinary_operating_verb_is_a_strong_estate_term() -> None:
         f"{sorted(ESTATE_TERMS & ordinary)} is ordinary English for operating software. A "
         f"question containing it is not evidence that somebody is asking about their records"
     )
+
+
+# ------------------------------------------- the signal a follow-up inherits from (035)
+
+
+#: Questions that say something the router recognises. Their route is theirs, and a
+#: conversation must never move it (FR-017).
+SIGNALLED = [
+    ("How do I run a Vault cluster in AWS?", Route.GUIDANCE),
+    ("What are the best practices for Terraform Enterprise?", Route.GUIDANCE),
+    ("Which runs were denied last night?", Route.ESTATE),
+    ("Show me the audit trail for yesterday", Route.ESTATE),
+    ("What did the planner agent do?", Route.ESTATE),
+]
+
+#: Questions that say nothing routable. These are the ones a conversation answers for
+#: (FR-017a) — asked standalone they take the guidance floor, which is unchanged.
+SIGNAL_LESS = [
+    "what about multi-region?",
+    "and the intermediate?",
+    "what about that?",
+    "and after that?",
+]
+
+
+@pytest.mark.parametrize(("question", "expected"), SIGNALLED)
+def test_a_question_with_its_own_vocabulary_reports_a_signal(
+    question: str, expected: Route
+) -> None:
+    """The route is unchanged and the signal is reported alongside it."""
+    route_taken, had_signal = route_with_signal(question)
+
+    assert route_taken is expected
+    assert had_signal is True, f"{question!r} matched vocabulary but reported no signal"
+
+
+@pytest.mark.parametrize("question", SIGNAL_LESS)
+def test_a_bare_follow_up_reports_no_signal(question: str) -> None:
+    """The fact `route()` discards, and the whole reason this function exists.
+
+    Both a documentation question and a bare follow-up come back GUIDANCE; only this tells
+    the caller which one reached it by matching and which by falling to the floor.
+    """
+    route_taken, had_signal = route_with_signal(question)
+
+    assert route_taken is Route.GUIDANCE, "the floor moved"
+    assert had_signal is False, f"{question!r} reported a signal it does not carry"
+
+
+@pytest.mark.parametrize("question", [q for q, _ in SIGNALLED] + SIGNAL_LESS + ["", "   ", "?"])
+def test_the_signal_form_never_disagrees_with_route(question: str) -> None:
+    """`route()` is the contract every existing row rests on; this must not fork it."""
+    assert route_with_signal(question)[0] is route(question)
+
+
+def test_the_router_still_holds_no_state() -> None:
+    """FR-017b, structurally. Inheritance belongs to the caller that knows the conversation.
+
+    If a conversation ever reaches this module, the determinism the module docstring stakes
+    its argument on becomes a claim about a store rather than about a string.
+    """
+    import ast  # noqa: PLC0415
+    import inspect  # noqa: PLC0415
+
+    # The DOCSTRING explains what the caller does with a conversation, which is exactly the
+    # prose a naive substring check trips over — the same defect `test_containment` fixed by
+    # stripping comments before checking. Read the code.
+    tree = ast.parse(inspect.getsource(route_with_signal).strip())
+    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)} | {
+        node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+    }
+
+    for held in ("conversation", "store", "previous", "history", "exchange"):
+        assert not any(held in name.lower() for name in names), (
+            f"route_with_signal reaches for {held!r} — the router sees a string and nothing else"
+        )
+
+
+def test_a_question_word_that_is_guidance_vocabulary_counts_as_a_signal() -> None:
+    """An accepted edge, recorded rather than smoothed over.
+
+    `why` is in `GUIDANCE_TERMS` — it earns its place there pulling a SHARED noun away from
+    the estate ("why are secrets rotated?" is documentation). That makes a bare "why?" a
+    signalled question under FR-017, so in a records conversation it goes to the corpus rather
+    than inheriting.
+
+    Left as it is, deliberately. The alternative — a second tier of "weak" guidance words —
+    adds a vocabulary judgement to every future term for a follow-up nobody has yet asked in
+    that shape. If somebody does, this row is where the decision gets revisited, with the
+    reason already written down.
+    """
+    route_taken, had_signal = route_with_signal("why?")
+
+    assert route_taken is Route.GUIDANCE
+    assert had_signal is True

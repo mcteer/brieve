@@ -4,19 +4,102 @@
 <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
 {% endblock %}
 {% block content %}
-<h1>Ask a question</h1>
+{# The rail is omitted when there is nothing to list, so the layout has to stop reserving a
+   column for it — otherwise a first-time visitor gets the whole page squeezed into 14rem with
+   the rest of the screen empty. Found by looking at a screenshot; no row would have caught it,
+   because it is correct markup that reads badly. #}
+<div class="ask-layout{% if not conversations %} ask-layout--alone{% endif %}">
+
+{#
+  THE RAIL — this person's own conversations, most recently used first.
+
+  A `nav`, so it is reachable as one and skippable as one. Absent entirely when there is
+  nothing to list: a heading over an empty box is furniture that tells a new person their
+  first question went somewhere it did not.
+#}
+{% if conversations %}
+<nav class="ask-rail" aria-label="Your conversations">
+  <p class="rail-heading">Conversations</p>
+  <ul>
+    {% for conversation in conversations %}
+      <li>
+        <a href="/ask/{{ conversation.conversation_id }}"
+           {% if conversation.conversation_id == conversation_id %}aria-current="page"{% endif %}>
+          {{ conversation.title }}
+        </a>
+        {# The count is a fact about the conversation, in the role reserved for what a person
+           would quote — not decoration. #}
+        <span class="rail-count">{{ conversation.exchanges }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+  <a class="link-button" href="/ask">New conversation</a>
+  {% if conversation_id %}
+    <a class="link-button" href="/ask/{{ conversation_id }}/delete">Delete this conversation</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+<div class="ask-main">
+<h1>{{ title or "Ask a question" }}</h1>
+{% if not exchanges and not response is defined %}
 <p class="lede">Asking answers; it never acts. Nothing here starts a run, changes anything, or
    touches your estate &mdash; to have an agent do something, <a href="/">run an agent</a>.</p>
+{% endif %}
+
+{% if missing %}
+  <p class="notice">That conversation is not one of yours &mdash; nothing about your access has
+     changed.</p>
+{% endif %}
+
+{#
+  THE TRANSCRIPT. Exchanges the platform already holds, oldest first, then anything this page
+  has added since it loaded. Rendered through `_exchange.html`, the same include the composer
+  swaps in, so a reopened conversation and a fresh answer cannot look different.
+#}
+{#
+  `tabindex="0"` because the transcript scrolls, and a scrollable region a keyboard cannot
+  reach is unreachable content — axe names it `scrollable-region-focusable` and it failed here
+  the moment the region gained its own scroll.
+
+  Labelled, so the new tab stop announces what it is rather than arriving as an unnamed group.
+  NOT `role="log"` and not `aria-live`: announcing a page of claims the instant it arrives
+  talks over somebody who is still reading. Focus moves to the new answer's heading instead.
+#}
+<div id="ask-transcript" class="transcript" tabindex="0" role="region"
+     aria-label="Conversation transcript">
+  {% for exchange in exchanges %}
+    {% with question = exchange.question, response = exchange.rendered %}
+      {% include "_exchange.html" %}
+    {% endwith %}
+  {% endfor %}
+  {% if response is defined %}
+    {% include "_exchange.html" %}
+  {% endif %}
+</div>
+
+{#
+  Two regions, deliberately, because they carry different kinds of thing. `ask-status` holds a
+  SHORT sentence about what is happening and is a live region, so a screen-reader user is told
+  the question went and later that it came back. The transcript is NOT live: announcing a page
+  of claims the instant it arrives talks over somebody who is still reading. Focus moves to the
+  new answer's heading instead, which is how a person gets there on purpose.
+#}
+<p id="ask-status" role="status" class="meta ask-status"></p>
 
 {#
   ONE FORM, ONE FIELD. No source selector and no model selector: which corpus is pinned and
   which model may answer are not the asker's to choose, and a control for either would be a
   request to widen scope. The platform decides what the question needs.
+
+  The conversation it belongs to travels in the action, not in a field — there is nothing here
+  for a person to set, and an id in a form control is an id somebody can edit.
 #}
-<form method="post" action="/ask" class="ask">
-  <label for="question">Your question</label>
+<form method="post" class="ask"
+      action="/ask{% if conversation_id %}?conversation_id={{ conversation_id }}{% endif %}">
+  <label for="question">{% if exchanges or conversation_id %}Ask a follow-up{% else %}Your question{% endif %}</label>
   <textarea id="question" name="question" rows="3" required
-            aria-describedby="ask-expectation">{{ question or "" }}</textarea>
+            aria-describedby="ask-expectation"></textarea>
   <p id="ask-expectation" class="meta">
     Answers come from the platform&rsquo;s pinned documentation or from your own records
     &mdash; whichever fits what you asked. An answer usually takes a minute or two, so leave
@@ -25,18 +108,11 @@
   <button type="submit" class="button">Ask</button>
 </form>
 
-{#
-  WHERE AN ANSWER LANDS.
+{% if empty %}
+  <p class="notice">Type a question first &mdash; nothing was sent.</p>
+{% endif %}
 
-  Two regions, deliberately, because they carry different kinds of thing. `ask-status` holds a
-  SHORT sentence about what is happening and is a live region, so a screen-reader user is told
-  the question went and later that it came back. `ask-outcome` holds the answer itself and is
-  NOT live: announcing a page of claims the instant it arrives talks over somebody who is still
-  reading. Focus moves to its heading instead, which is how a person gets there on purpose.
-#}
-<p id="ask-status" role="status" class="meta ask-status"></p>
-<div id="ask-outcome">
-{% include "_outcome.html" %}
+</div>
 </div>
 {% endblock %}
 {% block scripts %}

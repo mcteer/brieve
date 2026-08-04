@@ -111,7 +111,7 @@ def _corpus(synced_at: datetime | None) -> Corpus:
 
 
 class _Cites:
-    def answer(self, question: str, corpus: Corpus) -> list[dict[str, Any]]:
+    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
         return [
             {
                 "statement": "The pinned corpus says so.",

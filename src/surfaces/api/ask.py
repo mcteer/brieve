@@ -14,11 +14,15 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 
 from core.answering.answer import ANSWERED, ProviderUnavailable, answer_question
+from core.answering.context import MAX_CARRIED_EXCHANGES, build_context
+from core.answering.conversations.postgres import ConversationStoreError
+from core.answering.conversations.records import ExchangeDisposition
 from core.answering.corpus import Corpus, CorpusUnavailable
 from core.answering.estate import ANSWERED as ESTATE_ANSWERED
 from core.answering.estate import (
@@ -29,7 +33,7 @@ from core.answering.estate import (
 from core.answering.focus import focus_types
 from core.answering.ground import describe_ground
 from core.answering.record import record_ask
-from core.answering.routing import Route, route, window_phrase
+from core.answering.routing import Route, route_with_signal, window_phrase
 from core.answering.scope import visible_event_types
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
@@ -76,14 +80,23 @@ def ask_for(
     cell_disposition: str = "",
     model_authority: str = "",
     now: datetime | None = None,
+    context: str = "",
+    conversation_id: str = "",
+    carried_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Answer or decline, and record that someone asked.
 
     A provider failure and a corpus failure both **raise**. Neither arrives shaped like a decline,
     because a reader cannot tell "the corpus does not say" from "we could not reach the model", and
     those send them to different places.
+
+    `context` is earlier conversation and changes only what is ASKED (035). What ships is decided
+    below exactly as before: every citation resolves against the pin or the claim is dropped.
+    `carried_context` is what the RECORD will say about that history — written even when nothing
+    was carried, because "a conversation existed and none of it was used" and "there was no
+    conversation" are different facts and an auditor needs to tell them apart (FR-022).
     """
-    answer = answer_question(question=question, corpus=corpus, provider=provider)
+    answer = answer_question(question=question, corpus=corpus, provider=provider, context=context)
 
     # HOW OLD THE GROUND IS (033), composed HERE for the same reason the estate window note is:
     # `answer_question` has no clock and should not grow one, and a module that calls the clock
@@ -110,6 +123,8 @@ def ask_for(
         bound_cell=bound_cell,
         cell_disposition=cell_disposition,
         model_authority=model_authority,
+        conversation_id=conversation_id,
+        carried_context=carried_context,
     )
 
     # `source` on BOTH paths, which it was not until the third route went away.
@@ -155,6 +170,9 @@ def estate_answer_for(
     bound_cell: str = "",
     cell_disposition: str = "",
     model_authority: str = "",
+    context: str = "",
+    conversation_id: str = "",
+    carried_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Answer an estate question from the asker's own records, or decline.
 
@@ -218,6 +236,7 @@ def estate_answer_for(
     )
 
     answer = answer_estate_question(
+        context=context,
         question=question,
         records=tuple(entries),
         provider=provider,
@@ -239,6 +258,8 @@ def estate_answer_for(
         bound_cell=bound_cell,
         cell_disposition=cell_disposition,
         model_authority=model_authority,
+        conversation_id=conversation_id,
+        carried_context=carried_context,
     )
 
     if answer.disposition != ESTATE_ANSWERED:
@@ -311,6 +332,108 @@ class AskCredentialUnavailable(Exception):
     """
 
     disposition = "credential_unavailable"
+
+
+def _remember(
+    *,
+    conversations: Any,
+    conversation_id: str | None,
+    subject: AuthenticatedSubject,
+    question: str,
+    source: str,
+    body: dict[str, Any],
+    context: Any,
+) -> dict[str, Any]:
+    """Persist the exchange and hand back the body the caller sees (035).
+
+    **The transcript only ever holds asks the platform actually answered, declined or
+    refused.** A provider fault raises above this and never reaches here, so a conversation
+    cannot accumulate an exchange nobody got an answer to — reopening one would then show a
+    question with nothing under it and no way to tell why.
+
+    The stored `outcome` is this body verbatim. Reopening re-renders what the person SAW,
+    rather than re-deriving it against a corpus that may since have been re-pinned.
+    """
+    if conversations is None:
+        return body
+
+    stated = str(body.get("disposition") or "")
+    disposition = ExchangeDisposition(stated if stated in _EXCHANGE_DISPOSITIONS else "answered")
+
+    if conversation_id:
+        exchange = conversations.append(
+            conversation_id=conversation_id,
+            tenant_id=subject.tenant_id,
+            subject_user_id=subject.subject_user_id,
+            question=question,
+            source=source,
+            disposition=disposition,
+            outcome=body,
+        )
+        # Resolution succeeded before the model was called; a `None` here means the
+        # conversation went away underneath the ask. The answer still stands and is returned —
+        # it was produced and recorded — but it belongs to no transcript.
+        if exchange is None:
+            return body
+        seq, resolved_id = exchange.seq, conversation_id
+    else:
+        conversation, exchange = conversations.start(
+            conversation_id=str(uuid4()),
+            tenant_id=subject.tenant_id,
+            subject_user_id=subject.subject_user_id,
+            question=question,
+            source=source,
+            disposition=disposition,
+            outcome=body,
+        )
+        seq, resolved_id = exchange.seq, conversation.conversation_id
+
+    enriched = dict(body)
+    enriched["conversation_id"] = resolved_id
+    enriched["exchange_seq"] = seq
+    # Present only when the conversation outgrew the bound — an unconditional caveat gets
+    # skipped, which costs exactly the case it exists for (the window note's own lesson).
+    if context.note:
+        enriched["context_note"] = context.note
+    return enriched
+
+
+#: The dispositions an exchange can hold. Anything else the surface produces is not a
+#: transcript entry — it raised before reaching the store.
+_EXCHANGE_DISPOSITIONS = frozenset({"answered", "declined", "refused"})
+
+
+class ConversationNotFound(Exception):
+    """The conversation is not this subject's — or does not exist. One answer for both."""
+
+
+def _resolve_conversation(
+    *, conversations: Any, conversation_id: str | None, subject: AuthenticatedSubject
+) -> tuple[Any, ...]:
+    """The exchanges this ask may build on, or a refusal — and never a hint (FR-012/013).
+
+    Returns `()` for a new conversation. Raises `ConversationNotFound` for an id that is
+    absent, another subject's, or another tenant's, all with one wording, because a distinct
+    response for "exists but not yours" confirms that it exists.
+
+    **Reached before routing, governance, the corpus and any vendor call.** A caller probing
+    identifiers must not be able to spend a model call or leave a governance record doing it.
+    """
+    if not conversation_id:
+        return ()
+    if conversations is None:
+        # A surface with no store cannot honour a conversation, and pretending the id was
+        # simply unknown would be the same lie in a friendlier tone.
+        raise ConversationNotFound("no such conversation")
+    found = conversations.get(
+        conversation_id=conversation_id,
+        tenant_id=subject.tenant_id,
+        subject_user_id=subject.subject_user_id,
+    )
+    if found is None:
+        raise ConversationNotFound("no such conversation")
+    _, exchanges = found
+    return tuple(exchanges[-MAX_CARRIED_EXCHANGES:])
 
 
 def obtain_ask_credential(
@@ -475,12 +598,21 @@ class AskRequest(BaseModel):
     #: are not the caller's to choose — a parameter for either would be a request to widen scope.
     question: str
 
+    #: Which conversation this question belongs to (035). Absent starts one; present appends to
+    #: it, and an id that is not this subject's own is a 404 before anything else happens.
+    #:
+    #: **Still not a widening.** A conversation groups a person's own questions and gives a
+    #: follow-up its subject; it grants no source, no model, and no scope the same question asked
+    #: standalone would not have.
+    conversation_id: str | None = None
+
 
 def build_router(
     *,
     providers: Any = None,
     model: str = "unconfigured",
     evidence_query: Any = None,
+    conversations: Any = None,
     ask_authority: Any = None,
     credential_source: Any = None,
 ) -> APIRouter:
@@ -517,7 +649,49 @@ def build_router(
         """
         from core.answering.corpus import load_corpus
 
-        destination = route(body.question)
+        # THE CONVERSATION, RESOLVED BEFORE ANYTHING ELSE HAPPENS (035).
+        #
+        # Before routing, before governance, before the corpus is loaded and long before a
+        # vendor is called: an id that is not this subject's own must cost nothing and reveal
+        # nothing. `resolve_conversation` returns the exchanges this ask may see — empty for a
+        # new conversation — and raises 404 for absent, somebody else's, and another tenant's
+        # alike, because a different answer for "exists but not yours" says it exists.
+        try:
+            prior = _resolve_conversation(
+                conversations=conversations,
+                conversation_id=body.conversation_id,
+                subject=subject,
+            )
+        except ConversationNotFound as missing:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "no_such_conversation") from missing
+        except ConversationStoreError as unavailable:
+            # NOT a 404, and not a context-free answer either. "Could not look" and "not yours"
+            # send a person to different places — one waits, the other goes and asks who owns
+            # it. And answering the follow-up as though it had no history would hand them an
+            # answer read in isolation with nothing saying so, which is the quietest wrong
+            # answer this feature could produce.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "this conversation could not be read just now, so the question was not asked. "
+                "Nothing is lost — try again in a moment.",
+            ) from unavailable
+
+        # EXPLICIT SIGNAL WINS; SILENCE INHERITS (FR-017/017a).
+        #
+        # `route_with_signal` reports the fact `route` discards: whether the question said
+        # anything the router recognises. A question that did is routed on its own words and
+        # the conversation cannot move it — that half is what keeps "which runs failed?" a
+        # records question wherever it is asked. A question that did not — "what about
+        # multi-region?" — inherits the source of the exchange it follows, because a bare
+        # follow-up has no words to route on and the guidance floor would answer a records
+        # conversation from the documentation.
+        destination, had_signal = route_with_signal(body.question)
+        inherited = False
+        if not had_signal and prior:
+            destination = Route(prior[-1].source)
+            inherited = True
+
+        context = build_context(prior, inherited_route=inherited)
 
         if destination is Route.ESTATE:
             # GOVERNANCE FIRST — before scope, before provider availability, before the evidence
@@ -563,7 +737,7 @@ def build_router(
                     status.HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)
                 ) from unavailable
             try:
-                return estate_answer_for(
+                answered = estate_answer_for(
                     question=body.question,
                     subject=subject,
                     query=evidence_query,
@@ -575,6 +749,18 @@ def build_router(
                     bound_cell=bound_cell,
                     cell_disposition=cell_disposition,
                     model_authority=credential.reference,
+                    context=context.text,
+                    conversation_id=body.conversation_id or "",
+                    carried_context=context.descriptor if body.conversation_id else None,
+                )
+                return _remember(
+                    conversations=conversations,
+                    conversation_id=body.conversation_id,
+                    subject=subject,
+                    question=body.question,
+                    source=str(Route.ESTATE),
+                    body=answered,
+                    context=context,
                 )
             except ScopeEmpty as empty:
                 raise HTTPException(status.HTTP_403_FORBIDDEN, str(empty)) from empty
@@ -651,7 +837,7 @@ def build_router(
             ) from unavailable
 
         try:
-            return ask_for(
+            answered = ask_for(
                 question=body.question,
                 subject=subject,
                 corpus=corpus,
@@ -662,6 +848,18 @@ def build_router(
                 bound_cell=bound_cell,
                 cell_disposition=cell_disposition,
                 model_authority=credential.reference,
+                context=context.text,
+                conversation_id=body.conversation_id or "",
+                carried_context=context.descriptor if body.conversation_id else None,
+            )
+            return _remember(
+                conversations=conversations,
+                conversation_id=body.conversation_id,
+                subject=subject,
+                question=body.question,
+                source=GUIDANCE_SOURCE,
+                body=answered,
+                context=context,
             )
         except ProviderUnavailable as unreachable:
             # NOT a decline. A reader cannot tell "the corpus does not say" from "we could not

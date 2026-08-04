@@ -240,6 +240,33 @@ def window_phrase(question: str) -> str | None:
     return None
 
 
+def route_with_signal(question: str) -> tuple[Route, bool]:
+    """The route, and **whether the question said anything the router recognises**.
+
+    `route()` alone cannot answer the question 035 needs asked: a documentation question and a
+    bare *"what about multi-region?"* both come back GUIDANCE, but the first reached it by
+    matching vocabulary and the second by falling to the floor. A follow-up in a records
+    conversation must inherit the records; a follow-up in a documentation conversation must
+    not be dragged anywhere. Telling those two apart needs the fact `route()` discards.
+
+    So this returns `(route, had_signal)` and `route()` below is unchanged — every existing
+    caller and every existing row keeps its exact behaviour, which is what makes this an
+    addition rather than a change to how anything is routed today.
+
+    **The router still holds no state.** Inheritance is applied by the caller, which is the
+    only party that knows what conversation a question was asked in. This function sees a
+    string and returns two facts about it, and the module's determinism argument is untouched.
+    """
+    words = _words(question)
+    signal = bool(
+        words & ESTATE_TERMS
+        or words & ESTATE_NOUNS
+        or words & GUIDANCE_TERMS
+        or window_phrase(question) is not None
+    )
+    return route(question), signal
+
+
 def route(question: str) -> Route:
     """Decide the source. Same question, same answer, always."""
     words = _words(question)
@@ -274,5 +301,6 @@ __all__ = [
     "WINDOW_PHRASES",
     "Route",
     "route",
+    "route_with_signal",
     "window_phrase",
 ]

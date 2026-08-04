@@ -29,6 +29,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from pydantic import AnyHttpUrl
 
 from adapters.anthropic_answering import build_ask_provider
+from core.answering.conversations.postgres import PostgresConversationStore
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
@@ -119,6 +120,11 @@ def build_transport() -> McpTransport:
     audit_sink = PostgresAuditSink(credentials=credentials, host=host)
     run_index = PostgresRunIndex(credentials=credentials, host=host)
     thread_store = PostgresThreadStore(credentials=credentials, host=host)
+    # 035. ADR-0033 is a claim about what a DEPLOYMENT does, so the served MCP surface gets the
+    # same store the served API gets — a parity row over two app objects would not have caught
+    # this surface shipping without one.
+    ask_conversations = PostgresConversationStore(credentials=credentials, host=host)
+    ask_conversations.migrate()
     audit_sink.migrate()
     run_index.migrate()
     thread_store.migrate()
@@ -145,6 +151,7 @@ def build_transport() -> McpTransport:
         # five features. Here the jobspec sets NOMAD_ADDR and the first version of this
         # assembly ignored it — caught by US3's rows on their first run, because starting a
         # run is the only operation that dispatches.
+        ask_conversations=ask_conversations,
         run_dispatcher=NomadDispatcher(
             run_index=run_index,
             nomad_addr=os.environ.get("NOMAD_ADDR") or "http://127.0.0.1:4646",

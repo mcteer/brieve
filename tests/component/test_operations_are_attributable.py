@@ -37,6 +37,12 @@ from tests.harness.api_fixtures import surface_under_test
 #: operations would have shipped uncovered by the authentication rows above, which is
 #: precisely how a coverage check becomes decorative.
 NEW_OPERATIONS = [
+    # 035's three. Enrolled because the guard below caught their absence, which is the check
+    # working exactly as the 021 note beneath describes: an operation that skipped these rows
+    # would ship without the authentication coverage every other one has.
+    ("GET", "/ask-conversations", "ask_conversations", {}),
+    ("GET", "/ask-conversations/c1", "ask_conversation", {"conversation_id": "c1"}),
+    ("DELETE", "/ask-conversations/c1", "delete_ask_conversation", {"conversation_id": "c1"}),
     ("GET", "/runs", "list_runs", {}),
     ("GET", "/runs/r/result", "get_run_result", {"run_id": "r"}),
     # 021's report. Added here because the guard below caught its absence — which is the

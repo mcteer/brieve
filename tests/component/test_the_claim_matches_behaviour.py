@@ -142,11 +142,20 @@ def test_the_two_catalogue_operations_stay_unrecorded() -> None:
     makes — an editor fetches them on every connect — and the trail is never sampled, so
     recording them would be a permanent cost for the least informative entries.
 
+    035's three conversation operations join them, on a related but distinct argument: a
+    conversation is a READING of asks the trail already records in full, so recording the
+    reading adds rows saying somebody looked at their own questions. Deleting one removes a
+    view and provably cannot touch a record (FR-023) — and recording it properly would need a
+    new `AuditEventType`, which is sealed core and needs its own spec.
+
     Pinned so that widening coverage later is a decision someone makes rather than a drift.
     """
     assert {o.tool_name for o in operations() if o.audit_disposition == NO_RECORD} == {
         "list_agent_definitions",
         "get_agent_definition",
+        "ask_conversations",
+        "ask_conversation",
+        "delete_ask_conversation",
     }
 
     surface = surface_under_test()
