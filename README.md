@@ -9,7 +9,7 @@ Put senior infrastructure expertise at everyone's fingertips. Terraform, Vault, 
 adjacent tooling are powerful but demand scarce, senior operational skill; the Harness
 turns that expertise — captured once in skills, validated designs, modules, policies,
 and golden-path workflows — into an agentic expert any team can direct in natural
-language: in the IDE, on the command line, over an API, and in a conversational portal.
+language: in the IDE, over an API, and in a conversational portal.
 
 Security and governance are not the goal here; they are what make the goal reachable.
 Every agent action executes under manufactured, evaporating authority mirroring the
