@@ -195,7 +195,11 @@ job "api" {
         }
 
         args = [
-          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cp -a /src/corpus /repo/ 2>/dev/null || true; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.api.service"
+          # The watchdog runs beside the service and restarts the task when the workload
+          # identity on disk has expired — see `infra/bin/identity-watchdog` for what it is
+          # repairing and why a restart is the whole repair. Started before the server so a
+          # surface that comes up with an already-dead identity recovers too.
+          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cp -a /src/corpus /repo/ 2>/dev/null || true; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; sh /src/infra/bin/identity-watchdog /secrets/nomad_vault.jwt 60 surfaces.api.service & uv run --extra adapters --extra surfaces python -m surfaces.api.service"
         ]
       }
 

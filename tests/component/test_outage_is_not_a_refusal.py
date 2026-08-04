@@ -59,7 +59,14 @@ def test_an_unreadable_trust_store_is_unavailable_not_forbidden() -> None:
     assert response.status_code == 503, (
         "an unreadable trust store came back as something other than 'come back later'"
     )
-    assert response.json()["detail"] == "identity_mappings_unavailable"
+    detail = response.json()["detail"]
+    # A SENTENCE, because a person reads this one. The 401/403 reason codes are collected by
+    # programs; a 503 on the ask path is read by somebody sitting in front of the portal, which
+    # relays it verbatim. `identity_mappings_unavailable` was what the maintainer actually saw.
+    assert detail.endswith("."), f"a person reads this; it is not a sentence: {detail!r}"
+    assert "_" not in detail, f"a reason code reached a human: {detail!r}"
+    assert "access has changed" in detail, "it does not say the thing that is worrying them"
+    assert "try again" in detail.lower(), "it does not say what to do"
 
 
 def test_nothing_executes_when_identity_cannot_be_established() -> None:
