@@ -595,24 +595,60 @@ main.main--app {
    considers visible — including one sitting behind a sticky element. Reserving the composer's
    own height at the end of the transcript means the last citation can always be scrolled
    clear, which is what makes 2.4.11 true rather than usually true. */
-.exchange { display: flex; flex-direction: column; gap: var(--space-3); }
+.exchange {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  scroll-margin-block-start: var(--space-6);
+}
 
-/* THE QUESTION, ABOVE ITS ANSWER. Indented rather than coloured: a transcript whose two
-   voices differ only by hue is a transcript that stops working in greyscale, which is the
-   same 1.4.1 argument the verdict pills answer. */
+/* NO CARD AROUND A RESPONSE. `.answer` is styled as a panel because 028 rendered exactly one
+   answer on an otherwise empty page, where a card said "this is the result". In a transcript
+   it says the wrong thing entirely — every chat interface renders the assistant's text plainly
+   on the page ground, and boxing each turn makes a conversation look like a stack of receipts.
+   The user's message is the one that gets a shape, below. */
+.exchange .answer {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-top: 0;
+}
+
+/* Claims inside a transcript are just paragraphs. The rule down their left was a way of
+   grouping evidence with its statement on a page that had nothing else on it; against a
+   conversation it reads as quoting, which is not what a claim is. Citations keep their own
+   treatment and still sit beneath the sentence they support. */
+.exchange .claims li {
+  border-left: none;
+  padding-left: 0;
+}
+
+/* THE QUESTION, as a shape rather than a colour — the one turn that gets a container, which
+   is how every chat interface separates the two voices.
+   
+   Aligned to the end of the column, and that is the whole visual difference: a transcript
+   whose two voices differ only by HUE stops working in greyscale, so position and a border do
+   the distinguishing and the tint is only reinforcement (the 1.4.1 argument the verdict pills
+   already answer). */
 .asked {
-  border-left: 3px solid var(--rule);
-  padding-left: var(--space-3);
+  align-self: end;
+  max-width: 85%;
   margin: 0;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
 }
 
 .asked-label {
   display: block;
   font-family: var(--font-control);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);
+  margin-block-end: var(--space-1);
 }
 
 /* THE PAGE SCROLLS, NOT A BOX INSIDE IT — which is how every chat interface a person has
@@ -641,6 +677,20 @@ main.main--app {
   width: 100%;
   max-width: 46rem;
   margin-inline: auto;
+}
+
+/* THE INTRO IS FOR AN EMPTY CONVERSATION, and goes the moment there is one.
+   
+   The template hides it when the SERVER renders exchanges, which is right on a reload and
+   wrong during the conversation you are actually having: answers are appended by script, so
+   the "asking never acts" preamble sat above three exchanges telling somebody what the page
+   is for while they were already using it. `:has()` asks the question the template cannot —
+   is there an exchange on the page NOW — without the client having to decide anything. */
+/* The LEDE goes; the heading stays. Hiding the h1 too was tidier and wrong — a page with no
+   level-one heading is a page a screen-reader user cannot orient in, and it carries the
+   conversation's own title once one is reopened. */
+.ask-main:has(.exchange) > .lede {
+  display: none;
 }
 
 .transcript {
