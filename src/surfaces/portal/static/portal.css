@@ -501,11 +501,25 @@ form.inline { display: inline; }
    Rail beside transcript at width, stacked below it. Every value below is a token —
    the identity rows fail on a literal, which is what keeps one design system. */
 
+/* THE APP SHELL, laid out the way a chat interface is: rail against the left edge, the
+   conversation filling everything left over, and the reading measure applied to the MESSAGES
+   rather than to the page.
+
+   It used to inherit `main`'s centred 52rem column, which put the rail in the middle of the
+   screen with dead space on both sides and made the whole thing look like a widget dropped on
+   a page. A rail belongs at the edge; a paragraph belongs at a readable width. Those are two
+   different constraints and they were being served by one. */
+main.main--app {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 .ask-layout {
   display: grid;
-  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
-  gap: var(--space-6);
-  align-items: start;
+  grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+  align-items: stretch;
+  min-height: calc(100vh - 3.5rem);
 }
 
 /* THE RAIL COLLAPSES, IT DOES NOT SHRINK. 028 learned that CI's Linux Chromium renders
@@ -515,13 +529,31 @@ form.inline { display: inline; }
 .ask-layout--alone { grid-template-columns: minmax(0, 1fr); }
 
 @media (max-width: 45rem) {
-  .ask-layout { grid-template-columns: minmax(0, 1fr); }
-  .ask-rail { border-right: none; padding-right: 0; }
+  .ask-layout { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  /* Stacked, so it stops being a sidebar and stops sticking. */
+  .ask-rail {
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+    position: static;
+    height: auto;
+    overflow-y: visible;
+  }
+  .ask-main { padding-inline: var(--space-4); }
 }
 
+/* The rail stays put while the conversation scrolls, which is what a sidebar is for. Sticky
+   under the header, scrolling on its own only when the list outgrows the viewport. */
 .ask-rail {
   border-right: 1px solid var(--rule);
-  padding-right: var(--space-4);
+  background: var(--raised);
+  padding: var(--space-5) var(--space-4);
+  position: sticky;
+  top: 3.5rem;
+  align-self: start;
+  /* Fills the viewport so the rail reads as a side of the app rather than a card that stops
+     halfway down, and scrolls on its own only when the list outgrows it. */
+  height: calc(100vh - 3.5rem);
+  overflow-y: auto;
 }
 
 .rail-heading {
@@ -597,9 +629,18 @@ form.inline { display: inline; }
    `scroll-margin-block-end` so sequential focus navigation lands it above the composer rather
    than under it. Asserted by a row that presses Tab rather than calling `.focus()`, because
    pressing Tab is what a keyboard user does and what makes the browser scroll. */
+/* The conversation fills the column; its CONTENT is what gets the measure, centred inside.
+   Same rule for the transcript and the composer, so a question and its answer line up. */
 .ask-main {
   display: flex;
   flex-direction: column;
+  padding: var(--space-6) var(--space-5) 0;
+}
+
+.ask-main > * {
+  width: 100%;
+  max-width: 46rem;
+  margin-inline: auto;
 }
 
 .transcript {

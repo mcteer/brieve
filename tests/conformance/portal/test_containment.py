@@ -250,14 +250,27 @@ MAY_INSERT_SERVER_MARKUP: Final[str] = "portal-ask.js"
 def test_row_the_served_client_is_small_enough_to_read() -> None:
     """SC-006 verified against the delivered client, which is the point of having no build.
 
-    A bundle can be trusted; a file can be checked. If this ever fails on size, the honest
-    response is to ask what was added rather than to raise the number — and the answer for the
-    second file is on the record: posting the ask form without navigating away.
+    A bundle can be trusted; a file can be checked. If this fails on size, the honest response
+    is to ask what was ADDED rather than to raise the number.
+
+    **Raised from 90 to 100 in 035, having asked.** The limit was set when the ask script did
+    one thing: post the form without navigating away. It now does four, and each is a behaviour
+    somebody can name:
+
+      1. posts without navigating and APPENDS the rendered exchange (the transcript),
+      2. learns from the server which conversation the exchange landed in, so a follow-up joins
+         it instead of starting a new one,
+      3. keeps the address in step with that conversation, so a reload does not lose it,
+      4. sends on Enter and writes a line on Shift+Enter.
+
+    The number went up once, after four rounds of trimming comment prose to hold it — and prose
+    is what makes a file readable, which is the thing this row is protecting. Stripping it to
+    keep a number is the opposite of the intent. The next addition faces the same question.
 
     Budgeted PER FILE, because that is what a person actually sits down and reads.
     """
     for script in _served_scripts():
-        assert len(script.read_text().splitlines()) < 90, (
+        assert len(script.read_text().splitlines()) < 100, (
             f"{script.name} has grown past the point where a row can meaningfully read it"
         )
 

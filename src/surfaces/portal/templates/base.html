@@ -30,7 +30,10 @@
     </nav>
     {% block header_actions %}{% endblock %}
   </header>
-  <main id="main">
+  {# `main_class` lets one page opt out of the centred 52rem column. The ask surface is the
+     only one that wants the whole viewport — a rail belongs against the left edge, not
+     floating in the middle of a narrow frame. Every other page leaves this empty. #}
+  <main id="main" class="{% block main_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
   <footer>

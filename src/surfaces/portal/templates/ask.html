@@ -3,6 +3,7 @@
 {% block header_actions %}
 <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
 {% endblock %}
+{% block main_class %}main--app{% endblock %}
 {% block content %}
 {# The rail is omitted when there is nothing to list, so the layout has to stop reserving a
    column for it — otherwise a first-time visitor gets the whole page squeezed into 14rem with
