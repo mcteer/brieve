@@ -69,11 +69,12 @@
           // not a navigation and Back should leave the page, not undo a question.
           if (history.replaceState) history.replaceState(null, "", "/ask/" + encodeURIComponent(id));
         }
-        // Focus the NEWEST answer's heading, not a live region — a page of claims read aloud
-        // talks over somebody already reading.
-        var seen = outcome.querySelectorAll("#outcome, h2");
-        var head = seen[seen.length - 1];
-        if (head) { head.setAttribute("tabindex", "-1"); head.focus(); }
+        // Focus the NEWEST EXCHANGE, not a live region — a page of claims read aloud talks
+        // over somebody already reading. The exchange rather than its heading, because the
+        // indicator then outlines the thing that arrived instead of boxing a two-word label.
+        var seen = outcome.querySelectorAll(".exchange");
+        var last = seen[seen.length - 1];
+        if (last) { last.setAttribute("tabindex", "-1"); last.focus(); }
       })
       .catch(function () {
         // The portal's own failure in its own voice, never dressed as an answer or a decline.
