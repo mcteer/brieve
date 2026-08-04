@@ -563,19 +563,6 @@ form.inline { display: inline; }
    considers visible — including one sitting behind a sticky element. Reserving the composer's
    own height at the end of the transcript means the last citation can always be scrolled
    clear, which is what makes 2.4.11 true rather than usually true. */
-.transcript {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-/* And when focus DOES cause a scroll, land it clear of the composer rather than against it. */
-.transcript a,
-.transcript button,
-.transcript code {
-  scroll-margin-block-end: 12rem;
-}
-
 .exchange { display: flex; flex-direction: column; gap: var(--space-3); }
 
 /* THE QUESTION, ABOVE ITS ANSWER. Indented rather than coloured: a transcript whose two
@@ -596,42 +583,47 @@ form.inline { display: inline; }
   color: var(--muted);
 }
 
-/* THE COMPOSER SITS BELOW THE TRANSCRIPT, AND OVERLAPS NOTHING — which is a retreat from
-   `position: sticky` and the a11y lane is why.
-   
-   Sticky was the plan and it fails 2.4.11 in a way no amount of scroll-padding fixes: a
-   browser does not scroll for an element it already considers visible, and an element behind
-   a sticky overlay IS visible to it. Measured — a focused citation ended at y=447 with the
-   composer starting at y=393, and reserving space at the end of the transcript did not help
-   because nothing scrolled.
-   
-   So the transcript scrolls in its own region and the composer follows it in normal flow.
-   Nothing can come to rest under anything, the composer is always on screen, and 2.4.11 holds
-   by construction rather than by arithmetic. The nested scroll region is keyboard-reachable
-   and collapses to the page's own scroll below 45rem, where a viewport that short makes a
-   fixed-height transcript worse than a document. */
+/* THE PAGE SCROLLS, NOT A BOX INSIDE IT — which is how every chat interface a person has
+   used behaves, and the first attempt got this wrong.
+
+   That attempt gave the transcript its own scroll region so a sticky composer could never
+   overlap a focused element. It satisfied 2.4.11 the easy way and read wrong: answers arrived
+   inside a little scrolling window while the page around them stayed still, which is not what
+   Claude or ChatGPT do and not what anybody expects.
+
+   So the page scrolls and the composer is sticky at the viewport's bottom edge. 2.4.11 is
+   answered properly instead of avoided: the transcript reserves the composer's height at its
+   end, so content can always be scrolled clear of it, and every focusable thing inside carries
+   `scroll-margin-block-end` so sequential focus navigation lands it above the composer rather
+   than under it. Asserted by a row that presses Tab rather than calling `.focus()`, because
+   pressing Tab is what a keyboard user does and what makes the browser scroll. */
 .ask-main {
   display: flex;
   flex-direction: column;
-  /* The header is the only thing above it; the rest of the column is transcript + composer. */
-  max-height: calc(100vh - 3.5rem);
 }
 
 .transcript {
-  overflow-y: auto;
-  flex: 1 1 auto;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  /* Room for the composer, so the last answer can always come to rest above it. */
+  padding-block-end: 11rem;
+}
+
+.transcript a,
+.transcript button,
+.transcript code,
+.transcript [tabindex] {
+  scroll-margin-block-end: 12rem;
 }
 
 .ask {
-  flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
   background: var(--surface);
   border-top: 1px solid var(--rule);
   padding-block: var(--space-3);
   margin-block-start: var(--space-5);
 }
 
-@media (max-width: 45rem) {
-  .ask-main { max-height: none; }
-  .transcript { overflow-y: visible; }
-}
+html { scroll-padding-block-end: 12rem; }
