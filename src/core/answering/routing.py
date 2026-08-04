@@ -77,25 +77,50 @@ class Route(StrEnum):
 #: `did` is here against the instinct that it is too common: it is the *what-happened* auxiliary,
 #: it routes *"What did the planner agent do?"*, and it appears in no guidance question anyone
 #: has written.
+#: **Seven words were removed after this set was measured against its own rule** — `run`,
+#: `used`, `active`, `changed`, `failed`, `resumed`, `stopped`.
+#:
+#: The rule above is *words that appear ONLY in what-happened questions*, and those seven do
+#: not. They are the ordinary English of operating software, and they are how people ask the
+#: most basic documentation questions this platform exists to answer:
+#:
+#:     "How do I RUN a Vault cluster in AWS?"        "Which ports are USED by Consul?"
+#:     "How many ACTIVE nodes should a cluster have?" "What CHANGED in Vault 1.15?"
+#:     "What happens when a node has FAILED?"         "How is a STOPPED allocation RESUMED?"
+#:
+#: Every one of those routed to the estate, read the asker's records, found nothing, and told
+#: them their records do not show it. Measured across eleven plainly documentation-shaped
+#: questions, NINE misrouted — and `run` alone accounted for the maintainer's own question,
+#: asked three times over a day, each time answered with a sentence about his audit trail.
+#:
+#: The tie-break is untouched and so is the asymmetry argument in the module docstring. This is
+#: not a decision to break ties differently; it is the observation that these were never ties.
+#: A question containing "run" carries no estate signal to tie with. And the docstring's
+#: consolation — that the estate-side failure is visible, so the asker rephrases — did not
+#: survive contact: told the records do not show it, a person concludes the platform is broken,
+#: because that is a perfectly reasonable thing to conclude.
+#:
+#: What kept the estate reachable is that real what-happened questions never rested on these
+#: words alone. All six of the module's own estate examples still route there on `runs` (plural,
+#: the noun), `audit`, `trail`, `denied`, `violate`, `happened`, `did`, a shared noun, or a
+#: window phrase — verified, not assumed.
+#:
+#: `did` STAYS, against the same instinct that it is too common. It is the what-happened
+#: auxiliary, it is what routes *"what did the planner agent do?"* — which has no other signal —
+#: and unlike the seven it does not appear in how-to questions, which ask *how do I*, not
+#: *what did*.
 ESTATE_TERMS: Final[frozenset[str]] = frozenset(
     {
-        "active",
         "audit",
-        "changed",
         "did",
         "denied",
         "estate",
         "evidence",
-        "failed",
         "granted",
         "happened",
         "refused",
-        "resumed",
-        "run",
         "runs",
-        "stopped",
         "trail",
-        "used",
         "violate",
         "violates",
         "violation",
