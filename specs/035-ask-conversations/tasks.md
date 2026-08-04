@@ -24,17 +24,17 @@ signal) blocks everything; each story is then independently completable and test
 
 *(No project scaffolding needed — the repo, gates and lanes exist. Setup is the schema.)*
 
-- [ ] T001 Create `src/core/answering/conversations/__init__.py` and `schema.sql` with `ask_conversations` + `ask_exchanges` per data-model.md (cascade delete, `(conversation_id, seq)` primary key, indexes on `(tenant_id, subject_user_id, last_asked_at)`)
+- [X] T001 Create `src/core/answering/conversations/__init__.py` and `schema.sql` with `ask_conversations` + `ask_exchanges` per data-model.md (cascade delete, `(conversation_id, seq)` primary key, indexes on `(tenant_id, subject_user_id, last_asked_at)`)
 
 ## Phase 2: Foundational (blocking all stories)
 
-- [ ] T002 [P] `ConversationRecord`, `ExchangeRecord`, and `title_from` (re-implemented, not imported from threads — mirror-not-share per plan) in `src/core/answering/conversations/records.py`
-- [ ] T003 [P] Store protocol + `MemoryConversationStore` (hermetic twin) in `src/core/answering/conversations/store.py` — create-with-first-exchange atomic, append assigns dense `seq`, list newest-first, owner+tenant filters on every method
-- [ ] T004 `PostgresConversationStore` in `src/core/answering/conversations/postgres.py` mirroring `src/core/threads/postgres.py` discipline (connection, `_run`, migrate-on-start), against the real Postgres in its rows
-- [ ] T005 [P] `build_context()` + descriptor in `src/core/answering/context.py` — 6 exchanges / 6,000 chars, whole exchanges oldest-dropped, question+claim-statements for answered, question-only for declined/refused, citations structurally stripped (contracts/carried-context.md)
-- [ ] T006 [P] `route_with_signal(question) -> (Route, bool)` in `src/core/answering/routing.py`; `route()` behaviour byte-identical, existing rows untouched
-- [ ] T007 Component rows for T002–T005 in `tests/component/test_ask_conversations_store.py` and `tests/component/test_carried_context.py` — including [GATE:no-secret-leak] a row asserting the store's written content is exactly the response body handed to it and nothing credential-shaped, and the concurrency row: two appends racing into the same conversation through the Postgres store both land, with distinct consecutive seqs and neither exchange lost (the same-conversation-open-twice edge case)
-- [ ] T008 Component rows for T006 in `tests/component/test_ask_routing.py` — signal detection across the existing vocabulary, floor-without-signal distinguished from guidance-by-signal
+- [X] T002 [P] `ConversationRecord`, `ExchangeRecord`, and `title_from` (re-implemented, not imported from threads — mirror-not-share per plan) in `src/core/answering/conversations/records.py`
+- [X] T003 [P] Store protocol + `MemoryConversationStore` (hermetic twin) in `src/core/answering/conversations/store.py` — create-with-first-exchange atomic, append assigns dense `seq`, list newest-first, owner+tenant filters on every method
+- [X] T004 `PostgresConversationStore` in `src/core/answering/conversations/postgres.py` mirroring `src/core/threads/postgres.py` discipline (connection, `_run`, migrate-on-start), against the real Postgres in its rows
+- [X] T005 [P] `build_context()` + descriptor in `src/core/answering/context.py` — 6 exchanges / 6,000 chars, whole exchanges oldest-dropped, question+claim-statements for answered, question-only for declined/refused, citations structurally stripped (contracts/carried-context.md)
+- [X] T006 [P] `route_with_signal(question) -> (Route, bool)` in `src/core/answering/routing.py`; `route()` behaviour byte-identical, existing rows untouched
+- [X] T007 Component rows for T002–T005 in `tests/component/test_ask_conversations_store.py` and `tests/component/test_carried_context.py` — including [GATE:no-secret-leak] a row asserting the store's written content is exactly the response body handed to it and nothing credential-shaped, and the concurrency row: two appends racing into the same conversation through the Postgres store both land, with distinct consecutive seqs and neither exchange lost (the same-conversation-open-twice edge case)
+- [X] T008 Component rows for T006 in `tests/component/test_ask_routing.py` — signal detection across the existing vocabulary, floor-without-signal distinguished from guidance-by-signal
 
 **Checkpoint**: store, context and signal exist and are green in `make check` before any surface changes.
 
