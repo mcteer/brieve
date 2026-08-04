@@ -177,7 +177,7 @@ place — only by not running it.
 | --- | --- | --- |
 | `src/core/` | Framework-agnostic governed core | Sealed. Never imports an agent framework |
 | `src/adapters/` | Bindings to agent frameworks | Sealed. Glue only — four mappings, nothing else |
-| `src/surfaces/` | MCP, API, CLI | Sealed. All four transports share one authorization core |
+| `src/surfaces/` | MCP, API, portal | Sealed. Every transport shares one authorization core |
 | `portal/` | Web UI (TypeScript) | Thin client — no business logic, orchestration, or model calls |
 | `packs/` | Capability packs (product knowledge) | Extension point. Tools, skills, workflows, evals |
 | `hooks/` | Hook implementations | Extension point. Enforcement code — highest review bar |

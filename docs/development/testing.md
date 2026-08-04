@@ -205,7 +205,7 @@ Isolation gets its own test class, not incidental coverage:
 - Caches and precedent: a cache or in-flight-index hit never crosses a tenant boundary
   (constitution, Principle IV — reuse carries no authority).
 
-Parameterize these across surfaces (MCP, API, CLI, portal), since **surface parity** is
+Parameterize these across the surfaces that exist (MCP, API, portal), since **surface parity** is
 itself a conformance requirement: the same operation must produce the same verdict on
 every transport.
 
