@@ -14,6 +14,7 @@ file says so out loud rather than leaving it to whoever reads the exit status.
 
 from __future__ import annotations
 
+import pathlib
 from typing import Any
 
 from core.audit.schema import AuditEventType
@@ -298,10 +299,15 @@ def test_the_composer_never_obscures_what_focus_is_on(
 ) -> None:
     """2.4.11 — THE NAMED TRAP, and the reason it was named in the plan before it was built.
 
-    A sticky composer is exactly the overlay that hid a focused element in 034. With a
-    transcript long enough to scroll, tabbing to a citation near the bottom must leave it
-    visible above the composer rather than under it — which is what `scroll-padding-block-end`
-    buys and what nothing else in the lane would notice.
+    A sticky composer is exactly the overlay that hid a focused element in 034, and the page
+    scrolls rather than a box inside it — which is how every chat interface behaves and what
+    the first attempt gave up to make this easy.
+
+    **Focus is moved by pressing Tab, not by calling `.focus()`.** That is the difference the
+    first version of this row missed: `.focus()` does not scroll, so an element behind the
+    composer stayed behind it and the row failed a layout that a keyboard user would never
+    have had trouble with. Sequential focus navigation is what makes the browser scroll, and
+    `scroll-margin-block-end` is what makes it land clear.
     """
     _conversation(
         page,
@@ -313,8 +319,18 @@ def test_the_composer_never_obscures_what_focus_is_on(
 
     links = page.locator("#ask-transcript a")
     assert links.count() > 0, "no citation to focus; this row would pass vacuously"
+
+    # Walk focus with Tab until it lands on the last citation, the way a person would.
     target = links.nth(links.count() - 1)
-    target.focus()
+    target.evaluate("el => el.previousElementSibling && el.previousElementSibling.focus()")
+    page.keyboard.press("Tab")
+    for _ in range(200):
+        if target.evaluate("el => el === document.activeElement"):
+            break
+        page.keyboard.press("Tab")
+    assert target.evaluate("el => el === document.activeElement"), (
+        "could not reach the last citation by keyboard"
+    )
 
     box = target.bounding_box()
     composer = page.locator("form.ask").bounding_box()
@@ -322,6 +338,27 @@ def test_the_composer_never_obscures_what_focus_is_on(
     assert box["y"] + box["height"] <= composer["y"] + 1, (
         f"the focused element sits under the sticky composer: element ends at "
         f"{box['y'] + box['height']}, composer starts at {composer['y']}"
+    )
+
+
+def test_the_page_scrolls_rather_than_a_box_inside_it() -> None:
+    """035, after the maintainer said so: answers do not arrive in a scrolling window.
+
+    A nested scroll region satisfied 2.4.11 the easy way and read wrong — it is not what
+    Claude or ChatGPT do, and it is not what anybody expects of a chat. Asserted on the
+    stylesheet rather than in a browser, because the property is "this element does not own a
+    scroll" and a browser can only show that it currently has nothing to scroll.
+    """
+    css = (
+        pathlib.Path(__file__).resolve().parents[2] / "src/surfaces/portal/static/portal.css"
+    ).read_text()
+    rule = css.split(".transcript {", 1)[1].split("}", 1)[0]
+
+    assert "overflow-y: auto" not in rule and "overflow: auto" not in rule, (
+        "the transcript owns a scroll region again — the page is what scrolls"
+    )
+    assert "padding-block-end" in rule, (
+        "no room reserved for the composer, so the last answer cannot be scrolled clear of it"
     )
 
 
@@ -365,3 +402,39 @@ def test_the_conversation_delete_confirmation_meets_wcag_22_aa(
     assert "does not remove" in page.inner_text("body"), (
         "the confirmation does not say that deleting leaves the platform's record intact"
     )
+
+
+def test_enter_sends_and_shift_enter_writes_a_line(page: Any, portal_server: PortalServer) -> None:
+    """035, after the maintainer said so. What every chat interface does.
+
+    A textarea's default is the opposite, so this is behaviour the page adds — and adding it
+    means the other half has to keep working, because somebody pasting a multi-line question
+    must not have it sent on the first newline.
+    """
+    page.goto(f"{portal_server.base}/ask")
+    page.click("#question")
+
+    # SHIFT+ENTER writes a line and sends nothing.
+    page.keyboard.type("first line")
+    page.keyboard.press("Shift+Enter")
+    page.keyboard.type("second line")
+    assert "\n" in page.input_value("#question"), "Shift+Enter did not write a new line"
+    assert page.locator("#ask-transcript section.answer").count() == 0, (
+        "Shift+Enter sent the question"
+    )
+
+    # ENTER sends it.
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#ask-transcript section.answer", timeout=30_000)
+    assert page.locator("#ask-transcript section.answer").count() == 1
+
+
+def test_enter_on_an_empty_box_sends_nothing(page: Any, portal_server: PortalServer) -> None:
+    """The browser's own `required` still speaks first — `requestSubmit` honours it, which is
+    why it is used rather than `submit()`."""
+    page.goto(f"{portal_server.base}/ask")
+    page.click("#question")
+    page.keyboard.press("Enter")
+
+    page.wait_for_timeout(1500)
+    assert page.locator("#ask-transcript section.answer").count() == 0, "an empty question was sent"
