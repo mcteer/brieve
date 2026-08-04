@@ -3,9 +3,9 @@
 // ASKING WITHOUT LOSING THE PAGE, keeping what was already answered (035).
 //
 // PROGRESSIVE ENHANCEMENT, NOT A CLIENT APP: without this file the form is an ordinary HTML
-// form and still works. Nothing here decides anything — the server renders each exchange and
-// states which conversation it landed in (ADR-0034); this only places both, and is the ONE
-// script permitted to insert markup this server rendered. See `test_containment.py`.
+// form and still works. The server renders each exchange and states which conversation it
+// landed in (ADR-0034); this places both and decides nothing. It is the ONE script permitted
+// to insert markup this server rendered — see `test_containment.py`.
 (function () {
   "use strict";
 
@@ -42,8 +42,7 @@
     form.setAttribute("aria-busy", "true");
     note.textContent = "Working on your question. This takes a minute or two; you can stay here.";
 
-    // The header is what the server branches on; without this file none is sent and the whole
-    // page comes back.
+    // The header is what the server branches on; without this file the whole page comes back.
     fetch(form.action, {
       method: "POST",
       headers: { "X-Portal-Fragment": "exchange" },
@@ -60,14 +59,18 @@
         field.value = "";
         // The conversation the server put this in. Until the first answer there is none to
         // post to, so the composer learns it here — otherwise every follow-up starts a new
-        // conversation, which the served walk-through caught.
+        // one, which the served walk-through caught.
         var landed = outcome.querySelectorAll("[data-conversation]");
         var id = landed.length ? landed[landed.length - 1].getAttribute("data-conversation") : "";
         if (id && form.action.indexOf("conversation_id=") === -1) {
           form.action = "/ask?conversation_id=" + encodeURIComponent(id);
+          // And the address follows it, so reloading keeps you in the conversation you are
+          // having rather than starting a new one. `replaceState`, not `pushState`: asking is
+          // not a navigation and Back should leave the page, not undo a question.
+          if (history.replaceState) history.replaceState(null, "", "/ask/" + encodeURIComponent(id));
         }
-        // Focus the NEWEST answer's heading, not a live region: a page of claims read aloud
-        // unprompted talks over somebody already reading.
+        // Focus the NEWEST answer's heading, not a live region — a page of claims read aloud
+        // talks over somebody already reading.
         var seen = outcome.querySelectorAll("#outcome, h2");
         var head = seen[seen.length - 1];
         if (head) { head.setAttribute("tabindex", "-1"); head.focus(); }
