@@ -446,6 +446,72 @@ class AuditEventType(StrEnum):
     #: nothing, and recording it would put un-executed model output in the trail.
     PROGRAM_SUBMITTED = "program_submitted"
 
+    #: What an automated analyzer concluded about a candidate skill (037, ADR-0053).
+    #: Payload: skill_name, candidate_digest, verdict, findings, analyzer_cell.
+    #:
+    #: **A SEALED-CORE ADDITION** (Principle V), one of four landing together and reviewed
+    #: together, on the precedent `TOOL_CHOSEN` set and `EFFECT_OBSERVED` followed.
+    #:
+    #: **It may block and it never approves.** ADR-0043 and Principle IX: a model verdict may
+    #: gate a step and never satisfies an approval policy assigns to a person. That is made
+    #: STRUCTURAL here rather than promised — there is no field in this payload a reader could
+    #: mistake for an acceptance, and the human's acceptance is a different member entirely. A
+    #: pipeline that decided what a reviewer reads has raised the review's floor; one that
+    #: decided whether a skill promotes would have replaced a slow human gate with a fast
+    #: machine one, which is strictly worse than the status quo it was built to improve.
+    #:
+    #: ``verdict`` is three-valued — ``clean`` / ``flagged`` / ``inconclusive`` — because an
+    #: analysis that could not complete is not a clean one. Two values would force an outage
+    #: to be recorded as an opinion.
+    #:
+    #: **``findings`` carries CODES, never quoted candidate text.** The subject of this record
+    #: is hostile-by-assumption instruction content; a trail that quoted it would copy the
+    #: thing it exists to describe into an append-only store, and would hand anyone reading
+    #: the trail the payload the analyzer was pointed at.
+    ANALYSIS_VERDICT = "analysis_verdict"
+
+    #: How a candidate behaved against the golden-task corpus relative to the pinned version
+    #: (037). Payload: skill_name, candidate_digest, baseline_digest, tasks_run,
+    #: new_attempts, new_denials, written_by.
+    #:
+    #: **``written_by`` is the OBSERVER's identity and never the specimen's.** The specimen
+    #: executes the candidate and is presumed infected; the observer reads the run's records
+    #: from outside and never ingests candidate output. That separation is the load-bearing
+    #: property of the whole gauntlet — an analyzer that read candidate output into its own
+    #: context would be the injection surface it exists to inspect — and recording which side
+    #: wrote the comparison is what makes the separation checkable after the fact.
+    #:
+    #: ``tasks_run`` is carried because a comparison over zero tasks is not a clean result; it
+    #: is no result wearing one.
+    DETONATION_COMPARED = "detonation_compared"
+
+    #: Planted material surfacing where it should not (037). Payload: canary_id, observed_in,
+    #: candidate_digest.
+    #:
+    #: **Its own member rather than a field on the comparison.** A canary is a fact about
+    #: CONTAINMENT, not about behaviour, and burying it in a behavioural diff would make the
+    #: loudest signal this pipeline can produce the quietest field in a payload.
+    #:
+    #: **Carries the canary's IDENTIFIER and never its value.** A trail that quoted canaries
+    #: would become the exfiltration channel it exists to detect — the record of a leak must
+    #: not be a second copy of what leaked.
+    CANARY_CONTACT = "canary_contact"
+
+    #: A skill was adopted without the gauntlet, because the gauntlet was unavailable (037).
+    #: Payload: skill_name, to_version, subject_user_id, reason.
+    #:
+    #: **The record that keeps a permitted bypass from becoming an invisible one.** Adoption
+    #: stays possible when the pipeline is down — a pipeline whose absence blocks all adoption
+    #: has become a dependency of the supply chain it protects, and the pressure then lands on
+    #: someone editing the pin directly, which leaves no record at all.
+    #:
+    #: So the manual path stays and using it is evidence. ``subject_user_id`` is required
+    #: because a bypass with no name is an unattributable act, and ``reason`` because a bypass
+    #: nobody has to justify is the normal route by the second time it is taken. This must be
+    #: no quieter than a gauntlet promotion: what is being guarded against is not the bypass
+    #: existing, it is the bypass being easier to reach for than to notice.
+    INTAKE_BYPASSED = "intake_bypassed"
+
 
 class AuditEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
