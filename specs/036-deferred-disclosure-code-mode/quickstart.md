@@ -68,9 +68,20 @@ test does this via the API operation, not by peeking at the store): the program 
 comes back, its `program_sha256` joins it to each inner call, and the ordered decisions
 reconstruct what happened and why (C9).
 
+## Scenario G — Parity survives a kill
+
+```sh
+uv run --extra adapters --extra surfaces --extra sandbox pytest tests/conformance/adapter -q -k resume
+```
+
+Expected: C10 passes — a program interrupted mid-execution resumes on a fresh
+allocation/identity, its post-resume calls are governed identically under the surviving
+grant, and the calls it already made are **not** re-executed. This is the row that proves
+parity holds for the runs that actually stop, not only the ones that never do.
+
 ## What done looks like
 
-- All rows in both contracts green; C5 green *by failing its rigged double*.
+- All rows in both contracts green; C5 green *by failing its rigged double*; C10 green (parity across a kill).
 - `make check` green — including the structural gates U1–U3.
 - The planning artifacts' obligations discharged: ADR-0061 merged (amending ADR-0040 by
   pointer), Principle V review recorded on the PR.

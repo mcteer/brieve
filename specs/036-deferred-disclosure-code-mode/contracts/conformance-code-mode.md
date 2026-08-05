@@ -82,6 +82,19 @@ After a code-mode run: read its evidence through the platform's own governed rea
 operation and recover the program text and the ordered calls it caused, joined by
 `program_sha256` and the correlation ID. Nothing outside the platform's records needed.
 
+### C10 — Parity holds across a kill (FR-011a, US2 scenario 4)
+
+The row pass 1 and the first draft both missed: parity is asserted only for runs that never
+stop. Interrupt a program mid-execution, resume it (a new allocation / new attested identity,
+014's dispatched-resume path), and assert **(a)** the calls made *after* resume each
+round-trip `invoke_tool` under the **surviving grant** — same decision/reason/record shape as
+the pre-kill calls (ADR-0026); **(b)** the inner calls made *before* the kill are **not**
+re-executed — the sandbox snapshot resumes past them, so no side effect fires twice
+(re-observe, never re-execute); **(c)** the N+1 step count and the bracket resolution survive
+the boundary coherently, which is the concrete exercise of R11's nested-bracket question. If
+this row cannot be made green, code mode does not ship for interruptible runs — the same
+FR-013 fork the per-call rows face, applied to durability.
+
 ## Structural gates (unit lane, same change)
 
 - **U1** — `pydantic_monty` is imported by exactly one module in `src/`

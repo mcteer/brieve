@@ -218,7 +218,12 @@ was checked:
   durability layer's bracket supports nesting on one run, or whether `run_program` must be
   bracketed while its inner calls rely on the outer bracket for replay-resolution. This is
   named here rather than discovered at T027; it is the one place the re-entrancy could need
-  more than the existing machinery.
+  more than the existing machinery. **This is where resume lives**: a run killed mid-program
+  leaves `run_program`'s bracket open and its inner brackets in whatever state the kill found,
+  and 014's dispatched resume must reconstruct the sandbox snapshot (the checkpoint) and
+  continue without replaying the inner calls already made. So the nested-bracket resolution
+  and FR-011a's resume-parity row (C10) are the same question asked twice — settle it once, in
+  T006, before T020 and T029a depend on it.
 
 **Rationale**: "the fixed point is untouched" (plan) is only safe if re-entering the fixed
 point is safe. It mostly is — bounds and lease compose correctly — and the one residue

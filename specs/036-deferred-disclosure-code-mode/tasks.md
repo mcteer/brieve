@@ -5,7 +5,7 @@
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
 
 **Tests**: This feature is a governance-parity claim, so its rows *are* the deliverable —
-test tasks are not optional here. Every contract row (D1–D8, C1–C9, U1–U3) has a task, and
+test tasks are not optional here. Every contract row (D1–D8, C1–C10, U1–U3) has a task, and
 several are the acceptance criteria of their story rather than a follow-on.
 
 ## Gate Task Types *(present in this feature)*
@@ -88,6 +88,7 @@ structured call. **Independent test**: quickstart Scenario C + D + E.
 - [ ] T027 [US2] Row C7 in `tests/conformance/adapter/test_code_mode_bounds.py`: (a) each inner call is checked and counted once by `invoke_tool`; (b) a program of N inner calls spends **N+1** of `max_steps` (the submission is the +1) and is stopped one inner call before an equivalent structured run — asserted with exact counts, **not** a "same total" claim; (c) a mid-program bound raises `ExecutionBoundExceeded` and terminates the run rather than becoming an in-sandbox failure (the C3-vs-C7 distinction). The seam owns no bound and none is settable from inside a program. (FR-010, FR-010a, R11)
 - [ ] T028 [US2] [GATE:no-secret-leak] Row C6 in `tests/conformance/adapter/test_code_mode_checkpoint.py`: a credential-shaped value seeded as input and as a resume value makes the checkpoint write raise `CredentialInCheckpointError`, asserted against the ledger, not the runtime's serialization. (FR-011)
 - [ ] T029 [P] [US2] Row C8 in `tests/conformance/adapter/test_code_mode_absent.py`: without the `sandbox` extra, `run_program` refuses with a stated reason code naming the missing runtime — never ImportError, never silence. Run in a path-filtered subprocess. (FR-013, SC-007)
+- [ ] T029a [US2] [GATE:conformance] Row C10 in `tests/conformance/adapter/test_code_mode_resume.py`: interrupt a program mid-execution, resume on a new allocation/identity (014's dispatched-resume path), and assert (a) post-resume inner calls round-trip `invoke_tool` under the surviving grant with the same record shape as pre-kill calls (ADR-0026); (b) pre-kill inner calls are not re-executed — the snapshot resumes past them (re-observe, never re-execute); (c) the N+1 count and bracket resolution survive the boundary — the concrete exercise of R11's nested-bracket question. Depends on the bracket resolution T006 owns; if it cannot be green, code mode does not ship for interruptible runs (FR-013 applied to durability). (FR-011a, US2#4)
 
 **Checkpoint**: code mode ships **only if every row above is honestly green**. If any
 cannot be, the outcome is FR-013 — `run_program` refuses with a reason, and US2 lands as a
@@ -128,7 +129,8 @@ effects.
 Setup (T001–T003)
    └─> Foundational (T004–T010)   [audit vocab + ADR + seam + runtime binding]
           ├─> US1 (T011–T019)     ── disclosure; independently shippable, closes owed row
-          └─> US2 (T020–T029)     ── code mode; depends on the seam (T006) + runtime (T009)
+          └─> US2 (T020–T029a)    ── code mode; depends on the seam (T006) + runtime (T009)
+                 │                    T029a (resume parity) depends on T006's bracket resolution (R11)
                  └─> US3 (T030–T031)  ── evidence; depends on PROGRAM_SUBMITTED (T020)
 Polish (T032–T034) after the stories it documents
 Review (T035) gates merge
