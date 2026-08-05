@@ -1,5 +1,47 @@
 <!--
 Sync Impact Report
+- This revision (1.4.0 → 1.5.0, MINOR — one enumeration narrowed to describe the surfaces that
+  exist; no principle removed or redefined). Motivated by ADR-0060, Accepted in this same
+  change.
+
+  **The document named a transport this platform does not have, and never will.** Principle II
+  read "Northbound: exactly four transports — MCP, API, CLI, portal". Three were built (008,
+  009, 012); the CLI was never started, and was formally tabled on 2026-07-28 as a scheduling
+  decision with ADR-0033 left standing. ADR-0060 converts that tabling into a withdrawal, and
+  this amendment makes the clause describe the platform: **exactly three — MCP, API, portal**.
+
+  **This is the same class of defect ADR-0047 named in tests, one level up.** A stub that
+  passes asserts a property nothing holds. A constitutional clause naming a surface nobody
+  built asserts a shape the platform does not have — and this is the document every
+  `/speckit.analyze` pass measures a specification against, so the false premise sat upstream
+  of every future feature's analysis.
+
+  **v1.2.0 fixed the gate and left the count.** That revision changed "surface parity across
+  all four transports" to "across every pair of implemented transports", recorded as a
+  correction rather than a policy change. It repaired the row that would have bound only at
+  four. The enumeration it was gating went unexamined, which is why this is a second edit
+  rather than part of that one.
+
+  **MINOR rather than MAJOR.** The versioning rule makes MAJOR the removal or redefinition of a
+  principle. Principle II's enforceable property is stated in its own rationale — "interception
+  coverage, not protocol uniformity" — and that is untouched. One authorization core, parity as
+  a conformance-asserted test, the thin-client rule, and the ADR gate on adding a transport all
+  stand exactly as written. Nothing permitted becomes forbidden and nothing forbidden becomes
+  permitted; the platform simply stops claiming a fourth surface. Recorded here rather than
+  assumed, because a maintainer reading this later should be able to disagree with the call
+  rather than only discover it.
+
+  **Three is a ceiling, not a floor.** A fourth transport still requires an ADR — that gate is
+  what the enumeration existed to hold, and narrowing the number does not loosen it.
+
+  Propagation: `docs/adr/0060-three-transports-the-cli-is-withdrawn.md` (new, motivating
+  record), `docs/adr/0033-four-transports-one-authorization-core.md` (status line only — the
+  record is append-only and its Decision section is unchanged), `docs/adr/README.md`,
+  `docs/glossary.md` (the surface list), `ROADMAP.md` (Tabled → Withdrawn, in both the
+  transport table and the demand-gated backlog), `src/surfaces/__init__.py` and
+  `src/surfaces/dispatch/__init__.py` (docstrings restating the count).
+
+Prior Sync Impact Report
 - This revision (1.3.0 → 1.4.0, MINOR — one exception added and one absolute softened to a
   bounded rule; no principle removed or redefined). Motivated by ADR-0058, Accepted in this
   same change.
@@ -166,8 +208,8 @@ integration) otherwise; authoring an MCP server is never required merely for pro
 uniformity. Registry review MAY
 require process isolation (MCP) for secret-touching or destructive risk classes.
 Non-tool egress is limited to enumerated classes (model inference via the gateway;
-identity via OIDC; telemetry via the collector); adding a class REQUIRES an ADR. Northbound: exactly four transports — MCP,
-API, CLI, portal — over one authorization core; the same operation on any transport
+identity via OIDC; telemetry via the collector); adding a class REQUIRES an ADR. Northbound: exactly three transports — MCP,
+API, portal — over one authorization core (ADR-0060; the CLI is withdrawn); the same operation on any transport
 MUST yield the same verdict and equivalent audit events (conformance-asserted). The
 portal is a thin client: no logic, orchestration, or model calls client-side.
 
@@ -327,4 +369,4 @@ change.
   train for drift against newly Accepted decisions; `/speckit.analyze` findings that
   implicate a principle block `/speckit.implement`.
 
-**Version**: 1.4.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-08-02
+**Version**: 1.5.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-08-05

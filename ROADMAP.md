@@ -127,22 +127,25 @@ which is the opposite of what happened.
 Ordered by dependency first, then by which owed gate row it closes. Each entry names what it
 unblocks — that is the argument for its position, and the thing to challenge if you disagree.
 
-### Northbound surfaces — split into four (ADR-0033, ADR-0034, ADR-0035)
+### Northbound surfaces — one feature per transport (ADR-0033, ADR-0034, ADR-0035, ADR-0060)
 
-**One feature per transport, not one feature for four.** ADR-0033 requires all four to yield the
-same verdict and equivalent audit events, and that parity is asserted *between* them — but
-building four surfaces in one pass means getting parity right across four things that are all
-still moving. Splitting lets each land against a settled core.
+**Planned as four, shipped as three.** ADR-0033 enumerated four transports and required every
+one to yield the same verdict and equivalent audit events, with parity asserted *between*
+them. Building them in one pass would have meant getting parity right across four things all
+still moving, so each got its own feature and landed against a settled core. The fourth, a
+CLI, was never started and is now withdrawn (ADR-0060) — the table below keeps its row so the
+plan and the outcome can be read together.
 
-**The API goes first**, because the other three consume it rather than reimplementing the
-authorization path. A CLI that talks to the core directly is a second authorization path
-wearing a different name.
+**The API goes first**, because the others consume it rather than reimplementing the
+authorization path. A transport that talks to the core directly is a second authorization
+path wearing a different name — the argument that ruled out a standalone CLI before anything
+else did.
 
 | # | Transport | Notes |
 | --- | --- | --- |
 | 008 | **API** | ✅ Shipped. The surface the others consume. Carries the audit plane as a governed read path |
 | 009 | **MCP** | ✅ Shipped. The persistent service coding IDEs talk to. Carries the dependency health checks and the resume sweeper decided in ADR-0049 — both needed a long-lived home, and this is it — plus the continuous evidence-stream verification 008 deferred here, and the second CI lane |
-| — | CLI | **Tabled** (2026-07-28) — see below |
+| — | ~~CLI~~ | **Withdrawn** (2026-08-05, ADR-0060) — see below. Tabled 2026-07-28, withdrawn when holding the place proved to cost more than the option was worth |
 | 012 | **Portal** | ✅ Shipped. Threads, the client, and the API's first actual deployment — 008 built `create_app` and nothing had ever served it. **Answering is not here**: estate-state and grounded guidance need an eval-gated model binding, and follow capability packs |
 
 **Gate row, no longer owed:** surface parity. It stayed owed through 008 because parity
@@ -152,21 +155,36 @@ binds across every pair of implemented transports (constitution v1.2.0). That ma
 at each transport rather than only at the fourth, which is the difference between catching
 divergence when it starts and catching it long after.
 
-**The CLI is tabled, and ADR-0033 is not withdrawn.** API, MCP, and the portal cover
+**The CLI is withdrawn (ADR-0060, 2026-08-05).** API, MCP, and the portal cover
 substantially every persona: services and automation reach the API, editors reach MCP, and
 people who do not live in an editor reach the portal (ADR-0034). A CLI would be a fourth
 way to reach the same four operations, for an audience already served by two of them.
 
-Tabled rather than declined — no ADR is superseded and nothing is deleted. If a demand
-appears that the other three genuinely cannot meet, ADR-0033 still describes how a CLI
-would work, down to the device authorization grant it would use.
+**It was tabled first, on 2026-07-28, and the difference matters.** Tabling superseded no ADR
+and deleted nothing — the position was that ADR-0033 still described how a CLI would work,
+device authorization grant and all, should a demand appear the other three could not meet.
+What ended that position was not a demand appearing but the cost of holding the place: the
+constitution went on asserting *"exactly four transports — MCP, API, CLI, portal"* as a
+normative clause, and that is the document every `/speckit.analyze` pass measures a
+specification against. A governing document naming a surface nobody built is the failure mode
+ADR-0047 named in tests, one level up.
 
-**What this costs, stated because it is easy to miss:** ADR-0033 makes parity a *test*
-rather than an intention, and a transport that is never built is a pair the test never
-covers. That is fine only because 009 amended the row to bind across every pair of
-**implemented** transports — had it stayed worded "across all four", tabling one would have
-left the row permanently unsatisfiable, and this decision would have been a constitutional
-change wearing the clothes of a scheduling one.
+ADR-0060 supersedes ADR-0033's transport enumeration and its CLI device-grant clause, and
+nothing else: one authorization core, parity as a conformance-asserted test, OIDC-always and
+no static API keys all stand. **Three is a ceiling, not a floor** — a fourth transport still
+requires an ADR, which is the gate the enumeration existed to hold.
+
+**What this costs, stated because it is easy to miss:** people who live in a terminal reach
+this platform through the API, which means writing a client or using `curl` rather than being
+handed one. That is a real ergonomic loss, and it is why this was tabled rather than declined
+the first time.
+
+The parity gate is unaffected, and only because 009 got there first. It binds across every
+pair of **implemented** transports — three implemented is three real pairs. Had it stayed
+worded "across all four", tabling one would have left the row permanently unsatisfiable, and
+that scheduling decision would have been a constitutional change wearing a scheduling
+decision's clothes. Withdrawing the fourth now makes the gate describe the whole inventory
+rather than most of it.
 
 **Why here:** the first features that ship something a user touches directly. They need the
 authorization core (002/003) and the approval gate (007) settled behind them; attempting them
@@ -278,7 +296,6 @@ the decision, not an omission.
 
 | Item | ADR | Trigger |
 | --- | --- | --- |
-| CLI transport | ADR-0033 | **Demand.** API, MCP, and the portal cover the personas; a CLI would be a fourth route to the same operations for an audience two of them already serve. ADR-0033 still specifies it — device authorization grant, same authorization core — so this is a scheduling decision, not a design one. Tabled 2026-07-28 |
 | Second framework adapter (LangGraph) | ADR-0017 | Demand. The ADR makes it explicitly demand-driven; 004's FR-014 forbids shipping it speculatively |
 | Dedicated workflow-engine durability provider | ADR-0024, ADR-0028 | A named trigger: scale, an existing deployment, or a requirement the library provider cannot meet |
 | Wire-level guardrail (second protection layer) | ADR-0014 | Optional by design; in-process hooks are the primary layer |

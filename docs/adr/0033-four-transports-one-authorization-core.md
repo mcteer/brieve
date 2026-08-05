@@ -1,6 +1,10 @@
 # ADR-0033: Four transports over one authorization core
 
-- **Status**: Accepted
+- **Status**: Accepted — amended in part by [ADR-0060](0060-three-transports-the-cli-is-withdrawn.md)
+- **Amended by**: [ADR-0060](0060-three-transports-the-cli-is-withdrawn.md) — the transport
+  enumeration is now three (MCP, API, portal) and the CLI device-grant clause is withdrawn.
+  Everything else below stands: one authorization core, parity as a conformance-asserted
+  test, OIDC-always, no static API keys.
 - **Date**: 2026-06-24
 - **Supersedes**: the console-trigger clause of [ADR-0007](0007-lean-and-federated-profiles.md) / [ADR-0008](0008-no-gateway-or-registry-product.md), for the minimum portal
 - **Relates to**: [ADR-0016](0016-control-groups-gate-authority-changes.md), [ADR-0032](0032-delegated-run-versus-local-loop.md), [ADR-0034](0034-conversational-web-ui.md), [ADR-0044](0044-authz-doctrine-and-credential-translation.md)
