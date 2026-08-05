@@ -38,6 +38,25 @@ both together.
 namespace, so network-level separation between the two tasks is **not** a control. What contains
 the analyzer is R2 (no egressing tool), T3 (no credential) and T4 (the declared allowlist).
 
+**The tasks are sequential, and that is not a detail.** `RunLease` fences by holder identity, and
+`invoke_tool` propagates `LeaseSupersededError` rather than converting it to a deny — so two
+concurrent tasks sharing a `run_id` are two holders, and the second kills the first mid-run. The
+`analyzer` runs as a `prestart` task and exits before `proposer` starts; the proposer's `acquire`
+is then the ordinary resume path the fencing was built for. Assert the ordering, because a
+concurrent arrangement passes every other row in this contract and dies on the first tool call.
+
+### P11 — `open_proposal` is non-repeatable and carries an observer (FR-009, edge case)
+Assert the registration directly. The `observer_required` refusal lives in the **pack loader**,
+and `open_proposal` is a **platform** tool — so nothing else checks this, and P4's resolution by
+observation depends on it.
+
+**Why it is a platform tool rather than a pack tool.** The eval suites are answering-shaped, and
+a pack carrying one PR-opening tool has no expertise for them to measure; twenty-five cases
+written to clear a floor would be the "gate that passes by vocabulary" 027 refused. Publishing a
+proposal is as product-blind as authoring one — a pull request against a Terraform module and
+one against application code are the same act. **ADR-0064 amends ADR-0038's "pack tool target"
+clause in the same change**, because a departure recorded nowhere is the defect ADR-0060 closed.
+
 ### P1 — Completed authoring is a proposal, and nothing has been merged or applied (FR-006, SC-001)
 Run authoring to completion. Assert a proposal exists against the requester's repository, and
 that **no merge and no apply occurred** — asserted over the trail, not over the proposal's own

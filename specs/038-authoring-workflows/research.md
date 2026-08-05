@@ -342,8 +342,12 @@ immutable and wrongly valued, and only the first was checked.
 - line 288 — `for suite in manifest.eval_suites` — the case floor (`MINIMUM_CASES_PER_SUITE = 5`)
   iterates the **declared** suites. A pack declaring none has **no floor to fail**.
 
-**Decision**: `packs/github/pack.toml` declares `product = "github"` with a `github_probe`, and
-**declares the five suites with their cases**, like both existing packs.
+**Decision at the time**: `packs/github/pack.toml` declares `product = "github"` with a
+`github_probe`, and **declares the five suites with their cases**, like both existing packs.
+
+**Superseded by R29.** The measurement above stands — a pack declaring no suites escapes the
+floor entirely — but the cure was wrong: those suites are answering-shaped and this pack has no
+expertise for them to measure. `open_proposal` is a platform tool and the pack is withdrawn.
 
 **Rationale for the second half**: Principle VIII is a MUST — *packs promote only through eval
 gates* — and the loader would not have caught a pack that declared no suites. That is a gate
@@ -716,7 +720,8 @@ and the authoring request now carries its own `tenant_id`. Nothing asserted they
 request scoped to one tenant could write audit entries under another, which is the one field
 `AuditEntry` puts *inside* the hash chain precisely because it decides who may read the record.
 
-**Audit payloads are validated by nothing, and the default shape leaks.** `append_event` takes
+**Audit payloads are validated by nothing, and the default shape leaks.** *(continues below; see
+R27–R29 for the fifth pass.)* `append_event` takes
 `payload: dict[str, Any]`; `redact_arguments` runs on **tool arguments** in the engine and never
 on event payloads. So every "carries codes, never text" rule in this feature is a **convention**.
 That was survivable for 037, whose payloads are digests by construction. It is not survivable
@@ -724,3 +729,114 @@ here — `InjectionFinding` carries **`excerpt: str`**, so reusing `injection_pa
 copying analysed private code into an append-only store the *natural* implementation. The four
 new members therefore get a **payload-shape gate**, asserted rather than documented, and the
 lens records `pattern_name` and location while explicitly dropping the excerpt.
+
+---
+
+*R27–R29 came from the **fifth** pass. Two of its three CRITICALs were defects in earlier
+remediations — one a single round old — which is the finding about the process rather than the
+feature, and it is recorded at the end.*
+
+## R27 — One run with two concurrent tasks is fenced by the platform's own lease
+
+**Measured**, `src/core/durability/lease.py`:
+
+```python
+RunLease(provider, run_id=..., holder_identity=...)
+def held(self): return bool(self._provider.check_lease(self.run_id, self.holder_identity))
+```
+
+and `invoke_tool` calls `assert_held` before anything executes, deliberately **not** converting
+`LeaseSupersededError` into a deny — *"a zombie's caller needs to stop, not to read a refusal and
+try the next tool."*
+
+**So R24's fix breaks.** Two tasks sharing one `run_id` are **two holder identities**. Whichever
+acquires second fences the first, and the first dies mid-run at its next tool call. The
+mechanism working exactly as designed kills the design.
+
+**Decision**: the two tasks are **sequential, not concurrent** —
+`lifecycle { hook = "prestart", sidecar = false }` on `analyzer`, so it runs to completion and
+exits before `proposer` starts. One holder at a time; the proposer's `acquire` after the
+analyzer has exited is **the ordinary resume path the fencing was built for**, not a fight.
+
+Everything R24 bought survives: one allocation, one `run_id`, one correlation ID, a shared
+`/alloc/data` for the handoff. What changes is that the handoff is a **baton**, not a shared
+desk — which is also a better fit for the work, since the analyzer's job is finished before the
+proposer's begins.
+
+## R28 — The publishing task cannot do the work the task list gave it
+
+**Measured against the design**: T022 composes the proposal *"from `artifact.paths` **against the
+subject**"* and T026 scans for spans *"matching a **subject file**"*. Both need the subject
+mounted. The `proposer` task has **no subject mount** — that is its defining property.
+
+**Decision**: modules are assigned to tasks explicitly, which nothing had done:
+
+| Task | Runs | Sees |
+| --- | --- | --- |
+| `analyzer` | `read_subject`, `author_file`, workspace, artifact, **proposal composition**, **containment** | the subject (read-only), `/alloc/data` |
+| `proposer` | `open_proposal` only | `/alloc/data` and the VCS host |
+
+**The proposer receives a finished, contained proposal and publishes it.** That is strictly
+better than the alternative of mounting the subject twice: the task holding the credential never
+holds the analysed content at all, so US3's exfiltration channel narrows to the bytes that
+already passed containment.
+
+**Why nobody noticed for a round**: "two postures" was reasoned about as *authority* — who holds
+the credential, who reads hostile content — and never as *capability*: what each side needs on
+disk to do its half. The split was correct about the first and silent about the second.
+
+## R29 — A pack with no expertise has nothing an eval suite can measure
+
+**Measured**: `SUITES` is `must_deny`, `must_decline`, `citation_accuracy`, `estate_state`,
+`report_fidelity` — all **answering-shaped**. `estate_state` cases are refused without an
+`asker_role` drawn from `ROLE_VISIBILITY` and without expected references; `citation_accuracy`
+scores whether claims carry citations that resolve. Both existing packs carry skills, guidance
+and a product estate.
+
+**A `github` pack would carry one tool that opens a pull request.** No skills, no guidance, no
+estate, no model use. Twenty-five cases written to clear a floor for a pack with no expertise to
+measure is the *"gate that passes by vocabulary"* 027 refused — and it was **my own pass-one
+remediation** that instructed it (T041b), having correctly diagnosed that a pack declaring no
+suites escapes the floor entirely and then prescribed the wrong cure.
+
+**Decision**: `open_proposal` is a **platform tool**, registered beside `author_file` and
+`read_subject`, and **`packs/github/` is withdrawn**.
+
+**This is the same argument R2 already made and did not carry far enough.** Producing a file is
+the same act for every product, so `author_file` is platform-level; **publishing a proposal is
+equally product-blind** — a pull request against a Terraform module and one against application
+code are the same act. R2 stopped at authoring because ADR-0038's sentence — *"Version control
+becomes a first-class pack tool target"* — read as settling it.
+
+**So ADR-0038 is amended, not quietly departed from.** Principle X: where a document conflicts
+with an Accepted ADR, the ADR wins and the document is amended **in the same change**. **ADR-0064
+(Proposed)** records that version control is a platform capability rather than a pack target,
+with ADR-0037's transport test still applying at registry review — the test is about *transport*,
+and it is orthogonal to *where the tool lives*.
+
+**What is lost, stated**: the pack loader's `observer_required` refusal is a **manifest** check,
+so a platform registration must assert non-repeatability-implies-observer itself. That is one
+row, and it is cheaper than a pack that cannot be gated.
+
+**Alternatives considered**: *a tool-only pack exempt from the answering suites* — inventing a
+second class of pack is a larger change than this one and would need its own record. *Twenty-five
+fabricated cases* — refused above.
+
+## R30 — What five passes say about the process, since it is the more useful finding
+
+Passes found **4, 2, 2, 2, 3** CRITICALs. That is not convergence, and the *source* moved: the
+first two passes found defects in the original plan; passes four and five found defects **in the
+remediations**, one of them a single round old (R27 breaking R24).
+
+**Each remediation was a design decision made at the end of a report and never given a pass of
+its own.** The plan received five readings; each fix received at most one, and usually zero
+before the next fix was layered on it.
+
+Two habits follow, and they belong in the record rather than in a resolution:
+
+1. **Audit the fixes, not only the artefact.** From pass four onward this produced almost every
+   finding.
+2. **Reading has a floor, and this feature is at it.** Z1 and Z2 are defects that *running the
+   code* surfaces in minutes — a lease that fences, a task that cannot read what it needs — and
+   no further reading of documents finds them faster. The honest next step after these fixes is
+   implementation, not a sixth pass.

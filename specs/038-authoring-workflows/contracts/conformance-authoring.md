@@ -90,6 +90,22 @@ exactly what the tier exists to keep out. This is the **third** control in this 
 for the property it named rather than the value it would hold; the other two were the egress
 allowlist and the containment claim.
 
+### T6 — Every module is assigned to a task, and the proposer never reads the subject (R28)
+Assert `analyzer` runs `read_subject`, `author_file`, workspace, artefact, **proposal composition
+and containment** — everything needing the subject — and that `proposer` runs **`open_proposal`
+alone**.
+
+**As first written the proposer could not do its work.** Composition diffs *against the subject*
+and the containment scan matches *subject files*; the proposer has no subject mount, which is its
+defining property. The split was reasoned about as **authority** — who holds the credential, who
+reads hostile content — and never as **capability**: what each side needs on disk. The assignment
+is also strictly safer, because the task holding the credential never holds the analysed content.
+
+### T7 — Step accounting and bounds survive the handoff (R27)
+Assert `step_index` and the bounds state cross from `analyzer` to `proposer`. Both are
+**per-process** on `GovernedRun`, so two tasks would otherwise run two counters and two budgets —
+letting one run consume its execution bound twice.
+
 ### T3 — The analysing step holds no credential that could publish (FR-015, R9)
 Assert **structurally** that the hardened-tier allocation's environment contains no
 version-control credential, and that the publishing step's ceiling contains no authoring or

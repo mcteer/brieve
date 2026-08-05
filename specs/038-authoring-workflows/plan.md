@@ -21,18 +21,24 @@ rule from a check into a property (R5).
 
 **Containing** (US3, US4) runs analysis in 037's hardened tier with the requester's repository
 mounted **read-only** and the platform's tree unmounted, and splits the run into two postures —
-**one job, one group, two tasks sharing the allocation directory** (R24). The `analyzer` task
-holds no credential that could publish; the `proposer` task never mounts the subject. Identity,
-env and mounts are per-task in Nomad, so the two hold genuinely different authority — and **one
-allocation means one run and one correlation ID**, which is what Principle IX requires and what
-two allocations would have broken.
+**one job, one group, two SEQUENTIAL tasks sharing the allocation directory** (R24, R27). The
+`analyzer` task holds no credential that could publish and runs everything that needs the
+subject — reading, authoring, composing and containment. The `proposer` task never mounts the
+subject and does one thing: publish an already-contained proposal.
+
+They are sequential rather than concurrent because **the run lease fences by holder identity**:
+two tasks sharing a `run_id` are two holders, and the second would kill the first (R27). A
+`prestart` lifecycle makes the handoff a baton, and the proposer's `acquire` after the analyzer
+exits is the ordinary resume path the fencing was built for. **One allocation means one run and
+one correlation ID**, which is what Principle IX requires and what two allocations would have
+broken.
 
 The **network namespace is shared**, and that is stated rather than glossed. What contains the
 analyzer is: no egressing tool in its ceiling, no credential in its task, and a declared empty
 allowlist. Three controls, not four.
 
 **Proposing and qualifying** (US2, US5) delivers the work as a pull request through a
-non-repeatable pack tool with an observer — which hands FR-009 and the interrupted-run edge
+non-repeatable **platform** tool with an observer — which hands FR-009 and the interrupted-run edge
 case a mechanism that already exists — under a `write` cell qualified against a corpus whose
 floor **fails rather than warns** and whose two correctness gates are **reported separately**.
 
@@ -47,9 +53,10 @@ platform produced, and enactment consults it.
 **Primary Dependencies**: **none new in `core`.** The workspace is `pathlib`; digests are
 `hashlib`; the diff is `difflib` from the standard library. The one genuinely new external
 dependency is a **credential path to a version-control host** (R9), which is a Vault-vended
-short-lived credential rather than a library. CI gains the `terraform` binary and a pinned
-provider mirror for the first correctness gate (R10) — a tool the lane runs, not a dependency
-the tree imports.
+short-lived credential rather than a library. The first correctness gate runs in the **enclave
+lane, which already installs the binary** (`install_hashicorp terraform`) — a precedent R10
+never measured; what it adds is a **vendored filesystem provider mirror** so `terraform init` is
+deterministic and needs no registry egress.
 
 **Storage**: none new. The workspace is ephemeral per run; authored artefacts live in the
 proposal and their digests in the existing audit trail.
@@ -63,7 +70,7 @@ as its own corpus.
 hardened-tier Nomad job with a read-only subject mount added.
 
 **Project Type**: single project. New: `src/core/authoring/`, `src/core/isolation/` (the tier,
-moved — R3), `packs/github/`, `evals/authoring/`.
+moved — R3) and `evals/authoring/`. **No `packs/github/`** — R29 withdrew it.
 
 **Performance Goals**: cost tracks the **task**, not the repository. A repository too large to
 analyse in full is truncated and the truncation is **disclosed in the proposal** (FR-005b) — a
@@ -93,15 +100,15 @@ be correct for one and must not assume a population, which is 037's R2 lesson ar
 | IV — Zero Standing Credentials; Authority Per Task | **Pass, with a CONSTITUTION AMENDMENT** | Every step authenticates as its own attested workload identity, and the publishing credential is Vault-vended, hour-scoped and installation-scoped to the requester's own repositories. **But Principle IV enumerates "exactly two named exceptions" and this is a third** (R15) — so the principle is **amended in the same change**, on 027's precedent, with ADR-0062 as its motivating record. The exception inherits the other two's conditions: rotated, Control-Group-governed, trust-store only, read under the reading workload's own attested identity, delivered per task, never persisted. Arguing the clause does not bite (the platform does not *manage* the requester's repository) was available and is the narrowing 027 declined — **a closed list that grows by interpretation is not a closed list**. The key is never mounted into the hardened tier: the step that reads hostile content cannot publish. |
 | V — Sealed Core, Versioned Seams | **Pass, with review** | Four additive `AuditEventType` members (`ARTIFACT_AUTHORED`, `PROPOSAL_OPENED`, `CONTAINMENT_REFUSED`, `ENACTMENT_REFUSED`) on `TOOL_CHOSEN`'s precedent, carrying the approved spec and security-maintainer review. **`RiskClass` and `Role` are not edited** — `write` already exists in both (R1), which is the whole payoff of vocabulary defined in advance. |
 | VI — Lean by Default | **Pass** | **No new operated component.** A pack is content; a workspace is a directory; the analysis step is the existing tier job with a mount added. The one genuinely operated thing is the version-control credential path, which is an integration rather than a service and is named in ADR-0062. |
-| VII — Anti-Fragmentation | **Pass** | One authoring path for every product: the same `author_file`, the same containment, the same proposal shape whether the artefact is a Terraform module or application code. **This is why the write tool is a platform tool rather than a pack tool** (R2) — a per-pack copy would be N implementations of one containment rule. The tier moves out of `core.intake` for the same reason (R3). |
-| VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass, with an ADR** | The `write` cell is qualified **before** a definition may bind it, and the corpus lands **in the same change** as the capability so `OWED` stays empty (FR-019, 037's sequencing precedent). Correctness is two gates reported separately (FR-018a); the must-deny half scores the **artefact**, not a verb (R8). **Both gates are MECHANICAL** — the reference carries a declared property set, and the must-deny half is the secret detector, the containment check and a byte-identical comparison — so **no judge participates**, and `promote_model_version` would refuse the cell for naming none (R18). It accepts a **scorer identity** instead, refusing only when both are absent: a human-authored reference terminates ADR-0052's regress *one link earlier* than a judge does. **ADR-0063** carries that. `qualified_by = "live"` (R20), because the matrix module says the fixture/live distinction *"matters most for `write` — a model permitted to make changes"*. **The new `github` pack declares the five suites with their cases**, like both existing packs — measured (R14), the loader's floor iterates *declared* suites, so a pack declaring none has no floor to fail and would be this platform's first pack outside the eval gate, first **by accident**. |
+| VII — Anti-Fragmentation | **Pass** | One authoring path for every product: the same `author_file`, `read_subject` and `open_proposal`, the same containment, the same proposal shape whether the artefact is a Terraform module or application code. **All three are platform tools rather than pack tools** — a per-pack copy would be N implementations of one containment rule (R2), and **publishing is as product-blind as authoring** (R29): a pull request against a Terraform module and one against application code are the same act. The tier moves out of `core.intake` for the same reason (R3). |
+| VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass, with an ADR** | The `write` cell is qualified **before** a definition may bind it, and the corpus lands **in the same change** as the capability so `OWED` stays empty (FR-019, 037's sequencing precedent). Correctness is two gates reported separately (FR-018a); the must-deny half scores the **artefact**, not a verb (R8). **Both gates are MECHANICAL** — the reference carries a declared property set, and the must-deny half is the secret detector, the containment check and a byte-identical comparison — so **no judge participates**, and `promote_model_version` would refuse the cell for naming none (R18). It accepts a **scorer identity** instead, refusing only when both are absent: a human-authored reference terminates ADR-0052's regress *one link earlier* than a judge does. **ADR-0063** carries that. `qualified_by = "live"` (R20), because the matrix module says the fixture/live distinction *"matters most for `write` — a model permitted to make changes"*. **No `github` pack exists to gate.** R14 correctly found that a pack declaring no suites escapes the floor entirely, and prescribed declaring all five — which was the wrong cure: the suites are answering-shaped, and a pack carrying one PR-opening tool has **no expertise for them to measure** (R29). Twenty-five cases written to clear a floor is the "gate that passes by vocabulary" 027 refused, so `open_proposal` becomes a platform tool and the pack is withdrawn. |
 | IX — Evidence Over Claims | **Pass, with a payload gate** | The proposal is the product and the trail is behind it. **One correlation ID**, because authoring and publishing are two tasks in one allocation rather than two runs (R24). Two load-bearing payload rules: `CONTAINMENT_REFUSED` carries **codes and digests, never the matched text** (`CANARY_CONTACT`'s rule — the record of a leak must not be a second copy of what leaked), and `ARTIFACT_AUTHORED` carries **paths and digests, not content**. **Those rules are now asserted rather than documented**: `append_event` takes `dict[str, Any]` and validates nothing, and `redact_arguments` runs on tool arguments and never on event payloads — so every such rule in this feature was a convention, while `InjectionFinding` carries an `excerpt` that would have made copying analysed private code into an append-only store the *default* implementation (R26). |
-| X — The Decision Record Governs | **Pass, with obligations** | **ADR-0038 is realized rather than amended** — it is already Accepted, and its four constraints are implemented as written, not reinterpreted. **Two new records**: **ADR-0062** (a new credential class under a MUST principle) and **ADR-0063** (what may qualify a cell, amending ADR-0052's chain — R18). Both Proposed here, Accepted in implementation. |
+| X — The Decision Record Governs | **Pass, with obligations** | ADR-0038's four safety constraints are implemented as written, not reinterpreted — but **one clause is amended rather than departed from**: *"Version control becomes a first-class pack tool target"* does not survive contact with the eval gate (R29), so **ADR-0064** records version control as a platform capability, with ADR-0037's transport test still applying at registry review (that test is about *transport* and is orthogonal to where a tool lives). **Three new records**: **ADR-0062** (a new credential class under a MUST principle), **ADR-0063** (what may qualify a cell, amending ADR-0052's chain — R18), **ADR-0064**. All Proposed here, Accepted in implementation. |
 
-**Gate result**: **PASS — proceed to Phase 0.** Six obligations travel with the feature: the
+**Gate result**: **PASS — proceed to Phase 0.** Seven obligations travel with the feature: the
 Principle V review, **the Principle IV amendment naming a third standing-credential exception**,
-ADR-0062's authoring, **ADR-0063's authoring**, the `write` corpus landing with the capability,
-and the tier's move out of `core.intake`.
+ADR-0062, ADR-0063 and **ADR-0064** authored and accepted, the `write` corpus landing with the
+capability, and the tier's move out of `core.intake`.
 
 ## Project Structure
 
@@ -150,10 +157,17 @@ src/core/authoring/           # NEW — product-blind, like the rest of core
 │                             #   refusal (PRE) and the injection lens (POST). A refusal in a
 │                             #   module and a refusal in the pipeline read alike in a task
 │                             #   list, and only one is enforcement (R23)
-└── tool.py                   # `author_file`, risk_class="write" — the registry's first —
-                              #   and `read_subject`, risk_class="read", which is what gives
-                              #   the lens something to attach to and FR-014/FR-005b/FR-004 a
-                              #   read path they were all written against and none of them had
+└── tool.py                   # THREE platform tools. `author_file` (write) — the registry's
+                              #   first occupant of that class. `read_subject` (read) — what
+                              #   the lens attaches to, and the read path FR-014/FR-005b/FR-004
+                              #   were all written against and none of them had. `open_proposal`
+                              #   (write, non-repeatable, observer) — a platform tool because
+                              #   publishing is as product-blind as authoring (R29); the
+                              #   observer_required refusal is a MANIFEST check, so this
+                              #   registration asserts it itself
+
+docs/adr/0064-*.md            # NEW (Proposed) — version control is a platform capability,
+                              #   amending ADR-0038's "pack tool target" clause
 
 src/core/evals/
 ├── suites.py                 # + AUTHORING_QUALIFICATION. NOT in SUITES (R7); OWED untouched.
@@ -168,11 +182,10 @@ src/core/evals/
 
 src/core/audit/schema.py      # additive: ARTIFACT_AUTHORED, PROPOSAL_OPENED,
                               #           CONTAINMENT_REFUSED, ENACTMENT_REFUSED
-packs/github/                 # NEW — one tool: `open_proposal`, write, non-repeatable,
-├── pack.toml                 #   observer required. Transport per ADR-0037 at registry review.
-│                             #   Declares a PROBE (a product with none refuses at load) and the
-│                             #   five eval suites (a pack declaring none has no floor to fail)
-└── evals/*.toml              #   5 cases per suite, on both existing packs' precedent
+                              # NO `packs/github/` — WITHDRAWN (R29). The eval suites are
+                              #   answering-shaped and a pack with one PR-opening tool has no
+                              #   expertise for them to measure; `open_proposal` is a platform
+                              #   tool beside `author_file`. ADR-0064 records the amendment
 evals/authoring/              # NEW — the corpus. Every golden task carries a HUMAN-AUTHORED
                               #   reference (FR-018c) — the expensive clause, and the one most
                               #   likely to erode into generated references
