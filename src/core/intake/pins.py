@@ -14,9 +14,15 @@ nobody could reach is not evidence that nothing changed.
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+
+#: How the current upstream head is obtained. Injected so one pipeline serves a connected
+#: estate, a restricted one behind a proxy, and an air-gapped one reading an imported
+#: snapshot — ADR-0021's 'one trigger difference' expressed as an argument.
+Fetcher = Callable[["Pin"], str]
 
 
 @dataclass(frozen=True)
@@ -77,4 +83,54 @@ def read_pins(packs_root: Path) -> list[Pin]:
     return found
 
 
-__all__ = ["Pin", "PinState", "read_pin", "read_pins"]
+__all__ = [
+    "CheckResult",
+    "Fetcher",
+    "Pin",
+    "PinState",
+    "check_pin",
+    "read_pin",
+    "read_pins",
+]
+
+
+@dataclass(frozen=True)
+class CheckResult:
+    """What one check of one pin found.
+
+    ``state`` is always set; ``upstream_commit`` and ``detail`` are populated per state. A
+    single result type rather than three, so a caller cannot handle two states and silently
+    drop the third — which is the specific way UNREACHABLE gets folded into UNMOVED.
+    """
+
+    pin: Pin
+    state: PinState
+    upstream_commit: str = ""
+    detail: str = ""
+
+
+def check_pin(pin: Pin, fetch_head: Fetcher) -> CheckResult:
+    """Compare a pin against upstream, or report that upstream could not be reached.
+
+    ``fetch_head`` is injected rather than imported so the same function serves all three
+    connectivity tiers (ADR-0021): a connected estate passes a network fetch, a restricted one
+    passes a proxy fetch, an air-gapped one passes a snapshot reader. **One pipeline with one
+    trigger difference** — the difference is this argument, and nothing downstream knows which
+    it got.
+    """
+    try:
+        head = fetch_head(pin)
+    except Exception as exc:  # noqa: BLE001 — any failure is unreachability, never "unmoved"
+        return CheckResult(
+            pin=pin,
+            state=PinState.UNREACHABLE,
+            detail=f"{type(exc).__name__}: {exc}",
+        )
+    head = head.strip()
+    if not head:
+        # An empty answer is not agreement. A fetcher that returned nothing has told us
+        # nothing, and reporting that as UNMOVED is how a pin rots while looking maintained.
+        return CheckResult(pin=pin, state=PinState.UNREACHABLE, detail="empty response")
+    if head == pin.commit:
+        return CheckResult(pin=pin, state=PinState.UNMOVED, upstream_commit=head)
+    return CheckResult(pin=pin, state=PinState.MOVED, upstream_commit=head)
