@@ -197,6 +197,16 @@ ignore_missing_imports = true
 module = "anthropic.*"
 ignore_missing_imports = true
 
+# The sandbox runtime (036), for the same reason and with a sharper edge: code mode is
+# OPTIONAL by design, and FR-013 requires the platform to refuse with a stated reason where
+# the runtime is absent. So `sandbox_runtime.py` must typecheck in an environment that does
+# not have it — which is exactly the environment the refusal exists for. Without this
+# override the module only typechecks where the capability is installed, and the
+# absent-runtime path would be the one nothing ever verified.
+[[tool.mypy.overrides]]
+module = "pydantic_monty.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/component"]
 pythonpath = ["src", "."]

@@ -26,10 +26,17 @@ from typing import Any
 
 from core.sandbox.seam import CallRequest, SandboxUnavailableError
 
-try:  # pragma: no cover - exercised by the absent-runtime row in a filtered environment
-    import pydantic_monty as _monty
+# THE OPTIONAL IMPORT, typed so this module checks in an environment WITHOUT the runtime —
+# which is precisely the environment FR-013's stated refusal exists for. Typed as `Any` so
+# the absent case is expressible; `ignore_missing_imports` for `pydantic_monty` in
+# pyproject.toml is what lets CI's fast lane typecheck this at all.
+_monty: Any
+try:  # pragma: no cover - exercised by the absent-runtime row
+    import pydantic_monty as _monty_module
+
+    _monty = _monty_module
 except ImportError:  # pragma: no cover - see MontyRuntime.__init__
-    _monty = None  # type: ignore[assignment]
+    _monty = None
 
 
 # **A program's value is its final expression**, measured rather than assumed. `MontyComplete`
@@ -112,7 +119,7 @@ class MontyRuntime:
         against these bytes, so that a format change in a `0.0.x` upstream cannot silently
         stop the scanner from finding things.
         """
-        return self._session.dump()
+        return bytes(self._session.dump())
 
     def close(self) -> None:
         try:

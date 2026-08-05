@@ -54,6 +54,12 @@ def _dependency_lines() -> list[str]:
         stripped = raw.strip()
         if stripped.startswith("#"):
             continue
+        # A DEPENDENCY ENTRY is a quoted string on its own line inside a list. Config that
+        # merely NAMES a package — `module = "pydantic_monty.*"` in a mypy override — is not
+        # a dependency, and treating it as one made this gate fire on the very override that
+        # lets the absent-runtime path typecheck. The gate's subject is what gets installed.
+        if not stripped.startswith('"'):
+            continue
         lines.append(raw)
     return lines
 
@@ -61,7 +67,7 @@ def _dependency_lines() -> list[str]:
 def test_the_check_covers_something() -> None:
     """Without this, a moved or renamed pyproject would make every assertion vacuous."""
     lines = _dependency_lines()
-    assert len(lines) > 50, "pyproject.toml did not parse into dependency lines"
+    assert len(lines) > 8, f"pyproject.toml did not parse into dependency lines ({len(lines)})"
     assert any("pydantic-ai-slim" in line for line in lines), (
         "the comment stripper removed real dependency entries"
     )
