@@ -119,7 +119,11 @@ effects.
 
 ## Phase 7: Sealed-core review (blocks merge, not a code task)
 
-- [ ] T035 [GATE:conformance] **Principle V security-maintainer review** (Dan). Two sealed-core touches: the adapter composition, and the additive `AuditEventType` pair. Reviewed against `TOOL_CHOSEN`'s precedent. Recorded on the implementation PR. The feature does not merge without it, and this task is checked only when that review is on the PR.
+- [X] T035 [GATE:conformance] **Principle V security-maintainer review** (Dan). Two sealed-core touches: the adapter composition, and the additive `AuditEventType` pair. Reviewed against `TOOL_CHOSEN`'s precedent. Recorded on the implementation PR. The feature does not merge without it, and this task is checked only when that review is on the PR.
+  **Approved by Dan McTeer, 2026-08-05, recorded on PR #162** — covering the additive
+  `DISCOVERY_OBSERVED` / `PROGRAM_SUBMITTED` members (on `TOOL_CHOSEN`'s precedent) and the
+  adapter's composition change, which keeps `GovernedToolset` terminal and leaves
+  `_reject_unreachable_wrappers` in force for every caller-supplied wrapper.
 
 ---
 
