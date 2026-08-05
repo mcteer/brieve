@@ -8,8 +8,9 @@
 
 Seven stages, built as **three independently shippable layers** so the half that carries no
 new risk lands before the half that does. **Detection** (US1) polls pinned upstreams, computes
-the exact delta, and opens a proposal — no model reads anything, so the injection hazard is
-absent by construction. **Containment** (US2, US4) builds the hardened isolation tier
+the exact delta, and opens a **detection proposal** — the evidence package's early form,
+stating which stages have run rather than leaving later sections silently absent. No model
+reads anything, so the injection hazard is absent by construction. **Containment** (US2, US4) builds the hardened isolation tier
 ADR-0038 named and never got, runs the analyzer inside it under the narrowest ceiling in the
 fleet, and qualifies that analyzer against its own human-labelled hostile corpus with a floor
 that fails rather than warns. **Detonation** (US3) stands up a purpose-built range — not the
@@ -95,7 +96,10 @@ specs/037-intake-gauntlet/
 ```text
 src/core/intake/              # NEW — the pipeline, product-blind like the rest of core
 ├── pins.py                   # read [upstream] pins; what "moved" means
-├── proposal.py               # candidate identity by content digest, delta, evidence package
+├── proposal.py               # candidate identity by content digest, delta, supersession
+├── package.py                # the evidence package a detection proposal GROWS INTO;
+│                             #   its limits statement is stage-aware
+├── emit.py                   # write the proposal, open the PR (033's PR-proposal shape)
 ├── verdict.py                # the analyzer's structured output; may block, never approves
 ├── tier.py                   # a definition REQUIRES the hardened tier; dispatch refuses
 │                             #   one that asks for it outside a tier that provides it

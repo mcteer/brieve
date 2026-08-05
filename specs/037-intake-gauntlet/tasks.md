@@ -51,7 +51,7 @@ exist, and T004/T005/T054 are one obligation in three files.**
 - [ ] T004 [GATE:conformance] Add `ANALYSIS_VERDICT`, `DETONATION_COMPARED`, `CANARY_CONTACT`, `INTAKE_BYPASSED` to `AuditEventType` in `src/core/audit/schema.py`, additive, each with the docstring rigour `TOOL_CHOSEN` set. Record on `ANALYSIS_VERDICT` that it carries no field readable as an approval, and on `CANARY_CONTACT` that it carries an identifier and never a value.
 - [ ] T005 Move `docs/adr/0053-automated-skill-intake-gauntlet.md` Proposed → **Accepted**, carrying the three clarification amendments: the range is purpose-built (not the test fake), the analyzer's floor is its own rather than ADR-0052's, and the manual path survives with a record. Include the **named trigger** Principle VI requires for the range as an operated component.
 - [ ] T006 [P] Update `docs/adr/README.md` for 0053's status change, and add the range's operated-component note where the connectivity-tier ADRs are indexed.
-- [ ] T007 Write the evidence-package shape in `src/core/intake/proposal.py`: delta, both provenances, verdict, comparison, canary status, and — per FR-027 — the **limits statement** naming what none of it establishes.
+- [ ] T007 Write the evidence-package shape in `src/core/intake/package.py` (split from `proposal.py`, which already carries candidate identity and delta): delta, both provenances, verdict, comparison, canary status, and — per FR-027 — a **stage-aware limits statement** naming what has not run as well as what ran and found nothing. The package is what a detection proposal GROWS INTO as stages complete, not a thing assembled once at the end.
 - [ ] T008a [GATE:fail-closed] **Build the hardened untrusted-content isolation tier** in `infra/jobs/analysis-tier.nomad.hcl` — the thing ADR-0038 named in 2026 and nothing has implemented since. Concretely, and each clause is the tier rather than the ceiling: **bridge networking, never `network_mode = "host"`** (the fix `portal.nomad.hcl` records making, for the same reason — host mode puts the workload on the machine's network); **egress allowlisted to the pinned source only**; **no repository mount** — the delta is delivered as input, not reachable on disk; and its own workload identity distinct from any other task. (FR-006)
 - [ ] T008b [GATE:conformance] Declare tier membership in `src/core/intake/tier.py` so a definition can REQUIRE the hardened tier, and dispatch refuses a definition that asks for it into an allocation that does not provide it. A tier nothing checks is a comment in a jobspec. (FR-006)
 - [ ] T008c [P] Row A0 in `tests/conformance/intake/test_isolation_tier.py`: assert the tier's posture STRUCTURALLY — bridge mode not host, no repo mount, allowlist present — and assert a definition requiring the tier is refused when dispatched outside it. **A ceiling is not a tier**: a ceiling bounds what a definition may call, a tier bounds what the process can reach, and this row exists because the two are easy to conflate. (FR-006, FR-009)
@@ -73,11 +73,17 @@ proceed alone and needs none of the tier; US2 cannot start without it.
 - [ ] T012 [P] [US1] [GATE:correlation] Row I1 (FR-002) in `tests/conformance/intake/test_detection.py`: an unmoved pin proposes nothing AND records that it was checked. "We looked and nothing had moved" is what distinguishes a maintained pin from an old one.
 - [ ] T013 [P] [US1] Row I2 (FR-004) in the same file: a moved pin produces a proposal carrying the delta and both provenances, and the skill on disk is **byte-identical afterwards** — detection adopts nothing.
 - [ ] T014 [P] [US1] [GATE:fail-closed] Row I3 (FR-003): an unreachable upstream reports failure and proposes nothing. Reporting silence as stability is how a pin rots while looking maintained.
-- [ ] T015 [P] [US1] Row I4: move upstream twice with a proposal open; earlier evidence is not presented as describing the new bytes (FR-005, keyed on digest).
+- [ ] T015 [P] [US1] Row I4 (FR-005, FR-004b): move upstream twice with a proposal open; the proposal is marked stale and **refuses acceptance**, so earlier evidence cannot be accepted as describing the new bytes.
 - [ ] T016 [US1] Row I5 (FR-001): the same pipeline against an imported snapshot produces the same proposal shape as against a reachable upstream (ADR-0021 — one pipeline, one trigger difference).
+- [ ] T016a [US1] **Emit the proposal** in `src/core/intake/emit.py` and open the version-bump PR — the artifact US1 exists to produce, which the first task list asserted (T013) without anything writing it. Carries 033's accepted limitation in the proposal body: a token-created PR triggers no checks, a PAT is the standing credential Principle IV refuses, so the proposal **explains its own missing checks** rather than acquiring one. (FR-004)
+- [ ] T016b [US1] Emit it as a **detection proposal**: stages-run stated, and the analyzer/detonation sections present-but-empty with the reason, never omitted. "No analysis has run" must appear where a verdict would (FR-004a, FR-027a) — an omitted section reads as a clean one.
+- [ ] T016c [US1] Implement **snapshot input** in `src/core/intake/pins.py` as an alternate trigger into the same pipeline, so an air-gapped estate runs the identical stages from an imported bundle. ADR-0053's claim is one pipeline with one trigger difference, and the difference is the part with no implementation until now. (FR-001)
+- [ ] T016d [US1] Detect **supersession**: an open proposal whose candidate digest no longer matches upstream is marked stale and refuses acceptance. The digest makes drift visible (T003); this makes it refuse. (FR-004b, FR-005)
 - [ ] T017 [US1] Add the GitHub Actions schedule in `.github/workflows/intake-poll.yml`, inheriting 033's accepted limitation: a token-created PR triggers no checks, a PAT is the standing credential Principle IV refuses, so the proposal **explains its own missing checks** rather than acquiring one.
 
-**Checkpoint**: US1 is shippable on its own and improves intake with zero new risk — no model has read anything.
+**Checkpoint**: US1 is shippable on its own and improves intake with zero new risk — no model
+has read anything. What it emits is a **detection proposal**: the evidence package's early
+form, honest about which stages have not run.
 
 ---
 
@@ -152,7 +158,7 @@ put a row in `OWED` for the first time since 021.
 - [ ] T048 [P] [US5] Row H3 (FR-023): accepted candidates still land warn-mode before enforce-mode.
 - [ ] T049 [US5] Row H4: the manual path works and its record is **no quieter** than a gauntlet promotion — the failure is a bypass that becomes routine because nothing makes its use visible (FR-025b).
 - [ ] T049a [P] [US5] Unit gate in `tests/unit/test_promotion_gate_unchanged.py`: assert `promote_skill`'s signature and its refusal reason codes (`promotion_incomplete`, `digest_mismatch`, `injection_suspected`) are untouched. This feature FEEDS that gate; a boundary that is only remembered erodes the first time a stage "just needs one more field". (FR-026)
-- [ ] T050 [P] [US5] Row H5: the evidence package carries its limits statement (FR-027, SC-008).
+- [ ] T050 [P] [US5] Row H5 (FR-027, FR-027a, SC-008): the evidence package carries its **stage-aware** limits statement, and a proposal with no verdict says so **where a verdict would appear**. Assert both — an omitted section and a section saying "not run" are the same to a grep and opposite to a reader.
 
 ---
 
@@ -176,6 +182,7 @@ put a row in `OWED` for the first time since 021.
 Setup (T001–T003)
    └─> Foundational (T004–T008c)    [audit vocab + ADR + package shape + THE TIER]
           ├─> US1 (T009–T017)       ── detection; SHIPPABLE ALONE, no model involved
+          │                            emits a DETECTION PROPOSAL (T016a–d)
           └─> US2 (T018–T025)       ── containment; needs the tier (T008a–c)
                  └─> US4 (T026–T033) ── qualification; BEFORE detonation, per R9
                         └─> US3 (T034–T044) ── detonation
@@ -194,7 +201,8 @@ Review (T054) gates merge
 
 - Setup: T002 ∥ T003 after T001.
 - Foundational: T006 ∥ T008 ∥ T008c; T005 independent; T008a → T008b → T008c.
-- US1: T012–T015 are `[P]` once T009–T011 land — four rows, four concerns.
+- US1: T012–T015 are `[P]` once T009–T011 land — four rows, four concerns. T016a–d serialize
+  (emit → detection-proposal shape → snapshot input → supersession) and gate T017.
 - US2: T021–T024 `[P]` after T018–T020.
 - US4: T029, T030, T033 `[P]`; T031/T032 serialize on the scorer.
 - US3: T038–T040, T042, T043 `[P]` after T034–T037.

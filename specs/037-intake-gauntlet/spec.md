@@ -130,6 +130,8 @@ A person opens the proposal and finds a package: what changed, what the analyzer
 - **FR-002**: A check that finds no change MUST be recorded. "We looked and nothing had moved" is the evidence that the pin is being maintained rather than merely old.
 - **FR-003**: A failure to reach upstream MUST be reported as a failure and MUST NOT be reported as no change.
 - **FR-004**: A proposal MUST carry the exact delta against the recorded pin and the provenance of both versions, and MUST NOT promote anything.
+- **FR-004a**: A proposal MUST state **which stages have run**. Detection alone produces a *detection proposal*; it becomes the full evidence package as later stages complete. An artifact whose analysis and detonation fields are simply absent reads as clean, and "no analysis has run" is a materially different claim from "analysis found nothing" — conflating them is the reassurance failure FR-027 exists to prevent, arriving through the shape of the artifact rather than through its wording.
+- **FR-004b**: A proposal whose candidate has been superseded MUST be marked stale and MUST NOT be acceptable. Detection of supersession is required, not implied by identifying candidates by digest — the digest makes drift *visible*, and this makes it *refuse*.
 - **FR-005**: A proposal whose candidate changes while it is open MUST NOT silently carry forward evidence produced about the earlier bytes.
 
 **Containment of the analysis**
@@ -173,7 +175,8 @@ A person opens the proposal and finds a package: what changed, what the analyzer
 **Boundaries**
 
 - **FR-026**: This feature MUST NOT change what the existing promotion gate requires. It produces evidence *for* that gate.
-- **FR-027**: Nothing in this feature MAY be described, in documentation or in the evidence package, as making an adopted skill safe. Detonation catches only what the corpus provokes, and the runtime governance floor remains the backstop.
+- **FR-027**: Nothing in this feature MAY be described, in documentation or in the evidence package, as making an adopted skill safe. The limits statement MUST be **stage-aware**: it names what has not run as well as what ran and found nothing.
+- **FR-027a**: A proposal carrying no analyzer verdict MUST say so in the same place a verdict would appear. Absence must be legible where presence would be, or a reader scanning for a finding sees nothing and concludes there was nothing to find. Detonation catches only what the corpus provokes, and the runtime governance floor remains the backstop.
 
 ### Key Entities
 

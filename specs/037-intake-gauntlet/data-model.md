@@ -73,10 +73,16 @@ describing a candidate that is no longer the one in the proposal.
 The exact difference between pinned and candidate. The analysis subject, which is why cost
 tracks upstream motion rather than upstream size.
 
+### Detection proposal
+What US1 emits: delta, both provenances, and **the stages that have run** — which at that
+point is detection alone. Its analyzer and detonation sections are present and empty *with
+their reason*, never omitted. It is the evidence package's early form rather than a different
+artifact, so nothing has to be reconciled when later stages fill it in.
+
 ### Evidence package
-What the reviewer is handed, and the feature's actual product: the delta, provenance for both
-versions, the verdict and its findings, the detonation comparison, canary status, and — per
-FR-027 — **an explicit statement of what none of it establishes**. A package that reads
+What the reviewer is handed once the stages complete, and the feature's actual product: the delta, provenance for both
+versions, the verdict and its findings, the detonation comparison, canary status, and — per FR-027 — **a stage-aware statement of what none of it establishes**, naming what
+did not run alongside what ran and found nothing. A package that reads
 "clean" without saying what clean does not cover is the reassurance failure this feature is
 most able to cause.
 
