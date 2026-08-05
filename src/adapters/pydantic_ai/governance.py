@@ -19,7 +19,6 @@ enforcement lives in core and is reached through ``invoke_tool``.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from enum import StrEnum
 from typing import Any
 
 from pydantic_ai.capabilities import ToolSearch
@@ -83,22 +82,6 @@ class GovernanceCapability(AbstractCapability[AdapterRunContext]):
             )
         deps.governed_run.probe_log.append(GOVERNANCE_PROBE_MARKER)
         return await handler(args)
-
-
-class DisclosurePosture(StrEnum):
-    """Which posture a run is actually in — recorded, never inferred (FR-004, SC-006).
-
-    A run that asked for deferral and did not get it must not look like a run that got it.
-    That is the unstated-posture failure this platform legislates against everywhere else,
-    and the reason this is a three-valued property rather than a boolean.
-    """
-
-    #: Every tool's schema presented up front. Today's behaviour, and the default.
-    EAGER = "eager"
-    #: Tools cost a catalog line until the model reaches for one.
-    DEFERRED = "deferred"
-    #: Deferral was requested and could not be composed for this run. Stated, not silent.
-    EAGER_FALLBACK = "eager_fallback"
 
 
 class DisclosureGovernance(GovernanceCapability):

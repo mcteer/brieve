@@ -12,9 +12,27 @@ trail is the platform's job.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from enum import StrEnum
 
 from core.audit.schema import AuditEventType
 from core.run import GovernedRun
+
+
+class DisclosurePosture(StrEnum):
+    """Which posture a run is actually in — recorded, never inferred (FR-004, SC-006).
+
+    Three-valued rather than a boolean, and that is the whole point. A run that ASKED for
+    deferral and did not get it must not look like one that got it: an operator reading
+    `eager` cannot tell whether deferral was never requested or silently failed, and an
+    unstated posture is the failure this platform legislates against everywhere else.
+    """
+
+    #: Every tool's schema presented up front. Today's behaviour, and the default.
+    EAGER = "eager"
+    #: Tools cost a catalog line until the model reaches for one.
+    DEFERRED = "deferred"
+    #: Deferral was requested and could not be composed for this run. Stated, not silent.
+    EAGER_FALLBACK = "eager_fallback"
 
 
 def record_discovery(
@@ -47,4 +65,4 @@ def record_discovery(
     )
 
 
-__all__ = ["record_discovery"]
+__all__ = ["DisclosurePosture", "record_discovery"]

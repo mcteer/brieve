@@ -175,6 +175,7 @@ def start_governed_run(
     dependency_health: DependencyHealthReader | None = None,
     brokered_material_source: BrokeredMaterialSource | None = None,
     content_pins: Mapping[str, str] | None = None,
+    disclosure_posture: str | None = None,
     manufactured: ManufacturedAuthority | None = None,
 ) -> GovernedRun:
     """Start an active governed run with bound task authority, or refuse.
@@ -319,6 +320,12 @@ def start_governed_run(
     start_payload: dict[str, object] = {"scope": sorted(run.scope)}
     if content_pins:
         start_payload["content_pins"] = dict(sorted(content_pins.items()))
+    # WHICH DISCLOSURE POSTURE THIS RUN IS ACTUALLY IN (036, FR-004). Recorded on the run
+    # rather than inferred, because a run that asked for deferral and fell back looks
+    # identical to an eager one from the outside — and an operator believing a run deferred
+    # when it did not is exactly the unstated posture this platform refuses elsewhere.
+    if disclosure_posture:
+        start_payload["disclosure_posture"] = disclosure_posture
 
     try:
         sink.append_event(

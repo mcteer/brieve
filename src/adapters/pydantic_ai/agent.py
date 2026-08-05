@@ -47,6 +47,7 @@ def start_adapter_run(
     approval_hook: ApprovalHook | None = None,
     durability: DurabilityProvider | None = None,
     brokered_material_source: BrokeredMaterialSource | None = None,
+    disclosure_posture: str | None = None,
 ) -> AdapterRunContext:
     """Start a governed run and return the deps object bound to it.
 
@@ -63,6 +64,7 @@ def start_adapter_run(
         clock=clock,
         audit_sink=audit_sink,
         brokered_material_source=brokered_material_source,
+        disclosure_posture=disclosure_posture,
     )
     return AdapterRunContext(
         governed_run=run,
