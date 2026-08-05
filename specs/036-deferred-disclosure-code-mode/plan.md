@@ -47,14 +47,18 @@ failure message. The threshold is calibrated against the real pack corpus during
 implementation; if the corpus cannot meet it, the row fails and the threshold gets an
 evidence-based revision in the contract — never a silent bump.
 
-**Constraints**: `invoke_tool` remains the sole execution entry (Principle II/III);
-`_reject_unreachable_wrappers` stays in force for caller-supplied capabilities; the audit
-schema change is additive to an unversioned enum and carries Principle V review; no
-framework import enters `core/` (Principle I) — `core/sandbox/` defines the seam as a
-protocol and the runtime binding lives in `adapters/`.
+**Constraints**: `invoke_tool` remains the sole execution entry (Principle II/III), and
+because `run_program` is itself a tool, that entry is **re-entered** on the same run —
+which composes for bounds and lease but leaves nested non-repeatable brackets as a named
+design task (research R11), not an assumption; `_reject_unreachable_wrappers` stays in
+force for caller-supplied capabilities; the audit schema change is additive to an
+unversioned enum and carries Principle V review; no framework import enters `core/`
+(Principle I) — `core/sandbox/` defines the seam as a protocol and the runtime binding
+lives in `adapters/`.
 
 **Scale/Scope**: two composition changes in the adapter, one new core seam module, one
-audit event type pair, one ADR, ~5 conformance rows, no API/MCP/portal surface change.
+audit event type pair, one ADR, **~17 conformance rows + 3 unit gates** (8 disclosure, 9
+code-mode, 3 structural — see `contracts/`), no API/MCP/portal surface change.
 
 ## Constitution Check
 

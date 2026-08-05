@@ -186,3 +186,41 @@ is revised *in the contract, with the measurement* — never bumped silently.
 25% is a starting claim strong enough to mean something and weak enough that a catalog
 line per tool plausibly meets it. The number is falsifiable by construction, which is the
 property that matters.
+
+## R11 — `invoke_tool` re-enters itself, and the seam must be safe under that
+
+**Decision**: the seam is designed for re-entrant `invoke_tool` explicitly; the property is
+asserted, not assumed from "it seemed to work".
+
+**Measured / read** (`src/core/tools/invoke.py`, `src/core/bounds.py`):
+
+`run_program` is a registered tool, so a code-mode run nests `invoke_tool` inside
+`invoke_tool` **on the same `GovernedRun`** — outer call for the submission, inner call per
+program call. Three pieces of shared, mutable run state are therefore re-entered, and each
+was checked:
+
+- **Bounds** (`BoundsTracker`, mutable): `check()` runs *before* `record_progress()` on
+  every call, so the outer submission counts one step and each inner call counts one more —
+  the N+1 of R8, and the reason C7 asserts N+1 rather than "same total". An inner call that
+  would exceed raises `ExecutionBoundExceeded` (a terminating `CoreError`, **not** a deny)
+  from inside the seam's `invoke_tool`; the seam MUST let it propagate, which terminates
+  `run_program` and the run. Converting it to an in-sandbox failure — the correct handling
+  for a *deny* — would let a program outlive its own budget. This is the FR-010a / C3-vs-C7
+  distinction, and it is a seam requirement, not a test detail.
+- **Lease** (`run.lease.assert_held`): re-asserted on the inner call against the same
+  holder. Re-entry does not change the holder, so a held lease stays held; a superseded one
+  raises on the *next* inner call, stopping a zombie program mid-flight exactly as it stops
+  a zombie structured run. No new behaviour, but asserted because "no new behaviour" is the
+  claim most worth a row.
+- **Bracket** (the intent/result record around a non-repeatable call): `run_program` is
+  non-repeatable (its inner calls have effects), and each non-repeatable inner call brackets
+  too — so brackets **nest**. The open question the implementer inherits: whether the
+  durability layer's bracket supports nesting on one run, or whether `run_program` must be
+  bracketed while its inner calls rely on the outer bracket for replay-resolution. This is
+  named here rather than discovered at T027; it is the one place the re-entrancy could need
+  more than the existing machinery.
+
+**Rationale**: "the fixed point is untouched" (plan) is only safe if re-entering the fixed
+point is safe. It mostly is — bounds and lease compose correctly — and the one residue
+(nested brackets) is written down as a design task rather than left to surface mid-build,
+which is the 021/022 failure this analysis pass exists to prevent.

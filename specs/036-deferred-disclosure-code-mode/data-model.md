@@ -69,7 +69,7 @@ what a model knows about is derivable from the trail.
 | Call request | `(name, args, kwargs, call_id)` from the runtime's snapshot | every one routes to `invoke_tool`; an unregistered `name` refuses on the existing path — one shape for tool, `open`, `eval`, and invented names alike (R5) |
 | Resume value | governed result, or the refusal converted to an in-sandbox exception | a denied call MUST NOT be resumable with a fabricated value — the seam owns the conversion |
 | Suspended state | opaque bytes from the runtime, plus the seam's own scannable ledger of what entered the sandbox | flows through `DurabilityProvider` under `_reject_credentials` (FR-011, R9); the ledger exists so the credential discipline never parses a `0.0.x` serialization format |
-| Bounds | the run's existing `bounds` | checked per inner call by `invoke_tool` itself — the seam adds no second bound and may not raise any (FR-010) |
+| Bounds | the run's existing `bounds` | checked and counted per inner call by `invoke_tool` itself — the seam adds no second bound and may not raise any (FR-010). The `run_program` submission is one governed step, so a program of N inner calls spends **N+1** of `max_steps` (default 100). A bound reached mid-program raises `ExecutionBoundExceeded` and **terminates the run** — the seam does NOT convert it to an in-sandbox failure the way it does a policy deny (FR-010a) |
 
 ## Relationships
 

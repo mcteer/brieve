@@ -31,7 +31,10 @@ cause — outside the compared span.
 A program whose second call is policy-denied: the denial is recorded, the sandbox
 receives the refusal as a failure (never a fabricated return value), and no subsequent
 effect in the program occurs from the denied capability. The program cannot obtain by
-continuing what it was refused at the call.
+continuing what it was refused at the call. **A deny is not a bound**: the program keeps
+running and may make further (permitted) calls after a denial, where an exhausted bound
+would have terminated it (C7c). The two must not be conflated in the seam — a bound
+converted to an in-sandbox failure would let a program run past its own budget.
 
 ### C4 — An invented name refuses on the existing path (FR-008)
 
@@ -56,11 +59,16 @@ suspend, and assert the checkpoint write raises `CredentialInCheckpointError`. A
 against the seam's scannable ledger, not by parsing the runtime's serialization format
 (R9) — the discipline must survive a runtime format change.
 
-### C7 — Bounds apply per inner call (FR-010)
+### C7 — Bounds apply per inner call, and the submission is one step (FR-010, FR-010a)
 
-A program issuing calls past the run's bound is stopped by the bound at the same count a
-structured run would be — checked by `invoke_tool` on the existing path, with no bound
-owned by the seam and none configurable from inside a program.
+Two assertions, because the arithmetic is the trap. **(a)** Each inner call is checked and
+counted once by `invoke_tool` on the existing path — the seam owns no bound and none is
+settable from inside a program. **(b)** A program making N inner calls consumes **N+1**
+steps of the run's budget (the `run_program` submission is the +1), so a program is stopped
+by `max_steps` one inner call *before* an equivalent structured run — asserted with the
+exact counts, **not** a "same total" claim, which the N+1 model makes false. And **(c)** a
+bound reached mid-program surfaces as `ExecutionBoundExceeded` that **terminates the run**,
+distinct from a policy deny (C3), which the program sees as an in-sandbox failure.
 
 ### C8 — Absent runtime, stated refusal (FR-013, SC-007)
 
