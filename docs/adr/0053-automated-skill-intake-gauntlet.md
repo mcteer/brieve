@@ -195,9 +195,16 @@ part so that the temptation is answerable with evidence rather than with confide
 
 ## Notes
 
-**Status is Proposed.** No pipeline exists, no analysis agent is registered, and no eval class
-is defined. This record captures a design so it can be argued with before it is built; it
-claims nothing about the present state of the repository.
+**Accepted 2026-08-05 and built by `specs/037-intake-gauntlet`.** What this record described
+as absent now exists: the pipeline, the analysis agent as a registered definition with the
+narrowest ceiling in the fleet, the hardened isolation tier ADR-0038 named and nothing had
+implemented, the golden-task corpus, the detonation range, and the analyzer's own eval class
+with a floor that fails rather than warns.
+
+The paragraph this replaces said "Status is Proposed. No pipeline exists..." — true when
+written and false the moment the feature merged. A record whose Notes contradict its own
+header is the defect [ADR-0060](0060-three-transports-the-cli-is-withdrawn.md) closed one
+level up, in the constitution.
 
 Adoption lands with pack intake — see the roadmap entry alongside capability packs, where
 skill adoption actually ships.
