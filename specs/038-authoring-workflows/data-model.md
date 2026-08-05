@@ -76,6 +76,12 @@ credential is installation-scoped to the requester's own repositories (R9), so a
 naming somewhere else fails twice: once at the check, and once because the token could not
 reach it. FR-007 asks for the first; the second is what makes the first hard to regress.
 
+**This is a dispatch payload, not a northbound operation** (R16). An authoring request reaches
+the platform as an ordinary dispatched run whose definition carries `author_file` — so Principle
+II's surface parity is **inherited rather than owed**, and a row asserts no new northbound verb
+was added. An absent parity row and a deliberately-inherited one look identical in a diff, and
+only one of them is a gate regression.
+
 ---
 
 ## Authored artifact
@@ -159,6 +165,15 @@ handed a clean proposal reads "clean" as "correct" unless the artefact says othe
 failure this feature is most likely to cause is a review that has been reassured rather than
 informed. Here the limits are specific — what was analysed, what was truncated, that two
 correctness gates ran and what each said.
+
+**And one limit that is not a caveat but a structural fact**, from the spec's own edge cases:
+*an authored artefact necessarily reflects what was read.* Where the analysed source is itself
+the sensitive thing — a proprietary algorithm, an undisclosed schema — "carry nothing out" is
+**not achievable by containment**, because the integration the requester asked for is a
+derivative of exactly that. The containment rules bound what is *copied*; they cannot bound what
+is *implied*. The limits statement says so in the artefact, because the alternative is a
+guarantee the feature cannot keep being read as one it can, and a reviewer deciding what to
+publish needs that distinction before they merge rather than after.
 
 ---
 

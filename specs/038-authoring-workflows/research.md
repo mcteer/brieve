@@ -298,3 +298,102 @@ proposal, which is where a reviewer reads it; a second verbatim copy in an appen
 would put a private repository's authored derivative somewhere nobody can delete it.
 `PROGRAM_SUBMITTED`'s verbatim rule does not transfer — that member records *the model's own
 words as the cause*, and this one records *a derivative of the requester's private code*.
+
+---
+
+*R13–R16 were measured during `/speckit-analyze` and are recorded here rather than only in the
+remediation, because each one changes a decision the plan had already made.*
+
+## R13 — The tier's egress allowlist is right for 037 and wrong for 038
+
+**Measured**: `infra/jobs/analysis-tier.nomad.hcl:69` — `HARNESS_EGRESS_ALLOWLIST = "github.com"`,
+with the comment *"The analyzer may reach the pinned source and nothing else. **Empty would
+also be correct and is stricter than required**."*
+
+**Why 037 needed it**: its analyser **fetched** the pinned upstream. The egress was the job.
+
+**Why 038 must not inherit it**: the subject arrives as a **mount** (R4), so the authoring
+analysis step fetches nothing and needs **no egress at all**. Leaving `github.com` open hands a
+successfully-redirected agent that has just read a private repository a network route to the
+one host in the allowlist that serves arbitrary user-controlled content — a gist, an attacker's
+repository, an issue comment. That is US3's exact failure mode arriving through the network
+layer while FR-015's ceiling assertion still passes.
+
+**Decision**: the authoring analysis step runs with an **empty** allowlist, as its own jobspec
+(`infra/jobs/authoring-tier.nomad.hcl`) so the value stays **static per job** rather than
+becoming per-run.
+
+**FR-005a is satisfied, not bent.** It requires the allowlist remain *static configuration
+rather than becoming per-run*; it does not require it keep 037's *value*. A second jobspec with
+a different static value is still static — a computed one would not be.
+
+**How this was missed the first time**: the plan reasoned about the allowlist's *mutability*
+(the property FR-005a names) and never about its *contents*. A control can be correctly
+immutable and wrongly valued, and only the first was checked.
+
+## R14 — A pack manifest as sketched cannot load, and the loader says why twice
+
+**Measured**, `src/core/packs/loader.py`:
+
+- line 285 — a pack whose tools declare a `product` and which names no `probe` refuses
+  `probe_required` at load. `packs/terraform/pack.toml` records the trap in its own words: *"a
+  pack reaching a product with no probe records UNHEALTHY, and every one of its tools would
+  then be denied `dependency_unavailable` naming a product that is simply absent."*
+- line 288 — `for suite in manifest.eval_suites` — the case floor (`MINIMUM_CASES_PER_SUITE = 5`)
+  iterates the **declared** suites. A pack declaring none has **no floor to fail**.
+
+**Decision**: `packs/github/pack.toml` declares `product = "github"` with a `github_probe`, and
+**declares the five suites with their cases**, like both existing packs.
+
+**Rationale for the second half**: Principle VIII is a MUST — *packs promote only through eval
+gates* — and the loader would not have caught a pack that declared no suites. That is a gate
+which passes by *omission* rather than by *vocabulary*, and it is the same shape 027 refused
+when it declined to rename a field to dodge a matcher. A github pack outside the eval gate
+would be this platform's first, and it would be first by accident.
+
+## R15 — The credential is a THIRD standing exception, and the constitution enumerates two
+
+**Measured**, `.specify/memory/constitution.md` Principle IV: *"The enclave holds no standing
+credentials to anything it manages — **with exactly two named exceptions**, both rotated and
+Control-Group-governed: the management token behind the TFE broker (ADR-0044), and the model
+vendor credential behind the model broker (ADR-0058)."*
+
+**And the precedent is exact.** `tests/unit/test_no_static_credentials.py` records what happened
+last time: *"**027 amended this gate in the open, in the same change that amended the
+constitution**, and for the same reason: the platform now holds a model vendor credential, so a
+check asserting it holds none anywhere would be a check asserting something untrue. The
+alternative considered and rejected was renaming the KV field to something the matcher does not
+know — which would have left the gate green while the credential existed, and **a gate that
+passes by vocabulary is worse than no gate**."*
+
+**Decision**: **Principle IV is amended in the same change**, naming a third exception, and
+ADR-0062 is its motivating record. The exception inherits the same conditions as the other two —
+rotated, Control-Group-governed, held only in the trust store, read under the reading workload's
+own attested identity, delivered per task, never persisted.
+
+**The alternative was considered and is weaker.** One could argue the clause does not bite,
+because it bounds credentials *"to anything it manages"* and the platform does not manage the
+requester's repository. That reading is available and it is exactly the kind of narrowing 027
+declined — the honest move is to amend the enumeration rather than to argue the new credential
+out of it. A closed list that grows by interpretation is not a closed list.
+
+**Consequence**: the plan's Principle IV verdict moves from *Pass, with a new credential class*
+to **Pass, with a constitution amendment**, and the amendment is a task rather than a note.
+
+## R16 — Authoring is a dispatched run, which is what makes surface parity inherited
+
+**Measured**: `src/surfaces/dispatch/` (`entrypoint.py`, `nomad.py`, `inprocess.py`) is how a run
+reaches an allocation today, and `tests/conformance/mcp/test_surface_parity.py` is the live gate
+Principle II's *"the same operation on any transport MUST yield the same verdict and equivalent
+audit events"* is asserted through.
+
+**Decision**: **authoring introduces no new northbound operation.** An authoring request is the
+payload of an ordinary dispatched run whose definition happens to carry `author_file`. Parity is
+therefore **inherited rather than owed**, and a row asserts that inheritance is real — that no
+new northbound verb was added.
+
+**Rationale**: the alternative — a first-class "author" operation on each transport — would owe a
+parity row per transport pair for a capability whose governance is entirely in the definition's
+ceiling and the tier. It would add a surface to certify and change nothing about what is
+enforced. Recording the decision matters more than which way it went: an absent parity row and a
+deliberately-inherited one look identical in a diff, and only one of them is a gate regression.

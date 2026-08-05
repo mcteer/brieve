@@ -144,7 +144,7 @@ Authoring runs under a model bound to the `write` role and qualified for it: sco
 
 - **FR-010**: No secret value MAY appear in produced content, in commit history, or in proposal text. References only.
 - **FR-011**: An attempt to place a secret value into authored output MUST be refused and recorded.
-- **FR-012**: Analysed content MUST NOT appear in the proposal beyond what the produced change itself requires.
+- **FR-012**: *The rule FR-013 operationalizes*: analysed content MUST NOT appear in the proposal beyond what the produced change itself requires. FR-013 is the normative form — this states the intent it serves, so a later change to FR-013 can be checked against what it was for.
 - **FR-013**: A proposal MUST contain only the files the change creates and diffs of the files it edits. No other content from the analysed repository may appear — not in the files, not in the commits, not in the proposal's description.
 - **FR-013a**: The rule MUST be enforced by **inspecting the artifact**, not by the agent declining to include things. A proposal either contains an untouched file or it does not, and that is decidable without a judgement call.
 - **FR-013b**: Surrounding context within an edited file's diff is **the change**, not a leak, and MUST NOT be refused. A rule that forbade it would forbid editing.
@@ -174,7 +174,7 @@ Authoring runs under a model bound to the `write` role and qualified for it: sco
 ### Key Entities
 
 - **Authoring request** — what a person asked for, and which repository of theirs it targets.
-- **Analysed repository** — the provided application. Adversarial by assumption, regardless of who supplied it.
+- **Subject** (the analysed repository) — the provided application. Adversarial by assumption, regardless of who supplied it. Called the *subject* throughout the plan and the design, because it is what the tier mounts and what the containment rules are stated against.
 - **Authored artifact** — what the agent produced. The feature's output, and a claim about work the platform did.
 - **Proposal** — the artifact delivered for a person to decide on. The only way work leaves the platform.
 - **Write cell** — the qualified model binding authoring runs under. The matrix's third role, unbound until now.
