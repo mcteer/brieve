@@ -101,16 +101,31 @@ defining property. The split was reasoned about as **authority** — who holds t
 reads hostile content — and never as **capability**: what each side needs on disk. The assignment
 is also strictly safer, because the task holding the credential never holds the analysed content.
 
-### T7 — The handoff is a checkpoint and a resume (R32)
-Assert the `analyzer` calls `checkpoint_run` before exiting and the `proposer` calls `resume_run`,
-recording `RUN_RESUMED` — so step accounting, bounds and the lease re-acquisition all come from
-the durability seam rather than from a carrier this feature wrote.
+### T7 — The handoff is a checkpoint and a continuation, never a resume (R35)
+Assert the `analyzer` calls `checkpoint_run` before exiting, the `proposer` loads the blob and
+continues under a freshly acquired lease, and — the load-bearing assertion — **`resume_count == 0`
+after a clean handoff**. Assert also that the analyzer leaves the run **non-terminal**.
 
-**Why not a bespoke carrier.** `step_index` and bounds are per-process on `GovernedRun`, and an
-earlier draft proposed serialising them through the workspace — which duplicates the durability
-seam (Principle VII) and routes run state around it (Principle V seals durability). The second
-process continues the first's run, which is what `resume` is for; it also brings re-observation
-of any interrupted step, which the carrier would have had to reinvent next.
+**Why not `resume_run`, which is the obvious call.** It counts `attempt = resume_count + 1`
+against `RESUME_ATTEMPT_CAP = 5` and stops the run terminally past it. A designed-in handoff
+would spend attempt 1 of 5 on **every healthy run**, leave a genuinely interrupted one with four
+revivals where every other run type has five, and make the trail read *"attempt 2 of 5"* for a
+run that never failed. **The cap is a safety bound against flapping**, and spending it on normal
+operation degrades the control silently rather than failing closed when it matters.
+
+The instinct was right and the member was wrong: `checkpoint_run` transfers state,
+`resume_run` counts failures. Reaching for the durability seam rather than writing a second one
+was correct; reaching for the part whose budget is a control was not.
+
+**And the non-terminal assertion is not decoration.** `complete_run` is currently called from
+nowhere in `src/`, so a finished step loop happens to leave the run resumable — which this
+handoff depends on. `resume.py:135` refuses a terminal outcome, so if anyone later adds
+`complete_run` at the end of the loop the handoff breaks. This row makes the dependency a
+statement rather than an accident.
+
+### T8 — `RUN_RESUME` is unset on both tasks (BB2)
+Assert neither task's `env` sets it. `entrypoint.py:983` branches on `RUN_RESUME=1`, so setting
+it takes the revival path T7 exists to avoid.
 
 ### T3 — The analysing step holds no credential that could publish (FR-015, R9)
 Assert **structurally** that the `analyzer` task's environment contains no version-control

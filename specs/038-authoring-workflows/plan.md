@@ -34,8 +34,10 @@ the authority hook, so FR-015 holds verbatim rather than being reworded to fit.
 
 They are sequential rather than concurrent because **the run lease fences by holder identity**:
 two tasks sharing a `run_id` are two holders, and the second would kill the first (R27). A
-`prestart` lifecycle makes the handoff a baton, and the proposer's `acquire` after the analyzer
-exits is the ordinary resume path the fencing was built for. **One allocation means one run and
+`prestart` lifecycle makes the handoff a baton: the analyzer checkpoints and exits, the proposer
+acquires the lease and continues from the blob. It **continues rather than resumes** — `resume_run`
+counts attempts against a cap that exists to stop flapping runs, and a planned handoff must not
+spend it (R35). **One allocation means one run and
 one correlation ID**, which is what Principle IX requires and what two allocations would have
 broken.
 
@@ -172,10 +174,13 @@ src/core/authoring/           # NEW — product-blind, like the rest of core
                               #   observer_required refusal is a MANIFEST check, so this
                               #   registration asserts it itself
 
-                              # NO bespoke state carrier: the handoff is a CHECKPOINT/RESUME on
-                              #   the existing durability seam (R32). Principle V seals durability
-                              #   and a second mechanism in a feature module is Principle VII's
-                              #   fragmentation; `resume_run` brings re-observation with it
+                              # NO bespoke state carrier: the analyzer CHECKPOINTS and the proposer
+                              #   LOADS AND CONTINUES on the existing durability seam (R32, R35).
+                              #   Principle V seals durability and a second mechanism in a feature
+                              #   module is Principle VII's fragmentation — but `resume_run` is NOT
+                              #   called: it counts attempts against RESUME_ATTEMPT_CAP, and a
+                              #   planned handoff must not spend a budget that exists to stop
+                              #   flapping runs. A row pins `resume_count == 0`
 
 docs/adr/0064-*.md            # NEW (Proposed) — version control is a platform capability,
                               #   amending ADR-0038's "pack tool target" clause

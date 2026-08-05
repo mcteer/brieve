@@ -893,9 +893,11 @@ is told."*
 `workspace.py`** — a bespoke state carrier in a feature module. That duplicates the durability
 seam (Principle VII) and routes run state around it (Principle V, which seals durability).
 
-**Decision**: the analyzer **checkpoints**; the proposer **resumes**. Step accounting, bounds and
-the lease re-acquisition all come from the path that already exists, and `resume_run` brings
-re-observation of any interrupted step with it — which T009e would have had to reinvent next.
+**Decision**: the analyzer **checkpoints**; the proposer **loads the checkpoint and continues**.
+Step accounting, bounds and the lease re-acquisition all come from the path that already exists.
+
+**Corrected by R35**: an earlier form of this decision said the proposer *resumes*, which is the
+wrong member of the right seam — see below.
 
 **Why it was reached for**: the handoff was framed as "two processes need to share state", which
 sounds like a serialisation problem. Framed as "the second process continues the first's run",
@@ -934,3 +936,60 @@ surfaced quickly. One definition would simply have been used, the disjointness r
 been quietly adjusted to fit, and SC-009's guarantee would have degraded with nothing going red.
 **A defect that implementation resolves by silently weakening an assertion is exactly the kind
 reading catches and running does not.**
+
+## R35 — The right seam, the wrong member: resume counts failures
+
+**Measured**, `core/durability/resume.py:183–193` and `core/run.py:54`:
+
+```python
+attempt = checkpoint.resume_count + 1
+if attempt > RESUME_ATTEMPT_CAP:     # 5
+    # STOPPED, and TERMINAL.
+```
+
+**So R32's decision, as first written, spent a safety budget on normal operation.** Every healthy
+authoring run would have burned **attempt 1 of 5** on its own designed-in handoff. A genuinely
+interrupted authoring run would then have four revivals where every other run type has five, and
+the trail would read *"attempt 2 of 5"* for a run that never failed.
+
+**The cap exists to stop flapping runs.** Consuming it on a planned transition degrades the
+control *silently* — nothing goes red, the run simply has less margin than the platform believes
+it has. That is the failure shape Principle III's fail-closed discipline exists to exclude.
+
+**Decision**: the analyzer calls `checkpoint_run`; the proposer calls `provider.load(blob_id)` and
+continues under a freshly acquired lease. **`resume_run` is not called.** Revival counting lives
+in `resume_run`, not in `checkpoint_run`, so the state transfers and the budget is untouched. A
+row asserts `resume_count == 0` after a clean handoff, which pins the property permanently.
+
+**Re-observation is not lost, because it was never needed here.** `resume_run` re-observes open
+intents — valuable when a process *died* mid-call. In the handoff the analyzer completed cleanly
+and closed its brackets. If the analyzer genuinely crashes, the allocation fails and the ordinary
+resume path takes over with a **full** cap, which is exactly what the budget is for.
+
+**The lesson, stated because it is subtle.** R32's instinct was right — *do not build a second
+durability mechanism; use the one that exists* — and it reached one function too far.
+`checkpoint_run` transfers state; `resume_run` counts failures. Choosing the seam correctly does
+not choose the member correctly, and a mechanism whose accounting is a safety control cannot be
+borrowed for a purpose that is not a failure.
+
+**One dependency surfaced alongside it and is now asserted rather than assumed**: `complete_run`
+is called from **nowhere** in `src/`, so a finished step loop happens to leave a run resumable —
+which this handoff needs. `resume.py:135` refuses a terminal outcome, so adding `complete_run` at
+the end of the loop later would break the handoff. That is a row now, not an accident.
+
+## R36 — Seven passes, and the first fix to be confirmed rather than corrected
+
+Counts: **4, 2, 2, 2, 3, 2, 1** CRITICALs. The seventh pass was **narrowly scoped to the sixth's
+two fixes**, as recommended, and that is what changed the shape:
+
+- one fix — **task scope standing in for a ceiling** — was **verified sound under measurement**.
+  `RUN_REQUESTED_TOOLS` absent yields an empty frozenset, and the entrypoint records that *"the
+  intersection algebra is strict — an empty requested action set yields an empty effective action
+  set."* A task that forgets to declare its scope gets **nothing**, not everything. First fix in
+  seven passes positively confirmed rather than found wanting.
+- the other — **the handoff** — was wrong by one function call, not by design.
+
+**A scoped pass can exhaust a small surface; a broad pass cannot.** Six broad passes each found
+defects in whatever region the previous had not examined, which is why the count never fell. One
+narrow pass over two specific fixes found one real defect and cleared the other, which is the
+convergence signal the counts alone never showed.
