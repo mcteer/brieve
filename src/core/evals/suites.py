@@ -46,6 +46,25 @@ SUITES: Final[tuple[str, ...]] = (
     "report_fidelity",
 )
 
+#: **The intake analyzer is qualified, and deliberately NOT from `SUITES` above** (037).
+#:
+#: The first attempt added `intake_analysis` here and nine existing rows refused it, correctly:
+#: `SUITES` is the PER-PACK list, so membership demands every pack ship
+#: `evals/intake_analysis.toml` and demands the judge's seed set span it. The analyzer is not a
+#: per-pack artifact — it is one platform component, qualified once against its own
+#: human-labelled corpus in `evals/intake-seed/`, by `core.evals.intake_seed` and
+#: `core.evals.intake_scoring`.
+#:
+#: Forcing it into this tuple would have created a suite every pack must satisfy for a
+#: capability no pack owns, and the machinery said so through the rule that already exists:
+#: *a gate with no cases must fail rather than pass vacuously*. That rule was written for a
+#: different reason and caught this one exactly.
+#:
+#: **`OWED` stays empty and this is not a deferral.** The analyzer's qualification exists and
+#: is merge-blocking; it simply is not a per-pack suite, which is a statement about shape
+#: rather than about readiness.
+INTAKE_QUALIFICATION = "intake_analysis"
+
 #: Suites the constitution names that cannot yet bind. **Empty since 021** — every row in the
 #: eval gate is now in force.
 #:

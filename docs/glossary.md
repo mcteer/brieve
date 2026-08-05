@@ -90,6 +90,27 @@ makes reaches `invoke_tool`. Owned by the platform rather than the runtime becau
 runtime does not enforce which functions a program may call: it forwards every unresolved
 name to the host, so the host's handler is the security boundary (036, FR-014a).
 
+**Intake gauntlet** — the staged pipeline that analyses an adopted skill's upstream change
+before a person reads it: poll, diff, adversarial read, differential detonation, evidence
+package. It decides what a reviewer reads and **never whether a skill promotes** (ADR-0053).
+
+**Detonation range** — an operated component with no authority source at all and no route to
+any real estate, seeded with canaries, where a presumed-hostile candidate is executed so its
+behaviour can be compared with the pinned version's. Deliberately *not* the development
+identity fake, which stays test-only (037).
+
+**Canary** — planted material whose appearance anywhere outside the range is proof of
+exfiltration. Records carry a canary's **identifier and never its value**: a trail that quoted
+canaries would be the exfiltration channel it exists to detect.
+
+**Analysis verdict** — `clean` / `flagged` / `inconclusive`. May block a candidate; **can
+never approve one** — there is no such value, so the type cannot express an approval
+(ADR-0043).
+
+**Intake seed set** — human-labelled hostile *and benign* cases the analyzer is qualified
+against, with a floor that fails rather than warns. The benign clause is what keeps "flag
+everything" from qualifying (037, ADR-0052's mechanism).
+
 **Sealed core** — the parts no downstream change may modify: identity flows, hook
 engine, registries, audit schema, durability, adapters. Everything else extends
 through semver'd seams: hooks, packs, prompt overlays, policy bundles, providers.

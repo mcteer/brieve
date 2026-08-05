@@ -109,7 +109,7 @@ same change.
 | [0050](0050-harness-ceilings-live-in-the-trust-fabric.md) | The harness-domain ceiling is its own record in the trust fabric | Accepted |
 | [0051](0051-a-turn-is-evidence-a-thread-is-a-view.md) | A turn is evidence; a thread is a view | Accepted |
 | [0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md) | The first judge is qualified by a human-labeled seed set | Accepted |
-| [0053](0053-automated-skill-intake-gauntlet.md) | An automated intake gauntlet for skill adoption; the human gate is unchanged | Proposed |
+| [0053](0053-automated-skill-intake-gauntlet.md) | An automated intake gauntlet for skill adoption; the human gate is unchanged | Accepted (amended on acceptance — range, analyzer floor, manual path) |
 | [0054](0054-model-written-orchestration-parity.md) | Model-written orchestration: per-call and per-delegation governance parity | Proposed |
 | [0055](0055-audit-egress-for-tamper-evidence.md) | Tamper-evidence requires a copy outside the writer's blast radius | Accepted |
 | [0056](0056-task-scope-needs-an-authorization-server-vault-is-not-one.md) | Task scope needs an authorization server, and Vault is not one | Accepted |

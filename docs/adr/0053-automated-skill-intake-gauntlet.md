@@ -1,6 +1,6 @@
 # ADR-0053: An automated intake gauntlet for skill adoption; the human gate is unchanged
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-08-05, by `specs/037-intake-gauntlet`)
 - **Date**: 2026-07-29
 - **Extends**: [ADR-0004](0004-adopt-skills-as-governed-supply-chain.md)
 - **Relates to**: [ADR-0021](0021-connectivity-tiers.md), [ADR-0030](0030-pinned-versus-consulted-artifacts.md), [ADR-0038](0038-integration-uplift-workflows.md), [ADR-0043](0043-judge-screened-precedent-reuse.md), [ADR-0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md)
@@ -109,6 +109,50 @@ rate**; a **false-positive budget**; and a **calibration check for lenient drift
 analyzer nobody re-qualifies is the ungated input to every intake decision above it — the
 same failure [ADR-0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md)
 terminates for judges.
+
+## Amendments on acceptance (2026-08-05)
+
+Three questions this record gestured at without settling, decided by 037's clarification and
+recorded here rather than left in a spec nobody will read next to the ADR.
+
+**The detonation range is purpose-built, not the development identity stand-in.** This record
+described the range as "the development-grade identity stand-in — the fake authority source
+that feature 010 retires from production". Measured while planning 037: that fake is
+test-only, and `test_fake_fabric_is_fault_injection_only` is a merge-blocking gate requiring
+every conformance row resolving authority through it to declare which failure mode it
+injects. Reusing it would mean amending that guard so the fake acquires a legitimate
+production life — weakening a control to accommodate a convenience, which is the move this
+repository refused when it declined psycopg rather than loosen the licence gate. The range is
+built as its own component with its own posture: **no authority source at all**, no route to
+any real estate, canaries seeded, full audit.
+
+**The named trigger, which Principle VI requires.** The range is an *operated component*, and
+the constitution says every additional one needs a trigger recorded in an ADR. The trigger is
+this: **stage 5 requires executing a presumed-hostile candidate somewhere it can do nothing,
+and that is a place rather than a library.** It needs its own network posture, its own
+identity boundary and its own seeded canaries; none of those is expressible as a dependency.
+The alternative — detonating in-process — collapses the observer/specimen separation below,
+which is the one property whose loss recreates the vulnerability this gauntlet exists to
+inspect.
+
+**The analyzer's eval class inherits ADR-0052's mechanism and not its floor.** Human-labelled
+cases checked into the repository, reviewed like code, with a floor that FAILS rather than
+warns — that mechanism is exactly right and is adopted whole. The *number* is not:
+[ADR-0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md)'s floor is
+calibrated to the four answering suites, and intake has no suites — it has attack classes.
+Inheriting "at least 20 cases spanning all four suites" would have been a category error that
+still passed at the right threshold. 037 states its own floor in those terms, and adds the
+clause ADR-0052 did not need: **benign cases the analyzer must not flag**, without which the
+false-positive budget has nothing to measure against and a corpus of purely hostile content
+would qualify an analyzer that flags everything.
+
+**Adoption remains possible when the pipeline is unavailable, and taking that path is
+recorded.** A gauntlet whose absence blocks all adoption has become a dependency of the
+supply chain it protects — an availability problem presenting as a security control, and one
+that pushes an operator under deadline toward editing the pin directly, which leaves no
+record at all. So the manual path stays, and using it writes `INTAKE_BYPASSED`: who, when,
+which skill, and why the pipeline was unavailable. A bypass that is recorded can be reviewed
+for becoming routine; a bypass that is forbidden becomes invisible.
 
 ## Consequences
 

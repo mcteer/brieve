@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Skill intake detection (037, US1). Scheduled rather than event-driven: ADR-0053 chose
+# polling over webhooks so no inbound surface is opened, and so the same pipeline degrades
+# across connectivity tiers where a webhook cannot.
+#
+# **This lane adopts nothing.** It checks pins and reports. A moved pin becomes a proposal a
+# person reviews; the gauntlet's later stages, and the human gate, are what decide anything.
+name: intake-poll
+
+on:
+  schedule:
+    # Weekly. Upstream skill repositories move on the order of weeks, and a poll cadence
+    # faster than upstream's motion buys nothing but noise — the cost this feature removes is
+    # "nobody noticed for a month", not "nobody noticed for a day".
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --frozen --extra adapters --extra surfaces
+
+      # A non-zero exit means an upstream could not be reached — reported as a failure rather
+      # than as "no change" (FR-003), because an unmaintained pin that looks maintained is the
+      # condition this whole feature exists to end.
+      - name: Check adopted pins
+        run: infra/bin/intake-poll
