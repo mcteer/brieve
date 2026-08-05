@@ -44,14 +44,39 @@ class SandboxLedger:
         self.resume_values.append((call_id, value))
 
     def scannable(self) -> dict[str, Any]:
-        """The ledger as a plain mapping, for the checkpoint credential scanner.
+        """The ledger FLATTENED, so the checkpoint credential scanner can see into it.
 
-        Shaped for `_reject_credentials`, which walks a payload looking for values that
-        look like credentials. Returning a nested structure rather than a flattened one
-        keeps the scan honest — a flattener that dropped a level would be a scanner that
-        stopped finding things, which is the failure this whole file exists to avoid.
+        **Measured, and the reason this method is not the obvious nested shape.** The
+        adapter's `_reject_credentials` inspects *top-level keys only* — it does not walk. A
+        nested payload therefore hides every credential-shaped key one level down, and a
+        checkpoint row asserting "a credential is refused" would pass while a credential in a
+        tool result sailed through. That is a scanner that has stopped finding things, which
+        is exactly the failure this file exists to prevent (FR-011, research R9).
+
+        So every mapping the sandbox saw is hoisted: a key anywhere in the ledger becomes a
+        key here, prefixed with where it came from. Prefixes keep provenance readable without
+        hiding the key itself — `_reject_credentials` matches on the key's own name, so
+        `resume.0.api_key` still ends in the token it is looking for.
+
+        Non-mapping values are carried under their own path. Nothing is dropped: a scanner
+        that summarized would be one that could stop noticing.
         """
-        return {
-            "inputs": dict(self.inputs),
-            "resume_values": [{"call_id": cid, "value": v} for cid, v in self.resume_values],
-        }
+        flat: dict[str, Any] = {}
+
+        def hoist(prefix: str, value: Any) -> None:
+            if isinstance(value, dict):
+                for key, inner in value.items():
+                    hoist(f"{prefix}{key}" if not prefix else f"{prefix}.{key}", inner)
+                    # The bare key too, so a shallow scanner matching on exact key names
+                    # sees it. Provenance lives in the prefixed entry beside it.
+                    if isinstance(key, str) and not isinstance(inner, dict | list):
+                        flat.setdefault(key, inner)
+            elif isinstance(value, list):
+                for index, item in enumerate(value):
+                    hoist(f"{prefix}.{index}" if prefix else str(index), item)
+            else:
+                flat[prefix] = value
+
+        hoist("inputs", dict(self.inputs))
+        hoist("resume", [{"call_id": cid, "value": v} for cid, v in self.resume_values])
+        return flat
