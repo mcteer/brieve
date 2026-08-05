@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Check every adopted skill's pin against upstream (037, US1).
+#
+# Polling rather than webhooks, deliberately (ADR-0053): no inbound surface is opened, and
+# polling degrades across connectivity tiers where a webhook cannot. A restricted estate polls
+# through its allowlisted proxy; an air-gapped estate passes `--snapshot` and runs the
+# identical pipeline against an imported bundle.
+set -euo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO"
+exec uv run --extra adapters --extra surfaces python -m core.intake.poll "$@"

@@ -14,7 +14,7 @@ nobody could reach is not evidence that nothing changed.
 from __future__ import annotations
 
 import tomllib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -89,6 +89,8 @@ __all__ = [
     "Pin",
     "PinState",
     "check_pin",
+    "github_head_fetcher",
+    "snapshot_fetcher",
     "read_pin",
     "read_pins",
 ]
@@ -134,3 +136,40 @@ def check_pin(pin: Pin, fetch_head: Fetcher) -> CheckResult:
     if head == pin.commit:
         return CheckResult(pin=pin, state=PinState.UNMOVED, upstream_commit=head)
     return CheckResult(pin=pin, state=PinState.MOVED, upstream_commit=head)
+
+
+def github_head_fetcher(open_url: Callable[[str], bytes]) -> Fetcher:
+    """A fetcher over a repository host's ref API, for connected and proxied estates.
+
+    ``open_url`` is injected so the transport stays the caller's choice — `urllib` here as
+    everywhere else in this repository (no HTTP client enters the tree), or a proxy-aware
+    reader in a restricted estate. `core` never opens a socket itself.
+    """
+
+    def fetch(pin: Pin) -> str:
+        owner_repo = pin.repository.rstrip("/").removeprefix("https://github.com/")
+        payload = open_url(f"https://api.github.com/repos/{owner_repo}/commits/HEAD")
+        import json
+
+        return str(json.loads(payload).get("sha", ""))
+
+    return fetch
+
+
+def snapshot_fetcher(snapshot: Mapping[str, str]) -> Fetcher:
+    """A fetcher over an imported bundle, for air-gapped estates (FR-001).
+
+    The air-gapped half of ADR-0021's answer, and the half analyze pass 2 found asserted but
+    unbuilt. It is deliberately trivial: a snapshot is a recorded mapping of repository to
+    head, produced when the bundle was assembled. **The point is that it is the same
+    `Fetcher`** — the pipeline downstream cannot tell an imported bundle from a live read,
+    which is what makes "one pipeline with one trigger difference" true rather than claimed.
+
+    A repository absent from the snapshot raises, and `check_pin` turns that into
+    UNREACHABLE: a bundle that does not mention a pin has not told us the pin is unchanged.
+    """
+
+    def fetch(pin: Pin) -> str:
+        return snapshot[pin.repository]
+
+    return fetch
