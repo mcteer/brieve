@@ -33,6 +33,19 @@ The same pipeline run against an imported snapshot produces the same proposal sh
 against a reachable upstream. Two implementations is what ADR-0053 forecloses; this is the
 row that keeps it foreclosed.
 
+## The isolation tier (US2 prerequisite)
+
+### A0 — The tier is a tier, not a ceiling (FR-006, FR-009)
+Assert the analysis allocation's posture **structurally**: bridge networking rather than
+`network_mode = "host"`, egress allowlisted to the pinned source, no repository mount, and a
+workload identity of its own. Then assert a definition requiring the hardened tier is
+**refused** when dispatched into an allocation that does not provide it.
+
+**Why this row is separate from A2.** A ceiling bounds what a definition may *call*; a tier
+bounds what the process can *reach*. The two are easy to conflate, and a feature that built
+only the ceiling would satisfy every containment row here while leaving ADR-0038's actual
+premise — that analyzed material is adversarial at the process level — unimplemented.
+
 ## Containment (US2)
 
 ### A1 — Candidate text is data, never instruction (FR-008)
@@ -82,6 +95,12 @@ the other three can lose; without it a qualification that always passes has qual
 Change the analyzer, attempt promotion without re-qualifying, and assert refusal.
 
 ## The human gate (US5)
+
+### Q6 — Leniency drift is surfaced, not absorbed (FR-018)
+Retain each qualification's scores and assert a **downward trend in the must-flag rate** is
+reported. Q1–Q5 are point-in-time and would all pass while the analyzer degrades one
+requalification at a time — which is the silent failure US4 exists to prevent, and the only
+one in this contract that no single run can detect.
 
 ### H1 — No pipeline outcome promotes (FR-021, SC-006)
 Drive every stage to its most favourable outcome and assert the skill is **not** promoted

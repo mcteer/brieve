@@ -97,7 +97,10 @@ src/core/intake/              # NEW — the pipeline, product-blind like the res
 ├── pins.py                   # read [upstream] pins; what "moved" means
 ├── proposal.py               # candidate identity by content digest, delta, evidence package
 ├── verdict.py                # the analyzer's structured output; may block, never approves
+├── tier.py                   # a definition REQUIRES the hardened tier; dispatch refuses
+│                             #   one that asks for it outside a tier that provides it
 ├── detonation.py             # the comparison: attempts, denials, canary contact
+├── separation.py             # specimen/observer split; the observer reads records
 └── manual.py                 # the recorded bypass (FR-025a)
 
 src/core/evals/
@@ -108,6 +111,9 @@ src/core/audit/schema.py      # additive: ANALYSIS_VERDICT, DETONATION_COMPARED,
                               #           CANARY_CONTACT, INTAKE_BYPASSED
 evals/intake-seed/            # NEW — human-labelled hostile cases, reviewed like code
 corpus/golden-tasks/          # NEW — the fixed task corpus detonation diffs against
+infra/jobs/analysis-tier.nomad.hcl      # NEW — the hardened tier ADR-0038 named and
+                              #       nothing built: bridge networking, allowlisted egress,
+                              #       no repo mount, its own identity
 infra/jobs/detonation-range.nomad.hcl   # NEW — the operated range, no real authority
 infra/bin/intake-poll         # NEW — the scheduled poller (urllib, like corpus-sync)
 docs/adr/0053-*.md            # Proposed → Accepted, amended by the clarifications
@@ -134,6 +140,12 @@ Re-evaluated after Phase 1. No verdict changed; two were sharpened by design dec
 - **IX** — the data model gives `CANARY_CONTACT` its own event rather than a field on the
   comparison, because a canary is a fact about containment and burying it in a diff would
   make the loudest available signal the quietest field in a payload.
+
+**A gap analyze caught before implementation**: this plan promised the hardened isolation
+tier in its Summary and cited it in the Principle I verdict, and the first task list built a
+narrow *ceiling* instead — which bounds what a definition may call, not what the process can
+reach. The tier is now three tasks (T008a–c) with a structural row, and the distinction is
+written into both so it cannot be re-conflated.
 
 One risk moved into the record rather than being resolved: R9 sequences the analyzer's eval
 suite to land *with* the analyzer so `OWED` stays empty. Shipping the pipeline first would
