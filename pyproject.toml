@@ -53,6 +53,26 @@ adapters = [
     "anthropic==0.120.2",
 ]
 
+# Code-mode sandbox (ADR-0041, 036), optional so the base install never grows a Rust
+# interpreter for a capability most runs do not use (Principle VI — a library behind an
+# extra is not an operated component, so no named-trigger ADR is owed).
+#
+# THE DISTRIBUTION IS `pydantic-monty`, NOT `monty`, and the difference is a supply-chain
+# trap rather than a naming preference. PyPI `monty` is an unrelated materials-science
+# package from the pymatgen ecosystem ("Monty is the missing complement to Python",
+# 2026.7.16); `uv add monty` installs it without error and nothing downstream complains
+# until the import fails. ADR-0004's identified-content discipline applies to a runtime
+# dependency exactly as it applies to a document, so the name is asserted by a unit gate
+# (`tests/unit/test_sandbox_dependency_identity.py`) and not merely written correctly once.
+#
+# Pinned EXACT rather than floored. Upstream is 0.0.x by its own versioning and moved
+# 0.0.17 -> 0.0.19 in the week around ADR-0054; its banner reads "Experimental — not ready
+# for prime time". The platform owns the sandbox seam (FR-014a) precisely so this runtime
+# is replaceable, and an exact pin is what makes a version move a deliberate act.
+sandbox = [
+    "pydantic-monty==0.0.19",
+]
+
 # Northbound API surface (ADR-0033), optional so the core install stays free of a web
 # framework. Deliberately an EXTRA and not a base dependency, which is the opposite call
 # from pg8000 above: pg8000 is imported by `core` itself, so making it optional would make

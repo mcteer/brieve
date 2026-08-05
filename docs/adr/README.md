@@ -96,7 +96,7 @@ same change.
 | [0037](0037-tool-transport-policy.md) | Tool transport policy — MCP where mature, native tools otherwise | Accepted |
 | [0038](0038-integration-uplift-workflows.md) | Integration and uplift work is a first-class workflow family | Accepted |
 | [0039](0039-per-role-model-bindings.md) | Definitions pin per-role model bindings, not a single model | Accepted |
-| [0040](0040-deferred-tool-disclosure.md) | Tool and capability disclosure is deferred by default | Accepted |
+| [0040](0040-deferred-tool-disclosure.md) | Tool and capability disclosure is deferred by default | Accepted (audit clause amended by [0061](0061-discovery-is-recorded-never-refused.md)) |
 | [0041](0041-code-mode-requires-hook-parity.md) | Code mode ships only with verified per-call hook parity | Accepted |
 | [0042](0042-duplicate-detection-and-precedent-cache.md) | Duplicate detection and precedent reuse — two mechanisms, neither skipping governance | Accepted |
 | [0043](0043-judge-screened-precedent-reuse.md) | Judge-screened precedent reuse, fail-closed on uncertainty | Accepted |
@@ -117,6 +117,7 @@ same change.
 | [0058](0058-model-credential-brokering.md) | A model vendor credential is brokered from the trust store, per task | Accepted |
 | [0059](0059-estate-eval-evidence-spans-asker-roles.md) | A cell's estate evidence spans the asker roles its cases declare | Accepted |
 | [0060](0060-three-transports-the-cli-is-withdrawn.md) | Three transports — the CLI is withdrawn | Accepted |
+| [0061](0061-discovery-is-recorded-never-refused.md) | A search for a tool is recorded, and can never be refused | Accepted |
 
 ## Reviews
 

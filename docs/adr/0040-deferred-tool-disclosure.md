@@ -1,6 +1,10 @@
 # ADR-0040: Tool and capability disclosure is deferred by default
 
-- **Status**: Accepted
+- **Status**: Accepted — amended in part by [ADR-0061](0061-discovery-is-recorded-never-refused.md)
+- **Amended by**: [ADR-0061](0061-discovery-is-recorded-never-refused.md) — the "no audit
+  change" clause below. A search for an undisclosed tool is now recorded as an observation
+  (and can never be refused). Everything else stands: no registry change, no hook change,
+  every tool registered, every CALL through the full pipeline.
 - **Date**: 2026-07-21
 - **Extends**: [ADR-0019](0019-adapter-on-framework-capabilities.md)
 - **Relates to**: [ADR-0037](0037-tool-transport-policy.md)
