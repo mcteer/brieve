@@ -840,3 +840,97 @@ Two habits follow, and they belong in the record rather than in a resolution:
    code* surfaces in minutes — a lease that fences, a task that cannot read what it needs — and
    no further reading of documents finds them faster. The honest next step after these fixes is
    implementation, not a sixth pass.
+
+---
+
+*R31–R33 came from the **sixth** pass, which audited the fifth's fixes. Both CRITICALs were
+collisions between two of my own remediations — individually correct, jointly impossible.*
+
+## R31 — One run has one definition, and task scope is what actually separates the two halves
+
+**Measured**: `DefinitionBindings(agent_definition_id, packs, binding_map, tier)` is resolved
+**once per run**, and `agent_definition_id` arrives as a single dispatch meta value. So a run has
+**one** definition, **one** ceiling and **one** binding map.
+
+**The collision**: T012c (pass one) authored an *analysing* definition and a *proposing*
+definition with disjoint ceilings; T009 (passes four and five) made them two tasks of **one
+run**. Both were correct answers to the finding that produced them, and together they require a
+run to hold two definitions. The rows asserting ceiling disjointness — V2 and T3 — were
+asserting a property the design cannot have.
+
+**Decision**: **one definition**, whose ceiling carries `read_subject`, `author_file` and
+`open_proposal` — and the separation moves to **task scope**, which is the platform's own
+mechanism for exactly this.
+
+**Measured, and it is already built**: `intersect_scopes(user, ceiling, requested, policy)` in
+`core/authority/intersection.py`, with `requested` reaching the run as
+`RUN_REQUESTED_TOOLS = "${NOMAD_META_requested_tools}"`. Principle IV names it in so many
+words — *"effective authority = user ∩ agent ceiling ∩ task scope ∩ policy"*, and *"task scope
+may narrow the ceiling"*. **Nomad `env` is per-task**, so the `analyzer` task declares
+`read_subject,author_file` and the `proposer` declares `open_proposal`, and the authority hook
+intersects each against the one ceiling.
+
+**FR-015 survives verbatim rather than being reworded.** *"The authoring definition's ceiling
+MUST contain nothing that could carry a redirection outside the run"* is satisfied at the level
+that decides tool calls: `authority.py:98` tests `effective.tool_names`, and the analyzer's
+effective set contains nothing that egresses. The requested scope arrives as dispatch metadata
+read at run start and is **not mutable from inside the run** — the same property that makes a
+ceiling trustworthy — which is asserted rather than assumed.
+
+**What this is better than the alternative.** Two definitions would have meant two runs and two
+correlation IDs, undoing pass four's fix; rewording FR-015 to talk about "task posture" would
+have weakened a requirement to fit an implementation. Task scope needs neither: it is narrower
+than the ceiling, per-task, operator-authored, and already enforced.
+
+## R32 — The handoff is a resume, and the platform already has one
+
+**Measured**: `core/durability/checkpoint.py` (`checkpoint_run`, `complete_run`, `suspend_run`),
+`core/durability/resume.py` (`resume_run`, `ResumeDecision`), the `RUN_RESUMED` audit member, and
+the dispatcher's own note that *"resume state travels as metadata, like everything else the job
+is told."*
+
+**The defect**: T009e proposed carrying `step_index` and bounds across the handoff **in
+`workspace.py`** — a bespoke state carrier in a feature module. That duplicates the durability
+seam (Principle VII) and routes run state around it (Principle V, which seals durability).
+
+**Decision**: the analyzer **checkpoints**; the proposer **resumes**. Step accounting, bounds and
+the lease re-acquisition all come from the path that already exists, and `resume_run` brings
+re-observation of any interrupted step with it — which T009e would have had to reinvent next.
+
+**Why it was reached for**: the handoff was framed as "two processes need to share state", which
+sounds like a serialisation problem. Framed as "the second process continues the first's run",
+it is the thing `resume` is for. The wrong frame produced a correct-looking task that would have
+built a second durability mechanism inside a feature.
+
+## R33 — Three smaller corrections to the fifth pass
+
+**The authoring job must be dispatchable.** `NomadDispatcher` takes `job_id` (defaulting to
+`agent-run`), so a different job is supported — but nothing said `authoring-tier` carries a
+`parameterized` stanza and the same `meta_required` contract (`correlation_id`, `tenant_id`,
+`agent_definition_id`, `packs`, `steps`, `run_id`). A jobspec without it cannot be dispatched by
+the dispatcher that exists.
+
+**Vendoring a provider mirror was impractical and I prescribed it without checking.** Terraform
+provider binaries run to tens or hundreds of megabytes per platform. Determinism comes from
+`.terraform.lock.hcl`; the providers are **cached in CI keyed on that file**, not committed.
+
+**The pack gate now rests on one check.** R2 counted three independent controls — ceiling, the
+pack's declared workflow, the tier. With both tools platform-level, the pack's workflow no longer
+gates publishing at all, so "only products whose pack declares an authoring workflow" is enforced
+solely by the request validation in `request.py`. That single check is now asserted by its own
+row rather than left as a property of a module.
+
+## R34 — Six passes, and what the count actually says
+
+4, 2, 2, 2, 3, 2 CRITICALs. **Not converging on zero, but the *kind* has narrowed sharply**:
+passes one and two found defects in the plan; three and four found over-claims and missing
+layers; five and six found **collisions between remediations** — fixes that are individually
+correct and jointly impossible.
+
+**The pass-five recommendation to stop was wrong, and the reason is worth keeping.** It argued
+that a lease which fences and a task that cannot read what it needs are defects implementation
+surfaces in minutes. True of those two, and it did not generalise: R31 would **not** have
+surfaced quickly. One definition would simply have been used, the disjointness rows would have
+been quietly adjusted to fit, and SC-009's guarantee would have degraded with nothing going red.
+**A defect that implementation resolves by silently weakening an assertion is exactly the kind
+reading catches and running does not.**

@@ -26,6 +26,12 @@ mounted **read-only** and the platform's tree unmounted, and splits the run into
 subject — reading, authoring, composing and containment. The `proposer` task never mounts the
 subject and does one thing: publish an already-contained proposal.
 
+**One run means one definition and one ceiling**, so the separation is **task scope** rather
+than disjoint ceilings: each task declares its own `RUN_REQUESTED_TOOLS`, and `intersect_scopes`
+narrows the shared ceiling per task (R31). That is Principle IV's own mechanism — *"effective
+authority = user ∩ agent ceiling ∩ task scope ∩ policy"* — already built and already enforced at
+the authority hook, so FR-015 holds verbatim rather than being reworded to fit.
+
 They are sequential rather than concurrent because **the run lease fences by holder identity**:
 two tasks sharing a `run_id` are two holders, and the second would kill the first (R27). A
 `prestart` lifecycle makes the handoff a baton, and the proposer's `acquire` after the analyzer
@@ -34,8 +40,8 @@ one correlation ID**, which is what Principle IX requires and what two allocatio
 broken.
 
 The **network namespace is shared**, and that is stated rather than glossed. What contains the
-analyzer is: no egressing tool in its ceiling, no credential in its task, and a declared empty
-allowlist. Three controls, not four.
+analyzer is: nothing egressing in its **effective scope**, no credential in its task, and a
+declared empty allowlist. Three controls, not four.
 
 **Proposing and qualifying** (US2, US5) delivers the work as a pull request through a
 non-repeatable **platform** tool with an observer — which hands FR-009 and the interrupted-run edge
@@ -55,15 +61,15 @@ platform produced, and enactment consults it.
 dependency is a **credential path to a version-control host** (R9), which is a Vault-vended
 short-lived credential rather than a library. The first correctness gate runs in the **enclave
 lane, which already installs the binary** (`install_hashicorp terraform`) — a precedent R10
-never measured; what it adds is a **vendored filesystem provider mirror** so `terraform init` is
-deterministic and needs no registry egress.
+never measured; what it adds is a `.terraform.lock.hcl` with the providers **cached in CI keyed on
+that file** — determinism comes from the lock, not from committing binaries (R33).
 
 **Storage**: none new. The workspace is ephemeral per run; authored artefacts live in the
 proposal and their digests in the existing audit trail.
 
 **Testing**: pytest — conformance rows in `tests/conformance/authoring/` (new), component
 suites for the workspace/containment/proposal stages, unit gates for the structural properties
-(ceiling disjointness, tier posture, provenance), and the `write` role's qualification scored
+(task-scope narrowing, tier posture, provenance), and the `write` role's qualification scored
 as its own corpus.
 
 **Target Platform**: unchanged (macOS dev, Linux CI/Nomad). The analysis step is the existing
@@ -97,7 +103,7 @@ be correct for one and must not assume a population, which is 037's R2 lesson ar
 | I — Build Glue Only | **Pass** | Authoring assembles what exists — the registry's unused `write` class, the matrix's unbound `write` role, 037's tier, 036's governed loop, the non-repeatable/observer bracket. What is genuinely new is the **corpus**, which is content rather than product, and which ADR-0038 predicted would be "real work". No editor, no VCS product, no diff engine — `difflib` is in the standard library. |
 | II — Total Interception; One Governed Tool Layer | **Pass** | `author_file` and `open_proposal` are ordinary registered tools reaching execution through `invoke_tool`. Code mode is unchanged **and is not on the path this feature ships**: measured, `run_program` is registered nowhere (R19), so a program that writes a file does so through the seam in conformance rows rather than in a running definition. The seam's guarantee is asserted; the production path is 036's to complete, and this feature must not claim it. Transport for `open_proposal` is decided by ADR-0037's standing test at registry review and recorded on the entry (R6). **Northbound: no new operation.** An authoring request is the payload of an ordinary dispatched run, so surface parity is **inherited rather than owed** (R16) — and a row asserts the inheritance is real, because an absent parity row and a deliberately-inherited one look identical in a diff and only one is a gate regression. |
 | III — Fail-Closed, In-Process Enforcement | **Pass, with two registrations** | Every gate refuses: an unqualified `write` cell (`resolve_with_fallback` has no third branch), a non-hardened posture (`assert_tier` by clause), a secret or analysed content heading into an artefact (`CONTAINMENT_REFUSED`), a repository the requester does not own, an enactment of platform-authored content. The corpus floor **fails rather than warns** (FR-018b). **The provenance refusal and the injection lens are `GOVERNANCE`-kind `HookRegistration`s, not module functions** — the first two drafts placed both in modules a caller must remember to call, which reads identically in a task list and is not enforcement (R23). The lens attaches to a registered `read_subject` tool, because a read-only mount read by ordinary file access offers no hook to attach to. |
-| IV — Zero Standing Credentials; Authority Per Task | **Pass, with a CONSTITUTION AMENDMENT** | Every step authenticates as its own attested workload identity, and the publishing credential is Vault-vended, hour-scoped and installation-scoped to the requester's own repositories. **But Principle IV enumerates "exactly two named exceptions" and this is a third** (R15) — so the principle is **amended in the same change**, on 027's precedent, with ADR-0062 as its motivating record. The exception inherits the other two's conditions: rotated, Control-Group-governed, trust-store only, read under the reading workload's own attested identity, delivered per task, never persisted. Arguing the clause does not bite (the platform does not *manage* the requester's repository) was available and is the narrowing 027 declined — **a closed list that grows by interpretation is not a closed list**. The key is never mounted into the hardened tier: the step that reads hostile content cannot publish. |
+| IV — Zero Standing Credentials; Authority Per Task | **Pass, with a CONSTITUTION AMENDMENT** | Every step authenticates as its own attested workload identity, and the publishing credential is Vault-vended, hour-scoped and installation-scoped to the requester's own repositories. **But Principle IV enumerates "exactly two named exceptions" and this is a third** (R15) — so the principle is **amended in the same change**, on 027's precedent, with ADR-0062 as its motivating record. The exception inherits the other two's conditions: rotated, Control-Group-governed, trust-store only, read under the reading workload's own attested identity, delivered per task, never persisted. Arguing the clause does not bite (the platform does not *manage* the requester's repository) was available and is the narrowing 027 declined — **a closed list that grows by interpretation is not a closed list**. The key is never mounted into the hardened tier, and **task scope narrows the shared ceiling per task** so the analysing half's effective authority carries nothing that egresses — Principle IV's own user ∩ ceiling ∩ task scope ∩ policy, used as intended (R31). |
 | V — Sealed Core, Versioned Seams | **Pass, with review** | Four additive `AuditEventType` members (`ARTIFACT_AUTHORED`, `PROPOSAL_OPENED`, `CONTAINMENT_REFUSED`, `ENACTMENT_REFUSED`) on `TOOL_CHOSEN`'s precedent, carrying the approved spec and security-maintainer review. **`RiskClass` and `Role` are not edited** — `write` already exists in both (R1), which is the whole payoff of vocabulary defined in advance. |
 | VI — Lean by Default | **Pass** | **No new operated component.** A pack is content; a workspace is a directory; the analysis step is the existing tier job with a mount added. The one genuinely operated thing is the version-control credential path, which is an integration rather than a service and is named in ADR-0062. |
 | VII — Anti-Fragmentation | **Pass** | One authoring path for every product: the same `author_file`, `read_subject` and `open_proposal`, the same containment, the same proposal shape whether the artefact is a Terraform module or application code. **All three are platform tools rather than pack tools** — a per-pack copy would be N implementations of one containment rule (R2), and **publishing is as product-blind as authoring** (R29): a pull request against a Terraform module and one against application code are the same act. The tier moves out of `core.intake` for the same reason (R3). |
@@ -165,6 +171,11 @@ src/core/authoring/           # NEW — product-blind, like the rest of core
                               #   publishing is as product-blind as authoring (R29); the
                               #   observer_required refusal is a MANIFEST check, so this
                               #   registration asserts it itself
+
+                              # NO bespoke state carrier: the handoff is a CHECKPOINT/RESUME on
+                              #   the existing durability seam (R32). Principle V seals durability
+                              #   and a second mechanism in a feature module is Principle VII's
+                              #   fragmentation; `resume_run` brings re-observation with it
 
 docs/adr/0064-*.md            # NEW (Proposed) — version control is a platform capability,
                               #   amending ADR-0038's "pack tool target" clause

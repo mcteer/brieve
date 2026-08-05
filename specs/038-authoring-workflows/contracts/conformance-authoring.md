@@ -101,17 +101,30 @@ defining property. The split was reasoned about as **authority** — who holds t
 reads hostile content — and never as **capability**: what each side needs on disk. The assignment
 is also strictly safer, because the task holding the credential never holds the analysed content.
 
-### T7 — Step accounting and bounds survive the handoff (R27)
-Assert `step_index` and the bounds state cross from `analyzer` to `proposer`. Both are
-**per-process** on `GovernedRun`, so two tasks would otherwise run two counters and two budgets —
-letting one run consume its execution bound twice.
+### T7 — The handoff is a checkpoint and a resume (R32)
+Assert the `analyzer` calls `checkpoint_run` before exiting and the `proposer` calls `resume_run`,
+recording `RUN_RESUMED` — so step accounting, bounds and the lease re-acquisition all come from
+the durability seam rather than from a carrier this feature wrote.
+
+**Why not a bespoke carrier.** `step_index` and bounds are per-process on `GovernedRun`, and an
+earlier draft proposed serialising them through the workspace — which duplicates the durability
+seam (Principle VII) and routes run state around it (Principle V seals durability). The second
+process continues the first's run, which is what `resume` is for; it also brings re-observation
+of any interrupted step, which the carrier would have had to reinvent next.
 
 ### T3 — The analysing step holds no credential that could publish (FR-015, R9)
-Assert **structurally** that the hardened-tier allocation's environment contains no
-version-control credential, and that the publishing step's ceiling contains no authoring or
-analysis tool. FR-015 asks that containment hold *structurally rather than by the agent
-declining*; this is what makes that literal — a redirected analyser has nothing to publish
-*with*, not merely nothing it *should* publish.
+Assert **structurally** that the `analyzer` task's environment contains no version-control
+credential, and that its **effective scope** — `intersect_scopes` of the one ceiling with that
+task's `RUN_REQUESTED_TOOLS` — contains nothing that egresses. FR-015 asks that containment hold
+*structurally rather than by the agent declining*; this is what makes that literal — a redirected
+analyser has nothing to publish *with*, not merely nothing it *should* publish.
+
+**Task scope, not a second ceiling.** One run resolves one `agent_definition_id` and therefore one
+ceiling, so the two-definition form an earlier draft used was unbuildable against a one-run job
+(R31). Principle IV's *user ∩ ceiling ∩ task scope ∩ policy* is the mechanism that survives, it is
+already enforced at `authority.py:98`, and the requested scope arrives as dispatch metadata that a
+run cannot widen from inside — which is the property task scope must inherit to stand in for a
+ceiling, and is asserted here rather than assumed.
 
 ## Carrying nothing out (US3)
 

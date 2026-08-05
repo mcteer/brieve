@@ -3,7 +3,8 @@
 **Feature**: 038 | **Lane**: merge-blocking (`tests/conformance/authoring/`), plus one CI-lane gate | **Runs on**: every PR
 
 **Who runs it**: CI's fast lane for every row below **except Q2**, which runs in the CI gate
-lane because it needs the product's own tooling (`terraform` and a pinned provider mirror).
+lane because it needs the product's own tooling — the **enclave lane**, which already installs
+the binary, with providers pinned in `.terraform.lock.hcl` and cached in CI on that key.
 Named here per the constitution's Quality Gates requirement that a blocking row no automated
 check executes carries a responsible party — **Q2 is automated; if its tooling is unavailable
 the row FAILS**, and no human is nominated to run it by hand, because a gate a person runs
@@ -57,6 +58,14 @@ proposal is as product-blind as authoring one — a pull request against a Terra
 one against application code are the same act. **ADR-0064 amends ADR-0038's "pack tool target"
 clause in the same change**, because a departure recorded nowhere is the defect ADR-0060 closed.
 
+### P12 — A pack that declares no authoring workflow is refused (FR-021, Deferred)
+Assert a request naming such a pack is refused.
+
+**This is now the only gate on it.** R2 counted three independent controls — the ceiling, the
+pack's declared workflow, and the tier — and with both tools platform-level the pack no longer
+gates publishing at all. A single remaining check is asserted rather than left as a property of
+a module.
+
 ### P1 — Completed authoring is a proposal, and nothing has been merged or applied (FR-006, SC-001)
 Run authoring to completion. Assert a proposal exists against the requester's repository, and
 that **no merge and no apply occurred** — asserted over the trail, not over the proposal's own
@@ -82,8 +91,8 @@ likely to slip through.
 
 ### P3 — A second proposal does not silently displace the first (FR-009, edge case)
 Author twice against the same target. Assert two distinct branches and that the first
-proposal is intact. The branch derives from the correlation ID, so this is structural rather
-than a naming convention someone must observe.
+proposal is intact. The branch derives from the **idempotency key** (P7), so this is structural
+rather than a naming convention someone must observe.
 
 ### P4 — An interrupted proposal is resolvable by observation (edge case)
 Kill the run mid-`open_proposal`. Assert the tool is registered `repeatable=false` **with an
@@ -138,9 +147,16 @@ fail-closed pipeline, and a refusal reachable only by a caller remembering to ca
 convention. V1 over a module function would have been green.
 
 ### V2 — There is no sequence of platform actions that reaches a merge or an apply (SC-009)
-Structural, and the stronger half of V1: assert the authoring definition's ceiling contains no
-enacting tool and the proposing definition's contains no authoring tool — the ceilings are
-**disjoint**. V1 is the rule; this is the absence of anything to apply it to.
+Structural, and the stronger half of V1: assert the authoring definition's ceiling contains **no
+enacting tool at all**, and that neither task's effective scope can reach one. V1 is the rule;
+this is the absence of anything to apply it to.
+
+**Disjointness between two definitions is gone, and the row says so.** One run resolves one
+`agent_definition_id`, so a design with an *authoring* definition and a *proposing* definition was
+unbuildable against a one-run job (R31) — two remediations that were individually correct and
+jointly impossible. What remains is stronger in one respect and weaker in another: the single
+ceiling never carried an enacting tool, which is a simpler claim than two ceilings agreeing; and
+the separation *between the halves* is now task scope rather than definition boundaries.
 
 **Both rows, not one.** V2 is a fact about today's definitions; V1 is what survives a
 definition somebody writes next year.
