@@ -78,6 +78,18 @@ an issue comment — while every ceiling assertion in this contract still passed
 the allowlist be *static*, not that it keep a particular value, and **a control can be correctly
 immutable and wrongly valued**.
 
+### T5 — The subject mount source is validated, and the row checks a path (FR-005a, R25)
+Assert a dispatch naming the **platform's own tree** as the subject is refused
+`subject_is_platform_tree`, and that `TierPosture` carries the **resolved mount source** so this
+row checks a path rather than a claim about one.
+
+**Why a declared boolean was not enough.** The subject differs every run, so its mount source
+must be per-dispatch — while `repo_mounted` is a boolean somebody sets. A dispatch naming the
+platform tree satisfies `bridge`, `readonly = true` and `repo_mounted = False` while mounting
+exactly what the tier exists to keep out. This is the **third** control in this feature checked
+for the property it named rather than the value it would hold; the other two were the egress
+allowlist and the containment claim.
+
 ### T3 — The analysing step holds no credential that could publish (FR-015, R9)
 Assert **structurally** that the hardened-tier allocation's environment contains no
 version-control credential, and that the publishing step's ceiling contains no authoring or

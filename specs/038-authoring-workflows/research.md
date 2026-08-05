@@ -629,3 +629,98 @@ them enumerable. All three were written against a read path that did not exist.
 **Why this was missed twice.** Both passes checked *whether* a refusal existed and not *where it
 would run*. A refusal in a module and a refusal in the pipeline read identically in a task list,
 and only one of them is enforcement.
+
+---
+
+*R24–R26 came from the **fourth** pass, which audited the earlier remediations rather than the
+original plan. All three are consequences of R9's two-posture split — a fix that was never
+re-examined with the scrutiny the design it replaced received.*
+
+## R24 — The two postures had no handoff, and fixing it fixes the correlation split too
+
+**The defect R9 created and never resolved**: the analysing step runs in the hardened tier with
+an **empty egress allowlist** and an **ephemeral workspace**; the publishing step runs elsewhere
+and never reads the subject. **Nothing carried the artefact between them.** No shared mount, no
+transfer, no task. The feature's happy path did not connect.
+
+Worse, two postures read as two allocations, which are two runs, which are **two correlation
+IDs** — and Principle IX requires *"one correlation ID [joining] prompt → hooks → MCP call →
+product run → audit entry, walkable both directions."* FR-004's "reconstruct the work" would
+have spanned two trails with nothing joining them.
+
+**Decision**: **one job, one group, two tasks** sharing the allocation directory.
+
+```
+group "authoring"          network { mode = "bridge" }
+  task "analyzer"          subject mounted read-only · no credential · empty allowlist
+  task "proposer"          no subject mount · VCS credential · allowlisted egress
+                           both share /alloc/data — the workspace
+```
+
+Every posture property that matters is **per-task** in Nomad — `identity`, `env`, and `config`
+including `mount` — so the two tasks hold genuinely different authority and see genuinely
+different filesystems. And one allocation is **one run and one correlation ID**, so Y4 dissolves
+rather than needing a join mechanism.
+
+**The contrast with 037 is deliberate and worth stating**, because this looks like a reversal of
+its specimen/observer decision and is not. There, the two sides must **not** share a filesystem —
+the observer reading specimen output is the injection surface the gauntlet exists to inspect —
+so separate allocations were correct. Here the handoff **is the point**: the artefact must cross
+from the side that made it to the side that publishes it. Same shape, opposite requirement,
+opposite mechanism.
+
+**And the honest cost, recorded rather than glossed.** A Nomad group in bridge mode shares **one
+network namespace**, so the analyzer sits in a namespace from which the VCS host is reachable
+even though its own `HARNESS_EGRESS_ALLOWLIST` is empty. Network-level separation between the
+two tasks is therefore **not** what contains the analyzer. What contains it is: **no egressing
+tool in its ceiling** (R2), **no credential in its task** (T3), and the declared allowlist. That
+is three real controls and one lost one, and the lost one must not be claimed.
+
+**Alternatives considered**: *two allocations with an external store* — reintroduces a store
+Principle VI would want a trigger for, and adds a place the artefact rests outside both
+postures. *A dispatch payload* — an authored change is not payload-scale, and 037's own R4 is
+the precedent for payload delivery not surviving real content.
+
+## R25 — The tier's mount is per-dispatch, and a declared boolean cannot see it
+
+**Measured**: `readonly = true` appears in four jobspecs (`portal`, `api`, `mcp`, `mcp-surface`),
+so the read-only half is expressible and has precedent. But **`NOMAD_META_*` reaches `env`
+only** in every jobspec here — nothing interpolates meta into `mount.source`.
+
+**The hole**: the subject differs every run, so its mount source must be per-dispatch. Meanwhile
+`TierPosture.repo_mounted` is a **declared boolean**. A dispatch naming **the platform's own
+tree** as the subject satisfies every clause — `bridge`, `readonly = true`, `repo_mounted =
+False` as declared — while mounting exactly what the tier exists to keep out.
+
+**Decision**: the subject path is **validated before dispatch and asserted in the posture**. The
+mount source must resolve outside the platform tree, refusing `subject_is_platform_tree`
+otherwise, and `TierPosture` carries the resolved source rather than only a boolean — so the
+structural row checks a **path**, not a claim about one.
+
+**The general lesson, which is the third instance of it in this feature**: a control expressed as
+a *declaration* is only as good as whatever validates the declaration. `repo_mounted=False`,
+like the egress allowlist before it (R13), was checked for the property it named and not for the
+value it would actually hold.
+
+## R26 — Two thresholds and two identity checks the design still owed
+
+**The read budget** (FR-005b). Now that subject reads go through `read_subject` (R23) they are
+countable, and nothing said what to count to. **4 MiB of subject content per run**, after which
+reads refuse and the truncation is disclosed. A Terraform module plus the surrounding
+application configuration is kilobytes; 4 MiB is generous for genuine integration work and far
+below a large monorepo, which is the case the disclosure exists for. Stated with its reasoning
+because an unfixed threshold is one that gets raised until the corpus passes.
+
+**The tenant must match.** `agent-run.nomad.hcl:219` passes `RUN_TENANT_ID` from dispatch meta,
+and the authoring request now carries its own `tenant_id`. Nothing asserted they agree — so a
+request scoped to one tenant could write audit entries under another, which is the one field
+`AuditEntry` puts *inside* the hash chain precisely because it decides who may read the record.
+
+**Audit payloads are validated by nothing, and the default shape leaks.** `append_event` takes
+`payload: dict[str, Any]`; `redact_arguments` runs on **tool arguments** in the engine and never
+on event payloads. So every "carries codes, never text" rule in this feature is a **convention**.
+That was survivable for 037, whose payloads are digests by construction. It is not survivable
+here — `InjectionFinding` carries **`excerpt: str`**, so reusing `injection_patterns.py` makes
+copying analysed private code into an append-only store the *natural* implementation. The four
+new members therefore get a **payload-shape gate**, asserted rather than documented, and the
+lens records `pattern_name` and location while explicitly dropping the excerpt.

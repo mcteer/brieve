@@ -20,11 +20,16 @@ a **writable workspace that is not the subject** — which is what turns FR-013a
 rule from a check into a property (R5).
 
 **Containing** (US3, US4) runs analysis in 037's hardened tier with the requester's repository
-mounted **read-only** and the platform's tree unmounted, and splits the run into two postures:
-the step that reads hostile content holds no credential that could publish, and the step that
-publishes never reads the subject. That separation is 037's specimen/observer split arriving
-for the same reason, and it makes FR-015's containment a fact about allocations rather than a
-promise about a ceiling.
+mounted **read-only** and the platform's tree unmounted, and splits the run into two postures —
+**one job, one group, two tasks sharing the allocation directory** (R24). The `analyzer` task
+holds no credential that could publish; the `proposer` task never mounts the subject. Identity,
+env and mounts are per-task in Nomad, so the two hold genuinely different authority — and **one
+allocation means one run and one correlation ID**, which is what Principle IX requires and what
+two allocations would have broken.
+
+The **network namespace is shared**, and that is stated rather than glossed. What contains the
+analyzer is: no egressing tool in its ceiling, no credential in its task, and a declared empty
+allowlist. Three controls, not four.
 
 **Proposing and qualifying** (US2, US5) delivers the work as a pull request through a
 non-repeatable pack tool with an observer — which hands FR-009 and the interrupted-run edge
@@ -90,7 +95,7 @@ be correct for one and must not assume a population, which is 037's R2 lesson ar
 | VI — Lean by Default | **Pass** | **No new operated component.** A pack is content; a workspace is a directory; the analysis step is the existing tier job with a mount added. The one genuinely operated thing is the version-control credential path, which is an integration rather than a service and is named in ADR-0062. |
 | VII — Anti-Fragmentation | **Pass** | One authoring path for every product: the same `author_file`, the same containment, the same proposal shape whether the artefact is a Terraform module or application code. **This is why the write tool is a platform tool rather than a pack tool** (R2) — a per-pack copy would be N implementations of one containment rule. The tier moves out of `core.intake` for the same reason (R3). |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass, with an ADR** | The `write` cell is qualified **before** a definition may bind it, and the corpus lands **in the same change** as the capability so `OWED` stays empty (FR-019, 037's sequencing precedent). Correctness is two gates reported separately (FR-018a); the must-deny half scores the **artefact**, not a verb (R8). **Both gates are MECHANICAL** — the reference carries a declared property set, and the must-deny half is the secret detector, the containment check and a byte-identical comparison — so **no judge participates**, and `promote_model_version` would refuse the cell for naming none (R18). It accepts a **scorer identity** instead, refusing only when both are absent: a human-authored reference terminates ADR-0052's regress *one link earlier* than a judge does. **ADR-0063** carries that. `qualified_by = "live"` (R20), because the matrix module says the fixture/live distinction *"matters most for `write` — a model permitted to make changes"*. **The new `github` pack declares the five suites with their cases**, like both existing packs — measured (R14), the loader's floor iterates *declared* suites, so a pack declaring none has no floor to fail and would be this platform's first pack outside the eval gate, first **by accident**. |
-| IX — Evidence Over Claims | **Pass** | The proposal is the product and the trail is behind it. Two load-bearing rules: `CONTAINMENT_REFUSED` carries **codes and digests, never the matched text** (`CANARY_CONTACT`'s rule — the record of a leak must not be a second copy of what leaked), and `ARTIFACT_AUTHORED` carries **paths and digests, not content**. |
+| IX — Evidence Over Claims | **Pass, with a payload gate** | The proposal is the product and the trail is behind it. **One correlation ID**, because authoring and publishing are two tasks in one allocation rather than two runs (R24). Two load-bearing payload rules: `CONTAINMENT_REFUSED` carries **codes and digests, never the matched text** (`CANARY_CONTACT`'s rule — the record of a leak must not be a second copy of what leaked), and `ARTIFACT_AUTHORED` carries **paths and digests, not content**. **Those rules are now asserted rather than documented**: `append_event` takes `dict[str, Any]` and validates nothing, and `redact_arguments` runs on tool arguments and never on event payloads — so every such rule in this feature was a convention, while `InjectionFinding` carries an `excerpt` that would have made copying analysed private code into an append-only store the *default* implementation (R26). |
 | X — The Decision Record Governs | **Pass, with obligations** | **ADR-0038 is realized rather than amended** — it is already Accepted, and its four constraints are implemented as written, not reinterpreted. **Two new records**: **ADR-0062** (a new credential class under a MUST principle) and **ADR-0063** (what may qualify a cell, amending ADR-0052's chain — R18). Both Proposed here, Accepted in implementation. |
 
 **Gate result**: **PASS — proceed to Phase 0.** Six obligations travel with the feature: the
@@ -171,9 +176,14 @@ packs/github/                 # NEW — one tool: `open_proposal`, write, non-re
 evals/authoring/              # NEW — the corpus. Every golden task carries a HUMAN-AUTHORED
                               #   reference (FR-018c) — the expensive clause, and the one most
                               #   likely to erode into generated references
-infra/jobs/authoring-tier.nomad.hcl  # NEW — the hardened tier with a READ-ONLY SUBJECT MOUNT
-                              #   and an EMPTY egress allowlist. Its own jobspec so the value
-                              #   stays static per job rather than becoming per-run (R13)
+infra/jobs/authoring-tier.nomad.hcl  # NEW — ONE GROUP, TWO TASKS sharing /alloc/data (R24):
+                              #   `analyzer` (read-only subject mount, EMPTY egress allowlist,
+                              #   no credential) and `proposer` (no subject mount, VCS
+                              #   credential). Identity/env/mount are per-task; the network
+                              #   namespace is SHARED and the plan says so. Its own jobspec
+                              #   rather than 037's, so the allowlist stays static per job
+                              #   rather than becoming per-run (R13) — sibling to
+                              #   analysis-tier.nomad.hcl, and each names the other
 .specify/memory/constitution.md      # AMENDED — Principle IV names a third exception (R15)
 docs/adr/0062-*.md            # NEW (Proposed) — the authoring credential class
 docs/adr/0063-*.md            # NEW (Proposed) — a mechanical scorer over a human-authored
@@ -262,6 +272,21 @@ and both passes had checked *whether* a refusal existed rather than *where it wo
 fix surfaced a requirement none of the artefacts had noticed — the injection lens needs a
 governed **read path** to attach to, which FR-014, FR-005b and FR-004 were all written against
 and none of them had.
+
+**The fourth pass audited the remediations rather than the plan, and that is where it found
+things.** All three of its significant findings descend from R9's two-posture split — a fix
+introduced in pass two and never re-examined. It had **no handoff** (the artefact could not
+reach the step that publishes it), it implied **two correlation IDs** where Principle IX
+requires one, and it left the tier's mount source **per-dispatch and unvalidated** so a dispatch
+naming the platform's own tree satisfied every clause. One job with two tasks resolves the first
+two together (R24); a validated, asserted mount source resolves the third (R25).
+
+**A remediation is a design change and deserves the scrutiny the design got.** Three passes
+treated earlier fixes as settled while re-examining the original plan, and the defects had
+migrated into the fixes. The recurring instance is worth naming on its own: **three separate
+controls in this feature were checked for the property they named and not for the value they
+would hold** — the egress allowlist (R13), the containment claim (R21), and now `repo_mounted`
+(R25). A declaration is only as good as whatever validates it.
 
 **One risk moved into the record rather than being resolved**: R10's first correctness gate
 depends on `terraform init` reaching a pinned provider mirror from CI. If that proves

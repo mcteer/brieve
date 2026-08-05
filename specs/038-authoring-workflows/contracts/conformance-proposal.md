@@ -23,6 +23,21 @@ dispatched run, so surface parity is **inherited rather than owed**.
 identical in a diff, and only one of them is a gate regression. This is the artefact that makes
 the difference legible.
 
+### P10 — The artefact reaches the publishing task, under one correlation ID (FR-004, FR-006, Principle IX)
+Assert the authored artefact crosses from `analyzer` to `proposer` through the shared allocation
+directory, and that **both tasks record under one correlation ID**.
+
+**Without this the happy path does not connect.** The two-posture split gave the analysing side
+an empty egress allowlist and an ephemeral workspace and defined **no transfer** — the artefact
+had no way to reach the side that publishes it. Two allocations would also have meant two
+correlation IDs, where Principle IX requires *"one correlation ID [joining] prompt → hooks → MCP
+call → product run → audit entry, walkable both directions."* One group with two tasks resolves
+both together.
+
+**And the row records what was lost**: a Nomad group in bridge mode shares one network
+namespace, so network-level separation between the two tasks is **not** a control. What contains
+the analyzer is R2 (no egressing tool), T3 (no credential) and T4 (the declared allowlist).
+
 ### P1 — Completed authoring is a proposal, and nothing has been merged or applied (FR-006, SC-001)
 Run authoring to completion. Assert a proposal exists against the requester's repository, and
 that **no merge and no apply occurred** — asserted over the trail, not over the proposal's own
