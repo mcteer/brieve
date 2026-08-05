@@ -175,7 +175,10 @@ put a row in `OWED` for the first time since 021.
 
 ## Phase 9: Sealed-core review (blocks merge, not a code task)
 
-- [ ] T054 [GATE:conformance] **Principle V security-maintainer review** (Dan). Four additive `AuditEventType` members on `TOOL_CHOSEN`'s precedent. Recorded on the implementation PR; the feature does not merge without it.
+- [X] T054 [GATE:conformance] **Principle V security-maintainer review** (Dan). Four additive `AuditEventType` members on `TOOL_CHOSEN`'s precedent. Recorded on the implementation PR; the feature does not merge without it.
+  **Approved by Dan McTeer, 2026-08-05, recorded on PR #164** — covering the four additive
+  members (`ANALYSIS_VERDICT`, `DETONATION_COMPARED`, `CANARY_CONTACT`, `INTAKE_BYPASSED`) on
+  `TOOL_CHOSEN`'s precedent, and ADR-0053's move to Accepted carrying them.
 
 ---
 
