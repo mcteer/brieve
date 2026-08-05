@@ -89,7 +89,7 @@ same change.
 | [0030](0030-pinned-versus-consulted-artifacts.md) | Executed artifacts are pinned; consulted artifacts are fetched fresh | Accepted |
 | [0031](0031-retrieval-telemetry-as-authoring-backlog.md) | Skills and retrieval are complementary; retrieval telemetry ranks the authoring backlog | Accepted |
 | [0032](0032-delegated-run-versus-local-loop.md) | Two integration paths, differentiated by what is governed | Accepted |
-| [0033](0033-four-transports-one-authorization-core.md) | Four transports over one authorization core | Accepted |
+| [0033](0033-four-transports-one-authorization-core.md) | Four transports over one authorization core | Accepted (transport count amended by [0060](0060-three-transports-the-cli-is-withdrawn.md)) |
 | [0034](0034-conversational-web-ui.md) | A conversational portal, as a thin client of the API | Accepted |
 | [0035](0035-audit-as-a-governed-read-path.md) | Estate-state queries, and the audit plane as a governed read path | Accepted |
 | [0036](0036-cost-estimation-boundaries.md) | Cost is estimated and gated, never managed or reported | Accepted |
@@ -114,6 +114,9 @@ same change.
 | [0055](0055-audit-egress-for-tamper-evidence.md) | Tamper-evidence requires a copy outside the writer's blast radius | Accepted |
 | [0056](0056-task-scope-needs-an-authorization-server-vault-is-not-one.md) | Task scope needs an authorization server, and Vault is not one | Accepted |
 | [0057](0057-context-hungry-agents-want-breadth-not-narrower-reads.md) | Read-scope narrowing is the wrong control for context-hungry expert agents | Accepted |
+| [0058](0058-model-credential-brokering.md) | A model vendor credential is brokered from the trust store, per task | Accepted |
+| [0059](0059-estate-eval-evidence-spans-asker-roles.md) | A cell's estate evidence spans the asker roles its cases declare | Accepted |
+| [0060](0060-three-transports-the-cli-is-withdrawn.md) | Three transports — the CLI is withdrawn | Accepted |
 
 ## Reviews
 

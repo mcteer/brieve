@@ -63,9 +63,11 @@ servers or native tools, each with a risk class), skills, pack hooks, workflows,
 evals for one managed product (Terraform pack, Vault pack, …). New products are new
 packs; the core does not change.
 
-**Surface** (or **transport**) — one of exactly four northbound client entry points:
-MCP server, REST API, CLI, portal/web UI. All are thin clients of one authorization
-core with conformance-asserted parity (ADR-0033).
+**Surface** (or **transport**) — one of exactly three northbound client entry points:
+MCP server, REST API, portal/web UI. All are thin clients of one authorization core with
+conformance-asserted parity (ADR-0033). ADR-0033 enumerated a fourth, a CLI; it was never
+built and [ADR-0060](adr/0060-three-transports-the-cli-is-withdrawn.md) withdrew it. Adding a
+fourth still requires an ADR — three is a ceiling, not a floor.
 
 **Sealed core** — the parts no downstream change may modify: identity flows, hook
 engine, registries, audit schema, durability, adapters. Everything else extends
