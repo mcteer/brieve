@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from core.audit.chain import GENESIS_PREV_HASH, compute_entry_hash
-from core.audit.schema import AuditEntry, AuditEventType
+from core.audit.schema import AuditEntry, AuditEventType, assert_payload_shape
 
 
 class AuditSink(Protocol):
@@ -65,6 +65,10 @@ class InMemoryAuditSink:
         payload: dict[str, Any],
         timestamp: datetime | None = None,
     ) -> AuditEntry:
+        # 038: the payload-shape gate, applied on EVERY append rather than at each call site.
+        # A rule about an append-only store that depends on callers having read a docstring is
+        # a comment; this is the only place that makes it a property.
+        assert_payload_shape(event_type, payload)
         existing = self.list_by_correlation_id(correlation_id)
         seq = len(existing)
         prev_hash = GENESIS_PREV_HASH if seq == 0 else existing[-1].entry_hash

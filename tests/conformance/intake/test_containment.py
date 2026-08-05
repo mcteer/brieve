@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import pytest
 
-from core.intake.tier import IsolationTier, TierPosture, TierRefused, assert_tier
 from core.intake.verdict import (
     CANDIDATE_CLOSE,
     CANDIDATE_OPEN,
@@ -22,6 +21,7 @@ from core.intake.verdict import (
     Verdict,
     as_data,
 )
+from core.isolation.tier import IsolationTier, TierPosture, TierRefused, assert_tier
 
 #: The analysis definition's ceiling: read the delta, write one report artifact. Nothing else.
 #: Held here as the contract the row asserts against — a ceiling that grows a product tool
