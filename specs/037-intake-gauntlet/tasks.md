@@ -92,14 +92,14 @@ form, honest about which stages have not run.
 **Goal**: the candidate is read adversarially by something that cannot act.
 **Independent test**: quickstart Scenario B.
 
-- [ ] T018 [US2] Register the analysis agent definition with **the narrowest ceiling in the fleet**: read the delta, write one report artifact, nothing else. No product tool, no egress beyond the pinned source (FR-007).
-- [ ] T019 [US2] Implement the structured verdict in `src/core/intake/verdict.py`: `clean` / `flagged` / `inconclusive`. Three-valued because an analysis that could not complete is not a clean one (FR-024).
-- [ ] T020 [US2] Deliver candidate text to the analyzer as delimited DATA, never as instruction, and accept only the verdict schema back (FR-008).
-- [ ] T021 [P] [US2] Row A1 in `tests/conformance/intake/test_containment.py`: a candidate carrying text addressed to the analyzer leaves the verdict unchanged, and the attempt is recorded.
-- [ ] T022 [P] [US2] [GATE:conformance] Row A2: assert what the analysis ceiling **contains** — read-delta plus one artifact, nothing more. Structural, so it holds for redirections nobody thought to write; a ceiling that grows a product tool fails here (FR-009).
-- [ ] T023 [P] [US2] Row A3: an analyzer stepping outside its ceiling is refused and recorded, through the interception that already exists.
-- [ ] T024 [P] [US2] [GATE:no-secret-leak] Row A4 (FR-024) + the findings shape: an incomplete analysis blocks, and `ANALYSIS_VERDICT.findings` carries **codes, never quoted candidate prose** — the trail must not become a copy of hostile content.
-- [ ] T025 [US2] [GATE:fail-closed] Row A5 (FR-010): any flag short-circuits to the human and **detonation is not attempted**. This is what makes A1's verdict meaningful rather than decorative.
+- [X] T018 [US2] Register the analysis agent definition with **the narrowest ceiling in the fleet**: read the delta, write one report artifact, nothing else. No product tool, no egress beyond the pinned source (FR-007).
+- [X] T019 [US2] Implement the structured verdict in `src/core/intake/verdict.py`: `clean` / `flagged` / `inconclusive`. Three-valued because an analysis that could not complete is not a clean one (FR-024).
+- [X] T020 [US2] Deliver candidate text to the analyzer as delimited DATA, never as instruction, and accept only the verdict schema back (FR-008).
+- [X] T021 [P] [US2] Row A1 in `tests/conformance/intake/test_containment.py`: a candidate carrying text addressed to the analyzer leaves the verdict unchanged, and the attempt is recorded.
+- [X] T022 [P] [US2] [GATE:conformance] Row A2: assert what the analysis ceiling **contains** — read-delta plus one artifact, nothing more. Structural, so it holds for redirections nobody thought to write; a ceiling that grows a product tool fails here (FR-009).
+- [X] T023 [P] [US2] Row A3: an analyzer stepping outside its ceiling is refused and recorded, through the interception that already exists.
+- [X] T024 [P] [US2] [GATE:no-secret-leak] Row A4 (FR-024) + the findings shape: an incomplete analysis blocks, and `ANALYSIS_VERDICT.findings` carries **codes, never quoted candidate prose** — the trail must not become a copy of hostile content.
+- [X] T025 [US2] [GATE:fail-closed] Row A5 (FR-010): any flag short-circuits to the human and **detonation is not attempted**. This is what makes A1's verdict meaningful rather than decorative.
 
 **Checkpoint**: the analyzer runs contained. It is not yet trusted — Phase 5 is what makes its verdicts mean anything.
 
@@ -114,16 +114,16 @@ form, honest about which stages have not run.
 gate that qualifies its analyzer creates the ungated input ADR-0053 warns about, and would
 put a row in `OWED` for the first time since 021.
 
-- [ ] T026 [US4] Author `evals/intake-seed/` to the floor — human-labelled cases covering redirection, exfiltration, encoded payloads, and content aimed at the reviewer (FR-019), **plus the benign cases the analyzer must not flag**. Authored here, authoritative when reviewed and merged (ADR-0052's mechanism).
-- [ ] T027 [US4] Implement `src/core/evals/intake_seed.py`: load the corpus and enforce the floor stated in `contracts/conformance-intake.md` — at least 20 cases, at least 3 per attack class, and **at least 5 benign cases the analyzer must not flag**. Expressed in attack classes, not the judge's four answering suites (FR-020b). The benign minimum is what gives Q3's false-positive budget something to measure: a corpus of only hostile cases would qualify an analyzer that flags everything.
-- [ ] T027a [P] [US4] [GATE:eval] Row Q7 in `tests/conformance/intake/test_qualification.py`: breach each floor clause separately — 19 cases, a class with 2, only 4 benign — and require each to fail on its own. A floor checked in aggregate can be satisfied by a corpus wrong in one dimension and generous in another. (FR-020a)
-- [ ] T028 [US4] Add `intake_analysis` to `SUITES` in `src/core/evals/suites.py` **in this same change**, so `OWED` stays empty (research R9).
-- [ ] T029 [P] [US4] [GATE:eval] Row Q1 (FR-020, FR-020a) in `tests/conformance/intake/test_qualification.py`: a corpus below the floor **fails** rather than warns — ADR-0052's own posture, since a floor nothing enforces is a suggestion.
-- [ ] T030 [P] [US4] [GATE:eval] Row Q2 (FR-020b): a corpus satisfying "all four suites" while covering one attack class must FAIL. The category error that would otherwise pass at the right threshold.
-- [ ] T031 [US4] [GATE:eval] Row Q3 (FR-017): must-flag rate and false-positive budget enforced as stated numbers, measured values printed on failure. A revision moves in `contracts/conformance-intake.md`, carrying its measurement.
-- [ ] T032 [US4] [GATE:eval] **Row Q4 (SC-002) — the row that proves the others can lose**: deliberately weaken the analyzer and require qualification to FAIL. If Q4 passes trivially, Q1–Q3 have stopped meaning anything.
-- [ ] T032a [US4] [GATE:eval] Row Q6 in `tests/conformance/intake/test_qualification.py`: retain each qualification's scores and assert a **downward trend in must-flag rate is surfaced** rather than absorbed. Q1–Q5 are all point-in-time; without this the analyzer degrades one requalification at a time, each of them passing, which is precisely the silent failure US4 exists to prevent. (FR-018)
-- [ ] T033 [P] [US4] Row Q5: changing the analyzer and attempting promotion without re-scoring is refused (FR-016).
+- [X] T026 [US4] Author `evals/intake-seed/` to the floor — human-labelled cases covering redirection, exfiltration, encoded payloads, and content aimed at the reviewer (FR-019), **plus the benign cases the analyzer must not flag**. Authored here, authoritative when reviewed and merged (ADR-0052's mechanism).
+- [X] T027 [US4] Implement `src/core/evals/intake_seed.py`: load the corpus and enforce the floor stated in `contracts/conformance-intake.md` — at least 20 cases, at least 3 per attack class, and **at least 5 benign cases the analyzer must not flag**. Expressed in attack classes, not the judge's four answering suites (FR-020b). The benign minimum is what gives Q3's false-positive budget something to measure: a corpus of only hostile cases would qualify an analyzer that flags everything.
+- [X] T027a [P] [US4] [GATE:eval] Row Q7 in `tests/conformance/intake/test_qualification.py`: breach each floor clause separately — 19 cases, a class with 2, only 4 benign — and require each to fail on its own. A floor checked in aggregate can be satisfied by a corpus wrong in one dimension and generous in another. (FR-020a)
+- [X] T028 [US4] Add `intake_analysis` to `SUITES` in `src/core/evals/suites.py` **in this same change**, so `OWED` stays empty (research R9).
+- [X] T029 [P] [US4] [GATE:eval] Row Q1 (FR-020, FR-020a) in `tests/conformance/intake/test_qualification.py`: a corpus below the floor **fails** rather than warns — ADR-0052's own posture, since a floor nothing enforces is a suggestion.
+- [X] T030 [P] [US4] [GATE:eval] Row Q2 (FR-020b): a corpus satisfying "all four suites" while covering one attack class must FAIL. The category error that would otherwise pass at the right threshold.
+- [X] T031 [US4] [GATE:eval] Row Q3 (FR-017): must-flag rate and false-positive budget enforced as stated numbers, measured values printed on failure. A revision moves in `contracts/conformance-intake.md`, carrying its measurement.
+- [X] T032 [US4] [GATE:eval] **Row Q4 (SC-002) — the row that proves the others can lose**: deliberately weaken the analyzer and require qualification to FAIL. If Q4 passes trivially, Q1–Q3 have stopped meaning anything.
+- [X] T032a [US4] [GATE:eval] Row Q6 in `tests/conformance/intake/test_qualification.py`: retain each qualification's scores and assert a **downward trend in must-flag rate is surfaced** rather than absorbed. Q1–Q5 are all point-in-time; without this the analyzer degrades one requalification at a time, each of them passing, which is precisely the silent failure US4 exists to prevent. (FR-018)
+- [X] T033 [P] [US4] Row Q5: changing the analyzer and attempting promotion without re-scoring is refused (FR-016).
 
 **Checkpoint**: the analyzer's verdicts now carry weight, because something can take it away.
 
@@ -134,19 +134,19 @@ put a row in `OWED` for the first time since 021.
 **Goal**: the candidate is executed where it can do nothing, and watched from outside.
 **Independent test**: quickstart Scenarios D and E.
 
-- [ ] T034 [US3] Write `infra/jobs/detonation-range.nomad.hcl`: **no authority source at all**, no route to any real estate, canaries seeded, full audit. Purpose-built — NOT the test-only fake, whose merge-blocking guard must not be weakened (FR-015a, research R5).
-- [ ] T034a [US3] Author the **detonation fixtures** in `tests/fixtures/intake/`: a candidate that exfiltrates a canary (SC-004, D8) and a candidate with a **constructed** behavioural difference from its baseline (D2). D2's own text says "constructed rather than hoped for" — by nothing, until this task. A row asserting against a fixture that does not exist is the shape that gets stubbed.
-- [ ] T035a [US3] [GATE:eval] Implement the golden-corpus floor in `src/core/intake/detonation.py` and Row D11 in `tests/conformance/intake/test_detonation.py`: at least 8 tasks, at least 2 attempting a denied tool, at least 1 exercising a must-deny case, every task comparable across versions — **failing rather than warning**, asserted per clause. This is the corpus side of ADR-0053's "detonation catches only what the corpus provokes"; without it the detonation half's honesty rests entirely on whoever writes the tasks. (FR-011)
-- [ ] T035 [US3] Author `corpus/golden-tasks/` (FR-011) — fixed tasks both skill versions run against. Fixed is the point: a corpus that changed between runs would produce a diff describing the corpus rather than the candidate.
-- [ ] T036 [US3] Implement the comparison in `src/core/intake/detonation.py`: attempts, denials, canary contact, with `written_by` carrying the **observer's** identity and never the specimen's.
-- [ ] T037 [US3] Run specimen and observer as separate allocations with separate workload identities; in `src/core/intake/separation.py`; the observer's input is a **governed evidence read** of the run's records — a channel that structurally cannot carry candidate prose (research R7).
-- [ ] T038 [P] [US3] Rows D1–D2 (FR-011, FR-014) in `tests/conformance/intake/test_detonation.py`: both versions run, `tasks_run > 0`, and a constructed behavioural difference appears in the comparison.
-- [ ] T039 [P] [US3] [GATE:fail-closed] Row D3 (FR-014): a broken range blocks the candidate rather than passing it to the reviewer as clean.
-- [ ] T040 [P] [US3] Row D4 (FR-013): specimen and observer hold distinct identities in distinct allocations — read the identities, do not infer them from behaviour.
-- [ ] T041 [US3] [GATE:conformance] **Row D5 (FR-013, SC-005) — the load-bearing row**: seed candidate output with a marker and assert it appears NOWHERE in the observer's context or report. Every other row can pass while this fails, and that combination is the vulnerability the gauntlet exists to inspect (FR-013, SC-005).
-- [ ] T042 [P] [US3] [GATE:no-secret-leak] Rows D8–D9 (FR-012): a seeded canary is caught mechanically with nobody reading anything, and `CANARY_CONTACT` carries the identifier and **never the value** — a trail that quoted canaries would become the exfiltration channel it detects.
-- [ ] T043 [P] [US3] Row D10 (FR-017, SC-003): realistic skill content discussing credentials in documentation does not register canary contact. Paired with Q3's budget — a check firing on the word "secret" trains reviewers to ignore it.
-- [ ] T044 [US3] Rows D6–D7 (FR-012, FR-015, FR-015b) in `tests/conformance/intake/test_range_posture.py`, marked `enclave`: the range reaches no real authority and no real estate, and is not the test fake. Named in the contract so they are not mistaken for absent.
+- [X] T034 [US3] Write `infra/jobs/detonation-range.nomad.hcl`: **no authority source at all**, no route to any real estate, canaries seeded, full audit. Purpose-built — NOT the test-only fake, whose merge-blocking guard must not be weakened (FR-015a, research R5).
+- [X] T034a [US3] Author the **detonation fixtures** in `tests/fixtures/intake/`: a candidate that exfiltrates a canary (SC-004, D8) and a candidate with a **constructed** behavioural difference from its baseline (D2). D2's own text says "constructed rather than hoped for" — by nothing, until this task. A row asserting against a fixture that does not exist is the shape that gets stubbed.
+- [X] T035a [US3] [GATE:eval] Implement the golden-corpus floor in `src/core/intake/detonation.py` and Row D11 in `tests/conformance/intake/test_detonation.py`: at least 8 tasks, at least 2 attempting a denied tool, at least 1 exercising a must-deny case, every task comparable across versions — **failing rather than warning**, asserted per clause. This is the corpus side of ADR-0053's "detonation catches only what the corpus provokes"; without it the detonation half's honesty rests entirely on whoever writes the tasks. (FR-011)
+- [X] T035 [US3] Author `corpus/golden-tasks/` (FR-011) — fixed tasks both skill versions run against. Fixed is the point: a corpus that changed between runs would produce a diff describing the corpus rather than the candidate.
+- [X] T036 [US3] Implement the comparison in `src/core/intake/detonation.py`: attempts, denials, canary contact, with `written_by` carrying the **observer's** identity and never the specimen's.
+- [X] T037 [US3] Run specimen and observer as separate allocations with separate workload identities; in `src/core/intake/separation.py`; the observer's input is a **governed evidence read** of the run's records — a channel that structurally cannot carry candidate prose (research R7).
+- [X] T038 [P] [US3] Rows D1–D2 (FR-011, FR-014) in `tests/conformance/intake/test_detonation.py`: both versions run, `tasks_run > 0`, and a constructed behavioural difference appears in the comparison.
+- [X] T039 [P] [US3] [GATE:fail-closed] Row D3 (FR-014): a broken range blocks the candidate rather than passing it to the reviewer as clean.
+- [X] T040 [P] [US3] Row D4 (FR-013): specimen and observer hold distinct identities in distinct allocations — read the identities, do not infer them from behaviour.
+- [X] T041 [US3] [GATE:conformance] **Row D5 (FR-013, SC-005) — the load-bearing row**: seed candidate output with a marker and assert it appears NOWHERE in the observer's context or report. Every other row can pass while this fails, and that combination is the vulnerability the gauntlet exists to inspect (FR-013, SC-005).
+- [X] T042 [P] [US3] [GATE:no-secret-leak] Rows D8–D9 (FR-012): a seeded canary is caught mechanically with nobody reading anything, and `CANARY_CONTACT` carries the identifier and **never the value** — a trail that quoted canaries would become the exfiltration channel it detects.
+- [X] T043 [P] [US3] Row D10 (FR-017, SC-003): realistic skill content discussing credentials in documentation does not register canary contact. Paired with Q3's budget — a check firing on the word "secret" trains reviewers to ignore it.
+- [X] T044 [US3] Rows D6–D7 (FR-012, FR-015, FR-015b) in `tests/conformance/intake/test_range_posture.py`, marked `enclave`: the range reaches no real authority and no real estate, and is not the test fake. Named in the contract so they are not mistaken for absent.
 
 ---
 
@@ -155,21 +155,21 @@ put a row in `OWED` for the first time since 021.
 **Goal**: nothing the pipeline produced decided anything.
 **Independent test**: quickstart Scenarios F and G.
 
-- [ ] T045 [US5] Implement the recorded manual path in `src/core/intake/manual.py` (FR-025): adoption succeeds with the pipeline unavailable, writing `INTAKE_BYPASSED` with who, when, which skill, and why (FR-025a).
-- [ ] T046 [US5] [GATE:conformance] Row H1 (FR-021, SC-006) in `tests/conformance/intake/test_human_gate.py`: drive every stage to its most favourable outcome and assert **no promotion** without a recorded human acceptance. Asserted over the whole sequence, because the failure is emergent — each stage declining to promote is not the same as no path promoting.
-- [ ] T047 [P] [US5] [GATE:correlation] Row H2: the human acceptance is identifiable as a person's act and no machine verdict can be mistaken for one (FR-022, ADR-0043).
-- [ ] T048 [P] [US5] Row H3 (FR-023): accepted candidates still land warn-mode before enforce-mode.
-- [ ] T049 [US5] Row H4: the manual path works and its record is **no quieter** than a gauntlet promotion — the failure is a bypass that becomes routine because nothing makes its use visible (FR-025b).
-- [ ] T049a [P] [US5] Unit gate in `tests/unit/test_promotion_gate_unchanged.py`: assert `promote_skill`'s signature and its refusal reason codes (`promotion_incomplete`, `digest_mismatch`, `injection_suspected`) are untouched. This feature FEEDS that gate; a boundary that is only remembered erodes the first time a stage "just needs one more field". (FR-026)
-- [ ] T050 [P] [US5] Row H5 (FR-027, FR-027a, SC-008): the evidence package carries its **stage-aware** limits statement, and a proposal with no verdict says so **where a verdict would appear**. Assert both — an omitted section and a section saying "not run" are the same to a grep and opposite to a reader.
+- [X] T045 [US5] Implement the recorded manual path in `src/core/intake/manual.py` (FR-025): adoption succeeds with the pipeline unavailable, writing `INTAKE_BYPASSED` with who, when, which skill, and why (FR-025a).
+- [X] T046 [US5] [GATE:conformance] Row H1 (FR-021, SC-006) in `tests/conformance/intake/test_human_gate.py`: drive every stage to its most favourable outcome and assert **no promotion** without a recorded human acceptance. Asserted over the whole sequence, because the failure is emergent — each stage declining to promote is not the same as no path promoting.
+- [X] T047 [P] [US5] [GATE:correlation] Row H2: the human acceptance is identifiable as a person's act and no machine verdict can be mistaken for one (FR-022, ADR-0043).
+- [X] T048 [P] [US5] Row H3 (FR-023): accepted candidates still land warn-mode before enforce-mode.
+- [X] T049 [US5] Row H4: the manual path works and its record is **no quieter** than a gauntlet promotion — the failure is a bypass that becomes routine because nothing makes its use visible (FR-025b).
+- [X] T049a [P] [US5] Unit gate in `tests/unit/test_promotion_gate_unchanged.py`: assert `promote_skill`'s signature and its refusal reason codes (`promotion_incomplete`, `digest_mismatch`, `injection_suspected`) are untouched. This feature FEEDS that gate; a boundary that is only remembered erodes the first time a stage "just needs one more field". (FR-026)
+- [X] T050 [P] [US5] Row H5 (FR-027, FR-027a, SC-008): the evidence package carries its **stage-aware** limits statement, and a proposal with no verdict says so **where a verdict would appear**. Assert both — an omitted section and a section saying "not run" are the same to a grep and opposite to a reader.
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T051 [P] Update `ROADMAP.md`: move the entry to Shipped with what it found, and **remove the `Next` entry** — landing means removing it, not only adding a row.
-- [ ] T052 [P] Update `docs/glossary.md`: intake gauntlet, detonation range, canary, analysis verdict, intake seed set.
-- [ ] T053 Run `make check`, `make conformance-hermetic`, and the enclave rows; confirm `OWED` is still empty.
+- [X] T051 [P] Update `ROADMAP.md`: move the entry to Shipped with what it found, and **remove the `Next` entry** — landing means removing it, not only adding a row.
+- [X] T052 [P] Update `docs/glossary.md`: intake gauntlet, detonation range, canary, analysis verdict, intake seed set.
+- [X] T053 Run `make check`, `make conformance-hermetic`, and the enclave rows; confirm `OWED` is still empty.
 
 ---
 
