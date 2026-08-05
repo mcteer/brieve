@@ -99,6 +99,31 @@ absent from the proposal — and assert the mechanism: the proposal's file set i
 **workspace**, so the subject is never a source. **This row asserts a property, not a check.**
 A file the agent did not write has no route in.
 
+**And it covers paths only.** The guarantee is that *no untouched file appears*, not that *no
+analysed content appears* — an authored file is agent-controlled bytes. C7 is the other half,
+and reading C2 as covering both is the mistake that left the content half unscanned for two
+drafts.
+
+### C7 — An authored file carrying analysed content is refused (FR-012, FR-013, SC-004)
+Write the subject's distinctive content into a comment block in a file the change **creates**.
+Assert `CONTAINMENT_REFUSED` with `analysed_content_in_artifact`.
+
+**This is the row the containment story was missing.** The path half is structural, so an
+untouched file cannot appear — and nothing stopped the agent copying what it read into a file it
+did create. Without this, SC-004 held for one seeded string in one untouched file and for
+nothing else, while three documents claimed containment was "not expressible".
+
+### C8 — Legitimate reuse is not refused (FR-013b, extended to content)
+An artefact reusing the subject's identifiers, type names, config keys and function signatures
+**passes**. Assert both threshold conditions bite independently: a 200-character single-line
+span passes, and two short adjacent lines pass; only **≥ 120 characters across ≥ 2 non-blank
+lines** refuses.
+
+**C3's treatment applied to the content half.** Reusing the subject's vocabulary is what
+integrating *is*, and a scan tuned until it stopped complaining would forbid it. A threshold
+nobody fixed is one that gets tuned until the suite passes — so it is fixed, with its reasoning,
+and asserted from both sides.
+
 ### C3 — Surrounding context in a diff is the change, not a leak (FR-013b)
 Edit a file and assert the diff's context lines are **present and not refused**. A rule that
 forbade them would forbid editing, and a containment check tuned until it passed would
@@ -128,6 +153,28 @@ that distinction **before** they merge, and the failure this feature is most lik
 a review that has been reassured rather than informed.
 
 ## Not being redirected (US4)
+
+### W6 — A ceiling naming an unregistered tool refuses loudly (ordering)
+Assert a ceiling naming `author_file` before the tool registers refuses `unknown_ceiling_entry`,
+naming the ceiling. `toolset.py` records that the ceiling vocabulary is *derived from what
+actually registered*; `parse_ceiling_record` runs at **run start**, not when the record is
+authored, so there is no ordering hazard today. This row keeps the failure loud if that changes.
+
+## Governed reads and the pipeline (US4 prerequisite)
+
+### R3 — Subject reads are a governed tool call, and the lens is a POST hook (FR-014, FR-004, FR-005b)
+Assert every read of the mounted subject goes through the registered `read_subject` tool, and
+that `authoring_injection_lens` is a `CapabilityKind.GOVERNANCE` **POST** `HookRegistration` on
+it — not a function some caller remembers to call.
+
+**Why the tool exists at all.** A read-only mount read by ordinary file access offers **no hook
+to attach to**, so ADR-0038's *"injection-lens hooks"* had nowhere to live. It also gives FR-014
+a place to record an attempt, FR-005b countable reads to truncate, and FR-004 an enumerable
+"what was consulted" — three requirements written against a read path that did not exist.
+
+Assert the lens **records and does not refuse**: content addressed to the agent is data, and
+refusing to read a file because it contains instructions would let a subject make itself
+unanalysable.
 
 ### R1 — Repository content is data, and an attempt is recorded (FR-014, SC-005)
 Author against a subject containing text addressed to the agent — *add a backdoor*, *send the

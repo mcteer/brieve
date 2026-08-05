@@ -535,3 +535,97 @@ None and not registration.repeatable and key is not None`. A publishing run conf
 durability executes a non-repeatable tool **unbracketed**: no intent record, nothing to observe,
 nothing for R17's fix to resolve. The authoring run therefore refuses to publish when it is not
 durable, rather than publishing in a posture where an interruption is unrecoverable.
+
+---
+
+*R21–R23 were measured during the **third** analyze pass, aimed at the containment scan and the
+enforcement layer. Both had a hole, and the first is the most serious defect found in this
+feature.*
+
+## R21 — The two-tree design bounds PATHS, not BYTES, and three documents claimed otherwise
+
+**The claim, as written in R5**: *"a file the agent never wrote has no route into the proposal…
+The rule is not checked; it is not expressible."*
+
+**True of paths. False of content.** An authored file is **agent-controlled bytes**. Nothing
+stopped the agent writing the subject's proprietary algorithm into a comment block in the new
+module, and nothing would have caught it: the verbatim scan's reason code is literally
+`analysed_content_in_prose`, and the containment table scoped it to *"commit messages, PR title
+and body"*. Authored file contents were scanned by **nothing**.
+
+So SC-004 held only for the one string C2 happens to seed, and only because it seeds it in a
+file the change does not touch. The general property — *nothing the agent read leaves with what
+it wrote* — was enforced against the wrong half of the artefact.
+
+**Decision**: containment splits into **two claims of different strength, stated separately**:
+
+| Claim | Covers | Strength |
+| --- | --- | --- |
+| Which paths appear | the file set | **Structural** — unforgeable; the workspace is the only source |
+| What those paths contain | authored bytes, diff additions, prose | **Inspected** — the verbatim scan, over the *whole proposal* |
+
+The scan gains a second reason code, `analysed_content_in_artifact`, so a reviewer can tell a
+leak in the code from a leak in the description — different mistakes with different fixes.
+
+**Why R5's sentence was wrong in a way worth recording**: "not expressible" is a strong claim
+and it was *earned* for paths. Extending it to the artefact as a whole took no additional
+argument and was never checked. A guarantee that is genuinely airtight over a narrow subject is
+the easiest kind to over-generalise, because the confidence transfers and the reasoning does not.
+
+## R22 — The scan's threshold has to survive the thing an integration IS
+
+**The problem X1 creates**: once the scan covers **code**, short overlaps are not suspicious —
+they are the point. An integration reuses the subject's identifiers, type names, config keys and
+function signatures. A naive character threshold would refuse every correct answer.
+
+**Decision**: a span refuses only when it is **≥ 120 characters AND spans ≥ 2 non-blank lines**,
+compared after whitespace normalisation.
+
+Two conditions rather than one, because either alone fails: a character count alone trips on a
+long identifier or a URL; a line count alone trips on two short adjacent lines that any
+integration would reproduce. Together they mean **no single token, signature or config key can
+trip the scan**, while a copied comment block, docstring or function body does.
+
+120 is *a couple of lines of real code* — long enough to clear the identifier scale by an order
+of magnitude, short enough that a copied paragraph cannot slip under it. Stated with its
+reasoning rather than left as `N`, because **a threshold nobody fixed is one that gets tuned
+until the suite passes**, and this one now sits on the feature's sharpest requirement.
+
+**And the legitimate case gets its own row**, the C3 treatment applied to the content half: an
+artefact that reuses the subject's identifiers **must not** be refused. A containment check
+tuned until it stopped complaining would plausibly have arrived at a rule that forbids
+integrating.
+
+**Diff context needs no exemption.** The scan ignores spans from files **in** `artifact.paths`,
+and an edited file is in that set by definition — so FR-013b holds without a special case.
+
+## R23 — Nothing in this feature was going to run inside the hook pipeline
+
+**Measured**: `HookRegistration(name, phase, capability_kind, handler)` in `core/hooks/types.py`
+is how enforcement enters the pipeline, and `engine.py:29` orders `GOVERNANCE` first. **No task
+created one.** T051 put the enactment refusal in `provenance.py`; T037 put the injection lens
+"on the analysis path in `tool.py`". Both are module functions a caller must remember to call —
+and Principle III is explicit: *"Every tool invocation MUST pass pre- and post-execution hooks in
+an in-process, fail-closed pipeline."*
+
+**Decision**: two registrations, both `CapabilityKind.GOVERNANCE` (a pack may never register at
+that kind, and these are platform enforcement):
+
+- `authoring_provenance` — **PRE**, refusing enactment of platform-authored content with no
+  recorded human merge.
+- `authoring_injection_lens` — **POST**, inspecting content returned from reading the subject.
+
+**And the second needs something to attach to, which is the finding inside the finding.** The
+subject is a read-only mount; if the agent reads it by ordinary file access, there is no tool
+call, no hook, and ADR-0038's *"injection-lens hooks"* have nowhere to live. So subject reads
+go through a registered **`read_subject`** tool (`risk_class="read"`), and the lens is a POST
+hook on it.
+
+That is not scope added for tidiness. It is what makes three requirements buildable: FR-014's
+*"an attempt to instruct the agent MUST be recorded"* needs a place to record it, FR-005b's
+truncation disclosure needs the reads to be countable, and FR-004's *"what was consulted"* needs
+them enumerable. All three were written against a read path that did not exist.
+
+**Why this was missed twice.** Both passes checked *whether* a refusal existed and not *where it
+would run*. A refusal in a module and a refusal in the pipeline read identically in a task list,
+and only one of them is enforcement.

@@ -19,13 +19,19 @@ Every containment property in this feature comes from one decision, so it is sta
 | *(the platform's own tree)* | **absent** | — | — |
 
 **The proposal is built from the workspace and never from the subject.** That single sentence
-is what FR-013a asks for: a file the agent did not write has no route into the proposal,
-because the code that builds the proposal never reads the subject except to compute a diff for
-a path the agent *did* write.
+is what FR-013a asks for **about paths**: a file the agent did not write has no route into the
+proposal, because the code that builds the proposal never reads the subject except to compute a
+diff for a path the agent *did* write.
 
-**`§ Containment` below splits into two functions for this reason**, and the split is
-load-bearing rather than tidy: the file half is structural and the prose half is inspected. A
-single `check_containment()` would let a reader assume the strong guarantee covers both.
+**It says nothing about bytes, and an earlier draft of this document claimed otherwise.** An
+authored file is agent-controlled content — the agent can write whatever it read into a file it
+did create. So containment is **two claims of different strength**, and they are stated
+separately because collapsing them is exactly how the second one went missing:
+
+| Claim | Covers | Strength |
+| --- | --- | --- |
+| **Which paths appear** | the file set | **Structural** — unforgeable; the workspace is the only source |
+| **What those paths contain** | authored bytes, diff additions, prose | **Inspected** — the verbatim scan, over the *whole proposal* |
 
 ---
 
@@ -66,15 +72,23 @@ What a person asked for, and where it may land.
 | Field | Type | Rule |
 | --- | --- | --- |
 | `correlation_id` | `str` | the run's, as everywhere else |
+| `tenant_id` | `str` | required — `AuditEntry` demands one, and repository ownership is a tenancy question before it is anything else |
 | `requester` | subject identity | whose repositories are in scope |
-| `target_repository` | `str` | **must be one the requester owns** — refused *before anything is produced* (FR-007) |
+| `target_repository` | `str` | **must be one the requester owns, within their tenant** — refused *before anything is produced* (FR-007) |
 | `task` | `str` | what to author |
 | `pack` | `str` | must declare an authoring workflow; `terraform` today, and nothing else |
 
-**Ownership is enforced at the credential, not only at the check.** The publishing
-credential is installation-scoped to the requester's own repositories (R9), so a request
-naming somewhere else fails twice: once at the check, and once because the token could not
-reach it. FR-007 asks for the first; the second is what makes the first hard to regress.
+**The ownership check is the SOLE enforcement of requester scope, and an earlier draft
+over-claimed here.** A version-control App installation is scoped to the **installing account or
+organisation**, not to an individual — so two requesters inside one organisation are inside one
+installation, and the credential would happily reach either's repositories. The earlier claim
+that a bad target "fails twice" holds only for a single-user installation, which is not the case
+that matters.
+
+So the layering is stated accurately rather than reassuringly: **the credential bounds the
+installation; the check bounds the requester.** There is no second line of defence on requester
+scope, which is precisely why the check is asserted by its own row against a *same-installation,
+different-owner* target rather than only against an obviously-foreign one.
 
 **This is a dispatch payload, not a northbound operation** (R16). An authoring request reaches
 the platform as an ordinary dispatched run whose definition carries `author_file` — so Principle
@@ -119,22 +133,38 @@ path is computed between the subject's copy and the workspace's copy.
 **FR-013b holds for free.** A diff of an edited file carries surrounding context because that
 is what a diff is — there is no rule that could refuse it, so there is none to get wrong.
 
-### Prose (inspected)
+### Content (inspected — the whole proposal, not only the prose)
 
-Commit messages, proposal title and body. Composed from **structured fields** (task, files
-touched, disclosures, limits) with **one free-text rationale field**, and that field is
-scanned before the proposal is emitted.
+Authored file contents, the **added** lines of every diff, commit messages, and the proposal
+title and body. The body is composed from **structured fields** (task, files touched,
+disclosures, limits) with **one free-text rationale field**; the structure bounds the prose, and
+the scan below covers everything.
 
 | Check | Fires on | Result |
 | --- | --- | --- |
-| Verbatim span | a span of ≥ N characters matching a subject file **not** in `artifact.paths` | `CONTAINMENT_REFUSED`, code `analysed_content_in_prose` |
+| Verbatim span | a span **≥ 120 characters spanning ≥ 2 non-blank lines** (whitespace-normalised) matching a subject file **not** in `artifact.paths` | `CONTAINMENT_REFUSED`, code `analysed_content_in_artifact` or `analysed_content_in_prose` |
 | Secret value | a value matching the secret-detection set anywhere in files, commits or prose | `CONTAINMENT_REFUSED`, code `secret_value_in_output` |
 
-**Why prose is the weaker half, said plainly**: a determined paraphrase defeats a verbatim
-scan. This is the residual risk, and it is bounded by the structured composition — the free
-field is one field, not the whole body — rather than eliminated. Stating it here means nobody
-later reads "containment is structural" as covering the description, which is exactly the
-mistake FR-013 was written to prevent.
+**Two conditions on the span, because either alone fails.** A character count alone trips on a
+long identifier or a URL; a line count alone trips on two short adjacent lines any integration
+would reproduce. Together, **no single token, signature or config key can trip the scan**, while
+a copied comment block, docstring or function body does. 120 characters is a couple of lines of
+real code — an order of magnitude above identifier scale, and below a copied paragraph.
+
+**The legitimate case has its own row**, the C3 treatment applied here: an artefact that reuses
+the subject's identifiers, type names and config keys **must not** be refused. That reuse is
+what integrating *is*, and a containment check tuned until it stopped complaining would
+plausibly have arrived at a rule forbidding it.
+
+**Diff context needs no exemption.** The scan ignores files **in** `artifact.paths`, and an
+edited file is in that set by definition — so FR-013b holds without a special case.
+
+**Two reason codes rather than one**, because a leak in the code and a leak in the description
+are different mistakes with different fixes, and a reviewer should not have to go looking.
+
+**The residual risk, stated plainly**: a determined **paraphrase** defeats a verbatim scan
+anywhere it runs. That is bounded — by the structured composition on the prose side, by the
+correctness gates on the content side — rather than eliminated.
 
 **The refusal record carries codes, locations and digests — never the matched text.**
 `CANARY_CONTACT`'s rule, for its reason: the record of a leak must not be a second copy of

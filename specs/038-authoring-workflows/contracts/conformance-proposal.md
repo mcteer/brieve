@@ -34,6 +34,18 @@ Request authoring against a repository outside the requester's own. Assert the r
 "Refused after producing" and "refused before producing" are different postures, and only one
 of them leaves nothing on disk to leak.
 
+### P9 — The ownership check is the sole enforcement of requester scope (FR-007)
+Assert a target inside the **same installation** but owned by a different requester is refused,
+and that a target in a different **tenant** is refused.
+
+**Why this target rather than an obviously-foreign one.** A version-control App installation is
+scoped to the **installing account or organisation** — so two requesters inside one organisation
+share one installation, and the credential would reach either's repositories. An earlier draft
+claimed a bad target "fails twice", once at the check and once at the credential; that holds only
+for a single-user installation, which is not the case that matters. The credential bounds the
+installation; **the check alone bounds the requester**, so it is asserted against the target most
+likely to slip through.
+
 ### P3 — A second proposal does not silently displace the first (FR-009, edge case)
 Author twice against the same target. Assert two distinct branches and that the first
 proposal is intact. The branch derives from the correlation ID, so this is structural rather
@@ -80,6 +92,16 @@ Attempt to apply a platform-authored artefact that has no recorded human merge. 
 `ENACTMENT_REFUSED`, naming the authoring correlation ID. **The rule turns on provenance, not
 capability**, and the record is what makes it decidable at the moment of enactment rather than
 reconstructible afterwards.
+
+### V4 — The provenance refusal runs in the hook pipeline (Principle III)
+Assert `authoring_provenance` is a `CapabilityKind.GOVERNANCE` **PRE** `HookRegistration`, and
+that `engine.py` orders governance hooks first.
+
+**V1 asserts the rule fires; this asserts it fires where enforcement lives.** The first two
+drafts placed the refusal in `provenance.py` as a module function, which reads identically in a
+task list and is not enforcement — Principle III requires every tool invocation pass the
+fail-closed pipeline, and a refusal reachable only by a caller remembering to call it is a
+convention. V1 over a module function would have been green.
 
 ### V2 — There is no sequence of platform actions that reaches a merge or an apply (SC-009)
 Structural, and the stronger half of V1: assert the authoring definition's ceiling contains no

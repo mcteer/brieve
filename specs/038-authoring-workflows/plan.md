@@ -84,7 +84,7 @@ be correct for one and must not assume a population, which is 037's R2 lesson ar
 | --- | --- | --- |
 | I — Build Glue Only | **Pass** | Authoring assembles what exists — the registry's unused `write` class, the matrix's unbound `write` role, 037's tier, 036's governed loop, the non-repeatable/observer bracket. What is genuinely new is the **corpus**, which is content rather than product, and which ADR-0038 predicted would be "real work". No editor, no VCS product, no diff engine — `difflib` is in the standard library. |
 | II — Total Interception; One Governed Tool Layer | **Pass** | `author_file` and `open_proposal` are ordinary registered tools reaching execution through `invoke_tool`. Code mode is unchanged **and is not on the path this feature ships**: measured, `run_program` is registered nowhere (R19), so a program that writes a file does so through the seam in conformance rows rather than in a running definition. The seam's guarantee is asserted; the production path is 036's to complete, and this feature must not claim it. Transport for `open_proposal` is decided by ADR-0037's standing test at registry review and recorded on the entry (R6). **Northbound: no new operation.** An authoring request is the payload of an ordinary dispatched run, so surface parity is **inherited rather than owed** (R16) — and a row asserts the inheritance is real, because an absent parity row and a deliberately-inherited one look identical in a diff and only one is a gate regression. |
-| III — Fail-Closed, In-Process Enforcement | **Pass** | Every gate refuses: an unqualified `write` cell (`resolve_with_fallback` has no third branch), a non-hardened posture (`assert_tier` by clause), a secret or unrelated content heading into an artefact (`CONTAINMENT_REFUSED`), a repository the requester does not own, an enactment of platform-authored content. The corpus floor **fails rather than warns** (FR-018b). |
+| III — Fail-Closed, In-Process Enforcement | **Pass, with two registrations** | Every gate refuses: an unqualified `write` cell (`resolve_with_fallback` has no third branch), a non-hardened posture (`assert_tier` by clause), a secret or analysed content heading into an artefact (`CONTAINMENT_REFUSED`), a repository the requester does not own, an enactment of platform-authored content. The corpus floor **fails rather than warns** (FR-018b). **The provenance refusal and the injection lens are `GOVERNANCE`-kind `HookRegistration`s, not module functions** — the first two drafts placed both in modules a caller must remember to call, which reads identically in a task list and is not enforcement (R23). The lens attaches to a registered `read_subject` tool, because a read-only mount read by ordinary file access offers no hook to attach to. |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass, with a CONSTITUTION AMENDMENT** | Every step authenticates as its own attested workload identity, and the publishing credential is Vault-vended, hour-scoped and installation-scoped to the requester's own repositories. **But Principle IV enumerates "exactly two named exceptions" and this is a third** (R15) — so the principle is **amended in the same change**, on 027's precedent, with ADR-0062 as its motivating record. The exception inherits the other two's conditions: rotated, Control-Group-governed, trust-store only, read under the reading workload's own attested identity, delivered per task, never persisted. Arguing the clause does not bite (the platform does not *manage* the requester's repository) was available and is the narrowing 027 declined — **a closed list that grows by interpretation is not a closed list**. The key is never mounted into the hardened tier: the step that reads hostile content cannot publish. |
 | V — Sealed Core, Versioned Seams | **Pass, with review** | Four additive `AuditEventType` members (`ARTIFACT_AUTHORED`, `PROPOSAL_OPENED`, `CONTAINMENT_REFUSED`, `ENACTMENT_REFUSED`) on `TOOL_CHOSEN`'s precedent, carrying the approved spec and security-maintainer review. **`RiskClass` and `Role` are not edited** — `write` already exists in both (R1), which is the whole payoff of vocabulary defined in advance. |
 | VI — Lean by Default | **Pass** | **No new operated component.** A pack is content; a workspace is a directory; the analysis step is the existing tier job with a mount added. The one genuinely operated thing is the version-control credential path, which is an integration rather than a service and is named in ADR-0062. |
@@ -131,14 +131,24 @@ src/core/authoring/           # NEW — product-blind, like the rest of core
 │                             #   sealed core beyond the four audit members
 ├── workspace.py              # the writable workspace; the subject is read-only and elsewhere
 ├── artifact.py               # authored paths + per-file digests; what ARTIFACT_AUTHORED carries
-├── containment.py            # FR-010–013b. STRUCTURAL for files (the workspace is the only
-│                             #   source), INSPECTED for prose (verbatim spans from untouched
-│                             #   subject files). Two functions, because they hold for
-│                             #   different reasons and one must not read as covering both.
+├── containment.py            # FR-010–013b. TWO CLAIMS OF DIFFERENT STRENGTH, and conflating
+│                             #   them is how the second went missing for two drafts:
+│                             #   STRUCTURAL over which PATHS appear (the workspace is the only
+│                             #   source), INSPECTED over what those paths CONTAIN — authored
+│                             #   bytes, diff additions AND prose. An authored file is
+│                             #   agent-controlled content; the earlier "not expressible"
+│                             #   claim was earned for paths and false for bytes (R21)
 ├── proposal.py               # files created + diffs of files edited; body composed from
 │                             #   structured fields; truncation disclosed (FR-005b)
 ├── provenance.py             # FR-020b — platform-authored digests, checkable AT enactment
-└── tool.py                   # `author_file`, risk_class="write" — the registry's first
+├── hooks.py                  # the two GOVERNANCE-kind HookRegistrations: the provenance
+│                             #   refusal (PRE) and the injection lens (POST). A refusal in a
+│                             #   module and a refusal in the pipeline read alike in a task
+│                             #   list, and only one is enforcement (R23)
+└── tool.py                   # `author_file`, risk_class="write" — the registry's first —
+                              #   and `read_subject`, risk_class="read", which is what gives
+                              #   the lens something to attach to and FR-014/FR-005b/FR-004 a
+                              #   read path they were all written against and none of them had
 
 src/core/evals/
 ├── suites.py                 # + AUTHORING_QUALIFICATION. NOT in SUITES (R7); OWED untouched.
@@ -188,10 +198,13 @@ never exists ahead of the qualification that gates it.
 
 Re-evaluated after Phase 1. No verdict changed; three were sharpened by design decisions:
 
-- **III** — R5 turned FR-013's file half from a rule to enforce into a property that cannot be
-  violated: the proposal is built from the workspace, so a file the agent never wrote has no
-  route into it. The prose half stayed a check, and the data model keeps them as two functions
-  rather than one, so nobody later reads the strong half as covering both.
+- **III** — R5 turned FR-013's **path** half into a property that cannot be violated: the
+  proposal is built from the workspace, so a file the agent never wrote has no route into it.
+  **That claim was then over-extended to the artefact as a whole and was wrong** (R21) — an
+  authored file is agent-controlled bytes, and its contents were scanned by nothing for two
+  drafts. Containment is now two claims of different strength, and the scan covers the whole
+  proposal. A guarantee that is genuinely airtight over a narrow subject is the easiest kind to
+  over-generalise: the confidence transfers and the reasoning does not.
 - **IV** — R9 moved the credential from an assumption into a decision record. The design
   consequence that came with it is the better half: **analysis and proposal became different
   steps in different postures**, so FR-015's containment is now a fact about which allocation
@@ -235,6 +248,20 @@ That last pair is this repository's own recorded lesson — *a green row proves 
 that the running service can reach it* — and both arrived here by **citation rather than
 measurement**. Naming a real module is not evidence that anything calls it, and the plan treated
 it as though it were.
+
+**The third pass found a fourth shape: a claim that outgrew its argument.** The two-tree design
+genuinely makes the *file set* unforgeable, and that strength was written up as containment
+being *"not expressible"* — a sentence true of paths and false of the artefact's bytes, repeated
+across three documents (R21). Nothing stopped an agent writing what it read into a file it did
+create. **The confidence transferred and the reasoning did not**, which is the failure mode to
+watch for wherever a design earns a strong guarantee over a narrow subject.
+
+Its companion was structural in a different way: **nothing in this feature was going to run
+inside the hook pipeline** (R23). Two refusals sat in modules a caller must remember to call,
+and both passes had checked *whether* a refusal existed rather than *where it would run*. The
+fix surfaced a requirement none of the artefacts had noticed — the injection lens needs a
+governed **read path** to attach to, which FR-014, FR-005b and FR-004 were all written against
+and none of them had.
 
 **One risk moved into the record rather than being resolved**: R10's first correctness gate
 depends on `terraform init` reaching a pinned provider mirror from CI. If that proves
