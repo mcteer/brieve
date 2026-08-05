@@ -16,6 +16,7 @@ from pydantic_ai import Agent
 from pydantic_ai.capabilities.abstract import AbstractCapability
 from pydantic_ai.toolsets import AbstractToolset
 
+from adapters.pydantic_ai.disclosure import DisclosureGovernance
 from adapters.pydantic_ai.governance import GovernanceCapability
 from adapters.pydantic_ai.run_context import AdapterRunContext
 from adapters.pydantic_ai.tools import GovernedToolError
@@ -104,6 +105,7 @@ def build_governed_agent(
     *,
     toolsets: Sequence[AbstractToolset[AdapterRunContext]] | None = None,
     capabilities: Sequence[Any] | None = None,
+    defer_disclosure: bool = False,
     **agent_kwargs: Any,
 ) -> Agent[AdapterRunContext, Any]:
     """Build an agent with governance installed first among capabilities.
@@ -113,13 +115,24 @@ def build_governed_agent(
 
     Rejects co-resident capabilities that wrap the toolset — see
     ``_reject_unreachable_wrappers``.
+
+    ``defer_disclosure`` opts a run into deferred tool disclosure (036, ADR-0040): tools
+    cost a catalog line until the model searches for one. **The guard above is unchanged
+    and still refuses caller-supplied toolset wrappers** — this is not a hole in it. The
+    difference is ownership: the disclosure composition is one capability this module
+    constructs and whose ordering it states, not an arbitrary capability handed in from
+    outside for governance to trust. `DisclosureGovernance` sits *inside* the framework's
+    search layer at the toolset seam while keeping the same terminal `GovernedToolset` and
+    the same admission check; `adapters.pydantic_ai.disclosure` records the three
+    measurements that made that the only correct arrangement.
     """
     co_resident = list(capabilities) if capabilities is not None else []
     _reject_unreachable_wrappers(co_resident)
+    governance: Any = DisclosureGovernance() if defer_disclosure else GovernanceCapability()
     return Agent(
         model,
         deps_type=AdapterRunContext,
         toolsets=list(toolsets) if toolsets is not None else None,
-        capabilities=[GovernanceCapability(), *co_resident],
+        capabilities=[governance, *co_resident],
         **agent_kwargs,
     )
