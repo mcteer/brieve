@@ -95,17 +95,37 @@
   The conversation it belongs to travels in the action, not in a field — there is nothing here
   for a person to set, and an id in a form control is an id somebody can edit.
 #}
+{#
+  ONE FIELD, and the control inside it — the composer every chat interface has.
+
+  The LABEL is visually hidden rather than deleted: the placeholder is not an accessible name,
+  it disappears the moment somebody types, and a control whose only name is placeholder text is
+  a control a screen-reader user meets unnamed. It still says which of the two things this is,
+  because "ask a follow-up" and "ask a question" are different acts.
+
+  The EXPECTATION text is hidden for the same reason and the opposite direction. It used to be
+  a paragraph under the box, which 028 wanted perceivable as plain content — but a sighted
+  person now learns the same fact at the moment it matters, from the status line that appears
+  while the platform is working. A screen-reader user has no such moment, so the description
+  stays on the control where `aria-describedby` will read it.
+#}
 <form method="post" class="ask"
       action="/ask{% if conversation_id %}?conversation_id={{ conversation_id }}{% endif %}">
-  <label for="question">{% if exchanges or conversation_id %}Ask a follow-up{% else %}Your question{% endif %}</label>
-  <textarea id="question" name="question" rows="3" required
-            aria-describedby="ask-expectation"></textarea>
-  <p id="ask-expectation" class="meta">
+  <label class="visually-hidden" for="question">{% if exchanges or conversation_id %}Ask a follow-up{% else %}Your question{% endif %}</label>
+  <div class="ask-field">
+    <textarea id="question" name="question" rows="1" required
+              {# ONE PLACEHOLDER, because the varying one is wrong half the time. It is chosen
+                 when the SERVER renders, and exchanges appended by script afterwards do not
+                 change it — so mid-conversation the box invited a first question. The label
+                 below still varies: it is read on load, which is when it is true. #}
+              placeholder="Ask a question&hellip;"
+              aria-describedby="ask-expectation"></textarea>
+    <button type="submit" class="button ask-send">Ask</button>
+  </div>
+  <p id="ask-expectation" class="visually-hidden">
     Answers come from the platform&rsquo;s pinned documentation or from your own records
-    &mdash; whichever fits what you asked. An answer usually takes a minute or two, so leave
-    this page open while it works.
+    &mdash; whichever fits what you asked. An answer usually takes a minute or two.
   </p>
-  <button type="submit" class="button">Ask</button>
 </form>
 
 {% if empty %}

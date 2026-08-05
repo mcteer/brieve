@@ -708,13 +708,58 @@ main.main--app {
   scroll-margin-block-end: 12rem;
 }
 
+/* THE COMPOSER IS THE FIELD, not a band across the page.
+   
+   It used to be a bordered strip with the ground painted behind it, which drew a frame around
+   the one part of the page that should feel like an input. The strip is gone; what remains is
+   the page's own ground (so the transcript does not show through while scrolling under it) and
+   a single rounded field with the control inside it. */
 .ask {
   position: sticky;
   bottom: 0;
-  background: var(--surface);
-  border-top: 1px solid var(--rule);
-  padding-block: var(--space-3);
+  background: var(--page);
+  padding-block: var(--space-4) var(--space-5);
   margin-block-start: var(--space-5);
 }
+
+/* `ask-field`, NOT `composer` — the thread page has used `.composer` since 012, and naming
+   this one the same put ask styling on a form belonging to another surface. The reflow rows
+   caught it at 320px, on a page this change never meant to touch. A class name is a namespace
+   whether or not anybody treats it as one. */
+.ask-field {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+
+/* The field carries no chrome of its own — the container is the input, visually. */
+.ask-field textarea {
+  flex: 1 1 auto;
+  /* Without this a flex item refuses to shrink below its content width, and at 320px the
+     composer pushed the page into horizontal scroll — 1.4.10, caught by the reflow rows. */
+  min-width: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  padding: var(--space-2) 0;
+  resize: none;
+  min-height: 2.5rem;
+  max-height: 14rem;
+  field-sizing: content;
+}
+
+.ask-field textarea:focus { outline: none; }
+
+/* The focus ring goes on the CONTAINER, so focusing the field lights the whole composer
+   rather than a borderless box inside it — the indicator has to be visible (2.4.7) and it is
+   the field a person thinks they are focusing. */
+.ask-field:focus-within { outline: 3px solid var(--link-bright); outline-offset: 2px; }
+
+.ask-send { flex: 0 0 auto; }
 
 html { scroll-padding-block-end: 12rem; }
