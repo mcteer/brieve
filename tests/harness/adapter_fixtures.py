@@ -160,6 +160,55 @@ def governed_agent_fixture(
     return agent, deps, handlers, audit
 
 
+def scripted_search_model(
+    *,
+    queries: Sequence[str],
+    then_call: tuple[str, dict[str, Any]],
+    final_text: str = "done",
+) -> FunctionModel:
+    """A model that searches for a tool, then calls what it found (036, US1).
+
+    The shape a deferred-disclosure run actually takes: the model cannot call what it has
+    not been shown, so step one is a search and step two is the call. Deterministic like
+    ``scripted_tool_model`` — the point is to exercise the *composition*, never to test
+    whether a real model would think to search.
+    """
+    steps = {"n": 0}
+    name, args = then_call
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        steps["n"] += 1
+        if steps["n"] == 1:
+            return ModelResponse(
+                parts=[ToolCallPart(tool_name="search_tools", args={"queries": list(queries)})]
+            )
+        if steps["n"] == 2:
+            return ModelResponse(parts=[ToolCallPart(tool_name=name, args=args)])
+        return ModelResponse(parts=[TextPart(content=final_text)])
+
+    return FunctionModel(respond)
+
+
+def scripted_program_model(program: str, *, final_text: str = "done") -> FunctionModel:
+    """A model that submits one code-mode program, then stops (036, US2).
+
+    The program is the argument to the registered ``run_program`` tool, which is what makes
+    submission itself a governed call — see ADR-0041 and 036's R8. Nothing here executes the
+    program; the seam does, and every call inside it round-trips ``invoke_tool``.
+    """
+    steps = {"n": 0}
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        steps["n"] += 1
+        if steps["n"] == 1:
+            return ModelResponse(
+                parts=[ToolCallPart(tool_name="run_program", args={"program": program})]
+            )
+        return ModelResponse(parts=[TextPart(content=final_text)])
+
+    return FunctionModel(respond)
+
+
 def build_probe_capability(probe_log: list[str], *, label: str = "co-resident") -> Any:
     """A co-resident (non-governance) capability that records when it observed a call.
 

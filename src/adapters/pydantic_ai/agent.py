@@ -16,7 +16,11 @@ from pydantic_ai import Agent
 from pydantic_ai.capabilities.abstract import AbstractCapability
 from pydantic_ai.toolsets import AbstractToolset
 
-from adapters.pydantic_ai.governance import GovernanceCapability
+from adapters.pydantic_ai.governance import (
+    DisclosureGovernance,
+    GovernanceCapability,
+    recording_search_fn,
+)
 from adapters.pydantic_ai.run_context import AdapterRunContext
 from adapters.pydantic_ai.tools import GovernedToolError
 from core.approvals import ApprovalHook, DenyAllApprovalHook
@@ -43,6 +47,7 @@ def start_adapter_run(
     approval_hook: ApprovalHook | None = None,
     durability: DurabilityProvider | None = None,
     brokered_material_source: BrokeredMaterialSource | None = None,
+    disclosure_posture: str | None = None,
 ) -> AdapterRunContext:
     """Start a governed run and return the deps object bound to it.
 
@@ -59,6 +64,7 @@ def start_adapter_run(
         clock=clock,
         audit_sink=audit_sink,
         brokered_material_source=brokered_material_source,
+        disclosure_posture=disclosure_posture,
     )
     return AdapterRunContext(
         governed_run=run,
@@ -104,6 +110,7 @@ def build_governed_agent(
     *,
     toolsets: Sequence[AbstractToolset[AdapterRunContext]] | None = None,
     capabilities: Sequence[Any] | None = None,
+    defer_disclosure: bool = False,
     **agent_kwargs: Any,
 ) -> Agent[AdapterRunContext, Any]:
     """Build an agent with governance installed first among capabilities.
@@ -113,13 +120,40 @@ def build_governed_agent(
 
     Rejects co-resident capabilities that wrap the toolset — see
     ``_reject_unreachable_wrappers``.
+
+    ``defer_disclosure`` opts a run into deferred tool disclosure (036, ADR-0040): tools
+    cost a catalog line until the model searches for one. **The guard above is unchanged
+    and still refuses caller-supplied toolset wrappers** — this is not a hole in it. The
+    difference is ownership: the disclosure composition is one capability this module
+    constructs and whose ordering it states, not an arbitrary capability handed in from
+    outside for governance to trust. `DisclosureGovernance` sits *inside* the framework's
+    search layer at the toolset seam while keeping the same terminal `GovernedToolset` and
+    the same admission check; `adapters.pydantic_ai.disclosure` records the three
+    measurements that made that the only correct arrangement.
     """
     co_resident = list(capabilities) if capabilities is not None else []
     _reject_unreachable_wrappers(co_resident)
+    installed: list[Any]
+    if defer_disclosure:
+        from pydantic_ai.capabilities import ToolSearch
+
+        # ToolSearch is installed EXPLICITLY, carrying the platform's recording search
+        # function as its `strategy` (a callable strategy is the custom-search mode, and it
+        # keeps the local `search_tools` fallback wired up).
+        #
+        # The framework auto-injects a default one when absent
+        # (`_AUTO_INJECT_CAPABILITY_TYPES`), and a default would answer searches without
+        # recording them — so this is not a preference about wiring, it is what makes
+        # ADR-0061's record exist at all. It is added here rather than accepted from a
+        # caller, so `_reject_unreachable_wrappers` above still refuses every wrapper the
+        # adapter did not construct itself.
+        installed = [DisclosureGovernance(), ToolSearch(strategy=recording_search_fn), *co_resident]
+    else:
+        installed = [GovernanceCapability(), *co_resident]
     return Agent(
         model,
         deps_type=AdapterRunContext,
         toolsets=list(toolsets) if toolsets is not None else None,
-        capabilities=[GovernanceCapability(), *co_resident],
+        capabilities=installed,
         **agent_kwargs,
     )

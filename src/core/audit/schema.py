@@ -385,6 +385,67 @@ class AuditEventType(StrEnum):
     #: establishes that distinction for runs, and this keeps it for asks rather than blurring it.
     ASK_ANSWERED = "ask_answered"
 
+    #: A model searched for a tool it had not been shown (036, ADR-0040/ADR-0061). Payload:
+    #: queries, matched, undisclosed_remaining.
+    #:
+    #: **A SEALED-CORE ADDITION** (Principle V), the fourth feature to make one. Additive to an
+    #: unversioned enum, on the argument 020, 021 and 022 each made and which
+    #: `test_widening_the_event_vocabulary_moves_no_existing_hash` checks rather than repeats:
+    #: the hash covers an entry's *own* ``event_type``, never the set of possible values.
+    #:
+    #: **This member is why ADR-0061 exists.** ADR-0040's Decision says deferred disclosure
+    #: brings "no registry, hook, or audit change" — and recording a search *is* an audit
+    #: change. Rather than ship behaviour its own record denies, 036 amends the ADR by pointer
+    #: and leaves its Decision section intact (the ADR-0060 mechanism). A feature quietly
+    #: contradicting an Accepted ADR is the defect ADR-0060 closed one level up, in the
+    #: constitution, the day before this landed.
+    #:
+    #: **An observation, never a decision.** There is no allow/deny here and no reason code,
+    #: because nothing may refuse a search: disclosure changes what the model *knows about*,
+    #: never what it may *do* (FR-006a). A search that reached `invoke_tool` would be a
+    #: governed act, which is precisely the shape 036 refused — the search layer sits outside
+    #: the terminal governance wrapper and never delegates inward.
+    #:
+    #: **Never confusable with an attempt.** ``matched`` may be empty, and an empty match is
+    #: the signal most worth keeping: a model repeatedly looking for a capability it was never
+    #: granted. That is intent, not action, and an auditor must not read "looked for a way to
+    #: delete a bucket" as "tried to delete a bucket" (FR-006c) — which is why this is its own
+    #: member rather than a flag on a tool-call event.
+    #:
+    #: **Names only, never schemas.** The payload carries tool names and counts; the schemas
+    #: the search discloses go to the model, not to the trail.
+    DISCOVERY_OBSERVED = "discovery_observed"
+
+    #: The program a model wrote in code mode, recorded as the cause of the calls that follow
+    #: (036, ADR-0041). Payload: program, program_sha256.
+    #:
+    #: **A SEALED-CORE ADDITION** (Principle V), landing with `DISCOVERY_OBSERVED` above and
+    #: reviewed with it.
+    #:
+    #: **Why the cause and not only the effects.** In code mode the model emits one tool call
+    #: and the program inside it makes many. The individual calls are recorded exactly as
+    #: structured calls are — that is 036's whole parity claim — but without the program the
+    #: trail holds a set of effects with no explanation, which is *less* evidence than
+    #: structured calling gives, where intent is visible turn by turn. Principle IX: an
+    #: orchestration whose effects are recorded and whose cause is not is one nobody can
+    #: reconstruct.
+    #:
+    #: **Verbatim, on `TURN_RECORDED`'s argued precedent** and diverging from
+    #: `redact_arguments` for the same reason: this is the only durable copy of the cause. The
+    #: submission's own arguments still pass the ordinary pipeline and are redacted there, so
+    #: the divergence is deliberate and narrow rather than a hole.
+    #:
+    #: **Scope of the no-secret-leak posture.** The credential-free-checkpoint discipline
+    #: governs what the *platform* puts into a sandbox. A model writing a literal secret into
+    #: its own program is `TURN_RECORDED`'s case — a person's or model's own words, recorded
+    #: as said — and not a platform leak. Conflating the two would argue for redacting the
+    #: cause, which defeats the member.
+    #:
+    #: **Written only when the submission is allowed.** A denied `run_program` leaves the
+    #: ordinary `PRE_DECISION` denial and nothing here: a program that never ran caused
+    #: nothing, and recording it would put un-executed model output in the trail.
+    PROGRAM_SUBMITTED = "program_submitted"
+
 
 class AuditEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")

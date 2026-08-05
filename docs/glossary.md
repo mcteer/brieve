@@ -69,6 +69,27 @@ conformance-asserted parity (ADR-0033). ADR-0033 enumerated a fourth, a CLI; it 
 built and [ADR-0060](adr/0060-three-transports-the-cli-is-withdrawn.md) withdrew it. Adding a
 fourth still requires an ADR — three is a ceiling, not a floor.
 
+**Disclosure posture** — whether a run presented every tool's schema up front (`eager`),
+withheld them until the model searched (`deferred`), or asked for deferral and could not get
+it (`eager_fallback`). A property *of a run*, recorded on its start record rather than
+inferred — a run believed to be deferring when it is not is the unstated posture this
+platform refuses elsewhere (ADR-0040, 036).
+
+**Discovery** — a model searching for a tool it was not shown, and what that search matched.
+Recorded as an observation and **never refusable**: disclosure changes what a model knows
+about, never what it may do (ADR-0061). Distinct from a tool call in the trail, so "looked
+for a way to delete a bucket" cannot read as "tried to delete a bucket".
+
+**Code mode** — a model writing a program that calls tools, rather than emitting one
+structured call per turn. Ships in the governed path **only** with verified per-call hook
+parity; sandbox safety is not governance (ADR-0041). Entered through the registered
+`run_program` tool, so submission is itself a governed call and the registry is the opt-in.
+
+**Sandbox seam** — the platform-owned loop through which every call a model-written program
+makes reaches `invoke_tool`. Owned by the platform rather than the runtime because the
+runtime does not enforce which functions a program may call: it forwards every unresolved
+name to the host, so the host's handler is the security boundary (036, FR-014a).
+
 **Sealed core** — the parts no downstream change may modify: identity flows, hook
 engine, registries, audit schema, durability, adapters. Everything else extends
 through semver'd seams: hooks, packs, prompt overlays, policy bundles, providers.
