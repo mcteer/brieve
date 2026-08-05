@@ -42,7 +42,6 @@ being re-derived at the start of every spec.
 | 020 | A model chooses, and the choice is governed | ADR-0022/ADR-0039 (**the Qualified Model Matrix binding path exercised for real** — 013 built the reader and the validation, and nothing had ever written a cell), ADR-0052 (the judge chain) | **Closed ROADMAP gap 0e**, the largest instance of a capability correct, tested, and wired to nothing. A model now names each step's tool and the choice passes the same governed entry a scripted one would — refused when it must be, recorded either way, durable across a kill |
 | 021 | Grounded run reports | ADR-0018 (**built**, four months after it was Accepted), ADR-0035 (a report is a governed, audited evidence read), ADR-0032 (attestation states its scope), ADR-0033 (the parity row grows by one operation), ADR-0055 (a report says whether its own basis verified) | **The last owed row: report fidelity.** `OWED` is empty for the first time since the constitution named five eval suites. Its Constitution Check **failed** on Principle IV — read-back at report time would have run under the API surface's identity — and the redesign put observation in the allocation, where an identity bounded by the run already exists. Four analysis passes, 11 → 6 → 6 → 3 findings; the fourth found `research.md` still describing the rejected architecture, which three passes over spec/plan/tasks could not see |
 | 017 | Deployment lane | ADR-0047 (**the inverse case it governs** — gates that PASSED while the guarantee was absent, because they asserted about the wrong object), ADR-0048 (a surface's identity is attested, and an assembly asking for the wrong role fails at login), ADR-0033, ADR-0025 | Twenty-one rows against the served surfaces, in a lane that stands them up. **Closed ROADMAP gap 0d.** A gate class no prior lane could run: every other asserts about a process the test constructs, this about the one a deployment constructs. Eight analysis passes before implementation, six of which found something in the surfaces' lifecycle; running it then found two more |
-
 | 022 | The trail records who looked | ADR-0035 (**amended** — the governed-read discipline extends past the audit plane to records about runs and threads), ADR-0009 (a read is now a step in the walk that carries an entry), ADR-0033 (parity held at zero coverage; it now holds at seven), ADR-0018 (the asymmetry that made this urgent) | **Found by connecting an editor and asking the platform what it had just done.** The answer came back; the question left no trace. Nine of seventeen operations wrote nothing while both surfaces claimed every operation was recorded. Ten analysis passes, 8 → 4 → 2 → 1 → 1 → 1 → 0 → **1 CRITICAL** → 3 → 2: the zero at pass 7 was misleading, and switching from comparing artifacts to each other to comparing them **against the code** immediately found that `stop_run` recorded nothing — which this spec had asserted was covered, marked *measured*, without measuring it |
 | 023 | A browser login for the dev lane | ADR-0033 (unchanged — the surface's OAuth half already worked), ADR-0016/0057 (a browser login resolves to the same claims a minted token does) | **Five defects, all found by connecting a real editor and none by any check.** A 404 on the discovery path clients probe; a document missing `response_types_supported`, which a client validates and refuses; a single-threaded `HTTPServer` that a browser's keep-alive blocks; default claims the deployed surface does not map; and `resource` — required by MCP — being swallowed as an identity claim, which defeated the default and refused every login after it appeared to succeed. That last one survived four rounds because the test kept being written without `resource`, a shape no real client uses. Nineteen served-surface rows were green throughout |
 | 024 | Grounded guidance — a question gets an answer | ADR-0039 (**built** — *ask answers, it never acts*, decided before the feature existed and satisfied structurally: the path holds no tool registry and no authority grant), ADR-0034 (answering is an API operation, so the portal stays thin), ADR-0033 (the parity row grows), ADR-0022/0039 (the `ask` binding), ADR-0004 (the corpus is the supply chain's second subject) | **Four eval suites for answering were in force and green over a capability that did not exist.** They scored `recorded` strings described as *"what a previously-observed run produced"* — for runs that had never happened, because neither scorer touched a product path: `FixtureScorer` replays, `LiveModelScorer` asks a vendor directly. `AnsweringScorer` drives the real path with the recording as the model's output, so the suites score what the product produced. Reauthoring the cases exposed the finding underneath: they cited `developer.hashicorp.com` product docs while the pinned corpus is `/validated-patterns/` — **disjoint sets, so every case cited a document the platform does not have**. **Two deferrals, both recorded rather than dropped**: estate-state answering, and the portal's own answering surface — the feature is named for a surface it does not touch, and analysis pass 3 found SC-001 reading "through the portal" while no task did. **A third deferral, raised during implementation and recorded rather than absorbed**: the pin has no refresh schedule and no staleness signal. `corpus_sync` re-discovers the document list upstream on every run, so a NEW pattern page is picked up without editing a list — but nothing runs it, and an answer cannot say its pin is forty days old. The intent is latest-available content; pinning serves that rather than fighting it (sync often, answer from the newest sync, and the citation still provably resolves), but the scheduling half does not exist. FR-014 says pinned and says nothing about how often, which is the gap. Same for `packs/*/skills`, vendored from hashicorp/agent-skills by hand. Four analysis passes, 3 → 2 → 1 → 3; the uptick is honest, since passes 2 and 3 changed the feature's shape |
@@ -55,79 +54,17 @@ being re-derived at the start of every spec.
 | 034 | The portal gets a visual identity | ADR-0034 (the portal stays thin — this is presentation, and the one payload field it adds is display-only), ADR-0039 (the never-acts distinction stays *visible*, which is partly a design job), ADR-0004 (**applied to a font** — adopted content is adopted content) | **The portal had no character and, worse, no way to tell an argument from an identifier.** Three type roles now do what one face could not: serif headings, Roboto prose, monospace for anything a person carries to an auditor — a record hash stops needing to be explained as "the technical bit" because it already looks like one. Saturated colour is scarce and always means something: a product or a verdict. Verdicts became pills carrying a border and the word, so meaning survives greyscale. **The a11y lane doubled** — every axe state and every keyboard criterion, in both themes, 53 rows — because a dark theme nothing exercised would be the untested surface this repository refuses. **That doubling immediately found the platform being right about something**: RATE_LIMIT_ACTS is 30 per five minutes per SUBJECT, so running every row twice as one person blew the budget and the rows failed far from the cause — a composer that never rendered reads as a missing label, not a refused act. Fixed by giving each theme its own subject; widening a real control for a lane's convenience was the alternative and was refused. **Two planning assumptions died at the licence file**: Roboto is SIL OFL 1.1 and not Apache-2.0 (stale rather than invented — it was Apache for years), and upstream ships no static weights at all, so one variable woff2 carries every weight at 222 KB against an estimated 90. Both were caught by reading the artifact instead of trusting the plan, which is the second time in one day a confidently-stated upstream fact turned out to be assumption. Two analysis passes, 4 → 0 |
 | 033 | The corpus refresh | ADR-0004 (**consumed twice over** — the corpus as the supply chain's second subject, and the `[upstream]` pin as provenance that is *checkable rather than asserted*, which turned out to already be the record this feature needed), ADR-0039/0034/0033 (the note reaches all three surfaces through the shared payload; no operation added) | **024's deferral, closed: the pin now says when it was made, and every guidance answer says how old its ground is.** The manifest carried no timestamp of any kind, so no layer above it could compute an age even if it wanted to — answers made a currency claim nothing was checking. `synced_at` moves on every sync including one that finds nothing changed, and that one-line diff IS the 'we checked' record the weekly proposal exists to produce. Six ways of not knowing (absent, empty, unparseable, wrong type, naive, future-from-skew) map to ONE state, disclosed as unknown rather than raising — the failure being guarded is an answer claiming currency it has not earned, so returning None fails toward more disclosure while refusing to load would take answering down over metadata. **The note never suppresses itself and never declines**: a disclosure that appeared only past a threshold would train readers that silence means recent, and declining would punish the asker for an operator's omission. **Three analysis passes, converging** (3 → 5 → 3, all resolved): pass 1 caught the artifacts inventing a `[skills.provenance]` table while the loader's `[upstream]` pin already existed and the invented name would have collided with `[[skills]]`; pass 2 caught the CI half's operational reality — a token-created PR triggers no checks, and the obvious fix (a PAT) is the standing credential Principle IV exists to refuse, so the proposal explains its own missing checks instead; pass 3 caught the dated-branch pile and the unassertable 'no network step'. **Run against real upstream during implementation**: hashicorp/agent-skills HAS moved since the 2026-07-29 vendoring, reported with a compare link and not one byte vendored — adoption stays a reviewed act through the promotion path |
 | 031 | A real model drives a governed run | ADR-0058 (**closed its owed half** — the first dispatched run with a non-fixture model brokered the vendor credential under the allocation's own attested identity, 027 T016b observed live), ADR-0059 (**applied to its first new cell** — plan-role evidence earned by scoring the tool-choice pair under a `plan` subject), ADR-0049 (terminal stops honoured, observed), ADR-0048/0022/0039 consumed | **The founding promise, executed: `TOOL_CHOSEN` naming `anthropic/claude-opus@5` on a dispatched allocation, from a live plan cell that exists for the demonstration and never for the gates** (seeded out of band by `infra/bin/model-run-demo`, trap-restored, restoration proven byte-for-byte, choice lane green before and after; the merge-lane row untouched). Operator visibility decided: `AUTHORITY_DENIED`/`AUTHORITY_REFUSED` and only those — and the loop closed over the wire, an operator token asking *"Which runs were denied?"* and the answer citing the demonstration's own refusal record. **Six executions to one clean run, each failure a real property**: an over-scoped run cannot start (manufacture refuses before any model exists); **an aligned model does not over-reach** — three samples, two wordings, NONE every time, so the over-reach scenario as spec'd is undemonstrable without adversarial injection and Run 2 became the user's design (one permitted tool, always refused — the model behaves perfectly and governance still says no); a machine credential is refused where a person's is expected (`subject_kind_mismatch`, the API's own defense); and 24 MHz of enclave cannot place dispatches under three surfaces. One live-lane variance row (terraform/must_decline case 001) recorded as it happened and re-run green the same day. **Owed onward**: the estate switches to Sonnet 5 for future lane runs — a governed re-qualification, not a config edit |
-## In progress
+| 035 | The ask becomes a conversation | ADR-0034 (**the thin-client rule under the hardest case yet** — a transcript the client appends to, where every word in it is still the server's), ADR-0039 (never-acts, held while the surface gained memory), ADR-0033 (three ask-conversation operations, on both surfaces) | **The spec deferred follow-up context and the maintainer put it back mid-specification**, which changes what the model is shown and therefore what a citation rests on — so the record had to carry it: `ask_answered` gains `conversation_id` and `carried_context`. Clarify settled the two questions that decides: an explicit routing signal always wins and only a signal-less follow-up inherits its predecessor's source, and a declined exchange carries its QUESTION forward but never its decline, because feeding a decline back invites a second one by agreement rather than by reading. **The plan was wrong about retrieval and SC-002 measured it**: 6/10 until the earlier questions widened the retrieval query, then 9/10. **Three pieces of 028's single-answer styling were correct then and defects once answers stacked** — a card around the response, a rule under each claim, and a button margin that read as a centring error. **A class name is a namespace whether or not anybody treats it as one**: naming the ask container `.composer` put ask styling on the thread page, caught by the 320px reflow rows on a page the change never meant to touch. Follow-on: #158 aligned the run surface on the same design principles and found a live 2.5.8 failure two a11y rows had never measured, because both walked one page; #159 withdrew the CLI |
+### How the shape got here
 
-*Nothing in progress.*
+Three entries that sat under **Next** long after they shipped. The reasoning in them is still
+the reasoning — why the API went first, why packs had to precede answering, what the parity
+gate cost — so they are kept rather than deleted, and collapsed rather than left where they
+read as work outstanding. Each summary says what actually closed it.
 
 <details>
-<summary>021 grounded run reports — shipped 2026-08-01</summary>
+<summary>Northbound surfaces — closed by 008, 009, 012, and ADR-0060</summary>
 
-**The last owed Quality Gate row.** ADR-0018 has been Accepted since 2026-04-08 and implemented
-by nothing: `RunReport` appears nowhere in `src/`, and `core/evals/suites.py` carries report
-fidelity in an `OWED` dictionary whose value says a gate over it "would assert something about a
-thing that is not there".
-
-020 is what makes it worth doing now rather than earlier. Before it, a report would have
-described a scripted sequence — every tool the same, chosen by nobody, refused never. The first
-run whose account is genuinely uncertain is the first run a report can get *wrong* in the way
-ADR-0018 is about.
-
-Three clarifications settled it, and the third was a correction: a report is scoped **as an
-evidence read is** — by tenant, not to the run's subject — because many personas read these, and
-because `EvidenceQueryRequest` carries no subject field at all. That measurement found a leak
-worth naming here: `get_run_result` *is* subject-restricted, so a report carrying the run's result
-payload would route around it. Forbidden by FR-008a before a line was written.
-
-**Known consequence for the parity row**: a requestable report is an operation, so ADR-0033's
-surface-parity row grows across API and MCP. Inherited work, not a discovery.
-
-</details>
-
-**016 task-scoped authority is PARKED** (`specs/016-task-scoped-authority`, tag
-`archive/016-task-scoped-authority`, 19 of 51 tasks built). Specified, planned, and the
-substrate built and demonstrated end to end — then stopped, because implementation established
-that the narrowing it delivers is one the workload does not want.
-
-These agents are HashiCorp experts who read widely before acting: skills, HVDs, internal
-policy, prior art. Breadth of read is how the output gets informed, and an agent denied
-context does not fail loudly — it advises badly. Meanwhile the property the narrowing was
-meant to buy is already held: authority is manufactured per allocation from an attested
-identity and expires in an hour.
-
-[ADR-0057](docs/adr/0057-context-hungry-agents-want-breadth-not-narrower-reads.md) records the
-decision and the three triggers for re-opening it. The research — Vault is the resource server
-and cannot perform the exchange, the entity-alias binding, the `jti` trap — is kept in
-`specs/016-task-scoped-authority/research.md`, alongside the spec and a README that says what
-was pruned. The rest of that feature's planning artifacts were removed on 2026-08-03: a
-fifty-one-item task list for work that was answered reads as fifty-one dropped obligations,
-which is the opposite of what happened.
-
-> **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
-> work by name. Guessing the next number reads as a fact, propagates into merged documents, and
-> is wrong the moment anything is specified out of order.
->
-> **Numbers are identifiers, not sequence.** 005 was assigned to durable execution before the
-> local environment was understood to precede it — and then 005 shipped first anyway, because
-> the blocking part of the environment turned out to be one Makefile target. The order of work
-> here does not match numeric order and is not meant to. Renaming a merged spec directory would
-> churn every reference to it for no gain.
-
-> **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
-> work by name. Guessing the next number reads as a fact, propagates into merged documents, and
-> is wrong the moment anything is specified out of order.
->
-> **Numbers are identifiers, not sequence.** 005 was assigned to durable execution before the
-> local environment was understood to precede it — and then 005 shipped first anyway, because
-> the blocking part of the environment turned out to be one Makefile target. The order of work
-> here does not match numeric order and is not meant to. Renaming a merged spec directory would
-> churn every reference to it for no gain.
-
-## Next
-
-Ordered by dependency first, then by which owed gate row it closes. Each entry names what it
-unblocks — that is the argument for its position, and the thing to challenge if you disagree.
-
-### Northbound surfaces — one feature per transport (ADR-0033, ADR-0034, ADR-0035, ADR-0060)
 
 **Planned as four, shipped as three.** ADR-0033 enumerated four transports and required every
 one to yield the same verdict and equivalent audit events, with parity asserted *between*
@@ -190,7 +127,17 @@ rather than most of it.
 authorization core (002/003) and the approval gate (007) settled behind them; attempting them
 earlier means building transports over guarantees still in motion.
 
-### Portal answering — estate-state and grounded guidance (ADR-0034, ADR-0039)
+</details>
+
+<details>
+<summary>Portal answering — closed by 024, 025, 026, 027, 028 (and 029, 033, 035 after)</summary>
+
+**Shipped.** 024 built answering, 025 bounded it by the asker's entitlements, 026 bound it to
+the Qualified Model Matrix, 027 gave it a credential it could actually use, and 028 put it on
+the portal. 029 fixed it at real volume, 033 closed corpus freshness, 035 made it a
+conversation. The dependency this entry named — packs before answering — held exactly as
+written: 013 shipped the eval gates, and the `ask` binding was inexpressible until it did.
+
 
 **Unnumbered, and after capability packs**, which is not a preference but a dependency:
 ADR-0039 makes an `ask` binding inexpressible without a green Qualified Model Matrix cell,
@@ -203,7 +150,19 @@ Patterns — 33 documents, stable per-section anchors, **no version metadata any
 change detection must be content-based), and ADR-0039 has already decided the rule it will
 be tempted to bend — *ask answers, it never acts*.
 
-### Capability packs and eval gates (ADR-0004, ADR-0022, ADR-0030, ADR-0031, ADR-0039, ADR-0045)
+</details>
+
+<details>
+<summary>Capability packs and eval gates — closed by 013 (and the eval suites completed by 021, 029, 030)</summary>
+
+**Shipped as 013**, which is why the Shipped table carries a row with this entry's exact ADR
+list. Reading the two together was the drift: this text says *"the eval-gate machinery does not
+exist"* and owes *"all Eval gates"*, and neither has been true for months. `src/core/evals/`
+holds `promotion`, `judge`, `scoring`, `fidelity`, `estate_fixtures` and `injection_patterns`;
+`src/core/packs/` holds the loader, manifest, isolation and workflows; the Qualified Model
+Matrix is `src/core/choice/matrix.py`. `OWED` has been empty since 021 closed report fidelity —
+the last of the five.
+
 
 > Previously headed "009", which guessed a number this file's own rule says not to guess —
 > and it was wrong the moment MCP was specified first. Unnumbered until its directory exists.
@@ -219,6 +178,80 @@ no approval path is hard to evaluate end to end.
 **Owed gate rows:** all Eval gates (must-deny safety, must-decline scope, citation accuracy,
 estate-state fixtures, report fidelity).
 
+</details>
+
+## In progress
+
+*Nothing in progress.*
+
+<details>
+<summary>021 grounded run reports — shipped 2026-08-01</summary>
+
+**The last owed Quality Gate row.** ADR-0018 has been Accepted since 2026-04-08 and implemented
+by nothing: `RunReport` appears nowhere in `src/`, and `core/evals/suites.py` carries report
+fidelity in an `OWED` dictionary whose value says a gate over it "would assert something about a
+thing that is not there".
+
+020 is what makes it worth doing now rather than earlier. Before it, a report would have
+described a scripted sequence — every tool the same, chosen by nobody, refused never. The first
+run whose account is genuinely uncertain is the first run a report can get *wrong* in the way
+ADR-0018 is about.
+
+Three clarifications settled it, and the third was a correction: a report is scoped **as an
+evidence read is** — by tenant, not to the run's subject — because many personas read these, and
+because `EvidenceQueryRequest` carries no subject field at all. That measurement found a leak
+worth naming here: `get_run_result` *is* subject-restricted, so a report carrying the run's result
+payload would route around it. Forbidden by FR-008a before a line was written.
+
+**Known consequence for the parity row**: a requestable report is an operation, so ADR-0033's
+surface-parity row grows across API and MCP. Inherited work, not a discovery.
+
+</details>
+
+**016 task-scoped authority is PARKED** (`specs/016-task-scoped-authority`, tag
+`archive/016-task-scoped-authority`, 19 of 51 tasks built). Specified, planned, and the
+substrate built and demonstrated end to end — then stopped, because implementation established
+that the narrowing it delivers is one the workload does not want.
+
+These agents are HashiCorp experts who read widely before acting: skills, HVDs, internal
+policy, prior art. Breadth of read is how the output gets informed, and an agent denied
+context does not fail loudly — it advises badly. Meanwhile the property the narrowing was
+meant to buy is already held: authority is manufactured per allocation from an attested
+identity and expires in an hour.
+
+[ADR-0057](docs/adr/0057-context-hungry-agents-want-breadth-not-narrower-reads.md) records the
+decision and the three triggers for re-opening it. The research — Vault is the resource server
+and cannot perform the exchange, the entity-alias binding, the `jti` trap — is kept in
+`specs/016-task-scoped-authority/research.md`, alongside the spec and a README that says what
+was pruned. The rest of that feature's planning artifacts were removed on 2026-08-03: a
+fifty-one-item task list for work that was answered reads as fifty-one dropped obligations,
+which is the opposite of what happened.
+
+> **A feature has no number until `/speckit-specify` creates its directory.** Refer to unstarted
+> work by name. Guessing the next number reads as a fact, propagates into merged documents, and
+> is wrong the moment anything is specified out of order.
+>
+> **Numbers are identifiers, not sequence.** 005 was assigned to durable execution before the
+> local environment was understood to precede it — and then 005 shipped first anyway, because
+> the blocking part of the environment turned out to be one Makefile target. The order of work
+> here does not match numeric order and is not meant to. Renaming a merged spec directory would
+> churn every reference to it for no gain.
+
+## Next
+
+Ordered by dependency first, then by which owed gate row it closes. Each entry names what it
+unblocks — that is the argument for its position, and the thing to challenge if you disagree.
+
+**Three entries were removed from here on 2026-08-05 because they had shipped** — northbound
+surfaces, portal answering, and capability packs. The last of them described the eval-gate
+machinery as not existing and owed all five eval gates, months after 013 built it and 021
+emptied `OWED`. They are kept under **Shipped → How the shape got here**, collapsed, because
+the reasoning in them is still the reasoning; only the framing was wrong.
+
+This is the same defect ADR-0060 closed in the constitution — a document asserting a shape the
+platform does not have — in the file a planner reads *first*. It produced two wrong
+recommendations in a single session before anyone checked it against `src/`.
+
 ### Automated skill intake — the supply-chain sentinel (ADR-0053)
 
 **Unnumbered, per this file's own rule** — no directory exists and nothing is specified.
@@ -232,8 +265,10 @@ differential detonation against the golden-task corpus in a canary-seeded range,
 observer and the specimen as separate workload identities. The evidence package attaches to
 the version-bump pull request.
 
-**Why beside capability packs:** skill adoption ships there, so intake has nothing to gate
-until packs exist. 013 built the promotion path — provenance, injection lens, eval — with the
+**Why it waited on capability packs:** skill adoption ships there, so intake had nothing to
+gate until packs existed. They do now — 013 shipped them (**Shipped → How the shape got
+here**), which means this entry's stated precondition is met and it is no longer blocked by
+anything but its own owed eval class, below. 013 built the promotion path — provenance, injection lens, eval — with the
 lens pattern-based and the review human. This is what feeds it.
 
 **The human gate is unchanged.** The pipeline raises the review's floor and never replaces
@@ -751,3 +786,13 @@ carry silently.
 Update it in the same change that lands a feature or defers work — not afterwards. A deferral
 recorded only in a spec's "out of scope" list is invisible to whoever plans the next feature,
 which is the failure this file exists to prevent.
+
+**Landing a feature means removing its `Next` entry, not only adding a `Shipped` row.** On
+2026-08-05 three entries were found still sitting under `Next` — northbound surfaces, portal
+answering, capability packs — every one of them shipped, one of them describing machinery as
+absent that had existed for months. Both halves had been done for each: the Shipped row was
+written and the Next entry was left. Nothing detects this, because a stale forward-looking
+section is indistinguishable from an ambitious one; the only thing that catches it is reading
+`Next` against `src/` before believing it. **This file is the first thing a planner reads, so
+it is the most expensive one to leave wrong** — this drift produced two wrong recommendations
+in a single session.
