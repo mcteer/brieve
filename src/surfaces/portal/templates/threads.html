@@ -30,7 +30,11 @@
     {% for thread in threads %}
       <li>
         <a href="/threads/{{ thread.thread_id }}">{{ thread.title or "Untitled conversation" }}</a>
-        <span class="meta">started {{ thread.created_at }}</span>
+        {# The exact instant stays on the page in `datetime`, machine-readable and unrounded;
+           the words are for the person reading the list. #}
+        <span class="meta">started
+          <time datetime="{{ thread.created_at }}">{{ thread.created_at | readable_instant }}</time>
+        </span>
       </li>
     {% endfor %}
   </ul>

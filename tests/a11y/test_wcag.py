@@ -288,7 +288,7 @@ def test_the_conversation_rail_meets_wcag_22_aa(page: Any, portal_server: Portal
     """A second navigation landmark on a page that already had one."""
     _ask(page, portal_server, "How does an AI agent obtain an identity with Vault?")
     page.goto(f"{portal_server.base}/ask")
-    page.wait_for_selector("nav.ask-rail", timeout=10_000)
+    page.wait_for_selector("nav.app-rail", timeout=10_000)
 
     violations = audit(page)
     assert violations == [], describe(violations)
@@ -391,7 +391,7 @@ def test_the_conversation_delete_confirmation_meets_wcag_22_aa(
     """A destructive page, and the one that has to say what deleting does not do."""
     _ask(page, portal_server, "How does an AI agent obtain an identity with Vault?")
     page.goto(f"{portal_server.base}/ask")
-    page.click("nav.ask-rail a")
+    page.click("nav.app-rail li a")
     page.wait_for_selector("form.ask", timeout=10_000)
     conversation_id = page.url.rstrip("/").rsplit("/", 1)[-1]
     page.goto(f"{portal_server.base}/ask/{conversation_id}/delete")

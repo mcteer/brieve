@@ -67,6 +67,27 @@ def create_portal(
     app.state.sessions = sessions if sessions is not None else SessionStore()
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     templates = Jinja2Templates(directory=str(TEMPLATES))
+
+    def _readable_instant(value: Any) -> str:
+        """An instant in words. `2026-08-05T03:46:53.836216Z` is a machine's way of saying it.
+
+        PRESENTATION, NOT CLASSIFICATION — the thin-client rule (ADR-0034) forbids the portal
+        deciding what a value MEANS, and this decides only how it reads. The exact value is
+        never discarded: the template keeps it in the element's `datetime` attribute, so the
+        precision an auditor needs is still on the page and still machine-readable.
+
+        Rendered in UTC because that is the zone the platform recorded it in, and guessing at
+        the reader's would be the portal claiming to know something it was not told. Anything
+        unparseable comes back untouched rather than swallowed — a surface that hides a value
+        it did not understand is worse than one that shows it raw.
+        """
+        try:
+            moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return str(value)
+        return f"{moment.day} {moment:%B %Y} at {moment:%H:%M} UTC"
+
+    templates.env.filters["readable_instant"] = _readable_instant
     app.state.templates = templates
 
     def _session(request: Request) -> Any:

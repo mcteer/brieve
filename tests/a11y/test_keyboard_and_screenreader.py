@@ -242,33 +242,49 @@ def test_the_focused_element_is_never_obscured(page: Any, portal_server: PortalS
         assert not state["covered"], f"the focused element {state['text']!r} is painted over"
 
 
+_TARGET_SIZE_PROBE = """(minimum) => {
+    const targets = document.querySelectorAll('a, button, select, textarea, input');
+    const bad = [];
+    for (const el of targets) {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) continue;   // not rendered
+        if (getComputedStyle(el).position === 'absolute' && r.width < 2) continue;
+        // 2.5.8's INLINE EXCEPTION, in the criterion's own words: a target "in a sentence or
+        // whose size is otherwise constrained by the line-height of non-target text" is
+        // exempt. A link inside prose is sized by the line box around it, and forcing it to
+        // 24px would break the rhythm of the sentence it lives in. Detected structurally —
+        // an inline-displayed link whose parent holds text that is not the link.
+        if (el.tagName === 'A' && getComputedStyle(el).display === 'inline') {
+            const parent = el.parentElement;
+            const around = parent ? parent.innerText.replace(el.innerText, '').trim() : '';
+            if (around.length > 0) continue;
+        }
+        if (r.width < minimum || r.height < minimum) {
+            bad.push({
+                text: (el.innerText || el.getAttribute('aria-label') ||
+                       el.tagName).trim().slice(0, 30),
+                w: Math.round(r.width), h: Math.round(r.height),
+            });
+        }
+    }
+    return bad;
+}"""
+
+
 def test_every_target_meets_the_minimum_size(page: Any, portal_server: PortalServer) -> None:
     """2.5.8: a control smaller than 24×24 is one a person with a tremor cannot hit."""
+    # BOTH surfaces. This row walked the thread page alone, and the ask composer's textarea
+    # measured 22px from the day it shipped — a real 2.5.8 failure nothing was looking at.
     page.goto(f"{portal_server.base}/")
     page.click("form[action='/threads'] button[type=submit]")
     page.wait_for_load_state()
+    small = page.evaluate(_TARGET_SIZE_PROBE, MIN_TARGET_PX)
+    assert small == [], f"thread-page targets below {MIN_TARGET_PX}px: {small}"
 
-    small = page.evaluate(
-        """(minimum) => {
-            const targets = document.querySelectorAll('a, button, select, textarea, input');
-            const bad = [];
-            for (const el of targets) {
-                const r = el.getBoundingClientRect();
-                if (r.width === 0 && r.height === 0) continue;   // not rendered
-                if (getComputedStyle(el).position === 'absolute' && r.width < 2) continue;
-                if (r.width < minimum || r.height < minimum) {
-                    bad.push({
-                        text: (el.innerText || el.getAttribute('aria-label') ||
-                               el.tagName).trim().slice(0, 30),
-                        w: Math.round(r.width), h: Math.round(r.height),
-                    });
-                }
-            }
-            return bad;
-        }""",
-        MIN_TARGET_PX,
-    )
-    assert small == [], f"targets below {MIN_TARGET_PX}px: {small}"
+    page.goto(f"{portal_server.base}/ask")
+    page.wait_for_load_state()
+    on_ask = page.evaluate(_TARGET_SIZE_PROBE, MIN_TARGET_PX)
+    assert on_ask == [], f"ask-page targets below {MIN_TARGET_PX}px: {on_ask}"
 
 
 def test_alt_text_is_not_present_but_useless(page: Any, portal_server: PortalServer) -> None:
@@ -340,37 +356,47 @@ def test_the_page_reflows_without_horizontal_scrolling(
     )
 
 
+_TEXT_SPACING_PROBE = """() => {
+    const style = document.createElement('style');
+    style.textContent = `* {
+        line-height: 1.5 !important;
+        letter-spacing: 0.12em !important;
+        word-spacing: 0.16em !important;
+    }
+    p { margin-bottom: 2em !important; }`;
+    document.head.appendChild(style);
+    const bad = [];
+    for (const el of document.querySelectorAll('p, li, label, h1, button, a')) {
+        // Deliberately offscreen text (the `visually-hidden` idiom) is not clipped — it is a
+        // 1px box on purpose, and nothing a sighted reader can see is being lost.
+        if (el.getBoundingClientRect().height <= 1) continue;
+        if (el.scrollHeight > el.clientHeight + 2 &&
+            getComputedStyle(el).overflow === 'hidden') {
+            bad.push((el.innerText || '').trim().slice(0, 30));
+        }
+    }
+    return bad;
+}"""
+
+
 def test_text_spacing_overrides_do_not_clip_content(page: Any, portal_server: PortalServer) -> None:
     """1.4.12: applying the criterion's own spacing values must lose nothing.
 
     People with dyslexia routinely apply exactly these overrides. A layout with fixed
     heights silently clips text under them, which the page's own rendering never reveals.
     """
+    # BOTH surfaces, because the pattern this row exists to catch is a fixed height and the
+    # ask surface is the one with a composer sharing a row with a control.
     page.goto(f"{portal_server.base}/")
     page.click("form[action='/threads'] button[type=submit]")
     page.wait_for_load_state()
+    clipped = page.evaluate(_TEXT_SPACING_PROBE)
+    assert clipped == [], f"text is clipped on the thread page under 1.4.12 spacing: {clipped}"
 
-    clipped = page.evaluate(
-        """() => {
-            const style = document.createElement('style');
-            style.textContent = `* {
-                line-height: 1.5 !important;
-                letter-spacing: 0.12em !important;
-                word-spacing: 0.16em !important;
-            }
-            p { margin-bottom: 2em !important; }`;
-            document.head.appendChild(style);
-            const bad = [];
-            for (const el of document.querySelectorAll('p, li, label, h1, button, a')) {
-                if (el.scrollHeight > el.clientHeight + 2 &&
-                    getComputedStyle(el).overflow === 'hidden') {
-                    bad.push((el.innerText || '').trim().slice(0, 30));
-                }
-            }
-            return bad;
-        }"""
-    )
-    assert clipped == [], f"text is clipped under 1.4.12 spacing: {clipped}"
+    page.goto(f"{portal_server.base}/ask")
+    page.wait_for_load_state()
+    on_ask = page.evaluate(_TEXT_SPACING_PROBE)
+    assert on_ask == [], f"text is clipped on the ask page under 1.4.12 spacing: {on_ask}"
 
 
 def test_the_document_declares_a_language_and_a_title(
