@@ -544,6 +544,8 @@ main.main--app {
 /* The rail stays put while the conversation scrolls, which is what a sidebar is for. Sticky
    under the header, scrolling on its own only when the list outgrows the viewport. */
 .ask-rail {
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--rule);
   background: var(--raised);
   padding: var(--space-5) var(--space-4);
@@ -556,37 +558,77 @@ main.main--app {
   overflow-y: auto;
 }
 
+/* A SIDEBAR IS ROWS, NOT A BULLETED LIST OF LINKS.
+
+   It was underlined blue text with a number floating beside it, wrapping to two ragged lines
+   whenever a title was long — which is what an unstyled list looks like, and it read as one.
+   Each conversation is a full-width row you can click anywhere on: one line, truncated,
+   neutral ink, with a ground on hover and on the one you are in. */
 .rail-heading {
   font-family: var(--font-control);
-  font-size: var(--text-sm);
-  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-block-end: var(--space-3);
+  margin: 0 0 var(--space-2);
+  padding-inline: var(--space-3);
 }
 
-.ask-rail ul { list-style: none; margin: 0; padding: 0; }
+.ask-rail ul { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.ask-rail li { margin: 0; }
 
-.ask-rail li {
+.ask-rail li > a {
   display: flex;
-  gap: var(--space-2);
-  align-items: baseline;
+  align-items: center;
+  gap: var(--space-3);
   justify-content: space-between;
-  /* 24x24 minimum target, met by padding rather than by a fixed height so the row still
-     grows with a long title instead of clipping it. */
-  padding-block: var(--space-2);
+  /* Comfortably past the 24px target the keyboard lane measures, and the whole row is the
+     target rather than the words inside it. */
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  line-height: var(--lead-snug);
 }
 
-.ask-rail a { text-decoration: none; }
-.ask-rail a:hover { text-decoration: underline; }
-.ask-rail a[aria-current="page"] { font-weight: 600; color: var(--ink); }
+/* ONE LINE, TRUNCATED. Titles are whole first questions, so most are longer than the rail —
+   wrapping them turned an even list into a ragged block where nothing lined up. The full text
+   stays a hover away via `title`, and the link's accessible name is still the whole question. */
+.ask-rail li > a > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 
-/* A count is something a person would quote, so it takes the role reserved for that. */
+.ask-rail li > a:hover { background: var(--surface); text-decoration: none; }
+
+.ask-rail li > a[aria-current="page"] {
+  background: var(--surface);
+  font-weight: 600;
+  box-shadow: var(--inset);
+}
+
+/* A count is a fact a person would quote, in the role reserved for that — and it never
+   shrinks, so titles truncate against a fixed column rather than against each other. */
 .rail-count {
+  flex: 0 0 auto;
   font-family: var(--font-evidence);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* NEW CONVERSATION ABOVE THE LIST, because it is what somebody comes here to do and it should
+   not drift down the page as the list grows. Delete sits last, separated and quiet — a
+   destructive action does not belong in the same rhythm as navigation. */
+.rail-new { width: 100%; justify-content: center; margin-block-end: var(--space-5); }
+
+.rail-danger {
+  margin-block-start: auto;
+  padding-block-start: var(--space-4);
+  border-top: 1px solid var(--rule);
 }
 
 /* ROOM AT THE END, so nothing can come to rest under the composer.
@@ -728,7 +770,7 @@ main.main--app {
    whether or not anybody treats it as one. */
 .ask-field {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--space-2);
   background: var(--surface);
   border: 1px solid var(--rule);
@@ -746,11 +788,14 @@ main.main--app {
   border: none;
   background: none;
   box-shadow: none;
-  padding: var(--space-2) 0;
+  padding: 0;
   resize: none;
-  min-height: 2.5rem;
+  /* Its natural height, so a single line sits on the same axis as the button beside it.
+     `field-sizing` grows it as somebody types; the cap keeps a pasted essay from taking the
+     page. */
   max-height: 14rem;
   field-sizing: content;
+  line-height: var(--lead-snug);
 }
 
 .ask-field textarea:focus { outline: none; }
