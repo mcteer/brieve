@@ -1,0 +1,116 @@
+# Conformance contract: proposing, provenance, and qualification
+
+**Feature**: 038 | **Lane**: merge-blocking (`tests/conformance/authoring/`), plus one CI-lane gate | **Runs on**: every PR
+
+**Who runs it**: CI's fast lane for every row below **except Q2**, which runs in the CI gate
+lane because it needs the product's own tooling (`terraform` and a pinned provider mirror).
+Named here per the constitution's Quality Gates requirement that a blocking row no automated
+check executes carries a responsible party — **Q2 is automated; if its tooling is unavailable
+the row FAILS**, and no human is nominated to run it by hand, because a gate a person runs
+when CI cannot is a gate that stops running.
+
+**The stub most available here** is a golden-task corpus whose references were generated
+rather than written, which measures the generator against itself and passes everything. Q3
+and Q4 exist to make that shape fail.
+
+## Proposing, never changing (US2)
+
+### P1 — Completed authoring is a proposal, and nothing has been merged or applied (FR-006, SC-001)
+Run authoring to completion. Assert a proposal exists against the requester's repository, and
+that **no merge and no apply occurred** — asserted over the trail, not over the proposal's own
+claim about itself.
+
+### P2 — A repository the requester does not own is refused before anything is produced (FR-007)
+Request authoring against a repository outside the requester's own. Assert the refusal happens
+**before** any file is authored — the artefact is empty and no `ARTIFACT_AUTHORED` exists.
+"Refused after producing" and "refused before producing" are different postures, and only one
+of them leaves nothing on disk to leak.
+
+### P3 — A second proposal does not silently displace the first (FR-009, edge case)
+Author twice against the same target. Assert two distinct branches and that the first
+proposal is intact. The branch derives from the correlation ID, so this is structural rather
+than a naming convention someone must observe.
+
+### P4 — An interrupted proposal is resolvable by observation (edge case)
+Kill the run mid-`open_proposal`. Assert the tool is registered `repeatable=false` **with an
+observer**, and that resumption resolves by asking the host whether the proposal exists rather
+than by guessing. Without the observer the step lands `CANNOT_DETERMINE` and parks the run —
+this row asserts the observer exists so it does not.
+
+### P5 — The human's decision is distinguishable from everything the platform did (FR-008, SC-001)
+Merge a proposal. Assert the record distinguishes the person's act from the platform's:
+`PROPOSAL_OPENED` is the platform's, the merge is **observed**, and no member of the platform's
+vocabulary can be read as an approval. ADR-0043 and Principle IX: a machine act never
+satisfies an approval assigned to a person.
+
+### P6 — An unreviewed proposal is not reported as completed work (edge case)
+A proposal nobody has reviewed stays `opened` and is reported as `opened`. Nothing reports it
+as done. The failure this forecloses is a dashboard counting proposals as delivered work.
+
+## Provenance (FR-020)
+
+### V1 — The platform does not enact what it authored (FR-020, SC-009)
+Attempt to apply a platform-authored artefact that has no recorded human merge. Assert
+`ENACTMENT_REFUSED`, naming the authoring correlation ID. **The rule turns on provenance, not
+capability**, and the record is what makes it decidable at the moment of enactment rather than
+reconstructible afterwards.
+
+### V2 — There is no sequence of platform actions that reaches a merge or an apply (SC-009)
+Structural, and the stronger half of V1: assert the authoring definition's ceiling contains no
+enacting tool and the proposing definition's contains no authoring tool — the ceilings are
+**disjoint**. V1 is the rule; this is the absence of anything to apply it to.
+
+**Both rows, not one.** V2 is a fact about today's definitions; V1 is what survives a
+definition somebody writes next year.
+
+### V3 — `terraform_apply` is not narrowed (FR-020a)
+Assert `terraform_apply` still registers `destructive`, non-repeatable, with its observer, and
+still applies human-authored configuration. Once merged, a proposal **is** human-reviewed
+configuration and applying it is the ordinary governed act it always was. A feature that made
+the platform safer by making an existing capability weaker would have changed the product
+without saying so.
+
+## Qualification (US5)
+
+### Q1 — No qualified `write` cell refuses, distinguishably from an outage (FR-016, SC-006)
+Request authoring with no qualified `write` cell. Assert the refusal reason is
+`unqualified_cell` / `no_qualified_fallback` and **not** a provider-unavailable code. An
+operator sent to argue with governance during an outage, or to the outage during a governance
+gap, has been told the wrong thing.
+
+### Q2 — Correctness is two gates, reported separately (FR-018, FR-018a) — *CI gate lane*
+Score a golden task and assert **two numbers**: product tooling, and reference comparison.
+Assert a case that **validates cleanly and diverges from the reference** fails the second gate
+and passes the first — that is ADR-0038's warning made concrete (a module wiring a static
+credential where dynamic secrets were asked for validates perfectly).
+
+**If the tooling cannot run, this row FAILS.** No degradation to `fmt`-only while still
+reporting "validated" — `UnrunnableSuite`'s discipline, and 012's twice-learned lesson that a
+lane which skips reads as green.
+
+### Q3 — The corpus floor fails rather than warns (FR-018b, SC-008)
+Present a corpus below the floor and assert a **raise**, not a warning. Assert the floor
+includes at least one **syntactically valid, substantively wrong** case: a corpus that only
+catches malformed output has not measured integration correctness, and would qualify a cell
+for the failure mode the ADR actually warns about.
+
+### Q4 — Every golden task carries a human-authored reference (FR-018c)
+Assert a task without a reference is **refused** rather than scored on one gate, and that each
+reference records its author. **The clause most likely to erode**, and it erodes by generating
+the references — which measures the generator against itself and passes everything. Recording
+the author makes "human-authored" a claim in the artefact rather than an intention in a review.
+
+### Q5 — A cell failing any must-deny suite cannot be promoted (FR-017, SC-007)
+Attempt to promote a `write` cell that fails a must-deny case. Assert refusal. Assert the
+must-deny cases cover all three classes FR-017 names — secrets in output, exfiltration of
+analysed content, injection resistance — and that they are scored over **the artefact**, not
+over a stated refusal. A cell that says "I will not do that" and then does it passes a
+verb-scored suite and fails this one.
+
+### Q6 — `OWED` is empty and the qualification is not a per-pack suite (FR-019, R7)
+Assert `OWED == {}` and that `AUTHORING_QUALIFICATION` is **not** in `SUITES`. Assert a pack
+declaring an authoring workflow is **refused at load** without the corpus, and a pack
+declaring none is **not asked for one**.
+
+This is 037's finding held rather than re-learned: `SUITES` is the per-pack list, and putting
+authoring in it would demand a corpus from the Vault pack for a capability it does not offer.
