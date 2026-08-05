@@ -749,9 +749,22 @@ and `invoke_tool` calls `assert_held` before anything executes, deliberately **n
 `LeaseSupersededError` into a deny — *"a zombie's caller needs to stop, not to read a refusal and
 try the next tool."*
 
-**So R24's fix breaks.** Two tasks sharing one `run_id` are **two holder identities**. Whichever
-acquires second fences the first, and the first dies mid-run at its next tool call. The
-mechanism working exactly as designed kills the design.
+**So R24's fix breaks** — for a reason **corrected below**. The claim made here was that two tasks
+sharing one `run_id` are two holder identities, the second fencing the first.
+
+**That premise is wrong, and the correction matters.** Measured at
+`surfaces/dispatch/entrypoint.py:977`: `holder_identity = os.environ.get("NOMAD_ALLOC_ID", ...)`,
+described in the code as *"this allocation's identity, for the lease"* — and `NOMAD_ALLOC_ID` is
+**per-allocation**, shared by every task in a group. The two tasks are therefore the **same
+holder**. They would not have fenced each other; they would **both** have passed `assert_held`
+and raced on the checkpoint blob, each overwriting the other's step index.
+
+**The conclusion survives and the reasoning does not.** Sequencing is still correct — the handoff
+needs it, and R28's capability split assumes it — but the lease provides **no mutual exclusion
+between the two tasks**. The `prestart` lifecycle is the only control, so it is asserted directly
+rather than left to a mechanism that would not catch its violation. A wrong reason in the record
+is a defect in its own right: a reader would believe the lease enforces something it does not,
+and would see no reason to keep the ordering.
 
 **Decision**: the two tasks are **sequential, not concurrent** —
 `lifecycle { hook = "prestart", sidecar = false }` on `analyzer`, so it runs to completion and
@@ -993,3 +1006,39 @@ two fixes**, as recommended, and that is what changed the shape:
 defects in whatever region the previous had not examined, which is why the count never fell. One
 narrow pass over two specific fixes found one real defect and cleared the other, which is the
 convergence signal the counts alone never showed.
+
+## R37 — The continuation needs a mode the entrypoint does not have
+
+**Measured**: `surfaces/dispatch/entrypoint.py` has exactly **two** entries. The **start** path
+issues a grant (`issue_grant`) and begins step accounting at zero. The **resume** path branches on
+`RUN_RESUME=1` (line 983) into `resume_dispatched_run` → `resume_run`, which counts a revival.
+
+**R35's decision needs a third**, and nothing built it: load the blob, continue at the
+checkpointed step, do **not** count a revival. Start would reset step accounting against the same
+`run_id`; resume burns the budget R35 exists to protect.
+
+**And skipping `resume_run` removes more than the counter.** That function is also the only place
+authority is re-manufactured — *"Fresh authority under the surviving grant, from THIS allocation's
+identity. Nothing is read from the checkpoint here, and nothing should be."* Principle IV requires
+*"resume re-authenticates, never replays"* and *"cached or precedent results never carry
+authority"*, so the continuation must load the grant and manufacture fresh authority under the
+proposer's own identity. That is the substance of the mode rather than a detail of it.
+
+**Decision**: a `RUN_CONTINUE=1` mode doing all four — load blob, load grant, manufacture
+authority, resume step accounting without incrementing `resume_count` — with a row asserting each.
+
+**The shape this is an instance of**: R35 chose the right member of the durability seam and
+assumed an entry path for it. Every layer of this feature has now produced one of these — a
+correct decision resting on a mechanism nobody measured — and the only reliable defence has been
+a pass scoped to the newest fix.
+
+## R38 — Eight passes, and the rule that actually predicts the next one
+
+Counts: **4, 2, 2, 2, 3, 2, 1, 1**. Twice the stopping point was called early (after passes five
+and seven), and both misses share a cause: **convergence was judged from the shape of the last
+pass rather than from whether the newest fix had itself been measured.**
+
+The reliable signal is narrower and worth stating as a rule: **a fix is not settled until a pass
+scoped to it has run.** Pass seven cleared one pass-six fix and corrected the other; pass eight
+corrected pass seven's. That is convergence — each round's surface is smaller than the last — but
+it is convergence in the *fixes*, not in the artefact, and only a scoped pass measures it.

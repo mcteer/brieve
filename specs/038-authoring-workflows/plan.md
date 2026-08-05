@@ -32,12 +32,18 @@ narrows the shared ceiling per task (R31). That is Principle IV's own mechanism 
 authority = user ∩ agent ceiling ∩ task scope ∩ policy"* — already built and already enforced at
 the authority hook, so FR-015 holds verbatim rather than being reworded to fit.
 
-They are sequential rather than concurrent because **the run lease fences by holder identity**:
-two tasks sharing a `run_id` are two holders, and the second would kill the first (R27). A
+They are sequential rather than concurrent because concurrent tasks would race on the checkpoint
+and because the capability split assumes ordering. A
 `prestart` lifecycle makes the handoff a baton: the analyzer checkpoints and exits, the proposer
-acquires the lease and continues from the blob. It **continues rather than resumes** — `resume_run`
-counts attempts against a cap that exists to stop flapping runs, and a planned handoff must not
-spend it (R35). **One allocation means one run and
+loads the blob, re-authenticates under its own identity, and continues. It **continues rather than
+resumes** — `resume_run` counts attempts against a cap that exists to stop flapping runs, and a
+planned handoff must not spend it (R35); the continuation therefore also re-manufactures authority,
+which is the thing `resume_run` was otherwise doing (R37).
+
+**And the lifecycle is the only control**: `holder_identity` derives from `NOMAD_ALLOC_ID`, which is
+per-allocation, so the two tasks are one holder and the lease would **not** fence a concurrent
+arrangement — it would let both through to race on the checkpoint. R27 said otherwise and is
+corrected. **One allocation means one run and
 one correlation ID**, which is what Principle IX requires and what two allocations would have
 broken.
 

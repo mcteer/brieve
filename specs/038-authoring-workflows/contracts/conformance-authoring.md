@@ -123,6 +123,34 @@ handoff depends on. `resume.py:135` refuses a terminal outcome, so if anyone lat
 `complete_run` at the end of the loop the handoff breaks. This row makes the dependency a
 statement rather than an accident.
 
+### T9 — The continuation mode exists and does all four things (R37)
+Assert `RUN_CONTINUE=1` loads the blob, **loads the grant and manufactures fresh authority under
+the proposer's own attested identity**, resumes step accounting at the checkpointed index, and
+**does not increment `resume_count`**.
+
+**The mode is new.** The entrypoint has exactly two entries today: **start** (issues a grant,
+accounting from zero) and **resume** (`RUN_RESUME=1`, counts a revival). T7's design needed a
+third and an earlier draft assumed one existed — start would reset step accounting against the
+same `run_id`, resume burns the budget T7 exists to protect.
+
+**The authority clause is the substance, not a detail.** `resume_run` is the only place authority
+is re-manufactured — *"Fresh authority under the surviving grant, from THIS allocation's identity.
+Nothing is read from the checkpoint here."* Skipping it to avoid the revival counter also skips
+that, and Principle IV is explicit: *"resume re-authenticates, never replays"*, and *"cached or
+precedent results never carry authority"*.
+
+### T10 — The lifecycle ordering is asserted, because the lease will not catch its violation (R27 corrected)
+Assert `analyzer` declares `lifecycle { hook = "prestart", sidecar = false }`.
+
+**Why this row rather than trusting the lease.** Measured: `holder_identity` derives from
+`NOMAD_ALLOC_ID` — *"this allocation's identity, for the lease"* — which is **per-allocation** and
+shared by every task in a group. The two tasks are therefore the **same holder**: run concurrently
+they would **both** pass `assert_held` and race on the checkpoint, each overwriting the other's
+step index. An earlier draft justified sequencing by lease fencing, which measurement contradicts.
+
+Sequencing remains correct — the handoff needs it and T6's capability split assumes it — but the
+lease provides **no mutual exclusion between the tasks**, so the ordering is asserted directly.
+
 ### T8 — `RUN_RESUME` is unset on both tasks (BB2)
 Assert neither task's `env` sets it. `entrypoint.py:983` branches on `RUN_RESUME=1`, so setting
 it takes the revival path T7 exists to avoid.
