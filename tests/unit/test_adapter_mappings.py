@@ -68,4 +68,15 @@ def test_adapter_modules_are_exactly_the_four_mappings() -> None:
         "run_context",  # mapping 4
         "agent",  # entry points binding the four together
         "governance",  # the capability that installs mapping 1
+        # 036: the sandbox runtime binding. Still MAPPING 1 — code mode issues tool calls
+        # and every one of them goes through `invoke_tool`, so this adds no governance path
+        # (ADR-0041). It is a separate module rather than part of `tools.py` for one
+        # reason: it imports an OPTIONAL dependency, and folding it in would make the tool
+        # mapping itself fail to import wherever the `sandbox` extra is absent.
+        #
+        # The governed loop it serves is in `core/sandbox/`, behind a Protocol this
+        # implements — asserted by `test_sandbox_seam_is_core.py` and
+        # `test_sandbox_runtime_is_the_only_import.py`, which together keep this file a
+        # binding rather than a second place governance could live.
+        "sandbox_runtime",
     }, f"unexpected adapter modules: {sorted(modules)}"

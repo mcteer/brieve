@@ -16,8 +16,11 @@ from pydantic_ai import Agent
 from pydantic_ai.capabilities.abstract import AbstractCapability
 from pydantic_ai.toolsets import AbstractToolset
 
-from adapters.pydantic_ai.disclosure import DisclosureGovernance
-from adapters.pydantic_ai.governance import GovernanceCapability
+from adapters.pydantic_ai.governance import (
+    DisclosureGovernance,
+    GovernanceCapability,
+    recording_search_fn,
+)
 from adapters.pydantic_ai.run_context import AdapterRunContext
 from adapters.pydantic_ai.tools import GovernedToolError
 from core.approvals import ApprovalHook, DenyAllApprovalHook
@@ -128,11 +131,27 @@ def build_governed_agent(
     """
     co_resident = list(capabilities) if capabilities is not None else []
     _reject_unreachable_wrappers(co_resident)
-    governance: Any = DisclosureGovernance() if defer_disclosure else GovernanceCapability()
+    installed: list[Any]
+    if defer_disclosure:
+        from pydantic_ai.capabilities import ToolSearch
+
+        # ToolSearch is installed EXPLICITLY, carrying the platform's recording search
+        # function as its `strategy` (a callable strategy is the custom-search mode, and it
+        # keeps the local `search_tools` fallback wired up).
+        #
+        # The framework auto-injects a default one when absent
+        # (`_AUTO_INJECT_CAPABILITY_TYPES`), and a default would answer searches without
+        # recording them — so this is not a preference about wiring, it is what makes
+        # ADR-0061's record exist at all. It is added here rather than accepted from a
+        # caller, so `_reject_unreachable_wrappers` above still refuses every wrapper the
+        # adapter did not construct itself.
+        installed = [DisclosureGovernance(), ToolSearch(strategy=recording_search_fn), *co_resident]
+    else:
+        installed = [GovernanceCapability(), *co_resident]
     return Agent(
         model,
         deps_type=AdapterRunContext,
         toolsets=list(toolsets) if toolsets is not None else None,
-        capabilities=[governance, *co_resident],
+        capabilities=installed,
         **agent_kwargs,
     )

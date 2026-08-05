@@ -27,7 +27,7 @@ from typing import Any
 import pytest
 
 from adapters.pydantic_ai.agent import build_governed_agent
-from adapters.pydantic_ai.disclosure import deferred_toolset
+from adapters.pydantic_ai.governance import deferred_toolset
 from core.audit.schema import AuditEventType
 from tests.harness.adapter_fixtures import (
     CountingHandler,

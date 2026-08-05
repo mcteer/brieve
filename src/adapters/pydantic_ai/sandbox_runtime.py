@@ -32,16 +32,16 @@ except ImportError:  # pragma: no cover - see MontyRuntime.__init__
     _monty = None  # type: ignore[assignment]
 
 
-#: **A program's value is its final expression**, measured rather than assumed. `MontyComplete`
-#: exposes exactly one thing — ``output`` — and it carries the value of the last *expression*
-#: the program evaluated. A program of statements only completes with ``output=None``, and a
-#: trailing ``result = [...]`` assignment is a statement, so it yields nothing.
-#:
-#: The first draft of this module read a module-level ``result`` binding out of a namespace
-#: attribute. There is no such attribute; the binding was invented, and it returned `None` for
-#: every program. Caught by driving the real runtime instead of trusting the shape — which is
-#: why the value contract is written down here, where the next person writing a program prompt
-#: will look.
+# **A program's value is its final expression**, measured rather than assumed. `MontyComplete`
+# exposes exactly one thing — ``output`` — and it carries the value of the last *expression*
+# the program evaluated. A program of statements only completes with ``output=None``, and a
+# trailing ``result = [...]`` assignment is a statement, so it yields nothing.
+#
+# The first draft of this module read a module-level ``result`` binding out of a namespace
+# attribute. There is no such attribute; the binding was invented, and it returned `None` for
+# every program. Caught by driving the real runtime instead of trusting the shape — which is
+# why the value contract is written down here, where the next person writing a program prompt
+# will look.
 
 
 class MontyRuntime:
@@ -53,7 +53,7 @@ class MontyRuntime:
     governance boundary nobody declared.
     """
 
-    def __init__(self, *, limits: dict[str, Any] | None = None) -> None:
+    def __init__(self, *, limits: Any | None = None) -> None:
         if _monty is None:
             # A STATED REFUSAL, never an ImportError from three frames down (FR-013). The
             # capability is absent; the operator is told which package supplies it.
@@ -99,8 +99,8 @@ class MontyRuntime:
 
     def value_of(self, snapshot: Any) -> Any:
         # `output` converts the final value out of the interpreter's representation on each
-        # access. See the note on `_RESULT_NAME` above for why it is the trailing expression
-        # and not a named binding.
+        # access. See the note at the top of this module for why the value is the program's
+        # trailing EXPRESSION and not a named binding.
         return snapshot.output
 
     # -- lifecycle ------------------------------------------------------------------
