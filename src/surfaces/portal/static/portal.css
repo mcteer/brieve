@@ -282,7 +282,6 @@ form.inline { display: inline; }
 }
 .composer .button { justify-self: start; margin-top: 0.5rem; }
 .ask label { display: block; margin-bottom: 0.25rem; }
-.ask button { margin-top: 0.75rem; }
 
 /* ---------------------------------------------------------------- lists and prose */
 
@@ -805,6 +804,19 @@ main.main--app {
    the field a person thinks they are focusing. */
 .ask-field:focus-within { outline: 3px solid var(--link-bright); outline-offset: 2px; }
 
-.ask-send { flex: 0 0 auto; }
+/* NO MARGIN, and that margin is why the button sat six pixels low. `.ask button` carried
+   `margin-top: 0.75rem` from 028, when the control was stacked BELOW the field — correct then,
+   and invisible now except as a centring error, because `align-items: center` centres the
+   margin box rather than the border box. Measured: textarea centre 490.16, button centre
+   496.17, half of the 12px margin.
+   
+   Uppercase in CSS rather than in the markup, so the accessible name stays "Ask". A screen
+   reader given the literal string "ASK" may spell it. */
+.ask-send {
+  flex: 0 0 auto;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 
 html { scroll-padding-block-end: 12rem; }
