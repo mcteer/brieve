@@ -11,6 +11,12 @@
 #
 # Every clause below is a reach property. None is expressible as a ceiling, which is why this
 # file has to exist rather than being folded into a definition's registration.
+#
+# SIBLING: `authoring-tier.nomad.hcl` (038). It differs in exactly two ways and both matter —
+# it MOUNTS its subject read-only (a repository is not payload-scale, as the delta below is),
+# and its analyzer's egress allowlist is EMPTY (it reads a mount and fetches nothing, where
+# this one fetches the pinned upstream). A change to one that does not need the other is
+# probably wrong.
 job "analysis-tier" {
   type        = "batch"
   datacenters = ["dc1"]
