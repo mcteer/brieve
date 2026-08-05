@@ -9,7 +9,7 @@
    column for it — otherwise a first-time visitor gets the whole page squeezed into 14rem with
    the rest of the screen empty. Found by looking at a screenshot; no row would have caught it,
    because it is correct markup that reads badly. #}
-<div class="ask-layout{% if not conversations %} ask-layout--alone{% endif %}">
+<div class="app-layout{% if not conversations %} app-layout--alone{% endif %}">
 
 {#
   THE RAIL — this person's own conversations, most recently used first.
@@ -19,7 +19,7 @@
   first question went somewhere it did not.
 #}
 {% if conversations %}
-<nav class="ask-rail" aria-label="Your conversations">
+<nav class="app-rail" aria-label="Your conversations">
   {# The whole ROW is the link, not the words inside it — a target you can hit anywhere is what
      makes a sidebar feel like one, and it clears the 24px minimum without a fixed height. #}
   <a class="button rail-new" href="/ask">New conversation</a>
@@ -47,7 +47,7 @@
 </nav>
 {% endif %}
 
-<div class="ask-main">
+<div class="app-main">
 <h1>{{ title or "Ask a question" }}</h1>
 {% if not exchanges and not response is defined %}
 <p class="lede">Asking answers; it never acts. Nothing here starts a run, changes anything, or

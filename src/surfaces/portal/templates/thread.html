@@ -5,11 +5,13 @@
 {% endblock %}
 {% block content %}
 <h1>{{ thread.title or "Untitled conversation" }}</h1>
-{# A destructive action is a CONTROL, not a sentence. As an underlined link in body text it
-   read as prose and was one careless click from deleting a conversation. #}
-<p class="page-actions">
-  <a class="link-button link-button--danger" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a>
-</p>
+{#
+  WHAT THIS SURFACE DOES, in its own words, the way `/ask` and the conversation list both say
+  it. The distinction ADR-0039 draws is only legible if each page states its side of it, and
+  this was the one page in the pair that stated neither — a title, then a red button.
+#}
+<p class="lede">Every message here is governed before it acts, and every effect is recorded.
+   To get an answer without anything happening, <a href="/ask">ask a question</a>.</p>
 
 {#
   THE PRODUCT'S IDENTITY, where the platform actually knows it (034). Each turn names the
@@ -94,6 +96,10 @@
   </li>
   {% endfor %}
 </ol>
+{% if not turns %}
+  <p class="empty">Nothing has been sent in this conversation yet. Choose an agent below, or
+     leave a note without one.</p>
+{% endif %}
 
 <form method="post" action="/threads/{{ thread.thread_id }}/turns" class="composer">
   <label for="agent">Agent</label>
@@ -114,14 +120,35 @@
     {% endfor %}
   </select>
 
+  {#
+    THE SAME COMPOSER PRINCIPLE AS THE ASK SURFACE, not the same composer. A message box is a
+    FIELD WITH ITS CONTROL IN IT rather than a stack of label, box and button — that is the
+    craft the two surfaces share.
+
+    What stays different is what makes this page a different page (ADR-0039): the agent picker
+    above, the verb `Send` rather than `Ask` because this one acts, and the evidence notice
+    kept VISIBLE. On the ask surface the equivalent text is hidden, and the difference is
+    deliberate: that one set an expectation about waiting, this one discloses what happens to
+    the words before anything acts on them. A disclosure somebody has to hover to receive is
+    not a disclosure.
+  #}
   <label for="message">Message</label>
-  <textarea name="message" id="message" rows="4" required
-            aria-describedby="recorded-note"></textarea>
+  <div class="field-with-control">
+    <textarea name="message" id="message" rows="2" required
+              placeholder="Describe what you want done&hellip;"
+              aria-describedby="recorded-note"></textarea>
+    <button type="submit" class="button field-control">Send</button>
+  </div>
   <p id="recorded-note" class="note">This message is recorded as evidence before anything
      acts on it.</p>
-
-  <button type="submit" class="button">Send</button>
 </form>
+
+<p class="page-actions page-actions--end">
+  {# A destructive action is a CONTROL, not a sentence — as an underlined link in body text it
+     read as prose and was one careless click from deleting a conversation. Where it SITS is
+     the other half of that: at the top it was the most prominent thing on an empty page. #}
+  <a class="link-button link-button--danger" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a>
+</p>
 {% endblock %}
 
 {% block scripts %}

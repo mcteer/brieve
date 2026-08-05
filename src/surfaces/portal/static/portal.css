@@ -500,9 +500,13 @@ form.inline { display: inline; }
    Rail beside transcript at width, stacked below it. Every value below is a token —
    the identity rows fail on a literal, which is what keeps one design system. */
 
-/* THE APP SHELL, laid out the way a chat interface is: rail against the left edge, the
-   conversation filling everything left over, and the reading measure applied to the MESSAGES
-   rather than to the page.
+/* THE APP SHELL, shared by both conversational surfaces — laid out the way a chat interface
+   is: rail against the left edge, the conversation filling everything left over, and the
+   reading measure applied to the MESSAGES rather than to the page.
+
+   Named `app-` rather than `ask-` because the run surface uses it too. It was ask-specific
+   when it was written and stopped being so the moment the two pages had to look like one
+   product; a prefix that lies about scope is how the next person learns the wrong boundary.
 
    It used to inherit `main`'s centred 52rem column, which put the rail in the middle of the
    screen with dead space on both sides and made the whole thing look like a widget dropped on
@@ -514,7 +518,7 @@ main.main--app {
   padding: 0;
 }
 
-.ask-layout {
+.app-layout {
   display: grid;
   grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
   align-items: stretch;
@@ -525,24 +529,24 @@ main.main--app {
    wider than macOS and broke reflow there first; a rail that narrows keeps a second
    column at 320px and takes the transcript below the horizontal-scroll line with it. */
 /* Nothing to list, so nothing to reserve a column for. */
-.ask-layout--alone { grid-template-columns: minmax(0, 1fr); }
+.app-layout--alone { grid-template-columns: minmax(0, 1fr); }
 
 @media (max-width: 45rem) {
-  .ask-layout { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .app-layout { grid-template-columns: minmax(0, 1fr); min-height: 0; }
   /* Stacked, so it stops being a sidebar and stops sticking. */
-  .ask-rail {
+  .app-rail {
     border-right: none;
     border-bottom: 1px solid var(--rule);
     position: static;
     height: auto;
     overflow-y: visible;
   }
-  .ask-main { padding-inline: var(--space-4); }
+  .app-main { padding-inline: var(--space-4); }
 }
 
 /* The rail stays put while the conversation scrolls, which is what a sidebar is for. Sticky
    under the header, scrolling on its own only when the list outgrows the viewport. */
-.ask-rail {
+.app-rail {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--rule);
@@ -573,10 +577,10 @@ main.main--app {
   padding-inline: var(--space-3);
 }
 
-.ask-rail ul { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
-.ask-rail li { margin: 0; }
+.app-rail ul { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.app-rail li { margin: 0; }
 
-.ask-rail li > a {
+.app-rail li > a {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -594,16 +598,16 @@ main.main--app {
 /* ONE LINE, TRUNCATED. Titles are whole first questions, so most are longer than the rail —
    wrapping them turned an even list into a ragged block where nothing lined up. The full text
    stays a hover away via `title`, and the link's accessible name is still the whole question. */
-.ask-rail li > a > span:first-child {
+.app-rail li > a > span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
 }
 
-.ask-rail li > a:hover { background: var(--surface); text-decoration: none; }
+.app-rail li > a:hover { background: var(--surface); text-decoration: none; }
 
-.ask-rail li > a[aria-current="page"] {
+.app-rail li > a[aria-current="page"] {
   background: var(--surface);
   font-weight: 600;
   box-shadow: var(--inset);
@@ -708,13 +712,13 @@ main.main--app {
    pressing Tab is what a keyboard user does and what makes the browser scroll. */
 /* The conversation fills the column; its CONTENT is what gets the measure, centred inside.
    Same rule for the transcript and the composer, so a question and its answer line up. */
-.ask-main {
+.app-main {
   display: flex;
   flex-direction: column;
   padding: var(--space-6) var(--space-5) 0;
 }
 
-.ask-main > * {
+.app-main > * {
   width: 100%;
   max-width: 46rem;
   margin-inline: auto;
@@ -730,7 +734,7 @@ main.main--app {
 /* The LEDE goes; the heading stays. Hiding the h1 too was tidier and wrong — a page with no
    level-one heading is a page a screen-reader user cannot orient in, and it carries the
    conversation's own title once one is reopened. */
-.ask-main:has(.exchange) > .lede {
+.app-main:has(.exchange) > .lede {
   display: none;
 }
 
@@ -767,7 +771,8 @@ main.main--app {
    this one the same put ask styling on a form belonging to another surface. The reflow rows
    caught it at 320px, on a page this change never meant to touch. A class name is a namespace
    whether or not anybody treats it as one. */
-.ask-field {
+.ask-field,
+.field-with-control {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -779,7 +784,8 @@ main.main--app {
 }
 
 /* The field carries no chrome of its own — the container is the input, visually. */
-.ask-field textarea {
+.ask-field textarea,
+.field-with-control textarea {
   flex: 1 1 auto;
   /* Without this a flex item refuses to shrink below its content width, and at 320px the
      composer pushed the page into horizontal scroll — 1.4.10, caught by the reflow rows. */
@@ -793,16 +799,21 @@ main.main--app {
      `field-sizing` grows it as somebody types; the cap keeps a pasted essay from taking the
      page. */
   max-height: 14rem;
+  /* 2.5.8's floor. `field-sizing: content` sizes an EMPTY box to a single 22px line, which is
+     under the minimum at precisely the moment somebody is trying to click into it. */
+  min-height: 24px;
   field-sizing: content;
   line-height: var(--lead-snug);
 }
 
-.ask-field textarea:focus { outline: none; }
+.ask-field textarea:focus,
+.field-with-control textarea:focus { outline: none; }
 
 /* The focus ring goes on the CONTAINER, so focusing the field lights the whole composer
    rather than a borderless box inside it — the indicator has to be visible (2.4.7) and it is
    the field a person thinks they are focusing. */
-.ask-field:focus-within { outline: 3px solid var(--link-bright); outline-offset: 2px; }
+.ask-field:focus-within,
+.field-with-control:focus-within { outline: 3px solid var(--link-bright); outline-offset: 2px; }
 
 /* NO MARGIN, and that margin is why the button sat six pixels low. `.ask button` carried
    `margin-top: 0.75rem` from 028, when the control was stacked BELOW the field — correct then,
@@ -812,7 +823,9 @@ main.main--app {
    
    Uppercase in CSS rather than in the markup, so the accessible name stays "Ask". A screen
    reader given the literal string "ASK" may spell it. */
-.ask-send {
+/* Shared by both composers — the run surface uses the same field with a different verb in it. */
+.ask-send,
+.field-control {
   flex: 0 0 auto;
   margin: 0;
   text-transform: uppercase;
@@ -820,3 +833,11 @@ main.main--app {
 }
 
 html { scroll-padding-block-end: 12rem; }
+
+/* Set apart from the page rather than in it — a destructive control belongs after the work,
+   behind a rule, not beside the title. Matches where the ask surface puts the same control. */
+.page-actions--end {
+  margin-block-start: var(--space-6);
+  padding-block-start: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
