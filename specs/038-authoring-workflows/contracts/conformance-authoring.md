@@ -28,6 +28,16 @@ through the seam — not as a side effect of `run_program`. **The failure this f
 sandbox that can touch the filesystem directly, which would make code mode a way to act
 without a write tool and would leave the governance model claiming coverage it did not have.
 
+### W3a — No filesystem write path exists outside the write tool (SC-002)
+Structural, on `tests/conformance/packs/test_no_bypass_path.py`'s pattern: enumerate the write
+surface and assert `author_file` is the only member. SC-002 claims **100%, no unaccounted
+writes**, and W3 asserts the positive — a negative requirement needs an absence asserted.
+
+**What W3 does and does not prove, stated in the row.** `run_program` is registered nowhere
+(research R19), so W3 exercises **the seam** rather than a path a running definition can reach.
+A row that read as proving the production path would be the "a green row proves the mechanism,
+not that the running service can reach it" failure this repository has already recorded.
+
 ### W4 — The evidence carries what was produced and what was consulted (FR-004)
 Read the trail of an authoring run: `ARTIFACT_AUTHORED` names every path and its digest, and
 the skills consulted are recoverable. Assert **no file content** appears in the trail — the
@@ -55,6 +65,18 @@ platform's tree* checkable, so the second cannot arrive wearing the first's just
 `repo_mounted=True` still fails, with its original message. The tier gained a clause; it lost
 nothing. This row exists because a feature that extended an isolation check is exactly where
 one gets accidentally relaxed.
+
+### T4 — The authoring tier's egress allowlist is empty, and static (FR-005a, R13)
+Assert `infra/jobs/authoring-tier.nomad.hcl` declares an **empty** `HARNESS_EGRESS_ALLOWLIST`,
+and that the value is a literal in the jobspec rather than computed per run.
+
+**Why empty rather than 037's `github.com`.** That value existed because 037's analyser
+*fetched* the pinned upstream. This step is handed a **mount** and fetches nothing, so
+inheriting the value would leave a redirected agent holding a private codebase with a route to
+the one allowlisted host that serves arbitrary user content — a gist, an attacker's repository,
+an issue comment — while every ceiling assertion in this contract still passed. FR-005a requires
+the allowlist be *static*, not that it keep a particular value, and **a control can be correctly
+immutable and wrongly valued**.
 
 ### T3 — The analysing step holds no credential that could publish (FR-015, R9)
 Assert **structurally** that the hardened-tier allocation's environment contains no
@@ -96,6 +118,15 @@ Author against a subject too large to read in full. Assert the proposal states t
 A proposal built from part of a codebase that does not say so is a claim about work nobody
 did, and it reads identically to a complete one.
 
+### C6 — The limit containment cannot reach is stated in the artefact (edge case)
+Assert the proposal's limits statement says that where the analysed source is itself the
+sensitive thing, the authored integration is a **derivative of exactly that**.
+
+**This is not a caveat, it is a structural fact.** The containment rules bound what is
+*copied*; they cannot bound what is *implied*. A reviewer deciding whether to publish needs
+that distinction **before** they merge, and the failure this feature is most likely to cause is
+a review that has been reassured rather than informed.
+
 ## Not being redirected (US4)
 
 ### R1 — Repository content is data, and an attempt is recorded (FR-014, SC-005)
@@ -108,6 +139,11 @@ Byte-identical rather than "unaffected" on purpose: "unaffected" is a judgement,
 that required one would be graded by whoever wrote it.
 
 ### R2 — A successful redirection has nowhere to go (FR-015)
-Assert the analysing definition's reachable tool set — `reachable_tools(bindings, loaded,
-ceiling)` — contains nothing that egresses. Combined with T3, a redirected analyser has neither
-a tool nor a credential. This is the row that keeps FR-015 structural.
+Assert the **effective scope the authority hook actually reads** — `effective.tool_names` at
+`src/core/hooks/authority.py:98` — contains nothing that egresses, for the analysing definition.
+Combined with T3 (no credential) and T4 (no egress route), a redirected analyser has nothing to
+publish with, nothing to publish to, and nothing to publish through.
+
+**Deliberately not `reachable_tools`.** That helper is called from **no `src/` module** — only
+from three component tests (research R19) — so a row asserting over it would prove a property
+of something the running platform never consults. The property is right; the subject was wrong.

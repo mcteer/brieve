@@ -15,6 +15,14 @@ and Q4 exist to make that shape fail.
 
 ## Proposing, never changing (US2)
 
+### P0 — Authoring adds no northbound operation (Principle II, R16)
+Assert no new verb exists on any transport: an authoring request is the payload of an ordinary
+dispatched run, so surface parity is **inherited rather than owed**.
+
+**Why the row exists at all.** An absent parity row and a deliberately-inherited one look
+identical in a diff, and only one of them is a gate regression. This is the artefact that makes
+the difference legible.
+
 ### P1 — Completed authoring is a proposal, and nothing has been merged or applied (FR-006, SC-001)
 Run authoring to completion. Assert a proposal exists against the requester's repository, and
 that **no merge and no apply occurred** — asserted over the trail, not over the proposal's own
@@ -46,6 +54,24 @@ satisfies an approval assigned to a person.
 ### P6 — An unreviewed proposal is not reported as completed work (edge case)
 A proposal nobody has reviewed stays `opened` and is reported as `opened`. Nothing reports it
 as done. The failure this forecloses is a dashboard counting proposals as delivered work.
+
+### P7 — The observer's input is sufficient to find the proposal (FR-009, edge case)
+Assert the branch is recomputable **from the idempotency key alone**. `Observer.observe(*,
+idempotency_key)` receives that string and nothing else, and the key is
+`f"{run_id}:{step_index}:{tool_name}"`.
+
+**This row exists because the first design made P4 impossible.** The branch was derived from the
+**correlation ID**, which the observer never sees and which is not reliably the same as
+`run_id` — so an interrupted publish would have resolved `CANNOT_DETERMINE` and parked the run,
+every time, while P4 still passed by asserting only that an observer was *registered*. A row
+that checks a mechanism exists is not a row that checks it can work.
+
+### P8 — A non-durable run refuses to publish (FR-006, Principle III)
+Assert publishing refuses when `run.durability is None`. Measured: bracketing is conditional —
+`bracket = run.durability is not None and not registration.repeatable and key is not None` — so
+a non-durable run would execute this non-repeatable tool **unbracketed**, with no intent record
+and nothing for P7 to observe. That is the one posture where an interruption is unrecoverable,
+and it must be refused rather than entered.
 
 ## Provenance (FR-020)
 
@@ -114,3 +140,31 @@ declaring none is **not asked for one**.
 
 This is 037's finding held rather than re-learned: `SUITES` is the per-pack list, and putting
 authoring in it would demand a corpus from the Vault pack for a capability it does not offer.
+
+Assert `AUTHORING_REQUIRED_SUITES` supplies what `promote_model_version` checks `suites_passed`
+against — because the exclusion above means **nothing else does**, and a cell promoted against
+an empty required-suite list passes for any evidence at all.
+
+### Q7 — The adoption and promotion path is unchanged (FR-021)
+Assert `promote_skill`'s order and refusal codes are as they were and that
+`tests/conformance/intake/` passes unmodified.
+
+**Not theoretical**: this feature moves a module out of `core/intake/` and edits
+`core/evals/suites.py` and `core/evals/promotion.py`. It physically touches the path it
+promises not to change, which is exactly when a promise needs a row.
+
+### Q8 — A `write` cell qualified only against a recording is refused (FR-016, R20)
+Assert `qualified_by = "live"` for the first `write` cell, and that a fixture-qualified one is
+refused. `src/core/authority/matrix.py` anticipates this feature by name: the distinction
+*"matters most for `write` — a model permitted to make changes"*.
+
+### Q9 — A cell with neither a judge nor a scorer is refused (ADR-0063)
+Assert `promote_model_version` refuses `promotion_incomplete` when **both** are absent, and
+accepts a **scorer identity** where a judge would otherwise go.
+
+**Why this row rather than a judge.** Both correctness gates and all three must-deny classes
+here are **mechanical**, so no judge participates — and the pre-existing check refuses any
+non-`judge` cell naming none, which would make this cell unpromotable. A human-authored
+reference terminates ADR-0052's regress **one link earlier** than a judge model does: there is
+no scoring model to qualify, so nothing sits above the human. Forcing a judge into the field to
+satisfy a string check would be the "gate that passes by vocabulary" 027 explicitly refused.

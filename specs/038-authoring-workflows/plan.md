@@ -83,20 +83,20 @@ be correct for one and must not assume a population, which is 037's R2 lesson ar
 | Principle | Verdict | Notes |
 | --- | --- | --- |
 | I — Build Glue Only | **Pass** | Authoring assembles what exists — the registry's unused `write` class, the matrix's unbound `write` role, 037's tier, 036's governed loop, the non-repeatable/observer bracket. What is genuinely new is the **corpus**, which is content rather than product, and which ADR-0038 predicted would be "real work". No editor, no VCS product, no diff engine — `difflib` is in the standard library. |
-| II — Total Interception; One Governed Tool Layer | **Pass** | `author_file` and `open_proposal` are ordinary registered tools reaching execution through `invoke_tool`. Code mode is unchanged: a program that writes a file does so by calling the write tool, which round-trips the seam like every other call. Transport for `open_proposal` is decided by ADR-0037's standing test at registry review and recorded on the entry (R6). **Northbound: no new operation.** An authoring request is the payload of an ordinary dispatched run, so surface parity is **inherited rather than owed** (R16) — and a row asserts the inheritance is real, because an absent parity row and a deliberately-inherited one look identical in a diff and only one is a gate regression. |
+| II — Total Interception; One Governed Tool Layer | **Pass** | `author_file` and `open_proposal` are ordinary registered tools reaching execution through `invoke_tool`. Code mode is unchanged **and is not on the path this feature ships**: measured, `run_program` is registered nowhere (R19), so a program that writes a file does so through the seam in conformance rows rather than in a running definition. The seam's guarantee is asserted; the production path is 036's to complete, and this feature must not claim it. Transport for `open_proposal` is decided by ADR-0037's standing test at registry review and recorded on the entry (R6). **Northbound: no new operation.** An authoring request is the payload of an ordinary dispatched run, so surface parity is **inherited rather than owed** (R16) — and a row asserts the inheritance is real, because an absent parity row and a deliberately-inherited one look identical in a diff and only one is a gate regression. |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | Every gate refuses: an unqualified `write` cell (`resolve_with_fallback` has no third branch), a non-hardened posture (`assert_tier` by clause), a secret or unrelated content heading into an artefact (`CONTAINMENT_REFUSED`), a repository the requester does not own, an enactment of platform-authored content. The corpus floor **fails rather than warns** (FR-018b). |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass, with a CONSTITUTION AMENDMENT** | Every step authenticates as its own attested workload identity, and the publishing credential is Vault-vended, hour-scoped and installation-scoped to the requester's own repositories. **But Principle IV enumerates "exactly two named exceptions" and this is a third** (R15) — so the principle is **amended in the same change**, on 027's precedent, with ADR-0062 as its motivating record. The exception inherits the other two's conditions: rotated, Control-Group-governed, trust-store only, read under the reading workload's own attested identity, delivered per task, never persisted. Arguing the clause does not bite (the platform does not *manage* the requester's repository) was available and is the narrowing 027 declined — **a closed list that grows by interpretation is not a closed list**. The key is never mounted into the hardened tier: the step that reads hostile content cannot publish. |
 | V — Sealed Core, Versioned Seams | **Pass, with review** | Four additive `AuditEventType` members (`ARTIFACT_AUTHORED`, `PROPOSAL_OPENED`, `CONTAINMENT_REFUSED`, `ENACTMENT_REFUSED`) on `TOOL_CHOSEN`'s precedent, carrying the approved spec and security-maintainer review. **`RiskClass` and `Role` are not edited** — `write` already exists in both (R1), which is the whole payoff of vocabulary defined in advance. |
 | VI — Lean by Default | **Pass** | **No new operated component.** A pack is content; a workspace is a directory; the analysis step is the existing tier job with a mount added. The one genuinely operated thing is the version-control credential path, which is an integration rather than a service and is named in ADR-0062. |
 | VII — Anti-Fragmentation | **Pass** | One authoring path for every product: the same `author_file`, the same containment, the same proposal shape whether the artefact is a Terraform module or application code. **This is why the write tool is a platform tool rather than a pack tool** (R2) — a per-pack copy would be N implementations of one containment rule. The tier moves out of `core.intake` for the same reason (R3). |
-| VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass, with obligation** | The `write` cell is qualified **before** a definition may bind it, and the corpus lands **in the same change** as the capability so `OWED` stays empty (FR-019, 037's sequencing precedent). Correctness is two gates reported separately (FR-018a); the must-deny half scores the **artefact**, not a verb (R8). **The new `github` pack declares the five suites with their cases**, like both existing packs — measured (R14), the loader's floor iterates *declared* suites, so a pack declaring none has no floor to fail and would be this platform's first pack outside the eval gate, first **by accident**. |
+| VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass, with an ADR** | The `write` cell is qualified **before** a definition may bind it, and the corpus lands **in the same change** as the capability so `OWED` stays empty (FR-019, 037's sequencing precedent). Correctness is two gates reported separately (FR-018a); the must-deny half scores the **artefact**, not a verb (R8). **Both gates are MECHANICAL** — the reference carries a declared property set, and the must-deny half is the secret detector, the containment check and a byte-identical comparison — so **no judge participates**, and `promote_model_version` would refuse the cell for naming none (R18). It accepts a **scorer identity** instead, refusing only when both are absent: a human-authored reference terminates ADR-0052's regress *one link earlier* than a judge does. **ADR-0063** carries that. `qualified_by = "live"` (R20), because the matrix module says the fixture/live distinction *"matters most for `write` — a model permitted to make changes"*. **The new `github` pack declares the five suites with their cases**, like both existing packs — measured (R14), the loader's floor iterates *declared* suites, so a pack declaring none has no floor to fail and would be this platform's first pack outside the eval gate, first **by accident**. |
 | IX — Evidence Over Claims | **Pass** | The proposal is the product and the trail is behind it. Two load-bearing rules: `CONTAINMENT_REFUSED` carries **codes and digests, never the matched text** (`CANARY_CONTACT`'s rule — the record of a leak must not be a second copy of what leaked), and `ARTIFACT_AUTHORED` carries **paths and digests, not content**. |
-| X — The Decision Record Governs | **Pass, with obligations** | **ADR-0038 is realized rather than amended** — it is already Accepted, and its four constraints are implemented as written, not reinterpreted. **ADR-0062 is new** (Proposed here, Accepted in implementation) because a new credential class under a MUST principle is exactly what the record is for. |
+| X — The Decision Record Governs | **Pass, with obligations** | **ADR-0038 is realized rather than amended** — it is already Accepted, and its four constraints are implemented as written, not reinterpreted. **Two new records**: **ADR-0062** (a new credential class under a MUST principle) and **ADR-0063** (what may qualify a cell, amending ADR-0052's chain — R18). Both Proposed here, Accepted in implementation. |
 
-**Gate result**: **PASS — proceed to Phase 0.** Five obligations travel with the feature: the
+**Gate result**: **PASS — proceed to Phase 0.** Six obligations travel with the feature: the
 Principle V review, **the Principle IV amendment naming a third standing-credential exception**,
-ADR-0062's authoring, the `write` corpus landing with the capability, and the tier's move out of
-`core.intake`.
+ADR-0062's authoring, **ADR-0063's authoring**, the `write` corpus landing with the capability,
+and the tier's move out of `core.intake`.
 
 ## Project Structure
 
@@ -141,10 +141,15 @@ src/core/authoring/           # NEW — product-blind, like the rest of core
 └── tool.py                   # `author_file`, risk_class="write" — the registry's first
 
 src/core/evals/
-├── suites.py                 # + AUTHORING_QUALIFICATION. NOT in SUITES (R7); OWED untouched
-├── authoring_corpus.py       # NEW — golden tasks, human-authored references, must-deny;
-│                             #   floor FAILS rather than warns
-└── authoring_scoring.py      # NEW — the two gates, scored and reported SEPARATELY
+├── suites.py                 # + AUTHORING_QUALIFICATION. NOT in SUITES (R7); OWED untouched.
+│                             #   + AUTHORING_REQUIRED_SUITES — what `promote_model_version`
+│                             #   checks a `write` cell against, declared beside the constant
+│                             #   that excludes it so both are read together (R20)
+├── promotion.py              # `promote_model_version` accepts a SCORER identity where a judge
+│                             #   would go, refusing only when both are absent (R18, ADR-0063)
+├── authoring_corpus.py       # NEW — golden tasks, human-authored references carrying a
+│                             #   DECLARED PROPERTY SET, must-deny; floor FAILS rather than warns
+└── authoring_scoring.py      # NEW — the two gates, both MECHANICAL, reported SEPARATELY
 
 src/core/audit/schema.py      # additive: ARTIFACT_AUTHORED, PROPOSAL_OPENED,
                               #           CONTAINMENT_REFUSED, ENACTMENT_REFUSED
@@ -161,6 +166,8 @@ infra/jobs/authoring-tier.nomad.hcl  # NEW — the hardened tier with a READ-ONL
                               #   stays static per job rather than becoming per-run (R13)
 .specify/memory/constitution.md      # AMENDED — Principle IV names a third exception (R15)
 docs/adr/0062-*.md            # NEW (Proposed) — the authoring credential class
+docs/adr/0063-*.md            # NEW (Proposed) — a mechanical scorer over a human-authored
+                              #   reference may qualify a cell (amends ADR-0052's chain)
 tests/
 ├── conformance/authoring/    # both contracts
 ├── component/                # workspace, containment, proposal, corpus floor
@@ -214,6 +221,20 @@ assertion in the feature still passed.
 this is a third (R15), and Principle II's parity gate needed the inheritance stated rather than
 assumed (R16). Neither was visible from the artefacts alone — both required reading the
 constitution's text and the loader's code against the plan.
+
+**The second analyze pass found a third shape, and it is the one to carry forward.** Where pass
+one found things nothing built, pass two found **things built against the wrong subject** — a
+mechanism named correctly and assumed to do something it does not. The observer was handed an
+idempotency key and the branch was derived from a correlation ID, so it could never have looked
+(R17). The correctness gate was mechanical all along and `promote_model_version` refuses a cell
+naming no judge, so the cell could never have been promoted (R18). And two mechanisms this plan
+cited — `run_program`'s registration and `reachable_tools` — are **not on the path it claimed**:
+one is registered nowhere, the other is called from tests only (R19).
+
+That last pair is this repository's own recorded lesson — *a green row proves the mechanism, not
+that the running service can reach it* — and both arrived here by **citation rather than
+measurement**. Naming a real module is not evidence that anything calls it, and the plan treated
+it as though it were.
 
 **One risk moved into the record rather than being resolved**: R10's first correctness gate
 depends on `terraform init` reaching a pinned provider mirror from CI. If that proves

@@ -397,3 +397,141 @@ parity row per transport pair for a capability whose governance is entirely in t
 ceiling and the tier. It would add a surface to certify and change nothing about what is
 enforced. Recording the decision matters more than which way it went: an absent parity row and a
 deliberately-inherited one look identical in a diff, and only one of them is a gate regression.
+
+---
+
+*R17–R20 were measured during the **second** analyze pass. Where the first pass found things
+nothing built, this one found things built against the wrong subject — a mechanism named
+correctly and assumed to do something it does not.*
+
+## R17 — The observer is handed a key, not a branch, and the first design gave it no way to look
+
+**Measured**, `src/core/hooks/engine.py:440`:
+
+```python
+return f"{run_id}:{run.step_index}:{tool_name}"
+```
+
+and `src/core/observation/types.py` — `Observer.observe(self, *, idempotency_key: str)`. **That
+is the observer's entire input.** No arguments, no correlation ID, no run object.
+
+**The defect**: the first design derived the proposal branch from the **correlation ID**
+(`run_id` is `run.run_id or run.correlation_id`, so the two are not reliably the same). An
+observer holding only `run_id:step_index:open_proposal` cannot compute a branch derived from
+something else — so it would return `CANNOT_DETERMINE`, which parks the run. **Every interrupted
+publish, every time.** The contract row asserting "resumption resolves by observation" would
+have been asserting something the design made impossible.
+
+**Decision**: **the branch is derived from the idempotency key**, not from the correlation ID:
+
+```
+brieve/authoring/<sha256(idempotency_key)[:16]>
+```
+
+The observer recomputes the same string from the key it is given and asks the host whether a
+proposal exists on that branch. Nothing else is needed and nothing else is available.
+
+**Both properties survive, and one gets stronger.** Two runs have different `run_id`s, so FR-009
+("a second proposal must not silently displace an earlier one") holds — different keys,
+different branches. A **resumed** run has the *same* `run_id` and `step_index`, so it recomputes
+the *same* branch, which is exactly what makes the observation meaningful rather than a
+coincidence.
+
+**Why it was missed**: "derive the branch from the correlation ID" is a correct-sounding
+sentence about determinism, and determinism was the property being reasoned about. The question
+never asked was *who has to recompute it, and what are they holding when they do.*
+
+## R18 — The correctness gate is MECHANICAL, and that collides with what promotion demands
+
+**Measured**, `src/core/evals/promotion.py`:
+
+```python
+if not judge.strip() and role != "judge":
+    raise PromotionRefused(..., reason_code="promotion_incomplete")
+```
+
+Every cell except the seed-qualified first judge **must name a judge**, because ADR-0052's
+regress has to terminate somewhere a person can inspect.
+
+**The decision the plan never made**: FR-018's second gate says the artefact *"matches a
+human-authored reference **on the properties the task is about**."* Read plainly, that is the
+spec choosing **mechanical** comparison — a property is checkable, and ADR-0038's own warning
+case is a property, not an impression: *a module wiring a static credential where dynamic
+secrets were asked for.* So the human-authored reference carries a **declared property set**
+(uses a dynamic secret source; pins the provider; no static credential), and the gate checks the
+artefact against it.
+
+**And the must-deny half is mechanical too.** Secrets in output → the secret detector.
+Exfiltration of analysed content → the containment check. Injection resistance → the
+byte-identical comparison in R1. **No judge participates anywhere in this qualification.**
+
+**Which means the `write` cell cannot be promoted.** `promote_model_version` would refuse it
+`promotion_incomplete` for naming no judge — a cell whose qualification is *stronger* than a
+judged one, refused for not being judged.
+
+**Decision**: `promote_model_version` accepts a **scorer identity** where a judge would
+otherwise go, refusing only when **both** are absent. The field's meaning becomes what it always
+described — *what qualified this* — and a mechanical scorer over a human-authored reference is a
+legitimate answer to that question.
+
+**Argued rather than assumed, because this touches ADR-0052's chain.** That record exists to
+terminate a regress at *"cases labelled by a person, checked into the repository, reviewed like
+code."* A human-authored reference with a declared property set terminates the regress **one
+link earlier** than a judge model does: there is no scoring model to qualify, so there is
+nothing above the human. Forcing a judge into the field to satisfy a string check would be the
+move 027 explicitly refused — *"a gate that passes by vocabulary is worse than no gate."*
+
+**This is a decision record, not an implementation detail**, so it lands as **ADR-0063
+(Proposed)**, relating to ADR-0052 and amending what may qualify a cell. Two ADRs in one feature
+is the honest count.
+
+**The empty-reference case.** A golden task whose correct outcome is *no artefact* (the subject
+already has the integration) has an empty property set, and an empty set trivially matches — the
+same vacuous-pass shape `parse_cases` refuses for measured suites. So the corpus carries the
+outcome explicitly: a task declares either a property set **or** `expects_no_artifact = true`,
+and a task declaring neither is refused.
+
+## R19 — Two mechanisms this feature cites are not on the path it claims
+
+**Measured**:
+
+- **`run_program` is registered nowhere.** `PROGRAM_TOOL_NAME` appears only in its own module and
+  its `__all__`; `src/surfaces/toolset.py` registers the fixture tools and the pack tools and
+  nothing else. 036's conformance rows call `run_submitted_program` **directly**. So code mode
+  exists as a library and **no definition can enter it in the running platform**.
+- **`reachable_tools` is called from no `src/` module** — only from three component test files.
+  The invoke path enforces the ceiling at `src/core/hooks/authority.py:98`
+  (`if ctx.tool_name not in effective.tool_names`).
+
+**Neither is this feature's defect and both were this feature's claims.** The plan said a
+program writes a file "by calling the write tool, which round-trips the seam like every other
+call"; the task list asserted FR-015 by inspecting `reachable_tools`.
+
+**Decisions**: W3 states it exercises **the seam**, not a production path, and T014 drops a
+citation to a registration that does not exist. R2 re-points at the **effective scope the
+authority hook actually reads** — the property was right and the subject was a helper nobody
+calls.
+
+**The pattern is named in this repository's own memory**: *a green row proves the mechanism, not
+that the running service can reach it.* Both instances are that, and both were inherited by
+citation rather than by measurement — the plan trusted a module's existence as evidence of its
+use.
+
+## R20 — Three smaller things the promotion path and the bracket require
+
+**`qualified_by` for the first `write` cell is `live`.** `src/core/authority/matrix.py:44`
+anticipates this feature by name: *"Carried per cell because the difference is invisible
+otherwise, and **it matters most for `write` — a model permitted to make changes**."* A cell
+qualified against a recording, permitted to author changes to a requester's repository, is
+exactly what that comment warns about. The live lane exists and this is what it is for.
+
+**`required_suites` for a `write` cell is the authoring corpus, named explicitly.**
+`AUTHORING_QUALIFICATION` is deliberately outside `SUITES` (R7), so nothing supplies the list
+`promote_model_version` checks `suites_passed` against. It is declared beside the constant that
+excludes it, so the exclusion and the requirement are read together.
+
+**Bracketing is conditional on durability.** `engine.py:237` — `bracket = run.durability is not
+None and not registration.repeatable and key is not None`. A publishing run configured without
+durability executes a non-repeatable tool **unbracketed**: no intent record, nothing to observe,
+nothing for R17's fix to resolve. The authoring run therefore refuses to publish when it is not
+durable, rather than publishing in a posture where an interruption is unrecoverable.
