@@ -5,7 +5,7 @@
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
 
 **Tests**: This feature's output is evidence a reviewer will trust, so its rows *are* the
-deliverable. Every contract row — A0, I1–I5, A1–A5, Q1–Q6, H1–H5, D1–D10 — has a task.
+deliverable. Every contract row — A0, I1–I5, A1–A5, Q1–Q7, H1–H5, D1–D11 — has a task.
 
 ## Gate Task Types *(present in this feature)*
 
@@ -14,7 +14,7 @@ deliverable. Every contract row — A0, I1–I5, A1–A5, Q1–Q6, H1–H5, D1�
 | **Fail-closed** | T008a (the tier's posture), T014 (unreachable ≠ unchanged), T024 (analysis blocks), T025 (flag short-circuits), T039 (detonation blocks) |
 | **Conformance** | Phases 2–7 — both contracts, `tests/conformance/intake/` |
 | **Correlation / evidence** | T012 (a check that found nothing is recorded), T047 (machine verdict ≠ human approval) |
-| **Eval** | Phase 5 entire — the analyzer's own qualification (Q1–Q6) |
+| **Eval** | Phase 5 entire — the analyzer's own qualification (Q1–Q7) — plus T035a, the golden corpus's floor |
 | **No-secret-leak** | T042 (a canary's value never enters the trail), T024 (findings carry codes, never candidate prose) |
 
 **Two tasks exist to prove the others can lose**: **T032** (Q4 — a weakened analyzer must
@@ -114,8 +114,9 @@ form, honest about which stages have not run.
 gate that qualifies its analyzer creates the ungated input ADR-0053 warns about, and would
 put a row in `OWED` for the first time since 021.
 
-- [ ] T026 [US4] Author `evals/intake-seed/` — human-labelled hostile cases covering redirection, exfiltration, encoded payloads, and content aimed at the reviewer (FR-019). Authored here, authoritative when reviewed and merged (ADR-0052's mechanism).
-- [ ] T027 [US4] Implement `src/core/evals/intake_seed.py`: load the corpus and enforce a floor expressed in **attack classes**, not the judge's four answering suites (FR-020b).
+- [ ] T026 [US4] Author `evals/intake-seed/` to the floor — human-labelled cases covering redirection, exfiltration, encoded payloads, and content aimed at the reviewer (FR-019), **plus the benign cases the analyzer must not flag**. Authored here, authoritative when reviewed and merged (ADR-0052's mechanism).
+- [ ] T027 [US4] Implement `src/core/evals/intake_seed.py`: load the corpus and enforce the floor stated in `contracts/conformance-intake.md` — at least 20 cases, at least 3 per attack class, and **at least 5 benign cases the analyzer must not flag**. Expressed in attack classes, not the judge's four answering suites (FR-020b). The benign minimum is what gives Q3's false-positive budget something to measure: a corpus of only hostile cases would qualify an analyzer that flags everything.
+- [ ] T027a [P] [US4] [GATE:eval] Row Q7 in `tests/conformance/intake/test_qualification.py`: breach each floor clause separately — 19 cases, a class with 2, only 4 benign — and require each to fail on its own. A floor checked in aggregate can be satisfied by a corpus wrong in one dimension and generous in another. (FR-020a)
 - [ ] T028 [US4] Add `intake_analysis` to `SUITES` in `src/core/evals/suites.py` **in this same change**, so `OWED` stays empty (research R9).
 - [ ] T029 [P] [US4] [GATE:eval] Row Q1 (FR-020, FR-020a) in `tests/conformance/intake/test_qualification.py`: a corpus below the floor **fails** rather than warns — ADR-0052's own posture, since a floor nothing enforces is a suggestion.
 - [ ] T030 [P] [US4] [GATE:eval] Row Q2 (FR-020b): a corpus satisfying "all four suites" while covering one attack class must FAIL. The category error that would otherwise pass at the right threshold.
@@ -134,6 +135,8 @@ put a row in `OWED` for the first time since 021.
 **Independent test**: quickstart Scenarios D and E.
 
 - [ ] T034 [US3] Write `infra/jobs/detonation-range.nomad.hcl`: **no authority source at all**, no route to any real estate, canaries seeded, full audit. Purpose-built — NOT the test-only fake, whose merge-blocking guard must not be weakened (FR-015a, research R5).
+- [ ] T034a [US3] Author the **detonation fixtures** in `tests/fixtures/intake/`: a candidate that exfiltrates a canary (SC-004, D8) and a candidate with a **constructed** behavioural difference from its baseline (D2). D2's own text says "constructed rather than hoped for" — by nothing, until this task. A row asserting against a fixture that does not exist is the shape that gets stubbed.
+- [ ] T035a [US3] [GATE:eval] Implement the golden-corpus floor in `src/core/intake/detonation.py` and Row D11 in `tests/conformance/intake/test_detonation.py`: at least 8 tasks, at least 2 attempting a denied tool, at least 1 exercising a must-deny case, every task comparable across versions — **failing rather than warning**, asserted per clause. This is the corpus side of ADR-0053's "detonation catches only what the corpus provokes"; without it the detonation half's honesty rests entirely on whoever writes the tasks. (FR-011)
 - [ ] T035 [US3] Author `corpus/golden-tasks/` (FR-011) — fixed tasks both skill versions run against. Fixed is the point: a corpus that changed between runs would produce a diff describing the corpus rather than the candidate.
 - [ ] T036 [US3] Implement the comparison in `src/core/intake/detonation.py`: attempts, denials, canary contact, with `written_by` carrying the **observer's** identity and never the specimen's.
 - [ ] T037 [US3] Run specimen and observer as separate allocations with separate workload identities; in `src/core/intake/separation.py`; the observer's input is a **governed evidence read** of the run's records — a channel that structurally cannot carry candidate prose (research R7).
@@ -205,7 +208,7 @@ Review (T054) gates merge
   (emit → detection-proposal shape → snapshot input → supersession) and gate T017.
 - US2: T021–T024 `[P]` after T018–T020.
 - US4: T029, T030, T033 `[P]`; T031/T032 serialize on the scorer.
-- US3: T038–T040, T042, T043 `[P]` after T034–T037.
+- US3: T038–T040, T042, T043 `[P]` after T034–T037; T034a ∥ T035, both before T035a.
 
 ## Implementation Strategy
 

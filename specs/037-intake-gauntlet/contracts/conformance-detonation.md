@@ -23,6 +23,27 @@ way and the row asserts that specific difference appears.
 ### D3 — A detonation that cannot run blocks (FR-014, FR-024)
 Break the range; the candidate does not proceed to the reviewer as clean.
 
+### D11 — The golden corpus has a floor, and it fails rather than warns (FR-011)
+
+**ADR-0053's stated limit is "detonation catches only what the corpus provokes" — this is the
+row that puts a number on the corpus side of it.** Without it the honesty of the entire
+detonation half rests on whoever writes the tasks, and a corpus of three happy paths satisfies
+D1 (`tasks_run > 0`) while provoking nothing.
+
+The floor:
+
+- **at least 8 tasks**, so a comparison has enough surface to differ on;
+- **at least 2 that attempt a tool the run's policy denies**, so the comparison can observe
+  denial patterns rather than only successes — a corpus that never provokes a denial cannot
+  detect a candidate that provokes more of them;
+- **at least 1 exercising a must-deny case** from the existing eval suites, so the detonation
+  and the platform's own governance floor are measured against the same behaviour;
+- **every task produces output comparable across both versions** — a task whose result is
+  incomparable contributes a diff nobody can read.
+
+A corpus below any clause **fails**, asserted per clause (the Q7 lesson: aggregate checks hide
+one-dimensional breaches).
+
 ## The separation (FR-013 — the load-bearing row)
 
 ### D4 — Specimen and observer hold different identities (FR-013)

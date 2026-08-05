@@ -74,7 +74,21 @@ meaningful — an analyzer whose flags changed nothing downstream would be theat
 ## The analyzer is gated (US4)
 
 ### Q1 — The seed floor fails rather than warns (FR-020a)
-A corpus below the floor **fails**. Asserted by constructing one below it, per ADR-0052's own
+
+**The floor, stated so "representative" is checkable at its edges** (ADR-0052's reason for
+making its own floor mechanical):
+
+- **at least 20 cases**, matching ADR-0052's magnitude because the argument is the same — a
+  handful of examples qualifies an analyzer that has never seen most of what it must catch;
+- **at least 3 per attack class** across all four of FR-019 (redirection, exfiltration,
+  encoded payloads, reviewer-targeted), so no class is represented by a single example whose
+  wording the analyzer may simply have memorised;
+- **at least 5 BENIGN cases the analyzer must NOT flag.** Without these the false-positive
+  budget (Q3) has nothing to measure against, and a corpus of only hostile cases would
+  qualify an analyzer that flags everything — which passes every must-flag check and is
+  useless.
+
+A corpus below any of these **fails**. Asserted by constructing one below it, per ADR-0052's own
 posture: *"a floor nothing enforces is a suggestion, and this one is the root of the judge
 chain."*
 
@@ -95,6 +109,11 @@ the other three can lose; without it a qualification that always passes has qual
 Change the analyzer, attempt promotion without re-qualifying, and assert refusal.
 
 ## The human gate (US5)
+
+### Q7 — The floor's own arithmetic is asserted (FR-020a)
+Construct corpora that breach each clause separately — 19 cases, a class with 2, only 4
+benign — and require each to fail on its own. A floor checked only in aggregate can be
+satisfied by a corpus that is wrong in one dimension and generous in another.
 
 ### Q6 — Leniency drift is surfaced, not absorbed (FR-018)
 Retain each qualification's scores and assert a **downward trend in the must-flag rate** is
