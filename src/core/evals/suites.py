@@ -65,6 +65,25 @@ SUITES: Final[tuple[str, ...]] = (
 #: rather than about readiness.
 INTAKE_QUALIFICATION = "intake_analysis"
 
+#: **The `write` role is qualified, and deliberately NOT from `SUITES` above** (038).
+#:
+#: The same shape as `INTAKE_QUALIFICATION` and for the same reason — `SUITES` is the PER-PACK
+#: list, so membership would demand every pack ship an integration-correctness corpus for a
+#: capability most of them do not offer. 037 made that mistake and nine rows refused it.
+#:
+#: **Where it differs**: intake's analyzer is one platform component, qualified once. A `write`
+#: cell is `(pack × model × role)`, so this is required of a pack that **declares an authoring
+#: workflow** and is not asked of one that does not. Neither a global suite nor a one-off.
+AUTHORING_QUALIFICATION = "authoring"
+
+#: What `promote_model_version` checks a `write` cell's `suites_passed` against.
+#:
+#: **Declared beside the constant that excludes it**, so the exclusion and the requirement are
+#: read together: `AUTHORING_QUALIFICATION` is outside `SUITES` precisely so nothing else
+#: supplies this list, and a cell promoted against an empty required-suite set passes for any
+#: evidence at all.
+AUTHORING_REQUIRED_SUITES: Final[tuple[str, ...]] = (AUTHORING_QUALIFICATION,)
+
 #: Suites the constitution names that cannot yet bind. **Empty since 021** — every row in the
 #: eval gate is now in force.
 #:
@@ -263,6 +282,8 @@ def suite_listing() -> dict[str, str]:
 
 
 __all__ = [
+    "AUTHORING_QUALIFICATION",
+    "AUTHORING_REQUIRED_SUITES",
     "EXPECTED_OUTCOMES",
     "ANSWERING_SUITES",
     "ESTATE_SUITES",
