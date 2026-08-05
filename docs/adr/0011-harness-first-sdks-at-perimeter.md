@@ -1,6 +1,6 @@
 # ADR-0011: Harness-first for structural guarantees; extension SDKs at the perimeter
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-08-05) — resolved on basis (2) below. See Resolution
 - **Date**: 2026-03-04
 - **Relates to**: [ADR-0006](0006-in-process-fail-closed-enforcement.md), [ADR-0012](0012-runtime-versus-attach-posture.md), [ADR-0032](0032-delegated-run-versus-local-loop.md)
 
@@ -54,8 +54,10 @@ carefully. Whatever form it takes, its documentation, its reports, and its attes
 language must state the limitation at every point where a claim is made — not once in a
 footnote.
 
-This decision remains **Proposed** pending the evidence the attach experiment is
-designed to produce.
+~~This decision remains **Proposed** pending the evidence the attach experiment is
+designed to produce.~~ **Superseded by the Resolution below**: the dependency was
+mis-stated. Struck rather than deleted — what a record believed about its own blocker is
+part of how it got here.
 
 ## Still open — reviewed 2026-08-01
 
@@ -102,3 +104,49 @@ and a review that skipped past that would be reading the tree generously.
 Recorded rather than resolved, because resolving it on (2) means revising what a prior record
 says about its own dependency, and that is a judgement to make deliberately rather than in
 passing.
+
+## Resolution
+
+**Accepted 2026-08-05, on basis (2): the dependency was mis-stated.** This record named "the
+evidence the attach experiment is designed to produce" as its blocker. That evidence is about
+*what adopters want*. This record's substantive claims are not.
+
+Read them back: harness-run guarantees are structural rather than cooperative; extension SDKs
+extend a governed runtime rather than govern an ungoverned one; any reduced-assurance tier
+must label itself at every point it makes a claim. **Every one of those is a position on
+honest labelling.** None becomes truer or falser depending on what a first cohort buys. A
+buyer who wanted cooperative guarantees called structural would not make them structural; they
+would make the claim dishonest, which is precisely what the third clause exists to prevent.
+
+The blocker was borrowed from [ADR-0012](0012-runtime-versus-attach-posture.md), which asks a
+genuinely cohort-dependent question — *where to invest* — and was right to wait for usage and
+right, in the end, to resolve without it. Sharing that dependency was an error of adjacency:
+the two records sat next to each other and one took the other's trigger.
+
+**What this does not claim.** ADR-0012's own Resolution says its evidence "is weaker than what
+[ADR-0011] was waiting for, so this resolution does not automatically resolve it" — and that
+remains correct. This is not resolution-by-inheritance. The dependency is being *withdrawn*
+after examination, by the maintainer, which is the deliberate judgement the Still-open section
+said basis (2) required.
+
+**What 020 and 037 contribute, stated so it is not overread.** 020 made the load-bearing
+distinction demonstrated rather than asserted: a model chooses a tool, the choice enters the
+same governed entry, an over-reach is refused by existing enforcement, and the trail records
+all of it. 037 added a second demonstration from the other direction — an analysis agent whose
+ceiling contains nothing to be redirected to, running in a tier that bounds what its process
+can reach. Structural guarantees now have two worked examples. **Neither is adopter evidence,
+and neither is why this is being accepted** — they are why the claim now reads as a description of a
+built thing rather than as an intention.
+
+**What remains unbuilt, recorded so acceptance does not imply otherwise.** "Extension SDKs
+live at the perimeter — custom hooks, packs, providers." Packs are real: two ship, with eval
+suites and a promotion path. `hooks/` and `providers/` hold a README each. Accepting a record
+that describes unbuilt work is ordinary here — ADR-0018 waited four months for 021, ADR-0040
+for 036 — but the perimeter model is a **plan, not a fact**, and anyone citing this record for
+it should know that.
+
+**The embedded-mode tier stays acknowledged and unbuilt.** Basis (3) — building one — would
+have settled the Decision's third paragraph by construction. It has not been built, so the
+reduced-assurance language remains a commitment about how such a tier *must* present itself
+rather than a description of how one does. If it is ever built, that paragraph is the
+requirement it inherits, not a preamble to be re-litigated.

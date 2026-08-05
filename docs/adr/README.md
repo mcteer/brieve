@@ -67,8 +67,8 @@ same change.
 | [0008](0008-no-gateway-or-registry-product.md) | Ship no gateway or registry product — provider interfaces are the deliverable | Accepted |
 | [0009](0009-adlc-stages-and-observability-planes.md) | An eight-stage agent lifecycle, and three observability planes joined by one correlation ID | Accepted |
 | [0010](0010-enablement-as-versioned-product-layer.md) | Enablement is a versioned product layer, not documentation | Accepted |
-| [0011](0011-harness-first-sdks-at-perimeter.md) | Harness-first for structural guarantees; extension SDKs at the perimeter | **Proposed** |
-| [0012](0012-runtime-versus-attach-posture.md) | Harness-as-runtime leads; governance-attach is the committed second posture | **Proposed** — amended by 0027 |
+| [0011](0011-harness-first-sdks-at-perimeter.md) | Harness-first for structural guarantees; extension SDKs at the perimeter | Accepted (2026-08-05 — the stated dependency was withdrawn as mis-stated) |
+| [0012](0012-runtime-versus-attach-posture.md) | Harness-as-runtime leads; governance-attach is the committed second posture | Accepted (2026-07-29) — amended by 0027 |
 | [0013](0013-adopt-agent-security-framework-taxonomy.md) | Adopt the vendor Agent Security Framework taxonomy | Accepted |
 | [0014](0014-two-layer-runtime-protection.md) | Runtime protection is two-layered — in-process hooks, plus an optional wire-level guardrail | Accepted — amended by 0027 |
 | [0015](0015-control-plane-vault-as-trust-fabric.md) | A dedicated control-plane Vault is the agent registry and trust fabric | Accepted |
@@ -129,14 +129,25 @@ Structured reviews that produced decisions but are not themselves decisions:
 
 ## Open records
 
-Two records remain **Proposed** and are expected to resolve rather than linger:
+**One record remains Proposed**, deliberately:
 
-- **[0011](0011-harness-first-sdks-at-perimeter.md)** — awaiting the evidence
-  [0012](0012-runtime-versus-attach-posture.md) is designed to produce.
-- **[0012](0012-runtime-versus-attach-posture.md)** — an experiment with a defined decision
-  point. It is partially amended by
-  [0027](0027-scope-narrowed-to-enclave-and-harness-run-agents.md); when the decision point
-  is reached it should be resolved to Accepted with a stated outcome, or superseded.
+- **[0054](0054-model-written-orchestration-parity.md)** — per-delegation governance for
+  model-written orchestration. Left Proposed by
+  [036](../../specs/036-deferred-disclosure-code-mode/spec.md) on purpose: its per-call half
+  was realized, and its delegation half has no substrate to govern — the orchestration package
+  still carries an `experimental` import segment and its durable-workflows extension has not
+  landed. **Governing an object that cannot yet be invoked would be a rule nothing exercises**,
+  which is ADR-0047's failure mode written into an ADR instead of a test. This is a watched
+  record, not a forgotten one; its watch signals are in the record itself.
 
-A Proposed record that has quietly become permanent is a failure of this process. Both are
-reviewed on the recurring review cadence.
+A Proposed record that has quietly become permanent is a failure of this process. This one is
+reviewed on the recurring cadence against those signals.
+
+**Resolved since this section was last accurate:**
+
+- **[0011](0011-harness-first-sdks-at-perimeter.md)** — Accepted 2026-08-05, on the basis that
+  its stated dependency was mis-stated. Its claims are positions on honest labelling and do not
+  turn on adopter evidence; the blocker was borrowed from 0012 by adjacency.
+- **[0012](0012-runtime-versus-attach-posture.md)** — Accepted 2026-07-29, harness-as-runtime
+  leads, decided on the platform's own construction rather than the cohort behaviour it named.
+- **[0053](0053-automated-skill-intake-gauntlet.md)** — Accepted 2026-08-05 and built by 037.
