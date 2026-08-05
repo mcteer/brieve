@@ -20,23 +20,29 @@
 #}
 {% if conversations %}
 <nav class="ask-rail" aria-label="Your conversations">
-  <p class="rail-heading">Conversations</p>
-  <ul>
+  {# The whole ROW is the link, not the words inside it — a target you can hit anywhere is what
+     makes a sidebar feel like one, and it clears the 24px minimum without a fixed height. #}
+  <a class="button rail-new" href="/ask">New conversation</a>
+  <p class="rail-heading" id="rail-heading">Conversations</p>
+  <ul aria-labelledby="rail-heading">
     {% for conversation in conversations %}
       <li>
-        <a href="/ask/{{ conversation.conversation_id }}"
+        <a href="/ask/{{ conversation.conversation_id }}" title="{{ conversation.title }}"
            {% if conversation.conversation_id == conversation_id %}aria-current="page"{% endif %}>
-          {{ conversation.title }}
+          {# Truncated to one line in CSS; `title` keeps the whole question a hover away, and
+             the accessible name is still the full text because it is the link's own content. #}
+          <span>{{ conversation.title }}</span>
+          {# A count is a fact about the conversation, in the role reserved for what a person
+             would quote — not decoration. #}
+          <span class="rail-count">{{ conversation.exchanges }}</span>
         </a>
-        {# The count is a fact about the conversation, in the role reserved for what a person
-           would quote — not decoration. #}
-        <span class="rail-count">{{ conversation.exchanges }}</span>
       </li>
     {% endfor %}
   </ul>
-  <a class="link-button" href="/ask">New conversation</a>
   {% if conversation_id %}
-    <a class="link-button" href="/ask/{{ conversation_id }}/delete">Delete this conversation</a>
+    <div class="rail-danger">
+      <a class="link-button" href="/ask/{{ conversation_id }}/delete">Delete this conversation</a>
+    </div>
   {% endif %}
 </nav>
 {% endif %}
