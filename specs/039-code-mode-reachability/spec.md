@@ -4,7 +4,24 @@
 
 **Created**: 2026-08-05
 
-**Status**: Draft
+**Status**: **Superseded — code mode was decided against** ([ADR-0065](../../docs/adr/0065-code-mode-is-decided-against.md), 2026-08-06)
+
+> **Do not implement this.** The runtime it depends on is upstream pre-release with no
+> timeline, and the capability was being conflated with the platform *writing code* — which is
+> 038's subject and shares nothing with this beyond the word. Code mode changes how a model
+> **invokes tools**; it is an efficiency optimization, and nothing has ever run a program
+> outside a test.
+>
+> **The analysis outlived the subject and is kept for two successors.** Its structure — three
+> layers, registration is the opt-in switch, the ceiling decides, and one enclave row proving
+> the thing works where dispatched work actually runs — applies unchanged to `author_file`,
+> `read_subject` and `open_proposal`, which are **also registered nowhere**. And FR-014's
+> finding stands on its own: `_PROBE_ARGUMENTS` is a hardcoded constant passed as the arguments
+> for *every* tool a model names, so a model can choose `vault_write` and cannot say what to
+> write. FR-015, FR-016 and FR-017 are that finding's consequences and survive with it.
+>
+> What does **not** survive: R8 (a looping program's lost intent record) and R10 (nested
+> programs), both reachable only through a program.
 
 **Input**: Measured against merged main — 036 shipped code mode, ADR-0041's gate is satisfied, and no definition can enter it in the running platform.
 
