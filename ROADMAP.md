@@ -311,19 +311,23 @@ ADR — never a passing stub.**
 
 ## Open records
 
-One ADR remains **Proposed** and is expected to resolve rather than linger. Neither blocks the
+One ADR remains **Proposed** and is expected to resolve rather than linger. It does not block the
 sequence above, but a Proposed record that quietly becomes permanent is a failure of the process
 ([`docs/adr/README.md`](docs/adr/README.md)).
 
-- **ADR-0011** — harness-first SDKs at the perimeter. **Reviewed 2026-08-01 and deliberately
-  left open, with three named triggers** rather than resolved or forgotten. ADR-0012's
-  resolution says in writing that its evidence does not resolve this one; 020 strengthens the
-  record's central claim — harness guarantees are structural and *now demonstrated*, since a
-  model finally makes a real decision for the harness to intercept — but that is evidence about
-  what was built, not about what adopters want, which is what this record asks for. The likely
-  resolution is a maintainer's judgement that the dependency was mis-stated; see the ADR's
-  "Still open" section.
-- **ADR-0012** — ✅ **Accepted 2026-07-29.** Harness-as-runtime leads. Decided on the platform's own construction rather than the early-adopter cohort the ADR named, because there is no cohort yet — recorded that way in the ADR's Resolution, since a record claiming evidence that never arrived is worse than one admitting its basis.
+- **ADR-0054** — model-written orchestration, per-call and per-delegation parity. Left Proposed
+  by [036](specs/036-deferred-disclosure-code-mode/spec.md) **on purpose**: its per-call half was
+  realized and its delegation half has no substrate to govern, because the orchestration package
+  still carries an `experimental` import segment and its durable-workflows extension has not
+  landed. Governing an object that cannot yet be invoked would be a rule nothing exercises.
+
+**ADR-0011 resolved on 2026-08-05** (Accepted, on basis (2) — the dependency was withdrawn after
+examination rather than inherited). It had been the entry here since 2026-08-01, and this section
+still named it hours after the change. **That is the defect this file's own `Next` section warns
+about, in the file a planner reads first** — and it is the second time: three shipped entries sat
+under `Next` until the same day. A stale record here is not a tidiness problem; it produced two
+wrong recommendations in a single session before anyone checked it against `src/`.
+
 
 ## Known gaps in the record
 
