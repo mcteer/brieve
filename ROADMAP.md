@@ -321,8 +321,43 @@ Three things it collides with, all measured:
   is where turns act; an ask never does (ADR-0039)."* So an admin surface is not unprecedented; a
   governance-**authoring** surface is.
 
+**The shape, as described 2026-08-06**: an admin navigates to a configuration panel in the Brieve
+interface and adds **Git repos** and **MCP server configs** the agent may consult. That is one
+panel over **two features of very different size**, and conflating them is the risk.
+
+**Git repos fit the model that exists.** Clone, digest, pin, cite — the `corpus-sync` pattern with
+a tenant dimension and an endorsement record on top. *"Nothing is fetched here"* survives intact,
+because you sync and then answer from the sync. Real work, but an extension of a thing the
+platform already does well.
+
+**MCP servers do not, and which half is meant decides everything.**
+
+- **Resources only** — documents and data a server exposes. Closer to the Git case, but the pin is
+  a genuine problem: you can digest-pin a cloned repo and you cannot pin a live query interface.
+  Either its resources are synced like a corpus, or answers fetch at answer time, which
+  `corpus.py` rejects with its reason attached.
+- **Tools** — an MCP server exposing tools is a **capability source**, and this is the largest
+  thing in this entry. Measured: `core/authority/ceiling.py:75` refuses `unknown_ceiling_entry` —
+  *"ceiling names a tool or action the platform does not know"* — so the capability vocabulary is
+  **closed and fixed before a run starts**. Customer tools arriving at runtime would open it. That
+  reaches Principle II (one governed tool layer, `invoke_tool` the sole entry), the ceiling model,
+  Principle VIII (packs are eval-gated; a customer's MCP tools are not), and Principle IV (whose
+  credential reaches that server).
+
+**And Brieve has no MCP client.** Measured: `surfaces/mcp/served.py` is `FastMCP` — the platform
+**serves** MCP (019) and consumes none. Consuming customer servers is a new direction with no
+substrate, not a configuration option over an existing one.
+
+**ADR-0041's reasoning outlived its subject and lands here.** *"Sandbox safety and preserved
+governance are different properties"* generalises: an external tool source being well-behaved is
+not a governance argument either. That ADR is superseded ([ADR-0065](docs/adr/0065-code-mode-is-decided-against.md))
+and its Context is the thing to read before specifying the tools half.
+
 **Not scheduled.** Recorded so nobody re-derives the constraints; the ordering argument belongs
-in its own specify.
+in its own specify. **The first question that specify must answer**: do customer MCP servers
+supply *context* or *capability*? Everything above sizes differently depending on the answer, and
+the phrase *"additional context or data"* suggests the first while *"MCP server"* usually delivers
+both.
 
 ## Demand-driven / trigger-gated
 
