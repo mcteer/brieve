@@ -266,6 +266,44 @@ One platform, isolated tenants, using the products' own isolation primitives.
 **Why last of the scheduled set:** it multiplies every guarantee above it. Isolating tenants
 before the things being isolated are stable means doing the work twice.
 
+### The Terraform workflow, end to end (unnumbered)
+
+The product shape the current feature sequence builds toward, stated 2026-08-06 so the pieces
+are aimed at it rather than discovered to almost compose later. **A user defines a workspace, a
+Git repo, and the scope of their need. The agent reads what exists in Terraform and in context,
+decides what should be built, runs `terraform plan` to prove the proposal is sound, and opens a
+PR back to the declared repo with the recommended changes.**
+
+Measured against merged main, most of the machinery exists and none of it composes yet:
+
+| Step of the workflow | What exists | The gap |
+| --- | --- | --- |
+| user declares workspace / repo / scope | definitions, ceilings, dispatch; 038's `SubjectMount` and `target_repository` | no intake surface where a *user* declares these three; today they are operator-authored records |
+| read what exists in Terraform | `terraform_plan` in `PLATFORM_HANDLERS` | **a fixture** — its own payload says so: *"Returns a shape, not a plan… Terraform is not deployed in the enclave"* |
+| read what exists in context | pinned corpus; estate answering | the customer's own context is the entry below this one |
+| decide what should be built | a model in the loop (020) | the model cannot say what to do with a tool — **040, planned** |
+| author the changes | 038's `author_file` / `read_subject`, containment, provenance | registered nowhere — **the successor feature**, and 040's capability ledger points at it |
+| `terraform plan` as a gate before proposing | the plan tool, the hook pipeline, MODEL_GATE precedent | **the ordering is the new decision**: plan must run against the *authored* tree, inside the authoring tier, and a failed plan must stop the proposal — a sequencing constraint nothing yet expresses |
+| PR back to the declared repo | `open_proposal`, `branch_for(idempotency_key)`, `PROPOSAL_OPENED`, the authoring tier's analyzer→proposer split | registered nowhere, same successor; and a proposal does not yet carry its **plan evidence** |
+
+**Two decisions this shape forces, recorded now so their features argue them rather than absorb
+them:**
+
+- **Plan-before-propose is a workflow constraint, not a tool property.** The authoring tier's
+  two-task split (analyzer authors, proposer publishes *"what already passed"*) is exactly the
+  seam for it — the plan belongs at the end of the analyzer's work, and its output belongs in
+  the proposal as evidence. A PR whose description carries the plan it passed is a different
+  product from a PR that merely compiles.
+- **The plan needs a real Terraform.** The fixture handlers were the right call while nothing
+  could reach them; a workflow whose soundness gate is a fixture would be green forever
+  (ADR-0047's exact shape). Deploying Terraform where the authoring tier runs is an
+  infrastructure decision with a Principle VI cost to state.
+
+**Sequence already pointed the right way**: 040 (the model can say what to do) → authoring
+becomes reachable (the trio + proposals) → this workflow as the composition feature that adds
+the intake surface, the plan gate, and plan-evidence-in-proposal. Each earlier feature is
+independently valuable; this entry is why they are ordered.
+
 ### Customer-supplied context (unnumbered)
 
 A customer's own material — internal compliance policies, architecture standards, reference
