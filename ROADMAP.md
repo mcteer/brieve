@@ -266,6 +266,114 @@ One platform, isolated tenants, using the products' own isolation primitives.
 **Why last of the scheduled set:** it multiplies every guarantee above it. Isolating tenants
 before the things being isolated are stable means doing the work twice.
 
+### Customer-supplied context (unnumbered)
+
+A customer's own material — internal compliance policies, architecture standards, reference
+designs — considered when the platform answers and when it authors. Raised 2026-08-06 as a
+product requirement, recorded before it was specified.
+
+**Measured, this is not "add a source".** `src/core/answering/corpus.py` has **no tenant
+dimension at all** — one process-wide manifest at `corpus/manifest.json`, digest-pinned, and
+*"nothing is fetched here"*: `infra/bin/corpus-sync` populates a cache and the reader refuses
+anything whose digest does not match, because *"a corpus that fetched at answer time would make
+every answer depend on a third party being reachable, and would make 'pinned' untrue."* Customer
+content is per-tenant, arrives at runtime, and is not vendored through the platform's supply
+chain. Every one of those cuts against the current model.
+
+**The citation gate is the real constraint, not storage.** `answer.py` states it plainly — *"an
+answer with no supported claims is a decline"* — and `corpus.py` calls citation resolution *"the
+single most important check in this feature."* So customer documents cannot be context the model
+merely reads; they have to be **citable**, or every answer grounded in them declines. Extending
+resolution to content the platform does not control is the whole of the work, and doing it badly
+weakens the gate for the corpus too.
+
+**Three records already hold most of the vocabulary.** ADR-0030 (pinned versus consulted
+artifacts) is the distinction this needs and may already name the customer case correctly.
+ADR-0004 makes the corpus the supply chain's second subject — customer material is emphatically
+not that, and saying so is half the design. ADR-0046 (multi-tenancy) owns the tenant dimension
+the corpus lacks; this does not strictly *require* multi-tenancy, since a single-tenant
+deployment could carry customer content, but it needs the same substrate and building the two in
+ignorance of each other means building the tenant boundary twice.
+
+**And it reaches authoring, not only answering.** *"Write the Vault integration for this repo"*
+against a customer's architecture standards is the same requirement arriving through 038's path
+rather than the ask path, which means whatever shape this takes has to serve both.
+
+**Endorsement by an admin, configured in the interface** — added 2026-08-06, and it is plausibly
+the *answer* to the citation problem rather than a complication. The gate needs a trust statement
+about content the platform did not vendor, and *"an admin of this customer endorsed this
+document"* is exactly that: a decision, made by a named person, at a time, which the trail can
+carry. Officially endorsed is a governance fact, not a storage one.
+
+Three things it collides with, all measured:
+
+- **There is no `admin` role.** The subject vocabulary in `core/answering/scope.py` is
+  `operator` and `compliance-analyst`, the latter introduced by 025 as a superset of the former.
+  A third role is a change to the governance vocabulary, not a UI addition.
+- **Governance records live in Terraform today**, operator-authored:
+  `infra/modules/trust-fabric/` holds ceilings, model credentials and the authoring records. 026
+  decided that shape on purpose — *"where a model is reachable from is assembly while which model
+  is permitted is governance"* — and rejected deployment config for governance. Endorsing content
+  through the portal moves a governance decision **out of Terraform for the first time**. That may
+  well be right, because the person who knows whether an architecture standard is current is not
+  the person with estate credentials, but it is a posture change to argue rather than assume.
+- **The portal can already act, just not while asking.** `surfaces/portal/app.py:201` — *"A thread
+  is where turns act; an ask never does (ADR-0039)."* So an admin surface is not unprecedented; a
+  governance-**authoring** surface is.
+
+**The shape, as described 2026-08-06**: an admin navigates to a configuration panel in the Brieve
+interface and adds **Git repos** and **MCP server configs** the agent may consult. That is one
+panel over **two features of very different size**, and conflating them is the risk.
+
+**Git repos fit the model that exists.** Clone, digest, pin, cite — the `corpus-sync` pattern with
+a tenant dimension and an endorsement record on top. *"Nothing is fetched here"* survives intact,
+because you sync and then answer from the sync. Real work, but an extension of a thing the
+platform already does well.
+
+**MCP servers do not, and which half is meant decides everything.**
+
+- **Resources only** — documents and data a server exposes. Closer to the Git case, but the pin is
+  a genuine problem: you can digest-pin a cloned repo and you cannot pin a live query interface.
+  Either its resources are synced like a corpus, or answers fetch at answer time, which
+  `corpus.py` rejects with its reason attached.
+- **Tools** — an MCP server exposing tools is a **capability source**, and the platform's shape
+  suits this well. `invoke_tool` is the sole governed entry and the registry is the decision-maker
+  — 036's seam states it directly: *"no blocklist, no allowlist, and no special case… the registry
+  decides."* A tool admitted from an endorsed config is **less exotic than a name a model
+  invented**, which that design already governs. What moves is *when* registration happens:
+  `core/authority/ceiling.py:75` refuses `unknown_ceiling_entry` because the vocabulary is
+  assembled before a run starts, and that is an implementation fact rather than a principle.
+  Register from an endorsed source and a ceiling names customer tools like any other.
+
+**Three things genuinely need deciding** — none of them a reason not to do it:
+
+- **Eval gating.** Principle VIII gates capability packs on evals; a customer's own tools cannot
+  be. The constitution's own pattern for this is a **named exception with a stated bound**, which
+  Principle IV has taken three times. *"Endorsed customer sources are not eval-gated, and here is
+  what bounds them instead"* is an ADR.
+- **Credentials.** Whose credential reaches the customer's server, and where it lives. 027 built
+  the broker for exactly this shape and its record is the precedent.
+- **Freshness.** A repo can be synced and digest-pinned; a live MCP server cannot. Endorsement
+  says *"this source is trusted"*, which is not the same as *"this response is what was reviewed."*
+
+**Brieve has no MCP client yet.** `surfaces/mcp/served.py` is `FastMCP` — 019 built the platform
+as a **server**. That is a substrate to build, not an obstacle.
+
+**Why this matters more than its position suggests.** The pinned corpus is HashiCorp's validated
+patterns, and a platform whose knowledge stops at one vendor's documentation addresses a small
+part of what a customer environment actually is. Their compliance posture, their architecture
+standards, their existing estate and their own tooling are the context that makes an answer
+usable rather than merely correct. **Governance and external sources are not in tension** — the
+governed entry, the registry, the ceiling and the trail are exactly the machinery that lets an
+external source be admitted deliberately rather than absorbed silently, and the endorsement
+record names who admitted it.
+
+**Not scheduled.** Recorded so nobody re-derives the constraints; the ordering argument belongs
+in its own specify. **The first question that specify must answer**: do customer MCP servers
+supply *context* or *capability*? Everything above sizes differently depending on the answer, and
+the phrase *"additional context or data"* suggests the first while *"MCP server"* usually delivers
+both.
+
 ## Demand-driven / trigger-gated
 
 Deliberately unscheduled. Each needs a recorded trigger before it enters [Next](#next) — that is
