@@ -18,6 +18,7 @@ choice" and "a choice came back" is production code in both lanes.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -37,12 +38,23 @@ def recording(*answers: str) -> str:
     """The wire form of a scripted sequence, as a run receives it.
 
     ``recording("plan", "apply")`` → ``"plan,apply"``. Use `NOTHING` for "the model names
-    nothing here", which ends the run terminally.
+    nothing here", which ends the run terminally. **A bare name is a choice with no
+    arguments** (040, FR-010) — every recording authored through this helper means exactly
+    what it meant before answers carried arguments.
     """
     return ",".join(answers)
 
 
-def scripted_chooser(answers: Sequence[str]) -> RecordedChooser:
+def structured_recording(*choices: dict[str, Any]) -> str:
+    """The wire form of a structured sequence — the ``[``-prefixed grammar (040).
+
+    ``structured_recording({"tool": "vault_write", "arguments": {"path": "a/b"}})``. Use
+    ``{"tool": NOTHING}`` for the terminal answer; the sentinel is the same in both grammars.
+    """
+    return json.dumps(list(choices))
+
+
+def scripted_chooser(answers: Sequence[Any]) -> RecordedChooser:
     """The in-process double, for rows that construct a run rather than dispatching one."""
     return RecordedChooser(answers)
 
@@ -139,4 +151,5 @@ __all__ = [
     "fixture_cell",
     "recording",
     "scripted_chooser",
+    "structured_recording",
 ]

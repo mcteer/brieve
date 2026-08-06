@@ -241,8 +241,9 @@ class PostgresDurabilityProvider:
             _exec(
                 conn,
                 """
-                INSERT INTO intents (run_id, idempotency_key, step_index, tool_name, recorded_at)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO intents
+                    (run_id, idempotency_key, step_index, tool_name, arguments, recorded_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (run_id, idempotency_key) DO NOTHING
                 """,
                 (
@@ -250,6 +251,10 @@ class PostgresDurabilityProvider:
                     record.idempotency_key,
                     record.step_index,
                     record.tool_name,
+                    # NULL when the record carries none, which is what a pre-040 intent
+                    # reads back as — and `{}` serialises to "{}", never to NULL, so the
+                    # two stay distinguishable through a round trip (040, research R4).
+                    None if record.arguments is None else json.dumps(record.arguments),
                     record.recorded_at,
                 ),
             )
@@ -280,7 +285,8 @@ class PostgresDurabilityProvider:
             rows = _all(
                 conn,
                 """
-                SELECT i.run_id, i.step_index, i.tool_name, i.idempotency_key, i.recorded_at
+                SELECT i.run_id, i.step_index, i.tool_name, i.idempotency_key,
+                       i.arguments, i.recorded_at
                 FROM intents i
                 LEFT JOIN results r
                   ON r.run_id = i.run_id AND r.idempotency_key = i.idempotency_key
@@ -295,7 +301,10 @@ class PostgresDurabilityProvider:
                     step_index=row[1],
                     tool_name=row[2],
                     idempotency_key=row[3],
-                    recorded_at=row[4],
+                    # NULL stays None — "recorded before this column existed", which the
+                    # revival path reads as "run with the pre-040 constant" (research R4).
+                    arguments=None if row[4] is None else json.loads(row[4]),
+                    recorded_at=row[5],
                 )
                 for row in rows
             ]
@@ -310,7 +319,8 @@ class PostgresDurabilityProvider:
             rows = _all(
                 conn,
                 """
-                SELECT i.run_id, i.step_index, i.tool_name, i.idempotency_key, i.recorded_at
+                SELECT i.run_id, i.step_index, i.tool_name, i.idempotency_key,
+                       i.arguments, i.recorded_at
                 FROM intents i
                 JOIN results r
                   ON r.run_id = i.run_id AND r.idempotency_key = i.idempotency_key
@@ -325,7 +335,10 @@ class PostgresDurabilityProvider:
                     step_index=row[1],
                     tool_name=row[2],
                     idempotency_key=row[3],
-                    recorded_at=row[4],
+                    # NULL stays None — "recorded before this column existed", which the
+                    # revival path reads as "run with the pre-040 constant" (research R4).
+                    arguments=None if row[4] is None else json.loads(row[4]),
+                    recorded_at=row[5],
                 )
                 for row in rows
             ]

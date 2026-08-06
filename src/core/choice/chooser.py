@@ -21,8 +21,8 @@ a claim about it.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -136,16 +136,51 @@ class ChoiceRequest:
     refused: Sequence[tuple[str, str]] = ()
 
 
-class Chooser(Protocol):
-    """Answers "which tool next", or nothing at all.
+@dataclass(frozen=True)
+class Answer:
+    """What a model answered: a tool name, and what to do with it (040).
 
-    Returning the empty string is a real answer and means *nothing to do* — the run ends in a
-    recorded terminal state rather than defaulting to a tool. Any other string is passed on
-    verbatim; deciding whether it names a real tool, and whether that tool is permitted, is
-    not this interface's job.
+    Until 040 an answer was a bare ``str`` and the platform supplied every tool's arguments
+    from a fixture constant — a model could choose the verb and never the object. Widening
+    the *answer* is the whole of the change: the platform still invokes, the bracket still
+    wraps it, and nothing about a governed step moves (research R1).
+
+    An empty ``name`` is a real answer and means *nothing to do* — the run ends in a
+    recorded terminal state rather than defaulting to a tool. ``arguments`` defaults to the
+    empty mapping, which is the true answer for a capability that takes nothing (FR-012)
+    and byte-equivalent in effect to the pre-040 behaviour.
     """
 
-    def choose(self, request: ChoiceRequest) -> str: ...
+    name: str
+    arguments: Mapping[str, Any] = field(default_factory=dict)
+
+
+class MalformedAnswer(Exception):
+    """The model's answer does not parse as a name and its arguments (040, FR-008).
+
+    Raised by a chooser, caught by `resolve_step_tool`, and fed back to the model as a
+    refusal within the existing re-choice bound — never acted on, and never "repaired" by
+    dropping the malformed parts, because guessing at a malformed request is how a platform
+    performs an act nobody asked for. Distinct from naming a non-tool (`not_a_tool`): a
+    model that could produce a valid word can produce an invalid object, and the two are
+    different things to whoever reads the trail (research R12).
+
+    The message carries a *shape* description, never the content: it travels into the next
+    ask's refusal context and into no durable record.
+    """
+
+
+class Chooser(Protocol):
+    """Answers "which tool next, and with what", or nothing at all.
+
+    Returns an :class:`Answer`. One whose ``name`` is empty means *nothing to do* — the run
+    ends in a recorded terminal state rather than defaulting to a tool. The name is passed on
+    verbatim; deciding whether it is a real tool, and whether that tool is permitted, is not
+    this interface's job. A chooser whose answer does not parse raises
+    :class:`MalformedAnswer` rather than guessing.
+    """
+
+    def choose(self, request: ChoiceRequest) -> Answer: ...
 
 
 class ChooserUnavailable(Exception):

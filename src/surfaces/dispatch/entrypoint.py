@@ -36,6 +36,7 @@ from core.authority.model_credential import BrokeredModelCredential
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
 from core.choice import (
+    Answer,
     CHOICE_ROLE,
     ChoiceOutcome,
     ChooserUnavailable,
@@ -56,16 +57,24 @@ from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
 from surfaces.toolset import build_registry, content_pins, dependency_products
 
-#: What a dispatched run passes a tool it was asked to invoke.
+#: What every pre-040 invoke ran with, kept for exactly two jobs — neither on the ask path.
 #:
-#: A fixture affordance, and it always was — `invoke_tools` is the opt-in that exists so a
-#: dispatched row can watch a pack tool reach a live product. What 014 added is `cas`, and the
-#: reason is worth stating: `vault_write` REQUIRES it and raises without it, and a handler
-#: exception does not make `outcome.allowed` false — `allowed` is `decision == "allow" and not
-#: evidential_gap`, both of which hold when the body throws. So a probe call missing `cas`
-#: would have every step report success while the tool errored, and the exactly-once row would
-#: be counting invocations that never did anything.
-_PROBE_ARGUMENTS = {"path": "conformance/probe", "cas": 0}
+#: Until 040 this constant was passed as the arguments for EVERY tool a model named — "a
+#: fixture affordance, and it always was" — so a model could choose the verb and never the
+#: object. The ask path no longer touches it: the model's answer carries the arguments now.
+#:
+#: Job one: the pre-040 intent (research R4). An intent whose ``arguments`` is None was
+#: recorded before the column existed, and its FIRST attempt ran with these values — so its
+#: revival must supply them, byte for byte. Reviving with ``{}`` would repeat a *different*
+#: act than the one attempted, which is the defect even when the different act is emptier.
+#:
+#: Job two: the zero-step probe loop below, which invokes each requested tool once with NO
+#: model consulted — there, the platform supplying the arguments is the point, because the
+#: row is proving tool reach, not model direction. That loop is outside 040's subject: the
+#: spec governs what a MODEL may say, and no model says anything on that path.
+#:
+#: (`cas` is here because `vault_write` REQUIRES it — 014's lesson, kept with the values.)
+_LEGACY_PRE_040_ARGUMENTS = {"path": "conformance/probe", "cas": 0}
 
 #: `_run_steps` met a mid-run suspension. Not an exit code — the caller files the index row
 #: and then exits ZERO, because a suspension is a wait rather than a failure.
@@ -218,13 +227,13 @@ def _run_steps(
                     step_index=step,
                     model=model,
                     chooser=chooser,
-                    arguments=_PROBE_ARGUMENTS,
-                    # The tool this step ALREADY chose, when a disrupted run left an open
-                    # intent naming one (FR-008). Honouring it is what makes re-observation
-                    # honest — re-asking could return a different tool from the one whose
+                    # The act this step ALREADY chose, when a disrupted run left an open
+                    # intent naming one (FR-008) — the tool AND, since 040, the arguments it
+                    # was chosen with (FR-004). Honouring both is what makes re-observation
+                    # honest — re-asking could return a different act from the one whose
                     # bracket is open, and the resumed run would then execute something the
                     # first allocation never chose while claiming to have observed it.
-                    already_chosen=(already_chosen or {}).get(step, ""),
+                    already_chosen=(already_chosen or {}).get(step),
                 )
             except ChooserUnavailable as exc:
                 # FR-007. Terminal and recorded, with no path back to a non-model selection.
@@ -320,6 +329,10 @@ def _run_steps(
                     idempotency_key=key,
                     step_index=step,
                     tool_name="echo",
+                    # `{}` explicitly, never defaulted (040, research R3): this is a
+                    # post-040 record that genuinely asks for nothing, and a defaulted None
+                    # would put it on the pre-feature side of the NULL-means-legacy line.
+                    arguments={},
                     recorded_at=datetime.now(UTC),
                 )
             )
@@ -809,9 +822,21 @@ def resume_dispatched_run(
     # step, and a trail that reads as observation.
     #
     # No new record for this. The intent is already the durable statement of "we were about
-    # to run X", written before the effect for exactly this purpose; a second store holding
-    # the same fact would eventually disagree with it.
-    already_chosen = {intent.step_index: intent.tool_name for intent in decision.pending_steps}
+    # to run X" — and, since 040, "with these" (FR-004) — written before the effect for
+    # exactly this purpose; a second store holding the same fact would eventually disagree
+    # with it.
+    #
+    # NULL IS NOT EMPTY (040, research R4). An intent whose arguments are None was recorded
+    # before the column existed, and its first attempt ran with the legacy constant — so its
+    # revival supplies that constant, repeating the act that was actually attempted. `{}` is
+    # a post-040 intent that genuinely asked for nothing, and it revives with `{}`.
+    already_chosen = {
+        intent.step_index: Answer(
+            intent.tool_name,
+            _LEGACY_PRE_040_ARGUMENTS if intent.arguments is None else intent.arguments,
+        )
+        for intent in decision.pending_steps
+    }
 
     def skip_reason(step: int) -> str | None:
         """Why this step will not run, or ``None`` to run it.
@@ -1208,7 +1233,7 @@ def main() -> int:
         from core.tools.invoke import invoke_tool
 
         for tool_name in sorted(tools):
-            outcome = invoke_tool(run, tool_name, _PROBE_ARGUMENTS)
+            outcome = invoke_tool(run, tool_name, _LEGACY_PRE_040_ARGUMENTS)
             print(f"tool {tool_name}: allowed={outcome.allowed}", flush=True)
             if not outcome.allowed:
                 # A refused invoke fails the allocation, so the dispatch row's

@@ -246,7 +246,10 @@ grammar is foundational even though its compatibility rows belong to US5.**
   `tests/conformance/durability/test_model_driven_resume.py`,
   `tests/conformance/reports/test_the_run_observes.py`) pass **unedited**, and the
   `recording(*answers)` helper's true home is `tests/harness/scripted_chooser.py` (T005's file),
-  not `choice/harness.py` (FR-010, SC-007). **An inventory that undercounts is a compatibility
+  not `choice/harness.py` (FR-010, SC-007). **Measured during implementation: eight of the nine recording consumers are behaviour-only and stay
+  byte-identical; exactly one — `tests/conformance/choice/test_the_double_is_faithful.py` — calls `choose()`
+  directly at three sites, and those assertions move WITH the protocol 040 widens (research R9). Assert the
+  eight, and state why the ninth moved.** **An inventory that undercounts is a compatibility
   row that passes while the uncounted suite is edited** — so the row **derives** the inventory: scan the test tree for importers of `tests/harness/scripted_chooser.py`'s `recording` and of `tests/conformance/choice/harness.py`, and assert the enumerated list matches the scan (the capability ledger's own pattern; enumerations of this tree have undercounted twice — the consumer shape is a tree, not a list).
   Check the diff, not only the run: an edited suite is the blast radius arriving through the
   test tree.

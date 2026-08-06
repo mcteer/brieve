@@ -25,14 +25,29 @@ goes to `invoke_tool`. Only the last hop differs.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 
-from core.choice.chooser import ChoiceRequest, ChooserUnavailable
+from core.choice.chooser import Answer, ChoiceRequest, ChooserUnavailable, MalformedAnswer
 
 #: What a recording writes to mean "the model names nothing here" — the terminal answer that
 #: ends a run. Spelled, because an empty element in a comma-separated list is indistinguishable
 #: from a trailing separator, and "the run ended" is not something to infer from punctuation.
 NOTHING = "-"
+
+
+@dataclass(frozen=True)
+class MalformedEntry:
+    """A recording entry that does not parse as a name and its arguments (040, M4's fixture).
+
+    Kept as a marker rather than raised at parse time, because a recording is consumed one
+    answer per *ask*: the malformed entry must surface at the step that consumes it, exactly
+    as a model producing an unusable object would, so the re-choice bound sees it.
+    ``shape`` describes what was wrong; it never carries the entry's content.
+    """
+
+    shape: str
 
 
 class RecordedChooser:
@@ -61,7 +76,10 @@ class RecordedChooser:
     which is a different thing from not supplying one.
     """
 
-    def __init__(self, answers: Sequence[str]) -> None:
+    def __init__(self, answers: Sequence[str | Answer | MalformedEntry]) -> None:
+        #: Entries stay in their authored form and are normalised per ask — a bare ``str``
+        #: is a choice with NO arguments (040, FR-010): every recording written before the
+        #: widening means exactly what it meant.
         self._answers = list(answers)
         self._asked = 0
 
@@ -75,13 +93,14 @@ class RecordedChooser:
         """
         return self._asked
 
-    def choose(self, request: ChoiceRequest) -> str:
+    def choose(self, request: ChoiceRequest) -> Answer:
         self._asked += 1
         if not self._answers:
-            # Nothing recorded: name the first tool this request permits. Sorted, so the
-            # answer is stable across runs — a fixture model that answered differently on
-            # identical input would make every row built on it intermittent.
-            return sorted(request.permitted)[0] if request.permitted else ""
+            # Nothing recorded: name the first tool this request permits, with no arguments
+            # — the true answer for the fixture tools (040). Sorted, so the answer is stable
+            # across runs — a fixture model that answered differently on identical input
+            # would make every row built on it intermittent.
+            return Answer(sorted(request.permitted)[0] if request.permitted else "")
 
         if self._asked > len(self._answers):
             # Running off the end is a recording that does not cover the run it was written
@@ -94,12 +113,65 @@ class RecordedChooser:
                 reason_code="recording_exhausted",
             )
         answer = self._answers[self._asked - 1]
-        return "" if answer == NOTHING else answer
+        if isinstance(answer, MalformedEntry):
+            # Surfaced at the step that consumes it, exactly as a model producing an
+            # unusable object would be — so the re-choice bound sees it (040, FR-008).
+            raise MalformedAnswer(answer.shape)
+        if isinstance(answer, Answer):
+            return Answer("", {}) if answer.name == NOTHING else answer
+        return Answer("") if answer == NOTHING else Answer(answer)
 
 
-def parse_recording(raw: str) -> list[str]:
-    """``"plan,apply,-"`` → ``["plan", "apply", "-"]``. Empty in, empty out."""
-    return [part.strip() for part in raw.split(",") if part.strip()]
+def parse_recording(raw: str) -> list[str | Answer | MalformedEntry]:
+    """Two grammars, chosen by the first non-space character (040, research R14).
+
+    A recording starting with ``[`` is a JSON list of ``{"tool": ..., "arguments": {...}}``;
+    anything else splits on commas exactly as it always has, and **a bare name is a choice
+    with no arguments** — ``"plan,apply,-"`` yields exactly what it yielded before the
+    widening. Two grammars rather than one widened one, because the value travels as an
+    environment variable parsed by a comma split, JSON contains commas, and the comma form
+    is load-bearing for every recording-driven suite in the merge lane (FR-010).
+
+    The ``"-"`` terminal sentinel serves both forms — one rule, and *"the run ended"* is
+    never inferred from punctuation. A JSON entry that is not an object with a string
+    ``"tool"`` and a mapping ``"arguments"`` becomes a :class:`MalformedEntry`, surfaced at
+    the ask that consumes it; a recording that is ``[``-prefixed and not JSON at all is a
+    configuration error and raises here, because nothing about it is per-entry.
+
+    Empty in, empty out.
+    """
+    stripped = raw.lstrip()
+    if not stripped.startswith("["):
+        return [part.strip() for part in raw.split(",") if part.strip()]
+
+    try:
+        entries = json.loads(stripped)
+    except ValueError as exc:
+        raise ValueError(
+            "recording starts with '[' but is not valid JSON — the structured grammar is "
+            "all-or-nothing, and a recording nobody can parse is a configuration error, not "
+            "a model behaviour"
+        ) from exc
+    if not isinstance(entries, list):
+        raise ValueError("a structured recording must be a JSON list of choices")
+
+    parsed: list[str | Answer | MalformedEntry] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            parsed.append(MalformedEntry(shape=f"entry is {type(entry).__name__}, not an object"))
+            continue
+        tool = entry.get("tool")
+        arguments = entry.get("arguments", {})
+        if not isinstance(tool, str) or not tool.strip():
+            parsed.append(MalformedEntry(shape="entry carries no string 'tool'"))
+            continue
+        if not isinstance(arguments, dict):
+            parsed.append(
+                MalformedEntry(shape=f"'arguments' is {type(arguments).__name__}, not an object")
+            )
+            continue
+        parsed.append(Answer("" if tool.strip() == NOTHING else tool.strip(), arguments))
+    return parsed
 
 
-__all__ = ["NOTHING", "RecordedChooser", "parse_recording"]
+__all__ = ["NOTHING", "MalformedEntry", "RecordedChooser", "parse_recording"]

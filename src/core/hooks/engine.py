@@ -252,6 +252,13 @@ def run_pipeline(
                 idempotency_key=key,
                 clock=run.clock,
                 call=lambda: registration.handler(arguments),
+                # THE ONE LINE 040 ADDS TO THIS MODULE. The arguments this call is about to
+                # be made with, into the intent that precedes it, so a revival repeats the
+                # same act. Nothing is derived and nothing is decided here — the engine
+                # already holds them, and the idempotency key deliberately does NOT include
+                # them (`_idempotency_key`: "a retry of one step is the same step even if
+                # its arguments were re-serialised differently").
+                arguments=arguments,
             )
         else:
             tool_result = registration.handler(arguments)
