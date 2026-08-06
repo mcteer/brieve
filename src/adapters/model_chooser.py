@@ -27,10 +27,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from adapters.pydantic_ai.agent import build_governed_agent
 from pydantic import BaseModel
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 
+from adapters.pydantic_ai.agent import build_governed_agent
 from core.choice.chooser import (
     Answer,
     ChoiceRequest,

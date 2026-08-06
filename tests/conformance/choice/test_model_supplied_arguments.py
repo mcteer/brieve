@@ -36,6 +36,7 @@ from tests.harness import (
     fake_identity_fabric,
     frozen_clock,
 )
+from tests.harness.frozen_clock import FrozenClock
 
 #: Why these rows resolve authority through the fake (the repo's own gate demands a reason).
 #:
@@ -155,9 +156,7 @@ def test_row_m2_the_same_authority_decides_on_the_same_facts() -> None:
     the request came from a model or from anywhere else — because permission is decided on the
     NAME, and 040 changed what an answer *contains*, never what it *unlocks*.
     """
-    run, handlers, sink = _run(
-        tools={"provision": {}, "forbidden": {}}, permitted={"provision"}
-    )
+    run, handlers, sink = _run(tools={"provision": {}, "forbidden": {}}, permitted={"provision"})
     resolution = _resolve(run, _Answers(Answer("provision", THE_REQUEST)))
     assert resolution.executed
     assert handlers["provision"].calls == [THE_REQUEST]
@@ -247,6 +246,7 @@ def test_row_m9_the_request_rests_in_exactly_one_place() -> None:
             )
 
     # AND THE ONE PLACE IT DOES REST.
+    assert run.durability is not None
     stored = run.durability.closed_intents("run-040") + run.durability.open_intents("run-040")
     assert [i.arguments for i in stored] == [THE_REQUEST], (
         "the intent is the single durable home: resume re-invokes, and a hash cannot be "
@@ -264,12 +264,17 @@ def test_row_m10_removing_a_finished_acts_request_breaks_nothing() -> None:
     """
     run, _, _ = _run(tools={"provision": {"repeatable": False}}, durable=True)
     _resolve(run, _Answers(Answer("provision", THE_REQUEST)))
+    assert run.durability is not None
     provider = run.durability
 
     [closed] = provider.closed_intents("run-040")
     assert closed.arguments == THE_REQUEST
 
-    # Clear it, exactly as a retention pass would.
+    # Clear it, exactly as a retention pass would. Reaching into the in-memory store's own
+    # dict rather than through the protocol, because the protocol has no 'forget this'
+    # operation yet — that is the retention control this row exists to constrain, and
+    # writing the row against a method that does not exist would be writing the feature.
+    assert isinstance(provider, InMemoryDurabilityProvider)
     provider._intents[("run-040", closed.idempotency_key)] = closed.model_copy(  # noqa: SLF001
         update={"arguments": None}
     )
@@ -286,6 +291,7 @@ def test_row_m10_removing_a_finished_acts_request_breaks_nothing() -> None:
     # request is what its revival replays, so clearing it leaves nothing to replay.
     open_run, _, _ = _run(tools={"boom": {"repeatable": False}}, durable=True)
     open_run.registry.resolve("boom")  # registered
+    assert open_run.durability is not None
     provider2 = open_run.durability
     from core.durability.types import IntentRecord
 
@@ -315,9 +321,11 @@ def test_row_m11_nothing_expires_what_is_kept() -> None:
     """
     run, _, _ = _run(tools={"provision": {"repeatable": False}}, durable=True)
     _resolve(run, _Answers(Answer("provision", THE_REQUEST)))
+    assert run.durability is not None
     provider = run.durability
 
     # Time passes — a lot of it — and the platform is asked to do its ordinary work.
+    assert isinstance(run.clock, FrozenClock)
     run.clock.advance(timedelta(days=365))
     provider.open_intents("run-040")
     provider.closed_intents("run-040")
@@ -534,11 +542,9 @@ def test_row_m17_malformed_refused_and_failed_are_three_records() -> None:
     assert not failed.executed
 
     # AND THE THREE ARE DISTINGUISHABLE, which is the requirement rather than their existence.
-    assert (
-        malformed[0].event_type
-        is not denials[0].event_type
-        is not failures[0].event_type
-    ), "three situations must not read alike"
+    assert malformed[0].event_type is not denials[0].event_type is not failures[0].event_type, (
+        "three situations must not read alike"
+    )
 
 
 # ------------------------------------------------------------ nothing that worked moves
@@ -568,17 +574,14 @@ def test_row_m13_every_existing_recording_means_what_it_meant() -> None:
         path.relative_to(root).as_posix()
         for path in (root / "tests").rglob("*.py")
         if any(
-            token in path.read_text()
-            for token in ("recording(", "scripted_chooser", "choice_args")
+            token in path.read_text() for token in ("recording(", "scripted_chooser", "choice_args")
         )
     )
     # Excluding this file: it is 040's OWN row file and asserts the widened protocol by
     # design. What the invariant protects is the suites that predate the widening.
     this_file = __file__[len(str(root)) + 1 :]
     asserts_protocol = [
-        name
-        for name in consumers
-        if name != this_file and ".choose(" in (root / name).read_text()
+        name for name in consumers if name != this_file and ".choose(" in (root / name).read_text()
     ]
     assert asserts_protocol == ["tests/conformance/choice/test_the_double_is_faithful.py"], (
         f"the set of suites asserting the Chooser PROTOCOL changed: {asserts_protocol}. "
@@ -645,12 +648,13 @@ def test_row_m15_the_same_capability_twice_two_requests_two_acts() -> None:
         )
 
     assert handlers["provision"].calls == [{"path": "first"}, {"path": "second"}]
+    assert run.durability is not None
     intents = run.durability.closed_intents("run-040") + run.durability.open_intents("run-040")
     assert len(intents) == 2, "two acts, two intents"
     assert len({i.idempotency_key for i in intents}) == 2, (
         "the two keys differ by construction — each act is its own step"
     )
-    assert sorted(i.arguments["path"] for i in intents) == ["first", "second"]
+    assert sorted((i.arguments or {})["path"] for i in intents) == ["first", "second"]
 
 
 @pytest.mark.parametrize("bound", [DEFAULT_REQUEST_BYTES])
@@ -660,3 +664,66 @@ def test_the_default_bound_is_stated_not_emergent(bound: int) -> None:
     registry = ToolRegistry()
     registry.register("plain", _Watching())
     assert registry.resolve("plain").max_request_bytes == DEFAULT_REQUEST_BYTES
+
+
+# ---------------------------------------------------------------- the production caller
+
+
+@pytest.mark.enclave
+@pytest.mark.host_enclave
+def test_row_m18_a_dispatched_run_acts_on_what_the_model_named() -> None:
+    """M18, SC-001 — in the environment where dispatched work actually happens.
+
+    **Every other row in this file could pass while this one was false.** That is not a
+    hypothetical: it is the state 036 and 038 both shipped in, with green rows over
+    capabilities no allocation could reach. `verify-the-production-caller` and
+    `run-the-served-process` are the same lesson from two directions, and this is where they
+    are settled for 040.
+
+    **The recording travels as JSON through Nomad meta interpolation** — HCL quoting included,
+    which is part of what this row proves rather than a nuisance to work around. A structured
+    recording that survives a unit test and dies in an environment variable would leave the
+    dispatched path exactly as unproven as it was before.
+    """
+    from tests.conformance.choice import harness as c
+    from tests.conformance.durability import dispatch_harness as h
+
+    connection = h.connection()
+    try:
+        run_id = "m18-model-supplied-arguments"
+        # The structured grammar, carrying a path the platform would never have chosen: the
+        # pre-040 constant wrote to `conformance/probe`, so an act against THIS path cannot
+        # have come from anywhere but the recording.
+        target = "conformance/m18-model-said-so"
+        wire = json.dumps(
+            [
+                {"tool": "vault_write", "arguments": {"path": target, "cas": 0}},
+                {"tool": "-"},
+            ]
+        )
+        alloc = c.run_to_completion(run_id, answers=["vault_write", "-"], choice_recording=wire)
+
+        assert c.named(connection, run_id)[:1] == ["vault_write"], (
+            f"the dispatched run did not choose from the structured recording; "
+            f"`nomad alloc logs {alloc}`"
+        )
+
+        outcomes = h.events(connection, run_id, "tool_outcome")
+        assert outcomes, f"no tool ran in the allocation; `nomad alloc logs {alloc}`"
+        assert all(o.get("success") for o in outcomes), (
+            f"the model-directed act failed in the allocation: {outcomes}; "
+            f"`nomad alloc logs {alloc}`"
+        )
+
+        # THE ASSERTION THIS ROW EXISTS FOR: the act reached the product against the target
+        # the MODEL named. The trail carries hashes rather than values, so the observable is
+        # the argument key set the pipeline redacted — a platform-supplied constant and a
+        # model-supplied request are different requests, and this is where that becomes a
+        # fact about production rather than about a unit test.
+        decisions = h.events(connection, run_id, "pre_decision")
+        keys = [tuple(sorted(d.get("arguments", {}).get("argument_keys", []))) for d in decisions]
+        assert ("cas", "path") in keys, (
+            f"no invoke carried the model's argument keys; got {keys}; `nomad alloc logs {alloc}`"
+        )
+    finally:
+        connection.close()

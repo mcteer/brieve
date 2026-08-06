@@ -45,7 +45,7 @@ Repo root; sources in `src/`, tests in `tests/`. Conformance rows for this featu
   arguments, and everything around that fact stays put* — and why it lives beside the four
   recording-driven suites it is forbidden to move: splitting them lets one be read without the
   other.
-- [ ] T002 [P] Create `tests/component/test_arguments_survive_revival.py` with a module docstring naming the stub this file exists to prevent:
+- [X] T002 [P] Create `tests/component/test_arguments_survive_revival.py` with a module docstring naming the stub this file exists to prevent:
   the in-memory provider stores the record object, so a resume row proven against it alone passes
   whether or not the SQL was widened (`src/core/durability/memory.py:29`'s own rule, research R3).
 
@@ -176,7 +176,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
   (`bracket.py:88`). **The closures are asserted, not inherited** (research R5) — each holds
   because of somebody else's decision, and a claim held by inheritance stops holding when they
   revisit it.
-- [ ] T015a [US3] [GATE:no-secret-leak] Record the security decision where the schema reader will
+- [X] T015a [US3] [GATE:no-secret-leak] Record the security decision where the schema reader will
   meet it: the `arguments` column comment in `src/core/durability/schema.sql` states that this is
   the **first and only** durable store of raw model-supplied values, why (resume re-invokes; a
   hash cannot be re-invoked with), and the retention (kept until removed). On 038's precedent —
@@ -268,7 +268,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T023 [GATE:conformance] Build the capability inventory in
+- [X] T023 [GATE:conformance] Build the capability inventory in
   `tests/unit/capability_inventory.py` and its row **M16** in
   `tests/unit/test_capability_inventory.py`: every capability name `core` defines is registered
   in the assembled registry or listed in `DELIBERATELY_UNREACHABLE` with a reason and a record —
@@ -277,11 +277,11 @@ grammar is foundational even though its compatibility rows belong to US5.**
   constants and `register(` literals keeps the ledger itself honest; the residual (a capability
   defined in a shape the sweep does not recognise) is stated in the ledger's docstring rather
   than hidden.
-- [ ] T023a **Prove M16 can fail** in `tests/unit/test_capability_inventory.py`: remove a name
+- [X] T023a **Prove M16 can fail** in `tests/unit/test_capability_inventory.py`: remove a name
   from the ledger in-memory and assert the check trips. Two features shipped unreachable
   capabilities behind green rows; a guard that cannot lose is the same defect wearing a
   checkmark (SC-009).
-- [ ] T024 Row **M18** in `tests/conformance/choice/test_model_supplied_arguments.py`, **enclave-marked**: **the recording is JSON travelling through Nomad meta interpolation** (`NOMAD_META_choice_recording` → env), so the row's fixture must survive HCL quoting — the quoting is part of what this row proves, not a nuisance to work around. dispatch a run whose recording carries a
+- [X] T024 Row **M18** in `tests/conformance/choice/test_model_supplied_arguments.py`, **enclave-marked**: **the recording is JSON travelling through Nomad meta interpolation** (`NOMAD_META_choice_recording` → env), so the row's fixture must survive HCL quoting — the quoting is part of what this row proves, not a nuisance to work around. dispatch a run whose recording carries a
   structured choice through the real path — Nomad meta → environment → `build_chooser` → the
   allocation — and assert the act happened against the model-named target. Every other row could
   pass while this one was false, which is the state two prior features shipped in
@@ -289,7 +289,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
 - [ ] T025 Run quickstart Scenarios A–E and G hermetically, then **F** against the enclave
   (`make dev-up`), per `specs/040-model-supplied-arguments/quickstart.md` — including M7's
   prove-it-can-fail leg, which is the one most worth watching fail.
-- [ ] T026 [P] Update `ROADMAP.md`: 020's row gains a note that the model chose the tool while
+- [X] T026 [P] Update `ROADMAP.md`: 020's row gains a note that the model chose the tool while
   the platform supplied every argument until 040; the authoring trio's ledger entry is the
   pointer the successor feature consumes.
 - [ ] T027 Run `make check` **and** the hermetic conformance lane. The local gate does not

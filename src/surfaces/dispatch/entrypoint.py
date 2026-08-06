@@ -36,8 +36,8 @@ from core.authority.model_credential import BrokeredModelCredential
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
 from core.choice import (
-    Answer,
     CHOICE_ROLE,
+    Answer,
     ChoiceOutcome,
     ChooserUnavailable,
     record_unconsulted_step,

@@ -171,7 +171,12 @@ def test_the_double_is_faithful() -> None:
     live = build_chooser(LIVE_MODEL)
 
     answers = {"double": double.choose(request), "live": live.choose(request)}
-    for which, answer in answers.items():
+    for which, chosen in answers.items():
+        # The NAME is what must be a well-formed choice from the permitted set. Since 040 an
+        # answer also carries arguments, and those are the capability's business rather than
+        # this row's — what the double and the provider must agree on is the shape of a
+        # decision, which is the name.
+        answer = chosen.name
         assert answer in FIXTURE_PERMITTED, (
             f"the {which} chooser answered {answer!r}, which is not a well-formed choice from "
             f"the permitted set {FIXTURE_PERMITTED} — the double and the provider no longer "
