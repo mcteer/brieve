@@ -31,7 +31,20 @@
 
 ## Notes
 
-**16/16.** Three observations worth carrying into planning rather than resolving here.
+**16/16 — re-validated after planning, and the spec grew.** Five functional requirements
+(FR-014…FR-018) and three success criteria (SC-008…SC-010) were added *during* planning rather
+than during clarification, because measuring what a model would have to do to submit a program
+found four consequences the original requirements did not name: a model must be able to **express**
+a program, what it chose must survive an interruption, the raw values it chose must rest in exactly
+one store and never in the trail, and a program may not submit a program.
+
+**That is a process finding as much as a spec one.** Research has no scope gate — each measurement
+adds a decision and nothing pushes back — while the spec is where scope is bounded, and it stopped
+being updated after clarification. Sixteen tasks and eight conformance rows existed with no
+requirement behind them before this was corrected. **A requirement nobody wrote is a requirement
+nobody reviewed.**
+
+Three observations worth carrying into planning rather than resolving here.
 
 **The spec deliberately names no module, tool name, or dependency.** The gap was *found* by
 measurement — a specific constant absent from a specific registration file, and a specific

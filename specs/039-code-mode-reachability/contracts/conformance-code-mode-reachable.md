@@ -67,7 +67,7 @@ row from reading as a stronger claim than it makes.
 **This is 036's parity property re-asserted from the production caller.** 036 proves the seam has
 one exit; this proves the thing with one exit is the thing a definition actually reaches.
 
-### K6a — The step's shape is unchanged when the answer widens (R7)
+### K6a — The step's shape is unchanged when the answer widens (FR-014, SC-008, R7)
 Assert that widening the model's answer to a structured choice leaves all four of 031's
 properties intact: bounded retry still validates before invoking, `already_chosen` still governs a
 resumed step, `TOOL_CHOSEN` is still recorded per step, and the **platform** still performs the
@@ -78,7 +78,7 @@ invoke.
 production caller** — a real gap, recorded rather than closed here, because closing it means
 deciding whether a model may call tools directly, which changes what a governed step *is*.
 
-### K6b — A malformed structured answer is retried, not executed (R7, blast radius)
+### K6b — A malformed structured answer is retried, not executed (FR-014, R7, blast radius)
 Assert `resolve_step_tool`'s bounded retry covers a **malformed object**, not only an unpermitted
 **name**. Assert also that a run whose ceiling omits the program tool behaves identically before
 and after the widening.
@@ -158,7 +158,7 @@ on regardless. **Asserting alignment unconditionally would claim something the d
 deliver**; solving it means checkpointing inside a program, which is a different and much larger
 feature.
 
-### K14a — Every existing recording parses exactly as it does today (R11)
+### K14a — Every existing recording parses exactly as it does today (FR-017, R11)
 Assert `"plan,apply,-"` parses to the same three choices it does now — a bare name is a choice
 with **no arguments**.
 
@@ -169,7 +169,7 @@ and `conformance/reports/test_the_run_observes.py` all supply recordings through
 runs work at all. **The same byte-identical discipline K13a applies to keys**: a format change
 requiring every caller to move is a blast radius nobody measured.
 
-### K15 — A program cannot submit a program (R10)
+### K15 — A program cannot submit a program (FR-018, R10)
 Assert that a call to the program tool **from inside a program** is refused with a stated reason.
 
 **Refused because nobody decided it, not because it is obviously wrong.** The seam routes every
@@ -194,7 +194,7 @@ program sees it as a deny it can route around: the seam's existing three-way dis
 than a fourth. **The row asserts the denial is recorded**, because a refusal nobody can find is
 how this becomes a second decision-maker again later.
 
-### K16 — A resumed step re-invokes with the arguments the model chose (R13)
+### K16 — A resumed step re-invokes with the arguments the model chose (FR-015, SC-009, R13)
 Interrupt a run at a step whose model-supplied arguments are non-trivial, resume, and assert the
 re-invoke carries **the same arguments** — not an empty map, and without a second provider call.
 
@@ -208,7 +208,7 @@ re-invoking reproduces them for free. The moment they come from the model, they 
 run rather than only for a code-mode one. Same shape as K13: correct-looking, dormant, reachable
 only once the feature that needs it ships.
 
-### K16a — The trail still carries no arguments (R13) — *no-secret-leak*
+### K16a — The trail still carries no arguments (FR-016, SC-010, R13) — *no-secret-leak*
 Assert `TOOL_CHOSEN`'s payload is unchanged: `run_id`, `step_index`, `attempt`, `model`, `named`,
 `outcome`, and **nothing else**.
 
@@ -220,7 +220,7 @@ arguments in the **control plane**, which only resume reads. The obvious wrong m
 K16 is to put them where they are easiest to see, and an append-only trail is the one place a
 leaked secret can never be taken back from.
 
-### K16b — The intent is the ONLY durable store of raw arguments (R16) — *no-secret-leak*
+### K16b — The intent is the ONLY durable store of raw arguments (FR-016, SC-010, R16) — *no-secret-leak*
 Assert that after a step with model-supplied arguments, the raw values appear in `intents` and
 **nowhere else**: not in `PRE_DECISION`, not in the hook-decision span, not in `TOOL_CHOSEN`.
 
@@ -238,7 +238,7 @@ re-invoked with — and this row is what keeps the break to exactly one store. *
 regression is the cheap one**: someone widens the redaction to "pass through what resume needs"
 and the trail starts carrying it too.
 
-### K17 — An absent recording cannot vacuously satisfy a code-mode row (R15)
+### K17 — An absent recording cannot vacuously satisfy a code-mode row (SC-008, R15)
 Assert that a dispatched run with **no recording** against the demonstration definition does not
 count as a code-mode proof: either the ceiling's ordering makes the program tool unreachable by
 the no-recording default, or the row asserts the submitted program is non-empty.
@@ -249,7 +249,7 @@ model-supplied arguments it can name the program tool and submit an **empty** pr
 does nothing, and completes green. That is the stub shape ADR-0047 names and that this contract
 already says is the one most available here.
 
-### K14 — A fixture recording can carry a structured choice (SC-001)
+### K14 — A fixture recording can carry a structured choice (FR-017, SC-001, SC-008)
 Assert `parse_recording` accepts a recording carrying a tool **and its arguments**, and that
 `RecordedChooser` returns it.
 

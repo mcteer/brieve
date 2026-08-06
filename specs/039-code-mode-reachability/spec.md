@@ -12,9 +12,9 @@
 
 | Field | Value |
 | --- | --- |
-| **Requirements (R1–R17)** | **R5, R11 (total interception)** — code mode becomes reachable without becoming a second way to reach a tool. **R7 (fail-closed)** — an environment without the capability must keep refusing with a stated reason. **R4, R13 (evidence)** — a program that runs in production leaves the same record one that runs in a test does. R12 (lean — the runtime stays a library behind an optional dependency) |
+| **Requirements (R1–R17)** | **R5, R11 (total interception)** — code mode becomes reachable without becoming a second way to reach a tool. **R7 (fail-closed)** — an environment without the capability must keep refusing with a stated reason. **R4, R13 (evidence)** — a program that runs in production leaves the same record one that runs in a test does. R12 (lean — the runtime stays a library behind an optional dependency). **R4, R13 again, from the other side** — a model supplying a tool's arguments means those arguments must survive an interruption, so the control plane holds raw model output for the first time while the evidence trail is unchanged (FR-015, FR-016) |
 | **ADRs touched** | **ADR-0041** (code mode ships only with verified per-call hook parity — the gate is satisfied at the seam, and this feature must not weaken it while making the seam reachable), ADR-0040 (deferred disclosure — the catalog a model searches now contains a capability it can actually use), ADR-0054 (**stays Proposed** — its delegation half still has no substrate), ADR-0047 (a passing stub is worse than a missing one), ADR-0024/0026 (execution bounds, which a program consumes differently from a structured run) |
-| **Evidence class** | **attestation-relevant.** A program is the recorded *cause* of the calls that follow it. Making programs reachable in production means the trail begins carrying model-written code that actually ran, rather than code that ran only in a test |
+| **Evidence class** | **attestation-relevant.** A program is the recorded *cause* of the calls that follow it. Making programs reachable in production means the trail begins carrying model-written code that actually ran, rather than code that ran only in a test. **And a second thing, found during planning**: once a model supplies a tool's arguments, they must survive an interruption, so the control plane begins holding **raw** model-supplied argument values — the first place they rest durably anywhere. The trail is unchanged and a requirement says so |
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -87,6 +87,7 @@ A program consumes the run's execution budget differently from a structured sequ
 - **A program produces no calls at all.** Submitting a program that does nothing is a legitimate outcome and must be distinguishable from one that failed to start.
 - **Every call a program makes is denied.** The program runs, each call is refused, and it completes having done nothing. That is not a platform failure and must not be recorded as one.
 - **A definition may submit programs and call nothing else.** A coherent posture, and the refusals it produces should read as intended rather than as a misconfiguration.
+- **A program submits a program.** Nothing forbids it: every call a program makes is decided by the same authority, with no special case, so a definition permitted to submit programs can recurse. Refused for now, because how much nesting is useful is a question nobody has answered and an unbounded one ships a capability by omission.
 - **The existing assertion that this is unreachable.** A live check asserts the capability is *not* reachable, deliberately, so its absence stays loud. This feature must **flip** that assertion rather than delete it — a check removed is a property nobody is watching.
 
 ## Requirements *(mandatory)*
@@ -97,7 +98,7 @@ A program consumes the run's execution budget differently from a structured sequ
 
 - **FR-001**: A definition MUST be able to submit a program through the same path every other capability is reached by.
 - **FR-002**: Permission to use code mode MUST be decided by the definition's ceiling, exactly as for any other capability. Nothing about it may be reachable by a definition whose ceiling does not name it.
-- **FR-003**: The environments where dispatched work actually runs MUST carry what code mode needs, or MUST refuse it honestly. **A capability reachable in testing and absent in production is the defect this feature exists to close, and closing half of it does not close it.**
+- **FR-003**: The environments where dispatched work actually runs MUST carry what code mode needs, or MUST refuse it honestly. **"What it needs" is two things, not one**: the capability to execute a program, and a channel wide enough for a model to express one (FR-014). **A capability reachable in testing and absent in production is the defect this feature exists to close, and closing half of it does not close it.**
 
 **Staying governed**
 
@@ -115,6 +116,28 @@ A program consumes the run's execution budget differently from a structured sequ
 - **FR-009**: The execution budget a program consumes MUST be visible: the submission and each call it makes are each a step against the run's bounds.
 - **FR-010**: A program that exhausts the run's budget MUST end the **run**, not merely receive a refusal it could route around. A bound a program can catch and continue past is not a bound.
 - **FR-011**: The outcome of a budget-exhausted program MUST be distinguishable in the record from a program that completed and from one whose calls were denied.
+
+**Saying it, and remembering what was said**
+
+*These five were found during planning rather than during clarification, by measuring what a model
+would have to do to submit a program. They are recorded here because the work exists either way,
+and a requirement nobody wrote is a requirement nobody reviewed.*
+
+- **FR-014**: A model MUST be able to **express** a program, not merely have one executed on its
+  behalf. A program is an argument rather than a name, and a channel that carries only names
+  cannot carry one — so what a model may answer with MUST widen, while what it may *do* MUST NOT.
+- **FR-015**: What a model chose MUST survive an interruption. A resumed step MUST re-invoke with
+  **the arguments it was given**, without consulting the model a second time. A resumed step that
+  re-invokes with different arguments is re-execution wearing observation's clothes.
+- **FR-016**: Raw argument values MUST rest in **exactly one** store, and that store MUST NOT be
+  the evidence trail. FR-015 requires them to be kept; the trail's own rule is that no model output
+  beyond a tool's name is written there, and both MUST hold at once.
+- **FR-017**: Widening what a model may answer MUST NOT change what any existing recording means.
+  The rows that prove model-driven runs work at all are driven by recordings, and a format change
+  every caller must move to is a blast radius nobody measured.
+- **FR-018**: A program MUST NOT be able to submit a program. Nobody has decided how much nesting
+  is useful, so it is refused rather than bounded — and the refusal MUST be decided by the same
+  authority that decides every other call, and MUST be recorded.
 
 **Not overreaching**
 
@@ -137,6 +160,9 @@ A program consumes the run's execution budget differently from a structured sequ
 - **SC-002**: **100% of the calls a program makes are governed decisions** carrying the same records a direct call produces. No unaccounted calls, since one is the gap the governance model is claimed not to have.
 - **SC-003**: A definition not permitted to use code mode **cannot submit a program**, demonstrated by attempting it.
 - **SC-004**: An environment without the capability **refuses with a stated reason**, distinguishable from a policy denial and from a program failure.
+- **SC-008**: A **model** can express a program — demonstrated by a model-driven run submitting one, not by the platform submitting one on a model's behalf.
+- **SC-009**: A resumed step re-invokes with the arguments it was given and consults no model a second time, demonstrated by interrupting one and comparing.
+- **SC-010**: Raw argument values are recoverable from exactly one store and from **no** evidence record, demonstrated by looking in both.
 - **SC-005**: A program's budget consumption is predictable from the number of calls it makes — demonstrated by measuring it rather than by asserting the arithmetic.
 - **SC-006**: A program that exhausts the budget **ends the run**, and the outcome is distinguishable from completion and from denial.
 - **SC-007**: The check asserting code mode is unreachable **has been replaced by one asserting it is reachable** — not deleted, and not left asserting something now false.
@@ -156,4 +182,5 @@ Recorded so nobody re-derives why these are absent:
 - **Streaming or incremental execution.** A program runs and returns; partial results are not surfaced mid-execution.
 - **Optimizing what a model is shown during discovery.** Descriptions become more load-bearing once a model can compose capabilities into programs, but tuning that is its own work.
 - **Which shipped definitions enable code mode.** Explicitly out of scope per FR-012.
+- **Nested programs.** Refused rather than bounded (FR-018). A depth limit is a decision about how much nesting is useful, and there is no evidence about that yet; a refusal is reversible by a later record and an unbounded recursion that shipped is not.
 - **Changing how programs are written, or what language they are written in.** The runtime is replaceable behind its seam by design; replacing it is not this feature.
