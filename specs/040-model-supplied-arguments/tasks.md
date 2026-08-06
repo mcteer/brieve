@@ -41,7 +41,7 @@ Repo root; sources in `src/`, tests in `tests/`. Conformance rows for this featu
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `tests/conformance/choice/test_model_supplied_arguments.py` with a module docstring stating what it owns — *the model's answer carries
+- [X] T001 Create `tests/conformance/choice/test_model_supplied_arguments.py` with a module docstring stating what it owns — *the model's answer carries
   arguments, and everything around that fact stays put* — and why it lives beside the four
   recording-driven suites it is forbidden to move: splitting them lets one be read without the
   other.
@@ -96,14 +96,14 @@ grammar is foundational even though its compatibility rows belong to US5.**
   **rewrite the constant's docstring** to its one remaining job: supplying the values a
   **pre-feature** intent's first attempt actually ran with, on revival only (research R4). A
   stale comment on this path nearly produced a phantom finding once already (039's record).
-- [ ] T010 [US1] Row **M1** in `tests/conformance/choice/test_model_supplied_arguments.py`: drive **two** runs whose recordings state different targets
+- [X] T010 [US1] Row **M1** in `tests/conformance/choice/test_model_supplied_arguments.py`: drive **two** runs whose recordings state different targets
   for the same capability; assert the two acts differ. Two, because one act matching one request
   is indistinguishable from a constant that happens to match.
-- [ ] T010a [US1] Row **M2** in `tests/conformance/choice/test_model_supplied_arguments.py`: a model-directed act traverses the identical pipeline — same
+- [X] T010a [US1] Row **M2** in `tests/conformance/choice/test_model_supplied_arguments.py`: a model-directed act traverses the identical pipeline — same
   entry, same hooks, same bracket, same records — and a denied capability refuses identically
   whether its request came from a model or the platform (FR-002, FR-003, SC-002). **State that
   argument provenance is the only difference**, so the row does not read as a stronger claim.
-- [ ] T010b [US1] Row **M3** in `tests/conformance/choice/test_model_supplied_arguments.py`:
+- [X] T010b [US1] Row **M3** in `tests/conformance/choice/test_model_supplied_arguments.py`:
   a no-argument step's records carry no argument material and are identical whether the step was
   driven by a bare-name recording or a structured one naming the same tool with `{}` (FR-012).
   **Not "before and after"** — there is no *before* to run in a single tree; the true
@@ -168,7 +168,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
 
 **Independent test**: read every durable record; the request is in one.
 
-- [ ] T015 [US3] [GATE:no-secret-leak] Row **M9** in `tests/conformance/choice/test_model_supplied_arguments.py`: after a step with model-supplied
+- [X] T015 [US3] [GATE:no-secret-leak] Row **M9** in `tests/conformance/choice/test_model_supplied_arguments.py`: after a step with model-supplied
   arguments, the raw request is in `intents` and **nowhere else**. Pin `TOOL_CHOSEN` to its exact
   six keys (`run_id`, `step_index`, `attempt`, `model`, `named`, `outcome`); pin `PRE_DECISION`
   to argument keys and hashes (`redact_arguments` still runs at `engine.py:101`); assert
@@ -181,12 +181,12 @@ grammar is foundational even though its compatibility rows belong to US5.**
   the **first and only** durable store of raw model-supplied values, why (resume re-invokes; a
   hash cannot be re-invoked with), and the retention (kept until removed). On 038's precedent —
   argued under a gate, never slipped in as a field.
-- [ ] T015b [US3] Row **M10** in `tests/component/test_arguments_survive_revival.py`: clear `arguments` on a **closed** bracket and assert resume
+- [X] T015b [US3] Row **M10** in `tests/component/test_arguments_survive_revival.py`: clear `arguments` on a **closed** bracket and assert resume
   decisions, accounting and re-observation are unchanged (FR-007a, SC-005a). **Name the unsafe
   removal in the same row**: clearing an **open** bracket's request makes its revival re-invoke
   with nothing — this feature's defect, reintroduced by policy. The row is the constraint the
   future retention control inherits: *finished acts only*.
-- [ ] T015c [US3] Row **M11** in `tests/component/test_arguments_survive_revival.py`: an intent's arguments survive arbitrary elapsed time with
+- [X] T015c [US3] Row **M11** in `tests/component/test_arguments_survive_revival.py`: an intent's arguments survive arbitrary elapsed time with
   no platform action — the **behaviour** of "kept until removed", never the prose (FR-007b).
   Six checks in this repository have matched comments instead of code; this is not the seventh.
 
@@ -211,19 +211,19 @@ grammar is foundational even though its compatibility rows belong to US5.**
   carrying the byte count and the bound and **never the content** (FR-007d, on `TURN_REFUSED`'s
   precedent — size, not payload). **Never truncated** (FR-007c): truncation performs a different
   act from the one described, which is worse than performing none.
-- [ ] T017 [US4] [GATE:fail-closed] Row **M4** in `tests/conformance/choice/test_model_supplied_arguments.py`: a malformed answer is re-asked, never
+- [X] T017 [US4] [GATE:fail-closed] Row **M4** in `tests/conformance/choice/test_model_supplied_arguments.py`: a malformed answer is re-asked, never
   acted on — and exhausting the bound ends the run in a recorded terminal state. **Both halves**
   (SC-006): a bound never reached is not demonstrated by the path that does not reach it.
-- [ ] T017a [US4] **Prove M4's bound is a bound** in `tests/conformance/choice/test_model_supplied_arguments.py`: a recording that answers malformed
+- [X] T017a [US4] **Prove M4's bound is a bound** in `tests/conformance/choice/test_model_supplied_arguments.py`: a recording that answers malformed
   objects past the re-choice bound must end the run, not act on the last answer.
-- [ ] T018 [US4] [GATE:fail-closed] Row **M5** in `tests/conformance/choice/test_model_supplied_arguments.py`: an oversized request is refused and
+- [X] T018 [US4] [GATE:fail-closed] Row **M5** in `tests/conformance/choice/test_model_supplied_arguments.py`: an oversized request is refused and
   re-asked; the refusal record carries the byte count and the bound and none of the content
   (SC-006a). Read the record to assert the absence, not only the refusal.
-- [ ] T018a [US4] Row **M6** in `tests/conformance/choice/test_model_supplied_arguments.py`: register two fixture capabilities, one with a raised
+- [X] T018a [US4] Row **M6** in `tests/conformance/choice/test_model_supplied_arguments.py`: register two fixture capabilities, one with a raised
   `max_request_bytes`; send **the same** large request to both; one accepts, one refuses
   (SC-006b). The same request to both is the row — different requests would prove nothing about
   the bound.
-- [ ] T019 [US4] Row **M17** in `tests/conformance/choice/test_model_supplied_arguments.py`: one run exercising malformed (re-asked), refused (a
+- [X] T019 [US4] Row **M17** in `tests/conformance/choice/test_model_supplied_arguments.py`: one run exercising malformed (re-asked), refused (a
   governance denial), and failed (the capability rejected the request — `tool_error`, the
   engine's existing path, research R12) — three distinguishable records (FR-009). An operator
   told the wrong one fixes the wrong thing.
@@ -238,7 +238,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
 
 **Independent test**: the four suites pass unedited.
 
-- [ ] T020 [US5] Row **M13** in `tests/conformance/choice/test_model_supplied_arguments.py`: `"plan,apply,-"` parses to exactly today's three choices — a
+- [X] T020 [US5] Row **M13** in `tests/conformance/choice/test_model_supplied_arguments.py`: `"plan,apply,-"` parses to exactly today's three choices — a
   bare name is a choice with **no arguments** — and **all five** recording-driven suites
   (`tests/conformance/choice/harness.py`, `tests/conformance/choice/test_a_model_chooses.py`,
   `tests/conformance/choice/test_the_double_is_faithful.py` — the one 039's inventory missed,
@@ -253,11 +253,11 @@ grammar is foundational even though its compatibility rows belong to US5.**
   row that passes while the uncounted suite is edited** — so the row **derives** the inventory: scan the test tree for importers of `tests/harness/scripted_chooser.py`'s `recording` and of `tests/conformance/choice/harness.py`, and assert the enumerated list matches the scan (the capability ledger's own pattern; enumerations of this tree have undercounted twice — the consumer shape is a tree, not a list).
   Check the diff, not only the run: an edited suite is the blast radius arriving through the
   test tree.
-- [ ] T021 [US5] Row **M14** in `tests/conformance/choice/test_model_supplied_arguments.py`: a `[`-prefixed recording carries structured choices and the
+- [X] T021 [US5] Row **M14** in `tests/conformance/choice/test_model_supplied_arguments.py`: a `[`-prefixed recording carries structured choices and the
   `"-"` terminal sentinel works in both grammars (FR-001's fixture path). **Include one recording
   round-tripped through an environment variable**, since that is how it travels
   (`RUN_CHOICE_RECORDING`), and JSON survives shells less obviously than bare words do.
-- [ ] T022 [US5] Row **M15** in `tests/conformance/choice/test_model_supplied_arguments.py`: one run naming one capability at two steps with different
+- [X] T022 [US5] Row **M15** in `tests/conformance/choice/test_model_supplied_arguments.py`: one run naming one capability at two steps with different
   requests — two intents, two acts, the second not mistaken for a repeat of the first. **This is
   R2's claim measured rather than remembered**: no programs means steps already key distinctly,
   and this row is what keeps that true by observation.
