@@ -87,7 +87,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
 - [ ] T007 [US1] Widen `ModelChooser` in `src/adapters/model_chooser.py`: `output_type` becomes
   the structured answer and `_SYSTEM` asks for a name **and arguments** — keeping `NONE` working,
   and keeping the prompt model-agnostic (`harness-owns-model-vocabulary`: phrasing failures are
-  harness-protocol work, never per-model branches).
+  harness-protocol work, never per-model branches). **Do not reorder `entrypoint._chooser_for` while wiring this**: `tests/conformance/answering/test_model_credential_posture.py:461` asserts the source order `resolve_bound_model` → `BrokeredModelCredential` → `build_chooser(model` inside that function, and the widening changes what `choose()` returns, never where the chooser is built.
 - [ ] T008 [US1] Carry the model's arguments to the governed invoke in
   `src/core/choice/bounded.py`, in place of the constant the entrypoint passes today. **This is
   the actual gap** (research R1): `_PROBE_ARGUMENTS`' own docstring calls it *"a fixture
@@ -247,7 +247,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
   `tests/conformance/reports/test_the_run_observes.py`) pass **unedited**, and the
   `recording(*answers)` helper's true home is `tests/harness/scripted_chooser.py` (T005's file),
   not `choice/harness.py` (FR-010, SC-007). **An inventory that undercounts is a compatibility
-  row that passes while the uncounted suite is edited.**
+  row that passes while the uncounted suite is edited** — so the row **derives** the inventory: scan the test tree for importers of `tests/harness/scripted_chooser.py`'s `recording` and of `tests/conformance/choice/harness.py`, and assert the enumerated list matches the scan (the capability ledger's own pattern; enumerations of this tree have undercounted twice — the consumer shape is a tree, not a list).
   Check the diff, not only the run: an edited suite is the blast radius arriving through the
   test tree.
 - [ ] T021 [US5] Row **M14** in `tests/conformance/choice/test_model_supplied_arguments.py`: a `[`-prefixed recording carries structured choices and the

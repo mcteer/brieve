@@ -101,6 +101,14 @@ and assert `"plan,apply,-"` parses to exactly today's three choices: a bare name
 to pass would be the blast radius arriving anyway, and **an undercounted inventory is a
 compatibility row that passes while the uncounted suite is edited.**
 
+**And the inventory is derived, not memorised** — the consumer shape is a tree, not a list:
+`recording(*answers)` lives in `tests/harness/scripted_chooser.py`, `choice/harness.py` wraps it
+(`choice_recording=recording(*answers)`) and is itself imported by three further suites plus
+`reports/`. Enumerations of this tree have now undercounted twice. The row scans the test tree
+for importers of the two helper entry points and asserts the enumerated list matches the scan —
+the capability ledger's own pattern, applied to recordings: a sixth consumer fails the row
+instead of silently joining the blast radius.
+
 ### M14 — A recording can carry a structured choice (FR-001)
 First non-space character `[` → JSON list of `{"tool": ..., "arguments": {...}}`; assert the
 `"-"` terminal sentinel works in both grammars — one rule, and *"the run ended"* is never
