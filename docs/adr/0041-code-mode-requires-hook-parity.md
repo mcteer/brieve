@@ -1,6 +1,6 @@
 # ADR-0041: Code mode ships only with verified per-call hook parity
 
-- **Status**: Accepted
+- **Status**: Superseded by [ADR-0065](0065-code-mode-is-decided-against.md)
 - **Date**: 2026-07-21
 - **Relates to**: [ADR-0006](0006-in-process-fail-closed-enforcement.md), [ADR-0019](0019-adapter-on-framework-capabilities.md), [ADR-0040](0040-deferred-tool-disclosure.md)
 - **Requirements**: R7
