@@ -224,6 +224,13 @@ leaked secret can never be taken back from.
 Assert that after a step with model-supplied arguments, the raw values appear in `intents` and
 **nowhere else**: not in `PRE_DECISION`, not in the hook-decision span, not in `TOOL_CHOSEN`.
 
+**Assert it at `RUN_RESUMED` too, which is where the arguments now travel.** Measured, two paths
+that could have carried them are already closed and the reasons are recorded: an observer receives
+`idempotency_key` **only** (`bracket.py:88`), never the intent; and `RUN_RESUMED` carries
+`completed_steps` / `pending_steps` as *"COUNTS rather than contents — enough for an investigator
+to see 'it skipped 3 and ran 2' without the trail carrying step payloads."* Those are the reasons
+this row's claim holds today, so the row asserts them rather than inheriting them.
+
 **Because the platform's implemented rule is stronger than K16a states.** `redact_arguments`
 returns *"argument keys and content hashes — never raw values"* and `engine.py:101` applies it to
 every invoke, so today raw values rest **nowhere**. R13 has to break that — a hash cannot be
