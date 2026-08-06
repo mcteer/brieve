@@ -158,9 +158,11 @@ def test_row_w4_the_trail_carries_paths_and_digests_and_no_content(
     audit = capture_audit()
     run = _run(registry, audit, permitted=frozenset({AUTHOR_FILE, READ_SUBJECT}))
 
+    reader = SubjectReader(trees)
+    registry.register(READ_SUBJECT, reader)
     invoke_tool(run, READ_SUBJECT, {"path": "app/main.py"})
     invoke_tool(run, AUTHOR_FILE, {"path": MODULE, "content": BODY})
-    record_artifact(run, artifact)
+    record_artifact(run, artifact, consulted=reader.consulted)
 
     authored = [
         e
@@ -171,6 +173,10 @@ def test_row_w4_the_trail_carries_paths_and_digests_and_no_content(
     payload = authored[0].payload
     assert payload["paths"] == [MODULE]
     assert payload["digests"][MODULE]
+    assert payload["consulted"] == ["app/main.py"], (
+        "FR-004 asks that what was consulted be recoverable; without it a reader can "
+        "reconstruct the outcome and not the work"
+    )
     assert "content" not in payload
 
     whole = "".join(str(e.payload) for e in audit.list_by_correlation_id(run.correlation_id))

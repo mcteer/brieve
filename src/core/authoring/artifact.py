@@ -18,6 +18,7 @@ answers and only one of them means try again.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from core.audit.schema import AuditEventType
@@ -99,18 +100,35 @@ class AuthoredArtifact:
         }
 
 
-def record_artifact(run: GovernedRun, artifact: AuthoredArtifact) -> None:
+def record_artifact(
+    run: GovernedRun,
+    artifact: AuthoredArtifact,
+    *,
+    consulted: Sequence[str] = (),
+) -> None:
     """Write `ARTIFACT_AUTHORED` — including for an empty artefact.
 
     **Especially for an empty one.** The record is how "produced nothing" stays distinguishable
     from "never got there", and omitting it for the empty case would erase exactly the
     distinction FR-021's edge case exists to keep.
+
+    ``consulted`` is the subject paths `read_subject` returned, in read order — FR-004's *"what
+    was consulted to produce it"*, so a reader can reconstruct the **work** rather than only its
+    outcome. Paths, never content, for the same reason the artefact carries digests.
+
+    **External guidance is not here and needs no second path.** ADR-0030's provenance-at-read
+    already archives a URL, a timestamp and a content hash for anything fetched fresh
+    (`core.packs.consulted`), and ADR-0004's skills-first layering means the agent applies
+    adopted skills with retrieval only on a gap. This records the one thing that mechanism does
+    not see: which files of the *subject* were read.
     """
+    payload = artifact.as_payload()
+    payload["consulted"] = list(consulted)
     run.audit_sink.append_event(
         correlation_id=run.correlation_id,
         tenant_id=run.tenant_id,
         event_type=AuditEventType.ARTIFACT_AUTHORED,
-        payload=artifact.as_payload(),
+        payload=payload,
     )
 
 

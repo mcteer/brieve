@@ -118,9 +118,9 @@ same change.
 | [0059](0059-estate-eval-evidence-spans-asker-roles.md) | A cell's estate evidence spans the asker roles its cases declare | Accepted |
 | [0060](0060-three-transports-the-cli-is-withdrawn.md) | Three transports — the CLI is withdrawn | Accepted |
 | [0061](0061-discovery-is-recorded-never-refused.md) | A search for a tool is recorded, and can never be refused | Accepted |
-| [0062](0062-authoring-credentials-are-vended-per-task.md) | The authoring credential is vended per task, and is Principle IV's third exception | Proposed |
-| [0063](0063-a-mechanical-scorer-may-qualify-a-cell.md) | A mechanical scorer over a human-authored reference may qualify a cell | Proposed |
-| [0064](0064-version-control-is-a-platform-capability.md) | Version control is a platform capability, not a pack tool target | Proposed |
+| [0062](0062-authoring-credentials-are-vended-per-task.md) | The authoring credential is vended per task, and is Principle IV's third exception | Accepted |
+| [0063](0063-a-mechanical-scorer-may-qualify-a-cell.md) | A mechanical scorer over a human-authored reference may qualify a cell | Accepted |
+| [0064](0064-version-control-is-a-platform-capability.md) | Version control is a platform capability, not a pack tool target | Accepted |
 
 ## Reviews
 

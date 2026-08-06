@@ -1,6 +1,6 @@
 # ADR-0064: Version control is a platform capability, not a pack tool target
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-08-05
 - **Amends**: the "pack tool target" clause of [ADR-0038](0038-integration-uplift-workflows.md)
 - **Relates to**: [ADR-0037](0037-tool-transport-policy.md), [ADR-0004](0004-adopt-skills-as-governed-supply-chain.md)

@@ -1,6 +1,6 @@
 # ADR-0062: The authoring credential is vended per task, and is Principle IV's third exception
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-08-05
 - **Amends**: Principle IV of the constitution (the enumerated exception list)
 - **Relates to**: [ADR-0038](0038-integration-uplift-workflows.md), [ADR-0044](0044-authz-doctrine-and-credential-translation.md), [ADR-0058](0058-model-credential-brokering.md), [ADR-0042](0042-duplicate-detection-and-precedent-cache.md)

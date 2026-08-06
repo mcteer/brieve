@@ -1,6 +1,6 @@
 # ADR-0063: A mechanical scorer over a human-authored reference may qualify a cell
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-08-05
 - **Amends**: [ADR-0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md) (what may occupy a cell's "what qualified this" field)
 - **Relates to**: [ADR-0022](0022-qualified-model-matrix.md), [ADR-0039](0039-per-role-model-bindings.md), [ADR-0038](0038-integration-uplift-workflows.md)
