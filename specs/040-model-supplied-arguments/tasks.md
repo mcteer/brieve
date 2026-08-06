@@ -57,19 +57,19 @@ Repo root; sources in `src/`, tests in `tests/`. Conformance rows for this featu
 R9). Nothing in Phases 3–7 can be tested until a recording can carry arguments, so the second
 grammar is foundational even though its compatibility rows belong to US5.**
 
-- [ ] T003 Define the structured answer in `src/core/choice/chooser.py`: a tool **name** and its
+- [X] T003 Define the structured answer in `src/core/choice/chooser.py`: a tool **name** and its
   **arguments** (default empty mapping). `choose()` returns it. **`record_choice`'s payload does
   not change** — six keys, and T015 pins them. The `NONE`/empty terminal answer keeps working.
-- [ ] T004 Update `RecordedChooser` and `parse_recording` in `src/core/choice/recorded.py`:
+- [X] T004 Update `RecordedChooser` and `parse_recording` in `src/core/choice/recorded.py`:
   **first non-space character `[`** parses the recording as a JSON list of
   `{"tool": ..., "arguments": {...}}`; anything else splits on commas exactly as today, and **a
   bare name is a choice with no arguments** (research R8). The `"-"` terminal sentinel serves
   both grammars — one rule, and *"the run ended"* is never inferred from punctuation. The
   empty-recording default (`sorted(permitted)[0]`, `recorded.py:82`) answers with no arguments —
   the true answer for the fixture tools and load-bearing for every pre-020 dispatched row.
-- [ ] T005 [P] Update the scripted chooser in `tests/harness/scripted_chooser.py` to return the
+- [X] T005 [P] Update the scripted chooser in `tests/harness/scripted_chooser.py` to return the
   structured answer — bare names still mean no arguments, so no existing harness caller moves.
-- [ ] T006 [P] Add `max_request_bytes` to `register()` in `src/core/registry/memory.py` with
+- [X] T006 [P] Add `max_request_bytes` to `register()` in `src/core/registry/memory.py` with
   platform default `DEFAULT_REQUEST_BYTES = 64 * 1024`, stored beside `risk_class` and
   `repeatable` and readable back from the entry (research R7). **A property of the capability,
   not a shape contract** — clarification Q1's line, held.
@@ -84,15 +84,15 @@ grammar is foundational even though its compatibility rows belong to US5.**
 
 **Independent test**: two recordings naming different targets produce two different acts.
 
-- [ ] T007 [US1] Widen `ModelChooser` in `src/adapters/model_chooser.py`: `output_type` becomes
+- [X] T007 [US1] Widen `ModelChooser` in `src/adapters/model_chooser.py`: `output_type` becomes
   the structured answer and `_SYSTEM` asks for a name **and arguments** — keeping `NONE` working,
   and keeping the prompt model-agnostic (`harness-owns-model-vocabulary`: phrasing failures are
   harness-protocol work, never per-model branches). **Do not reorder `entrypoint._chooser_for` while wiring this**: `tests/conformance/answering/test_model_credential_posture.py:461` asserts the source order `resolve_bound_model` → `BrokeredModelCredential` → `build_chooser(model` inside that function, and the widening changes what `choose()` returns, never where the chooser is built.
-- [ ] T008 [US1] Carry the model's arguments to the governed invoke in
+- [X] T008 [US1] Carry the model's arguments to the governed invoke in
   `src/core/choice/bounded.py`, in place of the constant the entrypoint passes today. **This is
   the actual gap** (research R1): `_PROBE_ARGUMENTS`' own docstring calls it *"a fixture
   affordance, and it always was."*
-- [ ] T009 [US1] Stop passing `_PROBE_ARGUMENTS` at `src/surfaces/dispatch/entrypoint.py:221` and
+- [X] T009 [US1] Stop passing `_PROBE_ARGUMENTS` at `src/surfaces/dispatch/entrypoint.py:221` and
   **rewrite the constant's docstring** to its one remaining job: supplying the values a
   **pre-feature** intent's first attempt actually ran with, on revival only (research R4). A
   stale comment on this path nearly produced a phantom finding once already (039's record).
@@ -120,7 +120,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
 
 **Independent test**: interrupt, revive, compare — against both stores.
 
-- [ ] T011 [US2] [GATE:fail-closed] Carry the request through durability: add a **nullable**
+- [X] T011 [US2] [GATE:fail-closed] Carry the request through durability: add a **nullable**
   `arguments` column to `intents` in `src/core/durability/schema.sql` **twice, on `resume_count`'s
   precedent** (research R13): in the `CREATE TABLE` declaration, where someone reads what the table
   *is*, **and** as `ALTER TABLE intents ADD COLUMN IF NOT EXISTS arguments TEXT` — because
@@ -140,21 +140,21 @@ grammar is foundational even though its compatibility rows belong to US5.**
   why T012 runs both providers. **And the synthetic no-tool intent at `entrypoint.py:318` passes
   `{}` explicitly** (research R3): it genuinely asks for nothing, and letting it default would
   write NULL on a post-feature record — corrupting the very distinction M12 asserts.
-- [ ] T011a [US2] Widen `already_chosen` from `{step: tool_name}` to carry the kept arguments
+- [X] T011a [US2] Widen `already_chosen` from `{step: tool_name}` to carry the kept arguments
   beside the name — built at `src/surfaces/dispatch/entrypoint.py:814`, consumed at
   `src/core/choice/bounded.py:147` — so honouring a pending intent costs no provider call and
   re-invokes with the model's request. **NULL arguments revive with the legacy constant** (T009's
   one remaining job): the first attempt ran with those values, and repeating a different act than
   the one attempted is the defect even when the different act is emptier.
-- [ ] T012 [US2] [GATE:fail-closed] Row **M7** in `tests/component/test_arguments_survive_revival.py`: interrupt a run at a step with
+- [X] T012 [US2] [GATE:fail-closed] Row **M7** in `tests/component/test_arguments_survive_revival.py`: interrupt a run at a step with
   non-trivial model-supplied arguments, revive, assert the re-invoke carries the same request —
   **parameterised over both durability providers, and that clause is the row** (SC-003).
-- [ ] T012a [US2] **Prove M7 can fail** in `tests/component/test_arguments_survive_revival.py`: revert the field in-memory and assert the
+- [X] T012a [US2] **Prove M7 can fail** in `tests/component/test_arguments_survive_revival.py`: revert the field in-memory and assert the
   Postgres leg fails with an empty request while the in-memory leg passes anyway. The asymmetry
   is the finding; a row that cannot show it proves neither store.
-- [ ] T013 [US2] Row **M8** in `tests/component/test_arguments_survive_revival.py`: revival consults no model — count asks across the revival
+- [X] T013 [US2] Row **M8** in `tests/component/test_arguments_survive_revival.py`: revival consults no model — count asks across the revival
   and assert zero for the revived step (FR-005, SC-004).
-- [ ] T014 [US2] Row **M12** in `tests/component/test_arguments_survive_revival.py`: build a pre-feature intent (NULL arguments), revive, assert
+- [X] T014 [US2] Row **M12** in `tests/component/test_arguments_survive_revival.py`: build a pre-feature intent (NULL arguments), revive, assert
   the re-invoke carries the **legacy constant** and that NULL and `{}` are distinguishable end to
   end (FR-011, SC-008).
 
@@ -200,12 +200,12 @@ grammar is foundational even though its compatibility rows belong to US5.**
 
 **Independent test**: malformed recording re-asks; exhaustion ends the run.
 
-- [ ] T016 [US4] Extend `resolve_step_tool`'s bounded retry in `src/core/choice/bounded.py` to
+- [X] T016 [US4] Extend `resolve_step_tool`'s bounded retry in `src/core/choice/bounded.py` to
   cover a **malformed object** — one that does not parse as name-plus-arguments — as a refusal
   fed back to the model within `DEFAULT_RECHOICE_BOUND`, distinguishable in the refusal reason
   from an unpermitted name and an unknown name (research R12). A model that could produce a valid
   word can produce an invalid object, and the existing retry was not written for that.
-- [ ] T016a [US4] Enforce the size bound centrally in `src/core/choice/bounded.py`: measure the
+- [X] T016a [US4] Enforce the size bound centrally in `src/core/choice/bounded.py`: measure the
   serialised request against the named capability's `max_request_bytes` (read from the registry,
   T006) **before** any invoke; over it, the answer joins the `refused` list with a reason
   carrying the byte count and the bound and **never the content** (FR-007d, on `TURN_REFUSED`'s
