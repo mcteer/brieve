@@ -235,6 +235,16 @@ def resolve_with_fallback(
     branch to guard.
     """
     cell = cells.get(pinned)
+    # **The role check on the PINNED path, added by 038.** The docstring above has always
+    # claimed every returned cell is "qualified for this exact role", and the fallback branch
+    # below filters on it — but this branch did not, so a pinned cell qualified for `plan` was
+    # returned for `write`. `validate_binding_map` catches that at definition-registration
+    # time, which is why nothing had met it; a caller resolving a role directly had no such
+    # guard. Narrowing rather than widening: this can only refuse where it previously allowed,
+    # and what it refuses is a model acting in a role nobody qualified it for.
+    if cell is not None and cell.role != role:
+        cell = None
+
     if cell is not None and not cell.withdrawn and cell.model in available:
         return cell, None
 

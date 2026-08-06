@@ -4,7 +4,7 @@
 **Scoped to what a check can actually see**, and the scoping is the honest part. Three claims live
 in Principle IV's amended sentences, and they are observable in three different places:
 
-1. *"exactly two named exceptions"* — text, checkable here.
+1. *"exactly three named exceptions"* — text, checkable here.
 2. *"static API keys are prohibited as workload credentials"* — a **config** property: no jobspec
    hands a vendor key to a workload as an environment variable. Greppable in HCL, checkable here.
 3. *"never persisted by any workload"* — a **runtime** property. A workload writing a fetched key
@@ -55,20 +55,26 @@ def _principle_iv() -> str:
     return re.sub(r"\s+", " ", body[start:end])
 
 
-def test_the_constitution_names_two_exceptions_and_bounds_the_static_key_rule() -> None:
+def test_the_constitution_names_three_exceptions_and_bounds_the_static_key_rule() -> None:
     """Both sentences, asserted together — because they had to move together (ADR-0058).
 
     Amending the exception count while leaving *"static API keys are prohibited without
     exception"* standing would reproduce, inside one principle, exactly the contradiction this
     amendment exists to end. So the row fails if either half regresses.
+
+    **The count moved again in 038** (ADR-0062, constitution v1.6.0): the version-control App key
+    behind the authoring credential path is the third. This row is what makes the enumeration a
+    boundary rather than a habit — it fails on every change to the count, so each one is a
+    deliberate amendment with a motivating record rather than a number somebody edited.
     """
     principle = _principle_iv()
 
-    assert "exactly two named exceptions" in principle
-    assert "exactly one named exception" not in principle, (
-        "Principle IV still names one exception; the model vendor credential is the second, and "
-        "the platform now holds it"
-    )
+    assert "exactly three named exceptions" in principle
+    for superseded in ("exactly one named exception", "exactly two named exceptions"):
+        assert superseded not in principle, (
+            f"Principle IV still reads {superseded!r}; the enumeration has grown and the clause "
+            f"must say so, because a closed list that grows by interpretation is not a closed list"
+        )
     assert "prohibited as workload credentials" in principle
     assert "prohibited without exception" not in principle, (
         "the static-key sentence still reads as an absolute while the exception clause above it "
@@ -80,9 +86,19 @@ def test_the_constitution_names_two_exceptions_and_bounds_the_static_key_rule() 
 
 
 def test_the_amendment_cites_the_record_that_motivated_it() -> None:
-    """Principle X: an amendment carries its motivating ADR, or nobody can find the argument."""
-    assert "ADR-0058" in _principle_iv()
-    assert (ROOT / "docs/adr/0058-model-credential-brokering.md").is_file()
+    """Principle X: an amendment carries its motivating ADR, or nobody can find the argument.
+
+    Every exception names one, so the clause is a set of decisions rather than a list of
+    allowances — and each can be argued with by whoever reads it next.
+    """
+    principle = _principle_iv()
+    for adr, filename in (
+        ("ADR-0044", "docs/adr/0044-authz-doctrine-and-credential-translation.md"),
+        ("ADR-0058", "docs/adr/0058-model-credential-brokering.md"),
+        ("ADR-0062", "docs/adr/0062-authoring-credentials-are-vended-per-task.md"),
+    ):
+        assert adr in principle, f"the exception clause names no motivating record for {adr}"
+        assert (ROOT / filename).is_file()
 
 
 def test_no_jobspec_hands_a_vendor_key_to_a_workload() -> None:

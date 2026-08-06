@@ -1,5 +1,40 @@
 <!--
 Sync Impact Report
+- This revision (1.5.0 → 1.6.0, MINOR — one enumeration widened by one; no principle removed
+  or redefined). Motivated by ADR-0062, Accepted in this same change.
+
+  **Principle IV's exception list is closed at two, and 038 makes it three.** The clause reads
+  "with exactly two named exceptions, both rotated and Control-Group-governed: the management
+  token behind the TFE broker (ADR-0044), and the model vendor credential behind the model
+  broker (ADR-0058)." Authoring adds a third: the version-control App private key behind the
+  authoring credential path (ADR-0062).
+
+  **The alternative was to argue the clause does not bite**, since it bounds credentials "to
+  anything it manages" and this platform does not manage the requester's repository. That
+  reading is genuinely available — and it is the narrowing v1.4.0 declined when the model
+  vendor credential arrived. That revision amended the enumeration in the open rather than
+  reasoning the new credential out of it, and `tests/unit/test_no_static_credentials.py`
+  records why: "a gate that passes by vocabulary is worse than no gate." **A closed list that
+  grows by interpretation is not a closed list**, so this is an amendment rather than an
+  argument.
+
+  **MINOR rather than MAJOR**, on v1.4.0's own precedent — which added an exception to this
+  same enumeration and called it MINOR. Nothing permitted becomes forbidden and nothing
+  forbidden becomes permitted for the two that already existed. The third inherits every
+  condition they carry: rotated, Control-Group-governed, trust-store only, read under the
+  reading workload's own attested identity, delivered per task, never persisted by any
+  workload.
+
+  **The cost is stated rather than absorbed.** Exceptions compound: the argument for a fourth
+  is easier than the argument for this one was, because a list of three reads as a pattern
+  where a list of two read as a boundary. That is the real price of this revision, and a
+  maintainer should be able to weigh it rather than discover it.
+
+  Propagation: `docs/adr/0062-authoring-credentials-are-vended-per-task.md` (new, motivating
+  record), `docs/adr/README.md`, `tests/unit/test_no_static_credentials.py` (the gate's
+  exemption table, which enumerates what may hold a credential name).
+
+Prior Sync Impact Report
 - This revision (1.4.0 → 1.5.0, MINOR — one enumeration narrowed to describe the surfaces that
   exist; no principle removed or redefined). Motivated by ADR-0060, Accepted in this same
   change.
@@ -230,10 +265,11 @@ packs use schema-based calling regardless of context-efficiency advantage.
 
 ### Principle IV — Zero Standing Credentials; Authority Per Task (R2, R3, ADR-0015, ADR-0016, ADR-0025, ADR-0026, ADR-0033, ADR-0042, ADR-0044, ADR-0058)
 
-The enclave holds no standing credentials to anything it manages — with exactly two
-named exceptions, both rotated and Control-Group-governed: the management token behind
-the TFE broker (ADR-0044), and the model vendor credential behind the model broker
-(ADR-0058). Authority is manufactured per task — attested workload identity →
+The enclave holds no standing credentials to anything it manages — with exactly three
+named exceptions, all rotated and Control-Group-governed: the management token behind
+the TFE broker (ADR-0044), the model vendor credential behind the model broker
+(ADR-0058), and the version-control App key behind the authoring credential path
+(ADR-0062). Authority is manufactured per task — attested workload identity →
 control-plane Vault, bounded by the definition's ceiling and by a short lifetime — and
 evaporates with it; effective authority = user ∩ agent ceiling ∩ task scope ∩ policy, so an
 agent never exceeds its human. **Task scope may narrow the ceiling; it is not required to.**
@@ -248,7 +284,7 @@ are resolved and enforced pre-tool-use, before any shared-grain credential is wi
 reduction, harness and product checks independently agreeing. Humans authenticate on
 every surface via the organization's OIDC IdP (flows per ADR-0033); no local accounts,
 no credential store. Machines use workload identity federation; static API keys are
-prohibited as workload credentials — the two named exceptions above are held only in
+prohibited as workload credentials — the three named exceptions above are held only in
 the trust store, read under the reading workload's own attested identity, delivered per
 task, and never persisted by any workload. IdP claim-to-role mapping is governed configuration
 behind Control Groups. Secret values never enter model context — references only.
@@ -369,4 +405,4 @@ change.
   train for drift against newly Accepted decisions; `/speckit.analyze` findings that
   implicate a principle block `/speckit.implement`.
 
-**Version**: 1.5.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-08-05
+**Version**: 1.6.0 | **Ratified**: 2026-07-24 | **Last Amended**: 2026-08-05

@@ -1,14 +1,32 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # An agent's ceiling. Whatever a task requests, authority cannot exceed this.
+#
+# A DEFINITION WITH NO SECRET PATHS IS A LEGITIMATE POSTURE, and 038 is the first to have one:
+# authored code carries secret REFERENCES only, so its run has no reason to read a value and a
+# ceiling granting one would invite it to. An empty `allowed_paths` used to produce an empty
+# policy body, which Vault rejects with "'policy' parameter not supplied or empty" — so the
+# estate would not apply at all.
+#
+# The fix is to say "nothing" explicitly rather than to say nothing. The deny below is the
+# narrowest expressible policy: it grants no capability on any path, which is what an empty
+# list MEANT and what an empty string failed to express. Making the absence explicit also
+# leaves the record readable — an operator seeing this policy learns the definition reads no
+# secrets by design, where an empty body would have looked like a generation bug.
 resource "vault_policy" "agent_ceiling" {
   for_each = var.agent_definitions
 
   name = each.value.ceiling_policy
-  policy = join("\n", [
+  policy = length(each.value.allowed_paths) > 0 ? join("\n", [
     for p in each.value.allowed_paths :
     "path \"${p}\" { capabilities = [\"read\"] }"
-  ])
+  ]) : <<-HCL
+    # This definition reads no secrets by design (038). Deny rather than empty: Vault refuses an
+    # empty policy body, and an absent grant must be expressible.
+    path "*" {
+      capabilities = ["deny"]
+    }
+  HCL
 }
 
 # Database access belongs to the WORKLOAD identity, never to an agent ceiling.

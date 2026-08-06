@@ -164,6 +164,7 @@ def promote_model_version(
     required_suites: tuple[str, ...],
     qualified_by: str,
     judge: str,
+    scorer: str = "",
 ) -> dict[str, str]:
     """Qualify a new (pack × model × role) cell, or refuse.
 
@@ -171,9 +172,19 @@ def promote_model_version(
     Treating it as an edit is how a version bump inherits a qualification it never earned,
     which is auto-tracking with a manual step in front of it.
 
-    `judge` is required, and empty only for the seed-qualified first judge. A cell recorded
-    without one has no answer to "what qualified this", which is the regress ADR-0052 exists
-    to terminate.
+    **What qualified this** — a `judge` or a `scorer`, and refused when both are absent
+    (ADR-0063). `judge` names a model that scored the cell; `scorer` names a mechanical
+    comparison against a human-authored reference. Empty for both is permitted only for the
+    seed-qualified first judge, which is the single case where nothing sits above it.
+
+    The second shape exists because 038's `write` qualification has **no judge at all**: both
+    correctness gates check an artefact against a reference's declared property set, and all
+    three must-deny classes are mechanical. A cell whose qualification is *stronger* than a
+    judged one — the regress terminates one link earlier, at the human who wrote the reference,
+    with no scoring model to qualify — would otherwise have been refused for not being judged.
+
+    Naming some judge that did no scoring, to satisfy a string check, is the move 027 refused:
+    *a gate that passes by vocabulary is worse than no gate.*
     """
     missing = tuple(s for s in required_suites if s not in suites_passed)
     if missing:
@@ -187,10 +198,10 @@ def promote_model_version(
             f"recording or a live model; got {qualified_by!r}",
             reason_code="promotion_incomplete",
         )
-    if not judge.strip() and role != "judge":
+    if not judge.strip() and not scorer.strip() and role != "judge":
         raise PromotionRefused(
-            f"cell {pack}:{model}:{role} names no judge; only the seed-qualified first judge "
-            f"has nothing above it",
+            f"cell {pack}:{model}:{role} names neither a judge nor a scorer; only the "
+            f"seed-qualified first judge has nothing above it",
             reason_code="promotion_incomplete",
         )
     return {
@@ -199,6 +210,7 @@ def promote_model_version(
         "role": role,
         "qualified_by": qualified_by,
         "judge": judge,
+        "scorer": scorer,
     }
 
 

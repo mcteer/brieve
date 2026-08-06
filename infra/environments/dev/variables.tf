@@ -115,6 +115,39 @@ variable "agent_definitions" {
       # is durability under a chooser rather than anything about which model.
       binding_map = { plan = "fixture:fixture/scripted@1:plan" }
     }
+
+    # 038. ONE definition, and that is the finding rather than a simplification.
+    #
+    # An earlier design had two — an *analysing* definition and a *proposing* one with disjoint
+    # ceilings — against a job with two tasks in ONE allocation. A run resolves exactly one
+    # `agent_definition_id`, so that pair was unbuildable: two remediations, each correct
+    # alone, jointly impossible.
+    #
+    # What separates the two halves instead is TASK SCOPE, which is Principle IV's own
+    # mechanism and was already built: effective authority = user ∩ ceiling ∩ task scope ∩
+    # policy. The jobspec's per-task `RUN_REQUESTED_TOOLS` narrows this one ceiling, so the
+    # analysing task's effective authority carries nothing that egresses while the publishing
+    # task's carries nothing that authors.
+    #
+    # THE CEILING CARRIES NO ENACTING TOOL AT ALL. `terraform_apply` is absent, and that
+    # absence is the structural half of "the platform does not enact what it authored" — the
+    # provenance rule is what survives a definition somebody writes later.
+    "authoring-agent" = {
+      description    = "Authors an integration and proposes it; a person merges (ADR-0038)"
+      owner          = "platform"
+      ceiling_policy = "agent-ceiling-authoring"
+      # No secret paths. Authored code carries secret REFERENCES only, so the run has no
+      # reason to read a value — and a ceiling that granted one would invite it to.
+      allowed_paths   = []
+      tool_names      = ["read_subject", "author_file", "open_proposal"]
+      product_actions = []
+      packs           = ["terraform"]
+      # `author-module` declares minimum_tier = 2 and DEFAULT_TIER is 1, so a definition that
+      # omitted this would be refused `above_tier` at composition rather than at review.
+      tier = 2
+      # The matrix's THIRD role, bound for the first time. 026 bound `ask`; 031 bound `plan`.
+      binding_map = { write = "terraform:fixture/scripted@1:write" }
+    }
   }
 }
 
@@ -147,7 +180,14 @@ variable "model_matrix_cells" {
     role         = string
     qualified_by = string
     judge        = optional(string, "")
-    withdrawn    = optional(bool, false)
+    # 038, ADR-0063: what qualified this, when a MECHANICAL scorer did rather than a judge
+    # model. A cell must name one or the other; `promote_model_version` refuses both empty.
+    # The `write` role's qualification has no judge at all — both correctness gates check an
+    # artifact against a human-authored reference's declared property set, and all three
+    # must-deny classes are mechanical — so the regress terminates one link earlier, at the
+    # person who wrote the reference, with no scoring model to qualify.
+    scorer    = optional(string, "")
+    withdrawn = optional(bool, false)
   }))
   default = [
     {
@@ -164,6 +204,21 @@ variable "model_matrix_cells" {
       role         = "plan"
       qualified_by = "fixture"
       judge        = "seed"
+    },
+    # 038: the `write` cell. FIXTURE-qualified in dev, and the distinction is load-bearing —
+    # `matrix.py` says it "matters most for `write`, a model permitted to make changes", so a
+    # dev cell must never read as a live qualification. Promoting a LIVE write cell is
+    # Principle VIII's gate and is human work that happens elsewhere.
+    #
+    # `scorer` rather than `judge`, per ADR-0063: no judge participates in this qualification,
+    # because both correctness gates check an artifact against a human-authored reference's
+    # declared property set and all three must-deny classes are mechanical.
+    {
+      pack         = "terraform"
+      model        = "fixture/scripted@1"
+      role         = "write"
+      qualified_by = "fixture"
+      scorer       = "authoring-reference-comparison"
     },
     # 026's `ask` cell, seeded TOGETHER WITH the binding below that names it.
     #

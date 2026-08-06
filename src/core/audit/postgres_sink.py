@@ -29,7 +29,7 @@ from typing import Any
 import pg8000.dbapi
 
 from core.audit.chain import GENESIS_PREV_HASH, compute_entry_hash
-from core.audit.schema import AuditEntry, AuditEventType
+from core.audit.schema import AuditEntry, AuditEventType, assert_payload_shape
 from core.durability.credentials import (
     DatabaseCredential,
     VaultDatabaseCredentials,
@@ -138,6 +138,9 @@ class PostgresAuditSink:
         payload: dict[str, Any],
         timestamp: datetime | None = None,
     ) -> AuditEntry:
+        # 038: the same payload-shape gate the in-memory sink applies. Both, because a rule
+        # enforced in one sink is a rule that holds until somebody deploys the other.
+        assert_payload_shape(event_type, payload)
         ts = timestamp if timestamp is not None else datetime.now(UTC)
 
         def _run(conn: Any) -> AuditEntry:

@@ -94,7 +94,7 @@ same change.
 | [0035](0035-audit-as-a-governed-read-path.md) | Estate-state queries, and the audit plane as a governed read path | Accepted |
 | [0036](0036-cost-estimation-boundaries.md) | Cost is estimated and gated, never managed or reported | Accepted |
 | [0037](0037-tool-transport-policy.md) | Tool transport policy — MCP where mature, native tools otherwise | Accepted |
-| [0038](0038-integration-uplift-workflows.md) | Integration and uplift work is a first-class workflow family | Accepted |
+| [0038](0038-integration-uplift-workflows.md) | Integration and uplift work is a first-class workflow family | Accepted (pack-tool-target clause amended by [0064](0064-version-control-is-a-platform-capability.md)) |
 | [0039](0039-per-role-model-bindings.md) | Definitions pin per-role model bindings, not a single model | Accepted |
 | [0040](0040-deferred-tool-disclosure.md) | Tool and capability disclosure is deferred by default | Accepted (audit clause amended by [0061](0061-discovery-is-recorded-never-refused.md)) |
 | [0041](0041-code-mode-requires-hook-parity.md) | Code mode ships only with verified per-call hook parity | Accepted |
@@ -108,7 +108,7 @@ same change.
 | [0049](0049-consent-to-start-is-consent-to-finish.md) | Consent to start a run is consent to finish it; dependencies are monitored, not escalated | Accepted |
 | [0050](0050-harness-ceilings-live-in-the-trust-fabric.md) | The harness-domain ceiling is its own record in the trust fabric | Accepted |
 | [0051](0051-a-turn-is-evidence-a-thread-is-a-view.md) | A turn is evidence; a thread is a view | Accepted |
-| [0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md) | The first judge is qualified by a human-labeled seed set | Accepted |
+| [0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md) | The first judge is qualified by a human-labeled seed set | Accepted (scorer field amended by [0063](0063-a-mechanical-scorer-may-qualify-a-cell.md)) |
 | [0053](0053-automated-skill-intake-gauntlet.md) | An automated intake gauntlet for skill adoption; the human gate is unchanged | Accepted (amended on acceptance — range, analyzer floor, manual path) |
 | [0054](0054-model-written-orchestration-parity.md) | Model-written orchestration: per-call and per-delegation governance parity | Proposed |
 | [0055](0055-audit-egress-for-tamper-evidence.md) | Tamper-evidence requires a copy outside the writer's blast radius | Accepted |
@@ -118,6 +118,9 @@ same change.
 | [0059](0059-estate-eval-evidence-spans-asker-roles.md) | A cell's estate evidence spans the asker roles its cases declare | Accepted |
 | [0060](0060-three-transports-the-cli-is-withdrawn.md) | Three transports — the CLI is withdrawn | Accepted |
 | [0061](0061-discovery-is-recorded-never-refused.md) | A search for a tool is recorded, and can never be refused | Accepted |
+| [0062](0062-authoring-credentials-are-vended-per-task.md) | The authoring credential is vended per task, and is Principle IV's third exception | Accepted |
+| [0063](0063-a-mechanical-scorer-may-qualify-a-cell.md) | A mechanical scorer over a human-authored reference may qualify a cell | Accepted |
+| [0064](0064-version-control-is-a-platform-capability.md) | Version control is a platform capability, not a pack tool target | Accepted |
 
 ## Reviews
 

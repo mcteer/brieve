@@ -61,8 +61,18 @@ variable "model_matrix_cells" {
     # per cell because the difference is invisible otherwise, and it matters most for
     # `write` — a model permitted to make changes.
     qualified_by = string
-    # Which judge scored it. Empty only for the seed-qualified first judge.
+    # Which judge scored it. Empty only for the seed-qualified first judge — or when a
+    # `scorer` names what qualified this instead (ADR-0063).
     judge = optional(string, "")
+    # 038, ADR-0063: a MECHANICAL comparison against a human-authored reference, where no
+    # judge model participated. `promote_model_version` refuses a cell naming neither.
+    #
+    # The `write` role has no judge at all: both correctness gates check an artifact against a
+    # reference's declared property set, and all three must-deny classes are mechanical. So the
+    # regress ADR-0052 terminates ends one link EARLIER — at the person who wrote the reference,
+    # with no scoring model above them to qualify. Naming a judge that did no scoring, to
+    # satisfy a string check, is the "gate that passes by vocabulary" 027 refused.
+    scorer = optional(string, "")
     # A cell qualified once and since pulled. Withdrawal is the case run-start validation
     # exists for: the definition pinning it sits unchanged in the registry, so validating
     # only at registration would let a withdrawn cell keep running because nothing re-asked.
@@ -285,4 +295,22 @@ variable "collector_shipper_bootstrap_password" {
   DESC
   type        = string
   default     = "dev-only-shipper"
+}
+
+# --- Authoring credential path (038, ADR-0062) -------------------------------------------------
+#
+# Identifiers only. The App private key is NEVER a variable: a variable reaches state, and state
+# is a second copy of every secret it manages. It is written out of band to the KV path
+# `authoring.tf` establishes, and the apply ignores changes to that value.
+
+variable "authoring_app_id" {
+  description = "Version-control App id for the authoring credential path (ADR-0062). Not a secret."
+  type        = string
+  default     = ""
+}
+
+variable "authoring_installation_id" {
+  description = "Installation id the authoring token is scoped to. Not a secret."
+  type        = string
+  default     = ""
 }

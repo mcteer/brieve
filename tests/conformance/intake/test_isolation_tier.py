@@ -18,7 +18,7 @@ import re
 
 import pytest
 
-from core.intake.tier import IsolationTier, TierPosture, TierRefused, assert_tier
+from core.isolation.tier import IsolationTier, TierPosture, TierRefused, assert_tier
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 JOBSPEC = REPO / "infra" / "jobs" / "analysis-tier.nomad.hcl"

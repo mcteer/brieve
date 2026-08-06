@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The hardened untrusted-content isolation tier (037, FR-006; ADR-0038).
+"""The hardened untrusted-content isolation tier (037 FR-006, 038 FR-005; ADR-0038).
 
 **A ceiling is not a tier, and conflating them was this feature's first CRITICAL.** A ceiling
 bounds what a definition may *call*; a tier bounds what the process can *reach*. An analysis
@@ -39,6 +39,27 @@ class IsolationTier(StrEnum):
 
 
 @dataclass(frozen=True)
+class SubjectMount:
+    """A tree the analysis is *about*, mounted for it to read (038, FR-005).
+
+    **Not the platform's tree, which is what `repo_mounted` guards.** 037 delivered its
+    subject as payload because a skill delta is kilobytes; a provided application repository
+    is not, so 038 mounts it. That looks like a reversal of 037's no-mount rule and is not:
+    the rule was *do not hand a redirected analyser the platform's own tree*, and this is
+    somebody else's.
+
+    ``source`` is carried rather than only a boolean because the subject differs every run,
+    so its path is per-dispatch — and a dispatch naming the platform tree would satisfy every
+    other clause here while mounting exactly what the tier exists to keep out. A control
+    expressed as a declaration is only as good as whatever validates the declaration; here the
+    row checks a *path* rather than a claim about one.
+    """
+
+    source: str
+    read_only: bool
+
+
+@dataclass(frozen=True)
 class TierPosture:
     """What an allocation actually provides, read from its own configuration.
 
@@ -53,11 +74,16 @@ class TierPosture:
     #: content would sit on the same network as everything else.
     network_mode: str
     #: Where egress is permitted at all. Empty means nowhere, which is stricter than the tier
-    #: requires but never wrong.
+    #: requires but never wrong — and is what 038's analysis step declares, because it reads a
+    #: mount and fetches nothing.
     egress_allowlist: frozenset[str]
-    #: Whether the repository is mounted. It must not be: the delta is delivered as INPUT, so
-    #: there is nothing on disk for a redirected analyzer to read or write.
+    #: Whether **the platform's own repository** is mounted. It must not be. 037 delivered its
+    #: delta as INPUT, so there was nothing on disk at all; 038 mounts a subject and still
+    #: never mounts this one. The name is unchanged because the meaning is unchanged.
     repo_mounted: bool
+    #: The tree the analysis is about, when there is one. ``None`` is 037's payload delivery
+    #: and passes unchanged; a **writable** subject fails.
+    subject_mount: SubjectMount | None = None
 
     def is_hardened(self) -> tuple[bool, str]:
         """Whether this posture is the hardened tier, and if not, which clause failed."""
@@ -65,6 +91,11 @@ class TierPosture:
             return False, f"network_mode is {self.network_mode!r}, not 'bridge'"
         if self.repo_mounted:
             return False, "the repository is mounted; the delta must be delivered as input"
+        if self.subject_mount is not None and not self.subject_mount.read_only:
+            return False, (
+                f"the subject at {self.subject_mount.source!r} is mounted writable; an "
+                f"analysis tier reads its subject and never writes it"
+            )
         return True, ""
 
 
@@ -85,4 +116,4 @@ def assert_tier(required: IsolationTier, provided: TierPosture) -> None:
         )
 
 
-__all__ = ["IsolationTier", "TierPosture", "TierRefused", "assert_tier"]
+__all__ = ["IsolationTier", "SubjectMount", "TierPosture", "TierRefused", "assert_tier"]

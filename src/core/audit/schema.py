@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -511,6 +512,101 @@ class AuditEventType(StrEnum):
     #: no quieter than a gauntlet promotion: what is being guarded against is not the bypass
     #: existing, it is the bypass being easier to reach for than to notice.
     INTAKE_BYPASSED = "intake_bypassed"
+
+    #: What an authoring run produced (038, ADR-0038). Payload: paths, digests (per path),
+    #: created, edited, truncated.
+    #:
+    #: **A SEALED-CORE ADDITION** (Principle V), one of four landing together and reviewed
+    #: together, on the precedent `TOOL_CHOSEN` set and 037's four followed.
+    #:
+    #: **Paths and per-path digests, never CONTENT.** `PROGRAM_SUBMITTED`'s verbatim rule does
+    #: not transfer and the difference is the whole reason this docstring exists: that member
+    #: records *the model's own words as the cause*, which is `TURN_RECORDED`'s case. This one
+    #: records a **derivative of the requester's private repository**, and an append-only store
+    #: holding a verbatim copy puts it somewhere nobody can delete it.
+    #:
+    #: The content a reviewer needs is in the proposal, which is where a reviewer reads it.
+    ARTIFACT_AUTHORED = "artifact_authored"
+
+    #: The platform opened a proposal (038, FR-006). Payload: repository, branch,
+    #: artifact_digest, proposal_ref.
+    #:
+    #: **A merge is NOT here, and its absence is load-bearing.** The platform proposes; a
+    #: person decides. A merge is *observed* from the host, never written by the platform, so
+    #: no member of this vocabulary can be read as the platform having accepted its own work
+    #: (ADR-0043, Principle IX: a model verdict may gate a step and never satisfies an approval
+    #: policy assigns to a person).
+    PROPOSAL_OPENED = "proposal_opened"
+
+    #: Content that must not leave was found heading into an artefact (038, FR-011).
+    #: Payload: code, location, digest.
+    #:
+    #: **Codes, locations and digests — NEVER the matched text.** `CANARY_CONTACT`'s rule, for
+    #: `CANARY_CONTACT`'s reason: the record of a leak must not be a second copy of what
+    #: leaked. A trail that quoted the secret it caught, or the analysed source it refused,
+    #: would become the exfiltration channel it exists to close.
+    #:
+    #: ``code`` distinguishes `secret_value_in_output` from `analysed_content_in_artifact` and
+    #: `analysed_content_in_prose`, because a leak in the code and a leak in the description
+    #: are different mistakes with different fixes and a reviewer should not have to go looking.
+    CONTAINMENT_REFUSED = "containment_refused"
+
+    #: The platform declined to enact something it had authored (038, FR-020).
+    #: Payload: content_digest, authoring_correlation_id, attempted_tool.
+    #:
+    #: **The rule turns on PROVENANCE, not capability.** Applying is not forbidden — applying
+    #: *one's own output* is. `terraform_apply` keeps doing what it always did for
+    #: configuration a person wrote and reviewed, and a merged proposal is exactly that.
+    #:
+    #: Distinct from an ordinary `PRE_DECISION` denial because *whose output it was* is the
+    #: reason, and a reader filtering for this failure wants the authoring run's correlation ID
+    #: rather than a generic refusal.
+    ENACTMENT_REFUSED = "enactment_refused"
+
+
+#: What each 038 member's payload may and may not carry (038, FR-011; research R26).
+#:
+#: **Asserted rather than documented, because `append_event` validates nothing.** Its signature
+#: is `payload: dict[str, Any]`, and `redact_arguments` runs on tool *arguments* in the hook
+#: engine — never on event payloads. So every "carries codes, never text" rule in this feature
+#: was a convention until this table existed.
+#:
+#: That was survivable for 037, whose payloads are digests by construction. It is not survivable
+#: here: `InjectionFinding` carries an `excerpt`, so reusing the injection-lens patterns without
+#: this gate would make copying analysed private code into an append-only store the *natural*
+#: implementation rather than a mistake somebody had to make.
+FORBIDDEN_PAYLOAD_KEYS: Final[dict[AuditEventType, frozenset[str]]] = {
+    AuditEventType.ARTIFACT_AUTHORED: frozenset({"content", "contents", "body", "text", "source"}),
+    AuditEventType.CONTAINMENT_REFUSED: frozenset(
+        {"excerpt", "match", "matched", "text", "value", "content", "snippet"}
+    ),
+}
+
+
+class PayloadRefused(Exception):
+    """A payload carrying something its member forbids. Raised, never trimmed.
+
+    Trimming would let the caller keep believing it recorded what it wrote, which is how a
+    convention decays into a comment. The write fails and names the key.
+    """
+
+
+def assert_payload_shape(event_type: AuditEventType, payload: Mapping[str, Any]) -> None:
+    """Refuse a payload carrying a forbidden key for its member (038).
+
+    Applied by the sink to every append, so the rule holds for callers that have not read the
+    docstring — which is the only kind of rule worth having about an append-only store.
+    """
+    forbidden = FORBIDDEN_PAYLOAD_KEYS.get(event_type)
+    if not forbidden:
+        return
+    present = sorted(k for k in payload if k in forbidden)
+    if present:
+        raise PayloadRefused(
+            f"{event_type.value} payload carries {present}, which this member forbids: the "
+            f"record of a leak must not be a second copy of what leaked. Carry a digest or a "
+            f"location instead."
+        )
 
 
 class AuditEntry(BaseModel):
