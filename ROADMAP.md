@@ -266,6 +266,88 @@ One platform, isolated tenants, using the products' own isolation primitives.
 **Why last of the scheduled set:** it multiplies every guarantee above it. Isolating tenants
 before the things being isolated are stable means doing the work twice.
 
+### The change-proposal workflow, end to end — Terraform first, Vault the same shape (unnumbered)
+
+The product shape the current feature sequence builds toward, stated 2026-08-06 so the pieces
+are aimed at it rather than discovered to almost compose later. **A user defines a workspace, a
+Git repo, and the scope of their need. The agent reads what exists in Terraform and in context,
+decides what should be built, runs `terraform plan` to prove the proposal is sound, and opens a
+PR back to the declared repo with the recommended changes.**
+
+Measured against merged main, most of the machinery exists and none of it composes yet:
+
+| Step of the workflow | What exists | The gap |
+| --- | --- | --- |
+| user declares workspace / repo / scope | definitions, ceilings, dispatch; 038's `SubjectMount` and `target_repository` | no intake surface where a *user* declares these three; today they are operator-authored records |
+| read what exists in Terraform | `terraform_plan` in `PLATFORM_HANDLERS` | **a fixture** — its own payload says so: *"Returns a shape, not a plan… Terraform is not deployed in the enclave"* |
+| read what exists in context | pinned corpus; estate answering | the customer's own context is the entry below this one |
+| decide what should be built | a model in the loop (020) | the model cannot say what to do with a tool — **040, planned** |
+| author the changes | 038's `author_file` / `read_subject`, containment, provenance | registered nowhere — **the successor feature**, and 040's capability ledger points at it |
+| `terraform plan`, twice — as **context** and as **gate** | the plan tool; the matrix already binds `plan` as its own role, distinct from `write` (038 narrowed exactly this: a `plan` cell no longer resolves for `write`) | plan is a fixture (below), and **the two roles are different requirements**: see the paragraph this row points at |
+| PR back to the declared repo | `open_proposal`, `branch_for(idempotency_key)`, `PROPOSAL_OPENED`, the authoring tier's analyzer→proposer split | registered nowhere, same successor; and a proposal does not yet carry its **plan evidence** |
+
+**Plan is the context, not only the gate — stated 2026-08-06, and it reorders the workflow.**
+Where infrastructure is already defined in Terraform, there is no better context for a proposed
+change than running `terraform plan` against the existing estate: it is the one instrument that
+answers *what would happen if this were applied*, from the product's own engine rather than from
+anything the platform infers. So plan appears **twice**:
+
+- **Early and repeatedly, as reading.** The agent plans against the estate to understand it, and
+  plans its own draft to see what the draft would do — possibly several times, adjusting between
+  runs. Each is an ordinary governed step against the run's budget, and the authority for it
+  already exists: the matrix binds `plan` as its own role, so a definition can hold generous
+  plan authority while never holding `apply` at all. **Iterating on a plan is reading, and the
+  ceiling can say so.**
+- **Once and finally, as the gate.** The last plan against the authored tree is the one whose
+  output travels with the proposal as evidence. A failed final plan stops the proposal.
+
+**Three decisions this shape forces, recorded now so their features argue them rather than absorb
+them:**
+
+- **Plan-as-context needs the plan's *output* to reach the model.** Today a tool result returns
+  to the loop, but a plan a model cannot read is context for nobody. What a plan output contains
+  — resource addresses, attribute values, possibly data a secret leaked into — and how much of it
+  enters the model's context is a real decision with 029's lesson attached (the read bounded by
+  the wrong thing answered from 1,000 of 63,947 entries). Bounding what re-enters the model is
+  this workflow's version of that problem.
+- **Plan-before-propose is a workflow constraint, not a tool property.** The authoring tier's
+  two-task split (analyzer authors, proposer publishes *"what already passed"*) is exactly the
+  seam for it — the plan belongs at the end of the analyzer's work, and its output belongs in
+  the proposal as evidence. A PR whose description carries the plan it passed is a different
+  product from a PR that merely compiles.
+- **The plan needs a real Terraform.** The fixture handlers were the right call while nothing
+  could reach them; a workflow whose soundness gate is a fixture would be green forever
+  (ADR-0047's exact shape). Deploying Terraform where the authoring tier runs is an
+  infrastructure decision with a Principle VI cost to state.
+
+**The same shape, second product — Vault policy authoring (added 2026-08-06).** *What exists?
+How does this change affect what exists? Is there a better way to write this, given the defined
+outcome?* — evaluated, then submitted back as a Vault policy PR. The workflow is the same; **what
+differs per product is the impact instrument**, and naming it per product is what keeps the
+workflow honest rather than generic:
+
+| | Terraform | Vault policy |
+| --- | --- | --- |
+| read what exists | state and config via plan | policies and what is attached to them, via reads |
+| impact oracle | **`terraform plan`** — the product's own engine answers *what would happen* | **no plan-equivalent for a policy as a whole** — capability checks answer *what a token could do* per path, and the rest is read-and-diff plus reasoning |
+| "a better way, given the outcome" | the corpus's Terraform operating guides | the corpus's **Vault operating guides** — already pinned (`/validated-designs/vault-operating-guides-adoption`), already the answering surface's grounding |
+| the proposal | PR carrying the final plan as evidence | PR carrying the policy diff, the capability-check results, and the guidance citations |
+
+Two facts measured for this row: **Vault is the one product genuinely present in the enclave** —
+the trust fabric runs on it, so plan-as-context's "deploy the product first" cost does not apply
+here, which arguably makes Vault the *earlier* end-to-end demonstration despite Terraform naming
+the workflow. And the existing `vault_read` handler already draws this workflow's most important
+boundary: *"Read a secret's metadata and keys — never its values… the value itself belongs in the
+process that consumes it, not in the reasoning about it."* Policy authoring needs exactly that
+posture — the agent reasons about policy *structure*, and no secret value ever enters the
+reasoning. The bounded-output decision above applies to capability-check results the same way it
+applies to plan output.
+
+**Sequence already pointed the right way**: 040 (the model can say what to do) → authoring
+becomes reachable (the trio + proposals) → this workflow as the composition feature that adds
+the intake surface, the impact gate, and evidence-in-proposal — **per product**, with Vault plausibly first since its product is already in the enclave. Each earlier feature is
+independently valuable; this entry is why they are ordered.
+
 ### Customer-supplied context (unnumbered)
 
 A customer's own material — internal compliance policies, architecture standards, reference
