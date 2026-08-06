@@ -59,7 +59,7 @@ name that does not exist. Assert all three produce the same records the same cal
 directly would, and that the invented name refuses as `tool is not registered` rather than
 through any blocklist.
 
-**"Identically" means the pipeline, and the row says which.** A direct call from the step loop
+**"Identically" means the pipeline, and the row says which (R9).** A direct call from the step loop
 carries arguments the **platform** chose; an inner call carries arguments the **program** wrote.
 Same entry, same hooks, same bracket — different provenance of arguments. Stating that keeps this
 row from reading as a stronger claim than it makes.
@@ -196,7 +196,7 @@ SC-001 makes, wearing the stronger one's clothes.
 
 ## The guard that must be inverted (FR-013, SC-007)
 
-### K11 — The 038 row now asserts reachability
+### K11 — The 038 row now asserts reachability (R5)
 `tests/conformance/authoring/test_producing.py` currently asserts the program tool is registered
 **nowhere**, with a message asking for exactly this promotion: *"run_program is now registered;
 W3's caveat is stale and this row should be promoted to drive the production path rather than the
@@ -210,7 +210,7 @@ absence looks like.
 
 ## Scope held (FR-012)
 
-### K12 — No shipped definition gains code mode
+### K12 — No shipped definition gains code mode (R6)
 Assert that the demonstration definition is the only one whose ceiling names the program tool,
 and that it lives in the dev estate.
 
