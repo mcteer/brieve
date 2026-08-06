@@ -336,22 +336,37 @@ platform already does well.
   a genuine problem: you can digest-pin a cloned repo and you cannot pin a live query interface.
   Either its resources are synced like a corpus, or answers fetch at answer time, which
   `corpus.py` rejects with its reason attached.
-- **Tools** — an MCP server exposing tools is a **capability source**, and this is the largest
-  thing in this entry. Measured: `core/authority/ceiling.py:75` refuses `unknown_ceiling_entry` —
-  *"ceiling names a tool or action the platform does not know"* — so the capability vocabulary is
-  **closed and fixed before a run starts**. Customer tools arriving at runtime would open it. That
-  reaches Principle II (one governed tool layer, `invoke_tool` the sole entry), the ceiling model,
-  Principle VIII (packs are eval-gated; a customer's MCP tools are not), and Principle IV (whose
-  credential reaches that server).
+- **Tools** — an MCP server exposing tools is a **capability source**, and the platform's shape
+  suits this well. `invoke_tool` is the sole governed entry and the registry is the decision-maker
+  — 036's seam states it directly: *"no blocklist, no allowlist, and no special case… the registry
+  decides."* A tool admitted from an endorsed config is **less exotic than a name a model
+  invented**, which that design already governs. What moves is *when* registration happens:
+  `core/authority/ceiling.py:75` refuses `unknown_ceiling_entry` because the vocabulary is
+  assembled before a run starts, and that is an implementation fact rather than a principle.
+  Register from an endorsed source and a ceiling names customer tools like any other.
 
-**And Brieve has no MCP client.** Measured: `surfaces/mcp/served.py` is `FastMCP` — the platform
-**serves** MCP (019) and consumes none. Consuming customer servers is a new direction with no
-substrate, not a configuration option over an existing one.
+**Three things genuinely need deciding** — none of them a reason not to do it:
 
-**ADR-0041's reasoning outlived its subject and lands here.** *"Sandbox safety and preserved
-governance are different properties"* generalises: an external tool source being well-behaved is
-not a governance argument either. That ADR is superseded ([ADR-0065](docs/adr/0065-code-mode-is-decided-against.md))
-and its Context is the thing to read before specifying the tools half.
+- **Eval gating.** Principle VIII gates capability packs on evals; a customer's own tools cannot
+  be. The constitution's own pattern for this is a **named exception with a stated bound**, which
+  Principle IV has taken three times. *"Endorsed customer sources are not eval-gated, and here is
+  what bounds them instead"* is an ADR.
+- **Credentials.** Whose credential reaches the customer's server, and where it lives. 027 built
+  the broker for exactly this shape and its record is the precedent.
+- **Freshness.** A repo can be synced and digest-pinned; a live MCP server cannot. Endorsement
+  says *"this source is trusted"*, which is not the same as *"this response is what was reviewed."*
+
+**Brieve has no MCP client yet.** `surfaces/mcp/served.py` is `FastMCP` — 019 built the platform
+as a **server**. That is a substrate to build, not an obstacle.
+
+**Why this matters more than its position suggests.** The pinned corpus is HashiCorp's validated
+patterns, and a platform whose knowledge stops at one vendor's documentation addresses a small
+part of what a customer environment actually is. Their compliance posture, their architecture
+standards, their existing estate and their own tooling are the context that makes an answer
+usable rather than merely correct. **Governance and external sources are not in tension** — the
+governed entry, the registry, the ceiling and the trail are exactly the machinery that lets an
+external source be admitted deliberately rather than absorbed silently, and the endorsement
+record names who admitted it.
 
 **Not scheduled.** Recorded so nobody re-derives the constraints; the ordering argument belongs
 in its own specify. **The first question that specify must answer**: do customer MCP servers
