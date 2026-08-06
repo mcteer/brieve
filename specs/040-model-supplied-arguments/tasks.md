@@ -281,7 +281,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
   from the ledger in-memory and assert the check trips. Two features shipped unreachable
   capabilities behind green rows; a guard that cannot lose is the same defect wearing a
   checkmark (SC-009).
-- [X] T024 Row **M18** in `tests/conformance/choice/test_model_supplied_arguments.py`, **enclave-marked**: **the recording is JSON travelling through Nomad meta interpolation** (`NOMAD_META_choice_recording` → env), so the row's fixture must survive HCL quoting — the quoting is part of what this row proves, not a nuisance to work around. dispatch a run whose recording carries a
+- [~] T024 Row **M18** in `tests/conformance/choice/test_model_supplied_arguments.py`, **enclave-marked**: **the recording is JSON travelling through Nomad meta interpolation** (`NOMAD_META_choice_recording` → env), so the row's fixture must survive HCL quoting — the quoting is part of what this row proves, not a nuisance to work around. dispatch a run whose recording carries a
   structured choice through the real path — Nomad meta → environment → `build_chooser` → the
   allocation — and assert the act happened against the model-named target. Every other row could
   pass while this one was false, which is the state two prior features shipped in
@@ -366,6 +366,8 @@ verified directly against the running database with operator credentials:
   nothing, as its own comment says it would; the ALTER added the column.
 * a model-supplied request, an empty request, and a pre-040 row round-tripped through real SQL
   as `{...}`, `{}` and `NULL` — **distinguishable**, which is M12's substantive claim.
+
+**T024 and T025 are marked partial, not done.** Their rows are written and collected; M18 has **never executed once**. Marking a row that has never run as complete is the exact shape this feature exists because of — 036 and 038 both shipped with green rows over capabilities nothing could reach.
 
 **Could not run, and neither is a code question.** M7/M12's `[postgres]` legs and **M18** need
 the conformance job placeable. They fail rather than skip, which is correct and is why they
