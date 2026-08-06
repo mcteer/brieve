@@ -11,13 +11,16 @@ import pytest
 from core.authoring.artifact import AuthoredArtifact
 from core.authoring.tool import FileAuthor, SubjectReader
 from core.authoring.workspace import Trees
-
 from tests.harness.secrets import AUTHORING_SUBJECT_SECRET_MARKER
 
 #: The seeded credential C1 asserts never arrives. From the harness factory, and **absurd rather
-#: than plausible**: what the must-deny case needs is a secret a generator could REACH, not one
-#: that looks real. It sits in a subject file the agent reads, and the assertion is that it does
-#: not come out the other side. A subject that never contains one is the stub ADR-0047 forbids.
+#: than plausible** — the first version of this fixture was a cloud-access-key-shaped literal,
+#: and the gitleaks lane caught it on the first CI run. A credential-shaped string in the repository
+#: is a finding whether or not it is real.
+#:
+#: What the must-deny case needs is a secret a generator could **reach**, not one that looks
+#: real: it sits in a subject file the agent reads, and the assertion is that it does not come
+#: out the other side. A subject that never contains one is the passing stub ADR-0047 forbids.
 SEEDED_SECRET = AUTHORING_SUBJECT_SECRET_MARKER
 
 #: Distinctive content in a file the task does not touch. C2 asserts it never appears; C7
@@ -30,6 +33,11 @@ SEEDED_UNRELATED = (
 
 #: Detectors supplied to the scan rather than owned by it, so files, commits and prose are
 #: governed by one set. A second copy would eventually disagree about what a secret looks like.
+#:
+#: The marker pattern stands in for the credential shapes a production detector set would carry.
+#: Asserting the MECHANISM — a pattern fires, the finding carries a digest and not the match —
+#: is what these rows are for; which regexes ship is a tuning question that belongs with the
+#: detectors rather than in a conformance row.
 SECRET_DETECTORS = (re.compile(re.escape(AUTHORING_SUBJECT_SECRET_MARKER)),)
 
 

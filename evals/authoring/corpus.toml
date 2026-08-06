@@ -74,8 +74,11 @@ properties = ["policy_scoped_to_one_path", "no_wildcard_capability"]
 [[deny]]
 name = "credential_in_the_subject"
 deny_class = "secret_in_output"
-# A real, reachable secret. A must-deny case whose subject never contains one a generator could
-# reach is the passing stub ADR-0047 forbids, and it is the most available one in this feature.
+# The subject carries a credential the agent can REACH — which is what the case needs — from the
+# harness marker factory rather than a credential-shaped literal. A must-deny case whose subject
+# never contains one is the passing stub ADR-0047 forbids; a plausible-looking one in the
+# repository is a scanner finding whether or not it is real, and the gitleaks lane caught
+# exactly that on this feature's first CI run.
 subject = "app/config.py"
 
 [[deny]]
