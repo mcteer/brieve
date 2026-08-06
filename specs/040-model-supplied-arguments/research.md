@@ -44,9 +44,14 @@ took twice, 040 takes once.**
   consumed as a bare string (`bounded.py:147-148`).
 - A pending step **re-invokes**: *"re-observation found [the effect] had NOT landed — so it runs
   again."*
-- The `IntentRecord` is constructed in exactly one place, `bracket_call`
-  (`src/core/observation/bracket.py:41`), whose one caller is `engine.py:247` — which already
-  holds the arguments.
+- The `IntentRecord` is constructed in **four** places, and only one is on the effect path:
+  `bracket_call` (`src/core/observation/bracket.py:41`), whose one caller is `engine.py:247` —
+  which already holds the arguments; the two Postgres reads (`postgres.py:293`, `:323`); and the
+  **synthetic no-tool intent** at `entrypoint.py:318`, written with `tool_name="echo"` for the
+  terminal no-tool case and closed in the same breath. **That fourth site must pass `{}`
+  explicitly** — it genuinely asks for nothing, and letting it default would write NULL on a
+  post-feature record, corrupting R4's rule that NULL means *pre-feature* (the fifth pass on 039
+  noted this constructor and this feature nearly dropped the note).
 - Postgres reconstructs the record from an **explicit column list in three places**:
   `record_intent`'s INSERT, `open_intents`' SELECT (`postgres.py:293`), `closed_intents`'
   (`postgres.py:323`). A defaulted field fails **silently** in each — the model validates, the
@@ -57,7 +62,8 @@ took twice, 040 takes once.**
   hermetic row would be used to prove."*
 
 **Decision**: `intents` gains an `arguments` column and `IntentRecord` a matching field; threaded
-through `bracket_call` from its one caller; carried through all three Postgres sites; and
+through `bracket_call` from its one caller, with the synthetic intent passing `{}`; carried
+through all three Postgres sites; and
 `already_chosen` widens to carry the arguments beside the name, so a revived step re-invokes with
 the model's request and consults no model. The resume row runs against **both** providers, and
 that clause is the row (SC-003's "every store").
@@ -145,11 +151,15 @@ contract about the request's *shape* — each capability still decides what it c
 
 **Measured**: `parse_recording` is `raw.split(",")` (`recorded.py:100-102`), the value arrives as
 `RUN_CHOICE_RECORDING` from `NOMAD_META_choice_recording` (`entrypoint.py:442`,
-`agent-run.nomad.hcl:241`), and JSON contains commas. Four conformance suites feed bare names
-through a `recording(*answers)` helper — `conformance/choice/harness.py`,
-`choice/test_a_model_chooses.py`, `durability/test_model_driven_resume.py`,
-`reports/test_the_run_observes.py` — and they are the rows that prove model-driven runs work at
-all. `NOTHING = "-"` is spelled because *"an empty element in a comma-separated list is
+`agent-run.nomad.hcl:241`), and JSON contains commas. **Five** conformance suites feed bare names
+through recordings — `conformance/choice/harness.py`, `choice/test_a_model_chooses.py`,
+`choice/test_the_double_is_faithful.py` (measured: `build_chooser(FIXTURE_MODEL,
+recording=recording("vault_write", "vault_read"))` at line 66 — the suite 039's inventory
+missed), `durability/test_model_driven_resume.py`, `reports/test_the_run_observes.py` — and the
+`recording(*answers)` helper itself lives in **`tests/harness/scripted_chooser.py`**, not in
+`choice/harness.py` as 039's carried note claimed. They are the rows that prove model-driven runs
+work at all, and an inventory that undercounts them is a compatibility row that passes while the
+uncounted suite is edited. `NOTHING = "-"` is spelled because *"an empty element in a comma-separated list is
 indistinguishable from a trailing separator"* (`recorded.py:34`).
 
 **Decision**: a recording whose first non-space character is `[` parses as a JSON list of
@@ -226,3 +236,18 @@ executed call that failed, decided by the capability, recorded as `tool_error` b
 existing path (`engine.py:374` returns `decision="deny", reason_code="tool_error"`), and visible
 to FR-009's three-way distinction: malformed (re-asked), refused (denied by governance), failed
 (performed and failed on its own terms).
+
+## R13 — The column arrives by the repository's own migration pattern, or not at all
+
+**Measured**: `schema.sql:35-48` argues this in its own words. `CREATE TABLE IF NOT EXISTS` *"is
+a no-op against an existing table — it does not reconcile columns"*, so on any enclave brought up
+earlier the new column *"would simply not exist"* and every insert naming it fails — *"the whole
+durability layer down, on a running enclave, from a file that looks like it declares the
+column."* `resume_count` was *"the first additive column in the repository's history"* and set
+the pattern: the column appears **twice** — in the `CREATE` declaration, where someone reads what
+the table *is*, and as `ALTER TABLE intents ADD COLUMN IF NOT EXISTS arguments TEXT`, which is
+idempotent and therefore safe for `migrate()` (`postgres.py:111`) to re-apply on every boot.
+
+**Decision**: both lines, on `resume_count`'s precedent, with no default expression — existing
+rows read back NULL, which is R4's *pre-feature* meaning arriving for free. The plan's "1 SQL
+migration line" was an undercount; it is two, and the second is the deployment story.

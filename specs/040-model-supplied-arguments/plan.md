@@ -25,7 +25,7 @@ row, because two features shipped tools registered nowhere behind green rows (R1
 **Primary Dependencies**: pydantic-ai (the chooser's agent — `output_type` widens from `str` to a
 structured choice), psycopg (Postgres durability), no new dependencies
 
-**Storage**: Postgres (`intents` gains a nullable `arguments` column, additive) and the in-memory
+**Storage**: Postgres (`intents` gains a nullable `arguments` column — declared in the CREATE **and** added by `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` on `resume_count`'s precedent, R13) and the in-memory
 provider (no change needed — which is itself a hazard, R3)
 
 **Testing**: pytest — hermetic conformance rows in `tests/conformance/` (merge lane), component
@@ -40,7 +40,7 @@ rows in `tests/component/`, unit ledger row in `tests/unit/`; one enclave-marked
 **Constraints**: every existing recording byte-compatible (FR-010); every pre-feature record
 revivable with its original behaviour (FR-011, R4); the trail gains nothing (FR-006)
 
-**Scale/Scope**: ~9 source files, 1 SQL migration line, ~18 conformance rows, no new modules
+**Scale/Scope**: ~9 source files, 2 SQL lines (declaration + idempotent ALTER, R13), ~18 conformance rows, no new modules
 except the capability ledger
 
 ## Constitution Check

@@ -23,7 +23,10 @@ bracket, same records — and that a denied capability refuses identically wheth
 from a model or the platform. **Argument provenance is the only difference, and the row says so.**
 
 ### M3 — A capability that takes nothing is untouched (FR-012)
-Byte-compare the records of a no-argument step before and after the widening.
+A no-argument step's records carry no argument material and are identical whether driven by a
+bare-name recording or a structured one naming the same tool with `{}`. **Not "before and
+after"** — there is no *before* to run in a single tree; the real before/after guarantee is the
+unedited suites (M13), and this row asserts the equivalence that guarantee rests on.
 
 ## Meaning it later (US2)
 
@@ -43,7 +46,7 @@ request beside the name, so honouring it costs no provider call.
 Build an intent with NULL arguments (the pre-feature shape); revive; assert the re-invoke carries
 the **legacy constant** — the values its first attempt actually used — and that NULL and `{}` are
 distinguishable end to end. **Repeating a different act than the one attempted is the defect,
-even when the different act is emptier.**
+even when the different act is emptier.** And assert the **synthetic no-tool intent** written post-feature carries `{}`, never NULL — it is the fourth `IntentRecord` constructor (`entrypoint.py:318`), and a defaulted NULL there would put a post-feature record on the pre-feature side of the line this row draws.
 
 ## The one durable home (US3)
 
@@ -90,10 +93,13 @@ distinguishable in the record — an operator told the wrong one fixes the wrong
 ## Nothing that worked moves (US5)
 
 ### M13 — Every existing recording means what it meant (FR-010, SC-007)
-Run the four recording-driven suites **unedited** and assert `"plan,apply,-"` parses to exactly
-today's three choices — a bare name is a choice with **no arguments**. The suites are the rows
-that prove model-driven runs work at all; editing them to pass would be the blast radius arriving
-anyway.
+Run **all five** recording-driven suites **unedited** — `choice/harness.py`,
+`choice/test_a_model_chooses.py`, `choice/test_the_double_is_faithful.py` (the one the carried
+inventory missed), `durability/test_model_driven_resume.py`, `reports/test_the_run_observes.py` —
+and assert `"plan,apply,-"` parses to exactly today's three choices: a bare name is a choice with
+**no arguments**. The suites are the rows that prove model-driven runs work at all; editing them
+to pass would be the blast radius arriving anyway, and **an undercounted inventory is a
+compatibility row that passes while the uncounted suite is edited.**
 
 ### M14 — A recording can carry a structured choice (FR-001)
 First non-space character `[` → JSON list of `{"tool": ..., "arguments": {...}}`; assert the

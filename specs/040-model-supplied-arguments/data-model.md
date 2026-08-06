@@ -64,8 +64,10 @@ ran with the legacy platform constant, so its revival supplies that constant —
 that was actually attempted. `{}` means *genuinely asked for nothing*. The distinction is
 schema-level, not a heuristic, and it is what makes FR-011 checkable.
 
-**One constructor, three column lists.** The record is built in exactly one place
-(`bracket_call`), from the one caller that already holds the arguments. Postgres reconstructs it
+**Four constructors, three column lists, one effect path.** The record is built on the effect
+path in one place (`bracket_call`), from the one caller that already holds the arguments; the
+synthetic no-tool intent (`entrypoint.py:318`) passes `{}` explicitly, because a defaulted NULL
+there would put a post-feature record on the pre-feature side of R4's line. Postgres reconstructs it
 from explicit column lists in three places, where a defaulted field fails **silently** — and the
 in-memory provider needs no change at all, which is why every resume row runs against both
 (SC-003, `memory.py:29`'s own rule).
@@ -120,4 +122,4 @@ that cannot fail is the defect it guards against.
 | the idempotency key | no programs, so steps already key distinctly (R2) |
 | the observer interface — `idempotency_key` only | observers never see the request |
 | the hook pipeline and every authority decision | carry-through only (Q1, R11) — `HookContext` already carries arguments and nothing consults their values to decide anything, which is where that stays |
-| the four recording-driven suites, byte for byte | FR-010, and they prove model-driven runs work |
+| all **five** recording-driven suites, byte for byte | FR-010, and they prove model-driven runs work — the fifth (`test_the_double_is_faithful.py`) is the one the carried inventory missed |

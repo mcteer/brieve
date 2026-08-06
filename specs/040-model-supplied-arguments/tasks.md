@@ -103,8 +103,12 @@ grammar is foundational even though its compatibility rows belong to US5.**
   entry, same hooks, same bracket, same records — and a denied capability refuses identically
   whether its request came from a model or the platform (FR-002, FR-003, SC-002). **State that
   argument provenance is the only difference**, so the row does not read as a stronger claim.
-- [ ] T010b [US1] Row **M3** in `tests/conformance/choice/test_model_supplied_arguments.py`: byte-compare a no-argument step's records before and after
-  the widening (FR-012).
+- [ ] T010b [US1] Row **M3** in `tests/conformance/choice/test_model_supplied_arguments.py`:
+  a no-argument step's records carry no argument material and are identical whether the step was
+  driven by a bare-name recording or a structured one naming the same tool with `{}` (FR-012).
+  **Not "before and after"** — there is no *before* to run in a single tree; the true
+  before/after guarantee is carried by the unedited suites (T020/M13), and this row asserts the
+  equivalence the guarantee rests on.
 
 **Checkpoint**: the act is the model's. An interruption still loses it.
 
@@ -117,8 +121,14 @@ grammar is foundational even though its compatibility rows belong to US5.**
 **Independent test**: interrupt, revive, compare — against both stores.
 
 - [ ] T011 [US2] [GATE:fail-closed] Carry the request through durability: add a **nullable**
-  `arguments` column to `intents` in `src/core/durability/schema.sql` (NULL = pre-feature, `{}` =
-  genuinely nothing — research R4, and the distinction is schema-level); add the field to
+  `arguments` column to `intents` in `src/core/durability/schema.sql` **twice, on `resume_count`'s
+  precedent** (research R13): in the `CREATE TABLE` declaration, where someone reads what the table
+  *is*, **and** as `ALTER TABLE intents ADD COLUMN IF NOT EXISTS arguments TEXT` — because
+  `CREATE TABLE IF NOT EXISTS` *"does not reconcile columns"* (`schema.sql:35`), so without the
+  ALTER line every existing enclave fails on an unknown column, *"the whole durability layer
+  down"*, and `migrate()` (`postgres.py:111`) re-applies the file idempotently so the ALTER **is**
+  the deployment story (NULL = pre-feature, `{}` = genuinely nothing — research R4, and the
+  distinction is schema-level); add the field to
   `IntentRecord` in `src/core/durability/types.py` with a docstring stating the retention
   (kept until removed; the platform expires nothing); thread it through `bracket_call` in
   `src/core/observation/bracket.py` from its one caller — **one argument at one line**,
@@ -127,7 +137,9 @@ grammar is foundational even though its compatibility rows belong to US5.**
   `open_intents`' SELECT (`postgres.py:293`), `closed_intents`' (`postgres.py:323`) — where a
   defaulted field fails **silently** and `open_intents` is the one resume reads (research R3).
   **`src/core/durability/memory.py` needs no change, and that is a hazard, not a saving** — it is
-  why T012 runs both providers.
+  why T012 runs both providers. **And the synthetic no-tool intent at `entrypoint.py:318` passes
+  `{}` explicitly** (research R3): it genuinely asks for nothing, and letting it default would
+  write NULL on a post-feature record — corrupting the very distinction M12 asserts.
 - [ ] T011a [US2] Widen `already_chosen` from `{step: tool_name}` to carry the kept arguments
   beside the name — built at `src/surfaces/dispatch/entrypoint.py:814`, consumed at
   `src/core/choice/bounded.py:147` — so honouring a pending intent costs no provider call and
@@ -227,14 +239,21 @@ grammar is foundational even though its compatibility rows belong to US5.**
 **Independent test**: the four suites pass unedited.
 
 - [ ] T020 [US5] Row **M13** in `tests/conformance/choice/test_model_supplied_arguments.py`: `"plan,apply,-"` parses to exactly today's three choices — a
-  bare name is a choice with **no arguments** — and the four recording-driven suites
+  bare name is a choice with **no arguments** — and **all five** recording-driven suites
   (`tests/conformance/choice/harness.py`, `tests/conformance/choice/test_a_model_chooses.py`,
+  `tests/conformance/choice/test_the_double_is_faithful.py` — the one 039's inventory missed,
+  measured: `build_chooser(..., recording=recording("vault_write", "vault_read"))` at line 66 —
   `tests/conformance/durability/test_model_driven_resume.py`,
-  `tests/conformance/reports/test_the_run_observes.py`) pass **unedited** (FR-010, SC-007).
+  `tests/conformance/reports/test_the_run_observes.py`) pass **unedited**, and the
+  `recording(*answers)` helper's true home is `tests/harness/scripted_chooser.py` (T005's file),
+  not `choice/harness.py` (FR-010, SC-007). **An inventory that undercounts is a compatibility
+  row that passes while the uncounted suite is edited.**
   Check the diff, not only the run: an edited suite is the blast radius arriving through the
   test tree.
 - [ ] T021 [US5] Row **M14** in `tests/conformance/choice/test_model_supplied_arguments.py`: a `[`-prefixed recording carries structured choices and the
-  `"-"` terminal sentinel works in both grammars (FR-001's fixture path).
+  `"-"` terminal sentinel works in both grammars (FR-001's fixture path). **Include one recording
+  round-tripped through an environment variable**, since that is how it travels
+  (`RUN_CHOICE_RECORDING`), and JSON survives shells less obviously than bare words do.
 - [ ] T022 [US5] Row **M15** in `tests/conformance/choice/test_model_supplied_arguments.py`: one run naming one capability at two steps with different
   requests — two intents, two acts, the second not mistaken for a repeat of the first. **This is
   R2's claim measured rather than remembered**: no programs means steps already key distinctly,
@@ -259,7 +278,7 @@ grammar is foundational even though its compatibility rows belong to US5.**
   from the ledger in-memory and assert the check trips. Two features shipped unreachable
   capabilities behind green rows; a guard that cannot lose is the same defect wearing a
   checkmark (SC-009).
-- [ ] T024 Row **M18** in `tests/conformance/choice/test_model_supplied_arguments.py`, **enclave-marked**: dispatch a run whose recording carries a
+- [ ] T024 Row **M18** in `tests/conformance/choice/test_model_supplied_arguments.py`, **enclave-marked**: **the recording is JSON travelling through Nomad meta interpolation** (`NOMAD_META_choice_recording` → env), so the row's fixture must survive HCL quoting — the quoting is part of what this row proves, not a nuisance to work around. dispatch a run whose recording carries a
   structured choice through the real path — Nomad meta → environment → `build_chooser` → the
   allocation — and assert the act happened against the model-named target. Every other row could
   pass while this one was false, which is the state two prior features shipped in
