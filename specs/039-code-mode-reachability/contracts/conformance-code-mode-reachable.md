@@ -71,6 +71,15 @@ Assert also that the toolset is built from the run's **effective scope**: a run 
 omits the program tool sees no new capability. That is the bound on this change's blast radius,
 since giving the agent a toolset affects *every* model-driven run rather than only code-mode ones.
 
+### K6b — A run without the capability sees no change (Principle II, blast radius)
+Assert that a run whose ceiling omits the program tool behaves identically before and after the
+agent gains a toolset — same reachable set, same refusals.
+
+**The bound asserted from the other side.** K6a checks the toolset is built from the run's
+effective scope; this checks an unrelated run is unaffected by that change. Giving the chooser's
+agent a toolset touches *every* model-driven run, which is a wider blast radius than "register a
+tool", and one row checking the mechanism is not the same as one checking the consequence.
+
 ## The budget (US4)
 
 ### K7 — A program runs in the environment where dispatched work happens (SC-001) — *enclave lane*
