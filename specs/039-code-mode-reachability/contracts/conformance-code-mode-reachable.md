@@ -220,6 +220,17 @@ arguments in the **control plane**, which only resume reads. The obvious wrong m
 K16 is to put them where they are easiest to see, and an append-only trail is the one place a
 leaked secret can never be taken back from.
 
+### K16b — The intent is the ONLY durable store of raw arguments (R16) — *no-secret-leak*
+Assert that after a step with model-supplied arguments, the raw values appear in `intents` and
+**nowhere else**: not in `PRE_DECISION`, not in the hook-decision span, not in `TOOL_CHOSEN`.
+
+**Because the platform's implemented rule is stronger than K16a states.** `redact_arguments`
+returns *"argument keys and content hashes — never raw values"* and `engine.py:101` applies it to
+every invoke, so today raw values rest **nowhere**. R13 has to break that — a hash cannot be
+re-invoked with — and this row is what keeps the break to exactly one store. **The obvious
+regression is the cheap one**: someone widens the redaction to "pass through what resume needs"
+and the trail starts carrying it too.
+
 ### K17 — An absent recording cannot vacuously satisfy a code-mode row (R15)
 Assert that a dispatched run with **no recording** against the demonstration definition does not
 count as a code-mode proof: either the ceiling's ordering makes the program tool unreachable by

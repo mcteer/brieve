@@ -460,4 +460,36 @@ whatever a variables file happens to contain, and the absent-recording case gets
 fixture model's no-recording behaviour is not changed — it is load-bearing for every pre-020 row
 — it is the *interaction* with a tool that requires arguments that needed deciding.
 
+## R16 — What R13 costs, measured against the rule the platform already enforces
 
+**Measured, and R13 did not notice it.** `redact_arguments` returns *"argument keys and content
+hashes — never raw values"* (`src/core/redaction.py:11`), and `src/core/hooks/engine.py:101`
+applies it to **every** set of arguments at the top of the pipeline, before any record is written.
+The platform's implemented posture is therefore stronger than "the trail carries no arguments": it
+is **raw argument values do not rest anywhere durable**.
+
+**R13 breaks that, and it has to.** Resume must re-invoke with the *actual* arguments; a hash
+cannot be re-invoked with. So `intents` becomes the first durable store of raw model-supplied
+argument values, and that is a security decision rather than a schema detail.
+
+**Recorded as one, on 038's precedent.** `PROGRAM_SUBMITTED` carrying a program verbatim is the
+same category of call, and 038 argued it explicitly under a no-secret-leak gate rather than
+letting it arrive as a field. What bounds this one:
+
+- it is the **control plane**, not the trail — read by resume, not exported, not append-only, and
+  removable with the run rather than permanent by construction;
+- **the trail and the spans are unchanged**: `redact_arguments` still runs at `engine.py:101` and
+  still feeds `PRE_DECISION` and `emit_hook_decision_span`. K16a asserts it;
+- it holds what the model wrote for **one open bracket**, which is the narrowest window that
+  still makes resume honest.
+
+**Rejected: storing hashes and re-deriving.** There is nothing to re-derive from. **Rejected:
+re-asking the model on resume.** That is the thing `already_chosen` exists to prevent — *"re-asking
+could return a different tool from the one whose bracket is open."*
+
+**And the refusal joins the required set.** `REQUIRED_GOVERNANCE_PRE_HOOKS` is what makes
+*"enforcement is whole"* checkable (`governance.py:19`, `has_required_governance_hooks`), and a
+refusal absent from it is one nobody verifies is present. Measured, the blast radius is small:
+`core/run.py:266` **prepends** the builtins to any explicit list, so every run with
+`include_governance` gets it, and the five sites passing `hooks=[...]` are the fail-closed tests
+that deliberately omit governance to prove the check fires.
