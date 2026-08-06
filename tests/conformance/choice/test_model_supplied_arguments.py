@@ -238,12 +238,21 @@ def test_row_m9_the_request_rests_in_exactly_one_place() -> None:
     decisions = [e for e in entries if e.event_type is AuditEventType.PRE_DECISION]
     assert decisions, "the pipeline decided"
     for decision in decisions:
-        arguments = decision.payload.get("arguments", {})
-        if arguments:
-            assert set(arguments) <= {"argument_keys", "argument_hashes"}, (
-                "PRE_DECISION carries redacted arguments — keys and content hashes, never raw "
-                "values — and `redact_arguments` runs on every invoke to make that true"
-            )
+        # TOP LEVEL, not nested under "arguments" — `redact_arguments` returns
+        # {argument_keys, argument_hashes} and the engine splats it into the payload. An
+        # earlier version of this row read `payload["arguments"]`, found nothing, and
+        # skipped its own assertion behind an `if` that was never true: a check that could
+        # not fail, in the row whose whole job is proving an absence. The dispatched row
+        # caught it, which is the argument for having one.
+        assert "argument_keys" in decision.payload, (
+            "PRE_DECISION no longer carries redacted argument keys — either the redaction "
+            "stopped running or the payload shape moved, and this row would silently stop "
+            "checking either way"
+        )
+        assert set(decision.payload["argument_keys"]) == set(THE_REQUEST), (
+            "the redacted keys do not describe the request the model actually made"
+        )
+        assert "argument_hashes" in decision.payload, "hashes, never raw values"
 
     # AND THE ONE PLACE IT DOES REST.
     assert run.durability is not None
@@ -690,7 +699,12 @@ def test_row_m18_a_dispatched_run_acts_on_what_the_model_named() -> None:
 
     connection = h.connection()
     try:
-        run_id = "m18-model-supplied-arguments"
+        # DISTINCT PER INVOCATION, not merely per row. A fixed id accumulates every
+        # earlier attempt under one correlation, and the assertions below then read
+        # events this run did not produce — which is how the first version of this row
+        # reported empty argument keys while the run it dispatched carried them.
+        # `dispatch_harness` states the rule; this row learned it the other way.
+        run_id = h.unique("m18-model-supplied-arguments")
         # The structured grammar, carrying a path the platform would never have chosen: the
         # pre-040 constant wrote to `conformance/probe`, so an act against THIS path cannot
         # have come from anywhere but the recording.
@@ -721,7 +735,7 @@ def test_row_m18_a_dispatched_run_acts_on_what_the_model_named() -> None:
         # model-supplied request are different requests, and this is where that becomes a
         # fact about production rather than about a unit test.
         decisions = h.events(connection, run_id, "pre_decision")
-        keys = [tuple(sorted(d.get("arguments", {}).get("argument_keys", []))) for d in decisions]
+        keys = [tuple(sorted(d.get("argument_keys") or ())) for d in decisions]
         assert ("cas", "path") in keys, (
             f"no invoke carried the model's argument keys; got {keys}; `nomad alloc logs {alloc}`"
         )

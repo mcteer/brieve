@@ -475,7 +475,21 @@ def _chooser_for(
             )
             raise
 
-    return build_chooser(model, recording=recording, secret=secret), model
+    return (
+        build_chooser(
+            model,
+            recording=recording,
+            secret=secret,
+            # A BARE NAME IN A RECORDING KEEPS MEANING WHAT IT MEANT (FR-010). Every
+            # pre-040 recording named a tool while the platform supplied these, so
+            # reading one as an empty request would change what it asks for — and
+            # `vault_write` raises without `cas`, so the dispatched suites would fail.
+            # Found exactly that way: hermetic rows passed against a handler that
+            # accepts anything, and the allocation did not.
+            bare_name_arguments=_LEGACY_PRE_040_ARGUMENTS,
+        ),
+        model,
+    )
 
 
 def continue_dispatched_run(

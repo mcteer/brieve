@@ -25,6 +25,7 @@ the model, which is re-execution wearing observation's clothes.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from pydantic import BaseModel
@@ -226,7 +227,13 @@ class ModelChooser:
         return Answer(name, output.arguments)
 
 
-def build_chooser(model: str, *, recording: str = "", secret: str = "") -> Chooser:
+def build_chooser(
+    model: str,
+    *,
+    recording: str = "",
+    secret: str = "",
+    bare_name_arguments: Mapping[str, Any] | None = None,
+) -> Chooser:
     """A chooser for the identifier the binding map resolved. **The injection point.**
 
     Research F5: the stand-in goes *here*, at the binding, and never at the loop. A double
@@ -248,7 +255,11 @@ def build_chooser(model: str, *, recording: str = "", secret: str = "") -> Choos
         # A FIXTURE MODEL FETCHES NOTHING. There is no vendor to hold authority for, so a
         # deployment running only fixture cells needs no model credential at all — which is what
         # every blocking lane in this repository is (FR-011).
-        return RecordedChooser(parse_recording(recording))
+        # `bare_name_arguments` is what a bare name in a recording has always meant
+        # (040, FR-010). It reaches only the RECORDED chooser: a real model states its
+        # own arguments, and topping those up from a fixture constant would be the
+        # platform putting words in a model's mouth.
+        return RecordedChooser(parse_recording(recording), bare_name_arguments=bare_name_arguments)
     return ModelChooser(model, secret=secret)
 
 

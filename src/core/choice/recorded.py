@@ -26,8 +26,9 @@ goes to `invoke_tool`. Only the last hop differs.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from core.choice.chooser import Answer, ChoiceRequest, ChooserUnavailable, MalformedAnswer
 
@@ -76,12 +77,28 @@ class RecordedChooser:
     which is a different thing from not supplying one.
     """
 
-    def __init__(self, answers: Sequence[str | Answer | MalformedEntry]) -> None:
-        #: Entries stay in their authored form and are normalised per ask — a bare ``str``
-        #: is a choice with NO arguments (040, FR-010): every recording written before the
-        #: widening means exactly what it meant.
+    def __init__(
+        self,
+        answers: Sequence[str | Answer | MalformedEntry],
+        *,
+        bare_name_arguments: Mapping[str, Any] | None = None,
+    ) -> None:
+        #: Entries stay in their authored form and are normalised per ask.
         self._answers = list(answers)
         self._asked = 0
+        #: WHAT A BARE NAME HAS ALWAYS MEANT (040, FR-010), supplied by the caller.
+        #:
+        #: Before 040 a recording named a tool and the *platform* supplied every tool's
+        #: arguments from a fixture constant — so `"vault_write"` meant "write to the probe
+        #: path", not "write with nothing". Reading a bare name as an empty request would
+        #: change what every existing recording means, and `vault_write` raises without
+        #: `cas`: the dispatched suites would fail, which is exactly how this was found.
+        #:
+        #: Passed in rather than known here, because which arguments a fixture implies is
+        #: the fixture's business and this module is core. Absent, a bare name is genuinely
+        #: an empty request — which is the right answer for any caller that never had a
+        #: platform constant behind it.
+        self._bare_name_arguments = dict(bare_name_arguments or {})
 
     @property
     def asked(self) -> int:
@@ -100,7 +117,8 @@ class RecordedChooser:
             # — the true answer for the fixture tools (040). Sorted, so the answer is stable
             # across runs — a fixture model that answered differently on identical input
             # would make every row built on it intermittent.
-            return Answer(sorted(request.permitted)[0] if request.permitted else "")
+            first = sorted(request.permitted)[0] if request.permitted else ""
+            return Answer(first, dict(self._bare_name_arguments) if first else {})
 
         if self._asked > len(self._answers):
             # Running off the end is a recording that does not cover the run it was written
@@ -118,8 +136,13 @@ class RecordedChooser:
             # unusable object would be — so the re-choice bound sees it (040, FR-008).
             raise MalformedAnswer(answer.shape)
         if isinstance(answer, Answer):
+            # A STRUCTURED entry says what it wants, including when it wants nothing. Its
+            # arguments are never topped up from the bare-name default — that default exists
+            # to preserve what an OLD recording meant, and a structured entry is new.
             return Answer("", {}) if answer.name == NOTHING else answer
-        return Answer("") if answer == NOTHING else Answer(answer)
+        if answer == NOTHING:
+            return Answer("")
+        return Answer(answer, dict(self._bare_name_arguments))
 
 
 def parse_recording(raw: str) -> list[str | Answer | MalformedEntry]:
