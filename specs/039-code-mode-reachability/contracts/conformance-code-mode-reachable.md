@@ -23,7 +23,7 @@ Resolve the tool **from the registry** and invoke it through `invoke_tool`; asse
 ran and returned its value. Not by calling the handler — a row that called the implementation
 directly would assert what 036 already asserts and would have passed for the last month.
 
-### K2 — A definition whose ceiling omits it cannot (FR-002)
+### K2 — A definition whose ceiling omits it cannot (FR-002, SC-003)
 Attempt submission from a definition without the tool in its ceiling: refused
 `authority_insufficient`, exactly as for any other capability outside a ceiling. **The registry
 knows the name and the ceiling still decides** — that is the opt-in property, and this row is
@@ -41,19 +41,19 @@ rules and the reason is the subject, not the format.
 
 ## The honest refusal (US2)
 
-### K4 — Where the runtime is absent, the refusal names what is missing (FR-007)
+### K4 — Where the runtime is absent, the refusal names what is missing (FR-007, SC-004)
 With the runtime uninstalled, submit a program: refused with a reason naming the absent
 capability. Assert it is **not** an import failure surfacing from three frames down, and **not**
 a partial success.
 
-### K5 — Three situations, three refusals (FR-008)
+### K5 — Three situations, three refusals (FR-008, SC-004)
 Assert that an unavailable-runtime refusal, a policy denial, and a program that failed on its own
 terms are distinguishable in the record. Three situations calling for three different responses
 must not read alike — an operator told the wrong one fixes the wrong thing.
 
 ## Still governed (US3)
 
-### K6 — Every call a program makes traverses the same pipeline as a direct call (FR-004, SC-002)
+### K6 — Every call a program makes traverses the same pipeline as a direct call (FR-004, FR-005, SC-002)
 Drive a program **through the registered path** that calls a permitted tool, a denied tool, and a
 name that does not exist. Assert all three produce the same records the same calls issued
 directly would, and that the invented name refuses as `tool is not registered` rather than
