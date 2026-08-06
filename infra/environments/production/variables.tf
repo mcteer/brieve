@@ -60,7 +60,14 @@ variable "model_matrix_cells" {
     role         = string
     qualified_by = string
     judge        = optional(string, "")
-    withdrawn    = optional(bool, false)
+    # 038, ADR-0063: what qualified this, when a MECHANICAL scorer did rather than a judge
+    # model. A cell must name one or the other; `promote_model_version` refuses both empty.
+    # The `write` role's qualification has no judge at all — both correctness gates check an
+    # artifact against a human-authored reference's declared property set, and all three
+    # must-deny classes are mechanical — so the regress terminates one link earlier, at the
+    # person who wrote the reference, with no scoring model to qualify.
+    scorer    = optional(string, "")
+    withdrawn = optional(bool, false)
   }))
 }
 

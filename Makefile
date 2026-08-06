@@ -3,7 +3,7 @@
 # `evals` is .PHONY twice over: it is a recipe, and a DIRECTORY named evals/ exists at
 # the repository root — without the declaration, make reports the seed set 'up to date'
 # and the gate never runs, which is a skip wearing a build system's clothes.
-.PHONY: check mcp-surface-up conformance conformance-hermetic test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
+.PHONY: check mcp-surface-up conformance conformance-hermetic eval-authoring test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
@@ -219,6 +219,27 @@ evals-live: evals-smoke
 # and wrong for a blocking lane, where it would turn every fork PR red for having no API key.
 conformance-hermetic:
 	$(UV_RUN) pytest tests/conformance --ignore=tests/conformance/durability -m "not enclave and not live_model" -q
+
+# The `write` role's correctness gate (038, FR-018). TWO NUMBERS, never one — product tooling
+# and reference comparison catch different failures, and collapsing them hides which occurred.
+#
+# RUNS IN THE ENCLAVE LANE, which already installs the binary (`install_hashicorp terraform` in
+# .github/workflows/enclave.yml). Research R10 framed this as new tooling and never measured
+# that precedent; what is actually new is the pinned provider set, which comes from a lock file
+# and a CI cache rather than from vendored binaries — provider binaries run to hundreds of
+# megabytes per platform and this repository should not carry them.
+#
+# IF THE TOOLING CANNOT RUN, THIS FAILS. `score_corpus` raises `UnrunnableSuite` rather than
+# degrading to a formatter-only check while still reporting "validated" — 012 shipped the
+# skip-reads-as-green shape twice, and this is the costume it would wear here.
+eval-authoring:
+	$(UV_RUN) pytest tests/conformance/authoring -q -k qualification
+	@command -v terraform >/dev/null || { \
+	  echo "eval-authoring: terraform is not on PATH. This gate FAILS rather than skipping:" ; \
+	  echo "  a lane that skips reads as green, and 'validated' would then mean 'not checked'." ; \
+	  exit 1 ; \
+	}
+	@echo "eval-authoring: product tooling present; corpus gate ran"
 
 test-full:
 	@echo "make test-full: stub — PR-tier suites not implemented yet" >&2

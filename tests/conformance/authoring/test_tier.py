@@ -21,6 +21,7 @@ from core.isolation.tier import (
     TierRefused,
     assert_tier,
 )
+from tests.harness.source_reading import code_without_prose
 
 ROOT = Path(__file__).resolve().parents[3]
 JOBSPEC = ROOT / "infra" / "jobs" / "authoring-tier.nomad.hcl"
@@ -210,3 +211,59 @@ def test_row_the_two_jobspecs_name_each_other_as_siblings(jobspec: str) -> None:
     analysis = (ROOT / "infra" / "jobs" / "analysis-tier.nomad.hcl").read_text()
     assert "authoring-tier.nomad.hcl" in analysis
     assert "analysis-tier.nomad.hcl" in jobspec
+
+
+def test_row_t9_the_continuation_mode_exists_and_does_all_four_things() -> None:
+    """T9 — research R37. **The mode is new**, and T7's design assumed one existed.
+
+    The entrypoint had exactly two entries: **start** (issues a grant, accounting from zero) and
+    **resume** (`RUN_RESUME=1`, counts a revival). Start would discard everything the first task
+    did; resume burns the budget T7 exists to protect.
+    """
+    raw = (ROOT / "src" / "surfaces" / "dispatch" / "entrypoint.py").read_text()
+    assert 'os.environ.get("RUN_CONTINUE", "").strip() == "1"' in raw
+
+    # **Prose stripped before matching.** This module necessarily contains a great deal of prose
+    # ABOUT revival counting, and the first run of this row matched its own docstring — the
+    # sixth time this repository has had a check match a comment instead of code.
+    entrypoint = code_without_prose(raw)
+    body = entrypoint[entrypoint.index("def continue_dispatched_run(") :]
+    body = body[: body.index("def resume_dispatched_run(")]
+
+    # 1. loads the blob, 2. loads the grant, 3. manufactures fresh authority,
+    # 4. does not increment resume_count.
+    assert "durability.load(blob_id)" in body
+    assert "durability.load_grant(checkpoint.grant_id)" in body
+    assert "manufacture_authority(" in body, (
+        "the continuation does not re-authenticate. `resume_run` was the only place authority "
+        "was re-manufactured, so skipping it to avoid the revival counter skips that too — and "
+        "Principle IV requires resume re-authenticates, never replays"
+    )
+    assert "run.resume_count = checkpoint.resume_count" in body
+    assert "resume_count + 1" not in body and "resume_run(" not in body, (
+        "the continuation counts a revival; a planned handoff must not spend a budget that "
+        "exists to stop flapping runs"
+    )
+
+    # And it refuses a terminal run rather than silently doing nothing.
+    assert "is_terminal()" in body
+
+
+def test_row_t7_the_analyzer_leaves_the_run_non_terminal() -> None:
+    """T7's dependency, asserted rather than assumed.
+
+    `complete_run` is called from **nowhere** in `src/`, so a finished step loop happens to
+    leave a run resumable — which this handoff needs. Adding it at the end of the loop later
+    would break the handoff silently, and `resume.py` refuses a terminal outcome.
+    """
+    src = ROOT / "src"
+    callers = [
+        p.relative_to(ROOT)
+        for p in src.rglob("*.py")
+        if "complete_run(" in p.read_text() and "def complete_run(" not in p.read_text()
+    ]
+    assert not callers, (
+        f"{callers} call complete_run; the analysing task must leave the run non-terminal or "
+        f"the proposer cannot continue it, and a terminal outcome is refused rather than "
+        f"noticed"
+    )

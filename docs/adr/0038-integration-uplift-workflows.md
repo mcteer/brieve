@@ -2,6 +2,8 @@
 
 - **Status**: Accepted
 - **Date**: 2026-07-14
+- **Amended by**: [ADR-0064](0064-version-control-is-a-platform-capability.md) (the pack-tool-target clause)
+- **Realized by**: 038 — `src/core/authoring/`, `infra/jobs/authoring-tier.nomad.hcl`, `evals/authoring/`
 - **Relates to**: [ADR-0023](0023-validated-designs-as-judgment-layer.md), [ADR-0031](0031-retrieval-telemetry-as-authoring-backlog.md), [ADR-0037](0037-tool-transport-policy.md)
 
 ## Context

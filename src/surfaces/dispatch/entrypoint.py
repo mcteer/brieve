@@ -29,8 +29,9 @@ from adapters.model_chooser import FIXTURE_PROVIDER, build_chooser
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.schema import AuditEventType
 from core.authority.clock import Clock, SystemClock
-from core.authority.errors import ResolutionRefused
+from core.authority.errors import AuthorityRefuseError, ResolutionRefused
 from core.authority.grant import DEFAULT_MAX_RUN_DURATION, issue_grant
+from core.authority.manufacture import manufacture_authority
 from core.authority.model_credential import BrokeredModelCredential
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
@@ -462,6 +463,99 @@ def _chooser_for(
             raise
 
     return build_chooser(model, recording=recording, secret=secret), model
+
+
+def continue_dispatched_run(
+    *,
+    durability: Any,
+    audit_sink: Any,
+    registry: Any,
+    identity_fabric: Any,
+    clock: Clock,
+    correlation_id: str,
+    blob_id: str,
+    tenant_id: str,
+    holder_identity: str,
+) -> int:
+    """Continue a run a previous task checkpointed — **without counting a revival** (038).
+
+    The third entry mode, and the one 038 needed. The other two do not fit a planned handoff:
+
+    * **start** issues a fresh grant and begins step accounting at zero, which against the same
+      `run_id` would discard everything the first task did;
+    * **resume** counts `attempt = resume_count + 1` against `RESUME_ATTEMPT_CAP` and stops the
+      run terminally past it. That budget exists to stop **flapping**, and spending it on a
+      designed-in transition degrades the control silently: nothing goes red, the run simply has
+      less margin than the platform believes.
+
+    **Authority is re-manufactured here, and that is the substance rather than a detail.**
+    `resume_run` was the only place that happened — *"Fresh authority under the surviving grant,
+    from THIS allocation's identity. Nothing is read from the checkpoint here, and nothing should
+    be."* Skipping it to avoid the counter would have skipped that too, and Principle IV is
+    explicit: *"resume re-authenticates, never replays"*, and *"cached or precedent results never
+    carry authority"*.
+
+    The lease is acquired under this task's own holder identity, and `checkpoint_run` asserts it
+    before every write — so a task continuing a run it does not hold cannot record anything.
+    """
+    checkpoint = durability.load(blob_id)
+    if checkpoint is None:
+        print(f"run {correlation_id}: no checkpoint to continue from", flush=True)
+        return 1
+    if checkpoint.outcome is not None and RunState(checkpoint.outcome.state).is_terminal():
+        # A terminal run is not re-entered. The analysing task must leave the run resumable,
+        # which a conformance row asserts — `complete_run` at the end of its step loop would
+        # break this handoff silently.
+        print(f"run {correlation_id}: already terminal, nothing to continue", flush=True)
+        return 1
+
+    grant = durability.load_grant(checkpoint.grant_id) if checkpoint.grant_id else None
+    if grant is None:
+        print(f"run {correlation_id}: no grant to continue under", flush=True)
+        return 1
+
+    lease = RunLease(durability, run_id=blob_id, holder_identity=holder_identity)
+    lease.acquire()
+
+    try:
+        authority = manufacture_authority(
+            subject_user_id=grant.subject_user_id,
+            requested_scope=grant.requested_scope,
+            identity_fabric=identity_fabric,
+            clock=clock,
+            agent_definition_id=grant.agent_definition_id,
+            correlation_id=correlation_id,
+        )
+    except AuthorityRefuseError as exc:
+        # Stops with the reason, on `resume_run`'s precedent: a cell can be withdrawn and a
+        # pack can stop being loaded between the first task and the second, and both must stop
+        # with the reason recorded rather than escaping as an untyped failure.
+        print(f"run {correlation_id}: authority refused on continuation: {exc}", flush=True)
+        return 1
+
+    run = start_governed_run(
+        correlation_id=correlation_id,
+        subject_user_id=grant.subject_user_id,
+        tenant_id=tenant_id,
+        agent_definition_id=grant.agent_definition_id,
+        requested_scope=grant.requested_scope,
+        identity_fabric=identity_fabric,
+        registry=registry,
+        audit_sink=audit_sink,
+        clock=clock,
+        manufactured=authority,
+    )
+    run.run_id = blob_id
+    run.durability = durability
+    run.lease = lease
+    run.grant = grant
+    # Step accounting continues where the first task left it. `resume_count` is untouched —
+    # asserted by a row, because that untouched zero is the whole point of this mode.
+    run.step_index = checkpoint.step_index
+    run.resume_count = checkpoint.resume_count
+
+    checkpoint_run(run, payload=dict(checkpoint.payload))
+    return 0
 
 
 def resume_dispatched_run(
@@ -980,6 +1074,30 @@ def main() -> int:
     # see `NomadDispatcher.dispatch`'s comment for why both candidate inferences turn a
     # coincidence into a resume. A fresh dispatch carrying a used run_id stays a fresh
     # dispatch, which is the id-collision edge case resolved by construction.
+    # THE CONTINUATION MODE (038). A planned handoff between two tasks of one allocation is
+    # NOT a revival, and routing it through the resume path would spend an attempt against
+    # RESUME_ATTEMPT_CAP on every healthy run — leaving a genuinely interrupted one with less
+    # margin than the platform believes it has, and making the trail read "attempt 2 of 5" for
+    # a run that never failed. The cap is a safety bound against flapping; normal operation
+    # must not consume it.
+    #
+    # Checked BEFORE the resume branch so the two are visibly exclusive rather than
+    # accidentally ordered, and RUN_RESUME is asserted unset on both authoring tasks by a
+    # conformance row — "the proposer resumes" is the phrasing that invites somebody to set it.
+    if os.environ.get("RUN_CONTINUE", "").strip() == "1":
+        durability = PostgresDurabilityProvider(credentials=credentials)
+        return continue_dispatched_run(
+            durability=durability,
+            audit_sink=audit,
+            registry=registry,
+            identity_fabric=fabric,
+            clock=SystemClock(),
+            correlation_id=correlation_id,
+            blob_id=blob_id,
+            tenant_id=tenant_id,
+            holder_identity=holder_identity,
+        )
+
     if os.environ.get("RUN_RESUME", "").strip() == "1":
         durability = PostgresDurabilityProvider(credentials=credentials)
         store = PostgresDependencyStore(credentials=credentials)

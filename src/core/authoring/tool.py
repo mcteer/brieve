@@ -22,12 +22,15 @@ that is ADR-0064's stated cost, and `request.py` carries the check that remains.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from core.authoring.artifact import AuthoredArtifact
 from core.authoring.workspace import Trees, WorkspaceRefused
 from core.authority.errors import ResolutionRefused
 from core.authority.matrix import MatrixFallback, QualifiedCell, resolve_with_fallback
+from core.observation.types import Observer
+from core.registry.memory import ToolHandler, ToolRegistry
 
 #: Registered names. Each is reachable only through a definition's ceiling — the registry is
 #: the opt-in switch, not a flag somebody must remember to set.
@@ -146,7 +149,74 @@ class FileAuthor:
         return {"path": authored.path, "digest": authored.digest, "edited": authored.edited}
 
 
+@dataclass(frozen=True)
+class AuthoringTools:
+    """The handlers a registered authoring run holds, so a caller can read their state.
+
+    Returned by `register_authoring_tools` rather than reconstructed, because the artefact and
+    the consulted list live on the handlers and the caller needs both when the run finishes.
+    """
+
+    reader: SubjectReader
+    author: FileAuthor
+    artifact: AuthoredArtifact
+
+
+def register_authoring_tools(
+    registry: ToolRegistry,
+    *,
+    trees: Trees,
+    artifact: AuthoredArtifact,
+    budget_bytes: int = READ_BUDGET_BYTES,
+) -> AuthoringTools:
+    """Register the analysing half's tools against **this run's** trees.
+
+    **Registered per run rather than once at import**, because both handlers hold run-scoped
+    state: the workspace they may write to, and the artefact they accumulate. A module-level
+    singleton would either share a workspace between runs or need a lookup that amounts to the
+    same thing with more steps.
+
+    That does not weaken the opt-in property. The **ceiling** still decides whether a definition
+    may call these — registration makes a tool resolvable, and `authority.py` decides whether
+    this run may reach it. A definition whose ceiling omits `author_file` has no authoring even
+    though the registry knows the name.
+
+    `open_proposal` is deliberately **not** here: it belongs to the publishing task, which holds
+    no trees, and registering it beside these would put the credential-holding tool in the same
+    place as the subject-reading ones.
+    """
+    reader = SubjectReader(trees, budget_bytes=budget_bytes)
+    author = FileAuthor(trees, artifact)
+    registry.register(READ_SUBJECT, reader, risk_class="read")
+    registry.register(AUTHOR_FILE, author, risk_class="write")
+    return AuthoringTools(reader=reader, author=author, artifact=artifact)
+
+
+def register_proposal_tool(
+    registry: ToolRegistry,
+    *,
+    handler: ToolHandler,
+    observer: Observer,
+) -> None:
+    """Register `open_proposal` for the publishing task.
+
+    **Non-repeatable with an observer, asserted here rather than inherited.** The pack loader
+    refuses `observer_required` when a manifest declares a non-repeatable tool without one —
+    and this is a platform tool (ADR-0064), so that check does not cover it. Opening a proposal
+    twice creates two proposals; without an observer an interrupted publish resolves
+    `CANNOT_DETERMINE` and parks the run.
+    """
+    registry.register(
+        OPEN_PROPOSAL,
+        handler,
+        risk_class="write",
+        repeatable=False,
+        observer=observer,
+    )
+
+
 __all__ = [
+    "AuthoringTools",
     "AUTHOR_FILE",
     "OPEN_PROPOSAL",
     "READ_BUDGET_BYTES",
@@ -156,5 +226,7 @@ __all__ = [
     "ResolutionRefused",
     "SubjectReader",
     "WorkspaceRefused",
+    "register_authoring_tools",
+    "register_proposal_tool",
     "resolve_write_cell",
 ]
