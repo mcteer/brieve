@@ -31,7 +31,29 @@
 
 ## Notes
 
-**16/16**, and three things about how it got there are worth carrying into planning rather than resolving here.
+**16/16 — re-validated after clarification (2026-08-06), still 16/16.** Three questions were asked and
+all three changed the spec; none changed its shape.
+
+**One of them corrected a contradiction the spec had with itself.** US3 said a request is kept *only
+while the act is unfinished* and the Assumptions said it is *released with the run*. Measured, neither
+was true: nothing in the platform deletes this class of record at all — no expiry, no purge, no policy
+— so a request would persist for as long as the store does. The answer is that it stays until something
+removes it, that a configurable retention control is **owed** rather than absent, and that this feature's
+job is to leave the material removable (FR-007a) and its retention stated (FR-007b) so the control can
+be added without unpicking this. **An unstated retention is one nobody can hold the platform to**, and
+this material is a model's own words.
+
+**Two answers looked like they collided and do not.** Argument-level policy was ruled out; a
+per-capability size bound was chosen. Both are per-capability, but by different mechanisms: registration
+already carries properties of a capability beside its handler, so a size is one more of those, while what
+was ruled out is the platform holding a contract about a request's *shape* and deciding malformed
+centrally. The Assumptions section records the distinction rather than leaving the next reader to spot it.
+
+**And the administrative surface now has three callers** — customer-supplied sources, endorsement of
+those sources, and retention for this. Three is the signal that it is its own feature rather than a field
+on somebody else's, and it is recorded that way in Deferred.
+
+Three things about the original draft are still worth carrying into planning rather than resolving here.
 
 **The spec names no module, constant, or table, and the first draft did.** The gap was *found* by
 measurement — a specific constant at a specific line, passed to a specific function — and the

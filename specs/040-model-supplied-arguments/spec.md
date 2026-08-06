@@ -16,6 +16,14 @@
 | **ADRs touched** | **ADR-0026** (the intent/result bracket — an intent must now carry enough to repeat the act it precedes), ADR-0022/ADR-0039 (**consumed, not revisited** — which model may answer is unchanged; only the shape of the answer moves), ADR-0047 (a passing stub is worse than a missing one, and this feature has an unusually available one), ADR-0051 (redaction of tool arguments — the rule this feature must break exactly once and no further), ADR-0065 (**why this is its own feature**: it was planned as a consequence of code mode, which was decided against; the finding is independent and outlived it) |
 | **Evidence class** | **attestation-relevant, and it moves in two directions.** The trail gains nothing: what a model named is already recorded and what it named it *with* stays out, deliberately. What changes is that the **control plane** begins holding a model's own words so an interrupted act can be repeated faithfully — the first place raw model output rests durably anywhere |
 
+## Clarifications
+
+### Session 2026-08-06
+
+- Q: Does this feature introduce authorization over *what* a model asks for, or only carry the request through? → A: Carry through only — each capability enforces its own rules as it does today; argument-level policy is deferred.
+- Q: How large may a request be, and what happens when it is too large? → A: A stated platform default, which a capability may raise for itself where it declares its other properties; over it the answer is refused and re-asked, and the refusal records the size and never the content.
+- Q: When is a kept request released? → A: Kept indefinitely until something deletes it. A configurable retention policy belongs in admin configuration and is owed, not built here — so this feature must leave the request removable rather than load-bearing.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — A model says what it wants done (Priority: P1)
@@ -52,17 +60,18 @@ A run disrupted partway is revived, and a step whose act had not landed is perfo
 
 ### User Story 3 — What a model asked with does not become permanent evidence (Priority: P1)
 
-A model's request is kept only where repeating the act requires it, and only for as long as that act is unfinished. The permanent record continues to say **what** was named and **who** named it, and not what it was named with.
+A model's request is kept in one place, and the permanent record continues to say **what** was named and **who** named it, and not what it was named with. **It is kept until something removes it** — the platform does not expire it on its own, and saying so plainly is part of the requirement, because an unstated retention is one nobody can hold the platform to.
 
 **Why this priority**: The permanent record is the one place a leaked secret cannot be taken back from, and a model may have read one out of an earlier result before composing its next request. The platform already refuses to write a model's words there beyond the name of what it chose, and that refusal was argued rather than assumed. This feature forces the material to be kept *somewhere*; it must not be allowed to drift into the place it was kept out of.
 
-**Independent Test**: Complete a step whose request came from a model, then read every durable record the platform wrote and confirm the request appears in exactly one of them.
+**Independent Test**: Complete a step whose request came from a model, then read every durable record the platform wrote and confirm the request appears in exactly one of them — and that removing it from that one place leaves everything else about the act intact.
 
 **Acceptance Scenarios**:
 
 1. **Given** a step whose request came from a model, **When** every record it produced is read, **Then** the request itself appears in exactly one place and that place is not the permanent record.
 2. **Given** the permanent record for that step, **When** it is read, **Then** it says what was named, by which model, and how it was decided — and nothing about what it was named with.
 3. **Given** a revival of that step, **When** the revival's own record is read, **Then** it too carries none of the request.
+4. **Given** a completed act whose request is removed, **When** the run's records are read, **Then** everything else about the act is intact and the removal has broken nothing.
 
 ---
 
@@ -100,11 +109,11 @@ Every scripted answer that stands in for a model in the merge lane keeps meaning
 ### Edge Cases
 
 - **A capability that takes nothing at all.** Naming it must stay exactly as cheap and exactly as valid as it is today; "asked for nothing" is a legitimate answer, not a malformed one.
-- **A model asks for something it is not permitted to act on.** Permission is decided where it is decided today, by what the run may reach. Stating a request does not widen that, and a permitted name with a forbidden target must refuse for the reason that is actually true.
+- **A model asks for something the capability itself forbids.** Permission to reach the capability is decided where it is decided today; whether *this* request is acceptable is the capability's own business, and it refuses as it already does. A permitted name with a target the capability rejects must refuse for the reason that is actually true rather than being reported as a permission failure.
 - **A request that makes the act fail on its own terms.** Distinct from a malformed request and from a refused one: the platform understood it, was permitted to perform it, and the act failed. Three situations, three records.
 - **The same capability named twice in one run with different requests.** Two acts, two records, and the second must not be mistaken for a repeat of the first.
 - **A record written before this feature, revived after it.** It asked for nothing, which is true and must not be confused with information having been lost.
-- **A request large enough to be a problem.** The platform bounds what it keeps rather than accepting whatever arrives, and a bound that is never stated is a bound nobody can rely on.
+- **A request larger than its capability accepts.** Refused and re-asked, never truncated, and the refusal records how big it was rather than what it said. A capability that legitimately needs more raises its own bound; a capability that needs a short path is not given room for a file.
 
 ## Requirements *(mandatory)*
 
@@ -114,14 +123,18 @@ Every scripted answer that stands in for a model in the merge lane keeps meaning
 
 - **FR-001**: A model MUST be able to state **what to do** with a capability it names, not only which capability to name.
 - **FR-002**: The platform MUST perform the act. Widening what a model may say MUST NOT become a second way for a model to act, and the shape of a governed step MUST NOT change: the model answers, the platform performs, and the same record is written around it.
-- **FR-003**: Everything that decides whether an act may happen MUST keep deciding it, unchanged. A model stating a request MUST NOT widen what the run may reach.
+- **FR-003**: Everything that decides whether an act may happen MUST keep deciding it, unchanged. A model stating a request MUST NOT widen what the run may reach. **Permission continues to be decided by which capability was named, not by what was asked for**: the platform carries the request to the capability, and the capability enforces its own rules exactly as it does today.
 
 **Meaning it later**
 
 - **FR-004**: What a model asked for MUST survive an interruption. A revived step that repeats an unfinished act MUST repeat it with **what the model originally asked for**.
 - **FR-005**: A revived step MUST NOT consult a model again to recover the request. Asking again could produce a different one, and repeating a different act while claiming to have observed the first is re-execution wearing observation's clothes.
 - **FR-006**: What a model asked for MUST be kept in **exactly one** durable place, and that place MUST NOT be the permanent record. The permanent record MUST continue to carry what was named and MUST NOT gain what it was named with.
-- **FR-007**: The platform MUST bound what it keeps, and the bound MUST be stated rather than emergent.
+- **FR-007**: The platform MUST bound how large a request may be, with a **stated default** that applies to every capability. A capability whose legitimate requests are larger MUST be able to raise the bound **for itself**, declared where its other properties are declared — which is a property of the capability, not a contract the platform enforces about the request's shape (see Clarifications).
+- **FR-007c**: A request over its capability's bound MUST be refused and re-asked, never truncated. Truncating would perform a different act from the one described, which is worse than performing none.
+- **FR-007d**: The refusal for an oversized request MUST record **the size and never the content**, on the platform's existing precedent for a message it declined to accept. Recording the content would let a record the platform cannot take back grow at whatever rate a request can be refused.
+- **FR-007a**: What a model asked for MUST be **removable** without damaging anything else the platform relies on. It is kept until something removes it, and the platform expires nothing on its own — so a retention policy must be able to act on it later without the act's own accounting depending on it still being there.
+- **FR-007b**: The retention of what a model asked for MUST be **stated** where an operator can find it. An unstated retention is one nobody can hold the platform to, and this material is a model's own words.
 
 **Getting it wrong**
 
@@ -155,6 +168,9 @@ Every scripted answer that stands in for a model in the merge lane keeps meaning
 - **SC-003**: An interrupted act is repeated with the original request, demonstrated by interrupting one and comparing — and demonstrated against **every** durable store the platform supports, since one of them keeps this information without being asked to.
 - **SC-004**: A revived step consults no model, demonstrated by counting.
 - **SC-005**: What a model asked for is recoverable from exactly one durable place and from **no** permanent record, demonstrated by looking in every one of them.
+- **SC-005a**: Removing what a model asked for leaves the act's own accounting intact, demonstrated by removing it and then reading everything else about the act.
+- **SC-006a**: An oversized request is refused and re-asked rather than truncated, and the refusal record carries its size and none of its content — demonstrated by looking.
+- **SC-006b**: A capability that raised its own bound accepts a request a capability that did not would refuse, demonstrated by sending the same request to both.
 - **SC-006**: An unusable request is re-asked rather than acted upon, and exhausting the re-asks ends the run — both demonstrated, since a bound that is never reached is not demonstrated by the path that does not reach it.
 - **SC-007**: Every scripted answer written before this change produces the identical result after it, demonstrated across all existing model-driven suites without editing any of them.
 - **SC-008**: A record written before this change is revivable after it.
@@ -164,8 +180,9 @@ Every scripted answer that stands in for a model in the merge lane keeps meaning
 
 - **The design is carried, not re-opened.** 039 planned this as a consequence of code mode and was superseded ([ADR-0065](../../docs/adr/0065-code-mode-is-decided-against.md)). Its findings were measured against merged main and stand on their own: what a model may *answer* widens while what it may *do* does not; the alternative — handing the model the capabilities directly — was rejected because it moves the act inside the model's own turn and bypasses the bounded re-ask, the revival honesty, the per-step record and the answer-not-act contract. That alternative stays rejected and its unused machinery stays an open gap rather than being closed as a side effect here.
 - **Permission is unchanged and out of scope.** Which capabilities a run may reach, and which model may answer for it, are decided by records that already exist. This changes what an answer *contains*, never what it *unlocks*.
-- **The keeping is bounded by the act, not by policy.** What a model asked for is kept while the act it describes is unfinished and released with the run. This feature does not introduce a retention policy, and one is not owed by it.
+- **The keeping is unbounded in time, and that is stated rather than hidden.** Measured: nothing in the platform deletes this class of record today — no expiry, no purge, no policy — so a request would persist for as long as the store does. This feature does not build a retention control and **does** owe one: it is a business decision an operator must be able to make, it belongs in administrative configuration alongside the other things that surface is accumulating, and it is recorded as owed rather than assumed away. What this feature must do is leave the material **removable** (FR-007a) and its retention **stated** (FR-007b), so the control can be added later without unpicking this one.
 - **The permanent record's existing rule is correct and stays.** That it carries what was named and not what it was named with was argued when it was written, not defaulted into. This feature is the first thing to press on that rule and must not be the thing that erodes it.
+- **A per-capability size bound is not the per-capability shape contract that was ruled out.** Registration already carries properties of a capability beside its handler, and a size is one more of those. What was ruled out is the platform holding a contract about a request's *shape* and deciding malformed centrally; each capability still decides what it can use. The two answers use different mechanisms and do not collide.
 - **The reachability check is scoped to the platform's own capabilities.** It compares what the platform defines against what a run can reach. It says nothing about capabilities that might arrive from elsewhere, which is a different question with its own record.
 
 ## Deferred
@@ -174,6 +191,7 @@ Recorded so nobody re-derives why these are absent:
 
 - **Letting a model perform acts directly** rather than answering with what it wants done. It is the rejected alternative above, it would give the platform's unused capability-mapping machinery its first caller, and it changes what a governed step *is* — which deserves its own record rather than arriving as a side effect.
 - **Repeating part of an act rather than all of it.** An unfinished act is repeated whole. Anything finer requires marking progress inside an act, which nothing here needs.
+- **Authorization over what a model asks for.** Permission stays a decision about *which* capability was named. Deciding which values a definition may use needs a policy vocabulary and a way for a ceiling to express it, and the platform has neither — the machinery that would carry it exists (a governance decision already receives the request) and nothing consults it, which is where it stays until something needs it.
 - **Which capabilities any given run may reach.** Configuration design, deferred by earlier features and still deferred.
-- **Retention policy for what a model asked for.** Bounded here by the act's own lifetime; a policy expressed in time or volume is a separate question.
+- **A configurable retention policy for what a model asked for.** Owed, not absent by accident. It is a business decision expressed in an administrative surface, and that surface does not exist yet — it is now wanted by customer-supplied sources, by endorsement of those sources, and by this. Three callers is the signal that the surface is its own feature rather than a field on somebody else's.
 - **Capabilities supplied from outside the platform.** Recorded on the roadmap as customer-supplied context and sources; this feature's reachability check is deliberately about the platform's own.
