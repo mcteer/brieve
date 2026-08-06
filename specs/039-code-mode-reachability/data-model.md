@@ -17,7 +17,7 @@ failure mode is closing one and believing it closed the gap.
 | --- | --- | --- | --- |
 | **Registration** | the tool name resolves nowhere | registered, ceiling-gated | an honest `SandboxUnavailableError` and no code mode |
 | **Runtime** | in CI, absent from the run allocation | installed where dispatched work runs | a runtime nothing can invoke |
-| **Channel** | the model answers with a bare tool name | the model issues a tool call with arguments | a program the model cannot express |
+| **Answer** | the model answers with a bare tool name | the model answers with a name **and arguments** | a program the model cannot express |
 
 **FR-003 names two environments in its own text for this reason.** A plan that registers the tool
 and stops has produced a capability reachable in principle and unreachable in fact — which is
@@ -92,30 +92,71 @@ tested. See *Budget* below.
 
 ---
 
-## Model channel (new — this is R3's entity)
+## Model answer (widened — this is R7's entity)
 
-**The thing the platform did not have to represent before.** Today the model's output is a
-`str`: one tool name, or `NONE`. That is a channel wide enough for a *name* and too narrow for a
-*program*.
+**The thing the platform did not have to represent before.** Today the model's answer is a `str`:
+one tool name, or `NONE`. That is wide enough for a *name* and too narrow for a *program*.
 
 | Today | After |
 | --- | --- |
-| `output_type=str`, no toolsets | a toolset built from the run's **effective scope** |
-| system prompt: *"EXACTLY ONE tool name … no punctuation"* | the model issues a tool call with arguments |
-| entrypoint invokes the name with `{"path": ..., "cas": 0}` | the framework's tool-call shape arrives at `GovernedToolset` |
+| `output_type=str` | `output_type=` a structured choice |
+| the model returns a **name** | the model returns a **name and its arguments** |
+| the entrypoint invokes with `_PROBE_ARGUMENTS` | the entrypoint invokes with the model's arguments |
 
-**Built from the effective scope, and that is the blast-radius bound.** Giving the agent a
-toolset changes how *every* model-driven run behaves, not only code-mode ones — so the toolset is
-populated from `effective.tool_names`, the same set the authority hook decides against. A run
-whose ceiling omits the program tool sees no new capability, because there is nothing extra in
-its toolset to see.
+**The shape of a governed step is unchanged, and that is the whole point of choosing this over a
+toolset.** The model still only *answers*; the platform still *invokes*; the bracket still wraps
+it. Four properties 031 built survive because nothing about the step moved:
 
-**Why this is not a second calling convention.** `GovernedToolset` already routes every wrapped
-call through `invoke_tool` and deliberately never calls `super().call_tool` — *"the framework's
-own execution path is never taken — that is the whole point."* This feature is its **first
-production caller**. The alternative, extending the string protocol to carry a program beside a
-name, would have the platform parse model-authored code with a convention it invented, when the
-framework already has one.
+| Property | Why it survives |
+| --- | --- |
+| bounded retry on a bad answer | `resolve_step_tool` still validates before invoking |
+| `already_chosen` re-observation honesty | the step still resolves a choice before executing |
+| `TOOL_CHOSEN` per step | the entrypoint still records what was chosen |
+| `choose()` as the step's contract | still returns an answer rather than a side effect |
+
+**The rejected design and its real cost.** Giving the agent a toolset moves execution inside
+`agent.run_sync` and bypasses every row of that table. It also makes `GovernedToolset` the
+executor — which is what that mapping is *for*, and is a change to what a governed step **is**
+rather than a change to what a model may say. `GovernedToolset` therefore **still has no
+production caller**, and that is recorded as an open gap rather than closed as a side effect
+(R7).
+
+**What widens the blast radius, and what bounds it.** Every model-driven run's model is now asked
+for a structured object rather than a bare word, so a model that could produce a valid name can
+produce a malformed object. **`resolve_step_tool`'s bounded retry is what absorbs that** — and
+it must cover a malformed *object*, not only an unpermitted *name*, which is a different failure
+the existing retry was not written for.
+
+---
+
+## Call ordinal (new — this is R8's entity)
+
+**A counter the platform did not need until a program could loop.**
+
+| Field | Rule |
+| --- | --- |
+| `call_ordinal` | on the run, default `0`; the seam increments it per inner call |
+
+**Why it exists.** The idempotency key is `run_id:step_index:tool_name`, and the seam **never
+advances `step_index`** — so a program calling the same non-repeatable tool twice produces the
+same key twice. Intents are `PRIMARY KEY (run_id, idempotency_key)` inserted `ON CONFLICT DO
+NOTHING`, so the second insert is a **silent no-op** while `bracket_call` executes the effect
+regardless. One intent, two effects, and resume re-observes once.
+
+**The key folds it in only when non-zero:**
+
+```
+ordinal == 0  ->  f"{run_id}:{step_index}:{tool_name}"        # byte-identical to today
+ordinal  > 0  ->  f"{run_id}:{step_index}:{tool_name}:{ordinal}"
+```
+
+**Byte-identical is not a nicety.** Changing every key would invalidate 014's durability rows and
+break resume for any run in flight. The suffix appears only in a situation that could not
+previously arise.
+
+**Rejected**: advancing `run.step_index` from inside the seam. It is the *run's* counter — the
+entrypoint's loop sets it and the checkpoint reads it — so mutating it from inside a tool would
+corrupt the run's accounting to repair the key's.
 
 ---
 

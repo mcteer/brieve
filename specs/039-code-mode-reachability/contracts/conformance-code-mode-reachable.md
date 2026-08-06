@@ -53,32 +53,40 @@ must not read alike — an operator told the wrong one fixes the wrong thing.
 
 ## Still governed (US3)
 
-### K6 — Every call a program makes is governed identically to a direct call (FR-004, SC-002)
+### K6 — Every call a program makes traverses the same pipeline as a direct call (FR-004, SC-002)
 Drive a program **through the registered path** that calls a permitted tool, a denied tool, and a
 name that does not exist. Assert all three produce the same records the same calls issued
 directly would, and that the invented name refuses as `tool is not registered` rather than
 through any blocklist.
 
+**"Identically" means the pipeline, and the row says which.** A direct call from the step loop
+carries arguments the **platform** chose; an inner call carries arguments the **program** wrote.
+Same entry, same hooks, same bracket — different provenance of arguments. Stating that keeps this
+row from reading as a stronger claim than it makes.
+
 **This is 036's parity property re-asserted from the production caller.** 036 proves the seam has
 one exit; this proves the thing with one exit is the thing a definition actually reaches.
 
-### K6a — Governance is terminal at the toolset layer (Principle II)
-Assert the model-facing toolset routes through `GovernedToolset` and that the framework's own
-execution path is never taken. **This feature is that mapping's first production caller** — it
-has existed since 004 with its central claim unexercised outside a test.
+### K6a — The step's shape is unchanged when the answer widens (R7)
+Assert that widening the model's answer to a structured choice leaves all four of 031's
+properties intact: bounded retry still validates before invoking, `already_chosen` still governs a
+resumed step, `TOOL_CHOSEN` is still recorded per step, and the **platform** still performs the
+invoke.
 
-Assert also that the toolset is built from the run's **effective scope**: a run whose ceiling
-omits the program tool sees no new capability. That is the bound on this change's blast radius,
-since giving the agent a toolset affects *every* model-driven run rather than only code-mode ones.
+**Chosen over giving the agent a toolset, and this row is why.** A toolset moves execution inside
+`agent.run_sync` and bypasses every one of those. `GovernedToolset` therefore **still has no
+production caller** — a real gap, recorded rather than closed here, because closing it means
+deciding whether a model may call tools directly, which changes what a governed step *is*.
 
-### K6b — A run without the capability sees no change (Principle II, blast radius)
-Assert that a run whose ceiling omits the program tool behaves identically before and after the
-agent gains a toolset — same reachable set, same refusals.
+### K6b — A malformed structured answer is retried, not executed (R7, blast radius)
+Assert `resolve_step_tool`'s bounded retry covers a **malformed object**, not only an unpermitted
+**name**. Assert also that a run whose ceiling omits the program tool behaves identically before
+and after the widening.
 
-**The bound asserted from the other side.** K6a checks the toolset is built from the run's
-effective scope; this checks an unrelated run is unaffected by that change. Giving the chooser's
-agent a toolset touches *every* model-driven run, which is a wider blast radius than "register a
-tool", and one row checking the mechanism is not the same as one checking the consequence.
+**The bound on this change.** Every model-driven run's model is now asked for a structured object
+rather than a bare word, so a model that could produce a valid name can produce an invalid object
+— a failure mode the existing retry was not written for. One row checking the mechanism is not
+the same as one checking the consequence, so this checks both sides.
 
 ## The budget (US4)
 
@@ -102,6 +110,27 @@ code mode ships a hole.
 Assert three distinct records: a program that finished, a program whose calls were denied and
 which completed having done nothing, and a program stopped by the bound. The middle one is not a
 platform failure and must not be recorded as one.
+
+### K13 — A program calling one non-repeatable tool twice writes TWO intents (R8)
+Run a program that calls the same non-repeatable tool twice. Assert **two** intent records, and
+that a resume re-observes **twice**.
+
+**A defect 036 shipped, reachable only now.** The idempotency key is
+`run_id:step_index:tool_name` and the seam **never advances `step_index`**, so both calls key
+identically; intents insert `ON CONFLICT (run_id, idempotency_key) DO NOTHING`, so the second is a
+silent no-op while `bracket_call` executes the effect regardless. One intent, two effects, and
+resume re-observes once — which is precisely the shape the non-repeatable/observer machinery
+exists to prevent, and which the constitution names as an in-force durability gate.
+
+**A loop is the whole point of code mode.** *"N inner calls cost N+1 steps"* presumes one, so this
+fires on the first realistic program rather than on a contrived one.
+
+### K13a — Every existing idempotency key is byte-identical (R8)
+Assert that a call made outside a program produces exactly the key it produces today — the
+ordinal is folded in **only when non-zero**.
+
+**Not a nicety.** Changing every key would invalidate 014's durability rows and break resume for
+any run in flight; the suffix must appear only in a situation that could not previously arise.
 
 ## The guard that must be inverted (FR-013, SC-007)
 

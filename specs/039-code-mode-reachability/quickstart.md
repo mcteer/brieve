@@ -56,10 +56,14 @@ a denied tool, and a name that does not exist produces the same records those ca
 directly would — and the invented name refuses as *not registered*, through the registry rather
 than through any blocklist.
 
-**K6a is the one to read.** It asserts the model-facing toolset routes through `GovernedToolset`
-and that the toolset is built from the run's **effective scope**. That second clause is the bound
-on this change's blast radius: giving the agent a toolset affects every model-driven run, and
-building it from effective scope means a run whose ceiling omits the program tool sees nothing new.
+**K6a is the one to read.** It asserts that widening the model's answer leaves all four of 031's
+properties intact — bounded retry, `already_chosen`, `TOOL_CHOSEN`, and the platform performing
+the invoke. The first design gave the agent a toolset and would have bypassed every one of them;
+`GovernedToolset` therefore still has **no production caller**, recorded as an open gap rather
+than closed as a side effect.
+
+**And K6b checks both sides of the bound**: a malformed structured answer is retried rather than
+executed, and a run whose ceiling omits the program tool is unaffected by the widening.
 
 ## Scenario D — The budget
 
@@ -68,7 +72,7 @@ uv run --extra adapters --extra surfaces --extra sandbox \
   pytest tests/conformance/adapter -q -k budget
 ```
 
-Expected: K8–K10 pass. A program making N calls consumes N+1 steps, **measured**; a program that
+Expected: K8–K10 and **K13/K13a** pass. A program making N calls consumes N+1 steps, **measured**; a program that
 exhausts the budget **ends the run**; and three outcomes stay distinguishable — finished, denied,
 stopped by the bound.
 
@@ -79,6 +83,12 @@ most plausible way code mode ships a hole.
 
 **And note what K8 does not do.** It counts steps rather than asserting the arithmetic, because
 an assertion that N calls cost N+1 passes against an implementation where the bound never fires.
+
+**K13 is the one that matters most here and is not about the budget at all.** A program calling
+one non-repeatable tool twice must write **two** intents. Measured, both calls key identically —
+the seam never advances `step_index` — and the second insert is `ON CONFLICT DO NOTHING`, so the
+effect happens and the record does not. That is a defect 036 shipped, dormant because nothing
+ever ran a program, and a loop is the whole point of code mode.
 
 ## Scenario E — In the environment where dispatched work actually happens
 

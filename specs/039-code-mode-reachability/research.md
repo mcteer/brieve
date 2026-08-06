@@ -93,9 +93,11 @@ capability for the second time.
 
 **Alternative considered**: extend the chooser's string protocol to carry a program — e.g. a tool
 name followed by a payload. Rejected: it invents a second calling convention alongside the
-framework's own, and it puts model-authored program text through a parser this platform would own
-and the framework already has. `GovernedToolset` exists precisely so the framework's tool-call
-shape is the one that arrives.
+framework's own, and it puts model-authored program text through a parser this platform would own.
+
+**Superseded by R7. The rejection above was a false dichotomy** — it weighed a toolset against a
+hand-rolled parser and never considered **structured output**, which is the framework's own
+mechanism and was reachable through a parameter this code already passes. See R7.
 
 ## R4 — The bound is real arithmetic against a budget nothing has ever tested
 
@@ -146,3 +148,104 @@ is what SC-001 requires — and that is a fixture rather than a policy.
 **The line, stated because it is thin**: registration forces *that a ceiling can name it*. It
 does not force *which ceilings do*. A demonstration definition answers the first; it is not an
 answer to the second, and the plan should not let it become one by accident.
+
+---
+
+*R7–R9 came from the first analyze pass. R7 corrects R3's decision; R8 is a defect 036 shipped
+that only a reachable code mode can reach.*
+
+## R7 — The narrow path R3 missed: the model returns arguments, not a tool call
+
+**R3 was right about the gap and wrong about the fix.** The gap is real and worth restating
+precisely, because the corrected fix follows from stating it exactly:
+
+> **The platform, not the model, supplies every tool's arguments.**
+
+Measured: `resolve_step_tool(run, task=…, permitted=…, chooser=…, arguments=_PROBE_ARGUMENTS,
+already_chosen=…)`. The model returns a **name**; the entrypoint invokes it with a fixed argument
+dict. A program is an argument, so the model has no channel — that much R3 had right.
+
+**What R3 compared, and what it omitted.** It weighed *"give the agent a toolset"* against
+*"extend the string protocol with a parser this platform would own"*, and correctly refused the
+second. It never considered the third: **structured output**. `build_governed_agent` already takes
+`output_type`, and every caller passes `str`. A Pydantic model there is the framework's own
+mechanism — no parser, no invented convention.
+
+**And the toolset path costs far more than R3 accounted for.** Measured, giving the agent a
+toolset moves execution inside `agent.run_sync`, which bypasses **four** properties 031 built:
+
+| Property | Where it lives | Lost under a toolset |
+| --- | --- | --- |
+| bounded retry on a bad answer | `resolve_step_tool` | the model calls directly; nothing bounds it |
+| `already_chosen` re-observation honesty | `resolve_step_tool`, FR-008 | *"re-asking could return a different tool from the one whose bracket is open"* |
+| `TOOL_CHOSEN` recorded per step | the entrypoint | the call happens inside the agent loop |
+| `choose() -> str` as the step's contract | `model_chooser` | meaningless — the tool already ran |
+
+**Decision**: the chooser's `output_type` becomes a structured choice — a tool name **and its
+arguments** — and `resolve_step_tool` carries those arguments through to the governed invoke in
+place of `_PROBE_ARGUMENTS`. Every property in the table survives untouched, because the shape of
+the step is unchanged: the model still answers, the platform still invokes, the bracket still
+wraps it.
+
+**What this deliberately does not do**, recorded so it is not mistaken for an oversight:
+`GovernedToolset` **still has no production caller**. That is a real gap — a mapping built in 004
+whose central claim is unexercised outside a test — and it is **not this feature's to close**.
+Closing it means deciding whether the model calls tools directly, which is a change to what a
+governed step *is*, and it deserves its own record rather than arriving as a side effect of
+making code mode reachable.
+
+## R8 — A looping program silently loses an intent record
+
+**Measured**, three facts that only matter together:
+
+1. `core/hooks/engine.py:450` — the idempotency key is `f"{run_id}:{run.step_index}:{tool_name}"`.
+2. **The seam never advances `step_index`** — grep returns nothing in `seam.py`, `program_tool.py`
+   or `state.py`. Every inner call a program makes carries the submission's step index.
+3. `core/durability/schema.sql:99` — `PRIMARY KEY (run_id, idempotency_key)`, and
+   `postgres.py:246` records intents with **`ON CONFLICT (run_id, idempotency_key) DO NOTHING`**.
+
+**So a program that calls the same non-repeatable tool twice produces one intent record for two
+effects.** `bracket_call` calls `call()` unconditionally after recording intent, so the second
+effect happens; the insert is a silent no-op; and `resolve_open_intents` later re-observes **once**
+for **two** effects.
+
+That is the shape the entire non-repeatable/observer machinery exists to prevent, and the
+constitution names **duplicate-side-effect rejection** as an in-force durability gate.
+
+**Dormant until now, and detonating on the first realistic program.** Nothing has ever run a
+program, and a loop is the whole point of code mode — *"N inner calls cost N+1 steps"* presumes
+one. 036 shipped this; only reachability reaches it.
+
+**Decision**: `GovernedRun` carries a **call ordinal**, the seam increments it per inner call, and
+`_idempotency_key` folds it in **only when it is non-zero**:
+
+```
+ordinal == 0  ->  f"{run_id}:{step_index}:{tool_name}"        # byte-identical to today
+ordinal  > 0  ->  f"{run_id}:{step_index}:{tool_name}:{ordinal}"
+```
+
+**Existing keys are unchanged**, which is not a nicety: altering every key would invalidate 014's
+durability rows and break resume for any run in flight. The new suffix appears only where a
+situation that could not previously arise now does.
+
+**Alternative rejected**: advancing `run.step_index` from inside the seam. It is the *run's* step
+counter, set by the entrypoint's loop and read by the checkpoint; mutating it from inside a tool
+would corrupt the run's own accounting to fix the key's.
+
+## R9 — Three smaller things the plan left to be discovered
+
+**The runtime's injection point.** `core` must not import an adapter (Principle I), and
+`SandboxRuntime` is a Protocol. The concrete Monty binding lives in
+`src/adapters/pydantic_ai/sandbox_runtime.py`, and the handler lives in `src/surfaces/handlers.py`
+— a **surface**, which may import an adapter. Stated rather than discovered, because the obvious
+wrong move is to reach for it from `core/sandbox/`.
+
+**What the fixture chooser can emit.** The dev estate's cells name `fixture/scripted@1`. If the
+fixture chooser cannot produce a structured choice carrying a program, the enclave row proves the
+allocation carries the runtime and **not** that a model can reach it — a weaker claim than SC-001
+makes, and one that would read as the stronger one.
+
+**Identical governance, and what "identical" means.** A direct call from the step loop is invoked
+with arguments the **platform** chose; an inner call carries arguments the **program** wrote. The
+*pipeline* is identical — same entry, same hooks, same bracket — and the *provenance of the
+arguments* is not. K6 asserts the first; saying so keeps it from reading as the second.

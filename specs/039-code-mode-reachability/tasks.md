@@ -5,7 +5,7 @@
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
 
 **Tests**: The feature's claim *is* reachability, so its rows are the deliverable. Every contract
-row — fourteen of them, K1 through K12 with K6a and K6b — has a task, and **every task that asserts has a task that builds**. That pairing
+row — sixteen of them, K1 through K13a — has a task, and **every task that asserts has a task that builds**. That pairing
 is the discipline 036/037/038's analyze passes each paid for: the recurring defect was a row
 asserting over something no task built.
 
@@ -13,7 +13,7 @@ asserting over something no task built.
 
 | Gate type | Where |
 | --- | --- |
-| **Fail-closed** | T012 (an absent runtime refuses with a stated reason), T023 (an exhausted bound ends the RUN) |
+| **Fail-closed** | T012 (an absent runtime refuses with a stated reason), T020b (a looping program writes one intent per effect), T023 (an exhausted bound ends the RUN) |
 | **Conformance** | Phases 3–6 — `tests/conformance/adapter/`, beside 036's parity rows |
 | **Correlation / evidence** | T009 (the program is the recorded cause, written before it runs) |
 | **Eval** | **None, and that is deliberate.** No model is promoted and no cell changes; the runtime is pinned exact and its identity is already asserted by `test_sandbox_dependency_identity.py` |
@@ -36,7 +36,7 @@ looks like progress and is not:
 | --- | --- | --- |
 | **Registration** | an honest refusal and no code mode | Phase 2 |
 | **Runtime installed where work runs** | a runtime nothing can invoke | Phase 2 |
-| **A channel the model can send a program through** | a program the model cannot express | Phase 5 |
+| **An answer wide enough to carry a program** | a program the model cannot express | Phase 5 |
 
 **FR-003 names two environments in its own text** so "we registered the tool" cannot be argued as
 done. The third layer is the one the spec could not name — it deliberately named no module, which
@@ -62,7 +62,7 @@ them would let one be read without the other, which is the mistake that produced
 **The tool becomes resolvable and the allocation carries the runtime. Nothing in Phases 3–6 can
 be reached until both exist, and either alone produces something that looks finished.**
 
-- [ ] T003 Implement the program-tool handler in `src/surfaces/handlers.py`: it constructs the runtime, calls `run_submitted_program`, and returns the program's value. **Constructed per run rather than as a module-level callable** — it needs the run and a runtime, exactly as 038's authoring handlers do, and a singleton would share a sandbox ledger between runs.
+- [ ] T003 Implement the program-tool handler in `src/surfaces/handlers.py`, importing the concrete runtime from `src/adapters/pydantic_ai/sandbox_runtime.py`: it constructs the runtime, calls `run_submitted_program`, and returns the program's value. **The import belongs here and nowhere lower** — `core` must not import an adapter (Principle I) and `SandboxRuntime` is a Protocol, so the binding is injected from a surface. The obvious wrong move is reaching for it from `core/sandbox/`. **Constructed per run rather than as a module-level callable** — it needs the run and a runtime, exactly as 038's authoring handlers do, and a singleton would share a sandbox ledger between runs.
 - [ ] T004 Register the program tool in `src/surfaces/toolset.py` under `PROGRAM_TOOL_NAME`, binding the T003 handler through `PLATFORM_HANDLERS`. **The registry is the opt-in switch and the ceiling is the decision** — registration makes the name resolvable, and `authority.py` decides whether this run may reach it (036's own design; this supplies the caller it never had).
 - [ ] T005 Add `--extra sandbox` to the run command in `infra/jobs/agent-run.nomad.hcl`. **Without this the allocation refuses honestly and the feature is half-closed** — which is FR-003's own wording, present so this cannot be argued as out of scope.
 - [ ] T006 Amend the `sandbox` extra's comment in `pyproject.toml`: "optional" now means **absent from the base install**, not absent from the thing that runs. The current comment says the extra exists *"so the base install never grows a Rust interpreter for a capability most runs do not use"* — after T005 every dispatched allocation carries one, and the comment must describe the posture the platform has rather than the one it had.
@@ -108,25 +108,17 @@ a channel wide enough to send a program.
 **Independent test**: drive a program through the reachable path; every call it makes carries the
 records a direct call would, including calls the program invents.
 
-- [ ] T015 [US3] **Layer three**: give the chooser's agent a toolset in `src/adapters/model_chooser.py`, so the model issues a real tool call with **arguments** rather than answering with a bare tool name. **A program is an argument, not a name** — `output_type=str` under a prompt demanding *"EXACTLY ONE tool name … no punctuation"* is a channel too narrow to carry one (research R3).
-- [ ] T016 [US3] Build the toolset from the run's **effective scope** in `src/adapters/model_chooser.py` — `effective.tool_names`, the same set the authority hook decides against. **This is the blast-radius bound**: giving the agent a toolset changes how *every* model-driven run behaves, and building it from effective scope means a run whose ceiling omits the program tool sees nothing new.
-- [ ] T017 [US3] Update the chooser's system prompt in `src/adapters/model_chooser.py` so it describes issuing a tool call rather than naming one, and keep the `NONE` terminal answer working — a run with nothing to do must still be able to say so.
-- [ ] T018 [US3] Row **K6** in `tests/conformance/adapter/test_code_mode_reachable.py`: drive a program **through the registered path** that calls a permitted tool, a denied tool, and a name that does not exist. Assert all three produce the records the same calls issued directly would, and that the invented name refuses as *not registered* — **through the registry, not through any blocklist**, because a second decision-maker would eventually disagree with the first.
-- [ ] T019 [US3] Row **K6a** in `tests/conformance/adapter/test_code_mode_reachable.py`: the model-facing toolset routes through `GovernedToolset` and the framework's own execution path is never taken. **This feature is that mapping's first production caller** — it has existed since 004 with its central claim unexercised outside a test. Assert also that the toolset equals the run's effective scope, which is T016's bound made checkable.
-- [ ] T020 [US3] Row **K6b** in `tests/conformance/adapter/test_code_mode_reachable.py`: a run whose ceiling omits the program tool sees **no change** in what it can do after T015. The blast radius is asserted from the other side — T019 checks the toolset is bounded, this checks an unrelated run is unaffected.
+- [ ] T015 [US3] Define the structured choice type in `src/core/choice/bounded.py`: a tool **name** and its **arguments**. **The platform still invokes** — this widens what the model may *answer*, not what it may *do*, which is what keeps 031's four properties intact (research R7).
+- [ ] T016 [US3] Pass it as `output_type` in `src/adapters/model_chooser.py` and update `_SYSTEM` so the model returns a name **and arguments** rather than a bare word. Keep `NONE` working — a run with nothing to do must still be able to say so.
+- [ ] T017 [US3] Carry the model's arguments through to the governed invoke in `src/core/choice/bounded.py`, in place of `_PROBE_ARGUMENTS` — whose own docstring in `src/surfaces/dispatch/entrypoint.py` calls it *"a fixture affordance, and it always was"*. **This is the actual gap**: the platform, not the model, has supplied every tool's arguments.
+- [ ] T018 [US3] Extend `resolve_step_tool`'s bounded retry in `src/core/choice/bounded.py` to cover a **malformed object**, not only an unpermitted **name**. A model that could produce a valid word can produce an invalid object, and that is a failure mode the existing retry was not written for.
+- [ ] T019 [US3] Row **K6** in `tests/conformance/adapter/test_code_mode_reachable.py`: drive a program through the registered path calling a permitted tool, a denied tool, and a name that does not exist. Assert the **pipeline** is identical to a direct call — same entry, same hooks, same bracket — and **state that argument provenance differs**: a direct call carries arguments the platform chose, an inner call carries arguments the program wrote. Without that clause the row reads as a stronger claim than it makes.
+- [ ] T020 [US3] Row **K6a** in `tests/conformance/adapter/test_code_mode_reachable.py`: widening the answer leaves all four of 031's properties intact — bounded retry validates before invoking, `already_chosen` governs a resumed step, `TOOL_CHOSEN` is recorded per step, and the **platform** performs the invoke. Assert also that `GovernedToolset` **still has no production caller**, recorded as an open gap rather than closed here.
+- [ ] T020a [US3] Row **K6b** in `tests/conformance/adapter/test_code_mode_reachable.py`: a malformed structured answer is **retried, not executed**, and a run whose ceiling omits the program tool behaves identically before and after the widening. **Both sides of the bound** — one row checking the mechanism is not the same as one checking the consequence.
 
-**Checkpoint**: the model can express a program, and expressing one changes nothing about how
-anything is governed.
-
----
-
-## Phase 6: US4 — What a program costs is knowable before it is permitted (P1)
-
-**Goal**: the budget arithmetic meets a real budget for the first time.
-
-**Independent test**: run a program whose calls exceed the run's bounds; the outcome is recorded
-and distinguishable.
-
+- [ ] T020b [US4] [GATE:fail-closed] Add a `call_ordinal` to `GovernedRun` in `src/core/run.py` (default `0`), increment it per inner call in `src/core/sandbox/seam.py`, and fold it into the key in `src/core/hooks/engine.py` **only when non-zero**. **Measured (research R8): the seam never advances `step_index`, so a program calling one non-repeatable tool twice keys both calls identically — and intents insert `ON CONFLICT DO NOTHING`, so the second is a silent no-op while the effect happens anyway.** One intent, two effects, and resume re-observes once.
+- [ ] T020c [US4] Row **K13** in `tests/conformance/adapter/test_code_mode_reachable.py`: a program calling one non-repeatable tool twice writes **two** intents, and a resume re-observes **twice**. A loop is the whole point of code mode, so this fires on the first realistic program.
+- [ ] T020d [US4] Row **K13a** in `tests/conformance/adapter/test_code_mode_reachable.py`: a call made **outside** a program produces exactly the key it produces today. **Byte-identical is not a nicety** — changing every key would invalidate 014's durability rows and break resume for any run in flight.
 - [ ] T021 [US4] Row **K8** in `tests/conformance/adapter/test_code_mode_reachable.py`: run a program making N calls and **count** the steps consumed, asserting N+1. **Measured rather than asserted** (SC-005's own wording) — an assertion that the arithmetic holds passes against an implementation where the bound never fires.
 - [ ] T022 [US4] Build a bounded fixture run in `tests/conformance/adapter/test_code_mode_reachable.py` whose `ExecutionBounds` are small enough that a short program exhausts them. Nothing today runs a program against a real budget, so the fixture is the thing that has never existed.
 - [ ] T023 [US4] [GATE:fail-closed] Row **K9** in `tests/conformance/adapter/test_code_mode_reachable.py`: a program that exhausts the budget **ends the run** — it does not merely receive a refusal. **A bound a program can route around is not a bound.**
@@ -141,6 +133,7 @@ and distinguishable.
 
 - [ ] T026 Author **one** demonstration definition in `infra/environments/dev/variables.tf` whose ceiling names the program tool, with `tier` and `packs` sufficient for a program to call something. **A fixture, not a policy**: registration forces that a ceiling *can* name the tool and never *which ceilings do*, and 036 deferred that as configuration design (FR-012).
 - [ ] T027 Row **K12** in `tests/conformance/adapter/test_code_mode_reachable.py`: the demonstration definition is the **only** one whose ceiling names the program tool, and it lives in the dev estate. The line between "one definition exists so the capability can be proven" and "code mode is part of the offering" is a sentence in a variables file, which is why it gets a row.
+- [ ] T027a State in `tests/harness/scripted_agent.py` (or wherever the fixture chooser lives) what a fixture answer for a program looks like, and assert it in a row. **If the fixture cannot emit a program, K7 proves the allocation carries the runtime and not that a model can reach it** — a weaker claim than SC-001 makes, wearing the stronger one's clothes.
 - [ ] T028 Row **K7** in `tests/conformance/adapter/test_code_mode_reachable.py`, **enclave-marked**: dispatch a run whose definition carries the tool, submit a program, and assert it ran **in the allocation**. **This is the row the whole feature exists for** — every other row could pass while the capability stayed unreachable in production, which is precisely the state 036 left, with green parity rows, for a month.
 - [ ] T029 Run quickstart **Scenario E** from `specs/039-code-mode-reachability/quickstart.md` against the enclave: `make dev-up`, dispatch, and read the trail. Confirm the allocation's command carries `--extra sandbox` — without it the run refuses honestly, which is correct behaviour and is **not** this feature being finished.
 - [ ] T030 [P] Update `ROADMAP.md`: 036's row gains a note that its parity gate was satisfied while the capability was unreachable, and that 039 closed it. The shipped table records what a feature *did*; leaving it silent here would preserve the impression that 036 delivered a usable capability.
@@ -182,9 +175,15 @@ the trail carrying the program as the cause. That closes two of the three layers
 independently valuable — but **it is not the feature**, because the model still cannot send a
 program. Phase 5 is what makes FR-001 true rather than nearly-true.
 
-**Phase 5 has the widest blast radius and the smallest word count.** Three tasks change how every
-model-driven run behaves. T016's bound — the toolset is built from the run's effective scope — is
-what keeps that change from being a widening, and T019/T020 assert it from both sides.
+**Phase 5 changes what every model-driven run's model is asked to produce**, which is a real blast
+radius and a far smaller one than the first design's. The platform still invokes, so nothing about
+a step's governance moves; what can newly go wrong is a malformed object, and T018's retry is what
+absorbs it. T020/T020a assert the bound from both sides.
+
+**Phase 6 carries a defect 036 shipped.** T020b is not part of making code mode reachable — it is
+the thing reachability *reaches*. A program that loops over one non-repeatable tool writes one
+intent for two effects, silently, and that defeats a durability gate the constitution names as in
+force.
 
 **Phase 7's T028 is the one that would have caught this feature's own subject.** Everything else
 can be green while production is unreachable.
@@ -194,10 +193,13 @@ can be green while production is unreachable.
 - **Gate types omitted**: **Eval**, deliberately. No model is promoted, no matrix cell changes,
   and the runtime is pinned exact with its distribution identity already asserted by
   `tests/unit/test_sandbox_dependency_identity.py`.
-- **No sealed-core change and no new ADR.** `PROGRAM_SUBMITTED` exists; ADR-0041's gate is
-  satisfied and stays satisfied; **ADR-0054 stays Proposed** because its delegation half still has
-  no substrate and this feature does not give it one.
-- **The obligation that travels**: `pyproject.toml`'s comment (T006). After T005 it describes a
+- **One sealed-core-adjacent change, and no new ADR.** `PROGRAM_SUBMITTED` exists; ADR-0041's
+  gate is satisfied and stays satisfied; **ADR-0054 stays Proposed** because its delegation half
+  still has no substrate and this feature does not give it one. **But T020b touches the hook
+  engine's idempotency key**, so the earlier "no sealed-core change" claim was wrong — it is a
+  narrowing that leaves every existing key byte-identical, and it carries the Principle V review.
+- **The obligations that travel**: the Principle V review for T020b's key change, and
+  `pyproject.toml`'s comment (T006). After T005 it describes a
   posture the platform no longer has, and a comment that outlives its truth is how the next reader
   makes a wrong assumption about what "optional" bought.
 - **What the previous three features kept finding**, so this list starts from it: a row that

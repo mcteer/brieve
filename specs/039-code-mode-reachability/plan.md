@@ -13,17 +13,22 @@ The two the spec anticipated: the program tool is **registered nowhere**, so a c
 refuses `unknown_ceiling_entry`; and the run allocation **never installs the runtime**, while CI
 does — which is why 036's rows are green.
 
-The third, and the reason this plan is not a two-line change: **the model has no channel to emit
-a program.** The chooser builds its agent with `output_type=str` and **no toolsets**, under a
-prompt demanding *"EXACTLY ONE tool name … no punctuation, no explanation"*; the entrypoint then
-invokes that name with one fixed argument shape, `{"path": ..., "cas": 0}`, which its own
-docstring calls *"a fixture affordance."* A program is not a name — it is model-authored text
-submitted as an argument. **`GovernedToolset`, the mapping built to route a model's tool calls
-through `invoke_tool`, has no production caller at all.**
+The third, and the reason this plan is not a two-line change: **the platform, not the model,
+supplies every tool's arguments.** `resolve_step_tool` asks the model for a *name*; the entrypoint
+invokes it with one fixed argument shape, `{"path": ..., "cas": 0}`, whose own docstring calls it
+*"a fixture affordance."* A program is an argument, so the model has no channel to send one.
+
+**The fix is structured output, not a toolset** (R7). `build_governed_agent` already takes
+`output_type` and every caller passes `str`; a structured type there is the framework's own
+mechanism. The model returns a tool **and its arguments**, and `resolve_step_tool` carries them to
+the governed invoke. **Giving the agent a toolset was the first design and cost far more than it
+looked** — it moves execution inside `agent.run_sync`, bypassing bounded retry, `already_chosen`
+re-observation honesty, `TOOL_CHOSEN`, and the chooser's own contract.
 
 So the work is: **register** the tool, **install** the runtime where dispatched work runs, and
-**give the model a toolset** so it issues a real tool call with arguments. Then prove it —
-against a real budget, because the arithmetic has never met one.
+**widen the model's answer** from a name to a name-with-arguments. Then prove it — against a real
+budget, because the arithmetic has never met one, and **fix a defect that only a reachable code
+mode can reach** (R8).
 
 ## Technical Context
 
@@ -43,8 +48,8 @@ where dispatched work actually happens"* and no hermetic row can assert that.
 
 **Target Platform**: unchanged. The change is what the run allocation installs, not where it runs.
 
-**Project Type**: single project. New: registration in `src/surfaces/`, a toolset on the chooser's
-agent, one demonstration definition in the dev estate.
+**Project Type**: single project. New: registration in `src/surfaces/`, a structured choice type
+on the chooser, a call ordinal on the run, one demonstration definition in the dev estate.
 
 **Performance Goals**: **the cost is the interpreter in the install**, not runtime latency. Every
 dispatched run will carry a Rust interpreter it mostly will not use, on the allocation's critical
@@ -56,8 +61,9 @@ reachable. An environment without the runtime must keep refusing with a stated r
 (`SandboxUnavailableError`), never an import failure. No shipped definition gains the capability
 (FR-012). The 038 row asserting unreachability is **inverted, never deleted** (FR-013).
 
-**Scale/Scope**: one tool, one extra, one toolset, one demonstration definition. The smallest
-change that makes an existing proven property true of the running platform.
+**Scale/Scope**: one tool, one extra, one widened answer, one key fix, one demonstration
+definition. The smallest change that makes an existing proven property true of the running
+platform — plus the one defect that property's absence had been hiding.
 
 ## Constitution Check
 
@@ -66,10 +72,10 @@ change that makes an existing proven property true of the running platform.
 | Principle | Verdict | Notes |
 | --- | --- | --- |
 | I — Build Glue Only | **Pass** | Nothing is built. The seam, the ledger, the audit member, the runtime binding and the toolset mapping all exist; this wires them. The one genuinely new artefact is a demonstration definition, which is configuration. |
-| II — Total Interception; One Governed Tool Layer | **Pass** | The program tool is an ordinary registered tool; every call a program makes already round-trips `invoke_tool` by construction at the seam. **Giving the chooser's agent a toolset is the first production use of `GovernedToolset`** — the mapping whose whole purpose is that the framework's own execution path is never taken. That strengthens Principle II rather than straining it: today the model names a tool and the entrypoint invokes it, which works, and leaves the adapter's governed-toolset guarantee unexercised in production. |
+| II — Total Interception; One Governed Tool Layer | **Pass** | The program tool is an ordinary registered tool; every call a program makes already round-trips `invoke_tool` by construction at the seam. **The shape of a governed step is unchanged**: the model answers, the platform invokes, the bracket wraps it. What widens is the *answer* — a name becomes a name and its arguments. **`GovernedToolset` still has no production caller**, and this feature deliberately does not give it one (R7): that would mean the model calling tools directly, which changes what a governed step *is* and deserves its own record rather than arriving as a side effect. |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | `SandboxUnavailableError` exists precisely so a missing runtime refuses with a stated reason rather than surfacing an ImportError three frames down, and an environment without the extra must keep doing exactly that (FR-007). The seam's three-way distinction — policy deny visible to the program, exhausted bound terminating the run, superseded lease propagating — is asserted against a real budget for the first time (R4). |
 | IV — Zero Standing Credentials; Authority Per Task | **N/A** | No credential path changes. A program runs under the run's existing authority and reaches tools through the ceiling that already bounds it. |
-| V — Sealed Core, Versioned Seams | **Pass** | **No sealed-core change.** No audit member is added — `PROGRAM_SUBMITTED` exists. The registry gains an entry through the ordinary `register` path; the hook engine, identity flows, durability and adapters are untouched in substance. The adapter gains a *caller*, not a new mapping. |
+| V — Sealed Core, Versioned Seams | **Pass, with a narrowing** | No audit member is added — `PROGRAM_SUBMITTED` exists — and the registry gains an entry through the ordinary `register` path. **But R8's fix touches the hook engine's idempotency key**, which is sealed-core adjacent, so the earlier "no sealed-core change" claim was wrong. The change is a **narrowing that adds a suffix only where the ordinal is non-zero**, so every key a non-sandbox call produces is byte-identical to today — which is what keeps 014's durability rows and any in-flight resume valid. It carries the security-maintainer review Principle V requires. |
 | VI — Lean by Default | **Pass, with a cost stated** | The runtime stays a library behind an optional dependency, so no named-trigger ADR is owed. But installing it where dispatched work runs means **every** dispatched run carries a Rust interpreter it mostly will not use. "Optional" stops meaning *absent from the thing that runs* and starts meaning *absent from the base install* — a weaker claim than `pyproject.toml`'s comment makes today, and the comment is amended to say so. |
 | VII — Anti-Fragmentation | **Pass** | One run allocation, one posture. The rejected alternative — a second jobspec installing the extra only for code-mode runs — halves the cost and doubles the substrate, which is the fragmentation this principle forecloses and which 038's two-jobspec experience says drifts (R2). |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass** | No model is promoted and no cell changes. The runtime is pinned exact (`==0.0.19`) and stays pinned; `test_sandbox_dependency_identity.py` already asserts the distribution's identity, which is ADR-0004's discipline applied to a runtime. |
@@ -107,10 +113,21 @@ src/surfaces/
                               #   even though the registry knows the name
 
 src/adapters/
-└── model_chooser.py          # THE THIRD LAYER (R3). The agent gains a toolset, so the model
-                              #   issues a real tool call with ARGUMENTS instead of answering
-                              #   with a bare tool name. First production caller of
-                              #   `GovernedToolset` — the mapping exists and nothing used it
+└── model_chooser.py          # THE THIRD LAYER (R7). `output_type` becomes a STRUCTURED choice —
+                              #   a tool name AND its arguments — so the platform still invokes
+                              #   and the model still only answers. Bounded retry,
+                              #   `already_chosen` and `TOOL_CHOSEN` all survive untouched
+
+src/core/choice/bounded.py    # `resolve_step_tool` carries the model's arguments to the invoke
+                              #   in place of `_PROBE_ARGUMENTS`, which its own docstring calls
+                              #   "a fixture affordance, and it always was"
+
+src/core/run.py               # + a call ordinal, default 0
+src/core/sandbox/seam.py      # increments it per inner call
+src/core/hooks/engine.py      # R8: the idempotency key folds the ordinal in ONLY when non-zero,
+                              #   so every existing key is byte-identical. Without this, a
+                              #   program calling one non-repeatable tool twice writes ONE intent
+                              #   for TWO effects — `ON CONFLICT DO NOTHING`, silently
 
 infra/jobs/agent-run.nomad.hcl  # + `--extra sandbox`. The allocation where dispatched work
                               #   runs carries the runtime, or FR-003 is half-closed
@@ -134,30 +151,35 @@ absent — that produced this feature.
 
 Re-evaluated after Phase 1. No verdict changed; two were sharpened:
 
-- **II** — the design's largest single change is giving the chooser's agent a toolset, and that
-  reads as a strain on Principle II until you notice it is the opposite. `GovernedToolset`'s
-  whole purpose is that *"the framework's own execution path is never taken"*, and today that
-  guarantee is unexercised in production because the model answers with a string. Using it is
-  the first time the adapter mapping's central claim is load-bearing outside a test.
+- **II** — the first design gave the chooser's agent a toolset and read as a strain on this
+  principle. The corrected design (R7) is not a strain at all: the shape of a governed step is
+  unchanged, and only the model's *answer* widens. `GovernedToolset` remains without a production
+  caller — recorded as a real gap rather than closed as a side effect, because closing it means
+  deciding whether a model may call tools directly.
+- **V** — the earlier "no sealed-core change" was wrong. R8's fix touches the hook engine's
+  idempotency key. It is a narrowing — the suffix appears only where the ordinal is non-zero, so
+  every key a non-sandbox call produces is unchanged — but it carries the review Principle V
+  requires rather than being argued past.
 - **VI** — the honest reading of "lean" changed rather than the verdict. Nothing operated is
   added; what changes is what every dispatched allocation carries. That is a real cost paid for
   a capability most runs will not use, and `pyproject.toml`'s comment is amended rather than left
   describing the old posture.
 
-**The risk moved into the record rather than resolved**: giving the agent a toolset changes how
-**every** model-driven run behaves, not only code-mode runs — the model gains the ability to
-issue tool calls where it previously answered with a name. That is a larger blast radius than
-"register a tool", and the plan states it here so tasks can bound it: the toolset is populated
-from the run's **effective scope**, so a run whose ceiling omits the program tool sees no change
-in what it can do.
+**The risk moved into the record rather than resolved**: widening the chooser's answer changes
+what **every** model-driven run's model is asked to produce, not only code-mode runs. The blast
+radius is far smaller than the toolset design's — the platform still invokes, so nothing about a
+step's governance moves — but a model that must now emit a structured object can emit a malformed
+one, and `resolve_step_tool`'s bounded retry is what absorbs that. Tasks assert the retry covers
+a malformed *object*, not only an unpermitted *name*.
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 | --- | --- | --- |
 | **Every dispatched allocation installs a Rust interpreter** it mostly will not use, against Principle VI's default | FR-003 says a capability reachable in testing and absent in production is the defect this feature closes, and closing half of it does not close it. The allocation that runs dispatched work must carry what code mode needs | **A second jobspec** installing the extra only for code-mode runs halves the cost and doubles the substrate — two allocations whose postures must stay identical, which is the fragmentation Principle VII forecloses and which 038's two-jobspec experience says drifts. **Lazy installation at first use** puts a package install inside a governed step, on the run's critical path, with no bound |
-| **The chooser's agent gains a toolset**, changing every model-driven run rather than only code-mode ones | A program is an argument, not a name. The model's only channel today is a bare tool name (R3), and no amount of registration makes a program travel through it | **Extending the string protocol** to carry a program alongside a name invents a second calling convention beside the framework's own, and puts model-authored program text through a parser this platform would own while the framework already has one. `GovernedToolset` exists precisely so the framework's tool-call shape is what arrives |
+| **The chooser's answer widens** from a name to a name-with-arguments, changing what every model-driven run's model is asked to produce | A program is an argument, not a name. The platform supplies every tool's arguments today (R7), and no amount of registration makes a program travel through a name-shaped channel | **Giving the agent a toolset** was the first design and costs far more: it moves execution inside `agent.run_sync`, bypassing bounded retry, `already_chosen` re-observation honesty, `TOOL_CHOSEN`, and the chooser's own contract. **A hand-rolled string protocol** invents a calling convention this platform would own and parse. Structured output is the framework's own mechanism, reachable through a parameter the code already passes |
+| **The hook engine's idempotency key changes shape** | A program calling one non-repeatable tool twice writes ONE intent for TWO effects — the seam never advances `step_index`, and the insert is `ON CONFLICT DO NOTHING` (R8). That defeats duplicate-side-effect rejection, which the constitution names as an in-force gate | **Advancing `run.step_index` from inside the seam** corrupts the run's own accounting to fix the key's: it is the entrypoint's counter and the checkpoint reads it. **Leaving it** ships a hole that only a looping program reaches — which is every realistic program |
 
-Neither is a new operated component, so no named-trigger ADR is owed. The first is a stated cost;
-the second is a bounded blast radius, and the bound — the toolset is built from the run's
-effective scope — is what tasks must assert.
+None is a new operated component, so no named-trigger ADR is owed. The first is a stated cost;
+the second is a bounded change whose bound — the platform still invokes — tasks must assert; the
+third is a narrowing that leaves every existing key byte-identical.
