@@ -287,6 +287,29 @@ qualify one and confirm it proceeds.
 
 - [X] T067 Run quickstart **Scenario G** from `specs/038-authoring-workflows/quickstart.md` against the enclave: dispatch a real authoring run at a scratch repository, confirm the proposal appears, the trail carries `ARTIFACT_AUTHORED` and `PROPOSAL_OPENED`, and **no merge event exists**. Then merge by hand and confirm the merge is *observed* and the subsequent apply is the ordinary governed act. **The assembly is the one path no hermetic row covers**, and every previous feature that skipped it found something here.
 - [X] T068 [P] Move `docs/adr/0062-authoring-credentials-are-vended-per-task.md` **and `docs/adr/0063-a-mechanical-scorer-may-qualify-a-cell.md`** to **Accepted** with the security-maintainer review, land the Principle IV amendment from T006a, and record the Principle V review for the four audit members — **one obligation in four files**, on 037's T004/T005/T054 precedent.
+  **Approved by Dan McTeer, 2026-08-05, recorded on PR #167** — Principle V security-maintainer
+  review, covering three things rather than one, because the sealed-core surface here is wider
+  than 037's and the approval should say so:
+
+  1. **The four additive `AuditEventType` members** — `ARTIFACT_AUTHORED`, `PROPOSAL_OPENED`,
+     `CONTAINMENT_REFUSED`, `ENACTMENT_REFUSED` — on `TOOL_CHOSEN`'s precedent and 037's four,
+     with `test_widening_the_event_vocabulary_moves_no_existing_hash` confirming the widening
+     moved no existing digest.
+  2. **The payload-shape gate**, applied by BOTH sinks. More than 037's precedent, and
+     deliberately: `append_event` takes `dict[str, Any]` and validates nothing, and
+     `redact_arguments` runs on tool *arguments* and never on event payloads — so every
+     "carries codes, never text" rule in this feature was a convention. It **raises rather than
+     trimming**, which means a bad payload fails the audit write rather than degrading it. That
+     is a fail-closed choice on an append-only path, approved as such: trimming would let a
+     caller keep believing it recorded what it wrote.
+  3. **`resolve_with_fallback`'s pinned-branch role check** (`core/authority/matrix.py`). A
+     narrowing that makes an existing docstring true — the branch never checked the role it
+     promised, so a `plan` cell resolved for `write`. It can only refuse where it previously
+     allowed.
+
+  037's approval (PR #164) covered a **disjoint** set of members and does not reach these.
+  ADR-0062, ADR-0063 and ADR-0064 move to Accepted carrying them, alongside the Principle IV
+  amendment (constitution 1.5.0 → 1.6.0).
 - [X] T068a [P] Reconcile `specs/038-authoring-workflows/quickstart.md` with the rows added across five remediations — T4, T5, T6, T7, C6, C7, C8, P0, P7, P8, P9, P10, P11, Q7, Q8, Q9, R3, V4, W3a, W6 — **and with the two-task job structure**, which Scenario G still describes as a single dispatch. **The guide is what somebody runs to believe the feature works**, and a validation guide describing an earlier design is worse than none.
 - [X] T069 [P] Add a realization note to `docs/adr/0038-integration-and-uplift.md` pointing at this feature, and reconcile `docs/adr/README.md` — its index rows have gone stale before, and only a mechanical header/index check caught it.
 - [X] T070 [P] Update `ROADMAP.md`: the integration-and-uplift row moves from named-and-unimplemented, and the `write` role is no longer unbound.
