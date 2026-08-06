@@ -493,3 +493,38 @@ refusal absent from it is one nobody verifies is present. Measured, the blast ra
 `core/run.py:266` **prepends** the builtins to any explicit list, so every run with
 `include_governance` gets it, and the five sites passing `hooks=[...]` are the fail-closed tests
 that deliberately omit governance to prove the check fires.
+
+## R17 — What the argument column and the fourth hook actually touch
+
+*From the seventh pass, which enumerated every consumer of every contract this feature changes
+rather than following one hop at a time. Three findings, all the same shape: the change reaches
+further than the task naming it said.*
+
+**The Postgres provider reconstructs `IntentRecord` from an explicit column list, in three
+places.** `record_intent`'s INSERT, `open_intents`' SELECT (`postgres.py:293`) and
+`closed_intents`' (`postgres.py:323`). A **defaulted** field is exactly the shape that fails
+silently here: the model validates, the row loads, and the arguments are `{}`. `open_intents` is
+the one resume reads, so missing it is the whole defect wearing a green row.
+
+**And the in-memory provider needs no change at all, which makes it a passing stub.**
+`InMemoryDurabilityProvider` stores the `IntentRecord` object itself (`memory.py:65`), so the
+arguments round-trip for free. A hermetic K16 run against it passes **whether or not** the SQL was
+widened.
+
+`memory.py:29` already argues this, about a different field: *"The two must agree here or a row
+proven against one says nothing about the other — and this is precisely the property a hermetic
+row would be used to prove."* It goes on to record that writing the narrower guard in one provider
+*"made the two providers disagree on precisely the stop-versus-finish race the guard exists for."*
+Same trap, one field over — and this feature exists because a green row did not mean what it
+looked like. **K16 runs against both providers.**
+
+**Decision: the nesting hook runs AFTER authority.** `builtin_governance_hooks()`'s docstring says
+its order *"is a decision rather than an accident"* — the dependency gate goes first so a call
+against a down product does not refuse with a scope error and *"send whoever is debugging it to the
+wrong place entirely."*
+
+Apply that reasoning: a definition whose ceiling omits code mode, submitting from inside a program,
+must refuse **`authority_insufficient`**. Nesting is only the true reason when the call would
+otherwise have been permitted. A hook placed before authority would report the wrong one — the
+exact failure the docstring names. **K15 asserts the ordering, not the membership**, because
+membership is what a hook appended anywhere would satisfy.

@@ -209,6 +209,14 @@ one place that must never be written to."* The control plane is read by resume; 
 by people and exported. **Two stores, opposite rules, and the reason is what each is for** — the
 same distinction 038 drew between `PROGRAM_SUBMITTED` and `ARTIFACT_AUTHORED`.
 
+**Two providers, and only one of them changes.** `InMemoryDurabilityProvider` stores the record
+object, so the arguments round-trip for free; Postgres reconstructs it from an **explicit column
+list in three places**. A defaulted field therefore fails *silently* in the SQL provider and
+succeeds *for free* in the memory one — so a row proven against memory says nothing about the
+provider production uses. `memory.py:29` records that this has happened before, on a different
+field: writing the narrower guard in one provider *"made the two providers disagree on precisely
+the stop-versus-finish race the guard exists for."*
+
 **Additive and defaulted, and `resume_count` names the trap that shape carries**: `save()`
 overwrites the whole row, so an intent written without threading the arguments through resumes
 with `{}` and is indistinguishable from a tool that takes none.

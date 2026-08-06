@@ -184,6 +184,15 @@ counter mid-flight so its remaining calls re-key from 1 and collide with intents
 
 **A refusal is reversible by a later record. An unbounded recursion that shipped is not.**
 
+**And the hook runs AFTER authority, which is what the row asserts** (R17). Membership is what a
+hook appended anywhere would satisfy; **order is the claim**. `builtin_governance_hooks()`'s
+docstring says its ordering *"is a decision rather than an accident"* — the dependency gate goes
+first so a call against a down product does not refuse with a scope error and *"send whoever is
+debugging it to the wrong place entirely."* A definition whose ceiling omits code mode, submitting
+from inside a program, must refuse **`authority_insufficient`**: nesting is the true reason only
+when the call would otherwise have been permitted, and a hook placed before authority reports the
+wrong one.
+
 **Refused by a HOOK, and the row asserts where.** A name check inside the seam would be the
 blocklist the seam's own docstring says it does not have — *"no blocklist, no allowlist, and no
 special case… there is one decision maker, and it is the one that already decides"* — and it would
@@ -207,6 +216,15 @@ re-invoking reproduces them for free. The moment they come from the model, they 
 **So this row fails before the fix and passes after**, and it fails for **every** model-driven
 run rather than only for a code-mode one. Same shape as K13: correct-looking, dormant, reachable
 only once the feature that needs it ships.
+
+**Run against BOTH durability providers, and that clause is the row** (R17). The in-memory provider
+stores the `IntentRecord` object, so the arguments round-trip **for free** — this row passes
+against it whether or not the SQL was widened, which is the stub shape ADR-0047 forbids and the
+shape this whole feature exists because of. `memory.py:29` argues the rule for a different field:
+*"The two must agree here or a row proven against one says nothing about the other — and this is
+precisely the property a hermetic row would be used to prove."* Postgres reconstructs the record
+from an **explicit column list in three places**, and a defaulted field fails silently in every one
+of them.
 
 ### K16a — The trail still carries no arguments (FR-016, SC-010, R13) — *no-secret-leak*
 Assert `TOOL_CHOSEN`'s payload is unchanged: `run_id`, `step_index`, `attempt`, `model`, `named`,

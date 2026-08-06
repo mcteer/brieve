@@ -135,7 +135,10 @@ src/core/durability/types.py   #   defaulted to `{}` on `resume_count`'s precede
                               #   is nothing to re-invoke with. NOT the audit trail — `TOOL_CHOSEN`
                               #   carries the name and nothing else, by argument
 src/core/observation/bracket.py #  where the IntentRecord is CONSTRUCTED (bracket.py:41) — one
-src/core/durability/postgres.py #  caller, engine.py:247, and it already holds the arguments
+src/core/durability/postgres.py #  caller, engine.py:247, and it already holds the arguments.
+                              #   THREE postgres sites: the INSERT and BOTH selects. memory.py
+                              #   needs no change at all, which is exactly why K16 runs against
+                              #   both — a row proven against memory says nothing about the SQL
 
 src/core/run.py               # + a call ordinal, default 0
 src/core/sandbox/seam.py      # SETS it on entry, CLEARS it in a `finally` — scoped to the
@@ -145,7 +148,8 @@ src/core/sandbox/seam.py      # SETS it on entry, CLEARS it in a `finally` — s
                               #   not catch a superseded lease or an exhausted bound, which are the
                               #   paths US4 exercises
 src/core/sandbox/hooks.py     # R10: a GOVERNANCE hook denying the program tool when
-src/core/hooks/governance.py  #   `call_ordinal > 0`, registered as a BUILTIN. NOT a name check in
+src/core/hooks/governance.py  #   `call_ordinal > 0`, registered as a BUILTIN, AFTER authority so a
+                              #   ceiling refusal still reads `authority_insufficient`. NOT a check in
                               #   the seam — the seam has "no blocklist, no allowlist, and no
                               #   special case", and a check there would sit before `invoke_tool`
                               #   and never be recorded. Builtin because run.py:203 says a second

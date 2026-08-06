@@ -70,8 +70,11 @@ has nothing to re-invoke with — `intents` carries the tool name and no argumen
 step *runs again*. K16 asserts the arguments survive; K16a asserts they went to the control plane
 and **not** to the trail, whose rule is that no model output beyond the name is written there.
 
-**Prove K16 can fail.** Revert the `arguments` field on `IntentRecord` and re-run: K16 must fail
-with an empty argument map rather than passing on a defaulted value. A row that passes whether or
+**Prove K16 can fail — and prove it against the right provider.** Revert the `arguments` field on
+`IntentRecord` and re-run: K16 must fail with an empty argument map rather than passing on a
+defaulted value. Then run it against the **in-memory** provider alone: it passes whether or not
+the SQL was widened, because that provider stores the record object and the arguments round-trip
+for free. That is the stub this feature exists because of, so K16 runs against both. A row that passes whether or
 not the arguments are persisted is asserting nothing about resume.
 
 ## Scenario D — The budget
