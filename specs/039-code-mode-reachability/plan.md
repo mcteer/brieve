@@ -118,6 +118,11 @@ src/adapters/
                               #   and the model still only answers. Bounded retry,
                               #   `already_chosen` and `TOOL_CHOSEN` all survive untouched
 
+src/core/choice/recorded.py   # the recording format widens, and a BARE NAME still parses as a
+                              #   choice with NO arguments — four existing conformance suites feed
+                              #   recordings through `recording(*answers)` with bare names, and
+                              #   they are the rows proving model-driven runs work at all
+
 src/core/choice/bounded.py    # `resolve_step_tool` carries the model's arguments to the invoke
                               #   in place of `_PROBE_ARGUMENTS`, which its own docstring calls
                               #   "a fixture affordance, and it always was" — and whose NEXT
@@ -125,9 +130,12 @@ src/core/choice/bounded.py    # `resolve_step_tool` carries the model's argument
                               #   (engine.py:374), so the silent-success risk it warns of is gone
 
 src/core/run.py               # + a call ordinal, default 0
-src/core/sandbox/seam.py      # SETS it on entry, CLEARS it on exit — scoped to the submission,
-                              #   because nothing resets a run-level counter between steps, and an
-                              #   elevated one would key the NEXT direct call `run:1:tool:3`
+src/core/sandbox/seam.py      # SETS it on entry, CLEARS it in a `finally` — scoped to the
+                              #   submission, because nothing resets a run-level counter between
+                              #   steps, and an elevated one would key the NEXT direct call
+                              #   `run:1:tool:3`. The `finally` matters: the seam deliberately does
+                              #   not catch a superseded lease or an exhausted bound, which are the
+                              #   paths US4 exercises. And it REFUSES a nested submission (R10)
 src/core/hooks/engine.py      # R8: the idempotency key folds the ordinal in ONLY when non-zero,
                               #   so every existing key is byte-identical. Without this, a
                               #   program calling one non-repeatable tool twice writes ONE intent
@@ -168,6 +176,20 @@ Re-evaluated after Phase 1. No verdict changed; two were sharpened:
   added; what changes is what every dispatched allocation carries. That is a real cost paid for
   a capability most runs will not use, and `pyproject.toml`'s comment is amended rather than left
   describing the old posture.
+
+**A limit stated rather than solved**: resume re-runs a program **from the start** — there is no
+mid-program checkpoint — so a program that branches on a tool result may re-issue a different
+second call, leaving a recorded intent for a call the re-run never makes. Its effect happened and
+re-observation establishes that; the program's control flow has moved on regardless. K13b
+therefore asserts ordinal alignment for a **deterministic** program and records the divergence
+case, because asserting it unconditionally would claim something the design cannot deliver.
+Solving it means checkpointing inside a program — a different and much larger feature.
+
+**And one capability refused rather than bounded**: a program can call the program tool, because
+the seam keeps no allowlist. Refused at the seam (R10) — nesting is absent from 036's Deferred
+list, so it is permitted by omission rather than by argument, and shipping reachability would make
+it live. A depth limit was rejected: a limit is a decision about how much nesting is useful, and
+there is no evidence about that yet.
 
 **The risk moved into the record rather than resolved**: widening the chooser's answer changes
 what **every** model-driven run's model is asked to produce, not only code-mode runs. The blast
