@@ -172,8 +172,8 @@ refusal is reversible by a later record; an unbounded recursion that shipped is 
 
 **By a hook, not by the seam.** A name check inside the seam is precisely the blocklist its
 docstring disclaims, and it would sit *before* `invoke_tool`, so the refusal would never be
-recorded — which FR-005 requires of every call to something a definition may not use. A governance
-hook reading `call_ordinal > 0` puts the decision where every other decision is made.
+recorded — which FR-005 requires of every call to something a definition may not use. A **builtin** governance
+hook reading `call_ordinal > 0` puts the decision where every other decision is made — builtin because `run.py:203` names a caller-supplied hook as *"a place a future hook can fail to be added"*, and a run that forgot this one permits unbounded nesting.
 
 **Rejected**: advancing `run.step_index` from inside the seam. It is the *run's* counter — the
 entrypoint's loop sets it and the checkpoint reads it — so mutating it from inside a tool would

@@ -310,6 +310,22 @@ a later record; an unbounded recursion that shipped is not.
 how much nesting is useful, and there is no evidence about that yet. Refusing states the position
 honestly; a depth of 1 would pretend to an answer.
 
+**Where the refusal lives, corrected by the fifth pass.** Not in the seam — that is the blocklist
+its docstring disclaims, and it would refuse *before* `invoke_tool` and so never be recorded.
+`core/hooks/governance.py` already makes the argument for its own contents: *"a check placed
+before the pipeline is a second refusal path (Principle II), and gets none of the ordering or
+audit guarantees the pipeline provides."* So: a **builtin** governance hook denying when
+`call_ordinal > 0`.
+
+**Builtin rather than caller-supplied**, because `core/run.py:203` names the failure mode — *"hooks
+are registered here, so a second constructor is a place a future hook can fail to be added"* — and
+a run that forgot this one permits unbounded nesting. `builtin_governance_hooks()` takes no
+arguments and a handler receives only a `HookContext`, which is why the ordinal belongs on the run.
+
+**And the handler is imported inside the function body**, on `build_chooser`'s precedent
+(`model_chooser.py:201`): measured, `core.run` imports `core.hooks.governance` and
+`core.sandbox.program_tool` imports `core.run`, so a module-level import closes a cycle.
+
 ## R11 — Widening the recording format would break four suites that already exist
 
 **Measured**: `parse_recording` is `"plan,apply,-"` → `["plan", "apply", "-"]` — comma-separated

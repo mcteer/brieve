@@ -145,9 +145,13 @@ src/core/sandbox/seam.py      # SETS it on entry, CLEARS it in a `finally` — s
                               #   not catch a superseded lease or an exhausted bound, which are the
                               #   paths US4 exercises
 src/core/sandbox/hooks.py     # R10: a GOVERNANCE hook denying the program tool when
-                              #   `call_ordinal > 0`. NOT a name check in the seam — the seam has
-                              #   "no blocklist, no allowlist, and no special case", and a check
-                              #   there would sit before `invoke_tool` and never be recorded
+src/core/hooks/governance.py  #   `call_ordinal > 0`, registered as a BUILTIN. NOT a name check in
+                              #   the seam — the seam has "no blocklist, no allowlist, and no
+                              #   special case", and a check there would sit before `invoke_tool`
+                              #   and never be recorded. Builtin because run.py:203 says a second
+                              #   constructor "is a place a future hook can fail to be added" —
+                              #   and the handler is imported INSIDE the function body, because
+                              #   core.run imports governance and program_tool imports core.run
 src/core/hooks/engine.py      # R8: the idempotency key folds the ordinal in ONLY when non-zero,
                               #   so every existing key is byte-identical. Without this, a
                               #   program calling one non-repeatable tool twice writes ONE intent
