@@ -299,6 +299,28 @@ ignorance of each other means building the tenant boundary twice.
 against a customer's architecture standards is the same requirement arriving through 038's path
 rather than the ask path, which means whatever shape this takes has to serve both.
 
+**Endorsement by an admin, configured in the interface** — added 2026-08-06, and it is plausibly
+the *answer* to the citation problem rather than a complication. The gate needs a trust statement
+about content the platform did not vendor, and *"an admin of this customer endorsed this
+document"* is exactly that: a decision, made by a named person, at a time, which the trail can
+carry. Officially endorsed is a governance fact, not a storage one.
+
+Three things it collides with, all measured:
+
+- **There is no `admin` role.** The subject vocabulary in `core/answering/scope.py` is
+  `operator` and `compliance-analyst`, the latter introduced by 025 as a superset of the former.
+  A third role is a change to the governance vocabulary, not a UI addition.
+- **Governance records live in Terraform today**, operator-authored:
+  `infra/modules/trust-fabric/` holds ceilings, model credentials and the authoring records. 026
+  decided that shape on purpose — *"where a model is reachable from is assembly while which model
+  is permitted is governance"* — and rejected deployment config for governance. Endorsing content
+  through the portal moves a governance decision **out of Terraform for the first time**. That may
+  well be right, because the person who knows whether an architecture standard is current is not
+  the person with estate credentials, but it is a posture change to argue rather than assume.
+- **The portal can already act, just not while asking.** `surfaces/portal/app.py:201` — *"A thread
+  is where turns act; an ask never does (ADR-0039)."* So an admin surface is not unprecedented; a
+  governance-**authoring** surface is.
+
 **Not scheduled.** Recorded so nobody re-derives the constraints; the ordering argument belongs
 in its own specify.
 
