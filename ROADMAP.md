@@ -266,6 +266,42 @@ One platform, isolated tenants, using the products' own isolation primitives.
 **Why last of the scheduled set:** it multiplies every guarantee above it. Isolating tenants
 before the things being isolated are stable means doing the work twice.
 
+### Customer-supplied context (unnumbered)
+
+A customer's own material — internal compliance policies, architecture standards, reference
+designs — considered when the platform answers and when it authors. Raised 2026-08-06 as a
+product requirement, recorded before it was specified.
+
+**Measured, this is not "add a source".** `src/core/answering/corpus.py` has **no tenant
+dimension at all** — one process-wide manifest at `corpus/manifest.json`, digest-pinned, and
+*"nothing is fetched here"*: `infra/bin/corpus-sync` populates a cache and the reader refuses
+anything whose digest does not match, because *"a corpus that fetched at answer time would make
+every answer depend on a third party being reachable, and would make 'pinned' untrue."* Customer
+content is per-tenant, arrives at runtime, and is not vendored through the platform's supply
+chain. Every one of those cuts against the current model.
+
+**The citation gate is the real constraint, not storage.** `answer.py` states it plainly — *"an
+answer with no supported claims is a decline"* — and `corpus.py` calls citation resolution *"the
+single most important check in this feature."* So customer documents cannot be context the model
+merely reads; they have to be **citable**, or every answer grounded in them declines. Extending
+resolution to content the platform does not control is the whole of the work, and doing it badly
+weakens the gate for the corpus too.
+
+**Three records already hold most of the vocabulary.** ADR-0030 (pinned versus consulted
+artifacts) is the distinction this needs and may already name the customer case correctly.
+ADR-0004 makes the corpus the supply chain's second subject — customer material is emphatically
+not that, and saying so is half the design. ADR-0046 (multi-tenancy) owns the tenant dimension
+the corpus lacks; this does not strictly *require* multi-tenancy, since a single-tenant
+deployment could carry customer content, but it needs the same substrate and building the two in
+ignorance of each other means building the tenant boundary twice.
+
+**And it reaches authoring, not only answering.** *"Write the Vault integration for this repo"*
+against a customer's architecture standards is the same requirement arriving through 038's path
+rather than the ask path, which means whatever shape this takes has to serve both.
+
+**Not scheduled.** Recorded so nobody re-derives the constraints; the ordering argument belongs
+in its own specify.
+
 ## Demand-driven / trigger-gated
 
 Deliberately unscheduled. Each needs a recorded trigger before it enters [Next](#next) — that is
