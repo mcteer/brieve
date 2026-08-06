@@ -283,12 +283,33 @@ Measured against merged main, most of the machinery exists and none of it compos
 | read what exists in context | pinned corpus; estate answering | the customer's own context is the entry below this one |
 | decide what should be built | a model in the loop (020) | the model cannot say what to do with a tool — **040, planned** |
 | author the changes | 038's `author_file` / `read_subject`, containment, provenance | registered nowhere — **the successor feature**, and 040's capability ledger points at it |
-| `terraform plan` as a gate before proposing | the plan tool, the hook pipeline, MODEL_GATE precedent | **the ordering is the new decision**: plan must run against the *authored* tree, inside the authoring tier, and a failed plan must stop the proposal — a sequencing constraint nothing yet expresses |
+| `terraform plan`, twice — as **context** and as **gate** | the plan tool; the matrix already binds `plan` as its own role, distinct from `write` (038 narrowed exactly this: a `plan` cell no longer resolves for `write`) | plan is a fixture (below), and **the two roles are different requirements**: see the paragraph this row points at |
 | PR back to the declared repo | `open_proposal`, `branch_for(idempotency_key)`, `PROPOSAL_OPENED`, the authoring tier's analyzer→proposer split | registered nowhere, same successor; and a proposal does not yet carry its **plan evidence** |
 
-**Two decisions this shape forces, recorded now so their features argue them rather than absorb
+**Plan is the context, not only the gate — stated 2026-08-06, and it reorders the workflow.**
+Where infrastructure is already defined in Terraform, there is no better context for a proposed
+change than running `terraform plan` against the existing estate: it is the one instrument that
+answers *what would happen if this were applied*, from the product's own engine rather than from
+anything the platform infers. So plan appears **twice**:
+
+- **Early and repeatedly, as reading.** The agent plans against the estate to understand it, and
+  plans its own draft to see what the draft would do — possibly several times, adjusting between
+  runs. Each is an ordinary governed step against the run's budget, and the authority for it
+  already exists: the matrix binds `plan` as its own role, so a definition can hold generous
+  plan authority while never holding `apply` at all. **Iterating on a plan is reading, and the
+  ceiling can say so.**
+- **Once and finally, as the gate.** The last plan against the authored tree is the one whose
+  output travels with the proposal as evidence. A failed final plan stops the proposal.
+
+**Three decisions this shape forces, recorded now so their features argue them rather than absorb
 them:**
 
+- **Plan-as-context needs the plan's *output* to reach the model.** Today a tool result returns
+  to the loop, but a plan a model cannot read is context for nobody. What a plan output contains
+  — resource addresses, attribute values, possibly data a secret leaked into — and how much of it
+  enters the model's context is a real decision with 029's lesson attached (the read bounded by
+  the wrong thing answered from 1,000 of 63,947 entries). Bounding what re-enters the model is
+  this workflow's version of that problem.
 - **Plan-before-propose is a workflow constraint, not a tool property.** The authoring tier's
   two-task split (analyzer authors, proposer publishes *"what already passed"*) is exactly the
   seam for it — the plan belongs at the end of the analyzer's work, and its output belongs in
