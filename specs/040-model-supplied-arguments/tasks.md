@@ -281,12 +281,12 @@ grammar is foundational even though its compatibility rows belong to US5.**
   from the ledger in-memory and assert the check trips. Two features shipped unreachable
   capabilities behind green rows; a guard that cannot lose is the same defect wearing a
   checkmark (SC-009).
-- [~] T024 Row **M18** in `tests/conformance/choice/test_model_supplied_arguments.py`, **enclave-marked**: **the recording is JSON travelling through Nomad meta interpolation** (`NOMAD_META_choice_recording` → env), so the row's fixture must survive HCL quoting — the quoting is part of what this row proves, not a nuisance to work around. dispatch a run whose recording carries a
+- [X] T024 Row **M18** in `tests/conformance/choice/test_model_supplied_arguments.py`, **enclave-marked**: **the recording is JSON travelling through Nomad meta interpolation** (`NOMAD_META_choice_recording` → env), so the row's fixture must survive HCL quoting — the quoting is part of what this row proves, not a nuisance to work around. dispatch a run whose recording carries a
   structured choice through the real path — Nomad meta → environment → `build_chooser` → the
   allocation — and assert the act happened against the model-named target. Every other row could
   pass while this one was false, which is the state two prior features shipped in
   (`verify-the-production-caller`).
-- [~] T025 Run quickstart Scenarios A–E and G hermetically, then **F** against the enclave
+- [X] T025 Run quickstart Scenarios A–E and G hermetically, then **F** against the enclave
   (`make dev-up`), per `specs/040-model-supplied-arguments/quickstart.md` — including M7's
   prove-it-can-fail leg, which is the one most worth watching fail.
 - [X] T026 [P] Update `ROADMAP.md`: 020's row gains a note that the model chose the tool while
@@ -348,28 +348,28 @@ pointer at the next feature: consuming it is how 041 starts.
 
 ---
 
-## Implementation record — what ran, and what could not
+## Implementation record — what ran
 
-**Ran and green.** `make check` (1242 passed, lint + mypy clean over 565 files). The hermetic
-conformance lane at exact parity with its pre-040 baseline: 2 failed before and after, both
-environment (`EVAL_PROVIDER_API_KEY`, cross-process Postgres). Quickstart Scenarios A–E and G.
-Sixteen new rows across `conformance/choice/`, `conformance/durability/` and `unit/`.
+**Everything ran.** `make check` green (1242 passed, lint and mypy clean over 565 files).
+Hermetic conformance at exact parity with its pre-040 baseline — 2 failed before and after,
+both environment. The dispatched choice lane 12 passed, **M18 included**. The durability job
+103 passed under an attested workload identity, **M7 and M12's Postgres legs included**.
 
-**Proven against the real store, by a route the rows do not take.** The durability conformance
-job could not be placed on this machine — the Nomad client reports `cpu.reservablecores = 0`
-and `cpu.totalcompute = 24` MHz, so a jobspec asking `cores = 1` is unplaceable. Rather than
-edit a merge-blocking gate's resource reservation for convenience, the schema change was
-verified directly against the running database with operator credentials:
+**The local lane had to be repaired first, and that is the finding.** Nomad read an M5 Pro's
+clock as 4 MHz rather than 4 GHz and multiplied it by six performance cores, advertising a
+**24 MHz** budget for an 18-core machine. Six ordinary allocations filled it exactly, so the
+merge-blocking durability job was unplaceable — and had been for as long as anyone had been
+running here. `infra/nomad/client.hcl` now states `cpu_total_compute`; the node went from
+24/24 to 12/41400.
 
-* the live `intents` table was in its **pre-040 shape**, which is precisely the case R13's
-  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` exists for. `CREATE TABLE IF NOT EXISTS` did
-  nothing, as its own comment says it would; the ALTER added the column.
-* a model-supplied request, an empty request, and a pre-040 row round-tripped through real SQL
-  as `{...}`, `{}` and `NULL` — **distinguishable**, which is M12's substantive claim.
+**Then the enclave failed three things a green hermetic lane could not see**, all recorded in
+`b682dea`: a bare-name recording stopped meaning what it meant (five dispatched rows broke,
+because `vault_write` raises without `cas` and the platform no longer supplied it); M9's
+no-secret-leak assertion was **vacuous**, reading a payload key that does not exist behind an
+`if` that was never true; and M18 hardcoded its run id, reading events from every earlier
+attempt.
 
-**T024 and T025 are marked partial, not done.** Their rows are written and collected; M18 has **never executed once**. Marking a row that has never run as complete is the exact shape this feature exists because of — 036 and 038 both shipped with green rows over capabilities nothing could reach.
-
-**Could not run, and neither is a code question.** M7/M12's `[postgres]` legs and **M18** need
-the conformance job placeable. They fail rather than skip, which is correct and is why they
-appear as errors rather than as green. `make conformance` is where they run once the node can
-place the job.
+**And one method correction.** Three "baselines" taken during implementation stashed nothing —
+the work was already committed — so they compared identical code and reported parity. The real
+baseline came from `git checkout main`, and it showed five broken rows the fake one had hidden.
+A comparison that cannot show a difference is the same defect as a row that cannot fail.
