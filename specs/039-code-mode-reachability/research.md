@@ -274,3 +274,72 @@ is read by whoever is changing that path, at the moment they are deciding what i
 with arguments the **platform** chose; an inner call carries arguments the **program** wrote. The
 *pipeline* is identical — same entry, same hooks, same bracket — and the *provenance of the
 arguments* is not. K6 asserts the first; saying so keeps it from reading as the second.
+
+---
+
+*R10–R12 came from the third analyze pass, scoped to R7's and R8's fixes. Both CRITICALs are
+about what those fixes **collide with** rather than about the fixes themselves.*
+
+## R10 — A program can submit a program, and nobody has decided whether it may
+
+**Measured**: the seam routes *every* request to `invoke_tool` — its own docstring says *"no
+blocklist, no allowlist, and no special case: `open`, `eval`, `__import__` and a name the model
+invented are all requests, and the registry decides."* That is the property that makes the
+governance claim airtight, and it has a consequence nobody has faced: **if a definition's ceiling
+names the program tool, a program running under it can call `run_program`.**
+
+The demonstration definition this feature authors does exactly that, so nesting is reachable the
+moment the feature ships.
+
+**Two problems, and the second is worse than the first.** Recursion is unbounded except by the
+step budget — a program that submits a program that submits a program consumes steps and nothing
+else stops it. And the submission-scoped ordinal (R8) breaks: the inner submission sets it on
+entry and **clears it on exit**, zeroing the outer program's counter mid-flight, so the outer's
+remaining calls re-key from 1 and collide with intents already written.
+
+**Decision**: **a program tool call from inside a program is refused**, with a stated reason, at
+the seam. One check, and it names what it refuses.
+
+**Not because recursion is obviously wrong** — it is a coherent thing to want, and a bounded form
+might be useful. It is refused because **nobody has decided it**. It is absent from 036's Deferred
+list, which means it is currently permitted by *omission* rather than by argument, and shipping
+reachability would turn an unexamined omission into a live capability. A refusal is reversible by
+a later record; an unbounded recursion that shipped is not.
+
+**Alternative considered**: a depth limit. Rejected for this feature — a limit is a decision about
+how much nesting is useful, and there is no evidence about that yet. Refusing states the position
+honestly; a depth of 1 would pretend to an answer.
+
+## R11 — Widening the recording format would break four suites that already exist
+
+**Measured**: `parse_recording` is `"plan,apply,-"` → `["plan", "apply", "-"]` — comma-separated
+bare names. It is consumed on the **dispatched** path via `build_chooser`, and four conformance
+suites already supply recordings through a `recording(*answers)` helper:
+`conformance/choice/harness.py`, `conformance/choice/test_a_model_chooses.py`,
+`conformance/durability/test_model_driven_resume.py`, `conformance/reports/test_the_run_observes.py`.
+
+**Decision**: the widened format **accepts a bare name as a choice with no arguments**, so every
+existing recording parses exactly as it does today and all four suites are untouched.
+
+**The same discipline K13a applies to keys.** A format change that requires every existing caller
+to move is a change with a blast radius nobody measured — and here the callers are the rows that
+prove model-driven runs work at all. A row asserts the old form still parses, so the compatibility
+is a property rather than an intention.
+
+## R12 — What a resumed program can and cannot promise
+
+**The honest limit behind K13b.** A program interrupted mid-flight leaves open intents at
+sub-step granularity, and resume re-runs the program **from the start** — there is no mid-program
+checkpoint. So the re-issued ordinals line up with the recorded intents **only while the re-run
+issues the same calls in the same order**.
+
+**A program that branches on a tool result may diverge.** If the first attempt called A then B,
+and the re-run calls A then C, then B's effect happened and the resumed program never learns it —
+the intent for B is resolved by re-observation, which establishes *what happened*, and the
+program's own control flow has moved on regardless.
+
+**Stated rather than solved.** Solving it means checkpointing inside a program, which is a
+different feature and a much larger one; K13b therefore asserts alignment for a **deterministic**
+program and the divergence case is recorded as a limit. A row that claimed alignment
+unconditionally would be asserting something the design cannot deliver.
+

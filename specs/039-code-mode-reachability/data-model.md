@@ -135,7 +135,7 @@ the existing retry was not written for.
 
 | Field | Rule |
 | --- | --- |
-| `call_ordinal` | on the run, default `0`. The seam **sets it on entry and clears it on exit**, so outside a program it is always `0` |
+| `call_ordinal` | on the run, default `0`. The seam **sets it on entry and clears it in a `finally`**, so outside a program it is always `0` — including when the program raises, which is the path US4 exercises |
 
 **Why it exists.** The idempotency key is `run_id:step_index:tool_name`, and the seam **never
 advances `step_index`** — so a program calling the same non-repeatable tool twice produces the
@@ -163,6 +163,13 @@ ran a three-call program would carry `3` into step 1, and the next **direct** ca
 
 **And it is what makes resume coherent**: a re-run program re-issues ordinals 1..N, matching the
 intents recorded the first time. A run-scoped counter could not.
+
+**And nesting is refused rather than scoped.** A program can call the program tool — the seam has
+*"no blocklist, no allowlist, and no special case"* — so an inner submission would clear the
+ordinal on exit and zero the outer program's counter mid-flight. Refused at the seam with a stated
+reason, because nesting is absent from 036's Deferred list and is therefore permitted by
+**omission** rather than by argument. A refusal is reversible by a later record; an unbounded
+recursion that shipped is not.
 
 **Rejected**: advancing `run.step_index` from inside the seam. It is the *run's* counter — the
 entrypoint's loop sets it and the checkpoint reads it — so mutating it from inside a tool would

@@ -138,13 +138,47 @@ feature is used is not caught by testing the feature's absence.**
 **Not a nicety.** Changing every key would invalidate 014's durability rows and break resume for
 any run in flight; the suffix must appear only in a situation that could not previously arise.
 
-### K13b — A resumed program's ordinals line up with the intents already recorded (R8)
+### K13b — A resumed DETERMINISTIC program's ordinals line up with the recorded intents (R8, R12)
 Interrupt a program partway, resume, and assert the re-issued ordinals match the intents from the
 first attempt — so re-observation resolves the right calls rather than a shifted set.
 
 **This is what submission-scoping buys beyond the key.** A run-scoped counter would start the
 resumed program at whatever the run had reached, and every ordinal would be offset — the intents
 would be unmatchable and re-observation would resolve nothing.
+
+**Scoped to a deterministic program, and the row says why.** Resume re-runs the program **from the
+start**; there is no mid-program checkpoint. A program that branches on a tool result may issue a
+different second call, and then the recorded intent is for a call the re-run never makes — its
+effect happened, re-observation establishes that it did, and the program's control flow has moved
+on regardless. **Asserting alignment unconditionally would claim something the design cannot
+deliver**; solving it means checkpointing inside a program, which is a different and much larger
+feature.
+
+### K14a — Every existing recording parses exactly as it does today (R11)
+Assert `"plan,apply,-"` parses to the same three choices it does now — a bare name is a choice
+with **no arguments**.
+
+**Four suites already depend on this.** `conformance/choice/harness.py`,
+`conformance/choice/test_a_model_chooses.py`, `conformance/durability/test_model_driven_resume.py`
+and `conformance/reports/test_the_run_observes.py` all supply recordings through a
+`recording(*answers)` helper taking bare names — and they are the rows that prove model-driven
+runs work at all. **The same byte-identical discipline K13a applies to keys**: a format change
+requiring every caller to move is a blast radius nobody measured.
+
+### K15 — A program cannot submit a program (R10)
+Assert that a call to the program tool **from inside a program** is refused with a stated reason.
+
+**Refused because nobody decided it, not because it is obviously wrong.** The seam routes every
+request to `invoke_tool` with *"no blocklist, no allowlist, and no special case"* — which is the
+property that makes governance airtight, and which means a definition whose ceiling names the
+program tool can recurse. The demonstration definition does. Nesting is absent from 036's Deferred
+list, so it is permitted by **omission**; shipping reachability would turn that into a live
+capability, unbounded except by the step budget.
+
+It also breaks the ordinal: an inner submission clears it on exit, zeroing the outer program's
+counter mid-flight so its remaining calls re-key from 1 and collide with intents already written.
+
+**A refusal is reversible by a later record. An unbounded recursion that shipped is not.**
 
 ### K14 — A fixture recording can carry a structured choice (SC-001)
 Assert `parse_recording` accepts a recording carrying a tool **and its arguments**, and that
