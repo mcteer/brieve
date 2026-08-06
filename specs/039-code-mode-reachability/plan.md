@@ -134,6 +134,8 @@ src/core/durability/types.py   #   defaulted to `{}` on `resume_count`'s precede
                               #   step RE-INVOKES, and once the arguments are the model's there
                               #   is nothing to re-invoke with. NOT the audit trail — `TOOL_CHOSEN`
                               #   carries the name and nothing else, by argument
+src/core/observation/bracket.py #  where the IntentRecord is CONSTRUCTED (bracket.py:41) — one
+src/core/durability/postgres.py #  caller, engine.py:247, and it already holds the arguments
 
 src/core/run.py               # + a call ordinal, default 0
 src/core/sandbox/seam.py      # SETS it on entry, CLEARS it in a `finally` — scoped to the
