@@ -216,8 +216,9 @@ constitution names **duplicate-side-effect rejection** as an in-force durability
 program, and a loop is the whole point of code mode — *"N inner calls cost N+1 steps"* presumes
 one. 036 shipped this; only reachability reaches it.
 
-**Decision**: `GovernedRun` carries a **call ordinal**, the seam increments it per inner call, and
-`_idempotency_key` folds it in **only when it is non-zero**:
+**Decision**: `GovernedRun` carries a **call ordinal scoped to the submission** — the seam sets it
+on entry and **clears it on exit** — and `_idempotency_key` folds it in **only when it is
+non-zero**:
 
 ```
 ordinal == 0  ->  f"{run_id}:{step_index}:{tool_name}"        # byte-identical to today
@@ -232,6 +233,17 @@ situation that could not previously arise now does.
 counter, set by the entrypoint's loop and read by the checkpoint; mutating it from inside a tool
 would corrupt the run's own accounting to fix the key's.
 
+**Scoped to the submission rather than to the run, and the first draft of this decision got that
+wrong** — it said "the seam increments it per inner call" and said nothing about where it stops.
+`run.step_index` is reset per step by the entrypoint; nothing would have reset an ordinal. So a
+run whose step 0 ran a three-call program would carry `call_ordinal == 3` into step 1, and the
+next **direct** call would key `run:1:tool:3` — destroying the byte-identical guarantee **only
+after a program runs**, which is to say only in the case this feature exists to create.
+
+**Set on entry, cleared on exit**, so outside a program the ordinal is always 0. That also makes
+resume coherent: a re-run program re-issues ordinals 1..N and they line up with the intents
+recorded the first time, which a run-scoped counter could never do.
+
 ## R9 — Three smaller things the plan left to be discovered
 
 **The runtime's injection point.** `core` must not import an adapter (Principle I), and
@@ -240,10 +252,23 @@ would corrupt the run's own accounting to fix the key's.
 — a **surface**, which may import an adapter. Stated rather than discovered, because the obvious
 wrong move is to reach for it from `core/sandbox/`.
 
-**What the fixture chooser can emit.** The dev estate's cells name `fixture/scripted@1`. If the
-fixture chooser cannot produce a structured choice carrying a program, the enclave row proves the
-allocation carries the runtime and **not** that a model can reach it — a weaker claim than SC-001
-makes, and one that would read as the stronger one.
+**What the fixture chooser can emit, and where it lives.** Measured: `build_chooser` in
+`src/adapters/model_chooser.py` returns `RecordedChooser(parse_recording(recording))` for the
+fixture provider — **not** a test harness module. Every dispatched conformance row goes through
+it, so **widening the answer changes what a recording must contain**, and `parse_recording` is
+part of this feature whether or not anyone planned it. If a recording can carry only a bare name,
+the enclave row proves the allocation carries the runtime and **not** that a model can reach it —
+a weaker claim than SC-001 makes, wearing the stronger one's clothes.
+
+**A stale comment nearly produced a finding that does not exist.** `_PROBE_ARGUMENTS`' docstring
+says *"a handler exception does not make `outcome.allowed` false — `allowed` is `decision ==
+"allow" and not evidential_gap`, both of which hold when the body throws."* **Measured, that is no
+longer true**: `engine.py:374` returns `decision="deny", reason_code="tool_error"` when
+`execution_error_code is not None`. So a model supplying arguments that make a handler raise gets
+an honest denial, and the risk the comment describes is gone.
+
+The comment is in the code this feature modifies, which is the worst place for a stale one — it
+is read by whoever is changing that path, at the moment they are deciding what is safe.
 
 **Identical governance, and what "identical" means.** A direct call from the step loop is invoked
 with arguments the **platform** chose; an inner call carries arguments the **program** wrote. The

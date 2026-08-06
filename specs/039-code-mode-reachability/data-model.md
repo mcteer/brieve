@@ -135,7 +135,7 @@ the existing retry was not written for.
 
 | Field | Rule |
 | --- | --- |
-| `call_ordinal` | on the run, default `0`; the seam increments it per inner call |
+| `call_ordinal` | on the run, default `0`. The seam **sets it on entry and clears it on exit**, so outside a program it is always `0` |
 
 **Why it exists.** The idempotency key is `run_id:step_index:tool_name`, and the seam **never
 advances `step_index`** — so a program calling the same non-repeatable tool twice produces the
@@ -153,6 +153,16 @@ ordinal  > 0  ->  f"{run_id}:{step_index}:{tool_name}:{ordinal}"
 **Byte-identical is not a nicety.** Changing every key would invalidate 014's durability rows and
 break resume for any run in flight. The suffix appears only in a situation that could not
 previously arise.
+
+**Scoped to the submission, not to the run.** The first draft said only "increment per inner
+call" and never said where it stops — and nothing resets a run-level counter between steps
+(`run.step_index` is reset by the entrypoint's loop; an ordinal would not be). A run whose step 0
+ran a three-call program would carry `3` into step 1, and the next **direct** call would key
+`run:1:tool:3`. The byte-identical guarantee would hold until a program ran and then quietly stop
+— failing only in the case this feature creates.
+
+**And it is what makes resume coherent**: a re-run program re-issues ordinals 1..N, matching the
+intents recorded the first time. A run-scoped counter could not.
 
 **Rejected**: advancing `run.step_index` from inside the seam. It is the *run's* counter — the
 entrypoint's loop sets it and the checkpoint reads it — so mutating it from inside a tool would

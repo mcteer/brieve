@@ -120,10 +120,14 @@ src/adapters/
 
 src/core/choice/bounded.py    # `resolve_step_tool` carries the model's arguments to the invoke
                               #   in place of `_PROBE_ARGUMENTS`, which its own docstring calls
-                              #   "a fixture affordance, and it always was"
+                              #   "a fixture affordance, and it always was" — and whose NEXT
+                              #   sentence is stale: a raising handler DOES deny `tool_error`
+                              #   (engine.py:374), so the silent-success risk it warns of is gone
 
 src/core/run.py               # + a call ordinal, default 0
-src/core/sandbox/seam.py      # increments it per inner call
+src/core/sandbox/seam.py      # SETS it on entry, CLEARS it on exit — scoped to the submission,
+                              #   because nothing resets a run-level counter between steps, and an
+                              #   elevated one would key the NEXT direct call `run:1:tool:3`
 src/core/hooks/engine.py      # R8: the idempotency key folds the ordinal in ONLY when non-zero,
                               #   so every existing key is byte-identical. Without this, a
                               #   program calling one non-repeatable tool twice writes ONE intent

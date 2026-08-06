@@ -125,12 +125,40 @@ exists to prevent, and which the constitution names as an in-force durability ga
 **A loop is the whole point of code mode.** *"N inner calls cost N+1 steps"* presumes one, so this
 fires on the first realistic program rather than on a contrived one.
 
-### K13a — Every existing idempotency key is byte-identical (R8)
+### K13a — Every existing idempotency key is byte-identical, including AFTER a program (R8)
 Assert that a call made outside a program produces exactly the key it produces today — the
-ordinal is folded in **only when non-zero**.
+ordinal is folded in **only when non-zero** — and assert it **at a step that follows a program
+which made several calls**.
+
+**That second clause is the row.** The ordinal is scoped to the submission and cleared on exit; a
+run-scoped counter would leave it elevated, so the next direct call would key `run:1:tool:3` and
+the guarantee would hold right up until a program ran. **A property that fails only after the
+feature is used is not caught by testing the feature's absence.**
 
 **Not a nicety.** Changing every key would invalidate 014's durability rows and break resume for
 any run in flight; the suffix must appear only in a situation that could not previously arise.
+
+### K13b — A resumed program's ordinals line up with the intents already recorded (R8)
+Interrupt a program partway, resume, and assert the re-issued ordinals match the intents from the
+first attempt — so re-observation resolves the right calls rather than a shifted set.
+
+**This is what submission-scoping buys beyond the key.** A run-scoped counter would start the
+resumed program at whatever the run had reached, and every ordinal would be offset — the intents
+would be unmatchable and re-observation would resolve nothing.
+
+### K14 — A fixture recording can carry a structured choice (SC-001)
+Assert `parse_recording` accepts a recording carrying a tool **and its arguments**, and that
+`RecordedChooser` returns it.
+
+**Measured, this is on the dispatched path and not in a harness**: `build_chooser` in
+`src/adapters/model_chooser.py` returns `RecordedChooser(parse_recording(recording))` for the
+fixture provider, and every dispatched conformance row goes through it. Widening the model's
+answer changes what a recording must contain, so the recording format is part of this feature
+whether or not anyone planned it.
+
+**And it decides what K7 proves.** If a recording carries only a bare name, the enclave row shows
+the allocation carries the runtime and **not** that a model can reach it — a weaker claim than
+SC-001 makes, wearing the stronger one's clothes.
 
 ## The guard that must be inverted (FR-013, SC-007)
 
