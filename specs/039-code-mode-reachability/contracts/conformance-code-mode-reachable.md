@@ -146,6 +146,10 @@ first attempt — so re-observation resolves the right calls rather than a shift
 resumed program at whatever the run had reached, and every ordinal would be offset — the intents
 would be unmatchable and re-observation would resolve nothing.
 
+**Depends on K16, which is what makes resume reach the program at all** (R13): until the intent
+carries the arguments, a resumed submission re-invokes with no program and this row has nothing to
+assert.
+
 **Scoped to a deterministic program, and the row says why.** Resume re-runs the program **from the
 start**; there is no mid-program checkpoint. A program that branches on a tool result may issue a
 different second call, and then the recorded intent is for a call the re-run never makes — its
@@ -179,6 +183,53 @@ It also breaks the ordinal: an inner submission clears it on exit, zeroing the o
 counter mid-flight so its remaining calls re-key from 1 and collide with intents already written.
 
 **A refusal is reversible by a later record. An unbounded recursion that shipped is not.**
+
+**Refused by a HOOK, and the row asserts where.** A name check inside the seam would be the
+blocklist the seam's own docstring says it does not have — *"no blocklist, no allowlist, and no
+special case… there is one decision maker, and it is the one that already decides"* — and it would
+sit **before** `invoke_tool`, so the refusal would never be recorded, which FR-005 requires of
+every call to something a definition may not use. A governance hook reading `call_ordinal > 0`
+routes through `run_pipeline`, produces an ordinary recorded denial with a reason code, and the
+program sees it as a deny it can route around: the seam's existing three-way distinction rather
+than a fourth. **The row asserts the denial is recorded**, because a refusal nobody can find is
+how this becomes a second decision-maker again later.
+
+### K16 — A resumed step re-invokes with the arguments the model chose (R13)
+Interrupt a run at a step whose model-supplied arguments are non-trivial, resume, and assert the
+re-invoke carries **the same arguments** — not an empty map, and without a second provider call.
+
+**The defect this row exists for is not about code mode.** Measured: `intents` carries
+`tool_name` and no arguments (`schema.sql:93`), `already_chosen` is `{step: tool_name}`
+(`entrypoint.py:814`), and a pending step **runs again** — the entrypoint says so in as many
+words. Resume is honest today only because arguments are `_PROBE_ARGUMENTS`, a platform constant:
+re-invoking reproduces them for free. The moment they come from the model, they are gone.
+
+**So this row fails before the fix and passes after**, and it fails for **every** model-driven
+run rather than only for a code-mode one. Same shape as K13: correct-looking, dormant, reachable
+only once the feature that needs it ships.
+
+### K16a — The trail still carries no arguments (R13) — *no-secret-leak*
+Assert `TOOL_CHOSEN`'s payload is unchanged: `run_id`, `step_index`, `attempt`, `model`, `named`,
+`outcome`, and **nothing else**.
+
+**Because the two stores have opposite rules and this feature must not erode either.**
+`record_choice`'s docstring argues the trail's: *"What is absent is load-bearing: no reasoning, no
+prompt, no model output beyond the name. The model may have read a secret out of a tool result,
+and an append-only trail is the one place that must never be written to."* K16 puts the model's
+arguments in the **control plane**, which only resume reads. The obvious wrong move while fixing
+K16 is to put them where they are easiest to see, and an append-only trail is the one place a
+leaked secret can never be taken back from.
+
+### K17 — An absent recording cannot vacuously satisfy a code-mode row (R15)
+Assert that a dispatched run with **no recording** against the demonstration definition does not
+count as a code-mode proof: either the ceiling's ordering makes the program tool unreachable by
+the no-recording default, or the row asserts the submitted program is non-empty.
+
+**`RecordedChooser` with nothing recorded answers `sorted(permitted)[0]` with no arguments**
+(`recorded.py:82`) — a deliberate behaviour every pre-020 dispatched row depends on. Combined with
+model-supplied arguments it can name the program tool and submit an **empty** program, which runs,
+does nothing, and completes green. That is the stub shape ADR-0047 names and that this contract
+already says is the one most available here.
 
 ### K14 — A fixture recording can carry a structured choice (SC-001)
 Assert `parse_recording` accepts a recording carrying a tool **and its arguments**, and that

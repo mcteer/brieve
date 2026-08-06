@@ -65,6 +65,15 @@ than closed as a side effect.
 **And K6b checks both sides of the bound**: a malformed structured answer is retried rather than
 executed, and a run whose ceiling omits the program tool is unaffected by the widening.
 
+**K16 and K16a are the ones that fail today.** Once the model supplies arguments, a resumed step
+has nothing to re-invoke with — `intents` carries the tool name and no arguments, and a pending
+step *runs again*. K16 asserts the arguments survive; K16a asserts they went to the control plane
+and **not** to the trail, whose rule is that no model output beyond the name is written there.
+
+**Prove K16 can fail.** Revert the `arguments` field on `IntentRecord` and re-run: K16 must fail
+with an empty argument map rather than passing on a defaulted value. A row that passes whether or
+not the arguments are persisted is asserting nothing about resume.
+
 ## Scenario D — The budget
 
 ```sh
@@ -118,6 +127,11 @@ uv run --extra adapters --extra surfaces --extra sandbox \
 
 Expected: the 038 row that asserted the program tool is registered **nowhere** now asserts it is
 **reachable** — same row, opposite claim (K11).
+
+**And Scenario D's K15** is worth reading for where the refusal lives: a program cannot submit a
+program, and it is a **governance hook** that says so rather than a name check in the seam — which
+would be the blocklist the seam's docstring disclaims, and would refuse before `invoke_tool` and
+so never be recorded.
 
 **Check it exists rather than that it passes.** A deleted guard also produces a green suite. The
 property being watched is that code mode's reachability is a **deliberate state** rather than an

@@ -343,3 +343,105 @@ different feature and a much larger one; K13b therefore asserts alignment for a 
 program and the divergence case is recorded as a limit. A row that claimed alignment
 unconditionally would be asserting something the design cannot deliver.
 
+**Amended by R13, and the amendment is larger than the limit.** This entry assumed the program
+re-runs on resume. Measured, it cannot: the arguments a resumed step re-invokes with are not
+persisted anywhere, so the program text is gone before the divergence question arises. R13 is the
+finding; this limit only becomes real once R13 is fixed.
+
+---
+
+*R13–R14 came from the fifth analyze pass, scoped to what R7's widening reaches. R13 is the
+defect R7 creates and R12 was written on top of without noticing.*
+
+## R13 — The widening discards the model's arguments at the process boundary
+
+**Measured, and this is a defect R7 creates for every model-driven run rather than for code mode.**
+
+- `intents` is `(run_id, idempotency_key, step_index, tool_name, recorded_at)` —
+  `src/core/durability/schema.sql:93`. There is no column for arguments.
+- `already_chosen` is built `{intent.step_index: intent.tool_name}` —
+  `src/surfaces/dispatch/entrypoint.py:814` — and consumed as a bare string,
+  `src/core/choice/bounded.py:148`.
+- Arguments reach the invoke as `arguments=_PROBE_ARGUMENTS` —
+  `src/surfaces/dispatch/entrypoint.py:221`. **A constant, supplied by the platform.**
+- A pending step genuinely **re-invokes**. The entrypoint says so: *"A pending step is one whose
+  bracket was opened and whose effect re-observation found had NOT landed — so it runs again."*
+
+**That constant is why resume is honest today.** The arguments were never the model's, so
+re-invoking produces byte-identical ones for free. T017 makes them the model's and nothing
+persists them, so a resumed step honours the recorded name, correctly skips the provider call
+(SC-005 intact), and invokes with **nothing**.
+
+**Decision: the intent carries them, and the trail does not.**
+
+The intent, because the entrypoint already argues that case for the tool name: *"No new record
+for this. The intent is already the durable statement of 'we were about to run X', written before
+the effect for exactly this purpose; a second store holding the same fact would eventually
+disagree with it."* Arguments are the rest of that same statement — "we were about to run X **with
+these**" — and splitting it across two stores is the disagreement that comment forecloses.
+
+Not the trail, because `record_choice`'s docstring makes the opposite rule and argues it: *"What
+is absent is load-bearing: no reasoning, no prompt, no model output beyond the name. The model may
+have read a secret out of a tool result, and an append-only trail is the one place that must never
+be written to."* **`TOOL_CHOSEN` is unchanged by this feature and a row asserts that it is.**
+
+**Two stores, opposite rules, and the reason is what each is for.** The trail is evidence — read
+by people, exported, append-only, and the place a leaked secret can never be taken back from. The
+intent table is control-plane state that only resume reads, already holding the name for exactly
+this purpose. This is the same distinction 038 drew between `PROGRAM_SUBMITTED` (verbatim, because
+a trail holding a program's effects without the program is one nobody can reconstruct) and
+`ARTIFACT_AUTHORED` (digests only, because its subject is somebody else's private repository).
+
+**Additive and defaulted, on `resume_count`'s precedent** (014, D3): `arguments` defaults to `{}`
+in the column and on `IntentRecord`, so every existing row reads back unchanged and every existing
+construction site still compiles. `resume_count`'s own comment names the trap that shape carries —
+`save()` overwrites the whole row, so a blob constructed without the field resets it — and the
+same trap applies here: an intent written without threading the arguments through would resume
+with `{}` and look exactly like a tool that takes none.
+
+**Principle V, twice.** Durability is named in the sealed list and so is the hook engine, so this
+feature makes **two** sealed-core changes rather than the one the plan claimed. Both are
+narrowings and both carry the review Principle V requires.
+
+## R14 — How a recording carries arguments without breaking the four suites that exist
+
+**Measured**: `parse_recording` is `[part.strip() for part in raw.split(",") if part.strip()]` —
+`src/core/choice/recorded.py:102` — and the value arrives as an environment variable,
+`RUN_CHOICE_RECORDING` from `NOMAD_META_choice_recording`
+(`infra/jobs/agent-run.nomad.hcl:241`).
+
+**The collision R11 did not see.** R11 decided a bare name must keep parsing exactly as today.
+The obvious encoding for arguments is JSON, and JSON contains commas — so the obvious encoding
+breaks the separator R11 exists to protect.
+
+**Decision: the format is chosen by the first non-space character.** A recording starting with
+`[` is parsed as a JSON list of `{"tool": ..., "arguments": {...}}`; anything else is split on
+commas exactly as today. `"plan,apply,-"` never reaches the JSON branch.
+
+**Two formats is the honest answer here rather than a hedge**, because R11's requirement *is* that
+the old one keeps working unchanged. A single widened grammar that every existing caller must move
+to is the blast radius K13a's discipline exists to refuse.
+
+**Rejected: encoding arguments so no comma appears** (base64, escaping). It preserves one grammar
+and produces a fixture nobody can read — and a recording is a thing a person writes by hand to
+describe what a model would have said. Unreadable fixtures are how a row stops being checked.
+
+## R15 — What an empty recording answers once answers carry arguments
+
+**Measured**: `RecordedChooser` with no recording returns `sorted(request.permitted)[0]`
+(`src/core/choice/recorded.py:82`) — a deliberate behaviour, argued in its own docstring: every
+pre-020 dispatched row would otherwise have to carry a script through the suspended-run index.
+
+**It has no arguments to give.** Today that is invisible, because the platform supplies
+`_PROBE_ARGUMENTS` to whatever is named. After T017 the default answers with a name and an empty
+argument map — and if the demonstration definition's ceiling sorts the program tool first, a
+dispatched row with no recording submits an **empty program**, which runs, does nothing, and
+completes. A green row proving nothing, which is the stub shape ADR-0047 names and the contract
+already says is the one most available here.
+
+**Decision**: the demonstration definition's ceiling is stated in T026 rather than left to
+whatever a variables file happens to contain, and the absent-recording case gets an assertion. The
+fixture model's no-recording behaviour is not changed — it is load-bearing for every pre-020 row
+— it is the *interaction* with a tool that requires arguments that needed deciding.
+
+

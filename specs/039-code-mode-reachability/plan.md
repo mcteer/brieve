@@ -75,7 +75,7 @@ platform — plus the one defect that property's absence had been hiding.
 | II — Total Interception; One Governed Tool Layer | **Pass** | The program tool is an ordinary registered tool; every call a program makes already round-trips `invoke_tool` by construction at the seam. **The shape of a governed step is unchanged**: the model answers, the platform invokes, the bracket wraps it. What widens is the *answer* — a name becomes a name and its arguments. **`GovernedToolset` still has no production caller**, and this feature deliberately does not give it one (R7): that would mean the model calling tools directly, which changes what a governed step *is* and deserves its own record rather than arriving as a side effect. |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | `SandboxUnavailableError` exists precisely so a missing runtime refuses with a stated reason rather than surfacing an ImportError three frames down, and an environment without the extra must keep doing exactly that (FR-007). The seam's three-way distinction — policy deny visible to the program, exhausted bound terminating the run, superseded lease propagating — is asserted against a real budget for the first time (R4). |
 | IV — Zero Standing Credentials; Authority Per Task | **N/A** | No credential path changes. A program runs under the run's existing authority and reaches tools through the ceiling that already bounds it. |
-| V — Sealed Core, Versioned Seams | **Pass, with a narrowing** | No audit member is added — `PROGRAM_SUBMITTED` exists — and the registry gains an entry through the ordinary `register` path. **But R8's fix touches the hook engine's idempotency key**, which is sealed-core adjacent, so the earlier "no sealed-core change" claim was wrong. The change is a **narrowing that adds a suffix only where the ordinal is non-zero**, so every key a non-sandbox call produces is byte-identical to today — which is what keeps 014's durability rows and any in-flight resume valid. It carries the security-maintainer review Principle V requires. |
+| V — Sealed Core, Versioned Seams | **Pass, with TWO narrowings** | No audit member is added — `PROGRAM_SUBMITTED` exists — and the registry gains an entry through the ordinary `register` path. **But two sealed-core areas change, not one.** (1) **The hook engine's idempotency key** (R8): a suffix appears only where the ordinal is non-zero, so every key a non-sandbox call produces is byte-identical to today. (2) **Durability** (R13): `intents` gains an `arguments` column and `IntentRecord` a matching field, **additive and defaulted to `{}`** on `resume_count`'s precedent, so every existing row reads back unchanged and every existing construction site still compiles. The second was missed in the first pass — the plan claimed one sealed-core touch when the widening it plans requires two, because a resumed step re-invokes and had nothing to re-invoke *with*. Both carry the security-maintainer review Principle V requires. |
 | VI — Lean by Default | **Pass, with a cost stated** | The runtime stays a library behind an optional dependency, so no named-trigger ADR is owed. But installing it where dispatched work runs means **every** dispatched run carries a Rust interpreter it mostly will not use. "Optional" stops meaning *absent from the thing that runs* and starts meaning *absent from the base install* — a weaker claim than `pyproject.toml`'s comment makes today, and the comment is amended to say so. |
 | VII — Anti-Fragmentation | **Pass** | One run allocation, one posture. The rejected alternative — a second jobspec installing the extra only for code-mode runs — halves the cost and doubles the substrate, which is the fragmentation this principle forecloses and which 038's two-jobspec experience says drifts (R2). |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass** | No model is promoted and no cell changes. The runtime is pinned exact (`==0.0.19`) and stays pinned; `test_sandbox_dependency_identity.py` already asserts the distribution's identity, which is ADR-0004's discipline applied to a runtime. |
@@ -129,13 +129,23 @@ src/core/choice/bounded.py    # `resolve_step_tool` carries the model's argument
                               #   sentence is stale: a raising handler DOES deny `tool_error`
                               #   (engine.py:374), so the silent-success risk it warns of is gone
 
+src/core/durability/schema.sql # R13: `intents` gains an `arguments` column, additive and
+src/core/durability/types.py   #   defaulted to `{}` on `resume_count`'s precedent. A pending
+                              #   step RE-INVOKES, and once the arguments are the model's there
+                              #   is nothing to re-invoke with. NOT the audit trail — `TOOL_CHOSEN`
+                              #   carries the name and nothing else, by argument
+
 src/core/run.py               # + a call ordinal, default 0
 src/core/sandbox/seam.py      # SETS it on entry, CLEARS it in a `finally` — scoped to the
                               #   submission, because nothing resets a run-level counter between
                               #   steps, and an elevated one would key the NEXT direct call
                               #   `run:1:tool:3`. The `finally` matters: the seam deliberately does
                               #   not catch a superseded lease or an exhausted bound, which are the
-                              #   paths US4 exercises. And it REFUSES a nested submission (R10)
+                              #   paths US4 exercises
+src/core/sandbox/hooks.py     # R10: a GOVERNANCE hook denying the program tool when
+                              #   `call_ordinal > 0`. NOT a name check in the seam — the seam has
+                              #   "no blocklist, no allowlist, and no special case", and a check
+                              #   there would sit before `invoke_tool` and never be recorded
 src/core/hooks/engine.py      # R8: the idempotency key folds the ordinal in ONLY when non-zero,
                               #   so every existing key is byte-identical. Without this, a
                               #   program calling one non-repeatable tool twice writes ONE intent
@@ -177,6 +187,15 @@ Re-evaluated after Phase 1. No verdict changed; two were sharpened:
   a capability most runs will not use, and `pyproject.toml`'s comment is amended rather than left
   describing the old posture.
 
+**The widening's real cost, found by measuring the resume path**: once arguments come from the
+model, nothing persists them. `intents` carries `tool_name` and no arguments, `already_chosen` is
+`{step: tool_name}`, and a pending step **re-invokes** — so every model-driven run would resume
+with an empty argument map. The intent carries them (R13), because the entrypoint already argues
+that case for the name — *"a second store holding the same fact would eventually disagree with
+it."* **The trail does not**, because `record_choice` argues the opposite rule for itself: no
+model output beyond the name, since the model may have read a secret out of a tool result. Two
+stores, opposite rules, and the reason is what each is for.
+
 **A limit stated rather than solved**: resume re-runs a program **from the start** — there is no
 mid-program checkpoint — so a program that branches on a tool result may re-issue a different
 second call, leaving a recorded intent for a call the re-run never makes. Its effect happened and
@@ -186,7 +205,8 @@ case, because asserting it unconditionally would claim something the design cann
 Solving it means checkpointing inside a program — a different and much larger feature.
 
 **And one capability refused rather than bounded**: a program can call the program tool, because
-the seam keeps no allowlist. Refused at the seam (R10) — nesting is absent from 036's Deferred
+the seam keeps no allowlist. Refused by a **hook** rather than by the seam, so the denial is
+decided by the pipeline that decides everything else and is recorded (FR-005). Refused at the seam (R10) — nesting is absent from 036's Deferred
 list, so it is permitted by omission rather than by argument, and shipping reachability would make
 it live. A depth limit was rejected: a limit is a decision about how much nesting is useful, and
 there is no evidence about that yet.

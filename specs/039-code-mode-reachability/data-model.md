@@ -166,14 +166,52 @@ intents recorded the first time. A run-scoped counter could not.
 
 **And nesting is refused rather than scoped.** A program can call the program tool — the seam has
 *"no blocklist, no allowlist, and no special case"* — so an inner submission would clear the
-ordinal on exit and zero the outer program's counter mid-flight. Refused at the seam with a stated
-reason, because nesting is absent from 036's Deferred list and is therefore permitted by
-**omission** rather than by argument. A refusal is reversible by a later record; an unbounded
-recursion that shipped is not.
+ordinal on exit and zero the outer program's counter mid-flight. Refused because nesting is absent
+from 036's Deferred list and is therefore permitted by **omission** rather than by argument. A
+refusal is reversible by a later record; an unbounded recursion that shipped is not.
+
+**By a hook, not by the seam.** A name check inside the seam is precisely the blocklist its
+docstring disclaims, and it would sit *before* `invoke_tool`, so the refusal would never be
+recorded — which FR-005 requires of every call to something a definition may not use. A governance
+hook reading `call_ordinal > 0` puts the decision where every other decision is made.
 
 **Rejected**: advancing `run.step_index` from inside the seam. It is the *run's* counter — the
 entrypoint's loop sets it and the checkpoint reads it — so mutating it from inside a tool would
 corrupt the run's accounting to repair the key's.
+
+---
+
+## Intent (widened — this is R13's entity)
+
+**What the widening in *Model answer* costs one layer down.** An intent is the durable statement
+of *"we were about to run X"*, written before a non-repeatable effect so an interruption is
+resolvable.
+
+| Field | Today | After |
+| --- | --- | --- |
+| `tool_name` | the tool a model named | unchanged |
+| `arguments` | **absent** | the arguments it named them with, defaulted to `{}` |
+
+**Because a pending step re-invokes.** The entrypoint says so: *"A pending step is one whose
+bracket was opened and whose effect re-observation found had NOT landed — so it runs again."*
+Today the arguments it runs again with are `_PROBE_ARGUMENTS`, a platform constant — which is the
+only reason resume is honest. Make them the model's without persisting them and **every**
+model-driven run resumes with an empty map, having correctly skipped the provider call.
+
+**Here rather than in a second store**, on the entrypoint's own argument for the name: *"No new
+record for this… a second store holding the same fact would eventually disagree with it."*
+Arguments are the rest of that same statement.
+
+**And never in the trail.** `TOOL_CHOSEN` carries `run_id`, `step_index`, `attempt`, `model`,
+`named`, `outcome` — and `record_choice`'s docstring argues the absence: *"no model output beyond
+the name. The model may have read a secret out of a tool result, and an append-only trail is the
+one place that must never be written to."* The control plane is read by resume; the trail is read
+by people and exported. **Two stores, opposite rules, and the reason is what each is for** — the
+same distinction 038 drew between `PROGRAM_SUBMITTED` and `ARTIFACT_AUTHORED`.
+
+**Additive and defaulted, and `resume_count` names the trap that shape carries**: `save()`
+overwrites the whole row, so an intent written without threading the arguments through resumes
+with `{}` and is indistinguishable from a tool that takes none.
 
 ---
 
