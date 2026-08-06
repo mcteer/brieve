@@ -286,13 +286,13 @@ grammar is foundational even though its compatibility rows belong to US5.**
   allocation — and assert the act happened against the model-named target. Every other row could
   pass while this one was false, which is the state two prior features shipped in
   (`verify-the-production-caller`).
-- [ ] T025 Run quickstart Scenarios A–E and G hermetically, then **F** against the enclave
+- [~] T025 Run quickstart Scenarios A–E and G hermetically, then **F** against the enclave
   (`make dev-up`), per `specs/040-model-supplied-arguments/quickstart.md` — including M7's
   prove-it-can-fail leg, which is the one most worth watching fail.
 - [X] T026 [P] Update `ROADMAP.md`: 020's row gains a note that the model chose the tool while
   the platform supplied every argument until 040; the authoring trio's ledger entry is the
   pointer the successor feature consumes.
-- [ ] T027 Run `make check` **and** the hermetic conformance lane. The local gate does not
+- [X] T027 Run `make check` **and** the hermetic conformance lane. The local gate does not
   collect `tests/conformance/` (`local-gate-is-not-the-fast-lane`), so a green `make check` says
   nothing about any row in this feature.
 
@@ -345,3 +345,29 @@ pointer at the next feature: consuming it is how 041 starts.
 - No task edits any of the four recording-driven suites; T020 asserts the diff stays empty.
 - The `_SYSTEM` prompt change (T007) rides the fixture/live parity — no per-model branches, per
   `harness-owns-model-vocabulary`.
+
+---
+
+## Implementation record — what ran, and what could not
+
+**Ran and green.** `make check` (1242 passed, lint + mypy clean over 565 files). The hermetic
+conformance lane at exact parity with its pre-040 baseline: 2 failed before and after, both
+environment (`EVAL_PROVIDER_API_KEY`, cross-process Postgres). Quickstart Scenarios A–E and G.
+Sixteen new rows across `conformance/choice/`, `conformance/durability/` and `unit/`.
+
+**Proven against the real store, by a route the rows do not take.** The durability conformance
+job could not be placed on this machine — the Nomad client reports `cpu.reservablecores = 0`
+and `cpu.totalcompute = 24` MHz, so a jobspec asking `cores = 1` is unplaceable. Rather than
+edit a merge-blocking gate's resource reservation for convenience, the schema change was
+verified directly against the running database with operator credentials:
+
+* the live `intents` table was in its **pre-040 shape**, which is precisely the case R13's
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` exists for. `CREATE TABLE IF NOT EXISTS` did
+  nothing, as its own comment says it would; the ALTER added the column.
+* a model-supplied request, an empty request, and a pre-040 row round-tripped through real SQL
+  as `{...}`, `{}` and `NULL` — **distinguishable**, which is M12's substantive claim.
+
+**Could not run, and neither is a code question.** M7/M12's `[postgres]` legs and **M18** need
+the conformance job placeable. They fail rather than skip, which is correct and is why they
+appear as errors rather than as green. `make conformance` is where they run once the node can
+place the job.
