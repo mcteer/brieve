@@ -89,6 +89,23 @@ handler    = "vault_policy_read"
 product    = "vault"
 repeatable = true
 
+[[tools]]
+name       = "vault_policy_impact"
+risk_class = "secret_touching"
+paths      = [{ path = "sys/policies/acl/scratch-agent-*", capabilities = ["create", "update", "delete", "read"] }]
+transport  = "native"
+handler    = "vault_policy_impact"
+product    = "vault"
+# REPEATABLE, and the precedent points the other way — `vault_write` is non-repeatable because
+# a CAS write that succeeded and lost its response must be resolved by observation, not replay.
+#
+# This tool's contract is that it leaves NOTHING behind: re-running it overwrites its own
+# derived scratch names, re-answers, and re-destroys. So a replay after interruption *heals*
+# the orphan the interruption created, and declaring it non-repeatable would demand an observer
+# whose only honest answer — "did a transient thing that no longer exists happen?" — is useless
+# to a resumer.
+repeatable = true
+
 [[skills]]
 name    = "vault-secret-access"
 path    = "skills/vault-secret-access/SKILL.md"

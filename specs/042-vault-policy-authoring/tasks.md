@@ -144,17 +144,17 @@ read is recorded, no secret value appears, and absent/protected/present are thre
 **Independent Test**: propose a widening change; the evidence shows the widening; a check
 that cannot run refuses the proposal; zero scratch artifacts survive.
 
-- [ ] T011 [US3] `vault_policy_impact` handler in `src/surfaces/handlers.py`: the whole
+- [X] T011 [US3] `vault_policy_impact` handler in `src/surfaces/handlers.py`: the whole
       lifecycle in one call (R1) — derive `scratch-agent-<run>-current/-proposed` from the
       run id (never from arguments), write both bodies, mint one 60s token per side via
       `scratch-check`, query `sys/capabilities` over the stanza-scan ∪ diff-touched path
       set (bounded, truncation disclosed — R10), compose per-path
       `current`/`proposed`/`granted`/`revoked`, destroy both policies in `finally`.
       Vault's parse failure surfaces as `policy_invalid`, never as an impact result.
-- [ ] T012 [P] [US3] `ImpactResult` composition unit rows in
+- [X] T012 [P] [US3] `ImpactResult` composition unit rows in
       `tests/unit/test_impact_result.py`: granted/revoked set arithmetic; a new policy's
       empty current side; the path cap and its disclosure; glob paths labelled `as-written`.
-- [ ] T013 [US3] [GATE:conformance] Rows V11–V14 in
+- [X] T013 [US3] [GATE:conformance] Rows V11–V14 in
       `tests/conformance/authoring/test_policy_impact.py`: V11 (names derived; forged name
       refuses), V12 (a widening change is visibly wider — the row fails if the evidence
       would read identically without the impact, SC-009), V13 (check cannot run → proposal
