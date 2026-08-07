@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: Measured against merged main (`f4f9f5c`) — 038 built the authoring tier and registered none of it. The gap is three layers deep, and only the first was known.
+**Input**: Measured against merged main (`f4f9f5c`) — 038 built the authoring tier and registered none of it. The gap is five layers deep, and only the first was known.
 
 ## Traceability *(mandatory)*
 
@@ -68,7 +68,7 @@
 
 ## The gap, measured
 
-Three layers, and 038's conformance rows are green through all three. Each was verified against
+Five layers, and 038's conformance rows are green through all five. Each was verified against
 merged `main` rather than inferred:
 
 | Layer | What exists | What is missing | How it was measured |
@@ -226,6 +226,12 @@ diff over them is empty.
   *read*, and the acquisition needs its own bound or an explicit statement that it has none.
 - The repository moves between the clone and the publish, so the proposal's base no longer
   exists.
+- An analyzer is killed mid-run and revived on another node, where the checkout path does not
+  exist: the resume path re-acquires **at the recorded commit**, never at HEAD — a base that
+  drifts between attempts would make two attempts of one run analyse two different trees.
+- A run reaches terminal state with kept requests holding subject-derived content: scrubbed
+  (FR-033), and a revival attempt after scrubbing cannot occur because only pending steps read
+  arguments.
 
 ## Requirements *(mandatory)*
 
@@ -268,8 +274,12 @@ diff over them is empty.
   and provenance.
 - **FR-014**: The tier's jobspec MUST actually execute the platform's entrypoint in both tasks,
   and a job that declares a task with nothing to run MUST fail a check rather than dispatch.
-- **FR-015**: The capability ledger MUST no longer list the trio as deliberately unreachable, and
-  the sweep MUST fail if any of the three becomes unregistered again.
+- **FR-015**: The capability ledger MUST no longer list the trio as deliberately unreachable.
+  Because the trio registers **per run** (the handlers hold run-scoped state), the ledger's
+  static sweep cannot observe the registration directly — so the entries MOVE to a declared
+  per-run-reachable record naming the registrar, they do not vanish. The sweep MUST fail if a
+  per-run-reachable entry's registrar stops registering it — kept honest by a row that drives
+  the registering construction, not by the declaration alone.
 - **FR-016**: At least one row MUST run **where dispatched work actually runs** — an enclave row
   under an attested workload identity, which fails rather than skips when the lane is
   unavailable.
@@ -326,6 +336,15 @@ diff over them is empty.
 - **FR-032**: The rationale is model-authored text reaching a customer's repository, so it MUST
   pass the same containment the authored files do. A description is content, and exempting it
   because it is prose would leave the one field nobody scanned.
+- **FR-033**: An authoring run's kept model requests MUST be scrubbed at the run's terminal
+  state. 040 stores a model's stated arguments durably so an interrupted act can be repeated
+  faithfully — and for `author_file` those arguments are file content derived from a customer's
+  private repository, resting in the control plane. 040's own design makes this safe to scrub:
+  resume reads arguments only for **pending** steps, so a terminal run's requests are read by
+  nothing — and 040 deliberately left the request removable rather than load-bearing, which
+  this requirement is the first to consume. FR-013's rationale extends here: the trail was
+  refused a copy nobody can delete; the control plane holds one only while the run can still
+  need it.
 
 ### Key Entities
 

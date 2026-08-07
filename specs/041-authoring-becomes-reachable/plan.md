@@ -63,7 +63,7 @@ capability ledger, ~18–24 new conformance rows, 1 qualified `write` cell.
 | II — Total Interception; One Governed Tool Layer | **Pass** | The trio enters through the same registry/hook pipeline as every tool; registration is the opt-in switch. New egress (git push, PR create) occurs **inside** a registered tool's handler in the proposer task, within its existing `github.com` allowlist. The pre-dispatch clone is dispatcher-context work, not agent-initiated egress — stated, and a row bounds it (research R3). |
 | III — Fail-Closed, In-Process Enforcement | **Pass** | Unknown tool / outside ceiling / outside task scope all refuse in-process with distinguishable reasons (FR-019). No gateway anchor. |
 | IV — Zero Standing Credentials; Authority Per Task | **Pass** | ADR-0062's exception used as written: App key read under the proposer's own attested identity, token minted per task, never persisted, never checkpointed. Analyzer's identity **absence** is asserted structurally (existing `available()`). The clone credential is minted in the dispatching context the same way (research R5). |
-| V — Sealed Core, Versioned Seams | **Pass, review owed** | Registries and the dispatch entrypoint are sealed core; touches are additive (a new registration branch, no signature changes). Security-maintainer review = Dan, per repository roles. |
+| V — Sealed Core, Versioned Seams | **Pass, review owed** | Registries and the dispatch entrypoint are sealed core; touches are additive (a new registration branch, no signature changes). **Analysis added a second sealed touch**: `core/authority/intersection.py` learns to name the excluding term (T002a) so FR-019's third refusal layer has a mechanism — additive, named here for the review. Security-maintainer review = Dan, per repository roles. |
 | VI — Lean by Default | **Pass** | No additional operated component — the MCP server was rejected partly on this ground. `gh` is a CLI in the task image, not a service. GitHub-as-product adds a probe entry, not a process. |
 | VII — Anti-Fragmentation | **Pass** | One registry, one conformance suite; the substrate remains the only delta. |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass** | The `write` cell is qualified through ADR-0063's mechanical scorer over the human-authored corpus and bound as an operator record; no auto-tracking. Sonnet 5 per the estate's standing decision, unchanged mid-feature (FR-012b). |
@@ -109,6 +109,9 @@ src/
 │   │   ├── credential.py    # token_for(): App-key exchange implemented (removes NotImplementedError)
 │   │   ├── acquisition.py   # NEW — pre-dispatch clone of target_repository (FR-026/027/028)
 │   │   └── publish.py       # NEW — open_proposal's production handler: git push + gh pr create
+│   ├── authority/
+│   │   └── intersection.py  # refusal names its excluding term (T002a — A2's mechanism)
+│   ├── durability/          # scoped terminal-state scrub of kept requests (T024a, FR-033)
 │   └── evals/
 │       └── (authoring_corpus/scoring exist; qualification evidence recorded, not new code)
 ├── surfaces/

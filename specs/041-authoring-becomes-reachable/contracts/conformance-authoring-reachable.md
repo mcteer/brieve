@@ -21,11 +21,16 @@ behaviour; these rows cover the path to them.
 ### A1 — A ceiling naming the trio parses and resolves (FR-002, SC-001)
 The same ceiling record refuses `unknown_ceiling_entry` against the pre-041 vocabulary and
 resolves against the post-041 one. Both halves asserted — the row pins the *change*, not just
-the end state.
+the end state. **The "before" is A4's rigged-off construction, in-process** — there is no
+pre-041 tree to run in a single checkout (040's M3 named this trap), so the row and its
+self-test deliberately share one seam.
 
 ### A2 — Three refusal layers, three distinguishable reasons (FR-019, SC-008)
 Unknown tool / known-but-outside-ceiling / inside-ceiling-but-outside-task-scope: three runs,
-three distinct reason codes, each naming the record an operator should read next.
+three distinct reason codes, each naming the record an operator should read next. **The third
+layer requires the refusal to name which intersection term excluded the tool** — today
+`intersect_scopes` computes one effective set with no memory of which term dropped what, so
+this row has a mechanism task (T002a), not only an assertion.
 
 ### A3 — Registration is the opt-in switch (FR-003)
 A definition whose ceiling omits `author_file` has no authoring even though the registry knows
@@ -36,8 +41,11 @@ A rigged entrypoint construction with the authoring branch disabled must make A1
 Runs as a self-test of the rows, not of the product.
 
 ### A5 — The ledger closes and re-arms (FR-015, SC-006)
-`DELIBERATELY_UNREACHABLE` carries no authoring entry, the sweep passes; un-registering any of
-the three makes the sweep fail.
+The trio MOVES from `DELIBERATELY_UNREACHABLE` to the declared per-run-reachable record naming
+the entrypoint's authoring branch as registrar — the static sweep cannot see per-run
+registration, so a declaration carries it, and this row keeps the declaration honest: driving
+the registering construction shows each declared name actually registers, and with the branch
+rigged off the check FAILS. An entry in neither record fails `unaccounted()` as before.
 
 ## The governed path (US2)
 
@@ -61,7 +69,9 @@ An analyzer-scoped run cannot call `open_proposal`; a proposer-scoped run cannot
 
 ### A10 — The subject is the target repository, by construction
 `AcquiredSubject.path` is a checkout of `target_repository` at `commit`; the analyzer's mount
-is that path; `subject_is_platform_tree` still refuses the platform's own tree.
+is that path; `subject_is_platform_tree` still refuses the platform's own tree. **A resumed
+analyzer re-acquires at the recorded `commit`, never at HEAD** — two attempts of one run must
+analyse one tree.
 
 ### A11 — Acquisition refuses before anything is produced (FR-028)
 Unreachable repository, missing revision, exceeded bound: three refusals, three codes, no
@@ -90,9 +100,19 @@ A rationale carrying a planted secret or analysed-content span refuses publish v
 containment path; a truncated artifact without a note refuses compose (exists — asserted
 surviving through the production path).
 
-### A17 — Suspension carries a product (FR-029, FR-030)
+### A17 — Suspension carries a product, and the product carries a probe (FR-029, FR-030)
 `open_proposal` suspends against product `github`; the generic guard fails for any registered
-suspendable tool with no product mapping.
+suspendable tool with no product mapping. **And the probe attaches**: the health checker's
+product→probe table includes `github` for an authoring run — asserted against the table the
+checker actually consumes, because a probe in a dict nothing reads is the same defect as a
+handler in a module nothing calls, one seam over.
+
+### A22 — Kept requests are scrubbed at terminal state (FR-033)
+An authoring run reaches terminal state; its kept model requests hold no subject-derived bytes
+afterwards. Asserted against the durability store directly, both providers — the in-memory
+provider round-trips scrubbing for free, which is exactly the shape 040's M7 exists to catch,
+so the Postgres leg is the one that counts. A non-authoring run's requests are untouched:
+scrubbing is scoped, not global, because 040's retention decision for ordinary runs stands.
 
 ## Qualification (FR-012, SC-011)
 

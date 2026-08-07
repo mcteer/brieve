@@ -20,11 +20,11 @@ consumes the previous story's wiring); US4/US5 are P2 and independent of each ot
 
 | Gate type | Where |
 | --- | --- |
-| **Fail-closed** | T005, T010, T017, T018 — refusal layers, product-mapping guard, task scope, acquisition refusals |
-| **Conformance** | T009, T011, T016, T020, T026, T028, T029, T034 — the A-rows; T030/T031 the E-rows |
+| **Fail-closed** | T005, T010, T017, T018 — refusal layers (T002a supplies A2's mechanism), product-mapping guard, task scope, acquisition refusals |
+| **Conformance** | T009, T011, T016, T020, T024b, T026, T028, T029, T034 — the A-rows; T030/T031 the E-rows |
 | **Correlation / evidence** | T030 — E1 walks the trail end to end under one correlation ID |
-| **Eval** | T019 — the `write` cells, qualified mechanically (ADR-0063) and bound |
-| **No-secret-leak** | T006, T027 — the token never in logs, checkpoints, configs, or audit |
+| **Eval** | T019 — the `write` cells, qualified mechanically (ADR-0063), bound only where the corpus earns them |
+| **No-secret-leak** | T006, T027 — the token never in logs, checkpoints, configs, or audit; T024a — subject-derived content scrubbed from kept requests at terminal state |
 
 ## The shape of the work, and why no phase closes the feature alone
 
@@ -62,10 +62,22 @@ on these, and the wait-forever suspension must be impossible before anything can
       `src/core/authoring/credential.py` (`token_for()` loses its `NotImplementedError`; App
       key read from `harness-authority/data/authoring/vcs-app` under the caller's attested
       identity; token TTL-bounded, never persisted; `available()` untouched — research R5).
+- [ ] T002a Make the intersection refusal name its excluding term in
+      `src/core/authority/intersection.py` (+ the error type beside it): a tool absent from
+      the effective set is refused as unknown / outside-ceiling / outside-task-scope depending
+      on **which term dropped it** — today `intersect_scopes` computes one set with no memory
+      of which term excluded what, so A2's third layer has no mechanism without this.
+      **Sealed-core touch (`core/authority`)**: additive, but named for Principle V review.
 - [ ] T003 [P] Add `PLATFORM_TOOL_PRODUCTS: dict[str, str]` (`open_proposal` → `github`) in
       `src/surfaces/toolset.py` and merge it into `dependency_products()` (FR-029).
 - [ ] T004 [P] Add the `github` probe to `PLATFORM_PROBES` in `src/surfaces/probes.py` — an
       authenticated reachability check keyed by product, per research R7 (FR-029).
+- [ ] T004a Wire platform products into the table the health checker consumes: `probes_for()`
+      in `src/surfaces/probes.py` (and its callers) merges platform product→probe pairs for
+      registered platform tools — today `bindings.probes` is consumed only by pack loading
+      (`core/packs/registration.py:120`), so a platform product's probe is a dict entry
+      nothing reads and the sweeper can never match a `github` recovery (FR-029, closes
+      analysis C3).
 - [ ] T005 [GATE:fail-closed] Unit guard: any registered suspendable tool absent from both the
       pack-derived and platform product maps fails, in
       `tests/unit/test_platform_tool_products.py` (FR-030 — the general rule, not a trio rule).
@@ -127,7 +139,8 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
       (`NomadDispatcher`): acquire after `AuthoringRequest.validate()` and before dispatch,
       pass the checkout as `NOMAD_META_subject_path`, run `resolve_subject_mount` against the
       produced path, delete the checkout at terminal state (FR-027; clone credential minted in
-      this context via T002).
+      this context via T002). **The resume path re-acquires at the recorded `commit`, never at
+      HEAD** — two attempts of one run analyse one tree; asserted by A10's resume half.
 - [ ] T014 [US2] Give the `analyzer` task its `args` in
       `infra/jobs/authoring-tier.nomad.hcl` — run the dispatch entrypoint with the env
       contract the jobspec already declares (FR-014).
@@ -147,10 +160,12 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
       repository at `commit` by construction; three acquisition refusals with no workspace
       created; bound disclosed, content never.
 - [ ] T019 [US2] [GATE:eval] Qualify and bind the `write` cells: run `make eval-authoring`
-      against live Sonnet 5, record dated evidence, add both packs' `write` cells to
-      `model_matrix_cells` in `infra/modules/trust-fabric/`, apply, and re-seed the model
-      credential after the apply (it clobbers the KV generation — known estate behaviour).
-      FR-012a/b; research R6.
+      against live Sonnet 5, record dated evidence, and bind a cell **only for packs the
+      corpus can actually qualify** — `evals/authoring/corpus.toml` is Terraform-shaped, and
+      a vault `write` cell without vault-shaped golden tasks would be an unearned cell,
+      ADR-0047's exact refusal. Add the earned cells to `model_matrix_cells` in
+      `infra/modules/trust-fabric/`, apply, and re-seed the model credential after the apply
+      (it clobbers the KV generation — known estate behaviour). FR-012a/b; research R6.
 - [ ] T020 [US2] [GATE:conformance] Rows A18 + A19 in
       `tests/conformance/authoring/test_qualification_dispatch.py` (new file — 038's
       qualification file stays unedited): unqualified stops `unqualified_cell` through
@@ -188,6 +203,18 @@ observably cannot publish; healthy handoff consumes no resume attempt.
       `CANNOT_DETERMINE` by querying the head branch — existing open PR → observed, absent →
       not performed; never a second proposal (FR-010, research R10; plugs into
       `core/observation` types).
+- [ ] T024a [US3] [GATE:no-secret-leak] Scrub an authoring run's kept model requests at
+      terminal state (FR-033): the terminal path in `src/surfaces/dispatch/entrypoint.py`
+      calls a scoped scrub on the durability provider (`src/core/durability/` — both
+      providers), removing `author_file`-class argument payloads for the finished run. Safe by
+      040's own design: resume reads arguments only for pending steps, and the request was
+      left removable rather than load-bearing. Non-authoring runs untouched.
+- [ ] T024b [US3] [GATE:conformance] Row A22 in
+      `tests/conformance/authoring/test_publishing.py` (hermetic) plus a durability leg in
+      `tests/conformance/durability/test_authoring_requests_scrubbed.py` (new file): after
+      terminal state no subject-derived bytes remain in either provider's request records —
+      the in-memory provider passes for free, so the Postgres leg is the one that counts
+      (040's M7 shape).
 - [ ] T025 [US3] Give the `proposer` task its `args` in
       `infra/jobs/authoring-tier.nomad.hcl`, and settle research R8 in `infra/`: verify the
       task image carries pinned `git` and `gh`, add a derived pinned image if the base lacks
@@ -206,7 +233,9 @@ observably cannot publish; healthy handoff consumes no resume attempt.
       through the production path.
 - [ ] T029 [US3] [GATE:conformance] Row A17 in
       `tests/conformance/authoring/test_publishing.py`: an `open_proposal` suspension carries
-      product `github` and the sweeper's map resolves it (depends T003/T004).
+      product `github`, the sweeper's map resolves it, **and the probe is present in the
+      table the health checker actually consumes** — not merely in `PLATFORM_PROBES`
+      (depends T003/T004/T004a).
 - [ ] T030 [US3] [GATE:correlation] Row E1 (enclave-marked, fails-never-skips) in
       `tests/conformance/authoring/test_enclave_publish.py` (new file): clone → read → author
       → contain → checkpoint → continue → publish; real PR, digests match, description carries
@@ -232,13 +261,17 @@ in the same task, and a person can merge what the agent proposed.
 
 **Independent Test**: Sweep passes with no trio entries; un-register one tool, sweep fails.
 
-- [ ] T033 [US4] Remove `read_subject`, `author_file`, `open_proposal` from
-      `DELIBERATELY_UNREACHABLE` in `tests/unit/capability_inventory.py`; extend the sweep's
-      reachable-set derivation to see per-run registration through the entrypoint's authoring
-      branch (FR-015).
+- [ ] T033 [US4] Move `read_subject`, `author_file`, `open_proposal` from
+      `DELIBERATELY_UNREACHABLE` to a new declared record `REACHABLE_PER_RUN: dict[str,
+      Registrar]` in `tests/unit/capability_inventory.py`, each entry naming its registrar
+      ("dispatch entrypoint, `HARNESS_AUTHORING_ROLE=analyzer`" / proposer) — the static
+      sweep cannot observe per-run registration, so a declaration carries it and
+      `unaccounted()` treats declared names as accounted (FR-015; closes analysis C2).
 - [ ] T034 [US4] [GATE:conformance] Row A5 in `tests/unit/test_capability_inventory.py`
-      (additive — the file is 040's, not 038's): sweep green with no authoring entries; a
-      rigged tree with one registration removed fails the sweep.
+      (additive — the file is 040's, not 038's): the declaration is kept honest by driving
+      the entrypoint's registering construction (T008's harness) and asserting every
+      `REACHABLE_PER_RUN` name actually registers; with the branch rigged off the check
+      FAILS; a name in neither record still fails `unaccounted()`.
 
 ---
 
@@ -249,9 +282,11 @@ in the same task, and a person can merge what the agent proposed.
 
 **Independent Test**: Empty diff over 038's row files; full suite green.
 
-- [ ] T035 [US5] Row A20 verification: `git diff main -- tests/conformance/authoring/` shows
-      only NEW files (T009/T016/T018/T020/T026/T030's); 038's seven row files unedited; run
-      the full authoring suite green. Record the diff command and result in the
+- [ ] T035 [US5] Row A20 verification: `git diff $(git merge-base main HEAD) --
+      tests/conformance/authoring/` shows only NEW files (T009/T016/T018/T020/T026/T030's);
+      038's seven row files unedited; run the full authoring suite green. **Merge-base, not
+      `main`** — main moves during implementation, and this estate has already recorded what
+      a wrong baseline reports: false parity. Record the command and result in the
       implementation record (FR-017).
 - [ ] T036 [US5] Row A21 verification: the four recording-driven suites and 008–012's
       fixture-tool lanes pass with zero edits — non-authoring vocabulary, resolution, and
@@ -273,7 +308,8 @@ in the same task, and a person can merge what the agent proposed.
 
 - **Setup (T001)**: independent; can land first or in parallel with Phase 2.
 - **Foundational (T002–T006)**: T002 blocks T013 (clone credential) and T021 (publish);
-  T003/T004 block T029; all block nothing in US1.
+  T002a blocks T010 (A2's third layer needs the mechanism); T003/T004/T004a block T029;
+  the rest block nothing in US1.
 - **US1 (T007–T011)**: needs nothing from Phase 2 — can start immediately after Setup.
   T007 → T008 → T009/T010 [P] → T011.
 - **US2 (T012–T020)**: T007 first (the branch exists); T012 → T013; T014/T015 beside them;
@@ -300,7 +336,9 @@ obligation being discharged, not a demo.
 
 ## Notes
 
-- **38 tasks; 25 contract rows (A1–A21, E1–E4)**, and every asserting task names its rows.
+- **43 tasks; 26 contract rows (A1–A22, E1–E4)**, and every asserting task names its rows.
+  Five tasks (T002a, T004a, T024a, T024b, and A5's rewrite) exist because the first analyze
+  pass found four artifacts asserting what the code cannot do — the suffixed IDs mark them.
 - No task edits 038's seven row files or the four recording-driven suites; T035/T036 assert it.
 - The fake-forge seam (T026) is declared, per the repo's undeclared-fake-row guard.
 - T019 re-seeds the model credential after `terraform apply` — the apply clobbers it
