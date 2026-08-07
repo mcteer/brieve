@@ -219,9 +219,9 @@ qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009)
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T023 [P] Run `specs/043-grounded-means-relevant/quickstart.md` top to bottom as written;
+- [X] T023 [P] Run `specs/043-grounded-means-relevant/quickstart.md` top to bottom as written;
       fix drift in the doc, not by hand-waving the steps.
-- [ ] T024 Update `ROADMAP.md` in the implementation PR: mark gap 0g **CLOSED by 043** with
+- [X] T024 Update `ROADMAP.md` in the implementation PR: mark gap 0g **CLOSED by 043** with
       the mechanism in one line, and add 043's Shipped row (the file's own landing rule).
 
 ---

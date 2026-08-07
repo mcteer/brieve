@@ -39,6 +39,22 @@ FIXTURE_TASK = "Read the current value stored at conformance/probe."
 FIXTURE_PERMITTED = ("vault_read", "vault_write")
 
 
+#: Roles reachable only from an ANSWERING SURFACE, never from a dispatched run — so a live cell
+#: in one of them cannot make a dispatched conformance row reach a vendor.
+#:
+#: **Narrowed a second time, on the same reasoning that narrowed it first** (2026-08-07, 043).
+#: The check began as "no live cell at all", and 2026-08-02 narrowed it to permit `ask` once the
+#: first live cell was earned, with the principle written into the docstring below: a dispatched
+#: run resolves `CHOICE_ROLE` and nothing else. `judge` is the role 043's relevance gate
+#: resolves, and it resolves it on the ask path — structurally the same position as `ask`, which
+#: this row already permits. The implementation was broader than the stated principle, and this
+#: is the principle applied rather than the guard relaxed.
+#:
+#: `plan`, `write` and `summarize` still fail. `write` most of all: a model permitted to make
+#: changes is the one the enclave must never reach by accident.
+SURFACE_ONLY_ROLES = frozenset({"ask", "judge"})
+
+
 def test_the_merge_lane_needs_no_provider() -> None:
     """FR-011, SC-006 — every model the blocking lane reaches replays a recording.
 
@@ -60,8 +76,10 @@ def test_the_merge_lane_needs_no_provider() -> None:
     turning a merge gate red. A gate that forbids the outcome it was written to protect gets
     deleted, and then nothing checks the thing that actually mattered.
 
-    What still fails: a live cell in `plan`, `write`, `judge` or `summarize`. `write` most of
-    all — a model permitted to make changes is the one the enclave must never reach by accident.
+    **Narrowed again 2026-08-07** to admit `judge`, which 043's relevance gate resolves on the
+    ask path — see `SURFACE_ONLY_ROLES`. What still fails: a live cell in `plan`, `write` or
+    `summarize`. `write` most of all — a model permitted to make changes is the one the enclave
+    must never reach by accident.
     """
     chooser = build_chooser(FIXTURE_MODEL, recording=recording("vault_write", "vault_read"))
     request = ChoiceRequest(task=FIXTURE_TASK, permitted=FIXTURE_PERMITTED, step_index=0, attempt=0)
@@ -83,7 +101,7 @@ def test_the_merge_lane_needs_no_provider() -> None:
     reachable = []
     for block in blocks:
         role = re.search(r'role\s*=\s*"([^"]+)"', block)
-        if 'qualified_by = "live"' in block and role and role.group(1) != "ask":
+        if 'qualified_by = "live"' in block and role and role.group(1) not in SURFACE_ONLY_ROLES:
             reachable.append(role.group(1))
 
     assert not reachable, (
