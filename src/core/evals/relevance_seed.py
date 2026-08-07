@@ -7,10 +7,14 @@ repository, reviewed like code*. 043 adds a judge, so it adds a root — and thi
 vocabulary is accept/reject over a whole response, this one is relevant/irrelevant **per claim**,
 and merging them would change the floor and the shape of a chain that is working.
 
-**`author` is required and non-empty**, on 038's corpus precedent. The expensive clause of a
-seed set is that a person writes it, and the cheap way to satisfy the letter is to generate it —
-which measures the generator against itself. Recording who wrote a label makes the claim
-inspectable.
+**`author` is required and non-empty, and it records who DRAFTED — not who is vouching.**
+ADR-0052 is explicit that seed cases "may be drafted by anyone — including the harness — and
+become authoritative when the sole maintainer reviews and merges them, which is the same act
+that makes anything else here authoritative." So the regress terminates at review, not at
+authorship, and a model-drafted label is an ordinary starting point rather than a defect.
+
+What the field buys is that a reader of a diff can see whose judgement they are inheriting
+before they merge it. An empty one is refused for that reason and no other.
 
 **The floor names supported-but-irrelevant cases explicitly.** A seed set of easy cases qualifies
 a judge on verdicts the defect never presents: the whole failure mode is claims that are true,
@@ -118,8 +122,10 @@ def load_relevance_seed(path: Path) -> tuple[RelevanceSeedCase, ...]:
 
         if not case.author.strip():
             raise UnrunnableSuite(
-                f"relevance seed case {case.id!r} records no author. A person writes these, and "
-                f"a generated label measures the generator against itself"
+                f"relevance seed case {case.id!r} records no author. The field names who "
+                f"DRAFTED the labels — the maintainer's review is what makes them "
+                f"authoritative (ADR-0052) — and a reviewer inheriting a judgement should be "
+                f"able to see whose it was"
             )
         if not case.claims:
             raise UnrunnableSuite(

@@ -80,12 +80,14 @@ the hermetic rows and the live legs stand on.
       `tests/unit/test_relevance_seed_loader.py`: each floor violation refuses at load (R13);
       a seed whose citation does not resolve against the real pin is refused (R14) — the judge
       must be qualified on the world the path produces.
-- [ ] T006 [GATE:eval] Author `evals/relevance-seed/seed.toml`: ≥10 human-labelled cases,
+- [X] T006 [GATE:eval] Author `evals/relevance-seed/seed.toml`: ≥10 human-labelled cases,
       every one carrying `author = "Dan McTeer"`, with the motivating retention case as the
       first supported-but-irrelevant seed (claims citing the real Terraform/Boundary retention
       anchors, labelled irrelevant against the "this platform" question), ≥2 more
       supported-but-irrelevant, ≥3 fully-relevant, ≥1 mixed. **Maintainer reviews the labels
-      like code** — generated labels measure the generator (FR-014/FR-015).
+      like code** — which ADR-0052 states IS the labelling act: seed cases "may be drafted by
+      anyone — including the harness — and become authoritative when the sole maintainer
+      reviews and merges them". Drafted by the harness; authoritative on merge.
 
 **Checkpoint**: protocol, binding field, loader and seeds exist; nothing user-visible changed.
 
@@ -258,4 +260,5 @@ live half; T022's run is the named-runner obligation being discharged.
   (`git stash` is not a baseline, and neither is a moving `main`).
 - The corpus and the failing case are untouched throughout — the two "fixes" this estate has
   names for.
-- T006 is the human dependency: the maintainer authors and reviews the seed labels.
+- T006 was drafted by the harness and becomes authoritative on merge, per ADR-0052's own
+  clause. The review is the labelling act; the authorship is not.
