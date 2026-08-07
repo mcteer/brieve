@@ -37,6 +37,25 @@ rest on what was measured against merged main rather than on what an earlier doc
 the ROADMAP's own preamble records two wrong recommendations produced in one session by a
 document asserting a shape the platform did not have. The **requirements** name no technology.
 
+## Clarify session — 2026-08-07
+
+Four questions asked and answered; all four integrated into the spec and its requirements.
+
+| Taxonomy area | Status |
+| --- | --- |
+| Domain & data model | **Resolved** — Q1 settled the endorsement's unit (a source, not a document) |
+| Interaction & UX | **Resolved** — Q2 made provenance per-citation and *data rather than presentation* |
+| Integration & governance | **Resolved** — Q3 gave endorsements their own record and named the four-place cost |
+| Lifecycle | **Resolved** — Q4 settled sync as an act somebody takes, never a schedule |
+| Non-functional (performance, scale) | **Outstanding, low impact** — no volume target is stated for a synced source; reasonable defaults exist and the pinned corpus's 238 documents is the working precedent |
+| Terminology | **Clear** — "endorsed source", "synced copy", "citable document", "provenance" used consistently |
+
+**Each answer carried a cost that is now written down rather than discovered**: source-level
+endorsement means a document added upstream is citable without a fresh human act (bounded by the
+sync record); a fourth console record means four places must be updated together (bounded by a
+check that they agree); and no scheduler means content is exactly as stale as the last
+deliberate act (bounded by making that age visible).
+
 **Two decisions were made rather than deferred**, both recorded in Assumptions:
 
 1. **MCP servers are excluded.** The ROADMAP describes one panel over Git repositories and MCP

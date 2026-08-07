@@ -45,7 +45,53 @@ protected-policy set are estate governance and are deliberately not console-writ
 
 ## Clarifications
 
-*(none yet — `/speckit-clarify` runs next)*
+### Session 2026-08-07
+
+- Q: What does an administrator endorse — a source, or individual documents? → A: **The source,
+  as a whole.** One endorsement covers everything synced from it, including documents added to
+  it later. This matches how a person actually decides to trust a body of work, and keeps the
+  endorsement a **governance decision rather than a filing task**: an administrator facing two
+  hundred files would approve in bulk without reading, and the record would then say more than
+  it means. One decision, one record, one withdrawal.
+  **The cost is stated rather than absorbed**: a document added upstream becomes citable at the
+  next sync without a fresh human act. What bounds that is the sync record — FR-017 already
+  requires each sync to say what it took — so *when* a document became citable is answerable
+  even though nobody endorsed it individually.
+
+- Q: How does an answer disclose that it rests on customer material, especially when mixed? →
+  A: **Per-citation provenance, plus a summary note.** Every citation carries where it came
+  from, and the answer's note says whether it rests on validated designs, on the customer's own
+  endorsed material, or on both.
+  **A summary alone would answer the wrong question.** A reader weighing an answer is not asking
+  "did any of this come from our own documents" — they are asking *"does THIS claim rest on
+  HashiCorp's guidance or on ours"*, and those carry different weight for different decisions.
+  A note cannot answer that, and a purely visual distinction cannot be filtered or recorded.
+  **Provenance is data, not presentation**, so the trail and any consumer see the same fact the
+  reader does.
+
+- Q: Where does an endorsement live, given 044's closed set of three console records? → A: **A
+  fourth record, `endorsed-sources`**, added to all four places that must agree — the route's
+  closed set, the submitter, the Vault grant, and the Control Group's path list.
+  **Separate because the acts are separate.** Endorsing whose documents the platform may cite
+  and naming where Terraform Enterprise lives are different governance decisions, plausibly
+  reviewed by different people; folding the first into `product-connections` would make one
+  grant cover both and one revocation remove both. **042's lesson applies directly**: its
+  enumerated grant exists so that scoping cannot widen by accident, and reusing a record because
+  it is already writable is exactly how it would.
+  **The four-place update is the cost and it is not avoidable by hiding.** A second write
+  mechanism outside the console would avoid it and reintroduce what 044's design argues against
+  — two lifecycles for one act, one of which stops getting attention.
+
+- Q: When is an endorsed source synced? → A: **On endorsement, and on demand from the console.**
+  No schedule and no background job.
+  **Staleness becomes visible rather than assumed away.** Content is exactly as old as the last
+  deliberate act, the console shows when that was, and an administrator deciding whether to
+  re-sync is making the same kind of judgement they made when endorsing. A scheduler would make
+  content change without anybody deciding it should — and would cost an operated component,
+  which Principle VI requires a named trigger for.
+  **033's rule carries over**: the age of the ground is disclosed rather than left to be
+  inferred, and an answer resting on customer material says how old that material is by the same
+  reasoning the pinned corpus already does.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -123,7 +169,8 @@ answered, that every citation resolves, and that the answer says which material 
 2. **Given** an answer resting on customer material, **When** it is returned, **Then** it
    discloses that, distinguishably from an answer resting on validated designs.
 3. **Given** an answer mixing both, **When** it is returned, **Then** the disclosure says so
-   rather than naming only one.
+   rather than naming only one, **and each citation carries its own provenance** so a reader can
+   tell which claim rests on which.
 4. **Given** a citation into customer material, **When** a reader follows it, **Then** it
    resolves to the content the platform actually holds.
 
@@ -198,7 +245,17 @@ the citations in the proposal resolve against the same pin the answering path us
 
 - **FR-001**: An administrator MUST be able to endorse a source of customer documents through
   the platform's existing governed configuration path.
+- **FR-001a**: Endorsements MUST live in their **own** governed record, separately grantable and
+  separately revocable from the records that already exist. Every place that enumerates the
+  writable set MUST be updated together, and a check MUST assert they agree — a set enforced in
+  four places is a set that can disagree in four places.
+- **FR-001b**: The feature MUST NOT introduce a second write mechanism for governance records.
+  One act, one path.
 - **FR-002**: An endorsement MUST record who endorsed it, what was endorsed, and when.
+- **FR-002a**: An endorsement applies to a **source**, and covers every citable document synced
+  from it — including documents that appear in it after the endorsement. The sync record is what
+  makes *when* a given document became citable answerable, since no person endorsed it
+  individually.
 - **FR-003**: Endorsing MUST NOT be possible for a non-administrator, and an attempt MUST be
   recorded.
 - **FR-004**: An endorsement MUST be withdrawable, and withdrawal MUST take effect without a
@@ -212,7 +269,13 @@ the citations in the proposal resolve against the same pin the answering path us
   the same check the pinned corpus uses.
 - **FR-009**: An answer resting wholly or partly on customer material MUST disclose that,
   distinguishably from an answer resting on validated designs.
+- **FR-009a**: Every citation MUST carry the provenance of the document it points at —
+  validated design, or the customer's own endorsed material — as **data rather than
+  presentation**, so the record and any consumer see what the reader sees.
 - **FR-010**: The disclosure MUST name which material an answer rests on when it rests on both.
+- **FR-010a**: A reader MUST be able to tell, for **an individual claim**, which material it
+  rests on. A summary that answers only "did any of this come from customer material" answers a
+  question nobody is asking.
 - **FR-011**: Content with no addressable sections MUST NOT be citable, and the platform MUST
   report that rather than citing a document as a whole.
 - **FR-012**: The platform's own corpus MUST continue to be verified against its pin exactly as
@@ -224,6 +287,12 @@ the citations in the proposal resolve against the same pin the answering path us
 - **FR-016**: A proposal citing customer material MUST carry the same disclosure an answer does.
 - **FR-017**: A sync MUST be recorded — what was synced, its identity, when, and whether it
   succeeded.
+- **FR-017a**: A source MUST be synced when it is endorsed, and MUST be re-syncable on demand by
+  an administrator. The platform MUST NOT sync on a schedule: content that changes without a
+  person deciding it should is content whose currency nobody owns.
+- **FR-017b**: The age of endorsed content MUST be visible to an administrator, and an answer
+  resting on it MUST disclose that age by the same rule the pinned corpus already follows —
+  a disclosure that appears only past a threshold trains readers that silence means fresh.
 - **FR-018**: A sync failure MUST be distinguishable from an empty source and from content that
   is present but not citable.
 - **FR-019**: Endorsed content MUST be scoped so that one customer's material cannot be cited in
@@ -255,6 +324,8 @@ the citations in the proposal resolve against the same pin the answering path us
 - **SC-001**: A question that only the customer's own documents answer is answered, with
   citations that resolve.
 - **SC-002**: 100% of answers resting on customer material disclose it; zero rest on it silently.
+- **SC-002a**: For any answer, a reader can determine the provenance of **each** claim without
+  consulting anything outside the answer.
 - **SC-003**: Zero requests reach a customer source while a question is being answered.
 - **SC-004**: Content that fails its identity check is answered from zero times.
 - **SC-005**: Every endorsement and withdrawal appears in the trail with its administrator and
@@ -267,6 +338,8 @@ the citations in the proposal resolve against the same pin the answering path us
 - **SC-010**: Customer content becomes citable without an endorsement zero times, and a row
   fails if that changes.
 - **SC-011**: A withdrawal is in force for the next question, with no restart.
+- **SC-013**: An administrator can state how old any endorsed source's content is, from the
+  console alone.
 - **SC-012**: A proposal citing customer material carries the same disclosure an answer does.
 
 ## Assumptions
