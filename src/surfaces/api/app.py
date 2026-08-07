@@ -69,6 +69,10 @@ def create_app(
     #: means every ask refuses `relevance_unbound` — the gate is a property of the surface.
     relevance_judges: Any | None = None,
     relevance_model: str = "unconfigured",
+    #: 045's second corpus. `None` leaves the ask path exactly as it was — which is what an
+    #: estate that has endorsed nothing should be, rather than a new path that happens to be
+    #: empty (US6 at the assembly layer).
+    endorsed_reader: Any = None,
     # 035. Where a person's own asks are grouped so they can come back to them. Absent means
     # asks are answered and recorded exactly as before and remembered by no transcript —
     # deliberately not fatal, because the evidence record is the platform's memory and this
@@ -135,6 +139,7 @@ def create_app(
             credential_source=credential_source,
             relevance_judges=relevance_judges,
             relevance_model=relevance_model,
+            endorsed_reader=endorsed_reader,
             # 035. Absent in an assembly with no store, and an ask then behaves exactly as it
             # did before conversations existed — answered, recorded, and remembered by nobody.
             conversations=ask_conversations_store,

@@ -51,6 +51,16 @@ resource "vault_policy" "authority_submit" {
       capabilities = ["create", "update"]
     }
 
+    # Endorsed sources (045). WHOSE documents the platform may cite, and which synced version
+    # answers rest on. Its own record rather than a field on `product-connections`, because
+    # endorsing a body of somebody's documents and naming where Terraform Enterprise lives are
+    # different governance acts, plausibly reviewed by different people — one grant covering
+    # both, and one revocation removing both, is the accidental widening 042's enumerated
+    # grant exists to prevent.
+    path "${vault_mount.harness_authority.path}/data/endorsed-sources" {
+      capabilities = ["create", "update"]
+    }
+
     # Product connections (044). Locations only — an address, an organisation, a namespace.
     # The material used to authenticate to a product stays in the trust store and is
     # referenced; there is no field here a credential could be written into.

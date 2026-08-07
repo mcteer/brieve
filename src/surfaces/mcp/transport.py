@@ -74,6 +74,11 @@ class McpTransport:
         relevance_judges: Any | None = None,
         relevance_model: str = "unconfigured",
         credential_source: Any | None = None,
+        #: 045's second corpus, mirrored from `create_app` exactly (ADR-0033). A collaborator
+        #: only one surface holds is a way for the two to differ that no catalogue comparison
+        #: can see — and 043 shipped that asymmetry once, with `relevance_note` reaching the
+        #: API's caller and not this one.
+        endorsed_reader: Any | None = None,
     ) -> None:
         self._dispatcher = run_dispatcher
         self._audit = audit_sink
@@ -93,6 +98,7 @@ class McpTransport:
         # 027. `None` refuses `credential_unavailable`. A default that supplied one would rebuild
         # "configured means permitted" one level below where 026 broke it.
         self._credential_source: Any = credential_source
+        self._endorsed_reader: Any = endorsed_reader
         self._evidence = evidence_query
         self._submitter = authority_submitter
         # Mirrors `create_app`'s collaborators exactly, and the mirroring is the point: the
@@ -215,6 +221,7 @@ class McpTransport:
         from core.answering.answer import ProviderUnavailable
         from core.answering.context import build_context
         from core.answering.corpus import CorpusUnavailable, load_corpus
+        from core.answering.endorsed.corpus import CombinedCorpus, EndorsedCorpus
         from core.answering.estate import EstateProviderUnavailable
         from core.answering.record import record_ask
         from core.answering.routing import Route, route_with_signal
@@ -348,9 +355,23 @@ class McpTransport:
             return McpResult(ok=False, status=403, payload={"reason": str(refused)})
 
         try:
-            corpus = load_corpus()
+            pinned = load_corpus()
         except CorpusUnavailable as unavailable:
             return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
+
+        # Resolved once per call, the API's reasoning verbatim: one question is one resolution,
+        # so no adoption can move the ground under a single answer. The pinned corpus is passed
+        # UNCHANGED when nothing is endorsed — an estate that endorsed nothing is the platform
+        # it was before this feature, not a new path that happens to be empty.
+        endorsed = EndorsedCorpus()
+        if self._endorsed_reader is not None:
+            try:
+                endorsed = self._endorsed_reader()
+            except Exception:  # noqa: BLE001 — customer material becoming temporarily uncitable
+                # narrows the answer and is disclosed; taking the ask down would let a
+                # customer's own outage stop the platform answering from the corpus it ships.
+                endorsed = EndorsedCorpus()
+        corpus: Any = pinned if endorsed.empty else CombinedCorpus(pinned=pinned, endorsed=endorsed)
 
         if self._ask_providers is None:
             # Recorded anyway — see the API's note. Someone asked and the platform could not

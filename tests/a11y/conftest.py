@@ -80,6 +80,127 @@ class _Answers:
         ]
 
 
+def _console_config() -> Any:
+    """A console with an endorsement to render, so the lane walks a POPULATED page (045, EL3).
+
+    044's row walks `/settings` as an *operator* and therefore audits the refusal state. That
+    is a real page and worth auditing, and it is not the page this feature adds: a refusal
+    contains no table, no drift flag and no review control, so a lane that only ever saw it
+    would stay green while every element 045 introduces went unchecked. 044's own note says
+    exactly this about the page it added — "a gate that does not visit a surface has not
+    tested it" — and this is that lesson applied to the surface after it.
+    """
+    from datetime import UTC, datetime
+
+    from core.answering.endorsed.records import (
+        CANDIDATE,
+        EndorsedDocument,
+        SyncedVersion,
+        digest_of_document,
+    )
+    from surfaces.api.console import ENDORSED_SOURCES_PATH, ConsoleConfig
+
+    record = {
+        "data": {
+            "data": {
+                "acme-standards": {
+                    "location": "https://git.example.com/acme/standards",
+                    "endorsed_by": "dan@acme.example",
+                    "endorsed_at": "2026-08-01T09:00:00+00:00",
+                    "adopted_version": "v-one",
+                    "adopted_by": "dan@acme.example",
+                    "adopted_at": "2026-08-01T09:05:00+00:00",
+                },
+                # A withdrawn source AND an endorsed-but-unadopted one, because the three
+                # states render differently and an audit of one row says nothing about the
+                # others.
+                "acme-retired": {
+                    "location": "https://git.example.com/acme/retired",
+                    "endorsed_by": "dan@acme.example",
+                    "withdrawn": True,
+                },
+                "acme-new": {
+                    "location": "https://git.example.com/acme/new",
+                    "endorsed_by": "dan@acme.example",
+                },
+            },
+            "metadata": {"version": 4},
+        }
+    }
+    sections = {"retention": "Logs are retained for 400 days."}
+    documents = {
+        "/endorsed/acme-standards/logging.md": EndorsedDocument(
+            path="/endorsed/acme-standards/logging.md",
+            url="https://git.example.com/acme/standards/logging.md",
+            digest=digest_of_document(sections),
+            anchors=frozenset(sections),
+            sections=dict(sections),
+        )
+    }
+
+    class _Store:
+        def __init__(self) -> None:
+            self.versions = {
+                "v-one": SyncedVersion(
+                    version_id="v-one",
+                    tenant_id="acme",
+                    source="acme-standards",
+                    upstream_tip="abc123",
+                    synced_at=datetime(2026, 8, 1, tzinfo=UTC),
+                    synced_by="dan@acme.example",
+                    state=CANDIDATE,
+                    documents=documents,
+                )
+            }
+
+        def read_version(self, version_id: str, *, verify: bool = True) -> Any:
+            return self.versions.get(version_id)
+
+        def write_version(self, version: Any) -> None:
+            self.versions[version.version_id] = version
+
+        def mark_adopted(self, **kwargs: Any) -> None:
+            return None
+
+    def _sync(**kwargs: Any) -> Any:
+        from core.endorsed_sync import SyncOutcome
+
+        version = SyncedVersion(
+            version_id="v-two",
+            tenant_id="acme",
+            source=kwargs["source"],
+            upstream_tip="def456",
+            synced_at=datetime(2026, 8, 6, tzinfo=UTC),
+            synced_by=kwargs["triggered_by"],
+            state=CANDIDATE,
+            documents={
+                **documents,
+                "/endorsed/acme-standards/incident.md": EndorsedDocument(
+                    path="/endorsed/acme-standards/incident.md",
+                    url="https://git.example.com/acme/standards/incident.md",
+                    digest=digest_of_document(sections),
+                    anchors=frozenset(sections),
+                    sections=dict(sections),
+                ),
+            },
+        )
+        return version, SyncOutcome(
+            version_id="v-two",
+            source=kwargs["source"],
+            upstream_tip="def456",
+            document_count=2,
+            uncitable=("preamble.md",),
+        )
+
+    return ConsoleConfig(
+        read_matrix=lambda: {"schema_version": 1, "cells": []},
+        read_versioned=lambda path: record if path == ENDORSED_SOURCES_PATH else None,
+        endorsed_store=_Store(),
+        sync_source=_sync,
+        tenant_id="acme",
+    )
+
+
 @pytest.fixture(scope="session")
 def portal_server() -> Iterator[PortalServer]:
     """The real portal as a process, because a browser cannot drive an ASGI object."""
@@ -89,6 +210,7 @@ def portal_server() -> Iterator[PortalServer]:
         ask_model="anthropic/claude-opus@5",
         ask_authority=qualified_ask_authority(model="anthropic/claude-opus@5"),
         credential_source=available_credential(),
+        console_config=_console_config(),
     )
     # THE THEMES ARE TWO PEOPLE (034). Each parametrized run signs in as its own subject so the
     # platform's per-subject rate window is not shared — see the `page` fixture for why. The
@@ -203,6 +325,24 @@ def page(request: Any, browser: Any, portal_server: PortalServer) -> Iterator[An
 
 
 @pytest.fixture(params=THEMES)
+def admin_page(request: Any, browser: Any, portal_server: PortalServer) -> Iterator[Any]:
+    """A signed-in ADMINISTRATOR, which is the only subject the console renders for (045).
+
+    Its own subject per theme for the reason the `page` fixture gives: the platform's rate
+    window is per subject, and sharing one makes the second theme's rows fail far from the
+    cause.
+    """
+    context = browser.new_context(color_scheme=request.param)
+    tab = context.new_page()
+    subject = f"admin-{request.param}"
+    fabric_users = portal_server.surface.identity_fabric.users
+    fabric_users.setdefault(subject, fabric_users["alice"])
+    _sign_in(tab, portal_server, subject=subject, groups=["platform-admin"])
+    yield tab
+    context.close()
+
+
+@pytest.fixture(params=THEMES)
 def anonymous_page(request: Any, browser: Any, portal_server: PortalServer) -> Iterator[Any]:
     """A page with no session, for the signed-out state — once per theme."""
     context = browser.new_context(color_scheme=request.param)
@@ -211,12 +351,14 @@ def anonymous_page(request: Any, browser: Any, portal_server: PortalServer) -> I
     context.close()
 
 
-def _sign_in(tab: Any, server: PortalServer, *, subject: str = "alice") -> None:
+def _sign_in(
+    tab: Any, server: PortalServer, *, subject: str = "alice", groups: list[str] | None = None
+) -> None:
     state, _url = server.oidc.begin()
     code = server.idp.authorize(
         code_challenge=code_challenge_for(server.oidc._pending[state].verifier),
         subject=subject,
-        claims={"groups": ["platform"]},
+        claims={"groups": groups or ["platform"]},
     )
     tab.goto(f"{server.base}/callback?code={code}&state={state}")
 

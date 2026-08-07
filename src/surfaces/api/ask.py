@@ -29,6 +29,12 @@ from core.answering.context import MAX_CARRIED_EXCHANGES, build_context
 from core.answering.conversations.postgres import ConversationStoreError
 from core.answering.conversations.records import ExchangeDisposition
 from core.answering.corpus import Corpus, CorpusUnavailable
+from core.answering.endorsed.corpus import (
+    CUSTOMER_ENDORSED,
+    CombinedCorpus,
+    EndorsedCorpus,
+    provenance_of,
+)
 from core.answering.estate import ANSWERED as ESTATE_ANSWERED
 from core.answering.estate import (
     EstateProviderUnavailable,
@@ -109,7 +115,11 @@ def ask_for(
     *,
     question: str,
     subject: AuthenticatedSubject,
-    corpus: Corpus,
+    #: The pinned corpus, or a `CombinedCorpus` composing it with the customer's endorsed
+    #: material (045). Widened rather than overloaded: both satisfy `resolves`/`url_for`/
+    #: `digest`, which is the whole contract this path uses, and research R1's design is that
+    #: there is a second implementation rather than a modified first one.
+    corpus: Corpus | CombinedCorpus,
     provider: Any,
     audit: AuditSink,
     model: str,
@@ -209,6 +219,10 @@ def ask_for(
         relevance_gate=(
             "disabled_by_admin" if relevance_disabled else ("checked" if relevance else "")
         ),
+        # WHICH endorsed version, beside `corpus_digest` and never folded into it (045,
+        # FR-017h). One request is one resolution, so this names exactly one identity — a
+        # record listing two would be an ask whose ground moved underneath it.
+        endorsed_version=getattr(corpus, "endorsed_version", "") or "",
     )
 
     # `source` on BOTH paths, which it was not until the third route went away.
@@ -242,16 +256,56 @@ def ask_for(
         "disposition": answer.disposition,
         "source": GUIDANCE_SOURCE,
         "corpus_digest": answer.corpus_digest,
+        # WHICH endorsed version the reader was shown, when one was in force. Alongside the
+        # digest for the same reason both are on the record: an answer a person keeps should
+        # name the ground it rested on well enough to look at it again.
+        **(
+            {"endorsed_version": getattr(corpus, "endorsed_version", "")}
+            if getattr(corpus, "endorsed_version", "")
+            else {}
+        ),
         "ground_note": answer.ground_note,
         "relevance_note": answer.relevance_note,
+        # WHAT THIS ANSWER RESTS ON, in one sentence (045, FR-016). Validated designs, the
+        # organisation's own endorsed material, or both — because "the platform says so" and
+        # "your own standard says so" are different claims and a reader acting on one should
+        # not believe they are acting on the other.
+        **({"grounding_note": _grounding_note(answer)} if _grounding_note(answer) else {}),
         "claims": [
             {
                 "statement": claim.statement,
-                "citations": [c.url(corpus) for c in claim.citations],
+                "citations": [
+                    # PROVENANCE AS DATA, per citation (clarify Q2, research R2). Derivable
+                    # from the path and emitted explicitly anyway: deriving it in every
+                    # consumer is a convention, and 038's payload table records what
+                    # conventions become.
+                    {"url": c.url(corpus), "provenance": provenance_of(c.path)}
+                    for c in claim.citations
+                ],
             }
             for claim in answer.claims
         ],
     }
+
+
+def _grounding_note(answer: Any) -> str:
+    """One sentence naming what an answer rests on.
+
+    Composed from the citations rather than from configuration, so it describes what was
+    actually cited. An answer that could have used endorsed material and did not must not
+    claim it did — that would be a disclosure that misleads in the direction of authority.
+    """
+    kinds = {provenance_of(c.path) for claim in answer.claims for c in claim.citations}
+    if not kinds:
+        return ""
+    if kinds == {CUSTOMER_ENDORSED}:
+        return "This answer rests on your organisation's endorsed material."
+    if CUSTOMER_ENDORSED in kinds:
+        return (
+            "This answer rests on both HashiCorp validated designs and your organisation's "
+            "endorsed material; each citation says which."
+        )
+    return "This answer rests on HashiCorp validated designs."
 
 
 def estate_answer_for(
@@ -825,6 +879,12 @@ def build_router(
     #: fallback pick a judge cell this surface cannot call, and the record would name a
     #: judgement that never happened.
     relevance_model: str = "unconfigured",
+    #: 045's second corpus, as a zero-argument reader returning an `EndorsedCorpus`.
+    #:
+    #: `None` means this deployment has no customer material, which is what every deployment
+    #: has until an administrator endorses something — and the answering path is then exactly
+    #: what it was before, which is US6 holding at the assembly layer as well as in the code.
+    endorsed_reader: Any = None,
 ) -> APIRouter:
     """The provider is a **parameter**, so a deployment can supply one and a test can share one.
 
@@ -1025,11 +1085,37 @@ def build_router(
                 raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
 
         try:
-            corpus = load_corpus()
+            pinned = load_corpus()
         except CorpusUnavailable as unavailable:
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE, str(unavailable)
             ) from unavailable
+
+        # **RESOLVED ONCE, HERE** (045, FR-017f). One question is one resolution, so there is
+        # no window in which an adoption could move the ground under a single answer — the ask
+        # path gets run isolation for free, and only the dispatched path needs a pin.
+        #
+        # A reader that fails resolves nothing rather than raising: customer material becoming
+        # temporarily uncitable narrows the answer and is disclosed, whereas taking the whole
+        # ask down would let a customer's own repository outage stop the platform answering
+        # from the corpus it ships with.
+        endorsed = EndorsedCorpus()
+        if endorsed_reader is not None:
+            try:
+                endorsed = endorsed_reader()
+            except Exception:  # noqa: BLE001 — see the note above
+                endorsed = EndorsedCorpus()
+
+        # **WITH NOTHING ENDORSED, THE PINNED CORPUS IS PASSED UNCHANGED**, and that is US6
+        # holding at the assembly layer rather than only in the code. It is also what the tree
+        # asked for: composing unconditionally broke ten answering rows whose provider doubles
+        # distinguish guidance from estate by `isinstance(material, Corpus)`. They were right
+        # to notice. An estate that has endorsed nothing should be byte-for-byte the platform
+        # it was before this feature, not a platform running a new code path that happens to
+        # be empty.
+        corpus: Corpus | CombinedCorpus = pinned
+        if not endorsed.empty:
+            corpus = CombinedCorpus(pinned=pinned, endorsed=endorsed)
 
         if providers is None:
             # RECORDED ANYWAY. Someone asked; the platform could not attempt it. 022 established

@@ -310,6 +310,81 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
     # generation, and nothing that could be presented to a vendor.
     assert payload["model_authority"] == "vault:model-credentials/anthropic@v3"
     assert "question" not in payload and "answer" not in payload
+    # 045: WITH NOTHING ENDORSED, the key is ABSENT rather than empty — which is why the exact
+    # set above is unchanged by the seventh feature in seven to touch this payload. An empty
+    # string on every ask in an estate that has endorsed nothing would be a field that means
+    # nothing everywhere it appears; absence is the statement. See the row below for the other
+    # half.
+    assert "endorsed_version" not in payload
+
+
+def test_an_ask_resting_on_endorsed_material_names_exactly_one_version() -> None:
+    """045, FR-017h — the seventh extension of this payload, admitted and bounded.
+
+    **One value, and the type is the assertion.** A record naming two content identities is an
+    ask whose ground moved underneath it, which is what US4 exists to make impossible; a string
+    cannot express two. That is deliberately stronger than a list with a length check, which
+    would make "exactly one" something a reader has to verify rather than something the shape
+    guarantees.
+
+    Beside `corpus_digest`, never folded into it (research R1): one digest covering content with
+    two trust stories would make the supply-chain scan either cover a customer's own documents,
+    which is wrong, or exempt part of its own manifest, which is worse.
+    """
+    from datetime import UTC, datetime
+
+    from core.answering.record import record_ask
+    from core.audit.sink import InMemoryAuditSink
+    from core.identity.types import AuthenticatedSubject, SubjectKind
+
+    sink = InMemoryAuditSink()
+    subject = AuthenticatedSubject(
+        subject_user_id="alice",
+        tenant_id="tenant-a",
+        roles=frozenset({"operator"}),
+        subject_kind=SubjectKind.HUMAN,
+        expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+    )
+    record_ask(
+        audit=sink,
+        subject=subject,
+        corpus_digest="f854d621",
+        evidence_stream="",
+        model="anthropic/claude-opus@5",
+        disposition="answered",
+        source="guidance",
+        cell="vault:anthropic/claude-opus@5:ask",
+        bound_cell="vault:anthropic/claude-opus@5:ask",
+        cell_disposition="pinned",
+        model_authority="vault:model-credentials/anthropic@v3",
+        endorsed_version="9f2c1ab",
+    )
+
+    payload = sink.list_by_correlation_id(ask_stream_for("tenant-a"))[0].payload
+
+    assert payload["endorsed_version"] == "9f2c1ab"
+    assert isinstance(payload["endorsed_version"], str)
+    # The pinned identity is untouched by the endorsed one. Two fields, two provenances.
+    assert payload["corpus_digest"] == "f854d621"
+    # EXACT, still — one key more than the row above and not one more than that.
+    assert set(payload) == {
+        "subject_user_id",
+        "corpus_digest",
+        "endorsed_version",
+        "model",
+        "disposition",
+        "declined_reason",
+        "source",
+        "evidence_stream",
+        "cell",
+        "bound_cell",
+        "cell_disposition",
+        "model_authority",
+        "relevance_gate",
+    }
+    # And still no content, which is the thing this whole row family exists for. The endorsed
+    # corpus is somebody else's material, so the rule is stricter here than it was for ours.
+    assert "question" not in payload and "answer" not in payload
 
 
 # ------------------------------------------------------------------ 035: retrieval at scale

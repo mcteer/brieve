@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -31,7 +33,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from core.audit.schema import AuditEventType
 from core.authority.ask_binding import parse_ask_binding_record
+from core.authority.endorsed_sources import (
+    SOURCE_FIELDS,
+    parse_endorsed_sources,
+    validate_source_name,
+)
+from core.authority.errors import ResolutionRefused
 from core.authority.matrix import parse_matrix_record
+from core.endorsed_sync import compare_versions
 from surfaces.api.authority_submit import (
     CONSOLE_RECORDS,
     AuthorityChangeRefused,
@@ -48,6 +57,10 @@ ADMIN_ROLE = "admin"
 #: Where the connections record lives. Read by this surface and by nothing else yet — the
 #: console labels it as such rather than implying a consumer it does not have (FR-022).
 CONNECTIONS_PATH = "harness-authority/data/product-connections"
+
+#: Where the endorsement record lives — the fourth console record (045). Read WITH metadata
+#: like the others: the version a CAS guard needs and the `set_by` provenance carries.
+ENDORSED_SOURCES_PATH = "harness-authority/data/endorsed-sources"
 
 #: The ask binding, read WITH its metadata. `AskAuthority.read_binding_record` unwraps to the
 #: secret alone, which loses the version a CAS guard needs and the `set_by` provenance carries.
@@ -96,6 +109,17 @@ class ConsoleConfig:
     #: merely *ungated* — FR-007's disclosure, and the difference between a development
     #: posture and a production one.
     quorum_configured: bool = False
+    #: 045's content store. `None` means this deployment cannot review or sync endorsed
+    #: content, which is a real state — the governance record can be written before the store
+    #: exists — and the route says so rather than failing as though something broke.
+    endorsed_store: Any = None
+    #: Performs one sync. Injected for the reason every other collaborator here is: what
+    #: reaches a customer's repository is assembly's decision, and neither this module nor its
+    #: rows should know whether a network is involved.
+    sync_source: Any = None
+    #: Which tenant this console serves. Single-tenant today; the key exists from day one so
+    #: ADR-0046 finds a boundary rather than a rewrite (research R9).
+    tenant_id: str = ""
 
 
 def _kv_body(record: Any) -> dict[str, Any]:
@@ -187,6 +211,37 @@ def read_configuration(config: ConsoleConfig) -> dict[str, Any]:
     except Exception:  # noqa: BLE001 — same reason
         posture["connections"] = {"unavailable": True}
 
+    try:
+        record = config.read_versioned(ENDORSED_SOURCES_PATH)
+        body = _kv_body(record)
+        sources = parse_endorsed_sources(body)
+        posture["endorsed_sources"] = {
+            "sources": {
+                name: {
+                    "location": source.location,
+                    "endorsed_by": source.endorsed_by,
+                    "endorsed_at": source.endorsed_at,
+                    "adopted_version": source.adopted_version,
+                    "adopted_by": source.adopted_by,
+                    "adopted_at": source.adopted_at,
+                    "withdrawn": source.withdrawn,
+                    # What the administrator most needs to know at a glance, and the one thing
+                    # not derivable from a single field: a source can be endorsed, un-withdrawn
+                    # and cite nothing because nothing has been adopted yet.
+                    "citable": source.citable,
+                }
+                for name, source in sources.items()
+            },
+            "version": _version_of(record),
+            "set_by": body.get("set_by", "") or "an estate apply",
+            # The honest label 044 established for a record with no consumer, inverted: this
+            # one HAS a consumer, and saying which keeps the page from implying the platform
+            # does something with endorsements beyond citing their content.
+            "consumed_by": "citation resolution, at the adopted version",
+        }
+    except Exception:  # noqa: BLE001 — unreadable renders unavailable, never as "none endorsed"
+        posture["endorsed_sources"] = {"unavailable": True}
+
     # FR-007/023b. An ungated estate is a legitimate development posture; an interface that
     # looks the same in both is not.
     posture["gating"] = "gated" if config.quorum_configured else "ungated"
@@ -277,6 +332,55 @@ def _validate_payload(body: Any, config: ConsoleConfig) -> None:
                     f"WHERE a product is; the material used to authenticate to it lives in "
                     f"the trust store and is never entered here."
                 )
+    if body.record == "endorsed-sources":
+        # **Refused on the generic route, and that is what makes the stamping real.** The
+        # submitter replaces a record body wholesale, so a caller who could post this body
+        # could write any `endorsed_by` they liked — and an endorsement naming somebody who
+        # did not endorse is worse than none, because the trail carries it as a fact.
+        # `/console/endorsed-sources` composes the body and the platform stamps who and when.
+        raise ValueError(
+            "endorsements are not written as a raw record. Use /console/endorsed-sources, "
+            "which composes the change and records WHO endorsed and WHEN from the "
+            "authenticated subject rather than from the request (FR-002)."
+        )
+
+
+def _validate_endorsed_sources(payload: Mapping[str, Any]) -> None:
+    """The fourth record's shape, refused at the route for the other three's reasons (045).
+
+    Endorsing is the act that makes somebody's documents citable, so what an administrator may
+    put in the record is a closed set for the same reason a connection's is: there must be no
+    field a credential could be written into. A private source's material is trust-store
+    material referenced per sync (FR-018b's posture, unchanged).
+
+    The **name** is checked here as well as in the parser because it is the citation namespace
+    — a name carrying a separator would let one source's documents resolve inside another's,
+    and being told that at the point of typing is the difference between governance working
+    and the platform looking broken.
+    """
+    for name, entry in payload.items():
+        if name in {"set_by", "schema_version"}:
+            continue
+        try:
+            validate_source_name(name)
+        except ResolutionRefused as refused:
+            raise ValueError(str(refused)) from refused
+        if not isinstance(entry, Mapping):
+            raise ValueError(f"endorsed source {name!r} must carry named fields")
+        unknown = sorted(set(entry) - SOURCE_FIELDS)
+        if unknown:
+            raise ValueError(
+                f"{unknown} are not fields of an endorsed source. An endorsement names WHERE "
+                f"the material is, WHO trusted it and WHICH version answers rest on; the "
+                f"material used to reach a private source lives in the trust store and is "
+                f"never entered here."
+            )
+        if str(entry.get("location", "")).strip() and not str(entry.get("endorsed_by", "")).strip():
+            raise ValueError(
+                f"endorsed source {name!r} names a location and no endorser. The endorsement "
+                f"IS the trust statement the citation gate rests on (FR-002); a source with "
+                f"no named endorser is content that arrived, not content somebody vouched for."
+            )
 
 
 def _qualified_cells(config: ConsoleConfig) -> frozenset[str] | None:
@@ -330,6 +434,110 @@ def _record_console_event(
         event_type=event,
         payload={"actor": subject.subject_user_id, **payload},
     )
+
+
+#: What an administrator may do to an endorsement. A closed vocabulary rather than a free-form
+#: record edit, and that is the whole of T007's design: the submitter replaces a record body
+#: wholesale, so a client that could send the body could rewrite `endorsed_by` on any source —
+#: and an endorsement whose author can be typed by whoever is editing is not a trust statement,
+#: it is a field. The operations below compose the body; the platform stamps who and when.
+ENDORSE = "endorse"
+WITHDRAW = "withdraw"
+ADOPT = "adopt"
+ENDORSEMENT_OPERATIONS: frozenset[str] = frozenset({ENDORSE, WITHDRAW, ADOPT})
+
+
+class EndorsementRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation: str = Field(description="endorse | withdraw | adopt")
+    source: str = Field(description="the citation namespace segment for this source")
+    location: str = Field(default="", description="where the source lives; never a credential")
+    version_id: str = Field(default="", description="for adopt: which synced version")
+    cas: int | None = None
+
+
+def compose_endorsement(
+    *,
+    current: dict[str, Any],
+    operation: str,
+    source: str,
+    actor: str,
+    now: str,
+    location: str = "",
+    version_id: str = "",
+) -> dict[str, Any]:
+    """Build the next endorsement record from the current one and one administrator's act.
+
+    **The stamping is the point.** `endorsed_by` is the subject the platform authenticated,
+    never a field a caller supplies; `endorsed_at` is the platform's clock. FR-002 asks for
+    who and when, and an answer either of those could be dictated by the requester would
+    record a claim rather than a fact.
+
+    **Merge, never replace.** The submitter writes the whole record body, so an endorsement
+    composed from nothing would silently withdraw every other source. Merging here — against
+    the record the administrator actually read, guarded by its CAS — is what makes adding a
+    second source not a way to lose the first.
+
+    Pure, and separately testable, because the property it carries is the one this phase
+    exists for and it should be assertable without a fabric.
+    """
+    if operation not in ENDORSEMENT_OPERATIONS:
+        raise ValueError(
+            f"{operation!r} is not something that can be done to an endorsement; the set is "
+            f"{sorted(ENDORSEMENT_OPERATIONS)}"
+        )
+    try:
+        validate_source_name(source)
+    except ResolutionRefused as refused:
+        raise ValueError(str(refused)) from refused
+
+    body = {name: dict(entry) for name, entry in current.items() if isinstance(entry, dict)}
+    entry = body.get(source, {})
+
+    if operation == ENDORSE:
+        if not location.strip() and not entry:
+            raise ValueError(
+                f"endorsing {source!r} needs a location. An endorsement names WHERE the "
+                f"material is; what is used to reach a private source lives in the trust "
+                f"store and is never entered here."
+            )
+        if location.strip():
+            entry["location"] = location.strip()
+        entry["endorsed_by"] = actor
+        entry["endorsed_at"] = now
+        # Re-endorsing a withdrawn source restores it. The alternative — refusing, and making
+        # the administrator delete and recreate — would lose the adopted version and with it
+        # every run record's ability to name ground that still exists.
+        entry["withdrawn"] = False
+
+    elif operation == WITHDRAW:
+        if not entry:
+            raise ValueError(f"{source!r} is not endorsed, so there is nothing to withdraw")
+        # `adopted_version` is deliberately LEFT IN PLACE. Runs in flight pinned it and their
+        # records must keep naming something that exists (research R3/R4); citability is
+        # already zero because `withdrawn` beats adoption in the parser.
+        entry["withdrawn"] = True
+
+    else:  # ADOPT
+        if not entry:
+            raise ValueError(f"{source!r} is not endorsed, so no version of it can be adopted")
+        if not version_id.strip():
+            raise ValueError("adopting names no version; which content answers rest on is the act")
+        entry["adopted_version"] = version_id.strip()
+        # An adoption is recorded like the endorsement it renews (FR-017e). Same stamping, same
+        # reason: "somebody decided this content is now what answers rest on" is a decision
+        # with an author, and a trail that carried only the version would name the content and
+        # not the choice.
+        entry["adopted_by"] = actor
+        entry["adopted_at"] = now
+
+    body[source] = entry
+    # The composed body is validated exactly as a raw one would have been. The vocabulary is
+    # closed above, so this is about what came OUT of the fabric: a record carrying a field
+    # this build does not know must not be silently rewritten and handed back as governance.
+    _validate_endorsed_sources(body)
+    return body
 
 
 class ChangeRequest(BaseModel):
@@ -427,65 +635,284 @@ def build_router(*, config: ConsoleConfig, submitter: Any) -> APIRouter:
             cas=body.cas,
             key=body.key,
         )
+        return _submit_and_render(
+            change, subject=subject, audit=audit, config=config, submitter=submitter
+        )
+
+    @router.post("/endorsed-sources")
+    def request_endorsement(body: EndorsementRequest, subject: SubjectDep, audit: AuditDep) -> Any:
+        """Endorse, withdraw, or adopt — **the same write mechanism, one composer** (045, US1).
+
+        This is not a second way to change governance: it builds a `ConfigChange` and hands it
+        to the same submitter, gets the same three outcomes, carries the same CAS and the same
+        `set_by`. What it adds is that the *body* is composed here rather than supplied, which
+        is what makes `endorsed_by` the platform's statement about who acted instead of a field
+        the actor filled in.
+
+        `/console/changes` refuses this record for exactly that reason. Leaving both doors open
+        would make the stamping advisory — a caller could post the raw record and write any
+        endorser they liked — and an endorsement that can name somebody who did not endorse is
+        worse than no endorsement, because the trail would carry it as a fact.
+        """
+        require_admin(subject, audit)
 
         try:
-            outcome = submitter.submit_change(change)
-        except RecordMoved as moved:
+            current = _kv_body(config.read_versioned(ENDORSED_SOURCES_PATH))
+        except Exception as unreadable:  # noqa: BLE001
+            # Composing from an empty record here would silently withdraw every other source,
+            # which is a data-loss path dressed as a fresh start. Refusing sends the
+            # administrator to the outage instead.
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "the endorsement record could not be read, so a change to it cannot be "
+                "composed without risking the endorsements already in it",
+            ) from unreadable
+
+        try:
+            payload = compose_endorsement(
+                current=current,
+                operation=body.operation,
+                source=body.source,
+                actor=subject.subject_user_id,
+                now=datetime.now(UTC).isoformat(),
+                location=body.location,
+                version_id=body.version_id,
+            )
+        except ValueError as invalid:
             _record_console_event(
                 audit,
                 subject,
                 event=AuditEventType.AUTHORITY_REFUSED,
-                payload={"reason_code": "record_moved", "record": body.record},
+                payload={"reason_code": "invalid_change", "record": "endorsed-sources"},
             )
-            raise HTTPException(status.HTTP_409_CONFLICT, str(moved)) from moved
-        except AuthorityChangeRefused as refused:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(invalid)) from invalid
+
+        change = ConfigChange(
+            record="endorsed-sources",
+            payload=payload,
+            requester=subject.subject_user_id,
+            cas=body.cas,
+        )
+        rendered = _submit_and_render(
+            change,
+            subject=subject,
+            audit=audit,
+            config=config,
+            submitter=submitter,
+            detail={"operation": body.operation, "source": body.source},
+        )
+
+        # **The store's labels follow the fabric's decision, and only after it.** The record is
+        # the authority on which version answers rest on; this keeps the store's own view
+        # consistent so detection can compare tips without asking the fabric. Deliberately NOT
+        # done for a pending change — marking a version adopted while the quorum is still
+        # deciding would make "awaiting approval" false in the one place a reader would not
+        # think to check.
+        if (
+            body.operation == ADOPT
+            and rendered.status_code == status.HTTP_200_OK
+            and config.endorsed_store is not None
+        ):
+            try:
+                config.endorsed_store.mark_adopted(
+                    tenant_id=config.tenant_id,
+                    source=body.source,
+                    version_id=body.version_id.strip(),
+                )
+            except Exception:  # noqa: BLE001 — the governance decision has applied and stands;
+                # a store that could not be labelled is a detection problem, not an adoption
+                # one, and failing here would tell the administrator their adoption did not
+                # happen when it did.
+                _record_console_event(
+                    audit,
+                    subject,
+                    event=AuditEventType.AUTHORITY_REFUSED,
+                    payload={
+                        "reason_code": "sync_failed",
+                        "record": "endorsed-sources",
+                        "source": body.source,
+                    },
+                )
+
+        return rendered
+
+    @router.post("/endorsed-sources/{source}/review")
+    def review_endorsed_source(source: str, subject: SubjectDep, audit: AuditDep) -> Any:
+        """Sync a **candidate** and show what changed against the adopted version (FR-017c).
+
+        **The candidate is synced at review time, and that is the design.** A source that moved
+        again while awaiting review is then reviewed against what is *currently* upstream,
+        rather than against whatever a detection pass happened to see days ago — which is the
+        spec's own edge case, and the only reading under which "review then adopt" means the
+        administrator adopted what they looked at.
+
+        Reviewing changes nothing. A candidate is not citable (E4), so opening this page cannot
+        move what answers rest on — the failure that would otherwise make the administrator's
+        decision by the act of looking at it.
+        """
+        require_admin(subject, audit)
+
+        if config.endorsed_store is None or config.sync_source is None:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "this deployment holds endorsements but cannot sync or review their content",
+            )
+
+        try:
+            sources = parse_endorsed_sources(_kv_body(config.read_versioned(ENDORSED_SOURCES_PATH)))
+        except Exception as unreadable:  # noqa: BLE001
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "the endorsement record could not be read",
+            ) from unreadable
+
+        endorsed = sources.get(source)
+        if endorsed is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"{source!r} is not an endorsed source")
+
+        try:
+            version, outcome = config.sync_source(
+                tenant_id=config.tenant_id,
+                source=source,
+                location=endorsed.location,
+                triggered_by=subject.subject_user_id,
+            )
+            config.endorsed_store.write_version(version)
+        except Exception as failed:  # noqa: BLE001 — the three sync states are distinguished by
+            # `reason_code`, which is what the console renders; collapsing them here would undo
+            # the distinction FR-018 exists for.
+            reason = getattr(failed, "reason_code", "sync_failed")
             _record_console_event(
                 audit,
                 subject,
-                event=AuditEventType.AUTHORITY_DENIED,
-                payload={"reason_code": "authority_change_denied", "record": body.record},
+                event=AuditEventType.AUTHORITY_REFUSED,
+                payload={"reason_code": reason, "record": "endorsed-sources", "source": source},
             )
-            raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
-        except AuthoritySubmitUnavailable as down:
-            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(down)) from down
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                # The exception's own message, which by construction carries no content and no
+                # credential (`endorsed_sync` never echoes git's stderr).
+                f"{reason}: {failed}",
+            ) from failed
+
+        adopted_paths: list[str] = []
+        if endorsed.adopted_version:
+            try:
+                adopted = config.endorsed_store.read_version(endorsed.adopted_version)
+                adopted_paths = sorted((adopted.documents if adopted else {}) or {})
+            except Exception:  # noqa: BLE001 — an unreadable adopted version makes every path
+                # read as added, which overstates the change; the empty list plus the flag below
+                # is the honest rendering.
+                adopted_paths = []
+
+        difference = compare_versions(adopted_paths, sorted(version.documents))
 
         _record_console_event(
             audit,
             subject,
-            event=AuditEventType.AUTHORITY_CHANGE_OBSERVED,
-            payload={"record": body.record, "outcome": outcome.state},
-        )
-
-        if outcome.is_pending:
-            # 202, never 403. 007's seam already names the trap: a client reading 403 stops
-            # asking, so a change approved twenty minutes later is never collected and the
-            # requester concludes it was refused when it was in fact granted.
-            return _json(
-                status.HTTP_202_ACCEPTED,
-                {
-                    "state": "pending",
-                    "accessor": outcome.accessor,
-                    "expires_at": outcome.expires_at,
-                    "message": "awaiting approval; this change is NOT in force",
-                },
-            )
-
-        return _json(
-            status.HTTP_200_OK,
-            {
-                "state": "applied",
-                # FR-007. An ungated estate is legitimate and must not read as an approval
-                # that happened.
-                "gating": "gated" if config.quorum_configured else "ungated",
-                "message": (
-                    "applied"
-                    if config.quorum_configured
-                    else "applied WITHOUT approval — no quorum is configured in this estate"
-                ),
+            event=AuditEventType.RECORD_READ,
+            payload={
+                "surface": "console",
+                "records": ["endorsed-sources"],
+                "source": source,
+                "candidate_version": version.version_id,
             },
         )
 
+        return {
+            "source": source,
+            "candidate_version": version.version_id,
+            "adopted_version": endorsed.adopted_version,
+            "upstream_tip": version.upstream_tip,
+            # PATHS, never words. The same line the trail draws, for the same reason: this is
+            # somebody else's material and the console shows what moved, not what it says.
+            "added": list(difference["added"]),
+            "removed": list(difference["removed"]),
+            "common": list(difference["common"]),
+            "uncitable": list(outcome.uncitable),
+            # FR-017a, stated on the page rather than implied by the absence of a change.
+            "in_force": "nothing has changed; adopting is a separate act",
+        }
+
     return router
+
+
+def _submit_and_render(
+    change: ConfigChange,
+    *,
+    subject: Any,
+    audit: Any,
+    config: ConsoleConfig,
+    submitter: Any,
+    detail: dict[str, Any] | None = None,
+) -> Any:
+    """Submit, record, and render which of the three things the fabric did.
+
+    Extracted so the endorsement route and the generic change route cannot drift into
+    reporting the same outcome differently — 044's finding was that the *distinctions* here
+    (pending is 202, refused is 403, unreachable is 503) are the load-bearing part, and a
+    second copy is where one of them quietly becomes another.
+    """
+    try:
+        outcome = submitter.submit_change(change)
+    except RecordMoved as moved:
+        _record_console_event(
+            audit,
+            subject,
+            event=AuditEventType.AUTHORITY_REFUSED,
+            payload={"reason_code": "record_moved", "record": change.record, **(detail or {})},
+        )
+        raise HTTPException(status.HTTP_409_CONFLICT, str(moved)) from moved
+    except AuthorityChangeRefused as refused:
+        _record_console_event(
+            audit,
+            subject,
+            event=AuditEventType.AUTHORITY_DENIED,
+            payload={
+                "reason_code": "authority_change_denied",
+                "record": change.record,
+                **(detail or {}),
+            },
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
+    except AuthoritySubmitUnavailable as down:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(down)) from down
+
+    _record_console_event(
+        audit,
+        subject,
+        event=AuditEventType.AUTHORITY_CHANGE_OBSERVED,
+        payload={"record": change.record, "outcome": outcome.state, **(detail or {})},
+    )
+
+    if outcome.is_pending:
+        # 202, never 403. 007's seam already names the trap: a client reading 403 stops
+        # asking, so a change approved twenty minutes later is never collected and the
+        # requester concludes it was refused when it was in fact granted.
+        return _json(
+            status.HTTP_202_ACCEPTED,
+            {
+                "state": "pending",
+                "accessor": outcome.accessor,
+                "expires_at": outcome.expires_at,
+                "message": "awaiting approval; this change is NOT in force",
+            },
+        )
+
+    return _json(
+        status.HTTP_200_OK,
+        {
+            "state": "applied",
+            # FR-007. An ungated estate is legitimate and must not read as an approval
+            # that happened.
+            "gating": "gated" if config.quorum_configured else "ungated",
+            "message": (
+                "applied"
+                if config.quorum_configured
+                else "applied WITHOUT approval — no quorum is configured in this estate"
+            ),
+        },
+    )
 
 
 def _json(code: int, body: dict[str, Any]) -> JSONResponse:

@@ -46,6 +46,21 @@ def record_ask(
     #: and to a vendor's status page respectively, and until this field the record could not
     #: tell them apart.
     relevance_gate: str = "",
+    #: WHICH VERSION of the customer's endorsed material this ask rested on (045, FR-017h).
+    #:
+    #: **Beside `corpus_digest`, never folded into it.** One digest covering content with two
+    #: trust stories was research R1's rejected alternative: the supply-chain scan would then
+    #: either cover a customer's own documents, which is wrong, or exempt part of its own
+    #: manifest, which is worse. Two fields, two provenances, one record.
+    #:
+    #: **Exactly one value.** A record naming two is a run whose ground moved underneath it,
+    #: which is the failure US4 exists to make impossible — so this is a string, not a list,
+    #: and the type is the assertion.
+    #:
+    #: Defaulted, unlike the four required fields above, and for the reason `conversation_id`
+    #: is: an estate with nothing endorsed genuinely has no version, and empty is the honest
+    #: answer rather than an omission somebody forgot.
+    endorsed_version: str = "",
 ) -> None:
     """Write the ask record, or fail the ask.
 
@@ -121,6 +136,12 @@ def record_ask(
                 # WHAT THE MODEL WAS SHOWN beyond the question (035). Written only when the ask
                 # belonged to a conversation, so their absence is itself the statement that it
                 # did not.
+                # WHICH endorsed version, when one was in force (045). Written only when
+                # something is endorsed and adopted, so its absence states that nothing was —
+                # the same shape `conversation_id` uses one line down, and for the same reason:
+                # an empty string on every ask in an estate with no endorsements would be a
+                # field that means nothing everywhere it appears.
+                **({"endorsed_version": endorsed_version} if endorsed_version else {}),
                 **({"conversation_id": conversation_id} if conversation_id else {}),
                 **({"carried_context": carried_context} if carried_context is not None else {}),
             },

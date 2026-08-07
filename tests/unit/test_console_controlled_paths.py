@@ -122,6 +122,51 @@ def test_the_gated_variant_is_attached_when_a_quorum_is_configured() -> None:
     )
 
 
+def test_the_code_and_the_grant_name_the_same_records() -> None:
+    """045's T003 — the scan reaches the **third** place, which until now was hand-coupled.
+
+    044 wrote "four places that must agree" and this file asserted two of them. The other two
+    — `CONSOLE_RECORDS` in the submitter and the read grant in `policies.tf` — agreed because
+    somebody kept them agreeing. 045 adding the fourth record is exactly the moment that
+    discipline is most likely to miss a place, so the scan grows to check rather than trust.
+
+    `claim-mappings` is granted as a subpath glob because 007's finding requires one path per
+    mapping; the comparison is on the record segment, which is the thing the closed set names.
+    """
+    from surfaces.api.authority_submit import CONSOLE_RECORDS
+
+    granted = _granted_paths(_policy_block(_hcl("authority-submit.tf"), "authority_submit"))
+    records = {path.split("/data/", 1)[-1].split("/")[0] for path in granted}
+
+    assert records == set(CONSOLE_RECORDS), (
+        f"the submitter's closed set is {sorted(CONSOLE_RECORDS)} and the grant covers "
+        f"{sorted(records)}. A record in the code with no grant refuses at Vault with a "
+        f"permission error the console reports as unavailable; a record in the grant with no "
+        f"code entry is standing write authority for something nothing asked for."
+    )
+
+
+def test_every_console_record_is_readable_by_the_api() -> None:
+    """The fourth place. Writable-but-unreadable is the failure that looks like an empty page.
+
+    042's 020-lesson applies to how the read is granted, not only to whether it is: an exact
+    path for a single record, a glob only where subpaths exist. A record the console can write
+    and the API cannot read renders as *unavailable* — indistinguishable, to an administrator,
+    from a fabric that is down.
+    """
+    from surfaces.api.authority_submit import CONSOLE_RECORDS
+
+    readable = _granted_paths(_policy_block(_hcl("policies.tf"), "harness_authority_read"))
+    segments = {path.split("/data/", 1)[-1].split("/")[0] for path in readable if "/data/" in path}
+
+    unreadable = sorted(set(CONSOLE_RECORDS) - segments)
+    assert not unreadable, (
+        f"{unreadable} can be written through the console and not read back by the API. The "
+        f"page would show the record as unavailable and an administrator would read that as "
+        f"an outage rather than as a missing grant."
+    )
+
+
 def test_the_console_cannot_write_the_records_this_feature_left_in_terraform() -> None:
     """Scope, asserted rather than trusted (spec Assumptions).
 

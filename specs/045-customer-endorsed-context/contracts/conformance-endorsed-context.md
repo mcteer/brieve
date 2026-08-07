@@ -69,6 +69,34 @@ the feature exists (ADR-0047); none may be stubbed green.
 | EL2 **enclave** | Drift for real: change the upstream, watch the checker flag it, review the difference, adopt, and see the next answer move while a run started pre-adoption finishes on the old version |
 | EL3 | The console's endorsed-sources page walked by the a11y lane (the 044 lesson: a page the lane does not visit is a page it has not tested) |
 
+## What actually ran — 2026-08-07
+
+Recorded because a contract that lists legs and never says which of them happened is the shape
+ADR-0047 refuses one level up: it reads as complete.
+
+### Ran, green
+
+| Lane | Outcome |
+| --- | --- |
+| `make check` | 1410 rows |
+| `make conformance-hermetic` | 780 rows, E1–E25 among them |
+| `make a11y` | 82 rows, including the administrator's populated console and the review page (EL3) |
+| **Allocation lane**, under an attested workload identity, no token anywhere | 110 durability/api/identity rows + **5 endorsed-store rows** against the real Postgres — the round trip, the digest refusal, supersede-never-delete, and candidate-is-not-adopted |
+| **Host lane**, `host_enclave` | 5 transport rows against **real `git`**: a real bare repository cloned, extracted, addressed and identified; two clones of unchanged content producing one identity; the working directory not outliving the sync; an unreachable source failing without echoing git's stderr |
+| **EL1's mechanism**, driven end to end | A real repository synced through the real code: 2 documents, anchors derived, a citation into `/endorsed/acme-standards/logging.md#retention-period` resolving through the combined view, provenance `customer-endorsed`, the pinned corpus still resolving, `corpus_digest` and `endorsed_version` separate |
+| **EL2**, driven end to end | Adopt → run pins → upstream pushed → checker flags (`moved=True`, tips differ) → **answers unchanged, the new document not citable** → review names `incident.md` added → adopt → next answer moves → **the resumed run still reads the version it pinned, and the new document is not citable to it** |
+| **The served process** | The API allocation replaced and restarted on this branch's code: it created `endorsed_versions`, `endorsed_documents` and `endorsed_sections` in the real Postgres under its own workload identity; both new routes are on the served app; unauthenticated reaches neither (401); a machine credential is refused `subject_kind_mismatch`, which is 044's fail-closed posture working |
+
+### Not run, and why
+
+**The console half of EL1 and EL2 — endorsing and adopting through `/settings` as a signed-in
+administrator.** The estate authenticates people against a real Auth0 tenant and the API admits
+human subjects only, so reaching the console needs an interactive sign-in. Everything behind it
+is exercised above; what is unproven is the browser walking the path.
+
+Left for the named runner deliberately rather than substituted with a stub: a token minted to
+get past the check would be a check nobody ran.
+
 ## Out of scope, recorded
 
 MCP-server sources (the ROADMAP's own split); retention of superseded versions (deferred with

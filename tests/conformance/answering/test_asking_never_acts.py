@@ -88,6 +88,10 @@ def test_the_path_cannot_reach_a_tool_at_all() -> None:
 ANSWERING_MODULES = (
     "src/core/answering/answer.py",
     "src/core/answering/corpus.py",
+    # 045's second corpus, held to the pinned one's rule. It exists because customer content
+    # must not be read through `corpus.py` (research R1) — and a second reader that fetched
+    # its own material would have moved the defect rather than avoided it.
+    "src/core/answering/endorsed/corpus.py",
     "src/core/answering/estate.py",
     "src/core/answering/record.py",
     "src/core/answering/routing.py",

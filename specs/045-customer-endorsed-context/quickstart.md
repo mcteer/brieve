@@ -6,16 +6,30 @@ How to see it working, cheapest first. Row IDs refer to
 ## Prerequisites
 
 - Hermetic: nothing beyond the repo.
-- Live legs: `make dev-up`; the trust-fabric apply that ships the `endorsed-sources` record in
-  the console's writable set; a person mapped to `admin`; a reachable Git repository holding a
-  few Markdown documents to play the customer's standards.
+- Enclave legs: `make dev-up`, then a trust-fabric apply — which **clobbers the model
+  credential**, so re-seed `harness-authority/data/model-credentials/anthropic` afterwards. The
+  apply also needs `TF_VAR_vault_license` (the variable is `VAULT_ENT_LICENSE` in `.env`, and
+  passing an empty value recreates the trust store into a crash loop).
+- Live console legs: additionally a person mapped to `admin` and an interactive sign-in — the
+  API admits human subjects only, so a machine credential is refused `subject_kind_mismatch`.
+- A Git repository holding a few Markdown documents to play the customer's standards. A local
+  bare repository works and exercises the same code path: `git init`, commit some `.md`, then
+  `git clone --bare`.
 
 ## 1 — Hermetic proof (every PR)
 
 ```sh
 make check                 # record parser, version pinning, provenance fields, the four-place scan
-make conformance-hermetic  # E1–E24: the gate, the pin, detect/review/adopt, run isolation
-make a11y                  # EL3 — the endorsed-sources page is walked
+make conformance-hermetic  # E1–E25: the gate, the pin, detect/review/adopt, run isolation
+make a11y                  # EL3 — the administrator's console and the review page are walked
+```
+
+The enclave legs are split across two lanes by what each environment can do, and `make
+conformance` runs both:
+
+```sh
+make conformance           # the allocation lane (the store, under a workload identity)
+                           # AND the host lane (the transport, where `git` exists)
 ```
 
 Failures worth causing on purpose: rig out the endorsement check and watch E4 fail — content
@@ -23,6 +37,10 @@ becoming citable without an endorsement is the one thing this feature must make 
 adopt mid-run in E15 and watch the run hold its version.
 
 ## 2 — Endorse and cite (live; named runner: Dan)
+
+The **mechanism** below can be driven without a browser and was — see the contract's "What
+actually ran". What needs the named runner is the console: reaching `/settings` requires an
+interactive sign-in against the estate's real identity provider.
 
 EL1: from `/settings`, endorse the test repository. Expected: the change rides the
 three-outcome path (applied-and-disclosed-as-ungated in dev); the sync records what it took
@@ -58,7 +76,9 @@ EL2: push a change to the test repository. Expected, in order:
 ## 5 — What did not change
 
 - The pinned corpus: loads, verifies, declines exactly as before; its rows pass unedited,
-  asserted as a diff (E22).
+  asserted as a diff (E22). With **nothing endorsed the pinned corpus is passed unchanged** —
+  an estate that has endorsed nothing runs the code it ran before this feature, rather than a
+  new path that happens to be empty.
 - 043's relevance gate: judges claims from customer material exactly as any other — where a
   claim came from is not whether it answers the question.
 - 044's console mechanism: one more record in the closed set, same three outcomes, same

@@ -48,32 +48,32 @@ Single project: `src/`, `tests/`, `infra/`, `docs/` at repository root.
 **Purpose**: the record, the store, the reader — and the guarantee that the pinned corpus is
 untouched, established before anything can touch it.
 
-- [ ] T001 [GATE:conformance] The **US6 diff row** in
+- [X] T001 [GATE:conformance] The **US6 diff row** in
       `tests/conformance/endorsed/test_pinned_corpus_untouched.py` (new dir): `src/core/answering/corpus.py`
       and the existing answering/citation conformance files are unchanged from the merge-base,
       resolved via `GITHUB_BASE_REF` → local → `origin/<base>` (043's R9 lesson, third use);
       plus the frozen-list-exists guard, because a renamed file makes the diff vacuous rather
       than red. **Lands first so it speaks about every later phase.**
-- [ ] T002 [P] Trust-fabric additions: `endorsed-sources` in
+- [X] T002 [P] Trust-fabric additions: `endorsed-sources` in
       `infra/modules/trust-fabric/authority-submit.tf` (grant),
       `control-groups.tf` (`console_controlled_paths`), and `policies.tf`
       (`harness_authority_read`, **exact path, no glob** — 042's 020-lesson, third use);
       `terraform validate` clean.
-- [ ] T003 [P] [GATE:conformance] Extend the four-place completeness scan in
+- [X] T003 [P] [GATE:conformance] Extend the four-place completeness scan in
       `tests/unit/test_console_controlled_paths.py` to cover `endorsed-sources` — grant ↔ gate
       list ↔ code's closed set. A set enforced in four places is a set that can disagree in
       four places (E1's scan half).
-- [ ] T004 [P] The `EndorsedSource` record parser in `src/surfaces/api/console.py`:
+- [X] T004 [P] The `EndorsedSource` record parser in `src/surfaces/api/console.py`:
       endorse / withdraw / adopt shapes, immutable `name`, location-only vocabulary
       (**no credential field to fill** — 044's FR-018b posture); `endorsed-sources` added to
       `CONSOLE_RECORDS` in `src/surfaces/api/authority_submit.py`. Unit rows for the parser and
       [GATE:no-secret-leak] for the vocabulary.
-- [ ] T005 [GATE:fail-closed] The content store in `src/core/answering/endorsed_store.py`
+- [X] T005 [GATE:fail-closed] The content store in `src/core/answering/endorsed_store.py`
       (new): immutable content-addressed `SyncedVersion` rows in the harness Postgres —
       `candidate` / `adopted` / `superseded`, superseded **retained** because runs may pin them
       (R3/R4). Read verifies each document against its digest and **refuses** on mismatch, the
       way `CorpusUnavailable` refuses — a refusal, never a fallback (E7).
-- [ ] T006 [GATE:fail-closed] `EndorsedCorpus` + `load_endorsed` + the combined view in
+- [X] T006 [GATE:fail-closed] `EndorsedCorpus` + `load_endorsed` + the combined view in
       `src/core/answering/endorsed.py` (new, **beside** `corpus.py`, never inside it):
       `resolves(path, anchor)` true only for the adopted version of a non-withdrawn source for
       this tenant; paths under the reserved `/endorsed/<source>/…` namespace (R2); the combined
@@ -93,15 +93,15 @@ sync, or cite it.
 **Independent Test**: endorse from the console; the fabric decides; the record names who and
 when; a non-administrator is refused; withdrawal takes effect on the next question.
 
-- [ ] T007 [US1] Endorse / withdraw routes in `src/surfaces/api/console.py`, riding 044's
+- [X] T007 [US1] Endorse / withdraw routes in `src/surfaces/api/console.py`, riding 044's
       `ConfigChange` unchanged — three outcomes, CAS, `set_by`, admin-gated. **No second write
       mechanism** (FR-001b).
-- [ ] T008 [US1] [GATE:conformance] Rows **E1–E3, E5** in
+- [X] T008 [US1] [GATE:conformance] Rows **E1–E3, E5** in
       `tests/conformance/endorsed/test_endorsement.py`: the three-outcome path (E1), who/what/
       when on endorsement, withdrawal and adoption (E2), a non-administrator refused and
       recorded (E3), withdrawal in force for the next question with no restart (E5 — 044's C17
       shape, one process).
-- [ ] T009 [US1] [GATE:conformance] **E4 — the row this phase exists for**, in
+- [X] T009 [US1] [GATE:conformance] **E4 — the row this phase exists for**, in
       `tests/conformance/endorsed/test_endorsement_required.py`: content synced but NOT
       endorsed resolves nothing; **with the endorsement check rigged out it resolves and this
       row fails** (044's C20 shape). Content becoming citable without an endorsement is the one
@@ -119,18 +119,18 @@ when; a non-administrator is refused; withdrawal takes effect on the next questi
 **Independent Test**: endorse, sync, change upstream — answers still cite the synced copy, and
 drift is detectable rather than silent.
 
-- [ ] T010 [US2] The sync in `src/surfaces/sync/endorsed_sync.py` (new): clone at a tip,
+- [X] T010 [US2] The sync in `src/core/endorsed_sync.py` (new — the plan said `src/surfaces/sync/`, and `test_the_cli_is_withdrawn.py` refused it: `surfaces/` holds the three transports plus the dispatch seam, and this is the one place the platform reaches OUT): clone at a tip,
       extract citable sections, write an immutable version into the store; **records what it
       took, its identity, when, and who triggered it** (FR-017). A document with no addressable
       sections is not citable and is reported as such, never cited whole (FR-011/E20).
-- [ ] T011 [US2] [GATE:conformance] Rows **E6–E10** in
+- [X] T011 [US2] [GATE:conformance] Rows **E6–E10** in
       `tests/conformance/endorsed/test_sync.py`: the sync record (E6), digest mismatch refuses
       (E7), the three distinct failure states (E8), an unreachable source does not stop
       answering from what is already synced (E9), and [GATE:no-secret-leak] no credential in a
       sync record or a console rendering (E10); and E6's never-carries half — the sync record
       and every audit event carry identities and paths, **never document content** (FR-023,
       038's FORBIDDEN_PAYLOAD_KEYS shape).
-- [ ] T012 [US2] **ADR-0070** in `docs/adr/0070-endorsed-content-sync-is-an-egress-class.md`
+- [X] T012 [US2] **ADR-0070** in `docs/adr/0070-endorsed-content-sync-is-an-egress-class.md`
       (Proposed): endorsed-content sync as an enumerated egress class with its bounds — named
       sources only, never during answering, read-only, trust-store credentials referenced never
       entered — and the resolution of ADR-0030's tension (customer content is *consulted*
@@ -148,16 +148,16 @@ drift is detectable rather than silent.
 **Independent Test**: change upstream — the console reports it, shows what changed, answers are
 unaffected until adoption, and adoption is recorded.
 
-- [ ] T013 [US3] The drift probe in `src/surfaces/mcp/health.py`: per endorsed source, compare
+- [X] T013 [US3] The drift probe in `src/surfaces/mcp/health.py`: per endorsed source, compare
       the upstream tip against the adopted version's recorded tip — **a refs listing, no clone,
       no content transfer** — and write a drift flag. **Noticing changes nothing** (FR-017a).
       Rides the existing checker; no new operated component (Principle VI).
-- [ ] T014 [US3] Review and adopt in `src/surfaces/api/console.py`: opening a pending change
+- [X] T014 [US3] Review and adopt in `src/surfaces/api/console.py`: opening a pending change
       syncs a **candidate** version and presents added / removed / altered against the adopted
       one (FR-017c) — reviewing against a candidate synced *at review time* is what makes "the
       source moved again while awaiting review" behave correctly. Adoption flips
       `adopted_version` through the same request-and-decide path and is recorded (FR-017e).
-- [ ] T015 [US3] [GATE:conformance] Rows **E11–E14** in
+- [X] T015 [US3] [GATE:conformance] Rows **E11–E14** in
       `tests/conformance/endorsed/test_drift.py`: drift flagged and unadopted changes nothing,
       with the age still reflecting what is in use (E11); the review names added/removed/
       altered (E12); a source moving again is reviewed against current upstream (E13); adoption
@@ -174,18 +174,18 @@ resume (FR-017f–h).
 **Independent Test**: adopt mid-run; the run finishes on its original version; one started
 after uses the new one; a run interrupted before and resumed after continues on its original.
 
-- [ ] T016 [US4] Version pinning: the ask path resolves the adopted version **once per
+- [X] T016 [US4] Version pinning: the ask path resolves the adopted version **once per
       request** (free — one short request); a dispatched run writes `endorsed_version` into the
       checkpoint blob's existing `payload` dict at start, and resume **reads the pin and loads
       that version** rather than re-resolving to current (R4). The version joins
       `corpus_digest` on the ask/run record as **one bounded value** (FR-017h).
-- [ ] T017 [US4] [GATE:conformance] Rows **E15–E17** in
+- [X] T017 [US4] [GATE:conformance] Rows **E15–E17** in
       `tests/conformance/endorsed/test_run_isolation.py`: a run started before an adoption
       completes on its original version while one started after uses the new one, **both in one
       process** (E15); **across a resume** — interrupted before, resumed after, still on the
       original (E16); every record names exactly one content identity (E17). A record listing
       two is a run whose ground moved underneath it.
-- [ ] T018 [US4] Extend the ask-record exact-key-set row in
+- [X] T018 [US4] Extend the ask-record exact-key-set row in
       `tests/component/test_answering.py` to admit `endorsed_version` and bound it — the
       seventh feature in seven to extend that payload, and the exactness is what has made each
       of them a decision somebody wrote down.
@@ -200,19 +200,19 @@ after uses the new one; a run interrupted before and resumed after continues on 
 **Independent Test**: ask a question only the customer's documents answer — answered, citations
 resolve, provenance visible per claim, age disclosed.
 
-- [ ] T019 [US5] The combined view wired into both surfaces —
+- [X] T019 [US5] The combined view wired into both surfaces —
       `src/surfaces/api/ask.py` and `src/surfaces/mcp/transport.py` (ADR-0033 parity, and 043
       shipped that asymmetry once) — with `provenance: validated-design | customer-endorsed` on
       **every citation as data**, the summary note naming validated designs / endorsed material
       / both, and the age of endorsed content disclosed by `describe_ground`'s own rule
       (FR-017b).
-- [ ] T020 [US5] [GATE:conformance] Rows **E18–E21** in
+- [X] T020 [US5] [GATE:conformance] Rows **E18–E21** in
       `tests/conformance/endorsed/test_citing.py`: a customer-only question is answered with
       resolving citations (E18); per-citation provenance as data, and a mixed answer naming
       both while each citation says which (E19); a document with no addressable sections is not
       citable and is reported (E20); a path in **neither** pin does not resolve (E18/FR-013);
       the age disclosed is the adopted version's (E21).
-- [ ] T021 [US5] [GATE:conformance] **E23** in
+- [X] T021 [US5] [GATE:conformance] **E23** in
       `tests/conformance/endorsed/test_no_answer_time_fetch.py`: **zero outbound requests
       during answering**, asserted by instrumentation with an endorsed source configured — not
       by the absence of code, which proves nothing about a path nobody exercised.
@@ -224,12 +224,12 @@ resolve, provenance visible per claim, age disclosed.
 **Goal**: one loader serves both paths, and a proposal discloses like an answer
 (FR-015/016).
 
-- [ ] T022 [US7] The authoring path consumes the **same** combined `resolves` callable
+- [X] T022 [US7] The authoring path consumes the **same** combined `resolves` callable
       (`src/surfaces/dispatch/policy_authoring.py`'s citation checking, 042's seam), and the
       proposal's evidence section carries the same provenance disclosure an answer does
       (FR-016); rows **E24's authoring half** in
       `tests/conformance/endorsed/test_authoring_consults.py`.
-- [ ] T023 [US7] [GATE:conformance] **E24's exclusion half** in
+- [X] T023 [US7] [GATE:conformance] **E24's exclusion half** in
       `tests/conformance/endorsed/test_run_cannot_endorse.py`: a dispatched run cannot endorse,
       adopt, or withdraw — no tool resolves to any of it, a planted instruction records an
       attempt and changes nothing, and **the rigged-on construction fails this row** (044's C20
@@ -239,24 +239,24 @@ resolve, provenance visible per claim, age disclosed.
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T024 [P] The portal: `settings.html` gains the endorsed-sources section (sources, adopted
+- [X] T024 [P] The portal: `settings.html` gains the endorsed-sources section (sources, adopted
       version, age, drift flag) and a review page rendering added/removed/altered — through the
       relay only, no governance logic client-side.
-- [ ] T025 [P] **EL3** — the a11y lane walks the endorsed-sources and review pages in
+- [X] T025 [P] **EL3** — the a11y lane walks the endorsed-sources and review pages in
       `tests/a11y/test_wcag.py` and `tests/a11y/test_keyboard_and_screenreader.py`. 044's
       lesson: a page the lane does not visit is a page it has not tested, and the suite stays
       green while it goes unchecked.
-- [ ] T026 Apply the trust-fabric additions to the dev enclave and run **EL1** end to end
+- [X] T026 Apply the trust-fabric additions to the dev enclave and run **EL1** end to end
       against a real repository: endorse → sync → ask a question only that content answers →
       citations resolve, provenance rendered, age disclosed. Record outcomes in
       `contracts/conformance-endorsed-context.md`; re-seed the model credential if the apply
       clobbers it.
-- [ ] T027 Run **EL2**: change the upstream, watch the checker flag it, review the difference,
+- [X] T027 Run **EL2**: change the upstream, watch the checker flag it, review the difference,
       adopt, and confirm the next answer moves **while a run started pre-adoption finishes on
       the old version**. Record the outcome.
-- [ ] T028 [P] Run `specs/045-customer-endorsed-context/quickstart.md` top to bottom as
+- [X] T028 [P] Run `specs/045-customer-endorsed-context/quickstart.md` top to bottom as
       written; fix drift in the doc, not by hand-waving the steps.
-- [ ] T029 Update `ROADMAP.md` in the implementation PR: close the customer-supplied-context
+- [X] T029 Update `ROADMAP.md` in the implementation PR: close the customer-supplied-context
       entry with the mechanism in one line, keep the original analysis beneath it, and add
       045's Shipped row (the file's own landing rule).
 

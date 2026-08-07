@@ -14,10 +14,13 @@ by different code.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from adapters.anthropic_answering import build_ask_provider
 from adapters.anthropic_relevance import build_relevance_judge
 from core.answering.conversations.postgres import PostgresConversationStore
+from core.answering.endorsed.corpus import resolve_endorsed
+from core.answering.endorsed.postgres import PostgresEndorsedStore
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
@@ -28,6 +31,7 @@ from core.authority.model_credential import BrokeredModelCredential
 from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
+from core.endorsed_sync import sync_source
 from core.identity.mappings_store import VaultClaimMappings
 from core.identity.types import SubjectKind
 from core.runs.changes import PostgresChangeRequestStore, VaultChangeStatus
@@ -35,7 +39,7 @@ from core.runs.index import PostgresRunIndex
 from core.threads.postgres import PostgresThreadStore
 from surfaces.api.app import create_app
 from surfaces.api.authority_submit import VaultAuthoritySubmitter
-from surfaces.api.console import ConsoleConfig
+from surfaces.api.console import ENDORSED_SOURCES_PATH, ConsoleConfig
 from surfaces.api.verification import (
     DEFAULT_TENANT_CLAIM,
     FederatedVerifier,
@@ -86,6 +90,12 @@ def build() -> object:
     thread_store = PostgresThreadStore(credentials=credentials)
     # 035. Under the same brokered credential as every other store here.
     ask_conversations = PostgresConversationStore(credentials=credentials)
+    # 045's endorsed content, under the same brokered credential. **Wired here and not only in
+    # the fixture**, which is the point 026/027's fourth analysis pass made about this file:
+    # the parity rows compare two surfaces built from ONE set of collaborators, so a feature
+    # present in the harness and absent from an assembly is a feature nobody can use and every
+    # row is green about.
+    endorsed_store = PostgresEndorsedStore(credentials=credentials)
 
     # WHICH model `ask` may call here — the same variable and the same meaning as the served MCP
     # surface's. Unset means no model is configured and every ask answers 503.
@@ -115,6 +125,36 @@ def build() -> object:
     run_index.migrate()
     thread_store.migrate()
     ask_conversations.migrate()
+    endorsed_store.migrate()
+
+    def _kv_data(record: Any) -> dict[str, Any]:
+        """KV v2 nests the body two levels down; anything unreadable is an empty mapping here.
+
+        The parser refuses a malformed record loudly (`parse_endorsed_sources`), so this only
+        has to survive the shapes Vault actually returns.
+        """
+        if not isinstance(record, dict):
+            return {}
+        data = record.get("data", record)
+        inner = data.get("data", data) if isinstance(data, dict) else {}
+        return inner if isinstance(inner, dict) else {}
+
+    def endorsed_reader() -> Any:
+        """The endorsed corpus in force, resolved once per ask.
+
+        A closure over the fabric and the store rather than a built corpus, for the reason
+        every reader in this file is a callable: a corpus built at assembly would be the state
+        of the estate when the process started, so an adoption would take effect at the next
+        deploy — which is not an adoption.
+
+        `HARNESS_DEFAULT_TENANT` keys it from day one so ADR-0046 finds a boundary rather than
+        a rewrite; a single-tenant deployment exercises the key without proving the wall.
+        """
+        return resolve_endorsed(
+            read_sources=lambda: _kv_data(fabric.read_versioned(ENDORSED_SOURCES_PATH)),
+            store=endorsed_store,
+            tenant_id=os.environ.get("HARNESS_DEFAULT_TENANT", "").strip(),
+        )
 
     # The approved claim-to-role mappings, read back from the same gated path the submit
     # endpoint writes to. Without this the verifier holds no mappings, `resolve_roles`
@@ -212,7 +252,11 @@ def build() -> object:
             read_versioned=fabric.read_versioned,
             quorum_configured=os.environ.get("HARNESS_QUORUM_CONFIGURED", "").strip().lower()
             in {"1", "true", "yes"},
+            endorsed_store=endorsed_store,
+            sync_source=sync_source,
+            tenant_id=os.environ.get("HARNESS_DEFAULT_TENANT", "").strip(),
         ),
+        endorsed_reader=endorsed_reader,
         # 043's RELEVANCE JUDGE, wired on exactly the ask provider's terms.
         #
         # A FACTORY, not a judge: called once per question, and the credential it holds was

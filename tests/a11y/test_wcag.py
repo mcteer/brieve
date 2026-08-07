@@ -107,6 +107,39 @@ def test_the_console_meets_wcag_22_aa(page: Any, portal_server: PortalServer) ->
     assert violations == [], describe(violations)
 
 
+def test_the_settings_page_meets_wcag_22_aa_for_an_administrator(
+    admin_page: Any, portal_server: PortalServer
+) -> None:
+    """EL3 — the **populated** console, which is a different page from the refusal (045).
+
+    044's row above walks `/settings` as an operator, so what it audits is "you do not hold
+    that role" — a real page with no table, no state column and no controls. Every element 045
+    adds lives on the administrator's version, so a lane that only ever saw the refusal would
+    have stayed green while all of it went unchecked. 044's own note makes this argument about
+    the page it introduced; this is the same argument one feature later.
+    """
+    admin_page.goto(f"{portal_server.base}/settings")
+    admin_page.wait_for_selector("table")
+    violations = audit(admin_page)
+    assert violations == [], describe(violations)
+
+
+def test_the_endorsed_review_page_meets_wcag_22_aa(
+    admin_page: Any, portal_server: PortalServer
+) -> None:
+    """EL3's second page, reached the way a person reaches it (045, US3).
+
+    **Clicked, not navigated to.** Opening a review syncs a candidate, so the control is a
+    form rather than a link — and a row that posted directly would audit a page no route in
+    the interface actually leads to.
+    """
+    admin_page.goto(f"{portal_server.base}/settings")
+    admin_page.click("form[action='/settings/endorsed/acme-standards/review'] button")
+    admin_page.wait_for_selector("h1")
+    violations = audit(admin_page)
+    assert violations == [], describe(violations)
+
+
 def _ask(page: Any, portal_server: PortalServer, question: str) -> None:
     """Ask, and wait for the answer to ARRIVE rather than for a page to load.
 

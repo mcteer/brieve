@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{#
+  The review page (045, US3).
+
+  What changed upstream, against what answers currently rest on. It renders paths and never
+  words: this is somebody else's material, and the console's job is to show what moved so an
+  administrator can decide, not to reproduce a customer's internal documents on a page.
+
+  **Reviewing changes nothing**, and the page says so rather than leaving the reader to infer
+  it from the absence of a confirmation. The candidate is synced when this page is opened, so
+  what is shown is what is currently upstream — a source that moved again while awaiting
+  review is reviewed against its current state, not against a days-old detection.
+#}
+{% block title %}Review {{ source }}{% endblock %}
+{% block content %}
+<h1>Review changes to {{ source }}</h1>
+
+{% if not reachable %}
+  {% include "_notice.html" %}
+  <p role="status">The platform could not be reached. Nothing here is current.</p>
+{% elif refused %}
+  <p role="status">
+    This is an administrative surface and your account does not hold that role.
+    Being refused here is the platform working, not a fault.
+  </p>
+{% elif failed %}
+  <p role="status">
+    {#
+      The three sync states stay distinct here (FR-018): unreachable, reached-and-empty, and
+      holds-documents-none-citable send an administrator to three different places, and an
+      interface reporting one for another sends them to fix something that is not broken.
+    #}
+    The source could not be synced for review: {{ failure }}
+  </p>
+{% else %}
+
+  <p role="status">
+    <strong>Nothing has changed.</strong> {{ review.in_force }}. Answers still rest on
+    {{ review.adopted_version or "nothing adopted yet" }}.
+  </p>
+
+  <dl>
+    <dt>Currently in force</dt><dd>{{ review.adopted_version or "nothing adopted yet" }}</dd>
+    <dt>Reviewing</dt><dd>{{ review.candidate_version }}</dd>
+    <dt>Upstream is at</dt><dd>{{ review.upstream_tip }}</dd>
+  </dl>
+
+  <h2>Documents added</h2>
+  {% if review.added %}
+    <ul>{% for path in review.added %}<li>{{ path }}</li>{% endfor %}</ul>
+  {% else %}
+    <p>None.</p>
+  {% endif %}
+
+  <h2>Documents removed</h2>
+  {% if review.removed %}
+    <ul>{% for path in review.removed %}<li>{{ path }}</li>{% endfor %}</ul>
+    <p>
+      Citations into a removed document stop resolving once this version is adopted. Answers
+      already given keep naming the version they rested on, which is still readable.
+    </p>
+  {% else %}
+    <p>None.</p>
+  {% endif %}
+
+  <h2>Documents present in both</h2>
+  {% if review.common %}
+    <ul>{% for path in review.common %}<li>{{ path }}</li>{% endfor %}</ul>
+  {% else %}
+    <p>None.</p>
+  {% endif %}
+
+  {% if review.uncitable %}
+    <h2>Not citable</h2>
+    <p>
+      These documents were found and cannot be cited: nothing in them is addressable by a
+      heading, and the platform will not cite a document whole. They are listed rather than
+      dropped silently, because a review that showed them as included would have you adopt
+      something other than what you think you are adopting.
+    </p>
+    <ul>{% for path in review.uncitable %}<li>{{ path }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <p>
+    Adopting {{ review.candidate_version }} is a separate act and is recorded against you.
+    A run already under way keeps the version it started on.
+  </p>
+
+{% endif %}
+{% endblock %}

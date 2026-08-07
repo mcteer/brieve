@@ -22,8 +22,25 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from core.answering.corpus import Corpus
 from core.answering.relevance import RelevanceJudge, RelevanceRefused
+
+
+class CitableCorpus(Protocol):
+    """What this module actually needs from a corpus — three members, structurally (045).
+
+    `Corpus` satisfies it, and so does the composition of the pinned corpus with a customer's
+    endorsed material. The Protocol is stated here rather than imported from the endorsed
+    package because the dependency must run the other way: the answering logic declares its
+    contract, and a second reader satisfies it. That is what makes research R1's "a second
+    corpus, never a modified first one" true of the types as well as of the code.
+    """
+
+    @property
+    def digest(self) -> str: ...
+
+    def resolves(self, path: str, anchor: str) -> bool: ...
+
+    def url_for(self, path: str, anchor: str) -> str: ...
 
 
 class ProviderUnavailable(Exception):
@@ -42,8 +59,18 @@ class AnswerProvider(Protocol):
     those gates back onto authored material.
     """
 
-    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
+    def answer(self, question: str, corpus: Any, context: str = "") -> list[dict[str, Any]]:
         """Candidate claims, each with the citations it rests on.
+
+        **`corpus` is `Any` rather than `CitableCorpus`, and that is about variance.** A
+        Protocol's parameter type is a *requirement on implementers*, and every existing
+        provider double annotates `Corpus` — narrower, so declaring the wider type here would
+        make each of them stop satisfying this Protocol. That would mean editing conformance
+        rows 043 wrote, to accommodate an annotation, with no behaviour changing anywhere; the
+        045 diff row exists precisely to stop that happening quietly. Nothing is lost: a
+        provider that understood only the pinned corpus is not a thing that exists, and what
+        gets handed here is decided by the surface.
+
 
         `context` is earlier conversation, supplied so a follow-up has a subject (035). It is
         **not material**: nothing in it may be cited, and citation resolution below is
@@ -59,7 +86,7 @@ class Citation:
     path: str
     anchor: str
 
-    def url(self, corpus: Corpus) -> str:
+    def url(self, corpus: CitableCorpus) -> str:
         return corpus.url_for(self.path, self.anchor)
 
 
@@ -131,7 +158,7 @@ RELEVANCE_DISABLED = (
 def answer_question(
     *,
     question: str,
-    corpus: Corpus,
+    corpus: CitableCorpus,
     provider: AnswerProvider,
     context: str = "",
     relevance: RelevanceJudge | None = None,
@@ -258,7 +285,9 @@ class RecordedProvider:
     def __init__(self, recorded: str) -> None:
         self._recorded = recorded
 
-    def answer(self, question: str, corpus: Corpus, context: str = "") -> list[dict[str, Any]]:
+    def answer(
+        self, question: str, corpus: CitableCorpus, context: str = ""
+    ) -> list[dict[str, Any]]:
         # `context` is accepted and IGNORED, deliberately. A recording is a recording: replaying
         # it under different conversation history would produce the same claims while implying
         # the history mattered, and the eval lane's determinism rests on it not mattering.
