@@ -49,6 +49,10 @@ RESOLUTION_REASONS: Final[dict[str, str]] = {
     # gap.
     "relevance_unbound": "no binding names a cell to judge whether an answer is relevant",
     "relevance_unqualified": "the relevance judge's cell is not qualified, or was withdrawn",
+    # ADR-0067's runtime binding point. Distinct from `relevance_unqualified` because the cell
+    # IS qualified — the operator bound a judge that shares the answering cell's model, and the
+    # fix is to bind a different one, not to qualify anything.
+    "self_judged_relevance": "the bound relevance judge is the model that generated the answer",
     # --- 027: the cell is qualified, and the credential to call it could not be obtained
     #
     # Three codes now sit between a question and a model, and each sends someone somewhere

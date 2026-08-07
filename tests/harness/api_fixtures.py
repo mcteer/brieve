@@ -66,7 +66,13 @@ class ScriptedSubmitter:
 #: gate exists to judge an answer, and a judge that is the same model as the generator is
 #: grading its own work. The fixtures encode the separation so a row cannot pass by accident
 #: with a self-judging binding.
-FIXTURE_RELEVANCE_MODEL = "anthropic/claude-sonnet@5"
+#:
+#: **A fixture identifier, not a vendor one, and that is the second fix.** It was
+#: `anthropic/claude-sonnet@5`, which collided the moment a row passed `model=` that same
+#: vendor string — and ADR-0067's runtime check then refused the row for a reason the row was
+#: not about. A name no answering cell will ever carry cannot collide by accident, which is
+#: what a shared fixture constant is for.
+FIXTURE_RELEVANCE_MODEL = "fixture/relevance-judge@1"
 
 
 def _default_relevance_judges() -> object:

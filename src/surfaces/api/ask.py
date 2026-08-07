@@ -655,6 +655,14 @@ def authorise_ask(
     raise AskNotQualified(disposition, detail)
 
 
+#: Reason codes this path may name in the record as-is. Anything outside it becomes
+#: `relevance_unqualified`, because a disposition an auditor cannot look up is worse than a
+#: coarse one — but every code the resolver actually raises belongs here.
+RELEVANCE_DISPOSITIONS: frozenset[str] = frozenset(
+    {"relevance_unbound", "relevance_unqualified", "self_judged_relevance"}
+)
+
+
 def relevance_judge_for(
     *,
     subject: AuthenticatedSubject,
@@ -687,9 +695,15 @@ def relevance_judge_for(
     try:
         cell, _fallback = authority.resolve_relevance(available=available)
     except ResolutionRefused as refused:
+        # The reason code carried through, not bucketed. An earlier version collapsed
+        # everything that was not `relevance_unbound` into `relevance_unqualified`, which
+        # swallowed ADR-0067's `self_judged_relevance` the day it was added: the operator
+        # would have been sent to re-run the eval lane for a cell that is already qualified,
+        # watched it pass, and been no closer. The whole value of a distinct code is that it
+        # survives to the record.
         disposition = (
-            "relevance_unbound"
-            if refused.reason_code == "relevance_unbound"
+            refused.reason_code
+            if refused.reason_code in RELEVANCE_DISPOSITIONS
             else "relevance_unqualified"
         )
         record_ask(

@@ -205,13 +205,45 @@ def resolve_relevance_cell(
             reason_code="relevance_unbound",
         )
 
-    return resolve_with_fallback(
+    resolved, fallback = resolve_with_fallback(
         RELEVANCE_ROLE,  # type: ignore[arg-type]
         pinned,
         cells,
         available=available,
         agent_definition_id="ask",
     )
+
+    # ADR-0067's SECOND binding point, and the one the ADR wrote down while 043 first
+    # implemented only the first. `promote_model_version` refuses a matrix cell whose `judge`
+    # names its own model; nothing stopped an operator BINDING relevance to the same model the
+    # answering cell names, which is the same defect arriving through configuration instead of
+    # through promotion — and it is the one that reaches a person, because this verdict decides
+    # whether an answer is shown at all.
+    #
+    # Checked against the RESOLVED cell, not the pinned one: a fallback lands on a different
+    # judge, and it is the model that will actually judge whose identity matters.
+    #
+    # Both sources, because one relevance cell serves both and the record does not say which
+    # will generate. Refusing on either is the narrower reading, and a gate that permitted
+    # self-judgement for one source would fail exactly when that source was asked.
+    generating = {
+        source: reference.split(":")[1]
+        for source, reference in (
+            (GUIDANCE, binding.guidance_cell),
+            (ESTATE, binding.estate_cell),
+        )
+        if reference.count(":") >= 2
+    }
+    for source, model in generating.items():
+        if model == resolved.model:
+            raise ResolutionRefused(
+                f"the relevance judge resolved to {resolved.model}, which is the model the "
+                f"{source} cell names; a model does not judge its own output (ADR-0067), and "
+                f"this verdict decides whether a person is shown an answer at all",
+                reason_code="self_judged_relevance",
+            )
+
+    return resolved, fallback
 
 
 class AskAuthority:

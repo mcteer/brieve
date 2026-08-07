@@ -15,8 +15,14 @@ always-affirming stub against the same seed set through the same scorer. Its pur
 show, in the same output, that the lane can lose: a qualification that only ever prints PASS
 is indistinguishable from one that is not running (ADR-0047).
 
-    make evals-relevance-qualify                       # the live judge at LIVE_MODEL
-    make evals-relevance-qualify ARGS=--rubber-stamp    # the rigged candidate, must FAIL
+    make evals-relevance-qualify                                   # the judge at LIVE_MODEL
+    make evals-relevance-qualify ARGS=--rubber-stamp                # rigged, must FAIL
+    make evals-relevance-qualify ARGS=anthropic/claude-opus@5       # a named candidate
+
+**The candidate is an argument because ADR-0067 makes it one.** A model may not judge its own
+output, so the estate needs a judge qualified for a model that is NOT the one answering — and
+the dev binding answers with Sonnet. Hard-coding `LIVE_MODEL` here would have qualified exactly
+the one candidate the binding is forbidden to use.
 
 Majority-of-three per case, because the answering lane already paid for the lesson: three
 single-sample runs once produced three different pass/fail sets, and a cell is being decided
@@ -86,7 +92,8 @@ def _report(model: str, report: QualificationReport) -> None:
 def main(argv: Sequence[str]) -> int:
     cases = load_relevance_seed(SEED)
     rigged = "--rubber-stamp" in argv
-    candidate: object = _RubberStamp() if rigged else LiveRelevanceJudge(LIVE_MODEL)
+    named = next((arg for arg in argv if not arg.startswith("-")), LIVE_MODEL)
+    candidate: object = _RubberStamp() if rigged else LiveRelevanceJudge(named)
     model = str(getattr(candidate, "model", "unknown"))
 
     print(f"seed set: {len(cases)} cases from {SEED.relative_to(ROOT)}")

@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from core.answering.corpus import Corpus
 from core.authority.ask_binding import AskAuthority
 from tests.harness.api_fixtures import (
+    FIXTURE_RELEVANCE_MODEL,
     available_credential,
     qualified_ask_authority,
     surface_under_test,
@@ -85,7 +86,13 @@ MODEL = "anthropic/claude-opus@5"
 #: A judge for these rows to bind, so the 043 gate is satisfied and these rows keep asserting
 #: what they are about. **A different model from `MODEL`**, per ADR-0067 — a self-judging
 #: binding would pass here and be exactly the shape that record forbids.
-RELEVANCE_MODEL = "anthropic/claude-sonnet@5"
+#:
+#: The SHARED fixture constant rather than a local vendor string. A local one was
+#: `anthropic/claude-sonnet@5`, which is also `ALTERNATE` below — so the moment a fallback row
+#: landed on the alternate cell, the answering model and the judge were the same model and
+#: ADR-0067's runtime check refused three rows for a reason none of them is about. Two
+#: constants that must never be equal should not be two constants.
+RELEVANCE_MODEL = FIXTURE_RELEVANCE_MODEL
 
 
 def _authority(binding: dict[str, Any], matrix: dict[str, Any]) -> AskAuthority:
