@@ -25,10 +25,20 @@ the model, which is re-execution wearing observation's clothes.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
+from pydantic import BaseModel
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+
 from adapters.pydantic_ai.agent import build_governed_agent
-from core.choice.chooser import ChoiceRequest, Chooser, ChooserUnavailable
+from core.choice.chooser import (
+    Answer,
+    ChoiceRequest,
+    Chooser,
+    ChooserUnavailable,
+    MalformedAnswer,
+)
 from core.choice.recorded import RecordedChooser
 
 #: The provider segment that resolves to a recording rather than a vendor (see
@@ -57,16 +67,30 @@ def to_model_string(model: str) -> str:
 #: have. That is not enforcement, which is `invoke_tool`'s alone; it is the difference between
 #: a model choosing badly and a model being invited to.
 _SYSTEM = (
-    "You choose the next tool for a governed agent run. Answer with EXACTLY ONE tool name "
-    "from the permitted list and nothing else — no punctuation, no explanation, no quotes. "
-    "If no tool should be called, answer with the single word NONE. "
+    "You choose the next tool for a governed agent run, and state what to do with it. "
+    "Answer with EXACTLY ONE tool name from the permitted list, plus the arguments the tool "
+    "should run with — an empty arguments object is correct for a tool that takes none. "
+    "If no tool should be called, set the tool to NONE. "
     "A tool outside the permitted list will be refused and you will be asked again, so "
     "naming one wastes an attempt rather than widening what you may do."
 )
 
-#: What the model says when it wants no tool. Mapped to the empty string, which the platform
-#: reads as a terminal answer.
+#: What the model says when it wants no tool. Mapped to the empty answer, which the platform
+#: reads as terminal.
 _NONE = "NONE"
+
+
+class _ToolCall(BaseModel):
+    """The structured answer the framework validates (040, research R1).
+
+    Lives in the adapter rather than in core, because core imports no framework and the
+    framework wants a schema it can hand a model. Converted to `core.choice.Answer` at the
+    seam, so the callers cannot tell which side produced it — the same division the
+    `Chooser` protocol itself draws.
+    """
+
+    tool: str
+    arguments: dict[str, Any] = {}
 
 
 def _prompt(request: ChoiceRequest) -> str:
@@ -146,7 +170,7 @@ class ModelChooser:
                 self._agent = build_governed_agent(
                     self._model_for_client(),
                     system_prompt=_SYSTEM,
-                    output_type=str,
+                    output_type=_ToolCall,
                 )
             except ChooserUnavailable:
                 raise
@@ -161,10 +185,20 @@ class ModelChooser:
                 ) from exc
         return self._agent
 
-    def choose(self, request: ChoiceRequest) -> str:
+    def choose(self, request: ChoiceRequest) -> Answer:
         agent = self._build()
         try:
             result = agent.run_sync(_prompt(request), deps=None)
+        except UnexpectedModelBehavior as exc:
+            # The model answered, and the answer does not validate as a tool call — a
+            # MALFORMED answer, not a provider outage (040, research R12). Re-asked within
+            # the bound rather than ending the run: a model that must now emit a structured
+            # object can emit an invalid one, and being told tends to fix it. The framework
+            # has already retried internally; what reaches here is its final word. The shape
+            # travels, the content does not.
+            raise MalformedAnswer(
+                f"the model's answer did not validate as a tool call: {type(exc).__name__}"
+            ) from exc
         except Exception as exc:
             # **Terminal, with no fallback** (FR-007, research F4). The tempting behaviour —
             # revert to a deterministic sequence when the provider is down — would silently
@@ -176,17 +210,30 @@ class ModelChooser:
                 reason_code="provider_unavailable",
             ) from exc
 
-        answer = str(getattr(result, "output", "") or "").strip()
-        if answer.upper() == _NONE:
-            return ""
+        output = getattr(result, "output", None)
+        if not isinstance(output, _ToolCall):
+            raise MalformedAnswer(
+                f"the framework returned {type(output).__name__} where a tool call was asked for"
+            )
+        name = output.tool.strip()
+        if name.upper() == _NONE:
+            return Answer("")
         # Returned verbatim otherwise. Whether it names a real tool is
         # `core.choice.is_tool_name`'s question and whether that tool is permitted is
         # `invoke_tool`'s; a normalisation step here would be the choosing code quietly
-        # deciding one of them.
-        return answer
+        # deciding one of them. The arguments travel untouched for the same reason — the
+        # platform carries the request to the capability, which enforces its own rules
+        # (040, clarification Q1).
+        return Answer(name, output.arguments)
 
 
-def build_chooser(model: str, *, recording: str = "", secret: str = "") -> Chooser:
+def build_chooser(
+    model: str,
+    *,
+    recording: str = "",
+    secret: str = "",
+    bare_name_arguments: Mapping[str, Any] | None = None,
+) -> Chooser:
     """A chooser for the identifier the binding map resolved. **The injection point.**
 
     Research F5: the stand-in goes *here*, at the binding, and never at the loop. A double
@@ -208,7 +255,11 @@ def build_chooser(model: str, *, recording: str = "", secret: str = "") -> Choos
         # A FIXTURE MODEL FETCHES NOTHING. There is no vendor to hold authority for, so a
         # deployment running only fixture cells needs no model credential at all — which is what
         # every blocking lane in this repository is (FR-011).
-        return RecordedChooser(parse_recording(recording))
+        # `bare_name_arguments` is what a bare name in a recording has always meant
+        # (040, FR-010). It reaches only the RECORDED chooser: a real model states its
+        # own arguments, and topping those up from a fixture constant would be the
+        # platform putting words in a model's mouth.
+        return RecordedChooser(parse_recording(recording), bare_name_arguments=bare_name_arguments)
     return ModelChooser(model, secret=secret)
 
 

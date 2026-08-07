@@ -24,6 +24,27 @@ advertise {
   serf = "127.0.0.1:4648"
 }
 
+# THE CPU BUDGET, STATED BECAUSE NOMAD CANNOT FINGERPRINT IT HERE.
+#
+# Measured on an Apple M5 Pro: `cpu.frequency = 4`, `cpu.numcores = 18`,
+# `cpu.totalcompute = 24`. Nomad read the clock as **4 MHz** rather than 4 GHz and multiplied
+# it by the 6 performance cores, so the node advertised a 24 MHz budget for an 18-core
+# machine. Six ordinary allocations consumed 24 of 24, and the seventh — the durability
+# conformance job — was unplaceable with "Dimension cpu exhausted".
+#
+# What that looks like from outside is a resource problem, and it is an arithmetic one. The
+# merge-blocking durability rows simply never ran locally, which is the same shape as a row
+# that skips itself: the lane reports nothing rather than reporting red.
+#
+# 41400 = 18 cores x 2300 MHz, and 2300 is deliberately borrowed from the GitHub runner this
+# repository already sizes against (`infra/jobs/conformance.nomad.hcl` records it as 4 cores /
+# 9200 MHz). Conservative on purpose: the efficiency cores are slower than the performance
+# ones, and a budget that overstates the machine schedules work it cannot run. This is a
+# scheduling unit, not a benchmark — what it has to be is proportionate and stable.
+client {
+  cpu_total_compute = 41400
+}
+
 # No Consul here. Left on, the agent retries discovery every few seconds and fills the
 # log with connection-refused errors that look like the real fault when something else
 # breaks.

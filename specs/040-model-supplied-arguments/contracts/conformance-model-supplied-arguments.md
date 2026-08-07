@@ -101,6 +101,17 @@ and assert `"plan,apply,-"` parses to exactly today's three choices: a bare name
 to pass would be the blast radius arriving anyway, and **an undercounted inventory is a
 compatibility row that passes while the uncounted suite is edited.**
 
+**Corrected during implementation, and the correction is the sharper claim.** "All five
+unedited" was written before anyone measured which suites assert the *protocol* and which assert
+the *behaviour*. Measured: of nine recording consumers in the tree, **exactly one calls
+`choose()` directly** — `choice/test_the_double_is_faithful.py`, at three call sites — and its
+assertions compare the return value to a bare string. That return type is what 040 deliberately
+widens (research R9; Principle V's declared adapters touch), so those three assertions move
+*with* the protocol and the row says so. The other eight consumers are behaviour-only and stay
+byte-identical, which is what FR-010 actually protects: **a recording still means what it meant**,
+and a bare name is still a choice with no arguments. A requirement that forbade the seam change
+its own feature declares would have been unsatisfiable.
+
 **And the inventory is derived, not memorised** — the consumer shape is a tree, not a list:
 `recording(*answers)` lives in `tests/harness/scripted_chooser.py`, `choice/harness.py` wraps it
 (`choice_recording=recording(*answers)`) and is itself imported by three further suites plus

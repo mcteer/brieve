@@ -25,15 +25,18 @@ attempt rather than wrapping it in a retry.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
 from core.choice.chooser import (
+    Answer,
     Choice,
     ChoiceOutcome,
     ChoiceRequest,
     Chooser,
+    MalformedAnswer,
     is_tool_name,
     record_choice,
 )
@@ -120,17 +123,25 @@ def resolve_step_tool(
     step_index: int,
     model: str,
     chooser: Chooser,
-    arguments: Mapping[str, Any],
     bound: int = DEFAULT_RECHOICE_BOUND,
-    already_chosen: str = "",
+    already_chosen: Answer | None = None,
 ) -> StepResolution:
     """Ask a model what to do at this step, and carry the answer into the governed entry.
 
+    **The model's arguments travel to the invoke** (040, FR-001). Until 040 this function
+    took an ``arguments`` mapping from its caller — a fixture constant, supplied by the
+    platform for every tool a model named — and the model could choose the verb but never
+    the object. The answer now carries both, and the platform still performs the act:
+    nothing about a governed step moves (research R1).
+
     ``already_chosen`` is the resume path (FR-008). When a disrupted run left an open intent
-    at this step, that intent names the tool the model *already* chose, and honouring it is
-    what makes re-observation honest: re-asking would let a resumed run execute a different
-    tool from the one whose bracket is open, which is re-execution wearing observation's
-    clothes. It costs no provider call, which is the observable half SC-005 asserts.
+    at this step, that intent names the tool the model *already* chose — **and, since 040,
+    the arguments it chose it with** (FR-004) — and honouring both is what makes
+    re-observation honest: re-asking would let a resumed run execute a different act from
+    the one whose bracket is open, which is re-execution wearing observation's clothes. It
+    costs no provider call, which is the observable half SC-005 asserts. The recorded answer
+    is honoured whole: it already passed every check when it was first made, and refusing it
+    now would strand a bracket that only re-invoking can resolve.
 
     **Nothing here decides permission.** Each named tool goes to `invoke_tool` — the same
     call a scripted name went to, unchanged — and what comes back is the core's answer. That
@@ -144,18 +155,37 @@ def resolve_step_tool(
     choices: list[Choice] = []
 
     for attempt in range(max(bound, 1)):
-        if attempt == 0 and already_chosen:
-            named = already_chosen
+        # Whether THIS iteration is replaying a recorded act rather than asking. Tracked
+        # rather than re-derived below: the size bound is skipped only for a replay, and a
+        # second expression testing "roughly the same thing" is how the two drift apart.
+        replayed = attempt == 0 and already_chosen is not None and bool(already_chosen.name)
+        if replayed:
+            assert already_chosen is not None  # narrowed by `replayed`
+            answer = already_chosen
         else:
-            named = chooser.choose(
-                ChoiceRequest(
-                    task=task,
-                    permitted=tuple(permitted),
-                    step_index=step_index,
-                    attempt=attempt,
-                    refused=tuple(refused),
+            try:
+                answer = chooser.choose(
+                    ChoiceRequest(
+                        task=task,
+                        permitted=tuple(permitted),
+                        step_index=step_index,
+                        attempt=attempt,
+                        refused=tuple(refused),
+                    )
                 )
-            ).strip()
+            except MalformedAnswer as exc:
+                # The answer does not parse as a name and its arguments (040, FR-008).
+                # Re-asked within the same bound as every other unusable answer, never
+                # acted on, and never repaired by dropping the malformed parts — guessing
+                # at a malformed request is how a platform performs an act nobody asked
+                # for. ``named`` is empty in the record: the trail carries no model output
+                # beyond a tool name, and a malformed answer has none.
+                choices.append(
+                    _record(run, step_index, attempt, model, "", ChoiceOutcome.MALFORMED)
+                )
+                refused.append(("", f"malformed_answer: {exc}"))
+                continue
+        named = answer.name.strip()
 
         if not named:
             # The model named nothing. Terminal, and emphatically not defaulted to a tool —
@@ -174,6 +204,38 @@ def resolve_step_tool(
             refused.append((named, "not_a_tool"))
             continue
 
+        # THE SIZE BOUND, centrally and before any invoke (040, FR-007). The named tool's
+        # own registration says how large a request it accepts; over it, the answer is
+        # refused and re-asked — NEVER truncated, because truncating performs a different
+        # act from the one described, which is worse than performing none (FR-007c). The
+        # refusal carries the byte count and the bound and none of the content (FR-007d,
+        # on TURN_REFUSED's precedent: a message the platform declined to accept is
+        # recorded by its size). Skipped for `already_chosen`: a recorded act passed this
+        # check when it was made, and refusing it now would strand an open bracket.
+        request_arguments = dict(answer.arguments)
+        if not replayed:
+            try:
+                encoded = json.dumps(request_arguments, separators=(",", ":")).encode("utf-8")
+            except (TypeError, ValueError) as exc:
+                # A request that cannot even be serialised is malformed, not a crash. It
+                # reaches here only from a chooser that fabricated a non-JSON value, and
+                # the honest response is the one every other unusable answer gets: refused
+                # and re-asked. Letting it propagate would end the run on a model mistake
+                # the bound exists to absorb. The type travels; the value does not.
+                choices.append(
+                    _record(run, step_index, attempt, model, named, ChoiceOutcome.MALFORMED)
+                )
+                refused.append((named, f"unserialisable_request: {type(exc).__name__}"))
+                continue
+            size = len(encoded)
+            limit = run.registry.resolve(named).max_request_bytes
+            if size > limit:
+                choices.append(
+                    _record(run, step_index, attempt, model, named, ChoiceOutcome.MALFORMED)
+                )
+                refused.append((named, f"request_too_large size={size} bound={limit}"))
+                continue
+
         # RECORDED BEFORE IT RUNS, and both halves of that matter.
         #
         # Ordering: every other causal record in this trail precedes its consequences, and the
@@ -186,7 +248,7 @@ def resolve_step_tool(
         # denies on exactly this condition for exactly this reason.
         choices.append(_record(run, step_index, attempt, model, named, ChoiceOutcome.NAMED))
 
-        result = invoke_tool(run, named, arguments)
+        result = invoke_tool(run, named, request_arguments)
 
         if result.allowed:
             return StepResolution(

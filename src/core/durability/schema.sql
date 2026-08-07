@@ -95,9 +95,42 @@ CREATE TABLE IF NOT EXISTS intents (
     idempotency_key TEXT        NOT NULL,
     step_index      INTEGER     NOT NULL,
     tool_name       TEXT        NOT NULL,
+    -- What the model asked this tool to do, as JSON (040).
+    --
+    -- THE FIRST AND ONLY DURABLE STORE OF RAW MODEL-SUPPLIED ARGUMENT VALUES, and that is a
+    -- security decision rather than a schema detail. `redact_arguments` keeps raw values out
+    -- of every record the platform writes — "argument keys and content hashes, never raw
+    -- values" — and a hash cannot be re-invoked with. A pending step RE-INVOKES on revival,
+    -- so resume needs the actual request; keeping it nowhere would make every model-driven
+    -- run revive with an empty act. The break is bounded to this column: control plane, not
+    -- the append-only trail; read by resume, never exported; and the trail keeps carrying the
+    -- tool NAME and nothing else, which rows assert rather than inherit.
+    --
+    -- RETENTION: kept until something removes it. The platform expires nothing on its own,
+    -- and stating that is part of the requirement — an unstated retention is one nobody can
+    -- hold the platform to, and this is a model's own words. A configurable retention control
+    -- belongs in administrative configuration and is owed; clearing this column on a CLOSED
+    -- bracket is safe (resume reads arguments only for pending steps), and clearing it on an
+    -- OPEN one would make that revival re-invoke with nothing — finished acts only.
+    --
+    -- NULL IS NOT EMPTY: NULL means recorded before this column existed, and such an intent
+    -- revives with the pre-040 platform constant its first attempt actually ran with. `{}`
+    -- means a post-040 act that genuinely asked for nothing.
+    arguments       TEXT,
     recorded_at     TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (run_id, idempotency_key)
 );
+
+-- The second additive column in this repository's history, and it needs the same two lines
+-- `resume_count` needed: `CREATE TABLE IF NOT EXISTS` is a no-op against an existing table
+-- and does not reconcile columns, so on any enclave brought up before 040 the declaration
+-- above is never read and this column would simply not exist — every intent write would then
+-- fail on an unknown column, which is the whole durability layer down, on a running enclave,
+-- from a file that looks like it declares the column. `ADD COLUMN IF NOT EXISTS` is
+-- idempotent, so this file stays safe for `migrate()` to re-apply on every boot.
+--
+-- No DEFAULT: existing rows read back NULL, which is exactly the pre-040 meaning.
+ALTER TABLE intents ADD COLUMN IF NOT EXISTS arguments TEXT;
 
 CREATE TABLE IF NOT EXISTS results (
     run_id          TEXT        NOT NULL,

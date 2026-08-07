@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from adapters.model_chooser import build_chooser, to_model_string
-from core.choice import CHOICE_ROLE, ChoiceRequest, ChooserUnavailable
+from core.choice import CHOICE_ROLE, Answer, ChoiceRequest, ChooserUnavailable
 from core.evals.scoring import EVAL_PROVIDER_KEY, LIVE_MODEL
 from tests.harness.scripted_chooser import FIXTURE_MODEL, recording
 
@@ -65,7 +65,11 @@ def test_the_merge_lane_needs_no_provider() -> None:
     """
     chooser = build_chooser(FIXTURE_MODEL, recording=recording("vault_write", "vault_read"))
     request = ChoiceRequest(task=FIXTURE_TASK, permitted=FIXTURE_PERMITTED, step_index=0, attempt=0)
-    assert chooser.choose(request) == "vault_write"
+    # `Answer`, not a bare string, since 040 — and the RECORDING is unchanged. A bare name
+    # in a recording is a choice with no arguments, so what this scripted sequence means is
+    # exactly what it meant; what moved is the protocol's return type, which is 040's
+    # declared seam change. The two are different claims and this row asserts the second.
+    assert chooser.choose(request) == Answer("vault_write")
 
     variables = (ROOT / "infra/environments/dev/variables.tf").read_text()
     matrix = variables.split('variable "model_matrix_cells"', 1)
@@ -106,11 +110,16 @@ def test_a_fixture_cell_without_a_recording_names_a_permitted_tool() -> None:
     """
     request = ChoiceRequest(task=FIXTURE_TASK, permitted=FIXTURE_PERMITTED, step_index=0, attempt=0)
     default = build_chooser(FIXTURE_MODEL, recording="")
-    assert default.choose(request) == "vault_read", "sorted-first of the permitted set"
-    assert default.choose(request) == "vault_read", "the default answer is stable across asks"
+    assert default.choose(request) == Answer("vault_read"), "sorted-first of the permitted set"
+    assert default.choose(request) == Answer("vault_read"), "stable across asks"
+    # NO ARGUMENTS, and that is the assertion rather than an incidental detail (040, FR-012):
+    # the no-recording default names a tool it was not told about, so it has nothing to say
+    # about what that tool should do. Answering with fabricated arguments would be the
+    # fixture inventing an act.
+    assert default.choose(request).arguments == {}
 
     short = build_chooser(FIXTURE_MODEL, recording=recording("vault_write"))
-    assert short.choose(request) == "vault_write"
+    assert short.choose(request) == Answer("vault_write")
     with pytest.raises(ChooserUnavailable) as excinfo:
         short.choose(request)
     assert excinfo.value.reason_code == "recording_exhausted"
@@ -162,7 +171,12 @@ def test_the_double_is_faithful() -> None:
     live = build_chooser(LIVE_MODEL)
 
     answers = {"double": double.choose(request), "live": live.choose(request)}
-    for which, answer in answers.items():
+    for which, chosen in answers.items():
+        # The NAME is what must be a well-formed choice from the permitted set. Since 040 an
+        # answer also carries arguments, and those are the capability's business rather than
+        # this row's — what the double and the provider must agree on is the shape of a
+        # decision, which is the name.
+        answer = chosen.name
         assert answer in FIXTURE_PERMITTED, (
             f"the {which} chooser answered {answer!r}, which is not a well-formed choice from "
             f"the permitted set {FIXTURE_PERMITTED} — the double and the provider no longer "

@@ -27,6 +27,12 @@ ProductMode = Literal["none", "federate", "broker"]
 RiskClass = Literal["read", "write", "destructive", "secret_touching"]
 
 
+#: The platform default for how large a model-stated request may be (040, FR-007).
+#: 64 KiB: generous for any structured request the current tools take, well below file
+#: content — a capability that needs a short path is not given room for a file.
+DEFAULT_REQUEST_BYTES = 64 * 1024
+
+
 @dataclass(frozen=True)
 class ToolRegistration:
     name: str
@@ -48,6 +54,14 @@ class ToolRegistration:
     #: Required in practice for a non-repeatable tool: without one, an interrupted
     #: step resolves to CANNOT_DETERMINE and parks the run.
     observer: Observer | None = None
+    #: The largest serialised request a model may state for this tool (040, FR-007).
+    #: A property of the capability declared beside its handler — like ``risk_class``,
+    #: and deliberately NOT a contract about the request's shape: the capability still
+    #: decides what it can use. The default is generous for structured requests and far
+    #: below file content; a capability whose legitimate requests are larger raises its
+    #: own. Enforced centrally, before any invoke; over it, the answer is refused and
+    #: re-asked — never truncated, and the refusal carries the size, never the content.
+    max_request_bytes: int = DEFAULT_REQUEST_BYTES
 
 
 class ToolRegistry:
@@ -65,6 +79,7 @@ class ToolRegistry:
         product_action: str | None = None,
         repeatable: bool = True,
         observer: Observer | None = None,
+        max_request_bytes: int = DEFAULT_REQUEST_BYTES,
     ) -> None:
         if not name.strip():
             raise ValueError("tool name must be non-empty")
@@ -79,6 +94,7 @@ class ToolRegistry:
             product_action=product_action,
             repeatable=repeatable,
             observer=observer,
+            max_request_bytes=max_request_bytes,
         )
 
     def observers(self) -> dict[str, Observer]:

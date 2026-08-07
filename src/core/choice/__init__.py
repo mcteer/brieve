@@ -19,11 +19,13 @@ from core.choice.bounded import (
 )
 from core.choice.chooser import (
     CHOICE_ROLE,
+    Answer,
     Choice,
     ChoiceOutcome,
     ChoiceRequest,
     Chooser,
     ChooserUnavailable,
+    MalformedAnswer,
     is_tool_name,
     record_choice,
     resolve_bound_model,
@@ -32,6 +34,7 @@ from core.choice.recorded import NOTHING, RecordedChooser, parse_recording
 
 __all__ = [
     "CHOICE_ROLE",
+    "Answer",
     "DEFAULT_RECHOICE_BOUND",
     "NOTHING",
     "Choice",
@@ -39,6 +42,7 @@ __all__ = [
     "ChoiceRequest",
     "Chooser",
     "ChooserUnavailable",
+    "MalformedAnswer",
     "RecordedChooser",
     "StepResolution",
     "is_tool_name",

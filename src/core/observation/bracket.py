@@ -12,7 +12,8 @@ pass.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from core.authority.clock import Clock
 from core.durability.types import DurabilityProvider, IntentRecord, ResultRecord
@@ -28,6 +29,7 @@ def bracket_call[T](
     idempotency_key: str,
     clock: Clock,
     call: Callable[[], T],
+    arguments: Mapping[str, Any] | None = None,
 ) -> T:
     """Record intent, perform the effect, record result.
 
@@ -36,6 +38,14 @@ def bracket_call[T](
     ran. The result write is likewise allowed to propagate — a missing result leaves an
     open intent, which resume resolves by observation, so failing loudly costs less
     than pretending.
+
+    ``arguments`` is what the call will be made with (040). It travels into the intent so a
+    revival re-invokes the **same act** rather than an emptier one: once the arguments come
+    from a model rather than from a platform constant, "we were about to run X" is not
+    enough to repeat X. Defaulted so every pre-040 construction site is unchanged — and,
+    exactly as with ``resume_count``, the default is the trap: a caller that knows its
+    arguments and lets this default writes a post-040 record on the pre-040 side of the
+    NULL-means-legacy line.
     """
     provider.record_intent(
         IntentRecord(
@@ -43,6 +53,7 @@ def bracket_call[T](
             step_index=step_index,
             tool_name=tool_name,
             idempotency_key=idempotency_key,
+            arguments=None if arguments is None else dict(arguments),
             recorded_at=clock.now(),
         )
     )

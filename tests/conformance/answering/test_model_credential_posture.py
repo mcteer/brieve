@@ -455,10 +455,15 @@ def test_the_run_path_fetches_after_the_cell_is_validated_and_before_anything_is
     from surfaces.dispatch import entrypoint
 
     source = inspect.getsource(entrypoint._chooser_for)  # noqa: SLF001
+    # Matched on the CALL, not on its first argument's formatting. The earlier form looked
+    # for "build_chooser(model" and broke the moment that call gained enough arguments to
+    # wrap — which says nothing about the ordering this row exists to assert. That is the
+    # seventh time a check in this repository has matched how code is written rather than
+    # what it does, and the property here is the sequence, not the line breaks.
     assert (
         source.index("resolve_bound_model")
         < source.index("BrokeredModelCredential")
-        < source.index("build_chooser(model")
+        < source.index("build_chooser(")
     )
 
 

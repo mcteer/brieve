@@ -57,7 +57,12 @@ class CheckpointBlob(BaseModel):
 
 
 class IntentRecord(BaseModel):
-    """Written *before* a non-repeatable effect, so an interruption is resolvable."""
+    """Written *before* a non-repeatable effect, so an interruption is resolvable.
+
+    Since 040 it says *"we were about to run X **with these**"*: a pending step re-invokes on
+    revival, and once the arguments come from a model rather than from a platform constant,
+    repeating the same act requires having kept them.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -65,6 +70,18 @@ class IntentRecord(BaseModel):
     step_index: int
     tool_name: str
     idempotency_key: str
+    #: What the model asked this tool to do (040). **NULL is not empty**: ``None`` means
+    #: recorded before this field existed, and such an intent revives with the pre-040
+    #: platform constant its first attempt actually ran with, while ``{}`` means a post-040
+    #: act that genuinely asked for nothing. Additive and defaulted on ``resume_count``'s
+    #: precedent, so every existing construction site is unchanged — and, exactly as there,
+    #: the default is the trap: a site that *does* know its arguments and lets this default
+    #: writes a post-040 record on the pre-040 side of that line.
+    #:
+    #: **Kept until something removes it**; the platform expires nothing. Removing it from a
+    #: CLOSED bracket is safe — resume reads arguments only for pending steps — and removing
+    #: it from an OPEN one would make that revival re-invoke with nothing.
+    arguments: dict[str, Any] | None = None
     recorded_at: datetime
 
 
