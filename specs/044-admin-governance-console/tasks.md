@@ -227,7 +227,7 @@ visible, and provenance says who wrote last.
       (quorum null); then with a quorum configured, pending → out-of-band approve → in
       force. Record outcomes in `contracts/conformance-console.md`; re-seed the model
       credential if the apply clobbers it.
-- [ ] T020 Run **CL2** on a served surface: disable the judge from the portal, ask, see the
+- [X] T020 Run **CL2** on a served surface: disable the judge from the portal, ask, see the
       disclosure; re-enable, ask, see the gate — no restart; record the outcome in the
       contract.
 - [ ] T021 [P] Run `specs/044-admin-governance-console/quickstart.md` top to bottom as
