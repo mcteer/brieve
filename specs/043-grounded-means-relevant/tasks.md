@@ -51,12 +51,12 @@ closure note, which lands in Polish because it must describe what shipped.)*
 **Purpose**: the protocol, the parser, the binding, and the seed machinery — everything both
 the hermetic rows and the live legs stand on.
 
-- [ ] T001 Create `src/core/answering/relevance.py`: `RelevanceJudge` protocol,
+- [X] T001 Create `src/core/answering/relevance.py`: `RelevanceJudge` protocol,
       `RelevanceVerdict` (relevant indices, model, raw leading token), and the strict
       leading-token parser — `RELEVANT: 1,3` / `RELEVANT: none`; anything else is malformed
       and surfaces as a typed refusal, never a provider fault (research R3; 032's
       harness-owns-vocabulary rule).
-- [ ] T002 [P] Add `relevance_cell: str = ""` to `AskBinding` in
+- [X] T002 [P] Add `relevance_cell: str = ""` to `AskBinding` in
       `src/core/authority/ask_binding.py` — **and teach the parser a per-field expected role,
       because today it refuses this feature's own record**: `parse_ask_binding_record` iterates
       the two sources and refuses at parse any cell whose role is not `ask` ("a cell qualified
@@ -67,16 +67,16 @@ the hermetic rows and the live legs stand on.
       T011). **Unit rows for both parser refusal directions** land beside it in
       `tests/unit/test_ask_binding_relevance.py` (new file) — the contract's companion
       assertion, tasked here so it is nobody's afterthought.
-- [ ] T003 [P] Create `src/core/evals/relevance_seed.py`: seed loader with the floor enforced
+- [X] T003 [P] Create `src/core/evals/relevance_seed.py`: seed loader with the floor enforced
       at load — ≥10 cases, ≥3 supported-but-irrelevant, ≥3 fully-relevant, ≥1 mixed;
       `author` required non-empty; per-claim verdicts from the closed `relevant`/`irrelevant`
       vocabulary; **deliberately separate from `judge.py`'s `SeedCase`** so the existing judge
       chain's loader and floor are untouched (research R4).
-- [ ] T004 [P] Create the fixture relevance judge in `tests/harness/fixture_relevance.py`:
+- [X] T004 [P] Create the fixture relevance judge in `tests/harness/fixture_relevance.py`:
       affirms all claims by default (scaffolding — the contract header says why), with
       constructor knobs to affirm a subset, affirm none, be unreachable, or return a malformed
       token; counts its invocations for R5.
-- [ ] T005 [GATE:eval] Unit rows for the loader in
+- [X] T005 [GATE:eval] Unit rows for the loader in
       `tests/unit/test_relevance_seed_loader.py`: each floor violation refuses at load (R13);
       a seed whose citation does not resolve against the real pin is refused (R14) — the judge
       must be qualified on the world the path produces.
@@ -100,7 +100,7 @@ failure (SC-001's hermetic half, SC-005, SC-006).
 **Independent Test**: drive `answer_question` with a fixture judge affirming none — declined,
 third reason; affirming one of three — answered with two disclosed irrelevant.
 
-- [ ] T007 [US1] Widen `src/core/answering/answer.py`: optional `relevance` parameter; gate
+- [X] T007 [US1] Widen `src/core/answering/answer.py`: optional `relevance` parameter; gate
       invoked only when `kept` is non-empty; third `declined_reason` (*"the corpus does not
       cover what was asked"*); `Answer.irrelevant` distinct from `dropped`;
       `Answer.relevance_note` naming the verdict as a model judgement (FR-001/002/006/007/018).

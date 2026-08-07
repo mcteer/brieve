@@ -49,17 +49,41 @@ GUIDANCE: Final[str] = "guidance"
 ESTATE: Final[str] = "estate"
 SOURCES: Final[frozenset[str]] = frozenset({GUIDANCE, ESTATE})
 
-#: The only role an ask binding may name. A green `plan` cell licenses planning; roles exist
+#: The role a SOURCE binding may name. A green `plan` cell licenses planning; roles exist
 #: precisely so that one qualification does not license everything.
 ASK_ROLE: Final[str] = "ask"
+
+#: The relevance gate's binding (043). Not a source — it consults nothing — so it sits beside
+#: `SOURCES` rather than in it, and every loop over sources is unchanged by its arrival.
+RELEVANCE: Final[str] = "relevance"
+
+#: The role the relevance binding may name. **A judge, not an ask** (043, FR-013): the gate
+#: renders a verdict on an answer, which is judging, and a cell qualified to answer is not
+#: qualified to judge. ADR-0039's closed vocabulary is not widened — this reuses `judge` under
+#: its own cell identity.
+RELEVANCE_ROLE: Final[str] = "judge"
+
+#: Field name → the role that field's cell must carry. **Per field, because 043 added a field
+#: whose role differs**, and the parser previously refused every non-`ask` cell outright — so
+#: the record would have refused the very field being added to it. The refusal is unchanged in
+#: strength and now runs in both directions: a `judge` cell in a source field and an `ask` cell
+#: in the relevance field each refuse at parse.
+EXPECTED_ROLE: Final[Mapping[str, str]] = {
+    GUIDANCE: ASK_ROLE,
+    ESTATE: ASK_ROLE,
+    RELEVANCE: RELEVANCE_ROLE,
+}
 
 
 @dataclass(frozen=True)
 class AskBinding:
-    """Which cell each source is bound to. Either may be absent."""
+    """Which cell each source is bound to, and which judges relevance. Any may be absent."""
 
     guidance_cell: str = ""
     estate_cell: str = ""
+    #: The relevance gate's cell (043). Absent means **nobody decided**, which the surface
+    #: surfaces as `relevance_unbound` before any question of availability — 026's rule.
+    relevance_cell: str = ""
 
     def cell_for(self, source: str) -> str:
         return self.guidance_cell if source == GUIDANCE else self.estate_cell
@@ -85,28 +109,33 @@ def parse_ask_binding_record(record: Mapping[str, Any]) -> AskBinding:
         )
 
     cells: dict[str, str] = {}
-    for source in sorted(SOURCES):
-        raw = record.get(f"{source}_cell")
+    for field_name in sorted(EXPECTED_ROLE):
+        raw = record.get(f"{field_name}_cell")
         if raw is None or raw == "":
             continue
         reference = str(raw)
         parts = reference.split(":")
         if len(parts) != 3:
             raise ResolutionRefused(
-                f"ask-binding names {reference!r} for {source}; a cell reference is "
+                f"ask-binding names {reference!r} for {field_name}; a cell reference is "
                 f"pack:model:role",
                 reason_code="malformed_record",
             )
-        if parts[2] != ASK_ROLE:
+        expected = EXPECTED_ROLE[field_name]
+        if parts[2] != expected:
             raise ResolutionRefused(
-                f"ask-binding names {reference!r} for {source}, whose role is {parts[2]!r} rather "
-                f"than {ASK_ROLE!r}. A cell qualified for another role licenses that role, not "
-                f"this one",
+                f"ask-binding names {reference!r} for {field_name}, whose role is {parts[2]!r} "
+                f"rather than {expected!r}. A cell qualified for another role licenses that "
+                f"role, not this one",
                 reason_code="malformed_record",
             )
-        cells[source] = reference
+        cells[field_name] = reference
 
-    return AskBinding(guidance_cell=cells.get(GUIDANCE, ""), estate_cell=cells.get(ESTATE, ""))
+    return AskBinding(
+        guidance_cell=cells.get(GUIDANCE, ""),
+        estate_cell=cells.get(ESTATE, ""),
+        relevance_cell=cells.get(RELEVANCE, ""),
+    )
 
 
 def resolve_ask_cell(

@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from core.answering.corpus import Corpus
+from core.answering.relevance import RelevanceJudge, RelevanceRefused
 
 
 class ProviderUnavailable(Exception):
@@ -87,14 +88,38 @@ class Answer:
     #: no clock and should not grow one. The surfaces do, and a conformance row asserts they
     #: did rather than trusting this default.
     ground_note: str = ""
+    #: Statements the RELEVANCE gate dropped (043) — distinct from `dropped`, which keeps
+    #: meaning "a citation did not resolve". Two grounds, two fields: they send a reader to
+    #: different places, and one bucket would make them indistinguishable in the record.
+    irrelevant: tuple[str, ...] = field(default_factory=tuple)
+    #: That a MODEL judged relevance, carried on answers and declines alike (FR-007).
+    #:
+    #: Never phrased as a platform fact. Principle IX distinguishes a model gate from a human
+    #: approval, and a note reading "this answer is relevant" would assert as the platform what
+    #: a model decided.
+    relevance_note: str = ""
 
 
 ANSWERED = "answered"
 DECLINED = "declined"
 
+#: The third decline ground (043). Distinguishable from "citations did not resolve" because the
+#: two send a reader to different places: one to what the model invented, one to what the corpus
+#: does not cover.
+NOT_COVERED = "the corpus does not cover what was asked"
+
+#: Carried on every answer and decline the gate touched. Phrased as a model's judgement rather
+#: than the platform's finding — Principle IX keeps those distinct.
+_MODEL_JUDGED = "relevance to the question was judged by a model, not by the platform"
+
 
 def answer_question(
-    *, question: str, corpus: Corpus, provider: AnswerProvider, context: str = ""
+    *,
+    question: str,
+    corpus: Corpus,
+    provider: AnswerProvider,
+    context: str = "",
+    relevance: RelevanceJudge | None = None,
 ) -> Answer:
     """Ask, keep only what the corpus supports, and decline if that is nothing.
 
@@ -147,6 +172,54 @@ def answer_question(
             ),
             dropped=tuple(dropped),
         )
+
+    # THE RELEVANCE GATE (043, ROADMAP gap 0g). Everything above asks whether a claim's
+    # citations EXIST; this asks whether what survived answers the question that was asked.
+    # Until 035 widened the pin the two were close enough to pass for each other — after it, a
+    # question about this platform's audit retention could be answered from another product's
+    # retention pages, every citation resolving and every claim true.
+    #
+    # **Only when something survived** (FR-018): an ask already declining pays nothing.
+    #
+    # **Optional here, mandatory at the caller.** Requiring it would force edits to the recorded
+    # eval scorers whose suites this feature promises not to touch — so the production surface
+    # always supplies one and a row drives the SURFACE to prove it, rather than trusting a
+    # default. A gate nothing calls is the defect 041 spent a feature closing.
+    if relevance is not None:
+        try:
+            verdict = relevance.assess(question, [claim.statement for claim in kept])
+        except RelevanceRefused as refusal:
+            # Fail closed. A gate that could not run must never read as one that passed.
+            return Answer(
+                disposition=DECLINED,
+                corpus_digest=corpus.digest,
+                declined_reason=f"relevance could not be established: {refusal.reason_code}",
+                dropped=tuple(dropped),
+                relevance_note=_MODEL_JUDGED,
+            )
+
+        relevant = [claim for index, claim in enumerate(kept) if index in verdict.relevant]
+        irrelevant = [
+            claim.statement for index, claim in enumerate(kept) if index not in verdict.relevant
+        ]
+        if not relevant:
+            return Answer(
+                disposition=DECLINED,
+                corpus_digest=corpus.digest,
+                declined_reason=NOT_COVERED,
+                dropped=tuple(dropped),
+                irrelevant=tuple(irrelevant),
+                relevance_note=_MODEL_JUDGED,
+            )
+        return Answer(
+            disposition=ANSWERED,
+            corpus_digest=corpus.digest,
+            claims=tuple(relevant),
+            dropped=tuple(dropped),
+            irrelevant=tuple(irrelevant),
+            relevance_note=_MODEL_JUDGED,
+        )
+
     return Answer(
         disposition=ANSWERED,
         corpus_digest=corpus.digest,
@@ -193,6 +266,7 @@ class RecordedProvider:
 
 __all__ = [
     "ANSWERED",
+    "NOT_COVERED",
     "RecordedProvider",
     "DECLINED",
     "Answer",
