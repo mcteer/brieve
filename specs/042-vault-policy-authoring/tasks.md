@@ -223,7 +223,7 @@ value and no trust-fabric body.
       single-call probe in `tests/evals_live/policy_impact_probe.py` (smoke shape: raw
       capability answers printed, one call before anything bigger); re-seed the model
       credential if the apply clobbers it.
-- [ ] T020 Run **PL2** end to end — policy-repository subject → read → author → impact →
+- [X] T020 Run **PL2** end to end — policy-repository subject → read → author → impact →
       real PR via 041's publisher; answer SC-001's three questions from the PR alone;
       record PL1–PL3 outcomes in `contracts/conformance-policy-authoring.md`.
 - [X] T021 [P] Run `specs/042-vault-policy-authoring/quickstart.md` top to bottom as
