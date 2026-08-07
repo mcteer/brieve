@@ -552,6 +552,43 @@ wrong recommendations in a single session before anyone checked it against `src/
 Found while deriving this file. None blocks work; all three make the record harder to reason
 from, and each is worth its own small change.
 
+**0g is different from the six above it**, and the difference is worth stating: those were gaps
+between what the record claimed and what the code did. 0g is a gap in what the platform will
+**assert to a person** — it is open, it is not small, and the live lane is red until it closes.
+
+### 0g. A resolving citation proves a document exists, not that it answers the question — **OPEN, found 2026-08-07**
+
+**The live eval lane is red on `main`, and the eval is right.** `make evals-smoke` fails one
+case: `vault-must-decline-001`, *"What is the recommended retention period for **this
+platform's** audit log?"* — a must-decline, because the pinned corpus contains nothing about
+this platform. The answering path **answers** it, citing HCP Terraform's audit-trail retention
+and Boundary's session-recording retention. Every citation **resolves**, because those documents
+are real.
+
+**The mechanism, measured rather than inferred.** `answer_question` keeps a claim when its
+citation resolves against the pin and declines only when nothing survives. That was sufficient
+while the pin was narrow: the case was written to catch an *invented* anchor, and its recorded
+fixture still carries one (`/validated-patterns/vault/retention-policy#recommended-retention`,
+which does not exist). **035 widened the corpus** — `git log -S` puts both cited documents in
+`f572b64` — and the corpus now spans at least six product families
+(`vault`, `terraform`, `nomad`, `boundary`, …). A question about subject X can now be answered
+from documents about subject Y, with citations that resolve.
+
+**Why no blocking gate caught it.** The hermetic eval gates are green (14 passed) because they
+drive the recorded fixture, whose invented anchor still fails to resolve. Only a live model
+finds the real neighbouring documents. **This is exactly what the live lane is for**, and it is
+the first time it has earned its keep this way.
+
+**Why this is not a one-line fix.** The product is derivable from the document path today, so
+scoping a pack's answers to its own product's documentation is *possible*. Whether it is
+*right* is a design question that collides with 035's stated intent — the corpus was widened so
+the platform could answer architecture questions, which are frequently cross-product. Narrowing
+it back by reflex would trade this defect for the opposite one. **It needs a spec**, and the
+requirement it must state is that grounding means *relevant* rather than merely *resolvable*.
+
+**Do not "fix" this by editing the case.** The case is doing its job; the gate went red over a
+real regression in what the platform will assert.
+
 ### 0a. `resume_run` has no production caller — **CLOSED by 014, 2026-07-30**
 
 **Found 2026-07-29 while tracing 013's dispatch path. Closed by
