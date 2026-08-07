@@ -188,7 +188,7 @@ held the subject (SC-002 complete, SC-004, SC-009, SC-010, SC-012, SC-013).
 **Independent Test**: Both tasks in sequence; PR exists with matching digests; analyzer
 observably cannot publish; healthy handoff consumes no resume attempt.
 
-- [ ] T021 [US3] Create `src/core/authoring/publish.py`: `PublishResult`; push
+- [X] T021 [US3] Create `src/core/authoring/publish.py`: `PublishResult`; push
       `branch_for(idempotency_key)` with `--force-with-lease` using
       `git -c credential.helper= -c credential.helper='!gh auth git-credential'` and a
       per-invocation env carrying `GH_TOKEN` only; `gh pr list --head` reuse check then
@@ -203,7 +203,7 @@ observably cannot publish; healthy handoff consumes no resume attempt.
       `src/surfaces/dispatch/entrypoint.py`: `RUN_CONTINUE` path (already checked before the
       resume branch), `register_proposal_tool` with the publish handler and the observer,
       task-scoped to `open_proposal` (FR-008/009/010).
-- [ ] T024 [US3] Implement the publish observer in `src/core/authoring/publish.py`: resolve
+- [X] T024 [US3] Implement the publish observer in `src/core/authoring/publish.py`: resolve
       `CANNOT_DETERMINE` by querying the head branch — existing open PR → observed, absent →
       not performed; never a second proposal (FR-010, research R10; plugs into
       `core/observation` types).
@@ -223,15 +223,15 @@ observably cannot publish; healthy handoff consumes no resume attempt.
       `infra/jobs/authoring-tier.nomad.hcl`, and settle research R8 in `infra/`: verify the
       task image carries pinned `git` and `gh`, add a derived pinned image if the base lacks
       them; the task start fails `tooling_missing` rather than installing at runtime (FR-014).
-- [ ] T026 [P] [US3] [GATE:conformance] Rows A13 + A14 in
+- [X] T026 [P] [US3] [GATE:conformance] Rows A13 + A14 in
       `tests/conformance/authoring/test_publishing.py` (new file, declared fake-forge seam):
       one key → one PR with `reused=true` on the second; observer converges on
       exists/absent with no second proposal on any path.
-- [ ] T027 [P] [US3] [GATE:no-secret-leak] Row A15 in
+- [X] T027 [P] [US3] [GATE:no-secret-leak] Row A15 in
       `tests/conformance/authoring/test_publishing.py`: after a publish — no token under
       `$HOME`, no `hosts.yml`, none in `.git/config` or remote URLs, none in the checkpoint,
       none in any audit payload; subprocess env constructed per call.
-- [ ] T028 [P] [US3] [GATE:conformance] Row A16 in
+- [X] T028 [P] [US3] [GATE:conformance] Row A16 in
       `tests/conformance/authoring/test_publishing.py`: planted secret and analysed-content
       span in the rationale each refuse publish; truncated-without-note still refuses compose
       through the production path.
@@ -265,13 +265,13 @@ in the same task, and a person can merge what the agent proposed.
 
 **Independent Test**: Sweep passes with no trio entries; un-register one tool, sweep fails.
 
-- [ ] T033 [US4] Move `read_subject`, `author_file`, `open_proposal` from
+- [X] T033 [US4] Move `read_subject`, `author_file`, `open_proposal` from
       `DELIBERATELY_UNREACHABLE` to a new declared record `REACHABLE_PER_RUN: dict[str,
       Registrar]` in `tests/unit/capability_inventory.py`, each entry naming its registrar
       ("dispatch entrypoint, `HARNESS_AUTHORING_ROLE=analyzer`" / proposer) — the static
       sweep cannot observe per-run registration, so a declaration carries it and
       `unaccounted()` treats declared names as accounted (FR-015; closes analysis C2).
-- [ ] T034 [US4] [GATE:conformance] Row A5 in `tests/unit/test_capability_inventory.py`
+- [X] T034 [US4] [GATE:conformance] Row A5 in `tests/unit/test_capability_inventory.py`
       (additive — the file is 040's, not 038's): the declaration is kept honest by driving
       the entrypoint's registering construction (T008's harness) and asserting every
       `REACHABLE_PER_RUN` name actually registers; with the branch rigged off the check
