@@ -13,9 +13,12 @@ whether anything can actually get to it.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from tests.unit.capability_inventory import (
     DELIBERATELY_UNREACHABLE,
+    REACHABLE_PER_RUN,
     Withheld,
     defined_capabilities,
     registered_capabilities,
@@ -114,3 +117,61 @@ def test_row_the_stale_check_can_lose(monkeypatch: pytest.MonkeyPatch) -> None:
         "the ledger claimed a reachable capability was deliberately withheld and the staleness "
         "check agreed with it — a record that cannot be caught being false is not a record"
     )
+
+
+# ---------------------------------------------------------------------------------------
+# A5 (041) — the per-run declaration, kept honest by driving the construction that registers.
+#
+# A list that only asserted itself would be the shape this ledger exists to refuse. So these
+# rows build the registry the way the dispatch entrypoint does, with the authoring branch on
+# and with it off, and require the declared names to appear and disappear accordingly.
+# ---------------------------------------------------------------------------------------
+
+
+def test_every_per_run_capability_actually_registers(tmp_path: Path) -> None:
+    """Each declared name must be registered by the registrar it names."""
+    from tests.harness.authoring_dispatch import build_as_entrypoint
+
+    analyzer = build_as_entrypoint(role="analyzer", tmp_path=tmp_path)
+    proposer = build_as_entrypoint(role="proposer", tmp_path=tmp_path)
+    reachable = analyzer.vocabulary | proposer.vocabulary
+
+    missing = sorted(name for name in REACHABLE_PER_RUN if name not in reachable)
+    assert not missing, (
+        f"{missing} are declared REACHABLE_PER_RUN and no authoring construction registers "
+        f"them. A declaration that nothing checks is how the trio went unreachable for a "
+        f"whole feature."
+    )
+
+
+def test_the_per_run_check_fails_when_registration_is_removed(tmp_path: Path) -> None:
+    """The row can lose. With the branch rigged off, every declared name must vanish."""
+    from tests.harness.authoring_dispatch import build_as_entrypoint
+
+    rigged = (
+        build_as_entrypoint(role="analyzer", tmp_path=tmp_path, authoring_enabled=False).vocabulary
+        | build_as_entrypoint(
+            role="proposer", tmp_path=tmp_path, authoring_enabled=False
+        ).vocabulary
+    )
+
+    assert not (set(REACHABLE_PER_RUN) & rigged), (
+        "with the authoring branch disabled the declared names must be unreachable; if they "
+        "are still present, this check is measuring something other than the branch"
+    )
+
+
+def test_a_name_in_neither_record_is_still_unaccounted() -> None:
+    """The ledger's original claim survives the new record.
+
+    `REACHABLE_PER_RUN` accounts for names; it must not become a place to put anything.
+    """
+    from tests.unit.capability_inventory import unaccounted
+
+    assert unaccounted() == {}
+
+
+def test_the_two_records_are_disjoint() -> None:
+    """A capability cannot be both deliberately withheld and reachable per run."""
+    overlap = set(DELIBERATELY_UNREACHABLE) & set(REACHABLE_PER_RUN)
+    assert not overlap, f"{sorted(overlap)} appear in both records, which cannot both be true"

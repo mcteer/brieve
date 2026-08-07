@@ -53,17 +53,44 @@ DELIBERATELY_UNREACHABLE: dict[str, Withheld] = {
         ),
         record="ADR-0065",
     ),
-    "read_subject": Withheld(
-        reason="authoring is built and not yet reachable; registering it is the successor feature",
-        record="040's successor — authoring becomes reachable",
+}
+
+
+@dataclass(frozen=True)
+class Registrar:
+    """Who registers a capability that no module-level table can show."""
+
+    #: One sentence naming the code path that performs the registration.
+    where: str
+    #: The record that decided it belongs there.
+    record: str
+
+
+#: Capabilities registered PER RUN, and by whom (041).
+#:
+#: **These are reachable; the static sweep simply cannot see them.**
+#: `registered_capabilities()` reads the assembled registry, which is the right thing to read
+#: — a registration behind a condition nobody meets is not reachability. But the authoring
+#: handlers hold run-scoped state (the workspace they may write to, the artefact they
+#: accumulate), so they are registered when a run starts rather than at import, and no
+#: module-level table will ever contain them.
+#:
+#: A declaration therefore carries them, and `test_capability_inventory` keeps the declaration
+#: honest by DRIVING the registering construction: every name here must actually register, and
+#: with the branch rigged off the check fails. A list that only asserted itself would be the
+#: shape this ledger exists to refuse.
+REACHABLE_PER_RUN: dict[str, Registrar] = {
+    "read_subject": Registrar(
+        where="surfaces.dispatch.authoring.authoring_registry_for, analyzer role",
+        record="041 — authoring becomes reachable",
     ),
-    "author_file": Withheld(
-        reason="authoring is built and not yet reachable; registering it is the successor feature",
-        record="040's successor — authoring becomes reachable",
+    "author_file": Registrar(
+        where="surfaces.dispatch.authoring.authoring_registry_for, analyzer role",
+        record="041 — authoring becomes reachable",
     ),
-    "open_proposal": Withheld(
-        reason="authoring is built and not yet reachable; registering it is the successor feature",
-        record="040's successor — authoring becomes reachable",
+    "open_proposal": Registrar(
+        where="surfaces.dispatch.authoring.authoring_registry_for, proposer role",
+        record="041 — authoring becomes reachable",
     ),
 }
 
@@ -132,7 +159,9 @@ def unaccounted() -> dict[str, str]:
     return {
         name: where
         for name, where in defined_capabilities().items()
-        if name not in reachable and name not in DELIBERATELY_UNREACHABLE
+        if name not in reachable
+        and name not in DELIBERATELY_UNREACHABLE
+        and name not in REACHABLE_PER_RUN
     }
 
 
@@ -150,6 +179,8 @@ def stale_ledger_entries() -> set[str]:
 
 __all__ = [
     "DELIBERATELY_UNREACHABLE",
+    "REACHABLE_PER_RUN",
+    "Registrar",
     "Withheld",
     "defined_capabilities",
     "registered_capabilities",

@@ -41,8 +41,23 @@ SC-011's other half.
 
 ## 3 — The real thing (enclave lane; named runner: Dan)
 
-Dispatch an authoring run against the target repository (request names `target_repository`,
-task, pack). Watch:
+**Run the E-rows, which do the whole cycle and clean up after themselves:**
+
+```sh
+E1_TARGET_REPOSITORY=<owner>/<repo> \
+  uv run --extra adapters --extra surfaces \
+  pytest tests/conformance/authoring/test_enclave_publish.py -q -m enclave
+```
+
+Expected: 6 passed. They clone for real, author through `author_file`, compose, push, open a
+proposal, republish to prove idempotency, and observe it. **They fail rather than skip** when
+`E1_TARGET_REPOSITORY`, `gh`, `git` or the credential is absent. Close the proposal and delete
+its branch afterwards — `branch_for("e1-041-authoring-conformance")` names it.
+
+**Verified 2026-08-07**: 6 passed in 13.23s against `mcteer/brieve`, opening PR #177 (closed).
+
+To drive it through a dispatched allocation instead, dispatch an authoring run against the
+target repository (request names `target_repository`, task, pack) and watch:
 
 ```sh
 nomad job status authoring-tier          # analyzer (prestart) exits, proposer runs

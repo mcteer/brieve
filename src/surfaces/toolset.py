@@ -135,23 +135,55 @@ def content_pins(loaded: Mapping[str, LoadedPack]) -> dict[str, str]:
     return pins
 
 
+#: Tool name → product, for tools the **platform** owns rather than a pack (041, FR-029).
+#:
+#: A pack tool's product comes from its manifest. A platform tool has no manifest, so without
+#: this table `dependency_products` cannot answer for one — and the consequence is the one
+#: that function already states: the sweeper watches products, so a suspension carrying only a
+#: tool name is never matched by anything recovering. `open_proposal` reaches a forge that can
+#: certainly be down, so it is the first platform tool that needed an answer here.
+#:
+#: The Vault and Terraform platform handlers are deliberately absent: they are bound *into*
+#: packs through `PlatformBindings`, so their products already arrive by the manifest path.
+#: `plan` and `apply` are here because FR-030's guard found them, not because 041 needed them.
+#: They are fixture tools registered by `register_fixture_tools`, they declare
+#: `product="workspace"`, and no manifest has ever named that product — so they carried the
+#: same wait-forever shape as `open_proposal` and nothing had looked. They are fixture-backed,
+#: so `workspace` is probed by `fixture_probe`: there is no live product to be down, which is
+#: an answer, where previously there was none.
+PLATFORM_TOOL_PRODUCTS: dict[str, str] = {
+    "open_proposal": "github",
+    "plan": "workspace",
+    "apply": "workspace",
+}
+
+
 def dependency_products(loaded: Mapping[str, LoadedPack]) -> dict[str, str]:
     """Tool name → the product it reaches, for `resume_run`'s `depends_on`.
 
-    Built here because the manifest is the only thing that knows, and a suspension carrying
-    a tool name rather than a product is never matched by that product recovering — the
-    sweeper watches products. A run suspended on a Vault tool would wait forever.
+    Built from the manifests, **plus the platform's own table** for tools no manifest
+    declares. A suspension carrying a tool name rather than a product is never matched by that
+    product recovering — the sweeper watches products. A run suspended on a Vault tool would
+    wait forever, and until 041 a run suspended on `open_proposal` would have too.
+
+    Manifests are merged last, so a pack naming a product for a tool this table also lists
+    wins: the manifest sits closer to the tool than a platform default does.
     """
-    return {
-        tool.name: tool.product
-        for pack in loaded.values()
-        for tool in pack.manifest.tools
-        if tool.product
-    }
+    table: dict[str, str] = dict(PLATFORM_TOOL_PRODUCTS)
+    table.update(
+        {
+            tool.name: tool.product
+            for pack in loaded.values()
+            for tool in pack.manifest.tools
+            if tool.product
+        }
+    )
+    return table
 
 
 __all__ = [
     "PACKS_ROOT",
+    "PLATFORM_TOOL_PRODUCTS",
     "build_registry",
     "content_pins",
     "dependency_products",

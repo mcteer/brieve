@@ -23,11 +23,17 @@ from __future__ import annotations
 import os
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from adapters.model_chooser import FIXTURE_PROVIDER, build_chooser
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.schema import AuditEventType
+from core.authoring.artifact import AuthoredArtifact
+from core.authoring.credential import AuthoringCredentials
+from core.authoring.publish import ProposalObserver, ProposalPublisher
+from core.authoring.retention import scrub_authoring_requests
+from core.authoring.tool import OPEN_PROPOSAL, WRITE_ROLE
 from core.authority.clock import Clock, SystemClock
 from core.authority.errors import AuthorityRefuseError, ResolutionRefused
 from core.authority.grant import DEFAULT_MAX_RUN_DURATION, issue_grant
@@ -55,6 +61,15 @@ from core.observation.record import observe_effects
 from core.run import RunState, start_governed_run
 from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
+from core.tools.invoke import invoke_tool
+from surfaces.dispatch.authoring import (
+    ANALYZER,
+    PROPOSER,
+    authoring_registry_for,
+    authoring_role,
+    proposal_from_payload,
+    trees_for,
+)
 from surfaces.toolset import build_registry, content_pins, dependency_products
 
 #: What every pre-040 invoke ran with, kept for exactly two jobs — neither on the ask path.
@@ -581,7 +596,79 @@ def continue_dispatched_run(
     run.step_index = checkpoint.step_index
     run.resume_count = checkpoint.resume_count
 
+    # THE PUBLISHING HALF (041). Until now this function re-established the run and
+    # checkpointed it, which is everything a continuation needs *except* the act it exists to
+    # perform. The proposer's whole job is one governed call, and it happens here — after
+    # authority is re-manufactured, so the publish runs under this task's own attestation
+    # rather than under anything the checkpoint carried.
+    if authoring_role(dict(os.environ)) == PROPOSER:
+        published = _publish_the_proposal(run, checkpoint=checkpoint, registry=registry)
+        if published != 0:
+            return published
+
     checkpoint_run(run, payload=dict(checkpoint.payload))
+
+    # FR-033: the finished acts' arguments are a customer's file content, and they do not
+    # outlive the run. Closed brackets only — 040's own bound, because an open one revives by
+    # re-invoking and needs its request.
+    if authoring_role(dict(os.environ)) is not None:
+        scrubbed = scrub_authoring_requests(durability, run_id=blob_id)
+        if scrubbed:
+            print(f"run {correlation_id}: scrubbed {scrubbed} authoring request(s)", flush=True)
+    return 0
+
+
+def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
+    """Register `open_proposal` for this task and invoke it once, through the governed path.
+
+    **Registered here rather than at construction** because the handler needs the proposal the
+    analysing task composed, which arrives in the checkpoint — so there is nothing to register
+    until the checkpoint has been read.
+    """
+    try:
+        proposal = proposal_from_payload(checkpoint.payload)
+    except (KeyError, TypeError, ValueError):
+        print(
+            f"run {run.correlation_id}: the checkpoint carries no composed proposal; the "
+            f"analysing task did not hand one over",
+            flush=True,
+        )
+        return 1
+
+    # The reader is supplied HERE, by the surface that knows which fabric this deployment
+    # runs. `core.authoring.credential` deliberately does not know (product blindness).
+    identity = NomadWorkloadIdentity()
+    credentials = AuthoringCredentials(
+        identity=identity,
+        reader=VaultDatabaseCredentials(identity=identity, role="agent-run"),
+    )
+    installation = os.environ.get("RUN_VCS_INSTALLATION", "").strip()
+    if not installation:
+        print(f"run {run.correlation_id}: no installation named for publishing", flush=True)
+        return 1
+
+    workspace = Path(os.environ.get("NOMAD_ALLOC_DIR", "/alloc")) / "workspace"
+    publisher = ProposalPublisher(
+        proposal=proposal,
+        workspace=workspace,
+        token_source=credentials,
+        installation=installation,
+    )
+    observer = ProposalObserver(
+        repository=proposal.target_repository,
+        token_source=credentials,
+        installation=installation,
+        workspace=workspace,
+    )
+    authoring_registry_for(
+        PROPOSER, registry=registry, proposal_handler=publisher, proposal_observer=observer
+    )
+
+    result = invoke_tool(run, OPEN_PROPOSAL, {})
+    if not result.allowed:
+        print(f"run {run.correlation_id}: publishing refused ({result.reason_code})", flush=True)
+        return 1
+    print(f"run {run.correlation_id}: {result.tool_result}", flush=True)
     return 0
 
 
@@ -1044,6 +1131,40 @@ def _file_suspension(
     )
 
 
+def _refuse_unless_write_qualified(
+    *, identity_fabric: Any, agent_definition_id: str, correlation_id: str
+) -> int:
+    """Stop the run unless a qualified `write` cell exists. 0 means qualified.
+
+    **Reuses `resolve_bound_model` rather than adding a resolver.** That function already has
+    the ordering FR-012 needs — binding map read, matrix parsed, cell validated, all before
+    anything constructs a client — and it already refuses rather than defaulting. A second
+    implementation here would be a second answer to "which model may write".
+
+    The refusal is distinguishable from an outage on purpose: `unqualified_cell` sends an
+    operator to the matrix, `provider_unavailable` sends them to a vendor's status page.
+    """
+    try:
+        model = resolve_bound_model(
+            identity_fabric,
+            agent_definition_id=agent_definition_id,
+            role=WRITE_ROLE,  # type: ignore[arg-type]
+        )
+    except ResolutionRefused as exc:
+        print(
+            f"run {correlation_id}: no qualified `write` cell "
+            f"({getattr(exc, 'reason_code', 'unqualified_cell')}); authoring stops rather than "
+            f"running under a model nothing qualified",
+            flush=True,
+        )
+        return 1
+    except Exception as exc:  # noqa: BLE001 — fail closed on any resolution failure
+        print(f"run {correlation_id}: `write` cell could not be resolved: {exc}", flush=True)
+        return 1
+    print(f"run {correlation_id}: write cell {model}", flush=True)
+    return 0
+
+
 def main() -> int:
     correlation_id = os.environ.get("RUN_CORRELATION_ID", "").strip()
     subject_user_id = os.environ.get("RUN_SUBJECT_USER_ID", "").strip()
@@ -1090,6 +1211,39 @@ def main() -> int:
         packs=[p for p in os.environ.get("RUN_PACKS", "").split(",") if p]
     )
 
+    # THE AUTHORING BRANCH (041). 038 built the tier, the jobspec has set
+    # HARNESS_AUTHORING_ROLE since it was written, and nothing here ever read it — so
+    # `register_authoring_tools` had no caller and a ceiling naming `author_file` refused
+    # `unknown_ceiling_entry`, because the vocabulary a ceiling may name is derived from what
+    # registered. This is the line that closes that.
+    #
+    # AFTER `build_registry` and BEFORE the fabric, which is the only correct position: the
+    # fabric derives `known_tools` from the registry, so registering later would leave the
+    # vocabulary narrower than the registry and reintroduce the refusal one layer down.
+    authoring = authoring_role(dict(os.environ))
+    if authoring == ANALYZER:
+        artifact = AuthoredArtifact()
+        authoring_registry_for(
+            ANALYZER,
+            registry=registry,
+            trees=trees_for(Path(os.environ.get("NOMAD_ALLOC_DIR", "/alloc")) / "workspace"),
+            artifact=artifact,
+        )
+        # THE `write` CELL, RESOLVED BEFORE ANY AUTHORING RUNS (041, FR-012).
+        #
+        # `resolve_write_cell` landed with 038 and nothing had ever called it — so the matrix
+        # governed which model may ASK and which may PLAN, and said nothing about the role that
+        # writes. Resolved here, at run start, because a capability that could run unqualified
+        # for even one step is the gap 026 found for `ask`: the refusal must arrive before a
+        # provider is reached, not after.
+        #
+        # The chooser below resolves the definition's bound cell for its own role; this is the
+        # governance check that the WRITE role is qualified at all, and it stops the run rather
+        # than degrading, because "nobody decided" is what an operator needs to see first.
+        #
+        # Performed after the fabric exists — see `_write_cell_is_qualified` below the toolset
+        # construction, which is the earliest point the matrix can be read.
+
     # The roles the dispatching surface already resolved from this subject's verified
     # claims. Passed rather than re-derived: a second derivation is a second answer to
     # "who is this", and the two would diverge exactly when it mattered.
@@ -1101,6 +1255,18 @@ def main() -> int:
         known_tools=registry.tool_names(),
         known_actions=registry.product_actions(),
     )
+    # THE `write` CELL (041, FR-012). Earliest point the matrix is readable, and still before
+    # any step runs — 026's rule: a capability that could run unqualified for even one step is
+    # the gap, and the refusal must be a governance answer rather than an outage one.
+    if authoring == ANALYZER:
+        refused = _refuse_unless_write_qualified(
+            identity_fabric=fabric,
+            agent_definition_id=definition_id,
+            correlation_id=correlation_id,
+        )
+        if refused:
+            return refused
+
     blob_id = os.environ.get("RUN_ID", "").strip() or correlation_id
     steps = int(os.environ.get("RUN_STEPS", "0") or 0)
     invoke_tools = os.environ.get("RUN_INVOKE_TOOLS", "").strip() == "1"

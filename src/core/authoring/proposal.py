@@ -89,6 +89,14 @@ class Proposal:
     rationale: str = ""
     disclosures: list[str] = field(default_factory=list)
     state: ProposalState = ProposalState.COMPOSED
+    #: Platform-authored, never model-authored (041, FR-031). Correlation id, what was
+    #: consulted, and the per-file digests, so a reviewer can trace the proposal back to the
+    #: run that made it without leaving the page.
+    #:
+    #: Separate from `rationale` because the two have different authors and therefore different
+    #: trust: the rationale is agent-controlled content and is scanned as such, while this is
+    #: the platform's own statement about its own run.
+    provenance: list[str] = field(default_factory=list)
 
     @property
     def limits(self) -> tuple[str, ...]:
@@ -106,6 +114,11 @@ class Proposal:
         lines += [f"- `{f.path}` ({'edited' if f.is_diff else 'created'})" for f in self.files]
         if self.rationale.strip():
             lines += ["", "### Rationale", "", self.rationale.strip()]
+        if self.provenance:
+            # After the rationale and before the limits: a reviewer reads what was proposed,
+            # then where it came from, then what it does not cover.
+            lines += ["", "### Provenance", ""]
+            lines += [f"- {entry}" for entry in self.provenance]
         lines += ["", "### Limits"]
         lines += [f"- {limit}" for limit in self.limits]
         return "\n".join(lines)
@@ -120,6 +133,9 @@ def compose(
     authored_content: dict[str, str],
     subject_content: dict[str, str],
     rationale: str = "",
+    correlation_id: str = "",
+    consulted: tuple[str, ...] = (),
+    base_commit: str = "",
 ) -> Proposal:
     """Build the proposal from the **workspace**, never from the subject.
 
@@ -163,6 +179,27 @@ def compose(
             "an outcome rather than a failure."
         )
 
+    # PLATFORM-AUTHORED, and assembled after the model's half rather than mixed into it
+    # (041, FR-031). A reviewer who can see the correlation id, what was read, and the digest
+    # of every file can reconcile this page against the trail; one who cannot is being asked
+    # to trust prose.
+    provenance: list[str] = []
+    if correlation_id:
+        provenance.append(f"Run: `{correlation_id}`")
+    if base_commit:
+        provenance.append(f"Analysed at commit `{base_commit}`")
+    if consulted:
+        provenance.append(
+            f"Consulted {len(consulted)} subject path(s): "
+            + ", ".join(f"`{path}`" for path in consulted)
+        )
+    provenance += [f"`{f.path}` — `{f.digest}`" for f in artifact.files]
+    if artifact.truncated:
+        # Repeated here as well as in the limits: the disclosure a reviewer most needs is the
+        # one saying the analysis did not see everything, and a page they skim to the end of
+        # should not be the only place it appears.
+        provenance.append(f"**Partial read** — {artifact.truncation_note}")
+
     return Proposal(
         target_repository=target_repository,
         branch=branch,
@@ -170,6 +207,7 @@ def compose(
         files=files,
         rationale=rationale,
         disclosures=disclosures,
+        provenance=provenance,
     )
 
 

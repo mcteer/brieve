@@ -23,12 +23,33 @@ AUTHORING = pathlib.Path(__file__).resolve().parents[2] / "src" / "core" / "auth
 
 #: Calls that put bytes on disk. Attribute names rather than qualified paths, because
 #: `path.write_text(...)` and `Path(p).write_text(...)` are the same act reached two ways.
-WRITE_CALLS = frozenset({"write_text", "write_bytes", "mkdir", "touch", "unlink", "rmdir"})
+#:
+#: `rmtree` added by 041: deleting a tree is a write in every sense this check cares about, and
+#: its absence meant the enumeration had a hole the day it was written. Nothing in the package
+#: used it, so the hole was invisible rather than exploited.
+WRITE_CALLS = frozenset(
+    {"write_text", "write_bytes", "mkdir", "touch", "unlink", "rmdir", "rmtree"}
+)
 
 #: The one function permitted to write, and the one module it lives in. `mkdir` accompanies it
 #: because a file cannot be written into a directory that does not exist — and the parent it
 #: creates is inside the workspace, which `resolve_in_workspace` has already bounded.
-PERMITTED = {("tool.py", "FileAuthor.__call__")}
+#:
+#: **Acquisition writes, and SC-002's claim survives it — but only because of where it runs.**
+#: `acquisition.py` produces the subject checkout BEFORE dispatch, in the dispatching context.
+#: No agent exists yet, nothing it writes is influenced by a model, and it never touches a
+#: workspace or a subject tree the tier hands out — it *creates* the tree the tier will later
+#: mount read-only. SC-002 is a claim about writes an agent can cause; this is a claim about
+#: the platform preparing an input.
+#:
+#: That distinction is asserted rather than argued: `test_acquisition.py` drives acquisition
+#: and checks every path it creates lies under the directory its caller named. An exemption
+#: whose justification lives only in a comment is the shape ADR-0047 refuses.
+PERMITTED = {
+    ("tool.py", "FileAuthor.__call__"),
+    ("acquisition.py", "acquire_subject"),
+    ("acquisition.py", "release_subject"),
+}
 
 
 def _qualified_functions(path: pathlib.Path) -> list[tuple[str, ast.AST]]:

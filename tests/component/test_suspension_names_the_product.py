@@ -22,7 +22,7 @@ from core.packs.loader import InMemoryPackLoader
 from core.packs.manifest import PackManifest, ToolDeclaration
 from core.packs.registration import PlatformBindings, load_packs
 from core.registry.memory import ToolRegistry
-from surfaces.toolset import dependency_products
+from surfaces.toolset import PLATFORM_TOOL_PRODUCTS, dependency_products
 
 
 def _pack() -> PackManifest:
@@ -64,7 +64,14 @@ def _loaded() -> dict[str, object]:
 
 
 def test_a_pack_tool_maps_to_the_product_it_reaches() -> None:
-    assert dependency_products(_loaded()) == {"vault_read": "vault"}  # type: ignore[arg-type]
+    mapped = dependency_products(_loaded())  # type: ignore[arg-type]
+    # The pack's own contribution, asserted exactly. Since 041 the table also carries the
+    # PLATFORM's tools — `open_proposal` and the fixture pair — which no manifest declares and
+    # which previously mapped to nothing, so a run suspended on one waited forever.
+    assert mapped["vault_read"] == "vault"
+    assert set(mapped) - set(PLATFORM_TOOL_PRODUCTS) == {"vault_read"}, (
+        "a tool arrived in the dependency map from neither this pack nor the platform table"
+    )
 
 
 def test_a_tool_reaching_no_product_contributes_no_mapping() -> None:

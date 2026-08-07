@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 import secrets
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import timedelta
 
 from core.authority.clock import Clock
 from core.authority.errors import RESOLUTION_REASONS, AuthorityRefuseError, ResolutionRefused
 from core.authority.fabric import IdentityFabric
 from core.authority.grant import DelegationGrant
+from core.authority.intersection import exclusions as compute_exclusions
 from core.authority.intersection import intersect_scopes
 from core.authority.matrix import MatrixFallback, parse_matrix_record, validate_binding_map
 from core.authority.types import AuthorityScope, TaskCredentialRef
@@ -33,6 +35,17 @@ class ManufacturedAuthority:
     #:
     #: Additive with a default, so every existing caller is unchanged.
     matrix_fallback: MatrixFallback | None = None
+
+    #: Tool name → which term of the intersection dropped it (041, FR-019).
+    #:
+    #: Computed here because this is the only place holding all four terms at once. A deny
+    #: site downstream sees the effective set and could never reconstruct whether a ceiling or
+    #: a task scope excluded a name — so every refusal read `authority_insufficient`, which is
+    #: true and sends an operator nowhere.
+    #:
+    #: Carries no secret and no authority: tool names paired with one of four fixed strings.
+    #: Additive with a default, like `matrix_fallback` above and for the same reason.
+    exclusions: Mapping[str, str] = field(default_factory=dict)
 
 
 def manufacture_authority(
@@ -137,7 +150,14 @@ def manufacture_authority(
         expires_at=expires_at,
         effective=effective,
     )
-    return ManufacturedAuthority(credential=ref, run_salt=run_salt, matrix_fallback=fallback)
+    return ManufacturedAuthority(
+        credential=ref,
+        run_salt=run_salt,
+        matrix_fallback=fallback,
+        exclusions=compute_exclusions(
+            user=user, ceiling=ceiling, requested=requested_scope, policy=policy
+        ),
+    )
 
 
 def _resolve_binding_map(

@@ -7,11 +7,26 @@ from typing import Any
 
 from core.audit.schema import AuditEventType
 from core.authority.errors import AuditAppendFailed
-from core.authority.intersection import live_effective
+from core.authority.intersection import (
+    OUTSIDE_CEILING,
+    OUTSIDE_POLICY,
+    OUTSIDE_TASK_SCOPE,
+    OUTSIDE_USER_SCOPE,
+    live_effective,
+)
 from core.hooks.suspension import TRUST_FABRIC_DEPENDENCY, suspend_for_dependency
 from core.hooks.types import HookContext, HookDecision
 
 AUTHORITY_HOOK_NAME = "authority"
+
+#: What each refusal means, phrased as the thing to go and look at. The reason code is for a
+#: machine; this is for the person the code sent somewhere.
+_DENIAL_MESSAGES = {
+    OUTSIDE_USER_SCOPE: "tool outside the subject's own authority; an agent never exceeds a human",
+    OUTSIDE_CEILING: "tool outside the definition's ceiling; the ceiling record decides this",
+    OUTSIDE_TASK_SCOPE: "tool inside the ceiling but not requested by this run's task scope",
+    OUTSIDE_POLICY: "tool narrowed by live policy after authority was issued",
+}
 
 
 def _append(run: Any, event_type: AuditEventType, payload: dict[str, Any]) -> None:
@@ -96,18 +111,26 @@ def authority_pre_hook(ctx: HookContext) -> HookDecision:
         run.live_effective = effective
 
         if ctx.tool_name not in effective.tool_names:
+            # WHICH bound excluded it, when manufacture could tell (041, FR-019). An operator
+            # reading `authority_insufficient` learns only that something said no; the four
+            # specific codes each name a different record to go and read. Falls back to the
+            # umbrella when the map is silent — a run whose authority was supplied rather than
+            # manufactured has no terms to have compared, and guessing a specific bound would
+            # be worse than declining to name one.
+            excluded = run.authority_exclusions.get(ctx.tool_name)
+            reason = excluded or "authority_insufficient"
             _append(
                 run,
                 AuditEventType.AUTHORITY_DENIED,
                 {
-                    "reason_code": "authority_insufficient",
+                    "reason_code": reason,
                     "tool_name": ctx.tool_name,
                 },
             )
             return HookDecision(
                 outcome="deny",
-                reason_code="authority_insufficient",
-                message="tool outside live effective authority",
+                reason_code=reason,
+                message=_DENIAL_MESSAGES.get(reason, "tool outside live effective authority"),
             )
 
         registration = run.registry.resolve(ctx.tool_name)

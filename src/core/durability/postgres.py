@@ -280,6 +280,38 @@ class PostgresDurabilityProvider:
 
         self._execute(work)
 
+    def scrub_closed_arguments(self, run_id: str) -> int:
+        """Clear arguments on this run's closed brackets. See the protocol for why closed only.
+
+        **The Postgres leg is the one that counts.** The in-memory provider round-trips a
+        cleared field for free, so a scrub proven only against it would pass whether or not
+        this SQL was ever written — which is 040's M7 shape, one column over.
+        """
+
+        def work(conn: Any) -> int:
+            # `_exec` discards the cursor, and this is the one caller that needs its
+            # rowcount — the count is what a row asserts, because "scrubbed nothing" and
+            # "scrubbed everything" are otherwise the same silent success.
+            cursor = conn.cursor()
+            try:
+                _run(
+                    cursor,
+                    """
+                    UPDATE intents SET arguments = NULL
+                     WHERE run_id = %s
+                       AND arguments IS NOT NULL
+                       AND idempotency_key IN (
+                           SELECT idempotency_key FROM results WHERE run_id = %s
+                       )
+                    """,
+                    (run_id, run_id),
+                )
+                return int(getattr(cursor, "rowcount", 0) or 0)
+            finally:
+                cursor.close()
+
+        return int(self._execute(work))
+
     def open_intents(self, run_id: str) -> list[IntentRecord]:
         def work(conn: Any) -> list[IntentRecord]:
             rows = _all(
