@@ -97,6 +97,22 @@ ROLE_VISIBILITY: Final[dict[str, frozenset[AuditEventType]]] = {
             AuditEventType.AUDIT_RECONCILED,
         }
     ),
+    # 044: the administrator, and the empty set is the decision rather than an omission.
+    #
+    # **Disjoint from both roles above.** The analyst is the operator's superset because both
+    # answer *what happened*; an administrator answers *what may happen*. Making admin a
+    # superset would hand configuration authority to everyone who can already read the trail
+    # — a widening nobody asked for — and making the analyst a superset of admin would do the
+    # reverse. They are different questions, so they are different sets, and a person who
+    # needs both holds both mappings.
+    #
+    # The empty frozenset falls out of the union exactly as the docstring above describes for
+    # an absent role: **being an administrator confers no audit visibility at all**. What it
+    # confers lives at the console's routes, which check the role directly.
+    #
+    # A row asserts both directions, because a widening in either would be invisible here —
+    # this map would still parse, and every existing test would still pass.
+    "admin": frozenset(),
 }
 
 

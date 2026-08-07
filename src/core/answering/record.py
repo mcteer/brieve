@@ -41,6 +41,11 @@ def record_ask(
     conversation_id: str = "",
     carried_context: dict[str, Any] | None = None,
     declined_reason: str = "",
+    #: How the relevance gate stood for THIS ask (044). Distinguishes an administrator's
+    #: decision from a judge that could not be reached — the two send a reader to a person
+    #: and to a vendor's status page respectively, and until this field the record could not
+    #: tell them apart.
+    relevance_gate: str = "",
 ) -> None:
     """Write the ask record, or fail the ask.
 
@@ -98,6 +103,11 @@ def record_ask(
                 # different places, and until this field the response carried the distinction
                 # and the RECORD did not.
                 "declined_reason": declined_reason,
+                # WHETHER the gate ran, and why not (044). `checked`, `disabled_by_admin`, or
+                # empty where the feature does not apply. Not derivable from the disposition:
+                # an answered ask looks identical whether its relevance was verified or the
+                # check was switched off, and that is exactly the difference an auditor needs.
+                "relevance_gate": relevance_gate,
                 # WHICH door was opened. Not derivable from anything else in the payload.
                 "source": source,
                 # WHETHER the model was allowed to answer, and under which authority (026).

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{#
+  The admin console (044).
+
+  Renders what `/console/configuration` returned. Every judgement — which cells are
+  qualified, whether a change would be gated, whether a record could be read — was made by
+  the platform; this file chooses no words the API did not supply, except the labels.
+#}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Platform settings</h1>
+
+{% if not reachable %}
+  {% include "_notice.html" %}
+  <p role="status">The platform could not be reached. Nothing here is current.</p>
+{% elif refused %}
+  <p role="status">
+    This is an administrative surface and your account does not hold that role.
+    Being refused here is the platform working, not a fault.
+  </p>
+{% else %}
+
+  {# FR-007/023b: an ungated estate is legitimate, and must never look like a gated one. #}
+  {% if posture.gating == "ungated" %}
+    <p role="status" class="notice">
+      <strong>No approval gate is configured in this estate.</strong>
+      Changes made here take effect immediately, without review. This is the development
+      posture; a production estate configures a quorum.
+    </p>
+  {% else %}
+    <p role="status">Changes here are submitted for approval and are not in force until approved.</p>
+  {% endif %}
+
+  <h2>Answering</h2>
+  {% if posture.bindings.unavailable %}
+    <p role="status">The answering configuration could not be read. It is unknown, not empty.</p>
+  {% else %}
+    <dl>
+      <dt>Guidance answers with</dt><dd>{{ posture.bindings.guidance_cell or "nothing bound" }}</dd>
+      <dt>Estate answers with</dt><dd>{{ posture.bindings.estate_cell or "nothing bound" }}</dd>
+      <dt>Relevance judged by</dt><dd>{{ posture.bindings.relevance_cell or "nothing bound" }}</dd>
+      <dt>Relevance checking</dt>
+      <dd>
+        {% if posture.bindings.relevance_enabled %}
+          enabled
+        {% else %}
+          <strong>disabled</strong> — answers are given without checking that they address
+          the question asked, and each one says so.
+        {% endif %}
+      </dd>
+    </dl>
+  {% endif %}
+
+  <h2>Qualified cells</h2>
+  {% if posture.qualified_cells.unavailable %}
+    <p role="status">The qualified-model matrix could not be read.</p>
+  {% else %}
+    <ul>
+      {% for cell in posture.qualified_cells %}<li>{{ cell }}</li>{% endfor %}
+    </ul>
+    <p>A binding may name only these. Nothing else is offered, and nothing else is accepted.</p>
+  {% endif %}
+
+  <h2>Product connections</h2>
+  {% if posture.connections.unavailable %}
+    <p role="status">The connections record could not be read.</p>
+  {% else %}
+    <dl>
+      {% for product, fields in posture.connections.products.items() %}
+        <dt>{{ product }}</dt>
+        <dd>{% for name, value in fields.items() %}{{ name }}: {{ value }}{% if not loop.last %}; {% endif %}{% endfor %}</dd>
+      {% endfor %}
+    </dl>
+    <p>{{ posture.connections.consumed_by }}.</p>
+    {% if posture.connections.set_by %}
+      <p>Last set by {{ posture.connections.set_by }}.</p>
+    {% endif %}
+  {% endif %}
+
+{% endif %}
+{% endblock %}

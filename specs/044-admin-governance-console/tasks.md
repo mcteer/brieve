@@ -45,7 +45,7 @@ Single project: `src/`, `tests/`, `infra/` at repository root.
 
 **Purpose**: the principal, the gate coverage, the record shapes — what every story stands on.
 
-- [ ] T001 Trust-fabric additions: `infra/modules/trust-fabric/authority-submit.tf` (new) —
+- [X] T001 Trust-fabric additions: `infra/modules/trust-fabric/authority-submit.tf` (new) —
       the `authority_submit` policy granting `create`/`update` on exactly the console's
       records (`claim-mappings/*`, `ask-bindings`, `product-connections`), with
       `control_group` blocks when `control_groups_enabled` (R1), attached to the **api**
@@ -53,22 +53,22 @@ Single project: `src/`, `tests/`, `infra/` at repository root.
       paths (Q3/FR-023a); extend `harness_authority_read` in `policies.tf` with
       `product-connections` as an **exact path, no glob** (042's 020-lesson). `terraform
       validate` clean.
-- [ ] T002 [P] Unit scan **C6** in `tests/unit/test_console_controlled_paths.py`: every
+- [X] T002 [P] Unit scan **C6** in `tests/unit/test_console_controlled_paths.py`: every
       record the console can write appears in `controlled_paths` — completeness against the
       module's own list, 042's V6 shape; plus the R1 regression guard — the
       `authority_submit` policy is attached to the api role, so the mechanism keeps its
       principal.
-- [ ] T003 [P] Generalise the submitter in `src/surfaces/api/authority_submit.py`:
+- [X] T003 [P] Generalise the submitter in `src/surfaces/api/authority_submit.py`:
       `ConfigChange` (record ∈ R2's closed set, payload, `cas`, requester) through the same
       three-outcome mapping as `ClaimMapping`; the submitter authenticates as the API's
       attested identity rather than a configured token (R1/R8); unit rows including **C3**
       (`wrap_info` present-as-null, read by truthiness — 007's shape driven directly) and
       `unknown_record` refusal.
-- [ ] T004 [P] [GATE:fail-closed] Binding-record field in
+- [X] T004 [P] [GATE:fail-closed] Binding-record field in
       `src/core/authority/ask_binding.py`: `relevance_enabled`, **absent = enabled** so
       every pre-044 record keeps its meaning; unit rows **C18** in
       `tests/unit/test_ask_binding_toggle.py`.
-- [ ] T005 [P] The disjoint role in `src/core/answering/scope.py`:
+- [X] T005 [P] The disjoint role in `src/core/answering/scope.py`:
       `ROLE_VISIBILITY["admin"] = frozenset()` with the R6 reasoning in a comment; unit rows
       asserting **both directions** of FR-016a — admin confers no audit visibility, and
       neither existing role gains configuration authority by this change.
@@ -85,18 +85,18 @@ no route exists yet.
 **Independent Test**: sign in as an admin, compare the console against the fabric's records,
 confirm no secret value and a recorded read; a non-admin is refused.
 
-- [ ] T006 [US1] Console read routes in `src/surfaces/api/console.py` (new):
+- [X] T006 [US1] Console read routes in `src/surfaces/api/console.py` (new):
       `GovernanceConfiguration` assembled per request from the fabric (bindings + toggle
       state, qualified cells, protected policies, connections, gating posture); requires
       `admin` in the resolved subject's roles (the evidence-read check pattern); an
       unreadable record renders **unavailable** (C10); every read audited with the
       administrator's identity on the EVIDENCE_READ precedent (FR-004); registered in
       `src/surfaces/api/app.py`.
-- [ ] T007 [US1] The portal page: `/settings` in `src/surfaces/portal/app.py` +
+- [X] T007 [US1] The portal page: `/settings` in `src/surfaces/portal/app.py` +
       `src/surfaces/portal/templates/settings.html`, through the existing relay only — the
       page renders what the API returned, including `unavailable` and the FR-023b gating
       posture, and holds no logic (C8's architecture half).
-- [ ] T008 [US1] [GATE:conformance] Rows **C9–C14** in
+- [X] T008 [US1] [GATE:conformance] Rows **C9–C14** in
       `tests/conformance/console/test_console_read.py` (new dir): field-for-field agreement
       (C9), unavailable-not-empty (C10), [GATE:no-secret-leak] no credential in any
       response (C11), reads recorded (C12), non-admin refused and recorded — including
@@ -118,7 +118,7 @@ exclusion land together (FR-014/015/017).
 **Independent Test**: propose a change with a quorum — pending, not in force; approve out of
 band — in force. Propose a refused change — refused. From a dispatched run, reach nothing.
 
-- [ ] T009 [US2] The change-request route in `src/surfaces/api/console.py`: validate against
+- [X] T009 [US2] The change-request route in `src/surfaces/api/console.py`: validate against
       the record's own parser **before** the fabric is asked (C1 — an unqualified cell
       refuses `unqualified_cell` with zero fabric writes); submit via T003's `ConfigChange`;
       render the three outcomes distinctly with the **ungated disclosure** when no quorum is
@@ -127,12 +127,12 @@ band — in force. Propose a refused change — refused. From a dispatched run, 
       the requester's own subject (`self_grant_refused`, FR-017); record every request,
       decision, and refusal (FR-008); pending shows the wrapping token's accessor and expiry
       (R11's native withdrawal).
-- [ ] T010 [US2] [GATE:conformance] Rows **C1–C5, C7–C8, C21** in
+- [X] T010 [US2] [GATE:conformance] Rows **C1–C5, C7–C8, C21** in
       `tests/conformance/console/test_console_write.py`: validation-first, the three
       outcomes never collapsed (C2 fails if they are), truthiness not membership (C3),
       refusal recorded (C4), ungated disclosed (C5), stale CAS (C7), no apply path (C8),
       self-grant refused in several wordings of "own subject" (C21).
-- [ ] T011 [US4] [GATE:conformance] Rows **C19, C20, C22** in
+- [X] T011 [US4] [GATE:conformance] Rows **C19, C20, C22** in
       `tests/conformance/console/test_console_exclusion.py`: a dispatched run resolves no
       tool to the console's read or write and a planted instruction records an attempt and
       changes nothing (C19); **the rigged-on construction** — with the exclusion removed,
@@ -152,7 +152,7 @@ estate governs cannot reach it. **No increment ships past this phase without all
 **Independent Test**: disable; ask; the answer carries the disclosure and the record says an
 administrator decided. Re-enable; the next ask judges. No restart.
 
-- [ ] T012 [US3] The toggle honoured in `src/surfaces/api/ask.py` and
+- [X] T012 [US3] The toggle honoured in `src/surfaces/api/ask.py` and
       `src/core/answering/answer.py`: when `relevance_enabled` is false, skip judge
       resolution and judging; the answer carries the disclosure in `relevance_note`
       ("relevance was not checked: disabled by an administrator"); the record's disposition
@@ -160,7 +160,7 @@ administrator decided. Re-enable; the next ask judges. No restart.
       **no MODEL_GATE is written** (R4 — an event for a gate that did not run is 040's
       vacuous shape); in-flight answers complete under the binding they started with (true
       by construction; asserted, not assumed).
-- [ ] T013 [US3] [GATE:conformance] Rows **C15–C17** in
+- [X] T013 [US3] [GATE:conformance] Rows **C15–C17** in
       `tests/conformance/console/test_console_toggle.py`: the disclosure reaches the
       rendered response, not only the record (C15); the disposition distinction and the
       absent MODEL_GATE (C16); disable→ask→enable→ask in one process against one surface —
@@ -176,7 +176,7 @@ administrator decided. Re-enable; the next ask judges. No restart.
 unreachable — `unreachable`, never "applied and working"; try to enter a credential — no
 field will take one.
 
-- [ ] T014 [US2] `ProductConnection` in `src/surfaces/api/console.py`, beside its only
+- [X] T014 [US2] `ProductConnection` in `src/surfaces/api/console.py`, beside its only
       consumers (R5 — the probe and the display): the record parser (product ∈
       {tfe, vault}, locations only — the vocabulary has no credential field, FR-018b), the
       reachability probe (stdlib urllib, unauthenticated health endpoints, R5), and the
@@ -187,7 +187,7 @@ field will take one.
       unreachable);
       the console labels the record "not yet consumed by dispatched runs" (R5's honest
       middle, FR-022).
-- [ ] T015 [US2] [GATE:conformance] Rows **C23–C25** in
+- [X] T015 [US2] [GATE:conformance] Rows **C23–C25** in
       `tests/conformance/console/test_console_connections.py`: same three-outcome path
       (C23), accepted-but-unreachable renders `unreachable` and never folds into applied
       (C24), [GATE:no-secret-leak] the parser rejects fields outside the location
@@ -202,7 +202,7 @@ field will take one.
 **Independent Test**: change a value in the console; apply the estate; the outcome is
 visible, and provenance says who wrote last.
 
-- [ ] T016 [US5] Provenance through the read path: the console writes `set_by:
+- [X] T016 [US5] Provenance through the read path: the console writes `set_by:
       console/<subject>` into every record payload (T009 carries it; this task renders it) —
       "last set by" readable from the record itself in `settings.html` and the read payload;
       rows in `tests/conformance/console/test_console_provenance.py`: a Terraform-shaped
@@ -214,25 +214,25 @@ visible, and provenance says who wrote last.
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T017 [P] The a11y lane walks the console (**CL3**, FR-021b): `/settings` rows in
+- [X] T017 [P] The a11y lane walks the console (**CL3**, FR-021b): `/settings` rows in
       `tests/a11y/test_wcag.py` and `tests/a11y/test_keyboard_and_screenreader.py`, behind
       the authenticated-page fixture the thread rows use — measured: today's rows visit no
       console page, so the lane would stay green while the page went unchecked.
-- [ ] T018 [P] Write `docs/adr/0069-governance-configuration-is-requested-at-a-console.md`
+- [X] T018 [P] Write `docs/adr/0069-governance-configuration-is-requested-at-a-console.md`
       (Proposed): the argued move of 026's origination line, the disjoint role, the
       disclose-not-suppress template, and R1's finding that the mechanism predated any
       principal able to use it; index in `docs/adr/README.md`.
-- [ ] T019 Apply the trust-fabric additions to the dev enclave and run **CL1**: the full
+- [X] T019 Apply the trust-fabric additions to the dev enclave and run **CL1**: the full
       request→decide cycle under the API's attested identity — applied-and-disclosed in dev
       (quorum null); then with a quorum configured, pending → out-of-band approve → in
       force. Record outcomes in `contracts/conformance-console.md`; re-seed the model
       credential if the apply clobbers it.
-- [ ] T020 Run **CL2** on a served surface: disable the judge from the portal, ask, see the
+- [X] T020 Run **CL2** on a served surface: disable the judge from the portal, ask, see the
       disclosure; re-enable, ask, see the gate — no restart; record the outcome in the
       contract.
-- [ ] T021 [P] Run `specs/044-admin-governance-console/quickstart.md` top to bottom as
+- [X] T021 [P] Run `specs/044-admin-governance-console/quickstart.md` top to bottom as
       written; fix drift in the doc, not by hand-waving the steps.
-- [ ] T022 Update `ROADMAP.md` in the implementation PR: the admin-interface Next entry
+- [X] T022 Update `ROADMAP.md` in the implementation PR: the admin-interface Next entry
       closes with the mechanism in one line, and 044's Shipped row lands (the file's own
       landing rule).
 

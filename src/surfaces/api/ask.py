@@ -19,7 +19,12 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 
-from core.answering.answer import ANSWERED, ProviderUnavailable, answer_question
+from core.answering.answer import (
+    ANSWERED,
+    RELEVANCE_DISABLED,
+    ProviderUnavailable,
+    answer_question,
+)
 from core.answering.context import MAX_CARRIED_EXCHANGES, build_context
 from core.answering.conversations.postgres import ConversationStoreError
 from core.answering.conversations.records import ExchangeDisposition
@@ -117,6 +122,11 @@ def ask_for(
     conversation_id: str = "",
     carried_context: dict[str, Any] | None = None,
     relevance: Any = None,
+    #: An administrator has switched the gate off (044). **Explicit rather than inferred from
+    #: `relevance is None`**: absent-judge and disabled-gate both arrive as `None`, and the
+    #: two must produce different answers — one is a governance gap the caller already refused
+    #: on, the other is a decision a person made and the reader should be told about.
+    relevance_disabled: bool = False,
 ) -> dict[str, Any]:
     """Answer or decline, and record that someone asked.
 
@@ -172,6 +182,13 @@ def ask_for(
         answer, ground_note=describe_ground(corpus.synced_at, now or datetime.now(UTC))
     )
 
+    # THE DISCLOSURE (044, FR-011). Disclosed, never suppressed — 033's rule, and its reason:
+    # a disclosure that appears only past some threshold trains readers that silence means
+    # complete. So it rides EVERY answer given without its relevance checked, in the field a
+    # reader already consults for gate information.
+    if relevance_disabled:
+        answer = replace(answer, relevance_note=RELEVANCE_DISABLED)
+
     # Recorded before the answer is returned. An answer delivered while its record failed is the
     # state 022 spent a feature removing.
     record_ask(
@@ -189,6 +206,9 @@ def ask_for(
         conversation_id=conversation_id,
         carried_context=carried_context,
         declined_reason=answer.declined_reason,
+        relevance_gate=(
+            "disabled_by_admin" if relevance_disabled else ("checked" if relevance else "")
+        ),
     )
 
     # `source` on BOTH paths, which it was not until the third route went away.
@@ -198,6 +218,17 @@ def ask_for(
     # the corpus carried a source, and the one that did read it did not. With `neither` removed,
     # a caller asking a documentation question got back a body that would not say what answered
     # it. The record always knew (`record_ask` above); this makes the caller's copy agree.
+    # `relevance_note` REACHES THE CALLER (044, FR-011), and until now it did not.
+    #
+    # 043 put the note on the `Answer` and rendered it nowhere: `evals-smoke` printed it and
+    # the response never carried it. That was survivable while the note only said "a model
+    # judged this" — it is not survivable now, because the note is how a person learns their
+    # answer was given *without* its relevance checked. A disclosure that lives only in the
+    # audit trail is one the reader of the answer never sees.
+    #
+    # On the decline as well as the answer, for the reason 033 gives about the ground note: a
+    # decline rests on the same configuration, and a reader deciding whether to look elsewhere
+    # is exactly who needs to know a check was switched off.
     if answer.disposition != ANSWERED:
         return {
             "disposition": answer.disposition,
@@ -205,12 +236,14 @@ def ask_for(
             "declined_reason": answer.declined_reason,
             "corpus_digest": answer.corpus_digest,
             "ground_note": answer.ground_note,
+            "relevance_note": answer.relevance_note,
         }
     return {
         "disposition": answer.disposition,
         "source": GUIDANCE_SOURCE,
         "corpus_digest": answer.corpus_digest,
         "ground_note": answer.ground_note,
+        "relevance_note": answer.relevance_note,
         "claims": [
             {
                 "statement": claim.statement,
@@ -663,6 +696,43 @@ RELEVANCE_DISPOSITIONS: frozenset[str] = frozenset(
 )
 
 
+def relevance_enabled_for(authority: Any) -> bool:
+    """Whether an administrator has left the relevance gate on (044, FR-010).
+
+    **Absent means enabled, and an unreadable record means enabled too.** The binding parser
+    already defaults the field that way for compatibility; this adds the second half — a
+    fabric that cannot be read must not silently switch the gate off. Failing *open* would be
+    wrong for a credential and is right for a check: a check that stops running because a
+    read failed is a check nobody knows stopped.
+
+    An unreadable fabric still refuses later, at `relevance_judge_for`, where the refusal
+    names the fabric rather than pretending an administrator decided something.
+    """
+    if authority is None:
+        return True
+
+    from core.authority.ask_binding import parse_ask_binding_record
+
+    # **The reader is resolved OUTSIDE the try**, and that placement is a finding rather than
+    # a style choice. The first version called `authority.read_binding()` — a private
+    # attribute, not a method — inside a `try/except Exception: return True`. The
+    # `AttributeError` was swallowed by the fail-open branch, so the toggle silently did
+    # nothing and every row about it failed pointing at the wrong thing.
+    #
+    # A fail-open default is right for this check and dangerous around a wiring error: it
+    # turns "the code is wrong" into "the estate must have it enabled". So only the READ is
+    # guarded.
+    reader = authority.read_binding_record
+    try:
+        record = reader()
+    except Exception:  # noqa: BLE001 — unreadable is not "disabled by somebody"
+        return True
+    try:
+        return parse_ask_binding_record(record).relevance_enabled
+    except Exception:  # noqa: BLE001 — a malformed record refuses later, at resolution
+        return True
+
+
 def relevance_judge_for(
     *,
     subject: AuthenticatedSubject,
@@ -927,19 +997,32 @@ def build_router(
         except AskNotQualified as refused:
             raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
 
+        # THE ADMINISTRATOR'S SWITCH (044), read before the gate's governance.
+        #
+        # **Ordering matters, and this is the honest one.** A disabled gate needs no bound
+        # cell and no reachable judge, so resolving governance first would refuse
+        # `relevance_unbound` for an estate that deliberately turned the check off — telling
+        # an operator to decide something they have already decided.
+        #
+        # The toggle rides the ask-binding record the surface already reads per ask, so a
+        # change is in force for the NEXT question with no restart and no extra fabric read.
+        gate_enabled = relevance_enabled_for(ask_authority)
+
         # THE RELEVANCE GATE'S OWN GOVERNANCE (043), resolved beside the answering cell and
         # before the corpus is loaded — one qualification does not license the other, and an
         # ask nobody permitted to be checked is an ask this surface does not answer.
-        try:
-            relevance = relevance_judge_for(
-                subject=subject,
-                audit=audit,
-                authority=ask_authority,
-                judges=relevance_judges,
-                available=_available(relevance_model, relevance_judges),
-            )
-        except AskNotQualified as refused:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
+        relevance = None
+        if gate_enabled:
+            try:
+                relevance = relevance_judge_for(
+                    subject=subject,
+                    audit=audit,
+                    authority=ask_authority,
+                    judges=relevance_judges,
+                    available=_available(relevance_model, relevance_judges),
+                )
+            except AskNotQualified as refused:
+                raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
 
         try:
             corpus = load_corpus()
@@ -992,6 +1075,7 @@ def build_router(
 
         try:
             answered = ask_for(
+                relevance_disabled=not gate_enabled,
                 question=body.question,
                 subject=subject,
                 corpus=corpus,

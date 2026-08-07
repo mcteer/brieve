@@ -20,7 +20,7 @@ from core.audit.sink import AuditSink
 from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
 from core.threads.store import InMemoryThreadStore, ThreadStore
-from surfaces.api import ask, ask_conversations, evidence, mappings, reports, runs, threads
+from surfaces.api import ask, ask_conversations, console, evidence, mappings, reports, runs, threads
 from surfaces.api import definitions as definitions_routes
 from surfaces.api.verification import IdentityVerifier
 from surfaces.dispatch.types import RunDispatcher
@@ -74,6 +74,10 @@ def create_app(
     # deliberately not fatal, because the evidence record is the platform's memory and this
     # store is only the asker's.
     ask_conversations_store: Any | None = None,
+    #: 044's console reader. `None` means the surface serves no console — which is what a
+    #: deployment that has not configured one actually has, and is legible rather than a
+    #: route that exists and answers 503.
+    console_config: Any | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -143,6 +147,14 @@ def create_app(
     app.include_router(threads.build_router())
     if authority_submitter is not None:
         app.include_router(mappings.build_router())
+        # 044. Registered on the SAME condition as the mappings route, because both are the
+        # same act — requesting a governance change the trust fabric decides — and a console
+        # whose presence varied independently would make the operation snapshot depend on
+        # assembly, which 011 already paid for once.
+        if console_config is not None:
+            app.include_router(
+                console.build_router(config=console_config, submitter=authority_submitter)
+            )
     if evidence_query is not None:
         app.include_router(evidence.build_router())
         # 021's report, registered on the same condition as the evidence read it compiles

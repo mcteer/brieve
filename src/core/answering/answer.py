@@ -112,6 +112,21 @@ NOT_COVERED = "the corpus does not cover what was asked"
 #: than the platform's finding — Principle IX keeps those distinct.
 _MODEL_JUDGED = "relevance to the question was judged by a model, not by the platform"
 
+#: What an answer says when an administrator has switched the gate off (044, FR-011).
+#:
+#: **Disclosed, never suppressed** — 033's rule, and the reason the alternatives were
+#: rejected: answering silently reintroduces gap 0g by configuration, and declining outright
+#: would mean an administrator who turns off a check has turned off answering. This is the
+#: third option, and it is the one this platform's precedent points at.
+#:
+#: It names WHO decided. "Relevance was not checked" alone reads as a platform failure; an
+#: administrator's decision is a fact about the estate, and the reader should be able to go
+#: and ask them.
+RELEVANCE_DISABLED = (
+    "relevance was NOT checked: an administrator has disabled the relevance gate, so these "
+    "claims are grounded in the corpus but nothing has confirmed they answer what was asked"
+)
+
 
 def answer_question(
     *,
@@ -267,6 +282,7 @@ class RecordedProvider:
 __all__ = [
     "ANSWERED",
     "NOT_COVERED",
+    "RELEVANCE_DISABLED",
     "RecordedProvider",
     "DECLINED",
     "Answer",

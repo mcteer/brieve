@@ -46,6 +46,25 @@ locals {
     "identity/entity/*",
     "sys/policies/acl/authority-change-*",
   ]
+
+  # 044: the harness-domain records the admin console may write.
+  #
+  # **A separate list, deliberately.** `controlled_paths` above gates the Vault-native
+  # surfaces and its own comment notes that our deployment tree is subject to it; these are
+  # KV records in the harness jurisdiction. Merging them would mean a change to one gate
+  # silently altering the other's blast radius.
+  #
+  # **This closes a gap the module asserted and never attached** (044 FR-023, established
+  # rather than assumed): `authority_controlled_path` defaults to
+  # `harness-authority/data/claim-mappings` and its description calls that "the
+  # Control-Group-gated path", while nothing in `controlled_paths` covered it. The submitter
+  # has requested changes on an ungated path since 007 — visible only because the console
+  # made the gating load-bearing.
+  console_controlled_paths = [
+    "${vault_mount.harness_authority.path}/data/claim-mappings/*",
+    "${vault_mount.harness_authority.path}/data/ask-bindings",
+    "${vault_mount.harness_authority.path}/data/product-connections",
+  ]
 }
 
 # The approver set. Membership is the customer's Vault administrator's to manage.

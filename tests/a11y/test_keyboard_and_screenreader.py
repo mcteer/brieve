@@ -142,6 +142,41 @@ def test_every_interactive_element_has_an_accessible_name(
     )
 
 
+def test_the_console_is_announced_to_a_screen_reader(
+    page: Any, portal_server: PortalServer
+) -> None:
+    """CL3's other half — the console's states are *announced*, not merely rendered.
+
+    Its most important content is a status, not a control: whether the estate is gated, and
+    whether a record could be read. A `role="status"` region is how a screen-reader user
+    learns those without hunting, and the console leans on them heavily precisely because
+    what it has to say is mostly not interactive.
+    """
+    page.goto(f"{portal_server.base}/settings")
+
+    session = page.context.new_cdp_session(page)
+    session.send("Accessibility.enable")
+    tree = session.send("Accessibility.getFullAXTree")
+
+    roles = [
+        str((node.get("role") or {}).get("value", ""))
+        for node in tree.get("nodes", [])
+        if not node.get("ignored")
+    ]
+    assert "status" in roles, (
+        "the console's state — refused, ungated, unavailable — reaches a screen-reader user "
+        "through a status region or not at all; rendering it as ordinary prose leaves them "
+        "to find it"
+    )
+
+    named = [
+        str((node.get("name") or {}).get("value", "")).strip()
+        for node in tree.get("nodes", [])
+        if not node.get("ignored")
+    ]
+    assert any(text for text in named), "the page exposes no accessible text at all"
+
+
 def test_a_screen_reader_is_told_when_a_run_changes_state(
     page: Any, portal_server: PortalServer
 ) -> None:

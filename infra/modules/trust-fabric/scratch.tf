@@ -152,6 +152,11 @@ resource "vault_kv_secret_v2" "protected_policies" {
       vault_policy.model_credential_read.name,
       vault_policy.scratch_policy_check.name,
       vault_policy.scratch_sweep.name,
+      # 044. `authority_submit` is the console's own write grant — a run able to rewrite it
+      # could widen what the console may change, and from there reach the records this whole
+      # safety case protects. Caught by V6 at the moment the policy was declared, which is
+      # what that scan is for.
+      vault_policy.authority_submit.name,
       ],
       # ONE CEILING POLICY PER AGENT DEFINITION — `agent_ceiling` is `for_each` over
       # `var.agent_definitions`, so this is N policies, not one. Every one of them is
@@ -163,6 +168,8 @@ resource "vault_kv_secret_v2" "protected_policies" {
       # would have published a set that silently omitted the most important names in it.
       values(vault_policy.agent_ceiling)[*].name,
       vault_policy.authority_change[*].name,
+      # Count-gated on the quorum, like `authority_change` above and for the same reason.
+      vault_policy.authority_submit_gated[*].name,
     ))
   })
 }

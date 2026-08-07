@@ -35,6 +35,7 @@ from core.runs.index import PostgresRunIndex
 from core.threads.postgres import PostgresThreadStore
 from surfaces.api.app import create_app
 from surfaces.api.authority_submit import VaultAuthoritySubmitter
+from surfaces.api.console import ConsoleConfig
 from surfaces.api.verification import (
     DEFAULT_TENANT_CLAIM,
     FederatedVerifier,
@@ -198,6 +199,19 @@ def build() -> object:
         # a qualification.
         ask_authority=AskAuthority(
             read_binding=fabric.read_ask_binding, read_matrix=fabric.read_matrix
+        ),
+        # 044's console, over the SAME fabric this assembly already holds. Callables in,
+        # nothing constructed there — the module never learns which fabric it reads.
+        #
+        # `quorum_configured` is deployment configuration rather than something inferred: the
+        # console must disclose an ungated change (FR-007), and inferring the posture from a
+        # write's outcome would mean the first change of the day teaches the console what
+        # estate it is in. An operator states it.
+        console_config=ConsoleConfig(
+            read_matrix=fabric.read_matrix,
+            read_versioned=fabric.read_versioned,
+            quorum_configured=os.environ.get("HARNESS_QUORUM_CONFIGURED", "").strip().lower()
+            in {"1", "true", "yes"},
         ),
         # 043's RELEVANCE JUDGE, wired on exactly the ask provider's terms.
         #

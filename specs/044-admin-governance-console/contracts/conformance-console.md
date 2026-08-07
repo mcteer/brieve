@@ -57,6 +57,32 @@ the feature exists (ADR-0047); none may be stubbed green.
 | C24 | Verification is its own fact: a fabric-accepted connection whose probe fails renders `unreachable`, never "applied and working" (FR-018c) |
 | C25 | [no-secret-leak] No credential can be entered: the record's parser rejects fields outside the location vocabulary (FR-018b) |
 
+## Enclave run — 2026-08-07
+
+Executed by the harness against the dev enclave, trust-fabric applied:
+
+| Leg | Outcome |
+| --- | --- |
+| **CL1** request → decide | **pass.** `authority-submit` is attached to the api role — the mechanism has a principal for the first time since 007. Read binding v4 (`relevance_enabled` absent = enabled, `set_by` absent = an estate apply) → submitted disable → **applied, ungated** (quorum is null in dev) → read back v5, `relevance_enabled=False`, `set_by=console/dan` → stale CAS **refused** → restored. |
+| **CL2** the toggle on a served surface | **pass.** Three real asks through the served MCP surface, gate flipped in the trust fabric between each, **nothing restarted**: enabled → `relevance to the question was judged by a model`; disabled → `relevance was NOT checked: an administrator has disabled the relevance gate…`; enabled again → judged. The disclosure reaches a real caller over the wire. |
+| **CL3** a11y | **pass** — 72 rows, `/settings` walked in both the WCAG scan and the screen-reader tree. |
+
+**CL1 found a defect no hermetic row could.** Vault answers a failed check-and-set with
+**400** and `"check-and-set parameter did not match the current version"`, not 409. The code
+checked for 409 and the hermetic row scripted a 409 — a test agreeing with its author rather
+than with the product — so `RecordMoved` would never have fired against the real Vault and two
+administrators would have overwritten each other silently. Now discriminated on Vault's own
+message, with the unrecognised case falling through to `AuthoritySubmitUnavailable` (loud, and
+they retry) rather than the reverse.
+
+**CL2 first ran against a three-hour-old allocation and read as a failure of the feature.**
+The served payload carried no `relevance_note` key at all — not an empty one — because
+`mcp-surface-up` submits the job and Nomad places no new allocation when the jobspec has not
+changed. The running process predated every 044 commit. Replacing the allocation was the whole
+fix, and the lesson is that "deployed" and "running the code you just wrote" are different
+facts: an absent KEY rather than an empty value is the tell, and it is worth checking before
+concluding the code is wrong.
+
 ## Live legs (named runner: Dan)
 
 | Leg | What runs |

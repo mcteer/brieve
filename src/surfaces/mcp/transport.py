@@ -230,6 +230,7 @@ class McpTransport:
             authorise_ask,
             estate_answer_for,
             obtain_ask_credential,
+            relevance_enabled_for,
         )
         from surfaces.api.evidence import evidence_stream_for
 
@@ -392,16 +393,25 @@ class McpTransport:
         # divergence ADR-0033's row exists to catch, and did.
         from surfaces.api.ask import _available, relevance_judge_for
 
-        try:
-            relevance = relevance_judge_for(
-                subject=subject,
-                audit=self._audit,
-                authority=self._ask_authority,
-                judges=self._relevance_judges,
-                available=_available(self._relevance_model, self._relevance_judges),
-            )
-        except AskNotQualified as refused:
-            return McpResult(ok=False, status=403, payload={"reason": str(refused)})
+        # 044's toggle, honoured here as well as on the API — ADR-0033 is a statement about
+        # what a DEPLOYMENT does, and a gate switched off on one transport and running on the
+        # other would make an administrator's decision depend on which door was used. 043
+        # shipped exactly that asymmetry once (the API emitted MODEL_GATE and MCP did not),
+        # and only the parity row caught it.
+        gate_enabled = relevance_enabled_for(self._ask_authority)
+
+        relevance = None
+        if gate_enabled:
+            try:
+                relevance = relevance_judge_for(
+                    subject=subject,
+                    audit=self._audit,
+                    authority=self._ask_authority,
+                    judges=self._relevance_judges,
+                    available=_available(self._relevance_model, self._relevance_judges),
+                )
+            except AskNotQualified as refused:
+                return McpResult(ok=False, status=403, payload={"reason": str(refused)})
 
         try:
             payload = ask_for(
@@ -418,6 +428,7 @@ class McpTransport:
                 context=context.text,
                 conversation_id=conversation_id or "",
                 carried_context=context.descriptor if conversation_id else None,
+                relevance_disabled=not gate_enabled,
                 relevance=relevance,
             )
             payload = _remember(

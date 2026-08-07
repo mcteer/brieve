@@ -90,6 +90,23 @@ def test_the_delete_confirmation_meets_wcag_22_aa(page: Any, portal_server: Port
     assert violations == [], describe(violations)
 
 
+def test_the_console_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
+    """CL3 — the console is walked, not merely shipped (044, FR-021b).
+
+    **Measured before it was written**: this suite visited `/`, a thread, and a delete
+    confirmation. A new page was covered by none of them, so the lane would have stayed green
+    while the console went unchecked — a gate that does not visit a surface has not tested it.
+
+    The default subject is an `operator`, so what this walks is the **refusal** state: the
+    console answering "you do not hold that role". That is the state most people will see, it
+    is a real page, and a refusal rendered inaccessibly is a person unable to learn why they
+    cannot proceed.
+    """
+    page.goto(f"{portal_server.base}/settings")
+    violations = audit(page)
+    assert violations == [], describe(violations)
+
+
 def _ask(page: Any, portal_server: PortalServer, question: str) -> None:
     """Ask, and wait for the answer to ARRIVE rather than for a page to load.
 
