@@ -168,7 +168,7 @@ that cannot run refuses the proposal; zero scratch artifacts survive.
       `scratch-agent-*` survivors; tokens expired), V16 (**Vault's own ACL refuses a
       protected-name scratch write with the platform hook disabled** — the back-stop holds
       independently), V17 (a planted orphan is swept and the removal audited).
-- [ ] T015 [US3] The scratch sweep beside the resume sweeper in the persistent MCP service
+- [X] T015 [US3] The scratch sweep beside the resume sweeper in the persistent MCP service
       (`src/surfaces/mcp/served.py` + a small module it hosts): list `sys/policies/acl`,
       filter `scratch-agent-*`, delete when the run is not live, audit the removal (R11,
       FR-023).
@@ -186,7 +186,7 @@ PR alone (SC-001).
 **Independent Test**: open a proposal; read only the PR; answer all three; find no secret
 value and no trust-fabric body.
 
-- [ ] T016 [US4] [GATE:conformance] Evidence composition in
+- [X] T016 [US4] [GATE:conformance] Evidence composition in
       `src/surfaces/dispatch/policy_authoring.py`: the impact section rendered **by the
       platform** from Vault's answers into the PR body (R9), citations resolved against the
       pinned corpus manifest at composition, zero resolutions appending the FR-012
@@ -206,7 +206,7 @@ value and no trust-fabric body.
 
 **Independent Test**: the 041 suite passes unedited; exactly one publisher is registered.
 
-- [ ] T017 [US5] [GATE:conformance] Rows in
+- [X] T017 [US5] [GATE:conformance] Rows in
       `tests/conformance/authoring/test_041_unchanged.py`: SC-008 as a **diff from the
       merge-base** over 041's conformance files (with the `origin/<base>` fallback 043's R9
       had to learn); FR-014 as a registry assertion — exactly one publisher, and

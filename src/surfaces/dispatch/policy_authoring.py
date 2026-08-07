@@ -22,6 +22,7 @@ Layer 2 is the one V3 deletes to prove the safety case can lose.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -260,13 +261,123 @@ def protected_policy_hook(protected: ProtectedSet) -> HookRegistration:
     )
 
 
+#: What a citation must resolve against. The pinned Vault operating guides are already the
+#: answering surface's ground (ADR-0004), so a proposal's reasoning rests on the same corpus a
+#: person would be shown if they asked the question directly.
+CITATION_PATTERN = re.compile(r"/validated-(?:designs|patterns)/[\w./-]+(?:#[\w-]+)?")
+
+#: FR-012's disclosure. Appended to the proposal's own disclosures rather than blocking the
+#: publish: declining to CLAIM grounding is honest, and refusing to propose at all would make
+#: the platform useless for any change the corpus does not happen to discuss.
+UNSUPPORTED_DISCLOSURE = (
+    "The rationale cites no pinned guidance that resolves. Treat its reasoning as the "
+    "proposing agent's own, not as grounded in the validated designs."
+)
+
+
+def render_impact_evidence(impact: Mapping[str, Any]) -> list[str]:
+    """Vault's answer, transcribed — never summarised, never interpreted (FR-009, FR-011).
+
+    **The platform writes this, not the model** (Principle IX). Every line is arithmetic over
+    what `sys/capabilities` returned: what a token under the current policy could do, what one
+    under the proposed policy could do, and the difference. A model asked to describe its own
+    change would produce something more readable and less checkable.
+
+    Lines rather than a table because `Proposal.render` emits bullets, and a second rendering
+    convention inside one body is how a document stops being scannable.
+    """
+    lines: list[str] = [f"Measured against the real product by `{impact.get('measured_by', '?')}`."]
+    for entry in impact.get("results", ()):
+        path = entry.get("path", "?")
+        if entry.get("unanswered"):
+            lines.append(
+                f"`{path}` — **not answered** by the capability check; this path's effect is "
+                f"unmeasured and must not be read as unchanged"
+            )
+            continue
+        granted, revoked = entry.get("granted") or [], entry.get("revoked") or []
+        if not granted and not revoked:
+            held = ", ".join(entry.get("proposed") or []) or "no capabilities"
+            lines.append(f"`{path}` — unchanged ({held})")
+            continue
+        parts = []
+        if granted:
+            parts.append(f"**grants** {', '.join(granted)}")
+        if revoked:
+            parts.append(f"**revokes** {', '.join(revoked)}")
+        lines.append(f"`{path}` — {'; '.join(parts)}")
+    if impact.get("truncated"):
+        lines.append(
+            "**Truncated**: more paths were declared than the check queries. The unlisted "
+            "paths are unmeasured, not unchanged."
+        )
+    return lines
+
+
+def resolved_citations(rationale: str, resolves: Any) -> tuple[list[str], bool]:
+    """Which cited documents exist in the pin, and whether ANY did (FR-011, FR-012).
+
+    ``resolves`` is supplied rather than imported so this stays testable without the corpus on
+    disk and so the caller decides which pin is authoritative — the same seam `answer_question`
+    uses for exactly the same reason.
+    """
+    found: list[str] = []
+    for citation in CITATION_PATTERN.findall(rationale or ""):
+        path, _, anchor = citation.partition("#")
+        if resolves(path, anchor) and citation not in found:
+            found.append(citation)
+    return found, bool(found)
+
+
+def compose_policy_evidence(
+    *,
+    proposal: Any,
+    impact: Mapping[str, Any] | None,
+    resolves: Any,
+) -> Any:
+    """Attach the measured impact and the citation disclosure to a composed proposal.
+
+    **Refuses when there is no impact** (FR-008). A proposal published with its evidence
+    section missing is 037's finding in a new place: a reviewer handed a document that looks
+    complete reads it as complete, and the reassurance is worse than an absent proposal.
+
+    Mutates the proposal 041 composed rather than building a second one — there is one
+    publishing path and one artefact, and a parallel composition would be the fork FR-014
+    exists to prevent.
+    """
+    if impact is None:
+        raise RequestRefused(
+            "no impact measurement is attached to this proposal, so what it would permit is "
+            "unknown. Publishing anyway would hand a reviewer a document that reads as "
+            "complete — the reassurance this feature exists to replace",
+            reason_code="impact_unavailable",
+        )
+
+    proposal.evidence.extend(render_impact_evidence(impact))
+
+    citations, grounded = resolved_citations(getattr(proposal, "rationale", ""), resolves)
+    if grounded:
+        proposal.evidence.append(
+            "Cited guidance that resolves against the pin: "
+            + ", ".join(f"`{c}`" for c in citations)
+        )
+    else:
+        proposal.disclosures.append(UNSUPPORTED_DISCLOSURE)
+    return proposal
+
+
 __all__ = [
+    "CITATION_PATTERN",
     "POLICY_WRITING_TOOLS",
     "PROTECTED_POLICIES_PATH",
     "SCRATCH_PREFIX",
     "PolicyAuthoringRequest",
     "ProtectedSet",
     "ProtectedSetUnavailable",
+    "UNSUPPORTED_DISCLOSURE",
+    "compose_policy_evidence",
     "protected_policy_hook",
+    "render_impact_evidence",
+    "resolved_citations",
     "read_protected_set",
 ]
