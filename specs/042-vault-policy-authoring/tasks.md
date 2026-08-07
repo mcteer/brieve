@@ -162,7 +162,7 @@ that cannot run refuses the proposal; zero scratch artifacts survive.
       from Vault's parser), **V19** (FR-024's ceiling clause, both directions in one
       process: a ceiling naming the new tools reaches them, one omitting them refuses —
       041's `unknown_ceiling_entry` gap, made unrepeatable here; analyze C1).
-- [ ] T014 [US3] [GATE:conformance] Enclave rows V15–V17 in
+- [X] T014 [US3] [GATE:conformance] Enclave rows V15–V17 in
       `tests/conformance/authoring/test_policy_impact_enclave.py`, `enclave`-marked,
       **failing rather than skipping without Vault** (SC-007): V15 (full lifecycle; zero
       `scratch-agent-*` survivors; tokens expired), V16 (**Vault's own ACL refuses a
