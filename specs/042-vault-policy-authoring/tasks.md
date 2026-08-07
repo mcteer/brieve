@@ -65,7 +65,7 @@ story stands on and none may build for itself.
       `scratch_policy_check` grant carries no attach capability (`identity/*`,
       `auth/+/role/*`, `auth/token/roles/*`), so SC-011 rests on a scanned grant rather
       than only on the absence of an attach step (analyze C2).
-- [ ] T004 [GATE:fail-closed] ProtectedSet reader in
+- [X] T004 [GATE:fail-closed] ProtectedSet reader in
       `src/surfaces/dispatch/policy_authoring.py` (new file): read
       `harness-authority/data/protected-policies` at run start; an unreadable fabric
       refuses — empty-because-outage never reads as nothing-protected (**V5**); hermetic row
@@ -85,7 +85,7 @@ lose (SC-002, SC-003).
 planted instruction; every attempt refuses from the platform, and removing the hook makes a
 row fail.
 
-- [ ] T005 [US2] `PolicyAuthoringRequest` in `src/surfaces/dispatch/policy_authoring.py`:
+- [X] T005 [US2] `PolicyAuthoringRequest` in `src/surfaces/dispatch/policy_authoring.py`:
       041's `AuthoringRequest` extended with `target_policy`; validation refuses
       `policy_protected` **before anything is read** (V1) — 041's `validate()` runs first,
       unchanged.
