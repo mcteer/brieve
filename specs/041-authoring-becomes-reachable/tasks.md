@@ -44,7 +44,7 @@ Single project: `src/`, `tests/`, `infra/`, `docs/` at repository root.
 
 **Purpose**: The record this feature owes before code moves.
 
-- [ ] T001 [P] Author ADR-0066 — the transport determination (native `git`/`gh`, MCP
+- [X] T001 [P] Author ADR-0066 — the transport determination (native `git`/`gh`, MCP
       considered and reversed on measurement, per research R2) in
       `docs/adr/0066-version-control-is-reached-through-adopted-clis.md`; add the index row in
       `docs/adr/README.md`. Records FR-023, including why core git alone cannot open a PR and
@@ -58,30 +58,30 @@ Single project: `src/`, `tests/`, `infra/`, `docs/` at repository root.
 **Purpose**: The credential exchange and the product substrate — both stories' wiring depends
 on these, and the wait-forever suspension must be impossible before anything can suspend.
 
-- [ ] T002 Implement the App JWT → installation-token exchange in
+- [X] T002 Implement the App JWT → installation-token exchange in
       `src/core/authoring/credential.py` (`token_for()` loses its `NotImplementedError`; App
       key read from `harness-authority/data/authoring/vcs-app` under the caller's attested
       identity; token TTL-bounded, never persisted; `available()` untouched — research R5).
-- [ ] T002a Make the intersection refusal name its excluding term in
+- [X] T002a Make the intersection refusal name its excluding term in
       `src/core/authority/intersection.py` (+ the error type beside it): a tool absent from
       the effective set is refused as unknown / outside-ceiling / outside-task-scope depending
       on **which term dropped it** — today `intersect_scopes` computes one set with no memory
       of which term excluded what, so A2's third layer has no mechanism without this.
       **Sealed-core touch (`core/authority`)**: additive, but named for Principle V review.
-- [ ] T003 [P] Add `PLATFORM_TOOL_PRODUCTS: dict[str, str]` (`open_proposal` → `github`) in
+- [X] T003 [P] Add `PLATFORM_TOOL_PRODUCTS: dict[str, str]` (`open_proposal` → `github`) in
       `src/surfaces/toolset.py` and merge it into `dependency_products()` (FR-029).
-- [ ] T004 [P] Add the `github` probe to `PLATFORM_PROBES` in `src/surfaces/probes.py` — an
+- [X] T004 [P] Add the `github` probe to `PLATFORM_PROBES` in `src/surfaces/probes.py` — an
       authenticated reachability check keyed by product, per research R7 (FR-029).
-- [ ] T004a Wire platform products into the table the health checker consumes: `probes_for()`
+- [X] T004a Wire platform products into the table the health checker consumes: `probes_for()`
       in `src/surfaces/probes.py` (and its callers) merges platform product→probe pairs for
       registered platform tools — today `bindings.probes` is consumed only by pack loading
       (`core/packs/registration.py:120`), so a platform product's probe is a dict entry
       nothing reads and the sweeper can never match a `github` recovery (FR-029, closes
       analysis C3).
-- [ ] T005 [GATE:fail-closed] Unit guard: any registered suspendable tool absent from both the
+- [X] T005 [GATE:fail-closed] Unit guard: any registered suspendable tool absent from both the
       pack-derived and platform product maps fails, in
       `tests/unit/test_platform_tool_products.py` (FR-030 — the general rule, not a trio rule).
-- [ ] T006 [GATE:no-secret-leak] Unit rows for the exchange: token absent from logs, exception
+- [X] T006 [GATE:no-secret-leak] Unit rows for the exchange: token absent from logs, exception
       text, and `repr` (the existing redaction asserted through the new path); the raw App key
       never leaves `token_for()`, in `tests/unit/test_authoring_credential_exchange.py`.
 

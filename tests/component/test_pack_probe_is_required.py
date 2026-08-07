@@ -29,7 +29,13 @@ import pytest
 
 from core.packs.loader import FilesystemPackLoader, validate_manifest
 from core.packs.manifest import ManifestError, PackManifest, ToolDeclaration
-from surfaces.probes import PLATFORM_PROBES, dispatching_probe, fixture_probe, probes_for
+from surfaces.probes import (
+    PLATFORM_PROBES,
+    PLATFORM_PRODUCT_PROBES,
+    dispatching_probe,
+    fixture_probe,
+    probes_for,
+)
 from surfaces.toolset import build_registry
 
 PACKS_ROOT = Path(__file__).resolve().parents[2] / "packs"
@@ -87,10 +93,16 @@ def test_both_shipped_packs_name_a_probe_the_platform_provides() -> None:
 def test_loading_the_real_packs_resolves_a_probe_for_each_product() -> None:
     _, loaded = build_registry(packs=["vault", "terraform"], packs_root=PACKS_ROOT)
     table = probes_for(loaded)
-    assert set(table) == {"vault", "terraform"}, (
+    # Subset rather than equality since 041: `probes_for` also carries the products the
+    # PLATFORM owns, which no manifest declares. The assertion this row exists to make is
+    # about the packs, and it is unchanged — every loaded pack's product still has a probe.
+    assert {"vault", "terraform"} <= set(table), (
         "a loaded pack's product has no probe; the health checker would record it UNHEALTHY "
         "and the dependency gate would deny every one of its tools"
     )
+    # And the widening is bounded: the extra entries are exactly the platform's, never a
+    # pack's product silently arriving from somewhere else.
+    assert set(table) - {"vault", "terraform"} <= set(PLATFORM_PRODUCT_PROBES)
 
 
 def test_a_fixture_backed_product_probes_reachable_and_says_why() -> None:

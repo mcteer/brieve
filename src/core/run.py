@@ -135,6 +135,13 @@ class GovernedRun:
     probe_log: list[str] = field(default_factory=list)
     # Recomputed by the authority hook on every invoke; issue-time authority never widens it.
     live_effective: AuthorityScope | None = None
+    #: Tool name → which intersection term excluded it, from manufacture time (041, FR-019).
+    #:
+    #: On the run for the same reason `dependency_health` is: the authority hook receives only
+    #: a `HookContext`, so without a field here there is no path from the one place that held
+    #: all four terms to the one place that must explain a refusal. Empty by default, and an
+    #: empty map degrades to today's umbrella reason rather than to a wrong one.
+    authority_exclusions: Mapping[str, str] = field(default_factory=dict)
     #: What the platform believes about the products this run's tools reach (009).
     #:
     #: On the run rather than closed over by the hook, because `builtin_governance_hooks()`
@@ -282,6 +289,7 @@ def start_governed_run(
         state=RunState.ACTIVE,
         dependency_health=dependency_health,
         brokered_material_source=brokered_material_source,
+        authority_exclusions=manufactured.exclusions,
     )
 
     issued_payload = {

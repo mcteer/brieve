@@ -85,7 +85,13 @@ def test_nothing_imports_the_deleted_hybrid() -> None:
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             module = getattr(node, "module", "") or ""
-            names = [a.name for a in getattr(node, "names", [])]
+            # `ast.Global` and `ast.Nonlocal` also carry `.names`, and theirs are plain
+            # strings rather than aliases — so the naive `a.name` raised AttributeError on the
+            # first `global` statement anywhere in the tests tree. The scanner crashed instead
+            # of reporting, which is a guard that fails open by falling over.
+            names = [
+                a.name if isinstance(a, ast.alias) else str(a) for a in getattr(node, "names", [])
+            ]
             if FORBIDDEN_MODULE in module or any(FORBIDDEN_MODULE in n for n in names):
                 offenders.append(str(path))
                 break

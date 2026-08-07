@@ -94,6 +94,28 @@ def fixture_probe(product: str) -> tuple[bool, str]:
     return True, f"{product} is fixture-backed; no live product to reach"
 
 
+def github_probe(product: str) -> tuple[bool, str]:
+    """Whether the forge answers, for the product `open_proposal` reaches (041, FR-029).
+
+    **Unauthenticated on purpose.** `/rate_limit` answers without a credential, and asking
+    reachability is not asking permission — a probe that authenticated would report an outage
+    when a token expired, sending an operator to the wrong incident. It would also need a
+    credential in the health checker, which runs outside the publishing task and holds none.
+    """
+    root = (os.environ.get("GITHUB_API_URL") or "https://api.github.com").rstrip("/")
+    try:
+        with urllib.request.urlopen(  # noqa: S310 — operator-supplied root, not user input
+            f"{root}/rate_limit", timeout=PROBE_TIMEOUT_SECONDS
+        ) as response:
+            return response.status == 200, f"rate_limit {response.status}"
+    except urllib.error.HTTPError as exc:
+        # 401/403 mean the forge is up and declined to answer this caller, which is
+        # reachability. Only a transport failure is an outage.
+        return exc.code in (401, 403), f"rate_limit {exc.code}"
+    except Exception as exc:  # noqa: BLE001 — a probe raising IS an unreachable result
+        return False, f"{type(exc).__name__}: {exc}"
+
+
 #: Probes the platform provides, by the name a manifest may use.
 #:
 #: A manifest naming something absent from this table refuses `unresolved_binding` at load —
@@ -102,6 +124,23 @@ def fixture_probe(product: str) -> tuple[bool, str]:
 PLATFORM_PROBES: dict[str, Probe] = {
     "vault_probe": vault_probe,
     "terraform_probe": fixture_probe,
+    "github_probe": github_probe,
+}
+
+#: Product → probe for products the **platform** owns, which no pack manifest declares.
+#:
+#: This table exists because of a defect found while planning 041 (analysis C3). Adding a probe
+#: to `PLATFORM_PROBES` alone does nothing: that table is consumed only by pack loading, which
+#: resolves `manifest.probe` by name. A platform tool has no manifest, so its product would
+#: reach `probes_for` never — and `dispatching_probe` falls through to "no probe configured",
+#: which the health checker treats as unhealthy. `open_proposal` would have been denied while
+#: GitHub was up, and a run suspended on it would have waited for a recovery signal that no
+#: pack could ever produce.
+#: `workspace` is the fixture toolset's product (`plan`, `apply`). Fixture-backed, so
+#: `fixture_probe` is the honest answer: nothing live to reach, therefore nothing to be down.
+PLATFORM_PRODUCT_PROBES: dict[str, Probe] = {
+    "github": github_probe,
+    "workspace": fixture_probe,
 }
 
 
@@ -111,8 +150,14 @@ def probes_for(loaded: Mapping[str, LoadedPack]) -> dict[str, Probe]:
     Keyed by **product** rather than by pack because that is what the checker probes and
     what the sweeper matches on. Two packs for one product would supply one probe between
     them, which is correct: reachability is a property of the product, not of who declared it.
+
+    Platform products are merged in **first**, so a pack declaring a probe for the same
+    product still wins. That ordering is deliberate: a pack that ships a better probe for a
+    product the platform also touches should not be overridden by the platform's default.
     """
-    return {pack.product: pack.probe for pack in loaded.values() if pack.probe is not None}
+    table: dict[str, Probe] = dict(PLATFORM_PRODUCT_PROBES)
+    table.update({pack.product: pack.probe for pack in loaded.values() if pack.probe is not None})
+    return table
 
 
 def dispatching_probe(loaded: Mapping[str, LoadedPack]) -> Probe:
@@ -136,7 +181,9 @@ def dispatching_probe(loaded: Mapping[str, LoadedPack]) -> Probe:
 
 
 __all__ = [
+    "PLATFORM_PRODUCT_PROBES",
     "PLATFORM_PROBES",
+    "github_probe",
     "PROBE_TIMEOUT_SECONDS",
     "Probe",
     "dispatching_probe",

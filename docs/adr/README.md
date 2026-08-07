@@ -121,6 +121,8 @@ same change.
 | [0062](0062-authoring-credentials-are-vended-per-task.md) | The authoring credential is vended per task, and is Principle IV's third exception | Accepted |
 | [0063](0063-a-mechanical-scorer-may-qualify-a-cell.md) | A mechanical scorer over a human-authored reference may qualify a cell | Accepted |
 | [0064](0064-version-control-is-a-platform-capability.md) | Version control is a platform capability, not a pack tool target | Accepted |
+| [0065](0065-code-mode-is-decided-against.md) | Code mode is decided against, superseding [0041](0041-code-mode-requires-hook-parity.md) | Proposed |
+| [0066](0066-version-control-is-reached-through-adopted-clis.md) | Version control is reached through adopted CLIs, not an MCP server | Accepted |
 
 ## Reviews
 
