@@ -125,6 +125,7 @@ same change.
 | [0066](0066-version-control-is-reached-through-adopted-clis.md) | Version control is reached through adopted CLIs, not an MCP server | Accepted |
 | [0067](0067-a-model-does-not-judge-its-own-output.md) | A model does not judge its own output | Proposed |
 | [0068](0068-impact-is-measured-by-the-product.md) | Impact is measured by the product, in a namespace reserved for measurement | Proposed |
+| [0069](0069-governance-configuration-is-requested-at-a-console.md) | Governance configuration is requested at a console and decided by the trust fabric | Proposed |
 
 ## Reviews
 

@@ -214,11 +214,11 @@ visible, and provenance says who wrote last.
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T017 [P] The a11y lane walks the console (**CL3**, FR-021b): `/settings` rows in
+- [X] T017 [P] The a11y lane walks the console (**CL3**, FR-021b): `/settings` rows in
       `tests/a11y/test_wcag.py` and `tests/a11y/test_keyboard_and_screenreader.py`, behind
       the authenticated-page fixture the thread rows use — measured: today's rows visit no
       console page, so the lane would stay green while the page went unchecked.
-- [ ] T018 [P] Write `docs/adr/0069-governance-configuration-is-requested-at-a-console.md`
+- [X] T018 [P] Write `docs/adr/0069-governance-configuration-is-requested-at-a-console.md`
       (Proposed): the argued move of 026's origination line, the disjoint role, the
       disclose-not-suppress template, and R1's finding that the mechanism predated any
       principal able to use it; index in `docs/adr/README.md`.
