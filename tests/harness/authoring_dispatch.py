@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from core.authoring.artifact import AuthoredArtifact
+from core.authoring.tool import AuthoringTools
 from core.authoring.workspace import Trees
 from core.registry.memory import ToolRegistry
 from surfaces.dispatch.authoring import (
@@ -36,6 +37,8 @@ class BuiltRegistry:
     vocabulary: frozenset[str]
     trees: Trees | None = None
     artifact: AuthoredArtifact | None = None
+    #: The analyzer's handles, so a row can read `consulted` and the artefact afterwards.
+    tools: AuthoringTools | None = None
 
 
 def build_as_entrypoint(
@@ -56,6 +59,7 @@ def build_as_entrypoint(
     registry, _loaded = build_registry(packs=packs or [])
     trees: Trees | None = None
     artifact: AuthoredArtifact | None = None
+    tools: AuthoringTools | None = None
 
     if authoring_enabled and role == ANALYZER:
         subject = tmp_path / "subject"
@@ -64,7 +68,10 @@ def build_as_entrypoint(
         workspace.mkdir(parents=True, exist_ok=True)
         trees = Trees(subject=subject.resolve(), workspace=workspace.resolve())
         artifact = AuthoredArtifact()
-        authoring_registry_for(ANALYZER, registry=registry, trees=trees, artifact=artifact)
+        registration = authoring_registry_for(
+            ANALYZER, registry=registry, trees=trees, artifact=artifact
+        )
+        tools = registration.tools
     elif authoring_enabled and role == PROPOSER:
         authoring_registry_for(
             PROPOSER,
@@ -78,6 +85,7 @@ def build_as_entrypoint(
         vocabulary=known_tools(registry),
         trees=trees,
         artifact=artifact,
+        tools=tools,
     )
 
 

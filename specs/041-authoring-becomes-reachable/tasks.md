@@ -152,11 +152,11 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
       `src/surfaces/dispatch/entrypoint.py` via `resolve_write_cell` feeding `_chooser_for`'s
       ordering (validate before build; no default on a missing binding) so 040's structured
       recordings supply `path`/`content` (FR-012, research R11).
-- [ ] T016 [P] [US2] [GATE:conformance] Rows A6–A8 in
+- [X] T016 [P] [US2] [GATE:conformance] Rows A6–A8 in
       `tests/conformance/authoring/test_governed_path.py` (new file): identical pipeline shape
       vs `vault_write` (A6); escape refused through the registered tool (A7); lens + record +
       budget-with-disclosure + ordered `consulted` through registered `read_subject` (A8).
-- [ ] T017 [P] [US2] [GATE:fail-closed] Row A9 in
+- [X] T017 [P] [US2] [GATE:fail-closed] Row A9 in
       `tests/conformance/authoring/test_governed_path.py`: analyzer scope cannot publish,
       proposer scope cannot author — both refusals carry the task-scope reason.
 - [X] T018 [P] [US2] [GATE:fail-closed] Rows A10–A12 in
@@ -286,7 +286,7 @@ in the same task, and a person can merge what the agent proposed.
 
 **Independent Test**: Empty diff over 038's row files; full suite green.
 
-- [ ] T035 [US5] Row A20 verification: `git diff $(git merge-base main HEAD) --
+- [X] T035 [US5] Row A20 verification: `git diff $(git merge-base main HEAD) --
       tests/conformance/authoring/` shows only NEW files (T009/T016/T018/T020/T026/T030's);
       038's seven row files unedited; run the full authoring suite green. **Merge-base, not
       `main`** — main moves during implementation, and this estate has already recorded what
@@ -351,3 +351,60 @@ obligation being discharged, not a demo.
   (estate memory; the 503 `AuthenticationError` is the tell).
 - Docker VM clock drift breaks dispatched-row attestation — resync the VM clock before the
   enclave gate if rows fail with empty trails (estate memory).
+
+---
+
+## Implementation record — what ran
+
+**Phases 1–2, US1, US4, and the buildable half of US2/US3 are complete and green.**
+`make check` equivalent: **1280 passed**, lint and mypy clean over 577 files. Authoring
+conformance: **129 rows**, of which 049 are 038's, unedited.
+
+**FR-017 verified from the merge-base, not from `main`.** `git diff $(git merge-base main HEAD)
+HEAD -- tests/conformance/authoring/` lists only NEW files; all seven of 038's row files report
+UNEDITED. The merge-base matters: `main` moves during implementation, and this estate has
+already recorded what a wrong baseline reports — false parity.
+
+**Four findings the rows produced rather than the plan.**
+
+1. **A2's mechanism was in the wrong place.** The plan put the excluding-term discriminator on
+   the authority hook. Measured, that hook fires only when live policy narrows authority *after*
+   issuance — every ceiling and task-scope refusal is caught earlier by the pipeline's scope
+   gate, so both arrived as one `out_of_scope` record and the new codes were unreachable for
+   them. The reason CODE stays `out_of_scope` (nine assertions depend on a stable vocabulary)
+   and the discriminator rides in the payload, which is what SC-008 asked for all along.
+
+2. **A run may not request more than its ceiling**, so "outside ceiling" and "outside task
+   scope" cannot both be per-call denials for the same tool — `manufacture_authority` refuses
+   the run outright. A9 was rewritten to use a tool the task can actually resolve, because
+   `open_proposal` in an analyzer refuses one layer earlier as `unregistered`, which proves
+   something else.
+
+3. **The jobspec guard found two more instances of 038's defect**, both 037's: `analysis-tier`
+   and `detonation-range` declare four tasks between them with a command-taking entrypoint and
+   no command. Recorded in `KNOWN_UNEXECUTABLE` with the record that owns them rather than
+   fixed — inventing a command for another feature's tier would be guessing — and a row makes
+   that list shrink rather than rot.
+
+4. **FR-030's guard found `plan` and `apply`** carrying the same wait-forever suspension shape
+   as `open_proposal`: they declare `product="workspace"` and no manifest ever named it. Mapped,
+   and `workspace` is probed by `fixture_probe`.
+
+**Two guards were extended rather than worked around.** `WRITE_CALLS` gained `rmtree`, which it
+should always have had. And the fake-fabric scanner crashed on any `global` statement in the
+tests tree (`ast.Global.names` holds strings, not aliases) — a guard failing by falling over.
+
+## What has NOT run, and why
+
+- **T019** (qualify and bind the `write` cell) — needs the live estate and a Sonnet 5 lane run.
+- **T030–T032** (E1–E4, the real proposal) — need the enclave *and* the operator prerequisite: a
+  GitHub App installed on a maintainer-owned repository with its key seeded at
+  `harness-authority/data/authoring/vcs-app`. The rows fail rather than skip when it is absent,
+  which is why they are not marked done.
+- **T013** (dispatcher wiring), **T015** (write-cell resolution in the entrypoint), **T020**,
+  **T022**'s provenance block, **T023** (proposer branch), **T024a/b** (the FR-033 scrub),
+  **T029**, **T036–T038** — buildable, not yet built.
+
+**The feature does not ship at this point**, and the tasks file said so before any code was
+written: *ship at the US5 checkpoint or not at all*. A registered analyzer whose proposer branch
+is unwired is 038's gap moved one layer, not closed.
