@@ -230,9 +230,9 @@ visible, and provenance says who wrote last.
 - [X] T020 Run **CL2** on a served surface: disable the judge from the portal, ask, see the
       disclosure; re-enable, ask, see the gate — no restart; record the outcome in the
       contract.
-- [ ] T021 [P] Run `specs/044-admin-governance-console/quickstart.md` top to bottom as
+- [X] T021 [P] Run `specs/044-admin-governance-console/quickstart.md` top to bottom as
       written; fix drift in the doc, not by hand-waving the steps.
-- [ ] T022 Update `ROADMAP.md` in the implementation PR: the admin-interface Next entry
+- [X] T022 Update `ROADMAP.md` in the implementation PR: the admin-interface Next entry
       closes with the mechanism in one line, and 044's Shipped row lands (the file's own
       landing rule).
 
