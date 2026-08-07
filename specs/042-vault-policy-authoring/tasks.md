@@ -44,13 +44,13 @@ Single project: `src/`, `tests/`, `packs/`, `infra/` at repository root.
 **Purpose**: the write path, the grants, and the protected set — the three things every
 story stands on and none may build for itself.
 
-- [ ] T001 Extend `src/core/durability/credentials.py` with four additive methods —
+- [X] T001 Extend `src/core/durability/credentials.py` with four additive methods —
       `write_path`, `delete_path`, `create_token(role, policies, ttl)`,
       `capabilities(token, paths)` — reusing the existing login/TLS/timeout handling (R8);
       **sealed-core additive, named in plan's Principle V row**; unit rows in
       `tests/unit/test_vault_client_writes.py` including [GATE:no-secret-leak] — no token
       value in any log, exception message, or return beyond the caller's hands.
-- [ ] T002 [P] Trust-fabric additions in `infra/modules/trust-fabric/scratch.tf` (new):
+- [X] T002 [P] Trust-fabric additions in `infra/modules/trust-fabric/scratch.tf` (new):
       `scratch-check` token role (`allowed_policies_glob = ["scratch-agent-*"]`, TTL 60s,
       `no_default_policy`), protected-set publication to
       `harness-authority/data/protected-policies`; `scratch_policy_check` policy in
@@ -58,14 +58,14 @@ story stands on and none may build for itself.
       in `auth.tf` (R3, R4). `terraform validate` clean. **Verify `harness_authority_read`'s
       path grammar covers `protected-policies`** — if its grants enumerate subpaths, extend
       the grant in the same change (analyze U1; 043's M2 was this shape and was real).
-- [ ] T003 [P] Unit scans in `tests/unit/test_trust_fabric_protected_set.py`: **V6** —
+- [X] T003 [P] Unit scans in `tests/unit/test_trust_fabric_protected_set.py`: **V6** —
       every `resource "vault_policy"` name in `infra/modules/trust-fabric/` appears in the
       published protected list; **V7** — no trust-fabric policy name begins
       `scratch-agent-` (FR-020's reserved namespace as a merge gate); **V20** — the
       `scratch_policy_check` grant carries no attach capability (`identity/*`,
       `auth/+/role/*`, `auth/token/roles/*`), so SC-011 rests on a scanned grant rather
       than only on the absence of an attach step (analyze C2).
-- [ ] T004 [GATE:fail-closed] ProtectedSet reader in
+- [X] T004 [GATE:fail-closed] ProtectedSet reader in
       `src/surfaces/dispatch/policy_authoring.py` (new file): read
       `harness-authority/data/protected-policies` at run start; an unreadable fabric
       refuses — empty-because-outage never reads as nothing-protected (**V5**); hermetic row
@@ -85,16 +85,16 @@ lose (SC-002, SC-003).
 planted instruction; every attempt refuses from the platform, and removing the hook makes a
 row fail.
 
-- [ ] T005 [US2] `PolicyAuthoringRequest` in `src/surfaces/dispatch/policy_authoring.py`:
+- [X] T005 [US2] `PolicyAuthoringRequest` in `src/surfaces/dispatch/policy_authoring.py`:
       041's `AuthoringRequest` extended with `target_policy`; validation refuses
       `policy_protected` **before anything is read** (V1) — 041's `validate()` runs first,
       unchanged.
-- [ ] T006 [US2] The GOVERNANCE pre-hook in `src/surfaces/dispatch/policy_authoring.py`:
+- [X] T006 [US2] The GOVERNANCE pre-hook in `src/surfaces/dispatch/policy_authoring.py`:
       inspects `author_file` and `vault_policy_impact` arguments; a protected policy name
       refuses and **records the attempt**; an argument supplying a scratch name refuses
       `scratch_name_forged` (V2, V11's hook half); registered for the policy-authoring run
       in `src/surfaces/dispatch/entrypoint.py` on 041's registration pattern.
-- [ ] T007 [US2] [GATE:conformance] Rows V1–V4 in
+- [X] T007 [US2] [GATE:conformance] Rows V1–V4 in
       `tests/conformance/authoring/test_policy_protected.py`: V1 (refusal before any read —
       provider records zero calls), V2 (the hook refuses and records), **V3 (with the 042
       hook removed from registration, authoring passes and this row FAILS — SC-003)**,
@@ -114,17 +114,20 @@ is the right order.
 **Independent Test**: ask about a named policy; the run reads it and its attachments, the
 read is recorded, no secret value appears, and absent/protected/present are three answers.
 
-- [ ] T008 [US1] Declare the tools and the workflow in `packs/vault/pack.toml`:
-      `[[tools]] vault_policy_read` and `[[tools]] vault_policy_impact` (both
+- [X] T008 [US1] Declare the tools and the workflow in `packs/vault/pack.toml`:
+      `[[tools]] vault_policy_read` here and `[[tools]] vault_policy_impact` **with its
+      handler in T011** — the manifest refuses `names handler ... which the platform does not
+      provide` at load, so a declaration cannot precede its implementation and this task list
+      ordered them apart. Found by the platform's own check, not by review. (both
       `risk_class = "secret_touching"`, `transport = "native"`, `product = "vault"`;
       impact `repeatable = true` with R7's argument in a comment), plus a
       `[[workflows]] policy-authoring` declaration — **without it, 041's
       `pack_declares_no_authoring` refusal blocks every request this feature makes**.
-- [ ] T009 [US1] `vault_policy_read` handler in `src/surfaces/handlers.py`: list names,
+- [X] T009 [US1] `vault_policy_read` handler in `src/surfaces/handlers.py`: list names,
       read bodies **only outside the protected set** (three states — `present` /
       `protected` / `absent`, R6), attachments from token roles, JWT auth roles, entities
       and groups, bounded with the bound disclosed (FR-010); joins `PLATFORM_HANDLERS`.
-- [ ] T010 [US1] [GATE:conformance] Rows V8–V10 in
+- [X] T010 [US1] [GATE:conformance] Rows V8–V10 in
       `tests/conformance/authoring/test_policy_read.py`: V8 (registered, hook-wrapped,
       ordinary intent/result bracket), V9 [GATE:no-secret-leak] (three distinct states; no
       secret value; no `secret/` path touched), V10 (attachment truncation disclosed).
@@ -141,17 +144,17 @@ read is recorded, no secret value appears, and absent/protected/present are thre
 **Independent Test**: propose a widening change; the evidence shows the widening; a check
 that cannot run refuses the proposal; zero scratch artifacts survive.
 
-- [ ] T011 [US3] `vault_policy_impact` handler in `src/surfaces/handlers.py`: the whole
+- [X] T011 [US3] `vault_policy_impact` handler in `src/surfaces/handlers.py`: the whole
       lifecycle in one call (R1) — derive `scratch-agent-<run>-current/-proposed` from the
       run id (never from arguments), write both bodies, mint one 60s token per side via
       `scratch-check`, query `sys/capabilities` over the stanza-scan ∪ diff-touched path
       set (bounded, truncation disclosed — R10), compose per-path
       `current`/`proposed`/`granted`/`revoked`, destroy both policies in `finally`.
       Vault's parse failure surfaces as `policy_invalid`, never as an impact result.
-- [ ] T012 [P] [US3] `ImpactResult` composition unit rows in
+- [X] T012 [P] [US3] `ImpactResult` composition unit rows in
       `tests/unit/test_impact_result.py`: granted/revoked set arithmetic; a new policy's
       empty current side; the path cap and its disclosure; glob paths labelled `as-written`.
-- [ ] T013 [US3] [GATE:conformance] Rows V11–V14 in
+- [X] T013 [US3] [GATE:conformance] Rows V11–V14 in
       `tests/conformance/authoring/test_policy_impact.py`: V11 (names derived; forged name
       refuses), V12 (a widening change is visibly wider — the row fails if the evidence
       would read identically without the impact, SC-009), V13 (check cannot run → proposal
@@ -159,13 +162,13 @@ that cannot run refuses the proposal; zero scratch artifacts survive.
       from Vault's parser), **V19** (FR-024's ceiling clause, both directions in one
       process: a ceiling naming the new tools reaches them, one omitting them refuses —
       041's `unknown_ceiling_entry` gap, made unrepeatable here; analyze C1).
-- [ ] T014 [US3] [GATE:conformance] Enclave rows V15–V17 in
+- [X] T014 [US3] [GATE:conformance] Enclave rows V15–V17 in
       `tests/conformance/authoring/test_policy_impact_enclave.py`, `enclave`-marked,
       **failing rather than skipping without Vault** (SC-007): V15 (full lifecycle; zero
       `scratch-agent-*` survivors; tokens expired), V16 (**Vault's own ACL refuses a
       protected-name scratch write with the platform hook disabled** — the back-stop holds
       independently), V17 (a planted orphan is swept and the removal audited).
-- [ ] T015 [US3] The scratch sweep beside the resume sweeper in the persistent MCP service
+- [X] T015 [US3] The scratch sweep beside the resume sweeper in the persistent MCP service
       (`src/surfaces/mcp/served.py` + a small module it hosts): list `sys/policies/acl`,
       filter `scratch-agent-*`, delete when the run is not live, audit the removal (R11,
       FR-023).
@@ -183,7 +186,7 @@ PR alone (SC-001).
 **Independent Test**: open a proposal; read only the PR; answer all three; find no secret
 value and no trust-fabric body.
 
-- [ ] T016 [US4] [GATE:conformance] Evidence composition in
+- [X] T016 [US4] [GATE:conformance] Evidence composition in
       `src/surfaces/dispatch/policy_authoring.py`: the impact section rendered **by the
       platform** from Vault's answers into the PR body (R9), citations resolved against the
       pinned corpus manifest at composition, zero resolutions appending the FR-012
@@ -203,7 +206,7 @@ value and no trust-fabric body.
 
 **Independent Test**: the 041 suite passes unedited; exactly one publisher is registered.
 
-- [ ] T017 [US5] [GATE:conformance] Rows in
+- [X] T017 [US5] [GATE:conformance] Rows in
       `tests/conformance/authoring/test_041_unchanged.py`: SC-008 as a **diff from the
       merge-base** over 041's conformance files (with the `origin/<base>` fallback 043's R9
       had to learn); FR-014 as a registry assertion — exactly one publisher, and
@@ -213,19 +216,19 @@ value and no trust-fabric body.
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T018 [P] Write `docs/adr/0068-impact-is-measured-by-the-product.md` (Proposed):
+- [X] T018 [P] Write `docs/adr/0068-impact-is-measured-by-the-product.md` (Proposed):
       the scratch mechanism, its three bounds, why one call, why both sides, the orphan
       window that remains (R14); index in `docs/adr/README.md`.
-- [ ] T019 Apply the trust-fabric additions to the dev enclave and run **PL1** — the
+- [X] T019 Apply the trust-fabric additions to the dev enclave and run **PL1** — the
       single-call probe in `tests/evals_live/policy_impact_probe.py` (smoke shape: raw
       capability answers printed, one call before anything bigger); re-seed the model
       credential if the apply clobbers it.
-- [ ] T020 Run **PL2** end to end — policy-repository subject → read → author → impact →
+- [X] T020 Run **PL2** end to end — policy-repository subject → read → author → impact →
       real PR via 041's publisher; answer SC-001's three questions from the PR alone;
       record PL1–PL3 outcomes in `contracts/conformance-policy-authoring.md`.
-- [ ] T021 [P] Run `specs/042-vault-policy-authoring/quickstart.md` top to bottom as
+- [X] T021 [P] Run `specs/042-vault-policy-authoring/quickstart.md` top to bottom as
       written; fix drift in the doc, not by hand-waving the steps.
-- [ ] T022 Update `ROADMAP.md` in the implementation PR: the change-proposal table's Vault
+- [X] T022 Update `ROADMAP.md` in the implementation PR: the change-proposal table's Vault
       row closes with the mechanism in one line, and 042's Shipped row lands (the file's
       own landing rule).
 

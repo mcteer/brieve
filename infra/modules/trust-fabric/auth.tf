@@ -162,6 +162,16 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
     # allocation must read it under its own attested identity — a key handed to an allocation
     # is a key in the allocation's environment, which is what ADR-0058 exists to avoid.
     vault_policy.model_credential_read.name,
+    # 042: the measurement namespace, and nothing outside it. This is the first WRITE
+    # capability a dispatched run has ever carried — every grant above is read-only, and
+    # `agent_pack_secrets` deliberately carries none, with its own comment explaining why
+    # the obvious reason to add one turned out not to need it.
+    #
+    # It is granted here because Principle IV's "structurally excluded from managing their
+    # own platform" is enforced by the NAMESPACE rather than by withholding the verb: a run
+    # can create and destroy `scratch-agent-*` and Vault refuses everything else, including
+    # the policy that grants this. See `scratch.tf` for the full argument.
+    vault_policy.scratch_policy_check.name,
   ]
   token_ttl  = 3600
   token_type = "service"
@@ -264,6 +274,14 @@ resource "vault_jwt_auth_backend_role" "mcp_surface" {
     # person on the other end of it, so it is the first place the platform ever calls a model
     # on somebody's behalf.
     vault_policy.model_credential_read.name,
+    # 042: the scratch sweep. This service already hosts the resume sweeper and the
+    # dependency checks because both needed a long-lived home, and an orphaned measurement
+    # policy is the same shape of problem — something a dead run left behind that only a
+    # living process can clear.
+    #
+    # The SWEEP grant, not the run's: `list` over the policy namespace, which a dispatched
+    # run does not get. "Always destroyed" is a claim; this is what lets a machine check it.
+    vault_policy.scratch_sweep.name,
   ]
   token_ttl  = 3600
   token_type = "service"

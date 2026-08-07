@@ -52,6 +52,43 @@ outcome recorded here in the implementation PR.
 - **FR-014**: a row asserts the registry holds exactly one publisher and `open_proposal`
   is it.
 
+## Enclave run — 2026-08-07
+
+Executed by the harness against the dev enclave (`make dev-up`, trust-fabric applied),
+`VAULT_ADDR=https://127.0.0.1:8200`:
+
+| Row | Outcome |
+| --- | --- |
+| V15 full scratch lifecycle | **pass** — Vault reported the widening from its own `sys/capabilities`; zero `scratch-agent-*` survivors |
+| V16 token role refuses a protected name | **pass** — Vault refused the mint under `agent-ceiling` |
+| V16 run grant refuses a protected write | **pass** — the ACL refused `sys/policies/acl/agent-ceiling` under a scratch-only token |
+| V17 orphan swept and audited | **pass** — planted orphan removed, removal recorded |
+
+The applied fabric was inspected rather than assumed: `auth/token/roles/scratch-check` carries
+`allowed_policies_glob = ["scratch-agent-*"]`, `token_explicit_max_ttl = 60`, `orphan = false`,
+`disallowed_policies = ["default"]`; the published protected set names 14 policies including
+**all five per-definition ceilings**, which is what the `for_each` splat exists for.
+
+## Live legs — executed 2026-08-07
+
+| Leg | Outcome |
+| --- | --- |
+| PL1 single impact probe | **pass** — and it found a defect on its first run: Vault answers `["deny"]` for an unreachable path, so the raw arithmetic reported `granted: ["list"], revoked: ["deny"]`. No hermetic row caught it; the scripted Vault never returned the real marker. Fixed and pinned. |
+| PL2 end to end | **pass** — real subject (`mcteer/vault-validation`, `files/loadtest-policy.hcl` @ `e6e988ba`), real measurement against the enclave Vault, real pull request: [mcteer/vault-validation#1](https://github.com/mcteer/vault-validation/pull/1). Every component is the production one — `acquire_subject`, `FileAuthor`, `compose`, `ProposalPublisher` unedited from 041. Zero scratch policies survived. |
+| PL3 (V15–V17) | **pass** — recorded above. |
+
+**What PL2's evidence actually said**, which is the SC-001 test a person applies:
+
+```
+secret/*                     revokes create, delete, list, read, update
+secret/data/loadtest/*       revokes delete
+secret/metadata/loadtest/*   revokes create, delete, update
+```
+
+Nothing granted on any path — the change is a **pure narrowing**, stated by the product rather
+than inferred by a reviewer from two policy bodies. That is the whole argument for the
+instrument in one output.
+
 ## Live legs (named runner: Dan)
 
 | Leg | What runs |

@@ -68,6 +68,44 @@ observer       = "vault_write_observer"
 product        = "vault"
 repeatable     = false
 
+# ── 042: policy authoring ────────────────────────────────────────────────────────────────
+#
+# Two tools, and the second is the feature. Reading policy is ordinary; MEASURING the impact
+# of a proposed one is what makes a change proposal worth reviewing, and Vault has no
+# plan-equivalent — so the platform writes the proposed document under a throwaway name, mints
+# a token carrying only it, and asks Vault's own `sys/capabilities`. The product answers.
+
+[[tools]]
+name       = "vault_policy_read"
+risk_class = "secret_touching"
+# Policy STRUCTURE, never secret values — `sys/policies/acl` and attachment metadata are the
+# entire surface, so `vault_read`'s "the value belongs in the process that consumes it, not in
+# the reasoning about it" holds here by construction rather than by filtering.
+#
+# Declared for review rather than enforcement, as the tools above are.
+paths      = [{ path = "sys/policies/acl", capabilities = ["read", "list"] }]
+transport  = "native"
+handler    = "vault_policy_read"
+product    = "vault"
+repeatable = true
+
+[[tools]]
+name       = "vault_policy_impact"
+risk_class = "secret_touching"
+paths      = [{ path = "sys/policies/acl/scratch-agent-*", capabilities = ["create", "update", "delete", "read"] }]
+transport  = "native"
+handler    = "vault_policy_impact"
+product    = "vault"
+# REPEATABLE, and the precedent points the other way — `vault_write` is non-repeatable because
+# a CAS write that succeeded and lost its response must be resolved by observation, not replay.
+#
+# This tool's contract is that it leaves NOTHING behind: re-running it overwrites its own
+# derived scratch names, re-answers, and re-destroys. So a replay after interruption *heals*
+# the orphan the interruption created, and declaring it non-repeatable would demand an observer
+# whose only honest answer — "did a transient thing that no longer exists happen?" — is useless
+# to a resumer.
+repeatable = true
+
 [[skills]]
 name    = "vault-secret-access"
 path    = "skills/vault-secret-access/SKILL.md"
@@ -83,6 +121,19 @@ paved        = true
 
 [[workflows]]
 name         = "rotate-credential"
+minimum_tier = 3
+paved        = false
+
+# 042. **Without this declaration nothing in the feature runs**: 041's request validation
+# refuses `pack_declares_no_authoring` for any pack that has not said it supports authoring,
+# which is one of the three independent gates ADR-0038 put on who may author for what.
+#
+# `minimum_tier = 3` and NOT paved. Authoring a policy reaches a hardened tier, opens a real
+# pull request against somebody's repository, and writes to the product to measure itself —
+# none of which belongs to a lowest-tier definition, and none of which is a well-trodden path
+# whose outcome a reviewer can assume.
+[[workflows]]
+name         = "policy-authoring"
 minimum_tier = 3
 paved        = false
 

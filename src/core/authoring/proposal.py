@@ -97,6 +97,18 @@ class Proposal:
     #: trust: the rationale is agent-controlled content and is scanned as such, while this is
     #: the platform's own statement about its own run.
     provenance: list[str] = field(default_factory=list)
+    #: MEASURED FACTS ABOUT WHAT THE CHANGE DOES, platform-rendered (042).
+    #:
+    #: A third author, and therefore a third trust level. `rationale` is the model's;
+    #: `provenance` is the platform's account of its own run; this is a **product's** answer,
+    #: transcribed. 042's impact check asks Vault what a token under the proposed policy could
+    #: do, and the platform renders the reply — a model verdict may gate a step and never
+    #: satisfies what evidence must show (Principle IX).
+    #:
+    #: Its own section rather than folded into `provenance`, because a reviewer asking "what
+    #: does this now permit" does not look under a heading about where the proposal came from.
+    #: Generic on purpose: `core.authoring` stays product-blind and 042 supplies the lines.
+    evidence: list[str] = field(default_factory=list)
 
     @property
     def limits(self) -> tuple[str, ...]:
@@ -114,6 +126,12 @@ class Proposal:
         lines += [f"- `{f.path}` ({'edited' if f.is_diff else 'created'})" for f in self.files]
         if self.rationale.strip():
             lines += ["", "### Rationale", "", self.rationale.strip()]
+        if self.evidence:
+            # Between the rationale and the provenance: the reviewer reads what was proposed,
+            # then what it MEASURABLY does, then where it came from, then what is not covered.
+            # Ahead of provenance because it is the question a policy review actually asks.
+            lines += ["", "### Measured impact", ""]
+            lines += [f"- {entry}" for entry in self.evidence]
         if self.provenance:
             # After the rationale and before the limits: a reviewer reads what was proposed,
             # then where it came from, then what it does not cover.

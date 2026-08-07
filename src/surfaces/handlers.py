@@ -21,6 +21,7 @@ without saying so is how a pack comes to read as proven.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -125,6 +126,307 @@ class VaultWriteObserver:
         return Observation(outcome=ObservationOutcome.HAPPENED, detail="metadata present")
 
 
+# ── 042: Vault policy authoring ──────────────────────────────────────────────────────────
+#
+# **The protected set is supplied, never derived here.** `surfaces.dispatch.policy_authoring`
+# reads it from the trust fabric and fails closed when it cannot; these handlers take the
+# result. A handler that read it itself would be a second answer to "what may not be touched",
+# and the two would disagree exactly when it mattered.
+
+#: How many attachments one read may report before it truncates and says so (FR-010).
+#:
+#: Fixed with its reasoning, on `READ_BUDGET_BYTES`'s precedent: an unfixed threshold is one
+#: that gets raised until the corpus passes. Fifty is far above what any real policy carries —
+#: a policy attached to more than fifty principals is a finding in itself — and far below the
+#: 029 failure, where a read bounded by the wrong thing answered from 1,000 of 63,947 entries.
+ATTACHMENT_BUDGET = 50
+
+#: Where a policy can be attached in this estate, measured from `auth.tf` rather than assumed:
+#: token roles, JWT auth roles, and identity entities and groups.
+_ATTACHMENT_SOURCES = (
+    ("token_role", "auth/token/roles"),
+    ("auth_role", "auth/workload/role"),
+    ("entity", "identity/entity/name"),
+    ("group", "identity/group/name"),
+)
+
+
+def _policy_attachments(fabric: Any, policy_name: str) -> tuple[list[dict[str, str]], bool]:
+    """Where ``policy_name`` is attached, bounded, with whether the bound bit.
+
+    **Wiring, not content.** "agent-ceiling is attached to the agent-run JWT role" describes
+    how the estate is put together; it carries no policy body and no secret. That distinction
+    is what lets attachments stay readable for a protected policy whose document does not.
+
+    A source that cannot be listed is skipped rather than fatal: an estate with no identity
+    secrets engine mounted is an ordinary estate, and refusing the whole read because one of
+    four optional locations is absent would make the tool unusable where it is most needed.
+    """
+    found: list[dict[str, str]] = []
+    truncated = False
+    for kind, base in _ATTACHMENT_SOURCES:
+        try:
+            names = fabric.list_path(base) or []
+        except Exception:  # noqa: BLE001 — an absent mount is not a failed read
+            continue
+        for name in names:
+            if len(found) >= ATTACHMENT_BUDGET:
+                truncated = True
+                break
+            try:
+                record = fabric.read_path(f"{base}/{str(name).rstrip('/')}")
+            except Exception:  # noqa: BLE001 — same reason
+                continue
+            data = (record or {}).get("data") or {}
+            attached: set[str] = set()
+            for field in ("policies", "token_policies"):
+                value = data.get(field) or []
+                if isinstance(value, list):
+                    attached.update(str(v) for v in value)
+            if policy_name in attached:
+                found.append({"kind": kind, "name": str(name).rstrip("/"), "mount": base})
+        if truncated:
+            break
+    return found, truncated
+
+
+def vault_policy_read(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Read a policy's structure and what it is attached to — never a secret value (042).
+
+    **Three states, not two** (FR-003). `present` carries the document; `absent` says the
+    policy is not there; `protected` says the platform will not hand over the body of a record
+    that bounds the agent asking. Collapsing the last two would make a denial read as a gap,
+    and an agent told "no such policy" about `agent-ceiling` would reasonably propose creating
+    one.
+
+    **A protected body never enters the run**, which is FR-013 done structurally rather than by
+    scrubbing at composition: a body that was never read cannot appear in a proposal, whereas a
+    body filtered later depends on every future composition path remembering to filter. 038's
+    containment module draws exactly this distinction between structural and inspected claims.
+
+    Attachments stay readable for every state but `absent`, because they are wiring rather than
+    content — and knowing that `agent-ceiling` is attached to the `agent-run` role is what lets
+    an agent reason about the estate without being handed its own leash.
+    """
+    name = str(arguments.get("policy_name", "")).strip()
+    if not name:
+        raise ValueError("vault_policy_read requires a 'policy_name' argument")
+
+    protected: frozenset[str] = frozenset(arguments.get("_protected") or ())
+    fabric = _fabric()
+
+    if name in protected:
+        attachments, truncated = _policy_attachments(fabric, name)
+        return {
+            "policy_name": name,
+            "state": "protected",
+            "document": "",
+            "attachments": attachments,
+            "truncated": truncated,
+            "note": (
+                "this policy is part of what bounds the agents in this estate; its "
+                "attachments are visible and its body is not"
+            ),
+        }
+
+    record = fabric.read_path(f"sys/policies/acl/{name}")
+    if record is None:
+        return {
+            "policy_name": name,
+            "state": "absent",
+            "document": "",
+            "attachments": [],
+            "truncated": False,
+        }
+
+    document = str(((record or {}).get("data") or {}).get("policy", ""))
+    attachments, truncated = _policy_attachments(fabric, name)
+    return {
+        "policy_name": name,
+        "state": "present",
+        "document": document,
+        "attachments": attachments,
+        "truncated": truncated,
+    }
+
+
+#: How many paths one impact check may query (FR-010). Same reasoning as `ATTACHMENT_BUDGET`:
+#: fixed with the number written down, because a threshold without one gets raised until the
+#: corpus passes. A policy touching more than forty paths is a policy nobody is reviewing
+#: carefully anyway, and the truncation is disclosed rather than silent.
+IMPACT_PATH_BUDGET = 40
+
+#: The token role that bounds what a scratch token may carry. Declared in
+#: `infra/modules/trust-fabric/scratch.tf`; named here because the handler must ask for it by
+#: name, and the two must agree or the mint refuses.
+SCRATCH_TOKEN_ROLE = "scratch-check"
+
+SCRATCH_PREFIX = "scratch-agent-"
+
+#: One minute. Long enough for a handful of capability queries, short enough that a run killed
+#: mid-measurement leaves no usable credential — which is why FR-023's sweep is about orphaned
+#: POLICIES and not about tokens.
+SCRATCH_TOKEN_TTL = "60s"
+
+_PATH_STANZA = re.compile(r'^\s*path\s+"([^"]+)"\s*\{', re.M)
+
+
+class PolicyInvalid(ValueError):
+    """Vault refused to parse the proposed document.
+
+    **A policy error, never an impact result.** Reporting "no capabilities" for a document
+    Vault could not read would tell a reviewer the change grants nothing, which is true of a
+    policy that does not exist and dangerously untrue of the one they are being asked to
+    approve.
+    """
+
+
+class ImpactUnavailable(RuntimeError):
+    """The measurement could not be taken, so no proposal may be published (FR-008).
+
+    Its own type because the response is refusal rather than a partial answer. 037's finding
+    applies: a reviewer handed a proposal with the evidence section missing reads the rest as
+    complete, and a review that has been reassured is worse than one that never happened.
+    """
+
+
+def _queried_paths(*documents: str) -> tuple[list[str], bool]:
+    """The paths worth asking about, bounded, with whether the bound bit.
+
+    **The scan does not need to parse HCL correctly to be safe**, and that is deliberate: the
+    full document goes to Vault, whose parser is authoritative, so a missed stanza costs a
+    disclosed bound rather than a wrong answer. Building an HCL parser to find query
+    candidates would be Principle VI's "could be a library" in the other direction — a
+    dependency bought to make a heuristic feel rigorous.
+    """
+    seen: list[str] = []
+    for document in documents:
+        for path in _PATH_STANZA.findall(document or ""):
+            if path not in seen:
+                seen.append(path)
+    return seen[:IMPACT_PATH_BUDGET], len(seen) > IMPACT_PATH_BUDGET
+
+
+def _capabilities_under(
+    fabric: Any, *, name: str, document: str, paths: list[str]
+) -> dict[str, list[str]]:
+    """Write one scratch policy, ask what a token carrying only it could do, destroy it.
+
+    Returns an empty map for an empty document: a policy that does not exist yet has no
+    current side, and every capability on the proposed side is newly granted.
+    """
+    if not document.strip():
+        return {}
+    try:
+        fabric.write_path(f"sys/policies/acl/{name}", {"policy": document})
+    except Exception as exc:  # noqa: BLE001 — Vault's parser is the authority here
+        raise PolicyInvalid(
+            f"Vault refused the policy document: {type(exc).__name__}. This is a policy "
+            f"error, not an impact result — a document the product cannot read grants "
+            f"nothing, and reporting that as the measurement would read as a safe change"
+        ) from exc
+
+    token = fabric.create_token(role=SCRATCH_TOKEN_ROLE, policies=[name], ttl=SCRATCH_TOKEN_TTL)
+    answered: dict[str, list[str]] = fabric.capabilities(subject_token=token, paths=paths)
+    return answered
+
+
+def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """What the proposed policy would ALTER, measured by Vault (042, FR-007/009/019-022).
+
+    **One tool call, and that is the safety design.** Splitting write / mint / check / destroy
+    into separate tools would make "always destroyed" depend on a model *choosing* to make the
+    last call — a rule the model is asked to follow, which is exactly what this feature's
+    central refusal says it must never rest on. Here the model can request a measurement and
+    cannot request a scratch policy: the names are derived from the run id, and `finally`
+    destroys both sides on every path out including the failing one.
+
+    **Both sides go through scratch**, which is not obvious and is load-bearing. The tempting
+    shortcut for the current side — mint a token carrying the LIVE policy by name — would
+    require the token role's `allowed_policies_glob` to admit real policy names, handing every
+    dispatched run a way to mint tokens under `agent-ceiling`. Two throwaway policies keep the
+    glob absolute.
+
+    **The residual orphan window is real and is not hidden.** A process killed between the
+    write and the `finally` leaves scratch policies behind; the sweep (FR-023) is what makes
+    "always destroyed" checkable rather than merely claimed.
+    """
+    run_id = str(arguments.get("run_id", "")).strip()
+    if not run_id:
+        raise ValueError("vault_policy_impact requires a 'run_id' argument to derive its names")
+    proposed_document = str(arguments.get("proposed_document", ""))
+    current_document = str(arguments.get("current_document", ""))
+    if not proposed_document.strip():
+        raise ValueError("vault_policy_impact requires a 'proposed_document' to measure")
+
+    # DERIVED, never supplied. A `scratch_name` argument would be a caller choosing what to
+    # overwrite, and the governance hook refuses a call that carries one.
+    current_name = f"{SCRATCH_PREFIX}{run_id}-current"
+    proposed_name = f"{SCRATCH_PREFIX}{run_id}-proposed"
+
+    paths, truncated = _queried_paths(current_document, proposed_document)
+    if not paths:
+        raise PolicyInvalid(
+            "neither document declares a path stanza; there is nothing to measure, and an "
+            "empty measurement must not read as a change that grants nothing"
+        )
+
+    fabric = _fabric()
+    try:
+        current = _capabilities_under(
+            fabric, name=current_name, document=current_document, paths=paths
+        )
+        proposed = _capabilities_under(
+            fabric, name=proposed_name, document=proposed_document, paths=paths
+        )
+    except PolicyInvalid:
+        raise
+    except Exception as exc:  # noqa: BLE001 — an unmeasurable change is not a safe one
+        raise ImpactUnavailable(
+            f"the impact could not be measured against Vault: {type(exc).__name__}. No "
+            f"proposal is published without its evidence — a reviewer handed one whose "
+            f"evidence section is missing reads the rest as complete"
+        ) from exc
+    finally:
+        # EVERY path out, including the failing one. `delete_path` treats already-absent as
+        # success precisely so this cannot mask the exception it is unwinding.
+        for name in (proposed_name, current_name):
+            try:
+                fabric.delete_path(f"sys/policies/acl/{name}")
+            except Exception:  # noqa: BLE001 — cleanup must not replace the original fault
+                pass
+
+    results = []
+    for path in paths:
+        # A path Vault did not answer for is absent from the map, not empty — the client
+        # keeps that distinction because filling it would report a widening as a narrowing.
+        #
+        # `deny` IS DROPPED, and the live probe is what found it. Vault answers `["deny"]` for
+        # a path a token cannot reach, so the raw arithmetic produced `granted: ["list"],
+        # revoked: ["deny"]` for a change that grants list on a previously unreachable path.
+        # "Revokes deny" is not a fact about the change; it is the absence of capabilities
+        # spelled as one, and a reviewer reading it would be counting a grant twice.
+        before = frozenset(current.get(path, ())) - {"deny"}
+        after = frozenset(proposed.get(path, ())) - {"deny"}
+        results.append(
+            {
+                "path": path,
+                "current": sorted(before),
+                "proposed": sorted(after),
+                "granted": sorted(after - before),
+                "revoked": sorted(before - after),
+                "unanswered": path not in proposed,
+            }
+        )
+
+    return {
+        "measured_by": "vault",
+        "results": results,
+        "truncated": truncated,
+        "scratch_destroyed": True,
+    }
+
+
 def terraform_plan(arguments: Mapping[str, Any]) -> dict[str, Any]:
     """FIXTURE — Terraform is not deployed in the enclave.
 
@@ -158,6 +460,8 @@ class TerraformApplyObserver:
 #: Handlers a manifest may name. A name absent from this table refuses `unresolved_binding`
 #: at load — where the name was written, rather than at the first call.
 PLATFORM_HANDLERS: dict[str, Any] = {
+    "vault_policy_impact": vault_policy_impact,
+    "vault_policy_read": vault_policy_read,
     "vault_read": vault_read,
     "vault_write": vault_write,
     "terraform_plan": terraform_plan,
@@ -173,12 +477,18 @@ PLATFORM_OBSERVERS: dict[str, Any] = {
 
 __all__ = [
     "AGENT_SECRET_MOUNT",
+    "ATTACHMENT_BUDGET",
+    "IMPACT_PATH_BUDGET",
+    "ImpactUnavailable",
+    "PolicyInvalid",
     "PLATFORM_HANDLERS",
     "PLATFORM_OBSERVERS",
     "TerraformApplyObserver",
     "VaultWriteObserver",
     "terraform_apply",
     "terraform_plan",
+    "vault_policy_impact",
+    "vault_policy_read",
     "vault_read",
     "vault_write",
 ]
