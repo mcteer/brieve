@@ -100,8 +100,11 @@ confirm no secret value and a recorded read; a non-admin is refused.
       `tests/conformance/console/test_console_read.py` (new dir): field-for-field agreement
       (C9), unavailable-not-empty (C10), [GATE:no-secret-leak] no credential in any
       response (C11), reads recorded (C12), non-admin refused and recorded — including
-      `operator` and `compliance-analyst` (C13), and admin's evidence read refusing exactly
-      as a stranger's (C14).
+      `operator` and `compliance-analyst` (C13), admin's evidence read refusing exactly
+      as a stranger's (C14), and **C26** — the presented role vocabulary is exactly
+      ADR-0039's, asserted against the canonical constant; C9 additionally pins FR-022
+      (settings shown = settings implemented) and FR-009's offer side (`qualified_cells`
+      from the matrix and nothing else) (analyze C1/C2/C3).
 
 **Checkpoint**: US1 independently testable — a read-only console, safe to ship alone.
 
@@ -165,7 +168,7 @@ administrator decided. Re-enable; the next ask judges. No restart.
 
 ---
 
-## Phase 5: Q4 — Product connections (P1, scope chosen over recommendation)
+## Phase 5: Q4 — Product connections (P1, scope chosen over recommendation; [US2] labels because connections ride US2's mechanism)
 
 **Goal**: locations governed like everything else; accepted ≠ reachable (FR-018a–c).
 
@@ -177,7 +180,11 @@ field will take one.
       consumers (R5 — the probe and the display): the record parser (product ∈
       {tfe, vault}, locations only — the vocabulary has no credential field, FR-018b), the
       reachability probe (stdlib urllib, unauthenticated health endpoints, R5), and the
-      three-state `verification` rendered separately from the change outcome (FR-018c);
+      three-state `verification` rendered separately from the change outcome (FR-018c) —
+      **any HTTP answer is reachable; only connection failure or timeout is `unreachable`**
+      (analyze A1: TFE's ping answers 401 without a token, and 401 proves the endpoint is
+      there — a probe treating non-2xx as down would read every correctly-secured TFE as
+      unreachable);
       the console labels the record "not yet consumed by dispatched runs" (R5's honest
       middle, FR-022).
 - [ ] T015 [US2] [GATE:conformance] Rows **C23–C25** in

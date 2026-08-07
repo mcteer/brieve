@@ -1,6 +1,6 @@
 # Conformance: The admin console (044)
 
-Rows **C1–C25** (hermetic unless marked), plus live legs **CL1–CL3**. Blocking from the moment
+Rows **C1–C26** (hermetic unless marked), plus live legs **CL1–CL3**. Blocking from the moment
 the feature exists (ADR-0047); none may be stubbed green.
 
 **Named runner (constitution v1.1.0)**: the `enclave`-marked rows and the CL legs are run by
@@ -23,12 +23,13 @@ the feature exists (ADR-0047); none may be stubbed green.
 
 | Row | Asserts |
 | --- | --- |
-| C9 | An administrator's read returns the fabric's records as they are — compared field-for-field against the records the row wrote |
+| C9 | An administrator's read returns the fabric's records as they are — compared field-for-field against the records the row wrote; the payload's setting set is **exactly the implemented set** (FR-022 — absent, never disabled), and `qualified_cells` comes from the matrix and nothing else (FR-009's offer side) |
 | C10 | An unreadable record renders **unavailable**, never empty or default (FR-002) |
 | C11 | [no-secret-leak] No credential, key, or token value in any console response — asserted over the rendered payloads, including connection records |
 | C12 | Every read is recorded with the administrator's identity (FR-004) |
 | C13 | A non-admin is refused and the refusal recorded; `operator` and `compliance-analyst` do NOT see the console (FR-016a's one direction) |
 | C14 | `admin` confers **no** audit visibility (FR-016a's other direction) — an admin's evidence read refuses exactly as a stranger's does |
+| C26 | The role vocabulary the console presents is exactly ADR-0039's, asserted against the canonical constant (FR-018, SC-010) — a friendly alias added later ships a name the platform does not implement, which is the drift R7's decision exists to stop |
 
 ## The toggle (US3 — FR-010–013, SC-006/011)
 

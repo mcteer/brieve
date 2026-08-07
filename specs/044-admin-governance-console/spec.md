@@ -311,9 +311,12 @@ happens to the value and confirm the outcome is visible rather than discovered l
   observable rather than silent.
 - **FR-021**: The interface MUST hold no governance logic: what is permitted is decided by the
   platform and the trust fabric, and the interface renders the result.
-- **FR-021a**: The console's operations MUST be reachable from the portal only. No northbound
-  API or MCP verb MAY expose configuration reads or change requests, and a row MUST assert that
-  MCP carries no configuration verb — an absence nobody checks is an absence that ends.
+- **FR-021a**: The console's operations are admin-gated routes the portal consumes; they are
+  the portal's supported path and MUST NOT be exposed as MCP operations. A row MUST assert that
+  MCP carries no configuration verb — an absence nobody checks is an absence that ends. (A
+  person holding the admin role reaching the same routes directly is the same person with the
+  same authority, not a second surface — the enforceable claims are the role gate and MCP's
+  absence, and "portal only" is a statement of the supported client, not of a mechanism.)
 - **FR-021b**: The console MUST meet the same accessibility standard as the rest of the portal
   (WCAG 2.2 AA, keyboard and screen-reader operable), and the accessibility suite MUST be
   extended to walk it. **Measured**: today's rows visit the portal root, a thread, and a
