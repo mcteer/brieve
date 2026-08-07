@@ -119,18 +119,18 @@ when; a non-administrator is refused; withdrawal takes effect on the next questi
 **Independent Test**: endorse, sync, change upstream — answers still cite the synced copy, and
 drift is detectable rather than silent.
 
-- [ ] T010 [US2] The sync in `src/surfaces/sync/endorsed_sync.py` (new): clone at a tip,
+- [X] T010 [US2] The sync in `src/core/endorsed_sync.py` (new — the plan said `src/surfaces/sync/`, and `test_the_cli_is_withdrawn.py` refused it: `surfaces/` holds the three transports plus the dispatch seam, and this is the one place the platform reaches OUT): clone at a tip,
       extract citable sections, write an immutable version into the store; **records what it
       took, its identity, when, and who triggered it** (FR-017). A document with no addressable
       sections is not citable and is reported as such, never cited whole (FR-011/E20).
-- [ ] T011 [US2] [GATE:conformance] Rows **E6–E10** in
+- [X] T011 [US2] [GATE:conformance] Rows **E6–E10** in
       `tests/conformance/endorsed/test_sync.py`: the sync record (E6), digest mismatch refuses
       (E7), the three distinct failure states (E8), an unreachable source does not stop
       answering from what is already synced (E9), and [GATE:no-secret-leak] no credential in a
       sync record or a console rendering (E10); and E6's never-carries half — the sync record
       and every audit event carry identities and paths, **never document content** (FR-023,
       038's FORBIDDEN_PAYLOAD_KEYS shape).
-- [ ] T012 [US2] **ADR-0070** in `docs/adr/0070-endorsed-content-sync-is-an-egress-class.md`
+- [X] T012 [US2] **ADR-0070** in `docs/adr/0070-endorsed-content-sync-is-an-egress-class.md`
       (Proposed): endorsed-content sync as an enumerated egress class with its bounds — named
       sources only, never during answering, read-only, trust-store credentials referenced never
       entered — and the resolution of ADR-0030's tension (customer content is *consulted*
