@@ -38,6 +38,7 @@ import sys
 from pathlib import Path
 
 from adapters.anthropic_answering import LiveAnswerProvider, LiveEstateProvider
+from adapters.anthropic_relevance import LiveRelevanceJudge
 from adapters.anthropic_scorer import LiveModelScorer
 from core.answering.answer import ANSWERED, DECLINED, ProviderUnavailable, answer_question
 from core.answering.corpus import load_corpus
@@ -56,9 +57,7 @@ class _Replay:
     def __init__(self, candidates: list[dict[str, object]]) -> None:
         self._candidates = candidates
 
-    def answer(
-        self, question: str, records: tuple[object, ...], context: str = ""
-    ) -> list[dict[str, object]]:
+    def answer(self, question: str, material: object, context: str = "") -> list[dict[str, object]]:
         return self._candidates
 
 
@@ -112,8 +111,16 @@ def main() -> int:
     # 3 & 4. The answering path against a real model. Both directions, because they fail
     # differently: a citable question that declines means the model invented an anchor, and an
     # uncitable question that answers means the pin is not being enforced.
+    #
+    # **043 threads the live relevance judge through both, because production does.** The
+    # must_decline probe is `vault-must-decline-001`, the case that went red when 035 widened
+    # the corpus: the model answers "this platform's audit log" with true, resolving claims
+    # about Vault's, and citation resolution has no opinion about subject. Running these
+    # probes WITHOUT a judge would smoke-test a path the surface no longer takes — the exact
+    # shape of a green row that proves nothing about the running service.
     corpus = load_corpus()
     provider = LiveAnswerProvider()
+    judge = LiveRelevanceJudge(LIVE_MODEL)
     for suite, expectation in (("citation_accuracy", ANSWERED), ("must_decline", DECLINED)):
         probe = load_pack_cases(ROOT / "packs" / "vault", suite)[0]
         print(f"--- answering path, case {probe.id} (expects {expectation})")
@@ -129,7 +136,21 @@ def main() -> int:
                 path, anchor = str(cite.get("path", "")), str(cite.get("anchor", ""))
                 mark = "resolves" if corpus.resolves(path, anchor) else "DOES NOT RESOLVE"
                 print(f"      → {path}#{anchor}  [{mark}]")
-        answer = answer_question(question=probe.prompt, corpus=corpus, provider=provider)
+        # `_Replay`, not `provider`, and 043 is why. Calling the provider a second time here
+        # gated a DIFFERENT sample from the one printed above — so the claims a reader sees
+        # and the claims the judge saw were never the same claims. Leg 5 already knew this.
+        answer = answer_question(
+            question=probe.prompt, corpus=corpus, provider=_Replay(candidates), relevance=judge
+        )
+        # The judge's own verdict, printed rather than summarised. A relevance failure and an
+        # invented-anchor failure both read as "declined" in a disposition, and they send a
+        # reader to entirely different places.
+        if answer.irrelevant:
+            print(f"    judge dropped {len(answer.irrelevant)} claim(s) as off-subject:")
+            for dropped in answer.irrelevant[:3]:
+                print(f"      × {dropped[:140]!r}")
+        if answer.relevance_note:
+            print(f"    gate: {answer.relevance_note}")
         print(f"    disposition: {answer.disposition} ({answer.declined_reason or 'answered'})\n")
         if answer.disposition != expectation:
             failures.append(

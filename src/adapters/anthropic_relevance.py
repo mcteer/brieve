@@ -46,12 +46,22 @@ listing the numbers of the statements that answer the question, or:
 
 RELEVANT: none
 
-if none of them do."""
+if none of them do.
 
-#: Enough for one line. A budget that let the model reason at length before answering would buy
-#: nothing the protocol uses, and 031's live lane recorded what a too-small budget costs — a
-#: response whose reasoning consumed the tokens and returned no text at all.
-_MAX_TOKENS = 256
+When the question says "this platform", "this product", "our system" or "we", it refers to the
+asker's own system — not to any of the products the statements are about."""
+
+#: **Not "enough for one line" — that reasoning was wrong and measured wrong.** The first draft
+#: set 256 on the grounds that the protocol only uses one line, and 043's live probe hit
+#: `stop_reason=max_tokens` with an EMPTY body on three consecutive samples of the motivating
+#: case: the model spends budget reasoning *before* the line, so the budget must cover the
+#: reasoning it never emits. 031 recorded this exact failure and this module's docstring cited
+#: it as a risk while the constant reproduced it.
+#:
+#: Intermittent, and that is what makes it expensive: the same input answered on some samples
+#: and returned nothing on others, so it reads as model flakiness rather than as a harness
+#: defect. `_refused_for_budget` below is what makes it name itself next time.
+_MAX_TOKENS = 2048
 
 
 class LiveRelevanceJudge:
@@ -94,6 +104,16 @@ class LiveRelevanceJudge:
             ) from exc
 
         response = "".join(block.text for block in message.content if block.type == "text")
+        # Truncation gets its OWN refusal, because "the model returned no verdict" and "the
+        # budget ran out before the model wrote one" send a reader to entirely different places
+        # — the first to the prompt, the second to this file. 043 spent live calls learning
+        # that the generic message names neither.
+        if getattr(message, "stop_reason", None) == "max_tokens" and not response.strip():
+            raise RelevanceRefused(
+                f"the relevance judge exhausted its {_MAX_TOKENS}-token budget before writing "
+                f"a verdict; the gate did not run, and the budget is this adapter's to fix",
+                reason_code="truncated_verdict",
+            )
         # `parse_verdict` raises `RelevanceRefused(malformed_verdict)` on anything that does
         # not open with the token — deliberately not caught here, because a malformed verdict
         # is a different cause from an unreachable judge and the record must say which.

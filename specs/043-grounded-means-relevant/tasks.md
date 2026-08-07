@@ -194,10 +194,10 @@ qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009)
       `client_and_model` (the adapter seam owns credential/import/model-id — and the
       no-live-dependencies guard forbids a vendor import anywhere else); leading-token protocol
       from T001; **sealed-core additive class, named for Principle V review**.
-- [ ] T019 [US1] Add the relevance leg to `tests/evals_live/smoke.py`: the unedited
+- [X] T019 [US1] Add the relevance leg to `tests/evals_live/smoke.py`: the unedited
       `vault-must-decline-001` through the real path with the live judge, response printed —
       one call before anything bigger (L1); smoke exit reflects it (L2).
-- [ ] T020 [US1] [GATE:eval] Create `tests/evals_live/relevance_qualify.py` and the
+- [X] T020 [US1] [GATE:eval] Create `tests/evals_live/relevance_qualify.py` and the
       `evals-relevance-qualify` Makefile target: every seed case at majority-of-three, two
       numbers printed separately — overall vs the ≥90% floor, and supported-but-irrelevant
       which must be ALL correct; a rigged always-affirm candidate demonstrably clears the

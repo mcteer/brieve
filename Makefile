@@ -3,7 +3,7 @@
 # `evals` is .PHONY twice over: it is a recipe, and a DIRECTORY named evals/ exists at
 # the repository root — without the declaration, make reports the seed set 'up to date'
 # and the gate never runs, which is a skip wearing a build system's clothes.
-.PHONY: check mcp-surface-up conformance conformance-hermetic eval-authoring test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke
+.PHONY: check mcp-surface-up conformance conformance-hermetic eval-authoring test-full dev-up dev-down dev-status enclave-verify enclave-digest-diff enclave-boundaries a11y portal-up evals evals-live evals-smoke evals-relevance-qualify
 
 # Every recipe names the adapters and surfaces extras so the gates cannot run in an
 # environment that silently lacks the primary adapter or the northbound surface
@@ -189,6 +189,18 @@ evals-smoke:
 	[ -n "$$K" ] || { echo "no ANTHROPIC_API_KEY in .env" >&2; exit 1; } ; \
 	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra portal --extra evals \
 	  python tests/evals_live/smoke.py
+
+# Qualifying a RELEVANCE judge against the human-labelled seed set (043). Separate from
+# `evals-live` on purpose: that lane qualifies answering cells and takes ~28 minutes, and
+# this one asks a different question of a different role. THE LANE BINDS NOTHING — it prints
+# two numbers and exits; promoting the cell stays a human act (ADR-0052).
+# Run the rigged candidate too, and expect it to be REFUSED:
+#   make evals-relevance-qualify ARGS=--rubber-stamp
+evals-relevance-qualify:
+	@K=$$(grep '^ANTHROPIC_API_KEY=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	[ -n "$$K" ] || { echo "no ANTHROPIC_API_KEY in .env" >&2; exit 1; } ; \
+	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra portal --extra evals \
+	  python tests/evals_live/relevance_qualify.py $(ARGS)
 
 evals-live: evals-smoke
 	@K=$$(grep '^ANTHROPIC_API_KEY=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
