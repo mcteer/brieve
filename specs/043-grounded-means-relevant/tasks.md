@@ -190,7 +190,7 @@ what was considered (SC-007, SC-010).
 **Goal**: the motivating case declines against a live judge; smoke is green; the judge
 qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009).
 
-- [ ] T018 [US1] Create `src/adapters/anthropic_relevance.py`: the live judge, through
+- [X] T018 [US1] Create `src/adapters/anthropic_relevance.py`: the live judge, through
       `client_and_model` (the adapter seam owns credential/import/model-id — and the
       no-live-dependencies guard forbids a vendor import anywhere else); leading-token protocol
       from T001; **sealed-core additive class, named for Principle V review**.
@@ -203,7 +203,7 @@ qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009)
       which must be ALL correct; a rigged always-affirm candidate demonstrably clears the
       first and fails the second (R15). **The lane binds nothing** — promotion is a separate
       human act.
-- [ ] T021 [US1] [GATE:conformance] Hermetic row R15 in
+- [X] T021 [US1] [GATE:conformance] Hermetic row R15 in
       `tests/unit/test_relevance_qualification.py`: the qualification scoring itself, driven
       with a rigged always-affirm candidate against the loaded seed set — passes the majority
       floor, fails the supported-but-irrelevant number, and is refused.
