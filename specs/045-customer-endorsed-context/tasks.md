@@ -251,12 +251,12 @@ resolve, provenance visible per claim, age disclosed.
       citations resolve, provenance rendered, age disclosed. Record outcomes in
       `contracts/conformance-endorsed-context.md`; re-seed the model credential if the apply
       clobbers it.
-- [ ] T027 Run **EL2**: change the upstream, watch the checker flag it, review the difference,
+- [X] T027 Run **EL2**: change the upstream, watch the checker flag it, review the difference,
       adopt, and confirm the next answer moves **while a run started pre-adoption finishes on
       the old version**. Record the outcome.
-- [ ] T028 [P] Run `specs/045-customer-endorsed-context/quickstart.md` top to bottom as
+- [X] T028 [P] Run `specs/045-customer-endorsed-context/quickstart.md` top to bottom as
       written; fix drift in the doc, not by hand-waving the steps.
-- [ ] T029 Update `ROADMAP.md` in the implementation PR: close the customer-supplied-context
+- [X] T029 Update `ROADMAP.md` in the implementation PR: close the customer-supplied-context
       entry with the mechanism in one line, keep the original analysis beneath it, and add
       045's Shipped row (the file's own landing rule).
 
