@@ -203,6 +203,21 @@ resource "vault_policy" "harness_authority_read" {
     path "${vault_mount.harness_authority.path}/data/model-matrix" {
       capabilities = ["read"]
     }
+    # The protected set (042). **The exact path, no glob** — one record, no subpath, which
+    # is 020's finding two blocks up applied before it could cost anything rather than
+    # after. A glob would match `protected-policies/<something>` and never the record that
+    # is actually read.
+    #
+    # Analyze pass 1 predicted this as "verify at implement" (U1) and it was real: this
+    # policy enumerates its subpaths, so a new record gets no grant by default, and the
+    # 403-not-404 trap above turns the missing line into "trust fabric unreachable" for a
+    # run whose only problem is a policy that never mentioned the path.
+    #
+    # Read-only, like everything else here. A run that could write the protected set could
+    # remove itself from it.
+    path "${vault_mount.harness_authority.path}/data/protected-policies" {
+      capabilities = ["read"]
+    }
     # The ASK BINDING (026). Which qualified cell an ask may use, per source.
     #
     # Beside the matrix and read-only for the same reason: a surface that could write its own

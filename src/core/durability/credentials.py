@@ -274,6 +274,166 @@ class VaultDatabaseCredentials:
         keys = (response.get("data") or {}).get("keys") or []
         return [str(k) for k in keys]
 
+    # ── Writes (042) ──────────────────────────────────────────────────────────────────
+    #
+    # **These are the platform's first writes to Vault through the workload identity.**
+    # `surfaces.handlers.vault_write` has always been a stub that validates arguments and
+    # returns `written: True` without touching the product, and `agent_pack_secrets` carries
+    # no write capability — its own comment records the reasoning. So nothing here is a
+    # well-worn path being reused; the grant, the role and these methods arrive together.
+    #
+    # Additive to a sealed-core module (Principle V), named in 042's plan for review.
+
+    def _request(
+        self, path: str, *, method: str, token: str, payload: dict[str, object] | None = None
+    ) -> dict[str, Any] | None:
+        """One writing request, with :meth:`read_path`'s error contract.
+
+        Shared by write and delete because the failure vocabulary is the failure vocabulary:
+        a refused write and a refused delete are both "the fabric said no, and here is what
+        it said", and two copies would drift on the detail extraction that makes the message
+        useful. 404 returns ``None`` — for a delete that is success (already gone), and the
+        caller decides what it means.
+        """
+        body = json.dumps(payload or {}).encode() if payload is not None else None
+        request = urllib.request.Request(  # noqa: S310 — fixed scheme, operator-supplied addr
+            f"{self._addr}/v1/{path}",
+            data=body,
+            headers={"Content-Type": "application/json", "X-Vault-Token": token},
+            method=method,
+        )
+        try:
+            with urllib.request.urlopen(  # noqa: S310
+                request, timeout=self._timeout, context=self._ssl_context
+            ) as response:
+                raw = response.read()
+                # 204 No Content is Vault's ordinary answer to a policy write and a delete.
+                # Parsing it would raise, and treating that as failure would report every
+                # successful write as broken.
+                if not raw:
+                    return {}
+                parsed: dict[str, Any] = json.loads(raw)
+                return parsed
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return None
+            try:
+                detail = exc.read().decode(errors="replace")[:500]
+            except Exception:  # noqa: BLE001 - the original failure is what matters
+                detail = ""
+            raise VaultReadFailed(
+                f"trust fabric refused {method} {path!r} at {self._addr} "
+                f"as role {self._role!r}: HTTP {exc.code} {detail}",
+                status=exc.code,
+                detail=detail,
+            ) from exc
+        except TimeoutError as exc:
+            raise VaultReadFailed(
+                f"trust fabric did not answer {method} {path!r} at {self._addr} "
+                f"within {self._timeout}s",
+                timed_out=True,
+            ) from exc
+        except OSError as exc:
+            timed_out = isinstance(getattr(exc, "reason", None), TimeoutError)
+            raise VaultReadFailed(
+                f"trust fabric unreachable for {method} {path!r} at {self._addr}: "
+                f"{type(exc).__name__}",
+                timed_out=timed_out,
+            ) from exc
+
+    def write_path(
+        self, path: str, payload: dict[str, object], *, token: str | None = None
+    ) -> None:
+        """Write one Vault path as this workload.
+
+        No return value on purpose: Vault answers a policy write with 204 and no body, so a
+        return would be an empty dict every time and a caller could come to test it.
+        """
+        tok = token if token is not None else self.login()
+        self._request(path, method="POST", token=tok, payload=payload)
+
+    def delete_path(self, path: str, *, token: str | None = None) -> None:
+        """Delete one Vault path as this workload. Already-absent is success.
+
+        **Idempotent by contract, because the caller is a ``finally`` block.** 042's impact
+        check destroys its scratch policies on the way out of every path including the
+        failing one, and a delete that raised on "already gone" would turn a successful
+        cleanup into a masked error — or worse, would replace the original exception with
+        one about tidying up.
+        """
+        tok = token if token is not None else self.login()
+        self._request(path, method="DELETE", token=tok)
+
+    def create_token(
+        self,
+        *,
+        role: str,
+        policies: list[str],
+        ttl: str = "60s",
+        token: str | None = None,
+    ) -> str:
+        """Mint a child token through a token ROLE, and return it.
+
+        **Through a role, never a bare create.** A bare `auth/token/create` can only grant
+        policies the parent already holds, which would mean attaching the scratch policy to
+        the run's own token — a run holding authority over what bounds it, in miniature. The
+        role carries `allowed_policies_glob`, so the bound is the product's and holds even if
+        every check in this repository is wrong.
+
+        `no_default_policy` is set here rather than on the role alone: a token described as
+        carrying "only the proposed policy" that also carried `default` would answer
+        capability questions for the union, and the answer would be wrong in the permissive
+        direction.
+        """
+        tok = token if token is not None else self.login()
+        response = self._request(
+            f"auth/token/create/{role}",
+            method="POST",
+            token=tok,
+            payload={"policies": policies, "ttl": ttl, "no_default_policy": True},
+        )
+        minted = ((response or {}).get("auth") or {}).get("client_token")
+        if not minted:
+            raise VaultReadFailed(
+                f"trust fabric minted no token for role {role!r} at {self._addr}; "
+                f"a check that cannot obtain its subject has not run"
+            )
+        return str(minted)
+
+    def capabilities(self, *, subject_token: str, paths: list[str]) -> dict[str, list[str]]:
+        """Ask Vault what ``subject_token`` could do on ``paths``.
+
+        **`sys/capabilities`, called as the platform with the subject in the body** — not
+        `capabilities-self` called as the subject. The scratch token is minted with
+        `no_default_policy`, and `capabilities-self` lives in the `default` policy, so the
+        subject cannot ask on its own behalf. Restoring `default` to make it possible would
+        mean the token no longer carries only the policy under measurement.
+
+        The answer is Vault's, which is the whole point of the instrument: the platform
+        renders it and never derives it.
+        """
+        response = (
+            self._request(
+                "sys/capabilities",
+                method="POST",
+                token=self.login(),
+                payload={"token": subject_token, "paths": paths},
+            )
+            or {}
+        )
+        data = response.get("data") or response
+        # **Only what Vault answered.** A path missing from the result is NOT an empty
+        # capability set — Vault says `["deny"]` when it means deny, so absent means the
+        # question was not answered. Filling it with `[]` would make an unanswered path
+        # indistinguishable from a denied one, and on the proposed side that reports a
+        # widening as a narrowing. The caller compares against the paths it asked for and
+        # discloses the difference (FR-010) rather than inventing a verdict.
+        return {
+            queried: sorted(str(v) for v in data[queried])
+            for queried in paths
+            if isinstance(data.get(queried), list)
+        }
+
     def fetch(self) -> DatabaseCredential:
         """Authenticate as this workload and mint a credential."""
         try:

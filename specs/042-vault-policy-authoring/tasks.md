@@ -44,13 +44,13 @@ Single project: `src/`, `tests/`, `packs/`, `infra/` at repository root.
 **Purpose**: the write path, the grants, and the protected set — the three things every
 story stands on and none may build for itself.
 
-- [ ] T001 Extend `src/core/durability/credentials.py` with four additive methods —
+- [X] T001 Extend `src/core/durability/credentials.py` with four additive methods —
       `write_path`, `delete_path`, `create_token(role, policies, ttl)`,
       `capabilities(token, paths)` — reusing the existing login/TLS/timeout handling (R8);
       **sealed-core additive, named in plan's Principle V row**; unit rows in
       `tests/unit/test_vault_client_writes.py` including [GATE:no-secret-leak] — no token
       value in any log, exception message, or return beyond the caller's hands.
-- [ ] T002 [P] Trust-fabric additions in `infra/modules/trust-fabric/scratch.tf` (new):
+- [X] T002 [P] Trust-fabric additions in `infra/modules/trust-fabric/scratch.tf` (new):
       `scratch-check` token role (`allowed_policies_glob = ["scratch-agent-*"]`, TTL 60s,
       `no_default_policy`), protected-set publication to
       `harness-authority/data/protected-policies`; `scratch_policy_check` policy in
@@ -58,7 +58,7 @@ story stands on and none may build for itself.
       in `auth.tf` (R3, R4). `terraform validate` clean. **Verify `harness_authority_read`'s
       path grammar covers `protected-policies`** — if its grants enumerate subpaths, extend
       the grant in the same change (analyze U1; 043's M2 was this shape and was real).
-- [ ] T003 [P] Unit scans in `tests/unit/test_trust_fabric_protected_set.py`: **V6** —
+- [X] T003 [P] Unit scans in `tests/unit/test_trust_fabric_protected_set.py`: **V6** —
       every `resource "vault_policy"` name in `infra/modules/trust-fabric/` appears in the
       published protected list; **V7** — no trust-fabric policy name begins
       `scratch-agent-` (FR-020's reserved namespace as a merge gate); **V20** — the
