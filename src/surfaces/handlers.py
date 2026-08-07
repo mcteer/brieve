@@ -400,8 +400,14 @@ def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
     for path in paths:
         # A path Vault did not answer for is absent from the map, not empty — the client
         # keeps that distinction because filling it would report a widening as a narrowing.
-        before = frozenset(current.get(path, ()))
-        after = frozenset(proposed.get(path, ()))
+        #
+        # `deny` IS DROPPED, and the live probe is what found it. Vault answers `["deny"]` for
+        # a path a token cannot reach, so the raw arithmetic produced `granted: ["list"],
+        # revoked: ["deny"]` for a change that grants list on a previously unreachable path.
+        # "Revokes deny" is not a fact about the change; it is the absence of capabilities
+        # spelled as one, and a reviewer reading it would be counting a grant twice.
+        before = frozenset(current.get(path, ())) - {"deny"}
+        after = frozenset(proposed.get(path, ())) - {"deny"}
         results.append(
             {
                 "path": path,

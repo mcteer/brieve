@@ -27,12 +27,37 @@ watch V3 fail — the safety case losing is the demonstration.
 
 ```sh
 make dev-up
-# PL1 — a single impact check with the capability answers printed
+export VAULT_ADDR=https://127.0.0.1:8200
+export VAULT_CACERT="$PWD/.enclave/ca.pem"   # the enclave serves TLS from its own CA
+export VAULT_TOKEN=...                       # VAULT_ROOT_TOKEN from .env
+uv run --extra adapters --extra surfaces --extra portal \
+  python tests/evals_live/policy_impact_probe.py
 ```
+
+**`VAULT_CACERT` is not optional and urllib will not find it for you.** The control plane
+serves TLS from a CA in no system trust store, and urllib does not read `VAULT_CACERT` on its
+own — that is a Vault CLI convention. Without it every request fails verification and the
+error surfaces as `URLError`, which reads as "Vault is down" rather than "the certificate was
+never loaded". The client handles this once the variable is set; setting it is the caller's.
 
 Expected: two scratch policies written and destroyed inside one tool call; per-path
 `current` / `proposed` / `granted` / `revoked` from Vault's own `sys/capabilities`; zero
-`scratch-agent-*` policies surviving (`vault policy list | grep scratch-agent-` is empty).
+`scratch-agent-*` policies surviving — which the probe checks itself rather than leaving to a
+follow-up command.
+
+Observed 2026-08-07:
+
+```
+  secret/data/payments/*        granted ['create', 'update']   revoked []
+  secret/metadata/payments/*    granted ['list']               revoked []
+zero scratch policies survived; the measurement left nothing behind
+```
+
+**This probe earned its keep on its first run.** Vault answers `["deny"]` for a path a token
+cannot reach, and the first version of the arithmetic reported `granted: ["list"], revoked:
+["deny"]` for the metadata path — "revokes deny" being the absence of capabilities spelled as
+a fact, which makes a reviewer count one grant twice. No hermetic row caught it, because the
+scripted Vault never returned Vault's actual marker.
 
 ## 3 — The product-level back-stop (live)
 

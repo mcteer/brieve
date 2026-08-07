@@ -124,6 +124,7 @@ same change.
 | [0065](0065-code-mode-is-decided-against.md) | Code mode is decided against, superseding [0041](0041-code-mode-requires-hook-parity.md) | Proposed |
 | [0066](0066-version-control-is-reached-through-adopted-clis.md) | Version control is reached through adopted CLIs, not an MCP server | Accepted |
 | [0067](0067-a-model-does-not-judge-its-own-output.md) | A model does not judge its own output | Proposed |
+| [0068](0068-impact-is-measured-by-the-product.md) | Impact is measured by the product, in a namespace reserved for measurement | Proposed |
 
 ## Reviews
 

@@ -283,3 +283,37 @@ def test_the_path_budget_truncates_and_says_so(monkeypatch: pytest.MonkeyPatch) 
 
     assert result["truncated"] is True
     assert len(result["results"]) == handlers.IMPACT_PATH_BUDGET
+
+
+def test_vaults_deny_marker_is_not_treated_as_a_capability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Found by the live probe (PL1), which is what the live probe is for.
+
+    Vault answers `["deny"]` for a path a token cannot reach. The first version of the
+    arithmetic took that literally and reported, for a change granting `list` on a previously
+    unreachable path:
+
+        granted: ["list"], revoked: ["deny"]
+
+    "Revokes deny" is not a fact about the change — it is the absence of capabilities spelled
+    as one, and a reviewer reading it counts the same grant twice. No hermetic row would have
+    caught it, because the scripted Vault never returned Vault's actual marker.
+    """
+
+    class _Denying(_Vault):
+        def capabilities(self, *, subject_token: str, paths: list[str]) -> dict[str, list[str]]:
+            document = self.written.get(subject_token.removeprefix("token-for-"), "")
+            return {path: (["list"] if "list" in document else ["deny"]) for path in paths}
+
+    result = _impact(
+        monkeypatch,
+        _Denying(),
+        current_document='path "secret/metadata/x" {\n  capabilities = ["read"]\n}\n',
+        proposed_document='path "secret/metadata/x" {\n  capabilities = ["list"]\n}\n',
+    )
+
+    entry = result["results"][0]
+    assert entry["granted"] == ["list"]
+    assert entry["revoked"] == [], "`deny` is not a capability and must not read as one"
+    assert entry["current"] == []

@@ -216,19 +216,19 @@ value and no trust-fabric body.
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T018 [P] Write `docs/adr/0068-impact-is-measured-by-the-product.md` (Proposed):
+- [X] T018 [P] Write `docs/adr/0068-impact-is-measured-by-the-product.md` (Proposed):
       the scratch mechanism, its three bounds, why one call, why both sides, the orphan
       window that remains (R14); index in `docs/adr/README.md`.
-- [ ] T019 Apply the trust-fabric additions to the dev enclave and run **PL1** — the
+- [X] T019 Apply the trust-fabric additions to the dev enclave and run **PL1** — the
       single-call probe in `tests/evals_live/policy_impact_probe.py` (smoke shape: raw
       capability answers printed, one call before anything bigger); re-seed the model
       credential if the apply clobbers it.
 - [ ] T020 Run **PL2** end to end — policy-repository subject → read → author → impact →
       real PR via 041's publisher; answer SC-001's three questions from the PR alone;
       record PL1–PL3 outcomes in `contracts/conformance-policy-authoring.md`.
-- [ ] T021 [P] Run `specs/042-vault-policy-authoring/quickstart.md` top to bottom as
+- [X] T021 [P] Run `specs/042-vault-policy-authoring/quickstart.md` top to bottom as
       written; fix drift in the doc, not by hand-waving the steps.
-- [ ] T022 Update `ROADMAP.md` in the implementation PR: the change-proposal table's Vault
+- [X] T022 Update `ROADMAP.md` in the implementation PR: the change-proposal table's Vault
       row closes with the mechanism in one line, and 042's Shipped row lands (the file's
       own landing rule).
 
