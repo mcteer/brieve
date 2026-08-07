@@ -264,7 +264,18 @@ def protected_policy_hook(protected: ProtectedSet) -> HookRegistration:
 #: What a citation must resolve against. The pinned Vault operating guides are already the
 #: answering surface's ground (ADR-0004), so a proposal's reasoning rests on the same corpus a
 #: person would be shown if they asked the question directly.
-CITATION_PATTERN = re.compile(r"/validated-(?:designs|patterns)/[\w./-]+(?:#[\w-]+)?")
+#: What counts as a citation in a rationale's free text.
+#:
+#: **045 added the `/endorsed/` alternative, and until it did the authoring half of this feature
+#: was a no-op** — customer material was resolvable and never extracted, so a proposal citing an
+#: organisation's own standard would have carried the "cites no pinned guidance" disclosure
+#: while citing exactly what it was asked to follow. Found by a row that asserted the
+#: disclosure rather than the extraction.
+#:
+#: The two alternatives are enumerated rather than generalised to "any absolute path": a
+#: pattern matching every slash-prefixed token would pull file paths and policy names out of a
+#: rationale and present them to a reviewer as evidence.
+CITATION_PATTERN = re.compile(r"(?:/validated-(?:designs|patterns)|/endorsed)/[\w./-]+(?:#[\w-]+)?")
 
 #: FR-012's disclosure. Appended to the proposal's own disclosures rather than blocking the
 #: publish: declining to CLAIM grounding is honest, and refusing to propose at all would make
@@ -357,13 +368,42 @@ def compose_policy_evidence(
 
     citations, grounded = resolved_citations(getattr(proposal, "rationale", ""), resolves)
     if grounded:
-        proposal.evidence.append(
-            "Cited guidance that resolves against the pin: "
-            + ", ".join(f"`{c}`" for c in citations)
-        )
+        proposal.evidence.extend(render_citation_evidence(citations))
     else:
         proposal.disclosures.append(UNSUPPORTED_DISCLOSURE)
     return proposal
+
+
+def render_citation_evidence(citations: list[str]) -> list[str]:
+    """The evidence lines for what a proposal rests on, **split by provenance** (045, FR-016).
+
+    A reviewer reading "this rests on your own architecture standard" is in a different
+    position from one reading "this rests on a HashiCorp validated design": the first is being
+    told the proposal follows a rule their organisation set, the second that it follows
+    somebody else's guidance. A single undifferentiated list would let them read either as the
+    other, which is the same failure the answer's per-citation provenance exists to prevent —
+    one path over, where the artefact is a pull request somebody merges.
+
+    Uses the answering path's single `provenance_of` reader rather than testing the prefix
+    here. Two places deciding what a path means is how the convention decays.
+    """
+    from core.answering.endorsed.corpus import CUSTOMER_ENDORSED, provenance_of
+
+    endorsed = [c for c in citations if provenance_of(c) == CUSTOMER_ENDORSED]
+    validated = [c for c in citations if provenance_of(c) != CUSTOMER_ENDORSED]
+
+    lines: list[str] = []
+    if validated:
+        lines.append(
+            "Cited guidance that resolves against the pin: "
+            + ", ".join(f"`{c}`" for c in validated)
+        )
+    if endorsed:
+        lines.append(
+            "Cited material from your organisation's endorsed sources: "
+            + ", ".join(f"`{c}`" for c in endorsed)
+        )
+    return lines
 
 
 __all__ = [
@@ -377,6 +417,7 @@ __all__ = [
     "UNSUPPORTED_DISCLOSURE",
     "compose_policy_evidence",
     "protected_policy_hook",
+    "render_citation_evidence",
     "render_impact_evidence",
     "resolved_citations",
     "read_protected_set",

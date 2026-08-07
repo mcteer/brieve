@@ -224,12 +224,12 @@ resolve, provenance visible per claim, age disclosed.
 **Goal**: one loader serves both paths, and a proposal discloses like an answer
 (FR-015/016).
 
-- [ ] T022 [US7] The authoring path consumes the **same** combined `resolves` callable
+- [X] T022 [US7] The authoring path consumes the **same** combined `resolves` callable
       (`src/surfaces/dispatch/policy_authoring.py`'s citation checking, 042's seam), and the
       proposal's evidence section carries the same provenance disclosure an answer does
       (FR-016); rows **E24's authoring half** in
       `tests/conformance/endorsed/test_authoring_consults.py`.
-- [ ] T023 [US7] [GATE:conformance] **E24's exclusion half** in
+- [X] T023 [US7] [GATE:conformance] **E24's exclusion half** in
       `tests/conformance/endorsed/test_run_cannot_endorse.py`: a dispatched run cannot endorse,
       adopt, or withdraw — no tool resolves to any of it, a planted instruction records an
       attempt and changes nothing, and **the rigged-on construction fails this row** (044's C20
