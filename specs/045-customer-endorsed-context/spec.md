@@ -82,16 +82,29 @@ protected-policy set are estate governance and are deliberately not console-writ
   mechanism outside the console would avoid it and reintroduce what 044's design argues against
   — two lifecycles for one act, one of which stops getting attention.
 
-- Q: When is an endorsed source synced? → A: **On endorsement, and on demand from the console.**
-  No schedule and no background job.
-  **Staleness becomes visible rather than assumed away.** Content is exactly as old as the last
-  deliberate act, the console shows when that was, and an administrator deciding whether to
-  re-sync is making the same kind of judgement they made when endorsing. A scheduler would make
-  content change without anybody deciding it should — and would cost an operated component,
-  which Principle VI requires a named trigger for.
-  **033's rule carries over**: the age of the ground is disclosed rather than left to be
-  inferred, and an answer resting on customer material says how old that material is by the same
-  reasoning the pinned corpus already does.
+- Q: When is an endorsed source synced? → A: **The platform DETECTS change; an administrator
+  ADOPTS it.** Those are two acts and separating them is the whole answer.
+  The platform may notice that an endorsed source has moved and **notify** the administrator.
+  Noticing changes nothing: what the platform answers from is unchanged until a person reviews
+  the difference and accepts it. So content still never changes without somebody deciding it
+  should — which was the reasoning behind rejecting a scheduler — while nobody has to remember
+  to go and look.
+  **033's rule carries over**: the age of the ground is disclosed rather than inferred, and an
+  answer resting on customer material says how old that material is by the same reasoning the
+  pinned corpus already does.
+
+- Q: What happens to a run that is already in flight when an administrator accepts a change? →
+  A: **It finishes on the content it started with.** A run resolves its ground once, at the
+  start, and keeps it; only runs starting afterwards see the new content.
+  **Otherwise a run's ground could move underneath it mid-flight** — the first half of an answer
+  resting on one version of a standard and the second half on another, with one `corpus_digest`
+  recorded for both and no way to tell afterwards which claim rested on what. That is the same
+  class of failure 005 addressed for authority and effects: a resumed run **re-authenticates but
+  never replays**, and by the same reasoning it must **re-read its ground but never re-resolve
+  it**. A resumed run continues on the version it began with, not on whatever is current.
+  **This is nearly free on the ask path and is the real requirement on the dispatched path**: an
+  ask is one short request, while a dispatched authoring run spans steps and can be checkpointed
+  and resumed hours later.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -149,7 +162,62 @@ answers still cite the synced copy, and that the drift is detectable rather than
 
 ---
 
-### User Story 3 — An answer may cite customer material, and says that it did (Priority: P1)
+### User Story 3 — The administrator is told what changed, and decides (Priority: P1)
+
+An endorsed source moves upstream. The administrator is notified, sees **what changed**, and
+chooses whether to adopt it. Until they do, the platform answers from what it already holds.
+
+**Why this priority**: Without notification an administrator has to remember to look, and
+nobody does. Without review, "accept" is a button somebody presses without knowing what they
+are accepting — which makes the endorsement record say a person decided when what they did was
+click. The review is what keeps the second endorsement as real as the first.
+
+**Independent Test**: Endorse a source, change it upstream, and confirm the console reports a
+change, describes what changed, and that answers are unaffected until an administrator accepts.
+
+**Acceptance Scenarios**:
+
+1. **Given** an endorsed source that has changed upstream, **When** the administrator opens the
+   console, **Then** it reports that the source has changed.
+2. **Given** a reported change, **When** the administrator reviews it, **Then** they can see
+   which documents were added, removed, or altered before deciding.
+3. **Given** an unadopted change, **When** a question is asked, **Then** it is answered from the
+   content the platform already holds, and the answer's age reflects that content.
+4. **Given** the administrator adopts the change, **When** the next question is asked, **Then**
+   it is answered from the new content, and the adoption is recorded with who and when.
+5. **Given** the administrator declines or ignores the change, **When** time passes, **Then**
+   nothing about what the platform answers from changes.
+
+---
+
+### User Story 4 — A run in flight keeps the ground it started on (Priority: P1)
+
+A change adopted while a run is in progress does not reach that run. It finishes on the content
+it began with; runs starting afterwards use the new content.
+
+**Why this priority**: A run whose ground moves mid-flight produces an answer resting on two
+versions of the truth with one identity recorded for both — and nobody can tell afterwards which
+claim rested on what. It is the same class of failure durable execution already addresses for
+authority and effects, arriving through content instead.
+
+**Independent Test**: Start a run, adopt a change mid-flight, and confirm the run completes on
+the original content while a run started afterwards uses the new content. Interrupt and resume a
+run across an adoption; confirm the resumed run continues on its original content.
+
+**Acceptance Scenarios**:
+
+1. **Given** a run in progress, **When** a change is adopted, **Then** that run continues on the
+   content it started with.
+2. **Given** a run that started after an adoption, **When** it runs, **Then** it uses the new
+   content.
+3. **Given** a run interrupted before an adoption and resumed after it, **When** it resumes,
+   **Then** it continues on the content it originally resolved — not on what is now current.
+4. **Given** any run, **When** its record is read, **Then** the identity of the content it used
+   is in the record, and one run's record names exactly one such identity.
+
+---
+
+### User Story 5 — An answer may cite customer material, and says that it did (Priority: P1)
 
 A question the customer's own documents answer is answered from them, with citations that
 resolve — and the answer discloses that it rests on the customer's own material rather than on
@@ -176,7 +244,7 @@ answered, that every citation resolves, and that the answer says which material 
 
 ---
 
-### User Story 4 — The pinned corpus is not weakened (Priority: P1)
+### User Story 6 — The pinned corpus is not weakened (Priority: P1)
 
 Everything true of the platform's own corpus before this feature is still true after it: the
 same pin, the same refusal on mismatch, the same decline when nothing resolves.
@@ -200,7 +268,7 @@ invented citation still declines, and that no path admits a document that is not
 
 ---
 
-### User Story 5 — Authoring sees the same material (Priority: P2)
+### User Story 7 — Authoring sees the same material (Priority: P2)
 
 A run authoring a change against the customer's architecture standards consults the same
 endorsed content the answering path does, and its proposal cites it the same way.
@@ -225,8 +293,15 @@ the citations in the proposal resolve against the same pin the answering path us
 
 - **Endorsed content contradicts a validated design**: both are cited, and the disclosure makes
   the provenance of each visible. The platform does not adjudicate between them.
-- **A document is removed from the source between syncs**: it stops being citable at the next
-  sync; answers already given are unaffected, and the record of what was cited stands.
+- **A document is removed from the source between syncs**: it stops being citable once the
+  change is adopted; answers already given are unaffected, and the record of what was cited
+  stands.
+- **A source changes again while a change is awaiting review**: the administrator reviews
+  against what is currently upstream, not against a stale snapshot of the difference.
+- **A run outlives several adoptions**: it finishes on the content it started with, however many
+  landed meanwhile.
+- **A change is adopted while a run is suspended awaiting approval**: the run resumes on its
+  original content, and the record says which — a suspension is not a new run.
 - **The endorsed source is empty or contains nothing citable**: reported as such, distinct from
   a sync failure.
 - **Content arrives in a form with no addressable sections**: it is not citable, and the
@@ -287,9 +362,26 @@ the citations in the proposal resolve against the same pin the answering path us
 - **FR-016**: A proposal citing customer material MUST carry the same disclosure an answer does.
 - **FR-017**: A sync MUST be recorded — what was synced, its identity, when, and whether it
   succeeded.
-- **FR-017a**: A source MUST be synced when it is endorsed, and MUST be re-syncable on demand by
-  an administrator. The platform MUST NOT sync on a schedule: content that changes without a
-  person deciding it should is content whose currency nobody owns.
+- **FR-017a**: A source MUST be synced when it is endorsed. The platform MAY **detect** that an
+  endorsed source has changed upstream, and MUST NOT **adopt** any change without an
+  administrator accepting it. Detecting is not adopting: content the platform answers from never
+  changes without a person deciding it should.
+- **FR-017c**: An administrator MUST be notified when an endorsed source has changed, and MUST
+  be able to see **what changed** — which documents were added, removed, or altered — before
+  deciding. An accept button in front of an unreviewed change makes the record claim a person
+  decided when what they did was click.
+- **FR-017d**: An unadopted change MUST have no effect on what any answer rests on, and the age
+  disclosed for that content MUST remain the age of what is actually in use.
+- **FR-017e**: An adoption MUST be recorded with who adopted it and when, exactly as the
+  original endorsement is.
+- **FR-017f**: A run MUST resolve the identity of the content it uses **once**, at its start, and
+  MUST use that content for its whole life. A change adopted mid-flight MUST NOT reach a run
+  already in progress.
+- **FR-017g**: A **resumed** run MUST continue on the content it originally resolved, not on
+  whatever is current at resume. A resumed run re-authenticates and never replays; by the same
+  reasoning it re-reads its ground and never re-resolves it.
+- **FR-017h**: A run's record MUST name the identity of the content it used, and MUST name
+  exactly one — a record listing two is a run whose ground moved underneath it.
 - **FR-017b**: The age of endorsed content MUST be visible to an administrator, and an answer
   resting on it MUST disclose that age by the same rule the pinned corpus already follows —
   a disclosure that appears only past a threshold trains readers that silence means fresh.
@@ -340,6 +432,13 @@ the citations in the proposal resolve against the same pin the answering path us
 - **SC-011**: A withdrawal is in force for the next question, with no restart.
 - **SC-013**: An administrator can state how old any endorsed source's content is, from the
   console alone.
+- **SC-014**: Zero changes reach what the platform answers from without an administrator
+  accepting them.
+- **SC-015**: An administrator can say which documents a pending change adds, removes, or alters
+  before accepting it.
+- **SC-016**: Zero runs observe a content change mid-flight, including runs interrupted before an
+  adoption and resumed after it.
+- **SC-017**: Every run record names exactly one content identity.
 - **SC-012**: A proposal citing customer material carries the same disclosure an answer does.
 
 ## Assumptions

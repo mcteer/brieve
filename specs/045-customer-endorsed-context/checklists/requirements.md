@@ -46,9 +46,20 @@ Four questions asked and answered; all four integrated into the spec and its req
 | Domain & data model | **Resolved** — Q1 settled the endorsement's unit (a source, not a document) |
 | Interaction & UX | **Resolved** — Q2 made provenance per-citation and *data rather than presentation* |
 | Integration & governance | **Resolved** — Q3 gave endorsements their own record and named the four-place cost |
-| Lifecycle | **Resolved** — Q4 settled sync as an act somebody takes, never a schedule |
+| Lifecycle | **Resolved** — Q4, then materially refined by the maintainer: the platform **detects** change and an administrator **adopts** it, with a review of what changed in between |
+| Concurrency / isolation | **Resolved** — a run resolves its ground once and keeps it; a resumed run continues on what it originally resolved |
 | Non-functional (performance, scale) | **Outstanding, low impact** — no volume target is stated for a synced source; reasonable defaults exist and the pinned corpus's 238 documents is the working precedent |
 | Terminology | **Clear** — "endorsed source", "synced copy", "citable document", "provenance" used consistently |
+
+**The maintainer refined Q4 after it was answered, and the refinement is better than the
+answer.** "On demand" put the burden of noticing on the administrator; **detect, review, adopt**
+keeps the property that mattered — content never changes without a person deciding — while
+removing the requirement that somebody remember to look. It also surfaced a requirement nothing
+in the spec had covered: **a run in flight keeps the ground it started on**. Without it a run's
+content could move mid-flight, producing an answer resting on two versions with one identity
+recorded for both. That is the class of failure 005 already addressed for authority and effects,
+arriving through content — and it is why US4 exists and why the resumed-run case is called out
+separately from the in-flight one.
 
 **Each answer carried a cost that is now written down rather than discovered**: source-level
 endorsement means a document added upstream is citable without a fresh human act (bounded by the
