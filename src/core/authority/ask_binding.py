@@ -309,6 +309,16 @@ class AskAuthority:
         cells = parse_matrix_record(matrix_record)
         return resolve_ask_cell(source, binding, cells, available=available)
 
+    def read_binding_record(self) -> Mapping[str, Any]:
+        """The raw binding record, for callers that need a field rather than a resolution.
+
+        Public because 044 needs the relevance toggle *before* resolving anything — a disabled
+        gate has no cell to resolve — and reaching for `_read_binding` from another module
+        would be a private attribute becoming an interface by use rather than by decision.
+        """
+        record: Mapping[str, Any] = self._read_binding()
+        return record
+
     def resolve_relevance(
         self, *, available: frozenset[str]
     ) -> tuple[QualifiedCell, MatrixFallback | None]:

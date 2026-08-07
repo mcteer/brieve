@@ -152,7 +152,7 @@ estate governs cannot reach it. **No increment ships past this phase without all
 **Independent Test**: disable; ask; the answer carries the disclosure and the record says an
 administrator decided. Re-enable; the next ask judges. No restart.
 
-- [ ] T012 [US3] The toggle honoured in `src/surfaces/api/ask.py` and
+- [X] T012 [US3] The toggle honoured in `src/surfaces/api/ask.py` and
       `src/core/answering/answer.py`: when `relevance_enabled` is false, skip judge
       resolution and judging; the answer carries the disclosure in `relevance_note`
       ("relevance was not checked: disabled by an administrator"); the record's disposition
@@ -160,7 +160,7 @@ administrator decided. Re-enable; the next ask judges. No restart.
       **no MODEL_GATE is written** (R4 — an event for a gate that did not run is 040's
       vacuous shape); in-flight answers complete under the binding they started with (true
       by construction; asserted, not assumed).
-- [ ] T013 [US3] [GATE:conformance] Rows **C15–C17** in
+- [X] T013 [US3] [GATE:conformance] Rows **C15–C17** in
       `tests/conformance/console/test_console_toggle.py`: the disclosure reaches the
       rendered response, not only the record (C15); the disposition distinction and the
       absent MODEL_GATE (C16); disable→ask→enable→ask in one process against one surface —

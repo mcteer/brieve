@@ -294,7 +294,16 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
         "bound_cell",
         "cell_disposition",
         "model_authority",
+        # 044: HOW THE GATE STOOD for this ask — `checked`, `disabled_by_admin`, or empty.
+        # The sixth feature in six to extend this payload, and the exactness is what made
+        # each of them a decision somebody wrote down rather than a field that appeared.
+        #
+        # Closed vocabulary, bounded below, for the same reason `declined_reason` is: this
+        # row exists to catch a free-text field arriving in a payload that must never carry
+        # content.
+        "relevance_gate",
     }
+    assert payload["relevance_gate"] in {"", "checked", "disabled_by_admin"}
     assert payload["source"] == "guidance"
     assert payload["cell_disposition"] == "pinned"
     # A REFERENCE, never a value — the property the whole field exists for. `vault:` and a version
