@@ -125,6 +125,130 @@ class VaultWriteObserver:
         return Observation(outcome=ObservationOutcome.HAPPENED, detail="metadata present")
 
 
+# ── 042: Vault policy authoring ──────────────────────────────────────────────────────────
+#
+# **The protected set is supplied, never derived here.** `surfaces.dispatch.policy_authoring`
+# reads it from the trust fabric and fails closed when it cannot; these handlers take the
+# result. A handler that read it itself would be a second answer to "what may not be touched",
+# and the two would disagree exactly when it mattered.
+
+#: How many attachments one read may report before it truncates and says so (FR-010).
+#:
+#: Fixed with its reasoning, on `READ_BUDGET_BYTES`'s precedent: an unfixed threshold is one
+#: that gets raised until the corpus passes. Fifty is far above what any real policy carries —
+#: a policy attached to more than fifty principals is a finding in itself — and far below the
+#: 029 failure, where a read bounded by the wrong thing answered from 1,000 of 63,947 entries.
+ATTACHMENT_BUDGET = 50
+
+#: Where a policy can be attached in this estate, measured from `auth.tf` rather than assumed:
+#: token roles, JWT auth roles, and identity entities and groups.
+_ATTACHMENT_SOURCES = (
+    ("token_role", "auth/token/roles"),
+    ("auth_role", "auth/workload/role"),
+    ("entity", "identity/entity/name"),
+    ("group", "identity/group/name"),
+)
+
+
+def _policy_attachments(fabric: Any, policy_name: str) -> tuple[list[dict[str, str]], bool]:
+    """Where ``policy_name`` is attached, bounded, with whether the bound bit.
+
+    **Wiring, not content.** "agent-ceiling is attached to the agent-run JWT role" describes
+    how the estate is put together; it carries no policy body and no secret. That distinction
+    is what lets attachments stay readable for a protected policy whose document does not.
+
+    A source that cannot be listed is skipped rather than fatal: an estate with no identity
+    secrets engine mounted is an ordinary estate, and refusing the whole read because one of
+    four optional locations is absent would make the tool unusable where it is most needed.
+    """
+    found: list[dict[str, str]] = []
+    truncated = False
+    for kind, base in _ATTACHMENT_SOURCES:
+        try:
+            names = fabric.list_path(base) or []
+        except Exception:  # noqa: BLE001 — an absent mount is not a failed read
+            continue
+        for name in names:
+            if len(found) >= ATTACHMENT_BUDGET:
+                truncated = True
+                break
+            try:
+                record = fabric.read_path(f"{base}/{str(name).rstrip('/')}")
+            except Exception:  # noqa: BLE001 — same reason
+                continue
+            data = (record or {}).get("data") or {}
+            attached: set[str] = set()
+            for field in ("policies", "token_policies"):
+                value = data.get(field) or []
+                if isinstance(value, list):
+                    attached.update(str(v) for v in value)
+            if policy_name in attached:
+                found.append({"kind": kind, "name": str(name).rstrip("/"), "mount": base})
+        if truncated:
+            break
+    return found, truncated
+
+
+def vault_policy_read(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Read a policy's structure and what it is attached to — never a secret value (042).
+
+    **Three states, not two** (FR-003). `present` carries the document; `absent` says the
+    policy is not there; `protected` says the platform will not hand over the body of a record
+    that bounds the agent asking. Collapsing the last two would make a denial read as a gap,
+    and an agent told "no such policy" about `agent-ceiling` would reasonably propose creating
+    one.
+
+    **A protected body never enters the run**, which is FR-013 done structurally rather than by
+    scrubbing at composition: a body that was never read cannot appear in a proposal, whereas a
+    body filtered later depends on every future composition path remembering to filter. 038's
+    containment module draws exactly this distinction between structural and inspected claims.
+
+    Attachments stay readable for every state but `absent`, because they are wiring rather than
+    content — and knowing that `agent-ceiling` is attached to the `agent-run` role is what lets
+    an agent reason about the estate without being handed its own leash.
+    """
+    name = str(arguments.get("policy_name", "")).strip()
+    if not name:
+        raise ValueError("vault_policy_read requires a 'policy_name' argument")
+
+    protected: frozenset[str] = frozenset(arguments.get("_protected") or ())
+    fabric = _fabric()
+
+    if name in protected:
+        attachments, truncated = _policy_attachments(fabric, name)
+        return {
+            "policy_name": name,
+            "state": "protected",
+            "document": "",
+            "attachments": attachments,
+            "truncated": truncated,
+            "note": (
+                "this policy is part of what bounds the agents in this estate; its "
+                "attachments are visible and its body is not"
+            ),
+        }
+
+    record = fabric.read_path(f"sys/policies/acl/{name}")
+    if record is None:
+        return {
+            "policy_name": name,
+            "state": "absent",
+            "document": "",
+            "attachments": [],
+            "truncated": False,
+        }
+
+    document = str(((record or {}).get("data") or {}).get("policy", ""))
+    attachments, truncated = _policy_attachments(fabric, name)
+    return {
+        "policy_name": name,
+        "state": "present",
+        "document": document,
+        "attachments": attachments,
+        "truncated": truncated,
+    }
+
+
 def terraform_plan(arguments: Mapping[str, Any]) -> dict[str, Any]:
     """FIXTURE — Terraform is not deployed in the enclave.
 
@@ -158,6 +282,7 @@ class TerraformApplyObserver:
 #: Handlers a manifest may name. A name absent from this table refuses `unresolved_binding`
 #: at load — where the name was written, rather than at the first call.
 PLATFORM_HANDLERS: dict[str, Any] = {
+    "vault_policy_read": vault_policy_read,
     "vault_read": vault_read,
     "vault_write": vault_write,
     "terraform_plan": terraform_plan,
@@ -173,12 +298,14 @@ PLATFORM_OBSERVERS: dict[str, Any] = {
 
 __all__ = [
     "AGENT_SECRET_MOUNT",
+    "ATTACHMENT_BUDGET",
     "PLATFORM_HANDLERS",
     "PLATFORM_OBSERVERS",
     "TerraformApplyObserver",
     "VaultWriteObserver",
     "terraform_apply",
     "terraform_plan",
+    "vault_policy_read",
     "vault_read",
     "vault_write",
 ]

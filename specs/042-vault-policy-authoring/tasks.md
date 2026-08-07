@@ -114,17 +114,20 @@ is the right order.
 **Independent Test**: ask about a named policy; the run reads it and its attachments, the
 read is recorded, no secret value appears, and absent/protected/present are three answers.
 
-- [ ] T008 [US1] Declare the tools and the workflow in `packs/vault/pack.toml`:
-      `[[tools]] vault_policy_read` and `[[tools]] vault_policy_impact` (both
+- [X] T008 [US1] Declare the tools and the workflow in `packs/vault/pack.toml`:
+      `[[tools]] vault_policy_read` here and `[[tools]] vault_policy_impact` **with its
+      handler in T011** — the manifest refuses `names handler ... which the platform does not
+      provide` at load, so a declaration cannot precede its implementation and this task list
+      ordered them apart. Found by the platform's own check, not by review. (both
       `risk_class = "secret_touching"`, `transport = "native"`, `product = "vault"`;
       impact `repeatable = true` with R7's argument in a comment), plus a
       `[[workflows]] policy-authoring` declaration — **without it, 041's
       `pack_declares_no_authoring` refusal blocks every request this feature makes**.
-- [ ] T009 [US1] `vault_policy_read` handler in `src/surfaces/handlers.py`: list names,
+- [X] T009 [US1] `vault_policy_read` handler in `src/surfaces/handlers.py`: list names,
       read bodies **only outside the protected set** (three states — `present` /
       `protected` / `absent`, R6), attachments from token roles, JWT auth roles, entities
       and groups, bounded with the bound disclosed (FR-010); joins `PLATFORM_HANDLERS`.
-- [ ] T010 [US1] [GATE:conformance] Rows V8–V10 in
+- [X] T010 [US1] [GATE:conformance] Rows V8–V10 in
       `tests/conformance/authoring/test_policy_read.py`: V8 (registered, hook-wrapped,
       ordinary intent/result bracket), V9 [GATE:no-secret-leak] (three distinct states; no
       secret value; no `secret/` path touched), V10 (attachment truncation disclosed).
