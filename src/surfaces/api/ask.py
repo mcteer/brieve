@@ -655,6 +655,62 @@ def authorise_ask(
     raise AskNotQualified(disposition, detail)
 
 
+def relevance_judge_for(
+    *,
+    subject: AuthenticatedSubject,
+    audit: AuditSink,
+    authority: Any,
+    judges: Any,
+    available: frozenset[str],
+) -> Any:
+    """The relevance judge this surface may use, or refuse (043, FR-017).
+
+    **Same ordering as `authorise_ask`, and for the same reason.** Governance precedes
+    availability: `relevance_unbound` means nobody decided which model may judge relevance, and
+    an operator needs that before "the judge could not be reached". The reverse order sends
+    them to a vendor's status page during a governance gap.
+
+    **Refusing is not optional.** An ask that cannot establish relevance must not proceed as
+    though the gate passed — so this raises, and the route turns it into a refusal the record
+    names. A `None` judge would be a silently absent gate, which is the shape 041 spent a
+    feature closing one layer over.
+    """
+    from core.authority.errors import ResolutionRefused
+
+    if authority is None or judges is None:
+        raise AskNotQualified(
+            "relevance_unbound",
+            "no relevance judge is configured for this surface; an answer whose relevance "
+            "nobody can establish is not an answer this platform will give",
+        )
+
+    try:
+        cell, _fallback = authority.resolve_relevance(available=available)
+    except ResolutionRefused as refused:
+        disposition = (
+            "relevance_unbound"
+            if refused.reason_code == "relevance_unbound"
+            else "relevance_unqualified"
+        )
+        record_ask(
+            audit=audit,
+            subject=subject,
+            corpus_digest="",
+            evidence_stream="",
+            model="unresolved",
+            disposition=disposition,
+            source=GUIDANCE_SOURCE,
+            cell="",
+            bound_cell="",
+            cell_disposition=f"refused:{disposition}",
+            model_authority="",
+            declined_reason=str(refused),
+        )
+        raise AskNotQualified(disposition, str(refused)) from refused
+
+    return judges(cell.reference)
+
+
 class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -679,6 +735,12 @@ def build_router(
     conversations: Any = None,
     ask_authority: Any = None,
     credential_source: Any = None,
+    relevance_judges: Any = None,
+    #: Which model this surface can build a relevance JUDGE for (043). Separate from
+    #: `ask_model` and narrow for the same reason `_available` is: a wider set would let
+    #: fallback pick a judge cell this surface cannot call, and the record would name a
+    #: judgement that never happened.
+    relevance_model: str = "unconfigured",
 ) -> APIRouter:
     """The provider is a **parameter**, so a deployment can supply one and a test can share one.
 
@@ -851,6 +913,20 @@ def build_router(
         except AskNotQualified as refused:
             raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
 
+        # THE RELEVANCE GATE'S OWN GOVERNANCE (043), resolved beside the answering cell and
+        # before the corpus is loaded — one qualification does not license the other, and an
+        # ask nobody permitted to be checked is an ask this surface does not answer.
+        try:
+            relevance = relevance_judge_for(
+                subject=subject,
+                audit=audit,
+                authority=ask_authority,
+                judges=relevance_judges,
+                available=_available(relevance_model, relevance_judges),
+            )
+        except AskNotQualified as refused:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
+
         try:
             corpus = load_corpus()
         except CorpusUnavailable as unavailable:
@@ -915,6 +991,7 @@ def build_router(
                 context=context.text,
                 conversation_id=body.conversation_id or "",
                 carried_context=context.descriptor if body.conversation_id else None,
+                relevance=relevance,
             )
             return _remember(
                 conversations=conversations,

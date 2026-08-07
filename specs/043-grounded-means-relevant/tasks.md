@@ -118,7 +118,7 @@ third reason; affirming one of three — answered with two disclosed irrelevant.
       nothing to assert against. It lands in T012, after the wiring exists.
 - [X] T010 [US1] [GATE:conformance] Row R7 in the same file: with `relevance=None`, R1's
       assertion FAILS — the gate can lose, asserted by running the rigged construction.
-- [ ] T011 [US1] Wire the surface in `src/surfaces/api/ask.py` and
+- [X] T011 [US1] Wire the surface in `src/surfaces/api/ask.py` and
       `src/surfaces/api/service.py`: resolve `relevance_cell` beside the ask binding,
       construct the judge (fixture cell → fixture judge in dev; live cell → adapter), pass it
       to `answer_question`; unbound/unqualified/unavailable each decline naming the cause

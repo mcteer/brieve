@@ -62,6 +62,13 @@ class ScriptedSubmitter:
         return ChangeDisposition.APPROVED
 
 
+#: The model the fixture authority binds for RELEVANCE. **Deliberately not `model`** (043): the
+#: gate exists to judge an answer, and a judge that is the same model as the generator is
+#: grading its own work. The fixtures encode the separation so a row cannot pass by accident
+#: with a self-judging binding.
+FIXTURE_RELEVANCE_MODEL = "anthropic/claude-sonnet@5"
+
+
 DEFAULT_MAPPINGS = [
     ClaimMapping(claim_name="groups", claim_value="platform", role="operator"),
 ]
@@ -203,6 +210,12 @@ def surface_under_test(
     # exact equation this feature exists to break. Rows that answer call
     # `qualified_ask_authority()` explicitly.
     ask_authority: object | None = None,
+    # 043's collaborator, shared like the eleven before it. **`None` means every ask refuses
+    # `relevance_unbound`**, on the same discipline: a fixture that auto-supplied a judge would
+    # make the gate's presence a property of the harness rather than of the surface, and 041
+    # spent a feature closing exactly that gap one layer over. Rows that answer pass one.
+    relevance_judges: object | None = None,
+    relevance_model: str = FIXTURE_RELEVANCE_MODEL,
     # 035's collaborator, shared like the ten before it. A REAL memory store by default rather
     # than `None`, because unlike a credential or a qualification a conversation store grants
     # nothing — it groups a person's own questions. Defaulting it absent would leave every
@@ -269,6 +282,8 @@ def surface_under_test(
         ask_model=ask_model,
         ask_authority=ask_authority,
         credential_source=credential_source,
+        relevance_judges=relevance_judges,
+        relevance_model=relevance_model,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
@@ -338,7 +353,10 @@ def fake_definitions_fabric(subject: str) -> Any:
 
 
 def qualified_ask_authority(
-    *, model: str = "anthropic/claude-opus@5", packs: tuple[str, str] = ("vault", "terraform")
+    *,
+    model: str = "anthropic/claude-opus@5",
+    packs: tuple[str, str] = ("vault", "terraform"),
+    relevance_model: str = FIXTURE_RELEVANCE_MODEL,
 ) -> AskAuthority:
     """An in-memory binding + matrix qualifying `model` for both sources.
 
@@ -353,6 +371,7 @@ def qualified_ask_authority(
             "schema_version": 1,
             "guidance_cell": f"{guidance}:{model}:ask",
             "estate_cell": f"{estate}:{model}:ask",
+            "relevance_cell": f"{guidance}:{relevance_model}:judge",
         },
         read_matrix=lambda: {
             "schema_version": 1,
@@ -365,6 +384,15 @@ def qualified_ask_authority(
                     "judge": "seed",
                 }
                 for pack in (guidance, estate)
+            ]
+            + [
+                {
+                    "pack": guidance,
+                    "model": relevance_model,
+                    "role": "judge",
+                    "qualified_by": "fixture",
+                    "judge": "seed",
+                }
             ],
         },
     )
