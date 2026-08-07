@@ -39,6 +39,27 @@ records what happens without it: a document asserting a shape the platform does 
 producing two wrong recommendations in one session. The requirements themselves name no
 technology.
 
+## Clarify session — 2026-08-07
+
+Four questions asked and answered; all four integrated into the spec and its requirements.
+Coverage after the session:
+
+| Taxonomy area | Status |
+| --- | --- |
+| Functional scope & boundaries | **Resolved** — Q4 settled that all three record types ship together |
+| User roles & permissions | **Resolved** — Q2 made `admin` disjoint from the existing two |
+| Integration & external dependencies | **Resolved** — Q1 (portal only, no parity owed), Q4 (connection failure is connectivity, not governance) |
+| Security & compliance | **Resolved** — Q3 requires the gate gap fixed, not merely recorded |
+| Accessibility | **Resolved without asking** — the standard has an obvious default (same WCAG 2.2 AA bar); what needed recording was the measured gap: today's rows walk `/`, a thread, and `/delete`, so a new page would be uncovered while the lane stayed green |
+| Lifecycle / state transitions | **Outstanding, low impact** — whether a pending change may be withdrawn, and how pending changes surface alongside in-force configuration. Reasonable defaults exist and the mechanism is the fabric's; deferred to planning |
+| Terminology | **Outstanding, low impact** — "console" is used throughout; "interface" and "settings panel" appear only when quoting the original ask |
+
+**One answer overrode the recommendation, and the spec carries the cost rather than hiding it.**
+Q4 was recommended as judge-plus-bindings only; the maintainer chose to include product
+connections. FR-018c exists because of that choice: a connection can be perfectly well-governed
+and simply wrong, which is a failure mode bindings do not have, so "the fabric accepted it" must
+never read as "the product answered".
+
 **Three decisions were made rather than deferred as clarifications**, each recorded in
 Assumptions with its reasoning:
 

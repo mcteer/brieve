@@ -18,6 +18,50 @@ from an interface rather than by holding estate credentials and running a Terraf
 | **ADRs touched** | **ADR-0016** (quorum on authority changes — the mechanism this feature makes reachable by a person rather than only by an operator), **ADR-0026** (the governance/assembly split this feature deliberately moves the line of, which is why it needs a record of its own), **ADR-0039** (the closed role vocabulary the ask does not match), **ADR-0022** (the Qualified Model Matrix an admin would bind against), **ADR-0025** (registry isolation — a dispatched run must not reach this write path), **ADR-0033** (surface parity, if the console is reachable from more than one transport), **ADR-0047** (a passing stub — acute here, because an "applied" that queued nothing looks identical to success), **ADR-0067** (a model does not judge its own output — the judge toggle's constraint), 043 (`relevance_cell`) and 042 (the published protected set) as the two records that motivated it |
 | **Evidence class** | **attestation-relevant.** A configuration change is an authority change: it alters which model may answer, which may judge, and what the platform will assert to a person. The record of who requested it and who approved it is the evidence that the estate's posture was chosen rather than drifted into |
 
+## Clarifications
+
+### Session 2026-08-07
+
+- Q: Which surfaces expose the console's operations? → A: **The portal alone.** The console is a
+  portal-hosted surface; its read and change-request operations are not northbound API or MCP
+  verbs. **ADR-0033's parity obligation is therefore not owed** — the record requires the same
+  operation on any transport to yield the same verdict, and an operation that exists on one
+  surface has nothing to diverge from. A row asserts **MCP carries no configuration verb**,
+  which turns the absence into a checked fact rather than an oversight: 043 shipped a gate the
+  API emitted and MCP did not, and only the parity row caught it. This also removes the direct
+  collision with US4 — an agent-facing transport with a governance-write path would be the
+  exclusion and its violation in the same feature.
+
+- Q: How does the `admin` role relate to `operator` and `compliance-analyst`? → A: **Disjoint.**
+  `admin` grants configuration read and change-request and nothing else; it is not a superset of
+  the analyst, and the analyst is not a subset of it. A person may hold both, and holding one
+  grants nothing of the other. **The reason is that they answer different questions**: operator
+  and analyst both answer *what happened* — which is why the analyst is documented as the
+  operator's superset — and an administrator answers *what may happen*. Making admin a superset
+  would hand configuration authority to everyone who can already read the trail, which is a
+  widening nobody asked for. **Consequence**: an administrator has no audit visibility by virtue
+  of being one, and `ROLE_VISIBILITY` gains a third key rather than a wider second.
+
+- Q: Does 044 fix the gate gap, or only record it? → A: **Fix it in this feature.** The console's
+  central requirement is FR-005 — the trust fabric decides and the interface never applies. If
+  the path a change request lands on carries no Control Group, then wherever a quorum *is*
+  configured the console applies the change directly while reporting it as governed, and FR-005
+  is false rather than merely unenforced. So `controlled_paths` is extended to cover the records
+  the console writes, and a row asserts the coverage rather than trusting the list. **The
+  development posture is unchanged and remains honest**: with `quorum_policy = null` there is no
+  gate anywhere, changes apply immediately, and FR-007 requires the console to say so rather
+  than implying an approval happened.
+
+- Q: Are TFE and workload Vault connection settings in the first cut? → A: **Yes — all three.**
+  The judge toggle, role bindings, and product connections ship together, matching the original
+  ask. **The cost is recorded rather than absorbed**: a connection setting is a different shape
+  from a binding. A binding names a cell the matrix either qualifies or does not, and its
+  failure is governance; a connection names an endpoint, an organisation or a namespace, and its
+  failure is *connectivity* — a value can be perfectly well-governed and simply wrong. So a
+  connection change needs a way to be seen to work that a binding does not, and this feature
+  must not let "the fabric accepted it" read as "the product answered". Narrowing to the judge
+  and bindings was offered and declined.
+
 ## What is true today, measured
 
 **Every governance record is a Terraform apply.** The `harness-authority` mount holds
@@ -199,6 +243,9 @@ happens to the value and confirm the outcome is visible rather than discovered l
   (the run stops with the reason recorded) is unchanged; the console surfaces the withdrawal.
 - **Two administrators change the same record concurrently**: the second sees that the record
   moved rather than overwriting silently.
+- **A connection is configured to somewhere unreachable**: the change is governed, applied, and
+  the product does not answer. The console reports the connection as *unverified* rather than
+  as working — accepted and reachable are different facts.
 - **The console is asked for a setting the platform does not have**: nothing is invented — an
   unimplemented setting is absent, not shown disabled.
 - **A configuration read succeeds and a write path is unavailable**: reading works and the
@@ -238,21 +285,51 @@ happens to the value and confirm the outcome is visible rather than discovered l
 - **FR-015**: A row MUST exist that **fails** when the exclusion in FR-014 is removed.
 - **FR-016**: The `admin` role MUST be established through the platform's existing gated
   authority-change mechanism, not asserted by configuration the console itself controls.
+- **FR-016a**: The `admin` role MUST be **disjoint** from `operator` and `compliance-analyst`:
+  it grants configuration read and change-request and confers no audit visibility, and neither
+  existing role confers configuration authority. A row MUST assert both directions — a widening
+  in either is a governance change nobody requested.
 - **FR-017**: An administrator MUST NOT be able to grant themselves the admin role through the
   console.
 - **FR-018**: The role names the interface presents MUST map onto ADR-0039's closed vocabulary,
   and where a presented name has no counterpart, the feature MUST either widen the vocabulary by
   amendment or drop the name — never silently introduce an unbacked role.
+- **FR-018a**: An administrator MUST be able to configure the platform's product connections
+  (the Terraform Enterprise organisation and workspace, and the workload Vault's address and
+  namespace) through the same request-and-decide path as every other change.
+- **FR-018b**: No credential MAY be entered or displayed through the console. Connection
+  settings name *where* a product is; the material used to authenticate to it continues to live
+  in the trust store and is referenced, never typed into an interface — Principle IV's
+  "secret values never enter model context" applied to the person's context as well.
+- **FR-018c**: A connection setting that is accepted by the fabric and does not reach its
+  product MUST be distinguishable from one that was refused. **A governed value can be a wrong
+  value**: this is the failure mode bindings do not have, and an interface reporting "applied"
+  for a workspace that does not exist has told the administrator the opposite of what happened.
 - **FR-019**: A record's provenance MUST say whether it was last set through the console or by
   an estate apply.
 - **FR-020**: Where the console and an estate apply write the same record, the outcome MUST be
   observable rather than silent.
 - **FR-021**: The interface MUST hold no governance logic: what is permitted is decided by the
   platform and the trust fabric, and the interface renders the result.
+- **FR-021a**: The console's operations MUST be reachable from the portal only. No northbound
+  API or MCP verb MAY expose configuration reads or change requests, and a row MUST assert that
+  MCP carries no configuration verb — an absence nobody checks is an absence that ends.
+- **FR-021b**: The console MUST meet the same accessibility standard as the rest of the portal
+  (WCAG 2.2 AA, keyboard and screen-reader operable), and the accessibility suite MUST be
+  extended to walk it. **Measured**: today's rows visit the portal root, a thread, and a
+  delete confirmation — a new page is covered by none of them, so the lane would stay green
+  while the console went unchecked. A gate that does not visit a surface has not tested it.
 - **FR-022**: Settings the platform does not implement MUST be absent from the console rather
   than displayed as unavailable or disabled.
 - **FR-023**: The feature MUST establish whether the existing claim-mapping write path is
   gated by the configured Control Group, and MUST state the answer rather than assuming it.
+- **FR-023a**: Every record the console may write MUST be covered by the configured approval
+  gate where one is configured, and a row MUST assert that coverage against the trust fabric's
+  own list rather than trusting that the list is complete. A path the console writes and the
+  gate does not name is FR-005 being false while reading as true.
+- **FR-023b**: Where no approval gate is configured at all, the console MUST NOT present itself
+  as governed. This is the development posture and it is legitimate; what is not legitimate is
+  an interface that looks the same in both estates.
 
 ### Key Entities
 
@@ -288,6 +365,8 @@ happens to the value and confirm the outcome is visible rather than discovered l
 - **SC-011**: A configuration change is in force for the next request without a restart.
 - **SC-012**: Where the console and an estate apply disagree about a record, the disagreement is
   visible in the console rather than discovered through changed behaviour.
+- **SC-013**: Zero credentials are entered through the console, and a connection setting that
+  the fabric accepted but the product did not answer is never reported as working.
 
 ## Assumptions
 
