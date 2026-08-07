@@ -16,6 +16,7 @@ so this returns an outcome and the route decides. Same mapping, different consum
 from __future__ import annotations
 
 import json
+import urllib.error
 from typing import Any
 
 import pytest
@@ -23,6 +24,7 @@ import pytest
 from surfaces.api.authority_submit import (
     CONSOLE_RECORDS,
     AuthorityChangeRefused,
+    AuthoritySubmitUnavailable,
     ChangeOutcome,
     ConfigChange,
     RecordMoved,
@@ -124,19 +126,51 @@ def test_a_refused_change_raises_rather_than_returning_an_outcome(
 def test_a_stale_cas_is_record_moved_not_a_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
     """Two administrators editing one record is neither a denial nor an outage (US5).
 
-    Vault answers 409 on a failed check-and-set. Folding that into `AuthorityChangeRefused`
-    would tell the second administrator that governance denied them, when what happened is
-    that somebody else got there first.
+    **The status and the body are the ones the real Vault returns**, captured from the enclave
+    rather than assumed. The first version of this row scripted a 409 — a conflict is a
+    conflict — and passed, while the code checking for 409 would never have fired against the
+    product: KV v2 answers a failed check-and-set with **400** and
+    `"check-and-set parameter did not match the current version"`. A test that agrees with its
+    author instead of with the product is the shape CL1 exists to catch.
     """
-    error = __import__("urllib.error", fromlist=["HTTPError"]).HTTPError(
-        "https://vault.test", 409, "Conflict", {}, None
-    )
-    submitter, _ = _submitter(monkeypatch, error)
+
+    class _CasMismatch(urllib.error.HTTPError):
+        def __init__(self) -> None:
+            super().__init__("https://vault.test", 400, "Bad Request", {}, None)  # type: ignore[arg-type]
+
+        def read(self) -> bytes:  # type: ignore[override]
+            return b'{"errors":["check-and-set parameter did not match the current version"]}'
+
+    submitter, _ = _submitter(monkeypatch, _CasMismatch())
 
     with pytest.raises(RecordMoved) as raised:
         submitter.submit_change(_change(cas=3))
 
     assert raised.value.reason_code == "record_moved"
+
+
+def test_an_ordinary_400_is_not_read_as_a_concurrent_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The discriminator is the message, and this is the direction it must fail in.
+
+    A malformed request reported as "somebody else got there first" sends an administrator to
+    look for a colleague who does not exist. An unrecognised message falls through to
+    `AuthoritySubmitUnavailable` — loud, and they retry — rather than the reverse, which is
+    quiet and ends in an overwrite.
+    """
+
+    class _Malformed(urllib.error.HTTPError):
+        def __init__(self) -> None:
+            super().__init__("https://vault.test", 400, "Bad Request", {}, None)  # type: ignore[arg-type]
+
+        def read(self) -> bytes:  # type: ignore[override]
+            return b'{"errors":["missing data"]}'
+
+    submitter, _ = _submitter(monkeypatch, _Malformed())
+
+    with pytest.raises(AuthoritySubmitUnavailable):
+        submitter.submit_change(_change(cas=3))
 
 
 def test_the_cas_guard_goes_in_options_not_in_the_body(

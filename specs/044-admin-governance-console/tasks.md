@@ -222,7 +222,7 @@ visible, and provenance says who wrote last.
       (Proposed): the argued move of 026's origination line, the disjoint role, the
       disclose-not-suppress template, and R1's finding that the mechanism predated any
       principal able to use it; index in `docs/adr/README.md`.
-- [ ] T019 Apply the trust-fabric additions to the dev enclave and run **CL1**: the full
+- [X] T019 Apply the trust-fabric additions to the dev enclave and run **CL1**: the full
       request→decide cycle under the API's attested identity — applied-and-disclosed in dev
       (quorum null); then with a quorum configured, pending → out-of-band approve → in
       force. Record outcomes in `contracts/conformance-console.md`; re-seed the model

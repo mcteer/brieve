@@ -168,7 +168,17 @@ class VaultAuthoritySubmitter:
 
         status, response = self._post(body, change.path_within(self._mount))
 
-        if status == 409:
+        # **KV v2 answers a failed check-and-set with 400, not 409**, and the live leg is what
+        # established that. The first version checked for 409 on the reasonable assumption
+        # that a conflict is a conflict — and the hermetic row passed because it scripted the
+        # same assumption, which is the shape of a test that agrees with its author rather
+        # than with the product.
+        #
+        # So the discriminator is Vault's own message. A bare 400 is a malformed request and
+        # stays `AuthoritySubmitUnavailable`; only the CAS text is `RecordMoved`, because
+        # telling an administrator "somebody else got there first" when the truth is "your
+        # request was malformed" sends them to look for a colleague who does not exist.
+        if status == 400 and _is_cas_mismatch(response):
             raise RecordMoved(
                 f"the {change.record} record changed since it was read; re-read it and "
                 f"resubmit rather than overwriting somebody else's change"
@@ -232,6 +242,23 @@ class VaultAuthoritySubmitter:
 CONSOLE_RECORDS: frozenset[str] = frozenset(
     {"ask-bindings", "product-connections", "claim-mappings"}
 )
+
+
+def _is_cas_mismatch(response: dict[str, Any]) -> bool:
+    """Whether a 400 is Vault's check-and-set refusal rather than a malformed request.
+
+    Matched on the message because Vault gives no code: KV v2 answers
+    ``{"errors": ["check-and-set parameter did not match the current version"]}``, verified
+    against the real product rather than assumed.
+
+    Matching on prose is ordinarily how a check comes to mean something else after an upgrade
+    — this repository has five such findings — so the failure mode is chosen deliberately: an
+    unrecognised message falls through to `AuthoritySubmitUnavailable`, which is the safe
+    direction. A concurrent edit then reads as an outage (loud, and the administrator retries)
+    rather than an outage reading as a concurrent edit (quiet, and they overwrite).
+    """
+    errors = response.get("errors") or []
+    return any("check-and-set" in str(error) for error in errors)
 
 
 class RecordMoved(CoreError):
