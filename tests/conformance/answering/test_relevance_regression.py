@@ -14,6 +14,7 @@ parity.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -34,16 +35,41 @@ EVAL_CASES = "packs"
 GUIDANCE_QUESTION = "How does an AI agent obtain an identity with Vault?"
 
 
+#: Where the trunk might be named, in the order worth trying.
+#:
+#: **The local branch first, the remote-tracking ref second, and CI is why.** `main` exists as
+#: a local branch on a developer's clone and does NOT exist in a PR checkout — `actions/checkout`
+#: fetches the history but leaves the trunk as a remote-tracking ref only. The first version of
+#: this row asked for `main` alone, passed locally, and failed the fast lane with an empty
+#: merge-base. `GITHUB_BASE_REF` is honoured ahead of a hardcoded name because a PR against a
+#: release branch has a different baseline and this row should compare against the one it is
+#: actually merging into.
+def _baseline_refs() -> list[str]:
+    base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
+    candidates = ["main", "origin/main"]
+    if base_ref:
+        candidates = [base_ref, f"origin/{base_ref}", *candidates]
+    return candidates
+
+
 def _merge_base() -> str:
-    """The baseline. Not `main` — it moves, and a moving baseline reports false parity."""
-    result = subprocess.run(
-        ["git", "merge-base", "main", "HEAD"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return result.stdout.strip()
+    """The baseline. Not the trunk's tip — it moves, and a moving baseline reports false parity.
+
+    Returns empty when NO candidate resolves, and the caller fails on that rather than skipping.
+    A row that cannot establish its baseline has not verified the promise it exists to verify,
+    and reporting that as a pass is the shape this whole feature refuses.
+    """
+    for ref in _baseline_refs():
+        result = subprocess.run(
+            ["git", "merge-base", ref, "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    return ""
 
 
 def test_row_r9_no_answering_eval_case_was_edited() -> None:
@@ -53,7 +79,10 @@ def test_row_r9_no_answering_eval_case_was_edited() -> None:
     feature. This is the one that makes that impossible to do quietly.
     """
     base = _merge_base()
-    assert base, "no merge-base against main; the baseline this row needs does not exist"
+    assert base, (
+        f"no merge-base against any of {_baseline_refs()}; the baseline this row needs does "
+        f"not exist, so the promise it asserts is unverified — which is not a pass"
+    )
 
     changed = subprocess.run(
         ["git", "diff", "--name-only", base, "HEAD", "--", f"{EVAL_CASES}/"],
