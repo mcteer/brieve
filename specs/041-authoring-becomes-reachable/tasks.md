@@ -163,7 +163,7 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
       `tests/conformance/authoring/test_acquisition.py` (new file): subject is the target
       repository at `commit` by construction; three acquisition refusals with no workspace
       created; bound disclosed, content never.
-- [ ] T019 [US2] [GATE:eval] Qualify and bind the `write` cells: run `make eval-authoring`
+- [X] T019 [US2] [GATE:eval] Qualify and bind the `write` cells: run `make eval-authoring`
       against live Sonnet 5, record dated evidence, and bind a cell **only for packs the
       corpus can actually qualify** — `evals/authoring/corpus.toml` is Terraform-shaped, and
       a vault `write` cell without vault-shaped golden tasks would be an unearned cell,
@@ -394,29 +394,63 @@ already recorded what a wrong baseline reports — false parity.
 should always have had. And the fake-fabric scanner crashed on any `global` statement in the
 tests tree (`ast.Global.names` holds strings, not aliases) — a guard failing by falling over.
 
-## T019, and why it is the one task not done
+## T019 — the qualification ran, and the cell is not bound
 
-**41 of 42.** T019 asks for a **live** `write` cell, qualified through ADR-0063's mechanical
-scorer and bound in the estate. Everything around it ran: `make eval-authoring` passes (13
-rows), terraform is present, and the fixture-qualified terraform `write` cell 038 declared is
-in the dev estate.
+**42 of 42.** T019 says qualify and bind, *and* — after this feature's own analyze remediation —
+"bind a cell **only for packs the corpus can actually qualify**; an unearned cell is ADR-0047's
+exact refusal." The qualification ran. It says the cell is not earned. So nothing was bound,
+which is the task executing correctly rather than the task being skipped.
 
-**What is missing is a property detector, and it does not exist.** `score_corpus` takes a
-`properties_of(task, artifact, contents) -> frozenset[str]` callable, and every implementation
-in this repository is a literal map inside a row (`properties_of=lambda t, _a, _c:
-properties[t.name]`). Qualifying a live model means having it author the five golden tasks and
-then **mechanically detecting** whether each artefact `reads_credentials_from_secret_store`,
-carries `no_literal_credential_in_source`, and gives the credential a lease.
+**What had to be built first.** ADR-0063 permits a mechanical scorer, and 038 built every piece
+of the scoring — `score_corpus`, `score_reference`, `score_deny_case`, a corpus with a human
+author on every reference. What did not exist was **anything that produced artefacts to score**:
+`properties_of` is caller-supplied and its only implementations were literal maps inside rows.
+So the lane is new (`tests/evals_live/authoring.py`, `make evals-authoring-live`), along with
+the property detector and the subjects each task is asked *about*.
 
-Writing that detector hastily is the one thing this feature must not do. It is the load-bearing
-half of the qualification: a lenient detector qualifies a model on a check that cannot fail,
-which is the shape ADR-0047 refuses and the reason `valid_but_wrong` exists in the corpus at
-all — `static_credential_lookalike` passes gate one and must fail gate two. Binding a live cell
-on a detector written in the last hour of a feature would be an unearned cell, which is exactly
-what this task's own text warns against.
+**The detector had to be able to lose, and the corpus supplies the case that proves it.**
+`static_credential_lookalike` is ADR-0038's own warning shape: it parses, `terraform validate`
+is happy, and it answers a dynamic-secrets request with a long-lived credential in
+configuration. `tests/unit/test_authoring_properties.py` requires the detector to FAIL it. That
+row is what makes every other number here mean anything.
 
-So the cell stays fixture-qualified, the gate stays honest, and the detector is named as its
-own piece of work.
+**Measured, `anthropic/claude-sonnet@5`, 2026-08-07:**
+
+| Gate | Result |
+| --- | --- |
+| product tooling (`terraform init` + `validate`) | **5/5** |
+| reference comparison (property detection) | **2/5** |
+| valid-but-wrong | `pin_the_provider`, `existing_integration_is_not_duplicated`, `least_privilege_role` |
+
+Two runs after the harness fixes, and the numbers moved between them (3/5 then 5/5 on tooling,
+1/5 then 2/5 on reference) — **the variance is itself a finding**: this lane scores one sample
+per case, where the answering lane learned to take a majority of three after three
+single-sample runs produced three different pass/fail sets. Sampling is the next thing this
+lane needs, and it is recorded here rather than bolted on at the end of a feature.
+
+`pin_the_provider` leaves a floating constraint; `least_privilege_role` keeps a wildcard
+capability. Both are the second gate catching exactly what it exists for — syntactically fine,
+substantively wrong.
+
+**Four iterations, four harness defects, which is 031's pattern rather than a surprise** (it
+recorded six executions to one clean run, four of them surfacing harness rather than model
+faults):
+
+1. the protocol over-applied `--- NO CHANGE`, so the same prompt and subject produced a perfect
+   answer once and nothing the next time;
+2. `_PLAIN_APP` used `random_pet` while declaring only the vault provider — **the subject itself
+   was invalid Terraform**, so gate one was failing the harness, not the answer;
+3. gate one validated the authored **fragment** rather than the merged tree, so any answer
+   relying on a `required_providers` block it did not rewrite could never init;
+4. `init` failing because a configuration is *wrong* was being reported as the tooling being
+   *unrunnable* — which would turn every malformed answer into an infrastructure excuse.
+
+**Iteration stopped there deliberately.** Fixing the harness is legitimate; adjusting what the
+corpus asks until a model passes is gate tuning, and this estate has a standing rule against it.
+The remaining failures are the measurement, not a bug to be worked around.
+
+**The lane binds nothing, on purpose.** It prints evidence; promotion stays a human decision.
+A lane that promoted what it measured would be grading its own homework.
 
 ## The live eval lane is red on main, independent of this feature
 
