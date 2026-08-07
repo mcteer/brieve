@@ -78,7 +78,8 @@ untouched, established before anything can touch it.
       `resolves(path, anchor)` true only for the adopted version of a non-withdrawn source for
       this tenant; paths under the reserved `/endorsed/<source>/…` namespace (R2); the combined
       view tries the pin then the endorsed set. Three distinct failure reports — sync failed,
-      source empty, nothing citable (E8/FR-018).
+      source empty, nothing citable (E8/FR-018). **Row E25**: tenant A's content resolves
+      nothing for tenant B (FR-019 — the key does something, and the hook ADR-0046 needs).
 
 **Checkpoint**: content can be stored, verified and resolved — and nothing can yet endorse,
 sync, or cite it.
@@ -126,7 +127,9 @@ drift is detectable rather than silent.
       `tests/conformance/endorsed/test_sync.py`: the sync record (E6), digest mismatch refuses
       (E7), the three distinct failure states (E8), an unreachable source does not stop
       answering from what is already synced (E9), and [GATE:no-secret-leak] no credential in a
-      sync record or a console rendering (E10).
+      sync record or a console rendering (E10); and E6's never-carries half — the sync record
+      and every audit event carry identities and paths, **never document content** (FR-023,
+      038's FORBIDDEN_PAYLOAD_KEYS shape).
 - [ ] T012 [US2] **ADR-0070** in `docs/adr/0070-endorsed-content-sync-is-an-egress-class.md`
       (Proposed): endorsed-content sync as an enumerated egress class with its bounds — named
       sources only, never during answering, read-only, trust-store credentials referenced never
@@ -158,7 +161,8 @@ unaffected until adoption, and adoption is recorded.
       `tests/conformance/endorsed/test_drift.py`: drift flagged and unadopted changes nothing,
       with the age still reflecting what is in use (E11); the review names added/removed/
       altered (E12); a source moving again is reviewed against current upstream (E13); adoption
-      moves the next answer and is recorded, while declining or ignoring changes nothing (E14).
+      moves the next answer and is recorded, while declining or ignoring changes nothing, **and
+      an added document becomes citable with no fresh endorsement** (E14/FR-002a).
 
 ---
 
@@ -206,7 +210,8 @@ resolve, provenance visible per claim, age disclosed.
       `tests/conformance/endorsed/test_citing.py`: a customer-only question is answered with
       resolving citations (E18); per-citation provenance as data, and a mixed answer naming
       both while each citation says which (E19); a document with no addressable sections is not
-      citable and is reported (E20); the age disclosed is the adopted version's (E21).
+      citable and is reported (E20); a path in **neither** pin does not resolve (E18/FR-013);
+      the age disclosed is the adopted version's (E21).
 - [ ] T021 [US5] [GATE:conformance] **E23** in
       `tests/conformance/endorsed/test_no_answer_time_fetch.py`: **zero outbound requests
       during answering**, asserted by instrumentation with an endorsed source configured — not

@@ -93,3 +93,22 @@ stops the boundary from being assumed, and it is the hook a later multi-tenancy 
 endorsement is per-source or per-document, how the disclosure reads when an answer mixes
 material, and whether a fourth console record is the right shape or the endorsement belongs
 inside an existing one.
+
+## Analyze — pass 1 (2026-08-07)
+
+0 CRITICAL, 0 HIGH. Four findings, all remediated in-branch:
+
+- **C1 (E25)** — FR-019's tenant key was set by `EndorsedCorpus` but no row exercised it. A key
+  never exercised is a key nobody can trust, and it is the hook ADR-0046 needs; E25 drives two
+  tenants, cheap and hermetic in a single-tenant enclave.
+- **C2 (E6)** — FR-023 ("no content in records") had no row. Endorsed material is exactly what
+  an administrator may have endorsed carelessly, and an append-only trail is the wrong place for
+  it; E6 now asserts identities and paths, never document content, over the payloads.
+- **C3 (E14)** — FR-002a's defining consequence (a document added upstream becomes citable with
+  no fresh endorsement) was described in clarify Q1 and now asserted.
+- **C4 (E18)** — FR-013's "resolves against a recorded pin or not at all" now drives a path in
+  neither pin.
+
+The gate-table mislabel caught during `/speckit-tasks` (five tagged tasks absent from the
+conformance row) was fixed before this pass, by cross-checking the table against the tags
+programmatically rather than by eye — the I1 shape from 044's analyze, pre-empted.
