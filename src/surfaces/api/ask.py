@@ -32,9 +32,10 @@ from core.answering.estate import (
 )
 from core.answering.focus import focus_types
 from core.answering.ground import describe_ground
-from core.answering.record import record_ask
+from core.answering.record import ask_stream_for, record_ask
 from core.answering.routing import Route, route_with_signal, window_phrase
 from core.answering.scope import visible_event_types
+from core.audit.schema import AuditEventType
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
 from surfaces.api.dependencies import AuditDep, SubjectDep
@@ -67,6 +68,38 @@ GUIDANCE_SOURCE = str(Route.GUIDANCE)
 RECORDS_PER_TYPE = 200
 
 
+def _record_relevance_gate(
+    *,
+    audit: AuditSink,
+    subject: AuthenticatedSubject,
+    answer: Any,
+    model: str,
+    cell: str,
+) -> None:
+    """`MODEL_GATE` for the relevance verdict — the event type's first production writer (043).
+
+    **Counts and the cell, never statements.** The ask record already carries the surviving
+    claims once; a second copy here would be a second place a reader must redact, and the gate's
+    job is to say a model decided, not to restate what it decided about.
+    """
+    audit.append_event(
+        correlation_id=ask_stream_for(subject.tenant_id),
+        tenant_id=subject.tenant_id,
+        event_type=AuditEventType.MODEL_GATE,
+        payload={
+            "subject_user_id": subject.subject_user_id,
+            "gate": "relevance",
+            # A MODEL judged, and the payload says so in the shape Principle IX asks for: a
+            # gate, distinguishable from an approval a policy assigns to a person.
+            "model": model,
+            "cell": cell,
+            "disposition": answer.disposition,
+            "kept_count": len(answer.claims),
+            "irrelevant_count": len(answer.irrelevant),
+        },
+    )
+
+
 def ask_for(
     *,
     question: str,
@@ -83,6 +116,7 @@ def ask_for(
     context: str = "",
     conversation_id: str = "",
     carried_context: dict[str, Any] | None = None,
+    relevance: Any = None,
 ) -> dict[str, Any]:
     """Answer or decline, and record that someone asked.
 
@@ -96,7 +130,36 @@ def ask_for(
     was carried, because "a conversation existed and none of it was used" and "there was no
     conversation" are different facts and an auditor needs to tell them apart (FR-022).
     """
-    answer = answer_question(question=question, corpus=corpus, provider=provider, context=context)
+    answer = answer_question(
+        question=question,
+        corpus=corpus,
+        provider=provider,
+        context=context,
+        # THE RELEVANCE GATE (043). Supplied here, always, by the route below — the parameter
+        # is optional on `answer_question` only so the recorded eval scorers keep working
+        # untouched, and a conformance row drives THIS function to prove the surface passes
+        # one. A gate nothing calls is the defect 041 spent a feature closing.
+        relevance=relevance,
+    )
+
+    # `MODEL_GATE`'s FIRST PRODUCTION WRITER. The event type has existed since the audit schema
+    # named it and nothing had ever written one — Principle IX requires a model's verdict be
+    # distinguishable in the trail from a human approval, and this is the first verdict the
+    # platform has taken from a model in a governed path.
+    #
+    # BEFORE the ask record, on 031's ordering precedent: a reader meets the gate before the
+    # outcome it produced, rather than discovering afterwards that something decided.
+    #
+    # Counts and the cell, never statements — the ask record already carries the surviving
+    # claims once, and a second copy in the gate payload would be a second place to redact.
+    if relevance is not None and answer.relevance_note:
+        _record_relevance_gate(
+            audit=audit,
+            subject=subject,
+            answer=answer,
+            model=getattr(relevance, "model", "") or model,
+            cell=cell,
+        )
 
     # HOW OLD THE GROUND IS (033), composed HERE for the same reason the estate window note is:
     # `answer_question` has no clock and should not grow one, and a module that calls the clock
@@ -125,6 +188,7 @@ def ask_for(
         model_authority=model_authority,
         conversation_id=conversation_id,
         carried_context=carried_context,
+        declined_reason=answer.declined_reason,
     )
 
     # `source` on BOTH paths, which it was not until the third route went away.

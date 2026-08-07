@@ -104,17 +104,17 @@ third reason; affirming one of three — answered with two disclosed irrelevant.
       invoked only when `kept` is non-empty; third `declined_reason` (*"the corpus does not
       cover what was asked"*); `Answer.irrelevant` distinct from `dropped`;
       `Answer.relevance_note` naming the verdict as a model judgement (FR-001/002/006/007/018).
-- [ ] T008 [P] [US1] [GATE:fail-closed] Rows R1–R4 in
+- [X] T008 [P] [US1] [GATE:fail-closed] Rows R1–R4 in
       `tests/conformance/answering/test_relevance_gate.py` (new file): all-irrelevant declines
       with the third reason (R1); the two decline grounds distinguishable end to end (R2);
       partial keep with disclosure (R3); unreachable / unqualified / malformed each decline
       naming their distinct cause and never answer (R4).
-- [ ] T009 [P] [US1] [GATE:fail-closed] Row R5 in the same file: an ask declining by
+- [X] T009 [P] [US1] [GATE:fail-closed] Row R5 in the same file: an ask declining by
       resolution never invokes the judge, asserted by the counting fixture. **R6 is
       deliberately NOT here**: unbound is decided where the surface resolves the binding, and
       `answer_question` knows nothing about bindings — a row for it in this file would have
       nothing to assert against. It lands in T012, after the wiring exists.
-- [ ] T010 [US1] [GATE:conformance] Row R7 in the same file: with `relevance=None`, R1's
+- [X] T010 [US1] [GATE:conformance] Row R7 in the same file: with `relevance=None`, R1's
       assertion FAILS — the gate can lose, asserted by running the rigged construction.
 - [ ] T011 [US1] Wire the surface in `src/surfaces/api/ask.py` and
       `src/surfaces/api/service.py`: resolve `relevance_cell` beside the ask binding,
@@ -166,7 +166,7 @@ what was considered (SC-007, SC-010).
 
 **Independent Test**: produce a decline and an answer; read only the records.
 
-- [ ] T016 [US3] [GATE:correlation] Write `MODEL_GATE` from `src/surfaces/api/ask.py` on every
+- [X] T016 [US3] [GATE:correlation] Write `MODEL_GATE` from `src/surfaces/api/ask.py` on every
       relevance judgement — payload `{gate: "relevance", verdict, kept_count,
       irrelevant_count, model, cell}`, **before** the ask outcome record (031's
       fallback-before-issued ordering); statements never enter the payload. **Verify at

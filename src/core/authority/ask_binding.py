@@ -179,6 +179,41 @@ def resolve_ask_cell(
     )
 
 
+def resolve_relevance_cell(
+    binding: AskBinding,
+    cells: Mapping[str, QualifiedCell],
+    *,
+    available: frozenset[str],
+) -> tuple[QualifiedCell, MatrixFallback | None]:
+    """The cell the relevance gate is bound to, or another qualified judge, or refuse (043).
+
+    **`relevance_unbound` is its own reason, and it arrives before any question of
+    availability.** 026's rule, applied to a second decision: "nobody decided which model may
+    judge relevance" and "the model we chose cannot be reached" send an operator to the trust
+    fabric and to a vendor's status page respectively, and one code for both sends them to
+    argue with governance during an outage.
+
+    Everything past the binding is `resolve_with_fallback`'s, exactly as the source path does
+    it — absent, withdrawn and wrong-role all refuse there, and a fallback only ever lands on
+    another qualified **judge** cell.
+    """
+    pinned = binding.relevance_cell
+    if not pinned:
+        raise ResolutionRefused(
+            "no ask binding names a cell for relevance; an operator has not decided which "
+            "model may judge whether an answer addresses the question",
+            reason_code="relevance_unbound",
+        )
+
+    return resolve_with_fallback(
+        RELEVANCE_ROLE,  # type: ignore[arg-type]
+        pinned,
+        cells,
+        available=available,
+        agent_definition_id="ask",
+    )
+
+
 class AskAuthority:
     """What the surface consults before an answering path exists in scope.
 
@@ -222,9 +257,35 @@ class AskAuthority:
         cells = parse_matrix_record(matrix_record)
         return resolve_ask_cell(source, binding, cells, available=available)
 
+    def resolve_relevance(
+        self, *, available: frozenset[str]
+    ) -> tuple[QualifiedCell, MatrixFallback | None]:
+        """The relevance judge's cell (043), read from the same records as the sources.
+
+        Same fabric, same parse, same refusal vocabulary — a second reader would be a second
+        answer to "what did the operator decide", and they would disagree exactly when it
+        mattered.
+        """
+        try:
+            binding_record = self._read_binding()
+            matrix_record = self._read_matrix()
+        except ResolutionRefused:
+            raise
+        except Exception as exc:  # noqa: BLE001 — any read fault is a read fault
+            raise ResolutionRefused(
+                f"the trust fabric could not be read: {type(exc).__name__}",
+                reason_code="fabric_unreachable",
+            ) from exc
+
+        binding = parse_ask_binding_record(binding_record)
+        cells = parse_matrix_record(matrix_record)
+        return resolve_relevance_cell(binding, cells, available=available)
+
 
 __all__ = [
     "ASK_ROLE",
+    "RELEVANCE",
+    "RELEVANCE_ROLE",
     "ESTATE",
     "GUIDANCE",
     "SOURCES",
@@ -233,4 +294,5 @@ __all__ = [
     "AskBinding",
     "parse_ask_binding_record",
     "resolve_ask_cell",
+    "resolve_relevance_cell",
 ]

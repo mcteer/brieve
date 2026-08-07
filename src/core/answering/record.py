@@ -40,6 +40,7 @@ def record_ask(
     model_authority: str,
     conversation_id: str = "",
     carried_context: dict[str, Any] | None = None,
+    declined_reason: str = "",
 ) -> None:
     """Write the ask record, or fail the ask.
 
@@ -90,6 +91,13 @@ def record_ask(
                 # and Principle IX, and `MODEL_GATE` already keeps that distinction for runs.
                 "model": model,
                 "disposition": disposition,
+                # WHY it declined, when it did (043). Defaulted, because an answer has no
+                # reason to give — but a decline without one is a record an auditor cannot act
+                # on: "the corpus does not cover what was asked", "every citation failed to
+                # resolve" and "relevance could not be established" send a reader to three
+                # different places, and until this field the response carried the distinction
+                # and the RECORD did not.
+                "declined_reason": declined_reason,
                 # WHICH door was opened. Not derivable from anything else in the payload.
                 "source": source,
                 # WHETHER the model was allowed to answer, and under which authority (026).
@@ -111,4 +119,4 @@ def record_ask(
         raise AskNotRecorded("the ask could not be recorded; it is refused") from exc
 
 
-__all__ = ["AskNotRecorded", "record_ask"]
+__all__ = ["ask_stream_for", "AskNotRecorded", "record_ask"]

@@ -231,6 +231,7 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
     """
     from datetime import UTC, datetime
 
+    from core.answering.answer import NOT_COVERED
     from core.answering.record import record_ask
     from core.audit.sink import InMemoryAuditSink
     from core.identity.types import AuthenticatedSubject, SubjectKind
@@ -262,6 +263,15 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
     payload = entries[0].payload
     assert payload["subject_user_id"] == "alice"
     assert payload["corpus_digest"] == "f854d621"
+    # 043: the decline reason is CLOSED vocabulary. A record that could carry arbitrary prose
+    # here would be the leak this row exists to prevent, one field over — so the field is
+    # admitted above and immediately bounded here.
+    assert payload["declined_reason"] in {
+        "",
+        NOT_COVERED,
+        "the pinned corpus does not support an answer to this question",
+        "every candidate claim rested on a citation that does not resolve",
+    } or payload["declined_reason"].startswith("relevance could not be established:")
     # 025 adds `source`. The set is EXACT rather than a superset check, which is why this row
     # fires on a deliberate change as loudly as on an accidental one — a payload contract nobody
     # is forced to look at is a payload contract that grows a content field eventually.
@@ -274,6 +284,10 @@ def test_an_ask_record_carries_shape_and_never_content() -> None:
         "corpus_digest",
         "model",
         "disposition",
+        # 043: WHY it declined. Platform vocabulary, never corpus content — asserted
+        # below rather than assumed, because a free-text field in this payload is exactly
+        # what this row exists to catch.
+        "declined_reason",
         "source",
         "evidence_stream",
         "cell",
