@@ -53,6 +53,10 @@ chain's floor and vocabulary are untouched.
 
 - New `relevance_cell: str = ""` beside `guidance_cell`/`estate_cell`. Absent → the surface
   declines `relevance_unbound` (026: "nobody decided" precedes "nothing is wired").
+- **The parser learns a per-field expected role** (sources → `ask`, relevance → `judge`),
+  refusing both mismatch directions **at parse** — today it refuses any non-`ask` cell
+  outright, so without this the record would refuse this feature's own field (analysis C1).
+  One qualification must not license another in either direction.
 
 ### `answer_question`
 

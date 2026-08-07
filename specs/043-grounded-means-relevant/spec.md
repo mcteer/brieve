@@ -232,6 +232,12 @@ it was insufficient.
 - **The hermetic gates stay green throughout**, since they drive a recorded fixture whose
   invented anchor still fails to resolve — this feature must not need them changed to pass.
 - **`ask` still never acts.** ADR-0039 is untouched.
+- **The gate applies to guidance answers only.** The estate path is excluded on reasoning
+  rather than by omission: its "corpus" is the asker's own run records, already bounded by
+  role scope and the 029 window, and its relevance failure mode is routing — which 029 owns.
+  The defect mechanism here is corpus breadth, which the estate path does not have. **The
+  revisit trigger is an observed estate analogue**, recorded now so widening the gate later is
+  a decision rather than a reaction.
 - **Every ask that survives citation resolution now costs a second model call.** That is the
   price of the chosen mechanism, and it is stated here rather than discovered in a latency
   budget: 028 already decided the ask waits 180s while every other call keeps 10s, so there is

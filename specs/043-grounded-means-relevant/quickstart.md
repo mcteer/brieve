@@ -14,8 +14,8 @@ How to see the gate working, cheapest first. Row IDs refer to
 ## 1 — Hermetic proof (every PR)
 
 ```sh
-make check                 # unit rows: seed loader floor, verdict parsing, caller row R8
-make conformance-hermetic  # R1–R15: the gate, its refusals, the record, the rig-off row
+make check                 # unit rows: seed loader floor (R13–R14), qualification scoring (R15), parser refusals
+make conformance-hermetic  # R1–R12: the gate, its refusals, the record, the rig-off and caller rows
 ```
 
 Expected: all green, with **zero edits** to existing answering cases (R9). The interesting
