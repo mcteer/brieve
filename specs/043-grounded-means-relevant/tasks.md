@@ -123,7 +123,7 @@ third reason; affirming one of three — answered with two disclosed irrelevant.
       construct the judge (fixture cell → fixture judge in dev; live cell → adapter), pass it
       to `answer_question`; unbound/unqualified/unavailable each decline naming the cause
       (FR-017).
-- [ ] T012 [US1] [GATE:conformance] Rows R6 + R8 in
+- [X] T012 [US1] [GATE:conformance] Rows R6 + R8 in
       `tests/conformance/answering/test_relevance_caller.py` (new file), both driven against
       the surface because both are facts about it: an empty `relevance_cell` refuses
       `relevance_unbound` before any availability question (R6 — 026's "nobody decided" rule,
@@ -144,15 +144,15 @@ kept (SC-003, SC-004).
 **Independent Test**: run the answering suites unedited with the fixture judge wired; ask a
 two-product question through the gate with all claims affirmed.
 
-- [ ] T013 [US2] Wire the fixture judge into the recorded-suite path so the existing answering
+- [X] T013 [US2] Wire the fixture judge into the recorded-suite path so the existing answering
       suites run with the gate PRESENT (never bypassed) and unedited — the fixture affirms for
       cases expecting `answered`, and the wiring lives in the scorer construction, not in any
       case file (`src/core/evals/scoring.py` or its conftest seam; zero case edits).
-- [ ] T014 [P] [US2] [GATE:conformance] Row R9 in
+- [X] T014 [P] [US2] [GATE:conformance] Row R9 in
       `tests/conformance/answering/test_relevance_regression.py` (new file): `git diff` over
       the answering eval case files against the merge-base is empty, and the recorded suites
       pass with the gate wired.
-- [ ] T015 [P] [US2] [GATE:conformance] Row R10 in the same file: a question whose claims span
+- [X] T015 [P] [US2] [GATE:conformance] Row R10 in the same file: a question whose claims span
       two products' documents, all affirmed → answered with both citations kept. **This row
       fails if the fix is product-scoping**, which is its reason to exist.
 
@@ -177,7 +177,7 @@ what was considered (SC-007, SC-010).
       "distinguishable from the records alone" is a fact about the records rather than about
       the in-memory `Answer` — a reason that exists only in the response is invisible to an
       auditor.
-- [ ] T017 [P] [US3] [GATE:conformance] Rows R11–R12 in
+- [X] T017 [P] [US3] [GATE:conformance] Rows R11–R12 in
       `tests/conformance/answering/test_relevance_record.py` (new file): the gate event is
       present, ordered before the outcome, carries the cell identity and counts and no
       statements (R11); from a declined ask's records alone a reader can state what was
