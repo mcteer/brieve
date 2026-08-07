@@ -336,9 +336,10 @@ obligation being discharged, not a demo.
 
 ## Notes
 
-- **43 tasks; 26 contract rows (A1–A22, E1–E4)**, and every asserting task names its rows.
-  Five tasks (T002a, T004a, T024a, T024b, and A5's rewrite) exist because the first analyze
-  pass found four artifacts asserting what the code cannot do — the suffixed IDs mark them.
+- **42 tasks; 26 contract rows (A1–A22, E1–E4)**, and every asserting task names its rows.
+  Four tasks (T002a, T004a, T024a, T024b) exist because the first analyze pass found four
+  artifacts asserting what the code cannot do — the suffixed IDs mark them, and T033/T034
+  were rewritten in the same pass for the same reason.
 - No task edits 038's seven row files or the four recording-driven suites; T035/T036 assert it.
 - The fake-forge seam (T026) is declared, per the repo's undeclared-fake-row guard.
 - T019 re-seeds the model credential after `terraform apply` — the apply clobbers it
