@@ -23,11 +23,13 @@ from __future__ import annotations
 import os
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from adapters.model_chooser import FIXTURE_PROVIDER, build_chooser
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.schema import AuditEventType
+from core.authoring.artifact import AuthoredArtifact
 from core.authority.clock import Clock, SystemClock
 from core.authority.errors import AuthorityRefuseError, ResolutionRefused
 from core.authority.grant import DEFAULT_MAX_RUN_DURATION, issue_grant
@@ -55,6 +57,12 @@ from core.observation.record import observe_effects
 from core.run import RunState, start_governed_run
 from core.threads.context import RESULT_KEY, resolve_run_input
 from core.threads.postgres import PostgresThreadStore
+from surfaces.dispatch.authoring import (
+    ANALYZER,
+    authoring_registry_for,
+    authoring_role,
+    trees_for,
+)
 from surfaces.toolset import build_registry, content_pins, dependency_products
 
 #: What every pre-040 invoke ran with, kept for exactly two jobs — neither on the ask path.
@@ -1089,6 +1097,25 @@ def main() -> int:
     registry, _loaded_packs = build_registry(
         packs=[p for p in os.environ.get("RUN_PACKS", "").split(",") if p]
     )
+
+    # THE AUTHORING BRANCH (041). 038 built the tier, the jobspec has set
+    # HARNESS_AUTHORING_ROLE since it was written, and nothing here ever read it — so
+    # `register_authoring_tools` had no caller and a ceiling naming `author_file` refused
+    # `unknown_ceiling_entry`, because the vocabulary a ceiling may name is derived from what
+    # registered. This is the line that closes that.
+    #
+    # AFTER `build_registry` and BEFORE the fabric, which is the only correct position: the
+    # fabric derives `known_tools` from the registry, so registering later would leave the
+    # vocabulary narrower than the registry and reintroduce the refusal one layer down.
+    authoring = authoring_role(dict(os.environ))
+    if authoring == ANALYZER:
+        artifact = AuthoredArtifact()
+        authoring_registry_for(
+            ANALYZER,
+            registry=registry,
+            trees=trees_for(Path(os.environ.get("NOMAD_ALLOC_DIR", "/alloc")) / "workspace"),
+            artifact=artifact,
+        )
 
     # The roles the dispatching surface already resolved from this subject's verified
     # claims. Passed rather than re-derived: a second derivation is a second answer to

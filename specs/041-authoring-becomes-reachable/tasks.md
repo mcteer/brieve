@@ -97,7 +97,7 @@ refusal layers are distinguishable (SC-001, SC-008).
 **Independent Test**: Author a ceiling naming `read_subject`/`author_file`, load it through the
 entrypoint-built registry, confirm it resolves; confirm the three refusal reasons differ.
 
-- [ ] T007 [US1] Add the `HARNESS_AUTHORING_ROLE=analyzer` branch to
+- [X] T007 [US1] Add the `HARNESS_AUTHORING_ROLE=analyzer` branch to
       `src/surfaces/dispatch/entrypoint.py`: build `Trees` from the mounted `/subject` and the
       allocation workspace, construct `AuthoredArtifact`, call `register_authoring_tools`
       after `build_registry()`, and feed the widened vocabulary to the fabric
@@ -107,19 +107,19 @@ entrypoint-built registry, confirm it resolves; confirm the three refusal reason
       the construction rigged on and off, which a private inline block cannot offer. The trio
       joins the derived vocabulary only in authoring runs; non-authoring runs are untouched
       (FR-001/002/003).
-- [ ] T008 [US1] Extend the harness fixtures so hermetic rows can drive the entrypoint's
+- [X] T008 [US1] Extend the harness fixtures so hermetic rows can drive the entrypoint's
       authoring construction without Nomad (role env + tmp trees), in
       `tests/harness/` (new module beside `scripted_chooser.py`; declared, never a silent
       fake-fabric row — 038's own guard catches undeclared ones).
-- [ ] T009 [P] [US1] [GATE:conformance] Rows A1 + A3 in
+- [X] T009 [P] [US1] [GATE:conformance] Rows A1 + A3 in
       `tests/conformance/authoring/test_reachability.py` (new file): the same ceiling record
       refuses before / resolves after, asserted as a change; ceiling-omits → no authoring
       through the entrypoint-built registry.
-- [ ] T010 [P] [US1] [GATE:fail-closed] Row A2 in
+- [X] T010 [P] [US1] [GATE:fail-closed] Row A2 in
       `tests/conformance/authoring/test_reachability.py`: unknown tool / outside ceiling /
       outside task scope — three runs, three reason codes, each naming a different record
       (FR-019).
-- [ ] T011 [US1] [GATE:conformance] Row A4 in
+- [X] T011 [US1] [GATE:conformance] Row A4 in
       `tests/conformance/authoring/test_reachability.py`: with the authoring branch rigged
       off, A1 and A3 must FAIL — the suite can lose (FR-018).
 

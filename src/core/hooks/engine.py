@@ -143,12 +143,26 @@ def run_pipeline(
 
     # Scope check
     if tool_name not in run.scope:
+        # WHICH bound excluded it (041, FR-019/SC-008). The reason CODE stays `out_of_scope`:
+        # it is a stable part of the refusal vocabulary that surfaces and recorded runs
+        # already depend on, and this feature has no business churning it. What was genuinely
+        # missing is that "your ceiling does not carry this tool" and "this run did not ask
+        # for it" were the same record — one sends a reader to a governance record, the other
+        # to the dispatch, and an operator could not tell which.
+        #
+        # So the discriminator rides in the PAYLOAD and the message, which is exactly what
+        # SC-008 asks for: distinguishable by an operator reading only the record.
+        excluded = run.authority_exclusions.get(tool_name)
         return _deny_pre(
             run,
             tool_name,
-            redacted,
+            {**redacted, **({"excluded_by": excluded} if excluded else {})},
             reason_code="out_of_scope",
-            message="tool is outside the run scope",
+            message=(
+                f"tool is outside the run scope ({excluded})"
+                if excluded
+                else "tool is outside the run scope"
+            ),
         )
 
     # Pre-hooks
