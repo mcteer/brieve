@@ -376,6 +376,39 @@ this workflow as the composition feature that adds
 the intake surface, the impact gate, and evidence-in-proposal — **per product**, with Vault plausibly first since its product is already in the enclave. Each earlier feature is
 independently valuable; this entry is why they are ordered.
 
+### The admin interface — governance leaves Terraform (unnumbered)
+
+**Raised 2026-08-07, recorded before it was specified.** An administrator of the stack should
+be able to configure the platform from an interface: whether LLM-as-a-judge is enabled, which
+model is bound to each role, TFE and workload-Vault configuration, and the rest of what is
+today operator-authored HCL.
+
+**This is the entry every other governance-in-the-interface question now hangs from.** Two are
+already recorded and both were waiting for it: [customer-supplied
+context](#customer-supplied-context-unnumbered)'s *"endorsement by an admin, configured in the
+interface"*, and 043's judge toggle. Neither should invent its own admin surface.
+
+**Four collisions, measured, and the first is the whole feature:**
+
+| What it collides with | The state today |
+| --- | --- |
+| **026's governance/assembly split** | *"Where a model is reachable from is assembly while which model is permitted is governance"* — and deployment config was **rejected** on exactly that ground. An interface that writes bindings moves governance out of Terraform for the first time. That may well be right, since the person who knows which model should judge is not the person with estate credentials; it is a posture change to argue rather than assume |
+| **There is no `admin` role** | `core/answering/scope.py` knows `operator` and `compliance-analyst`. A third role is a change to the governance vocabulary, not a UI addition — and Principle IV puts IdP claim-to-role mapping behind Control Groups |
+| **The role vocabulary is closed and does not match the ask** | The proposal names *research / plan / write / validate*; ADR-0039's closed set is **ask / plan / write / judge / summarize**. Two of the four proposed names do not exist. Either the vocabulary widens (an ADR amendment, and v1.6.0's Sync Impact Report warns about closed lists growing by interpretation) or the interface maps display names onto the real roles. **Deciding which is part of this feature, not a detail of it** |
+| **Agents are structurally excluded from managing their own platform** | Principle IV, and ADR-0025 made a run observably unable to write what bounds it. An admin surface is a new write path to exactly those records, and whatever it is, a dispatched run must not be able to reach it |
+
+**The sharpest product question, and it is not a technical one.** If an admin can *disable*
+LLM-as-a-judge, what happens to an answer that would have been judged? Three different products:
+answer anyway (which reintroduces [gap 0g](#0g-a-resolving-citation-proves-a-document-exists-not-that-it-answers-the-question--open-found-2026-08-07)
+by configuration, with the trail recording that a person chose it); decline (safe, and an admin
+who turns the gate off has turned answering off); or answer with the absence disclosed on the
+answer, which is 033's shape — *disclose rather than suppress* — and the one this platform's
+precedent points at. **The same question recurs for every toggle this interface grows**, which
+is the argument for deciding it once here rather than per setting.
+
+**Not blocked on anything.** 012 built the portal, 028 gave it an ask, 034 gave it an identity,
+and 035 gave it conversations; what is missing is a role, a write path, and the decision above.
+
 ### Customer-supplied context (unnumbered)
 
 A customer's own material — internal compliance policies, architecture standards, reference
@@ -408,6 +441,9 @@ ignorance of each other means building the tenant boundary twice.
 **And it reaches authoring, not only answering.** *"Write the Vault integration for this repo"*
 against a customer's architecture standards is the same requirement arriving through 038's path
 rather than the ask path, which means whatever shape this takes has to serve both.
+
+**The admin surface this needs is now its own entry** ([above](#the-admin-interface--governance-leaves-terraform-unnumbered)),
+raised 2026-08-07. This entry should consume it rather than invent one.
 
 **Endorsement by an admin, configured in the interface** — added 2026-08-06, and it is plausibly
 the *answer* to the citation problem rather than a complication. The gate needs a trust statement
