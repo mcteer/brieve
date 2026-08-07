@@ -149,7 +149,7 @@ def sections_of(text: str) -> dict[str, str]:
 
 
 def documents_in(
-    root: Path, *, source: str, location: str
+    root: Path, *, source: str, location: str, ref: str = "HEAD"
 ) -> tuple[dict[str, EndorsedDocument], list[str]]:
     """Read a checkout into citable documents, and name what could not be made citable.
 
@@ -184,13 +184,38 @@ def documents_in(
         citation_path = endorsed_path(source, relative)
         documents[citation_path] = EndorsedDocument(
             path=citation_path,
-            url=f"{location.rstrip('/')}/{relative}",
+            url=browse_url(location, relative, ref=ref),
             digest=digest_of_document(sections),
             anchors=frozenset(sections),
             sections=sections,
         )
 
     return documents, uncitable
+
+
+def browse_url(location: str, relative: str, *, ref: str = "HEAD") -> str:
+    """Where a person can READ this document — which is not where the platform cloned it from.
+
+    **Found by running EL1 against a real repository.** The first version was
+    `location + "/" + relative`, which produces `https://github.com/acme/standards.git/logging.md`
+    — a 404. A citation that resolves inside the platform and 404s in the reader's browser is
+    precisely the "reads as evidence and is not" failure the whole citation gate exists to
+    prevent, arriving through the one door the gate cannot see: the gate checks that the
+    *anchor exists in the content we hold*, and cannot check that the *link works*.
+
+    Hosted forges put a blob path in between; everything else — a local path, a bare mirror, a
+    server nobody here has heard of — falls back to joining, which is the honest answer for a
+    location whose browse layout we do not know.
+    """
+    base = location.rstrip("/")
+    if base.endswith(".git"):
+        base = base[: -len(".git")]
+    branch = "HEAD" if ref == "HEAD" else ref
+    for forge in ("github.com", "gitlab.com", "bitbucket.org"):
+        if forge in base:
+            segment = "src" if forge == "bitbucket.org" else "blob"
+            return f"{base}/{segment}/{branch}/{relative}"
+    return f"{base}/{relative}"
 
 
 def remote_tip(location: str, *, ref: str = "HEAD", runner: Any = None) -> str:
@@ -247,7 +272,7 @@ def sync_source(
                 timeout=CLONE_TIMEOUT_SECONDS,
             )
 
-        documents, uncitable = documents_in(target, source=source, location=location)
+        documents, uncitable = documents_in(target, source=source, location=location, ref=ref)
 
         if not documents and not uncitable:
             raise SyncFailed(

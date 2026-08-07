@@ -253,6 +253,38 @@ def _report_health(checker: HealthChecker) -> None:
             )
 
 
+def _report_drift(drift: Any) -> None:
+    """Report endorsed sources that have moved upstream, and say nothing else (045, T013).
+
+    **Noticing changes nothing.** This writes no version, adopts nothing, and touches no
+    record: it prints what the administrator will see in the console. That separation is what
+    makes the detection safe to run on a timer at all — the automatic operation cannot alter
+    behaviour, and the operation that alters behaviour is a person's act with a name against
+    it (ADR-0070).
+
+    A source that could not be reached is reported as unknown rather than unchanged, because
+    telling an administrator their material is current when the platform could not look is the
+    failure with the worst consequence here.
+    """
+    if drift is None:
+        return
+    for flag in drift.sweep():
+        if flag.error:
+            print(
+                f"::endorsed:: {flag.source} could not be checked ({flag.error}) — "
+                f"whether it has changed is UNKNOWN, not unchanged",
+                file=sys.stderr,
+                flush=True,
+            )
+        elif flag.moved:
+            print(
+                f"::endorsed:: {flag.source} has changed upstream "
+                f"({flag.adopted_tip or 'nothing adopted'} -> {flag.upstream_tip}); "
+                f"answers still rest on the adopted version until an administrator adopts",
+                flush=True,
+            )
+
+
 def _report_sweep(sweeper: Sweeper, store: PostgresDependencyStore) -> None:
     """Sweep every product something is actually waiting on.
 
@@ -348,6 +380,10 @@ def supervisory_pass(
     credentials: VaultDatabaseCredentials,
     destination_factory: Callable[[], Any] | None = None,
     audit_sink: Any = None,
+    #: 045's drift probe. `None` where nothing is endorsed — which is not a disabled feature
+    #: but an estate with no customer sources, and the pass is then genuinely absent from the
+    #: returned list rather than present and doing nothing.
+    drift: Any = None,
 ) -> list[str]:
     """One pass of everything this service exists to do. Returns the passes it ran.
 
@@ -374,6 +410,13 @@ def supervisory_pass(
     ran.append("trust-fabric")
     _pass("health", lambda: _report_health(checker))
     ran.append("health")
+    # AFTER health and BEFORE the sweep, and the placement is not arbitrary: drift detection
+    # reaches a customer's repository, so it belongs behind the pass that establishes whether
+    # the platform's own dependencies are answering. `drift` is None where nothing is
+    # endorsed, which is every estate until an administrator endorses something.
+    if drift is not None:
+        _pass("endorsed-drift", lambda: _report_drift(drift))
+        ran.append("endorsed-drift")
     _pass("sweep", lambda: _report_sweep(sweeper, store))
     ran.append("sweep")
     _pass("integrity", lambda: _report_integrity(check_integrity(credentials)))
@@ -454,6 +497,34 @@ def main() -> int:
         checkpoints.load,
     )
 
+    # 045's drift probe, riding this loop rather than operating a schedule of its own
+    # (research R5, Principle VI). One refs listing per endorsed source per pass — no clone,
+    # no content transfer — which is what makes it cheap enough to be somebody else's tenant.
+    from core.answering.endorsed.postgres import PostgresEndorsedStore
+    from core.authority.vault_fabric import VaultIdentityFabric
+    from core.endorsed_sync import remote_tip
+    from surfaces.api.console import ENDORSED_SOURCES_PATH
+    from surfaces.mcp.health import DriftChecker
+
+    _drift_fabric = VaultIdentityFabric(
+        credentials=credentials, known_tools=set(), known_actions=set()
+    )
+
+    def _endorsement_record() -> dict[str, Any]:
+        record = _drift_fabric.read_versioned(ENDORSED_SOURCES_PATH)
+        if not isinstance(record, dict):
+            return {}
+        data = record.get("data", record)
+        inner = data.get("data", data) if isinstance(data, dict) else {}
+        return inner if isinstance(inner, dict) else {}
+
+    drift = DriftChecker(
+        read_sources=_endorsement_record,
+        store=PostgresEndorsedStore(credentials=credentials),
+        list_tip=remote_tip,
+        tenant_id=os.environ.get("HARNESS_DEFAULT_TENANT", "").strip(),
+    )
+
     tenant = os.environ.get("HARNESS_DEFAULT_TENANT", "").strip()
     interval = float(os.environ.get("MCP_INTERVAL_SECONDS", DEFAULT_INTERVAL_SECONDS))
     print(
@@ -471,6 +542,7 @@ def main() -> int:
             credentials=credentials,
             destination_factory=build_destination,
             audit_sink=audit_sink,
+            drift=drift,
         )
         supervisor.sleep()
 

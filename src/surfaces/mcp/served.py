@@ -31,6 +31,8 @@ from pydantic import AnyHttpUrl
 from adapters.anthropic_answering import build_ask_provider
 from adapters.anthropic_relevance import build_relevance_judge
 from core.answering.conversations.postgres import PostgresConversationStore
+from core.answering.endorsed.corpus import resolve_endorsed
+from core.answering.endorsed.postgres import PostgresEndorsedStore
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
@@ -47,6 +49,7 @@ from core.runs.changes import PostgresChangeRequestStore, VaultChangeStatus
 from core.runs.index import PostgresRunIndex
 from core.threads.postgres import PostgresThreadStore
 from surfaces.api.authority_submit import VaultAuthoritySubmitter
+from surfaces.api.console import ENDORSED_SOURCES_PATH
 from surfaces.api.verification import (
     AuthenticationRefused,
     FederatedVerifier,
@@ -124,6 +127,15 @@ def _db_host() -> str:
     return os.environ.get(DB_HOST_ENV, "").strip() or "127.0.0.1"
 
 
+def _kv_data(record: object) -> dict[str, object]:
+    """KV v2 nests the body two levels down. Mirrors `service.py`'s, deliberately."""
+    if not isinstance(record, dict):
+        return {}
+    data = record.get("data", record)
+    inner = data.get("data", data) if isinstance(data, dict) else {}
+    return inner if isinstance(inner, dict) else {}
+
+
 def build_transport() -> McpTransport:
     """Assemble the transport from the collaborators the API uses. **No substitutes** (FR-002).
 
@@ -146,6 +158,11 @@ def build_transport() -> McpTransport:
     audit_sink.migrate()
     run_index.migrate()
     thread_store.migrate()
+    # 045, and wired HERE as well as in the API for the reason 144's note above gives about
+    # the conversation store: a parity row over two app objects compares collaborators the
+    # fixture supplied, and cannot see a store one assembly builds and the other does not.
+    endorsed_store = PostgresEndorsedStore(credentials=credentials, host=host)
+    endorsed_store.migrate()
 
     _fabric = VaultIdentityFabric(
         credentials=credentials, known_tools=KNOWN_TOOLS, known_actions=KNOWN_ACTIONS
@@ -196,6 +213,13 @@ def build_transport() -> McpTransport:
         # already holds, so an unqualified model is unreachable here as everywhere.
         ask_authority=AskAuthority(
             read_binding=_fabric.read_ask_binding, read_matrix=_fabric.read_matrix
+        ),
+        # 045's second corpus, resolved once per call. A closure rather than a built corpus,
+        # so an adoption takes effect at the next question rather than at the next deploy.
+        endorsed_reader=lambda: resolve_endorsed(
+            read_sources=lambda: _kv_data(_fabric.read_versioned(ENDORSED_SOURCES_PATH)),
+            store=endorsed_store,
+            tenant_id=os.environ.get("HARNESS_DEFAULT_TENANT", "").strip(),
         ),
         # 027 — the posture three features deferred, now decided (ADR-0058).
         #

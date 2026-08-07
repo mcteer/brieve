@@ -58,6 +58,30 @@ def run_id(request: pytest.FixtureRequest) -> str:
     return f"conformance-{request.node.name}-{uuid.uuid4().hex[:12]}"
 
 
+@pytest.fixture
+def postgres_durability() -> Iterator[DurabilityProvider]:
+    """The real store only, for a row whose whole subject is that the SQL exists.
+
+    **This fixture was missing and the row using it had therefore never run** — it errored at
+    setup with `fixture 'postgres_durability' not found`, inside the allocation lane, where the
+    error was one line above a pytest summary that reported the rest of the suite passing.
+    Found while wiring 045's endorsed store into the same lane.
+
+    Separate from `provider` rather than a parametrisation of it: `provider` yields memory AND
+    postgres, and a row that must speak only about Postgres would then also run against a
+    double — which is exactly what its docstring says it exists not to do.
+    """
+    if not _enclave_reachable():
+        pytest.fail(
+            "this row is about the SQL and cannot be answered without the store — run "
+            "`make dev-up`. Skipping would report a guarantee nobody tested."
+        )
+    credentials = VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role="conformance")
+    store = PostgresDurabilityProvider(credentials=credentials)
+    store.migrate()
+    yield store
+
+
 @pytest.fixture(params=PROVIDERS)
 def provider(request: pytest.FixtureRequest) -> Iterator[DurabilityProvider]:
     if request.param == "memory":

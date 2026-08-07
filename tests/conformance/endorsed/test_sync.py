@@ -376,6 +376,43 @@ def test_a_hidden_directory_is_not_customer_documentation(tmp_path: Path) -> Non
     assert set(documents) == {"/endorsed/acme/logging.md"}
 
 
+def test_a_citation_url_is_one_a_reader_can_actually_follow(tmp_path: Path) -> None:
+    """**Found by running EL1 against a real repository, and it is the gate's blind spot.**
+
+    The first version built `location + "/" + relative`, giving
+    `https://github.com/acme/standards.git/logging.md` — a 404. The citation gate checks that
+    the anchor exists in the content the platform holds; it cannot check that the link works.
+    So a reader following what reads as evidence would find nothing, which is the exact failure
+    the whole gate exists to prevent, arriving through the one door it does not watch.
+    """
+    root = _repo(tmp_path, {"logging.md": "# Retention\n\nkept 400 days\n"})
+
+    documents, _ = documents_in(
+        root, source="acme", location="https://github.com/acme/standards.git"
+    )
+
+    assert documents["/endorsed/acme/logging.md"].url == (
+        "https://github.com/acme/standards/blob/HEAD/logging.md"
+    )
+
+
+@pytest.mark.parametrize(
+    ("location", "expected"),
+    [
+        ("https://github.com/acme/std.git", "https://github.com/acme/std/blob/HEAD/a.md"),
+        ("https://gitlab.com/acme/std", "https://gitlab.com/acme/std/blob/HEAD/a.md"),
+        ("https://bitbucket.org/acme/std.git", "https://bitbucket.org/acme/std/src/HEAD/a.md"),
+        # A forge nobody here has heard of: join, which is the honest answer for a browse
+        # layout we do not know rather than a guess that produces a confident 404.
+        ("https://git.internal.acme/acme/std.git", "https://git.internal.acme/acme/std/a.md"),
+    ],
+)
+def test_the_browse_url_matches_each_forges_own_layout(location: str, expected: str) -> None:
+    from core.endorsed_sync import browse_url
+
+    assert browse_url(location, "a.md") == expected
+
+
 def test_the_synced_at_is_timezone_aware(tmp_path: Path) -> None:
     """A naive timestamp is not comparable to `now`, and the age disclosure needs to compare."""
     root = _repo(tmp_path, {"a.md": "# H\n\nb\n"})

@@ -103,8 +103,13 @@ job "conformance" {
         #
         # No VAULT_TOKEN is set, deliberately. The suite authenticates as this workload
         # or it does not run.
+        # 045: the endorsed directory runs as its OWN invocation with `-m enclave`, rather
+        # than joining the list above. Its hermetic rows include a merge-base diff that shells
+        # out to `git`, which this image does not carry — and that row has nothing to say in
+        # here anyway. What needs an allocation is the store; the assertion that `corpus.py`
+        # was never edited belongs to the lane that can see a git history.
         args = [
-          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces pytest tests/conformance/durability tests/conformance/api tests/conformance/identity -m \"not host_enclave\" -q"
+          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces pytest tests/conformance/durability tests/conformance/api tests/conformance/identity -m \"not host_enclave\" -q && uv run --extra adapters --extra surfaces pytest tests/conformance/endorsed -m enclave -q"
         ]
       }
 

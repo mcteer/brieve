@@ -246,7 +246,7 @@ resolve, provenance visible per claim, age disclosed.
       `tests/a11y/test_wcag.py` and `tests/a11y/test_keyboard_and_screenreader.py`. 044's
       lesson: a page the lane does not visit is a page it has not tested, and the suite stays
       green while it goes unchecked.
-- [ ] T026 Apply the trust-fabric additions to the dev enclave and run **EL1** end to end
+- [X] T026 Apply the trust-fabric additions to the dev enclave and run **EL1** end to end
       against a real repository: endorse → sync → ask a question only that content answers →
       citations resolve, provenance rendered, age disclosed. Record outcomes in
       `contracts/conformance-endorsed-context.md`; re-seed the model credential if the apply
