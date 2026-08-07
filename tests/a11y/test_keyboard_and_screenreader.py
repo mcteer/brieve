@@ -177,6 +177,108 @@ def test_the_console_is_announced_to_a_screen_reader(
     assert any(text for text in named), "the page exposes no accessible text at all"
 
 
+def test_the_endorsed_sources_table_is_navigable_by_a_screen_reader(
+    admin_page: Any, portal_server: PortalServer
+) -> None:
+    """EL3 — the console's new content is a TABLE, which is a structure or it is noise (045).
+
+    A table of endorsed sources without header association is a screen-reader user hearing
+    "acme-standards, https://…, dan@acme.example, v-one, citable" with no way to know which
+    value is which. The row above audits the operator's refusal page, which contains no table
+    at all — so this is the first row in the lane that can see the structure.
+    """
+    admin_page.goto(f"{portal_server.base}/settings")
+    admin_page.wait_for_selector("table")
+
+    session = admin_page.context.new_cdp_session(admin_page)
+    session.send("Accessibility.enable")
+    tree = session.send("Accessibility.getFullAXTree")
+    roles = [
+        str((node.get("role") or {}).get("value", ""))
+        for node in tree.get("nodes", [])
+        if not node.get("ignored")
+    ]
+
+    assert "table" in roles, "the endorsed sources render as something other than a table"
+    assert roles.count("columnheader") >= 5, (
+        "the table's columns are not headers, so a screen-reader user hears five values per "
+        "row with nothing saying which is the location and which is the version in force"
+    )
+    assert "rowheader" in roles, (
+        "no row is headed by its source name, so a user moving down a column cannot tell "
+        "which source each value belongs to"
+    )
+    # The caption, because a table announced without one is a table a user must read to
+    # identify.
+    assert "caption" in roles or any(
+        "endorsed" in str((node.get("name") or {}).get("value", "")).lower()
+        for node in tree.get("nodes", [])
+        if not node.get("ignored")
+    )
+
+
+def test_the_review_control_says_which_source_it_reviews(
+    admin_page: Any, portal_server: PortalServer
+) -> None:
+    """Three buttons reading "Review changes" are three buttons a screen-reader user cannot
+    tell apart — and picking the wrong one reaches a different customer's repository.
+
+    The accessible name carries the source, which is why the label is not shortened to fit the
+    column.
+    """
+    admin_page.goto(f"{portal_server.base}/settings")
+    admin_page.wait_for_selector("table")
+
+    names = admin_page.eval_on_selector_all(
+        "form[action^='/settings/endorsed/'] button",
+        "els => els.map(e => (e.getAttribute('aria-label') || e.textContent).trim())",
+    )
+
+    assert names, "there is no way to reach a review from the console"
+    assert len(names) == len(set(names)), f"two review controls share a name: {names}"
+    assert all("acme" in name for name in names), (
+        f"a review control does not name its source: {names}"
+    )
+
+
+def test_the_review_page_announces_that_nothing_has_changed(
+    admin_page: Any, portal_server: PortalServer
+) -> None:
+    """The review page's most important content is a status: **reviewing changes nothing**.
+
+    A user who cannot hear that is left to infer it from the absence of a confirmation, which
+    is exactly the inference an interface should never require about a governance act.
+    """
+    admin_page.goto(f"{portal_server.base}/settings")
+    admin_page.click("form[action='/settings/endorsed/acme-standards/review'] button")
+    admin_page.wait_for_selector("h1")
+
+    session = admin_page.context.new_cdp_session(admin_page)
+    session.send("Accessibility.enable")
+    tree = session.send("Accessibility.getFullAXTree")
+    roles = [
+        str((node.get("role") or {}).get("value", ""))
+        for node in tree.get("nodes", [])
+        if not node.get("ignored")
+    ]
+
+    assert "status" in roles, "the review page's state reaches a screen-reader user through nothing"
+
+    # **The AX tree gives the region's ROLE; its text comes from the DOM.** A live region's
+    # accessible *name* is empty unless it is labelled — the announcement is its contents, not
+    # its name — so a row asserting on the name alone would pass on a status region that said
+    # nothing at all.
+    announced = " ".join(
+        admin_page.eval_on_selector_all(
+            "[role=status]", "els => els.map(e => e.textContent.trim())"
+        )
+    ).lower()
+
+    assert "nothing has changed" in announced, (
+        f"the page does not announce that reviewing is not adopting: {announced!r}"
+    )
+
+
 def test_a_screen_reader_is_told_when_a_run_changes_state(
     page: Any, portal_server: PortalServer
 ) -> None:

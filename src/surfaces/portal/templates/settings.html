@@ -77,5 +77,85 @@
     {% endif %}
   {% endif %}
 
+  <h2>Endorsed sources</h2>
+  {#
+    045. The customer's own documents, and what the platform may cite from them.
+
+    Renders what the API returned and decides nothing. "Citable" in particular is the
+    platform's own word: a source can be endorsed, not withdrawn, and cite nothing because
+    no version has been adopted yet — and computing that here would put a governance
+    judgement in a template with no view of the fabric.
+  #}
+  {% if posture.endorsed_sources.unavailable %}
+    <p role="status">
+      The endorsement record could not be read. It is unknown, not empty — no conclusion
+      should be drawn about what is endorsed.
+    </p>
+  {% elif not posture.endorsed_sources.sources %}
+    <p>
+      No sources are endorsed. The platform answers from HashiCorp validated designs only.
+    </p>
+  {% else %}
+    <table>
+      <caption>Sources this organisation has endorsed, and the version answers rest on</caption>
+      <thead>
+        <tr>
+          <th scope="col">Source</th>
+          <th scope="col">Location</th>
+          <th scope="col">Endorsed by</th>
+          <th scope="col">Answers rest on</th>
+          <th scope="col">State</th>
+          <th scope="col">Review</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, source in posture.endorsed_sources.sources.items() %}
+          <tr>
+            <th scope="row">{{ name }}</th>
+            <td>{{ source.location }}</td>
+            <td>{{ source.endorsed_by }}{% if source.endorsed_at %}, {{ source.endorsed_at }}{% endif %}</td>
+            <td>
+              {% if source.adopted_version %}
+                {{ source.adopted_version }}{% if source.adopted_by %} (adopted by {{ source.adopted_by }}{% if source.adopted_at %} on {{ source.adopted_at }}{% endif %}){% endif %}
+              {% else %}
+                nothing adopted yet
+              {% endif %}
+            </td>
+            <td>
+              {% if source.withdrawn %}
+                <strong>withdrawn</strong> — nothing from this source is cited
+              {% elif source.citable %}
+                citable
+              {% else %}
+                endorsed, nothing citable yet
+              {% endif %}
+            </td>
+            <td>
+              {#
+                A FORM, not a link, because opening the review syncs a candidate version and
+                that reaches the customer's repository. A GET would be followed by every link
+                prefetcher that ever saw the URL.
+              #}
+              {% if not source.withdrawn %}
+                <form method="post" action="/settings/endorsed/{{ name }}/review">
+                  <button type="submit">Review changes to {{ name }}</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p>{{ posture.endorsed_sources.consumed_by }}.</p>
+    {% if posture.endorsed_sources.set_by %}
+      <p>Last set by {{ posture.endorsed_sources.set_by }}.</p>
+    {% endif %}
+    <p>
+      Endorsement is a statement of trust, not an inspection: the platform does not vet what
+      a source contains. What it guarantees is that nothing is cited unless somebody named
+      endorsed it, and that a citation resolves to the version the answer actually rested on.
+    </p>
+  {% endif %}
+
 {% endif %}
 {% endblock %}

@@ -194,6 +194,42 @@ def create_portal(
             },
         )
 
+    @app.post("/settings/endorsed/{source}/review", response_class=HTMLResponse)
+    def review_endorsed(request: Request, source: str) -> Response:
+        """Show what changed upstream, against what answers currently rest on (045, US3).
+
+        **POST, not GET**, and that is not REST pedantry: opening this page syncs a candidate
+        version, which reaches a customer's repository. A GET that performed egress would be
+        followed by every link prefetcher and crawler that ever saw the URL.
+
+        No governance logic here either. The API syncs, compares, and decides which of the
+        three sync failures occurred; this renders what came back.
+        """
+        session = _session(request)
+        if session is None:
+            return templates.TemplateResponse(request=request, name="signed_out.html", context={})
+
+        review = app.state.relay.request(
+            "POST",
+            f"/console/endorsed-sources/{source}/review",
+            token=session.access_token,
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="endorsed_review.html",
+            context={
+                "source": source,
+                "review": review.payload if review.ok else {},
+                "reachable": review.reachable,
+                "refused": review.status == 403 and review.reachable,
+                # A sync failure is neither a refusal nor an outage of ours — it is the
+                # customer's source not being readable, and the page keeps the distinction the
+                # API drew rather than flattening all three into "something went wrong".
+                "failed": review.status == 502,
+                "failure": (review.payload or {}).get("detail", ""),
+            },
+        )
+
     # ------------------------------------------------------------------- ask
 
     def _rendered(exchanges: list[dict[str, Any]]) -> list[dict[str, Any]]:

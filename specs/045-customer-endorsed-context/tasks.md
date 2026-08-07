@@ -239,10 +239,10 @@ resolve, provenance visible per claim, age disclosed.
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T024 [P] The portal: `settings.html` gains the endorsed-sources section (sources, adopted
+- [X] T024 [P] The portal: `settings.html` gains the endorsed-sources section (sources, adopted
       version, age, drift flag) and a review page rendering added/removed/altered — through the
       relay only, no governance logic client-side.
-- [ ] T025 [P] **EL3** — the a11y lane walks the endorsed-sources and review pages in
+- [X] T025 [P] **EL3** — the a11y lane walks the endorsed-sources and review pages in
       `tests/a11y/test_wcag.py` and `tests/a11y/test_keyboard_and_screenreader.py`. 044's
       lesson: a page the lane does not visit is a page it has not tested, and the suite stays
       green while it goes unchecked.
