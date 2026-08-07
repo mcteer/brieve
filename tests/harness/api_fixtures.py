@@ -69,6 +69,18 @@ class ScriptedSubmitter:
 FIXTURE_RELEVANCE_MODEL = "anthropic/claude-sonnet@5"
 
 
+def _default_relevance_judges() -> object:
+    """A judge that affirms, so rows about other properties keep asserting those properties.
+
+    Scaffolding, and the contract says so: the gate's REFUSING branches are driven by rows that
+    construct their own verdicts, and its presence on the production path is proven by R8
+    against `ask.py`. This default makes neither of those weaker.
+    """
+    from tests.harness.fixture_relevance import FixtureRelevanceJudge
+
+    return lambda cell: FixtureRelevanceJudge()
+
+
 DEFAULT_MAPPINGS = [
     ClaimMapping(claim_name="groups", claim_value="platform", role="operator"),
 ]
@@ -210,10 +222,18 @@ def surface_under_test(
     # exact equation this feature exists to break. Rows that answer call
     # `qualified_ask_authority()` explicitly.
     ask_authority: object | None = None,
-    # 043's collaborator, shared like the eleven before it. **`None` means every ask refuses
-    # `relevance_unbound`**, on the same discipline: a fixture that auto-supplied a judge would
-    # make the gate's presence a property of the harness rather than of the surface, and 041
-    # spent a feature closing exactly that gap one layer over. Rows that answer pass one.
+    # 043's collaborator, and the ONE that defaults to present rather than absent — which
+    # breaks the pattern of the eleven before it, so here is why.
+    #
+    # Those defaults are absent because each grants something: a credential, a qualification, a
+    # provider. A harness that supplied one by default would rebuild "configured = permitted"
+    # inside the tests, which is the equation 026 exists to break.
+    #
+    # A relevance judge grants NOTHING. It only narrows what ships. Defaulting it absent would
+    # make forty-six rows about routing, records and parity fail for a reason none of them is
+    # about — and the useful assertion is not "this row remembered to pass a judge" but "the
+    # PRODUCTION surface constructs one", which is R8's job and is driven against `ask.py`
+    # itself. The guard belongs there, not in every row's setup.
     relevance_judges: object | None = None,
     relevance_model: str = FIXTURE_RELEVANCE_MODEL,
     # 035's collaborator, shared like the ten before it. A REAL memory store by default rather
@@ -282,7 +302,9 @@ def surface_under_test(
         ask_model=ask_model,
         ask_authority=ask_authority,
         credential_source=credential_source,
-        relevance_judges=relevance_judges,
+        relevance_judges=(
+            relevance_judges if relevance_judges is not None else _default_relevance_judges()
+        ),
         relevance_model=relevance_model,
     )
     mcp = McpTransport(
@@ -302,6 +324,10 @@ def surface_under_test(
         ask_model=ask_model,
         ask_authority=ask_authority,
         credential_source=credential_source,
+        relevance_judges=(
+            relevance_judges if relevance_judges is not None else _default_relevance_judges()
+        ),
+        relevance_model=relevance_model,
     )
     return SurfaceUnderTest(
         app=app,

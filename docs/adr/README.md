@@ -123,6 +123,7 @@ same change.
 | [0064](0064-version-control-is-a-platform-capability.md) | Version control is a platform capability, not a pack tool target | Accepted |
 | [0065](0065-code-mode-is-decided-against.md) | Code mode is decided against, superseding [0041](0041-code-mode-requires-hook-parity.md) | Proposed |
 | [0066](0066-version-control-is-reached-through-adopted-clis.md) | Version control is reached through adopted CLIs, not an MCP server | Accepted |
+| [0067](0067-a-model-does-not-judge-its-own-output.md) | A model does not judge its own output | Proposed |
 
 ## Reviews
 

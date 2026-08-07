@@ -71,6 +71,8 @@ class McpTransport:
         ask_providers: Any | None = None,
         ask_model: str = "unconfigured",
         ask_authority: Any | None = None,
+        relevance_judges: Any | None = None,
+        relevance_model: str = "unconfigured",
         credential_source: Any | None = None,
     ) -> None:
         self._dispatcher = run_dispatcher
@@ -86,6 +88,8 @@ class McpTransport:
         self._ask_providers: Any = ask_providers
         self._ask_model: str = ask_model
         self._ask_authority: Any = ask_authority
+        self._relevance_judges: Any = relevance_judges
+        self._relevance_model: str = relevance_model
         # 027. `None` refuses `credential_unavailable`. A default that supplied one would rebuild
         # "configured means permitted" one level below where 026 broke it.
         self._credential_source: Any = credential_source
@@ -382,6 +386,23 @@ class McpTransport:
         except AskCredentialUnavailable as unavailable:
             return McpResult(ok=False, status=503, payload={"reason": str(unavailable)})
 
+        # THE RELEVANCE GATE, ON THIS TRANSPORT TOO (043). Parity is not a nicety here: the
+        # ask parity row compares the AUDIT TRAIL of both surfaces, and a gate wired on one
+        # would make the API emit `model_gate` while MCP did not — which is exactly the
+        # divergence ADR-0033's row exists to catch, and did.
+        from surfaces.api.ask import _available, relevance_judge_for
+
+        try:
+            relevance = relevance_judge_for(
+                subject=subject,
+                audit=self._audit,
+                authority=self._ask_authority,
+                judges=self._relevance_judges,
+                available=_available(self._relevance_model, self._relevance_judges),
+            )
+        except AskNotQualified as refused:
+            return McpResult(ok=False, status=403, payload={"reason": str(refused)})
+
         try:
             payload = ask_for(
                 question=question,
@@ -397,6 +418,7 @@ class McpTransport:
                 context=context.text,
                 conversation_id=conversation_id or "",
                 carried_context=context.descriptor if conversation_id else None,
+                relevance=relevance,
             )
             payload = _remember(
                 conversations=self._ask_conversations,
