@@ -241,6 +241,26 @@ eval-authoring:
 	}
 	@echo "eval-authoring: product tooling present; corpus gate ran"
 
+# The LIVE `write` qualification (041, T019; ADR-0063). Two gates, two numbers, never one.
+#
+# 038 built every piece of the scoring and nothing produced artefacts to score — `properties_of`
+# is caller-supplied and its only implementations were literal maps inside rows. This lane is
+# what points the machinery at a model.
+#
+# IT BINDS NOTHING. Promotion is a separate, human decision: this prints the evidence, and a
+# maintainer decides whether a cell is earned. A lane that promoted what it measured would be
+# grading its own homework.
+evals-authoring-live:
+	@K=$$(grep '^ANTHROPIC_API_KEY=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
+	[ -n "$$K" ] || { echo "no ANTHROPIC_API_KEY in .env" >&2; exit 1; } ; \
+	command -v terraform >/dev/null || { \
+	  echo "evals-authoring-live: terraform is not on PATH. Gate one is the product's OWN" >&2 ; \
+	  echo "  tooling; without it this FAILS rather than degrading to a syntax check." >&2 ; \
+	  exit 1 ; \
+	} ; \
+	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra evals \
+	  python tests/evals_live/authoring.py
+
 test-full:
 	@echo "make test-full: stub — PR-tier suites not implemented yet" >&2
 	@exit 2
