@@ -314,8 +314,9 @@ in the same task, and a person can merge what the agent proposed.
   T007 → T008 → T009/T010 [P] → T011.
 - **US2 (T012–T020)**: T007 first (the branch exists); T012 → T013; T014/T015 beside them;
   rows T016–T018 [P] after; T019 → T020.
-- **US3 (T021–T032)**: T002 and T023 gate the rest; T021/T022 → T024; T025 beside; rows
-  T026–T028 [P]; T029 after T003/T004; E-rows T030/T031 after everything; T032 last.
+- **US3 (T021–T032)**: T002 and T023 gate the rest; T021/T022 → T024; T024a after T023 (the
+  terminal path exists) → T024b; T025 beside; rows T026–T028 [P]; T029 after T003/T004/T004a;
+  E-rows T030/T031 after everything; T032 last.
 - **US4 (T033–T034)**: after US1–US3 registration is real (the sweep must see it).
 - **US5 (T035–T036)**: last before Polish — it asserts over the finished diff.
 
