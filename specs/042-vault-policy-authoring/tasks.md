@@ -5,7 +5,7 @@
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md,
 contracts/conformance-policy-authoring.md, quickstart.md
 
-**Tests**: Included — the deliverable is largely its rows (V1–V18, PL1–PL3). The safety rows
+**Tests**: Included — the deliverable is largely its rows (V1–V20, PL1–PL3). The safety rows
 land before the capability they bound wherever the order is expressible: the protected-set
 scans (V6/V7) are Foundational because every later phase stands on the namespace being real.
 
@@ -19,7 +19,7 @@ platform being editable by the thing it governs for exactly the length of that g
 
 | Gate type | Where |
 | --- | --- |
-| **Fail-closed** | T004 (unreadable protected set refuses — V5), T009 (the hook refuses on error, never allows), T016 (no ImpactResult → no publish, V13) |
+| **Fail-closed** | T004 (unreadable protected set refuses — V5), T006 (the hook refuses on internal error, never allows — asserted in V2, analyze I1), T016 (no ImpactResult → no publish, V13) |
 | **Conformance** | T007, T010, T013–T014, T016–T017 — the V-rows; T019–T020 the PL legs |
 | **Correlation / evidence** | T013 (the impact call's intent/result bracket joins the trail), T016 (the PR body is platform-rendered from Vault's answers — Principle IX) |
 | **Eval** | N/A per research R13 — the impact evidence is a product answer, not a model output; 041's write-cell qualification is consumed unchanged (stated per the template's rule) |
@@ -55,11 +55,16 @@ story stands on and none may build for itself.
       `no_default_policy`), protected-set publication to
       `harness-authority/data/protected-policies`; `scratch_policy_check` policy in
       `policies.tf`; attach to `agent-run` role and add the sweep grant to the service role
-      in `auth.tf` (R3, R4). `terraform validate` clean.
+      in `auth.tf` (R3, R4). `terraform validate` clean. **Verify `harness_authority_read`'s
+      path grammar covers `protected-policies`** — if its grants enumerate subpaths, extend
+      the grant in the same change (analyze U1; 043's M2 was this shape and was real).
 - [ ] T003 [P] Unit scans in `tests/unit/test_trust_fabric_protected_set.py`: **V6** —
       every `resource "vault_policy"` name in `infra/modules/trust-fabric/` appears in the
       published protected list; **V7** — no trust-fabric policy name begins
-      `scratch-agent-` (FR-020's reserved namespace as a merge gate).
+      `scratch-agent-` (FR-020's reserved namespace as a merge gate); **V20** — the
+      `scratch_policy_check` grant carries no attach capability (`identity/*`,
+      `auth/+/role/*`, `auth/token/roles/*`), so SC-011 rests on a scanned grant rather
+      than only on the absence of an attach step (analyze C2).
 - [ ] T004 [GATE:fail-closed] ProtectedSet reader in
       `src/surfaces/dispatch/policy_authoring.py` (new file): read
       `harness-authority/data/protected-policies` at run start; an unreadable fabric
@@ -94,6 +99,8 @@ row fail.
       provider records zero calls), V2 (the hook refuses and records), **V3 (with the 042
       hook removed from registration, authoring passes and this row FAILS — SC-003)**,
       V4 (planted instruction recorded by the inherited lens; escalation lands in V2).
+      V2 includes the fail-closed leg: an exception raised inside the hook refuses the
+      call, never allows it (analyze I1).
 
 **Checkpoint**: the safety case holds and can lose. Nothing can yet read or measure — which
 is the right order.
@@ -149,7 +156,9 @@ that cannot run refuses the proposal; zero scratch artifacts survive.
       refuses), V12 (a widening change is visibly wider — the row fails if the evidence
       would read identically without the impact, SC-009), V13 (check cannot run → proposal
       refused `impact_unavailable`, never fabricated), V14 (invalid policy → `policy_invalid`
-      from Vault's parser).
+      from Vault's parser), **V19** (FR-024's ceiling clause, both directions in one
+      process: a ceiling naming the new tools reaches them, one omitting them refuses —
+      041's `unknown_ceiling_entry` gap, made unrepeatable here; analyze C1).
 - [ ] T014 [US3] [GATE:conformance] Enclave rows V15–V17 in
       `tests/conformance/authoring/test_policy_impact_enclave.py`, `enclave`-marked,
       **failing rather than skipping without Vault** (SC-007): V15 (full lifecycle; zero
@@ -230,7 +239,7 @@ value and no trust-fabric body.
   phase.**
 - **US1**: T008 after T002; T009 after T004+T008; T010 after T009.
 - **US3**: T011 after T001+T006+T008 (client, hook, declaration); T012 ∥ T011; T013 after
-  T011; T014 after T011+T015 (V17 needs the sweep); T015 after T001.
+  T011+T009 (V19 exercises BOTH new tools, so the read handler must be registered too); T014 after T011+T015 (V17 needs the sweep); T015 after T001.
 - **US4**: T016 after T011 (an ImpactResult must exist to render).
 - **US5**: T017 any time after Foundational; cheapest early-warning if run continuously.
 - **Polish**: T018 ∥ anytime; T019 after T002+T011; T020 after everything; T021/T022 last.
