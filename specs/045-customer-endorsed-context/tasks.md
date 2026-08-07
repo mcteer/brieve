@@ -93,15 +93,15 @@ sync, or cite it.
 **Independent Test**: endorse from the console; the fabric decides; the record names who and
 when; a non-administrator is refused; withdrawal takes effect on the next question.
 
-- [ ] T007 [US1] Endorse / withdraw routes in `src/surfaces/api/console.py`, riding 044's
+- [X] T007 [US1] Endorse / withdraw routes in `src/surfaces/api/console.py`, riding 044's
       `ConfigChange` unchanged — three outcomes, CAS, `set_by`, admin-gated. **No second write
       mechanism** (FR-001b).
-- [ ] T008 [US1] [GATE:conformance] Rows **E1–E3, E5** in
+- [X] T008 [US1] [GATE:conformance] Rows **E1–E3, E5** in
       `tests/conformance/endorsed/test_endorsement.py`: the three-outcome path (E1), who/what/
       when on endorsement, withdrawal and adoption (E2), a non-administrator refused and
       recorded (E3), withdrawal in force for the next question with no restart (E5 — 044's C17
       shape, one process).
-- [ ] T009 [US1] [GATE:conformance] **E4 — the row this phase exists for**, in
+- [X] T009 [US1] [GATE:conformance] **E4 — the row this phase exists for**, in
       `tests/conformance/endorsed/test_endorsement_required.py`: content synced but NOT
       endorsed resolves nothing; **with the endorsement check rigged out it resolves and this
       row fails** (044's C20 shape). Content becoming citable without an endorsement is the one
