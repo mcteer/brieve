@@ -19,7 +19,7 @@ qualification stand on it.
 
 | Gate type | Where |
 | --- | --- |
-| **Fail-closed** | T008 (R4's three causes), T009 (R5 cost bound + R6 unbound-first) |
+| **Fail-closed** | T008 (R4's three causes), T009 (R5 cost bound), T012 (R6 unbound-first, at the surface where the binding is resolved) |
 | **Conformance** | T007–T012, T014–T016 — the R-rows; T021–T022 the L-legs |
 | **Correlation / evidence** | T015 — MODEL_GATE's first production writer, ordered before the outcome record |
 | **Eval** | T005/T006 (seed floor + seeds), T020 (qualification, majority-of-three, two numbers) |
@@ -64,7 +64,9 @@ the hermetic rows and the live legs stand on.
       with the SAME parse-time refusal in both directions — a relevance cell naming an
       `ask`-role cell refuses identically, because one qualification must not license another
       either way. Absent stays empty (the unbound refusal lands with the surface wiring,
-      T011).
+      T011). **Unit rows for both parser refusal directions** land beside it in
+      `tests/unit/test_ask_binding_relevance.py` (new file) — the contract's companion
+      assertion, tasked here so it is nobody's afterthought.
 - [ ] T003 [P] Create `src/core/evals/relevance_seed.py`: seed loader with the floor enforced
       at load — ≥10 cases, ≥3 supported-but-irrelevant, ≥3 fully-relevant, ≥1 mixed;
       `author` required non-empty; per-claim verdicts from the closed `relevant`/`irrelevant`
