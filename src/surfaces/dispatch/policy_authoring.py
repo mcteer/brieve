@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from core.authoring.request import AuthoringRequest, RequestRefused
+from core.hooks.types import CapabilityKind, HookContext, HookDecision, HookPhase, HookRegistration
 
 #: Where the trust fabric publishes what it declares. Read-only to runs by policy, on the
 #: same mount and the same posture as ceilings and the matrix.
@@ -183,11 +184,89 @@ class PolicyAuthoringRequest:
             )
 
 
+#: Arguments a tool may carry a policy name in. Checked as a set rather than per tool, so a
+#: tool added later with a differently-named argument is covered the moment it uses one of
+#: these — and a tool inventing a third spelling is the failure this cannot see, which is why
+#: Vault's ACL is the layer underneath.
+_POLICY_ARGUMENTS = ("policy_name", "target_policy", "name")
+
+#: Which tools this hook inspects. Supplied as a constant rather than checked against every
+#: tool, because a hook that examined `read_subject`'s file contents for policy names would
+#: refuse a run for analysing a repository that mentions `agent-ceiling` in a comment.
+POLICY_WRITING_TOOLS = frozenset({"author_file", "vault_policy_impact"})
+
+
+def protected_policy_hook(protected: ProtectedSet) -> HookRegistration:
+    """PRE at GOVERNANCE: refuse a tool call that names a policy the platform runs on (V2).
+
+    **Layer 2 of three, and the one V3 deletes.** Request validation binds on what a request
+    NAMED; this binds on what a call actually CARRIES, which is the difference between a run
+    that asked wrongly and a run that changed its mind. `SC-003` asserts that removing this
+    registration makes a row fail — a safety case that cannot lose is not one.
+
+    **A registration rather than a call**, on 038's finding in this same estate: its first two
+    drafts put the provenance refusal in a module function reachable only by a caller
+    remembering to call it, which reads identically to enforcement in a task list and is not
+    enforcement. `GOVERNANCE` kind runs first among co-resident capabilities, which is the
+    ordering Principle III requires.
+
+    **The attempt is recorded by the engine, not by this handler.** Every PRE decision is
+    appended with its hook name, outcome and reason code before the deny propagates — so
+    FR-005's "such an attempt MUST be recorded" is the pipeline's property, and a handler
+    writing its own event would file the same refusal twice. The row asserts the engine's
+    record rather than a second one.
+
+    **Fail-closed is also the engine's**: a handler that raises is caught and turned into a
+    deny with `internal_error`. This one raises nothing on purpose, and the row drives a
+    deliberately broken variant to assert the pipeline denies rather than allows.
+    """
+
+    def handler(ctx: HookContext) -> HookDecision:
+        if ctx.tool_name not in POLICY_WRITING_TOOLS:
+            return HookDecision(outcome="allow")
+
+        for argument in _POLICY_ARGUMENTS:
+            named = str(ctx.arguments.get(argument, "") or "").strip()
+            if not named:
+                continue
+            if protected.is_scratch(named):
+                return HookDecision(
+                    outcome="deny",
+                    reason_code="scratch_name_forged",
+                    message=(
+                        f"{named!r} is in the measurement namespace, which the impact check "
+                        f"derives from the run id and no caller supplies. A call naming one "
+                        f"is asking for a throwaway policy to be treated as a real one."
+                    ),
+                )
+            if protected.protects(named):
+                return HookDecision(
+                    outcome="deny",
+                    reason_code="policy_protected",
+                    message=(
+                        f"{named!r} is a trust-fabric policy — part of what bounds the agent "
+                        f"making this call. Agents are structurally excluded from managing "
+                        f"their own platform (Principle IV). Refused at the pipeline, so it "
+                        f"holds whether or not the request that started this run named it."
+                    ),
+                )
+        return HookDecision(outcome="allow")
+
+    return HookRegistration(
+        name="policy_protected",
+        phase=HookPhase.PRE,
+        capability_kind=CapabilityKind.GOVERNANCE,
+        handler=handler,
+    )
+
+
 __all__ = [
+    "POLICY_WRITING_TOOLS",
     "PROTECTED_POLICIES_PATH",
     "SCRATCH_PREFIX",
     "PolicyAuthoringRequest",
     "ProtectedSet",
     "ProtectedSetUnavailable",
+    "protected_policy_hook",
     "read_protected_set",
 ]

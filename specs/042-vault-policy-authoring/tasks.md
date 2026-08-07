@@ -89,12 +89,12 @@ row fail.
       041's `AuthoringRequest` extended with `target_policy`; validation refuses
       `policy_protected` **before anything is read** (V1) — 041's `validate()` runs first,
       unchanged.
-- [ ] T006 [US2] The GOVERNANCE pre-hook in `src/surfaces/dispatch/policy_authoring.py`:
+- [X] T006 [US2] The GOVERNANCE pre-hook in `src/surfaces/dispatch/policy_authoring.py`:
       inspects `author_file` and `vault_policy_impact` arguments; a protected policy name
       refuses and **records the attempt**; an argument supplying a scratch name refuses
       `scratch_name_forged` (V2, V11's hook half); registered for the policy-authoring run
       in `src/surfaces/dispatch/entrypoint.py` on 041's registration pattern.
-- [ ] T007 [US2] [GATE:conformance] Rows V1–V4 in
+- [X] T007 [US2] [GATE:conformance] Rows V1–V4 in
       `tests/conformance/authoring/test_policy_protected.py`: V1 (refusal before any read —
       provider records zero calls), V2 (the hook refuses and records), **V3 (with the 042
       hook removed from registration, authoring passes and this row FAILS — SC-003)**,
