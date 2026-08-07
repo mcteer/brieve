@@ -224,6 +224,11 @@ resource "vault_policy" "harness_authority_read" {
     path "${vault_mount.harness_authority.path}/data/product-connections" {
       capabilities = ["read"]
     }
+    # Endorsed sources (045). **The exact path, no glob** — one record, no subpath. The third
+    # time this file applies 020's finding, and the first two are written above it.
+    path "${vault_mount.harness_authority.path}/data/endorsed-sources" {
+      capabilities = ["read"]
+    }
     # The ASK BINDING (026). Which qualified cell an ask may use, per source.
     #
     # Beside the matrix and read-only for the same reason: a surface that could write its own

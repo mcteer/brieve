@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -31,6 +32,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from core.audit.schema import AuditEventType
 from core.authority.ask_binding import parse_ask_binding_record
+from core.authority.endorsed_sources import SOURCE_FIELDS, validate_source_name
+from core.authority.errors import ResolutionRefused
 from core.authority.matrix import parse_matrix_record
 from surfaces.api.authority_submit import (
     CONSOLE_RECORDS,
@@ -277,6 +280,46 @@ def _validate_payload(body: Any, config: ConsoleConfig) -> None:
                     f"WHERE a product is; the material used to authenticate to it lives in "
                     f"the trust store and is never entered here."
                 )
+    if body.record == "endorsed-sources":
+        _validate_endorsed_sources(body.payload)
+
+
+def _validate_endorsed_sources(payload: Mapping[str, Any]) -> None:
+    """The fourth record's shape, refused at the route for the other three's reasons (045).
+
+    Endorsing is the act that makes somebody's documents citable, so what an administrator may
+    put in the record is a closed set for the same reason a connection's is: there must be no
+    field a credential could be written into. A private source's material is trust-store
+    material referenced per sync (FR-018b's posture, unchanged).
+
+    The **name** is checked here as well as in the parser because it is the citation namespace
+    — a name carrying a separator would let one source's documents resolve inside another's,
+    and being told that at the point of typing is the difference between governance working
+    and the platform looking broken.
+    """
+    for name, entry in payload.items():
+        if name in {"set_by", "schema_version"}:
+            continue
+        try:
+            validate_source_name(name)
+        except ResolutionRefused as refused:
+            raise ValueError(str(refused)) from refused
+        if not isinstance(entry, Mapping):
+            raise ValueError(f"endorsed source {name!r} must carry named fields")
+        unknown = sorted(set(entry) - SOURCE_FIELDS)
+        if unknown:
+            raise ValueError(
+                f"{unknown} are not fields of an endorsed source. An endorsement names WHERE "
+                f"the material is, WHO trusted it and WHICH version answers rest on; the "
+                f"material used to reach a private source lives in the trust store and is "
+                f"never entered here."
+            )
+        if str(entry.get("location", "")).strip() and not str(entry.get("endorsed_by", "")).strip():
+            raise ValueError(
+                f"endorsed source {name!r} names a location and no endorser. The endorsement "
+                f"IS the trust statement the citation gate rests on (FR-002); a source with "
+                f"no named endorser is content that arrived, not content somebody vouched for."
+            )
 
 
 def _qualified_cells(config: ConsoleConfig) -> frozenset[str] | None:

@@ -234,13 +234,16 @@ class VaultAuthoritySubmitter:
 
 #: The records the console may request a change to (044, research R2).
 #:
+#: 045 adds `endorsed-sources` — the fourth, and the four places that must agree are the
+#: reason `test_console_controlled_paths.py` scans rather than trusts.
+#:
 #: **A closed set, enumerated here and granted in `authority-submit.tf`**, and the two must
 #: agree — `test_console_controlled_paths.py` asserts the grant matches the Control Group's
 #: list, and `unknown_record` below refuses anything outside this one before a socket opens.
 #: An open-ended record argument would let a caller aim the submitter at `harness-ceilings`,
 #: which is the escalation this feature spent its safety case preventing at every other layer.
 CONSOLE_RECORDS: frozenset[str] = frozenset(
-    {"ask-bindings", "product-connections", "claim-mappings"}
+    {"ask-bindings", "product-connections", "claim-mappings", "endorsed-sources"}
 )
 
 

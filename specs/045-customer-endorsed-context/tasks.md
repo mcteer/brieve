@@ -48,32 +48,32 @@ Single project: `src/`, `tests/`, `infra/`, `docs/` at repository root.
 **Purpose**: the record, the store, the reader — and the guarantee that the pinned corpus is
 untouched, established before anything can touch it.
 
-- [ ] T001 [GATE:conformance] The **US6 diff row** in
+- [X] T001 [GATE:conformance] The **US6 diff row** in
       `tests/conformance/endorsed/test_pinned_corpus_untouched.py` (new dir): `src/core/answering/corpus.py`
       and the existing answering/citation conformance files are unchanged from the merge-base,
       resolved via `GITHUB_BASE_REF` → local → `origin/<base>` (043's R9 lesson, third use);
       plus the frozen-list-exists guard, because a renamed file makes the diff vacuous rather
       than red. **Lands first so it speaks about every later phase.**
-- [ ] T002 [P] Trust-fabric additions: `endorsed-sources` in
+- [X] T002 [P] Trust-fabric additions: `endorsed-sources` in
       `infra/modules/trust-fabric/authority-submit.tf` (grant),
       `control-groups.tf` (`console_controlled_paths`), and `policies.tf`
       (`harness_authority_read`, **exact path, no glob** — 042's 020-lesson, third use);
       `terraform validate` clean.
-- [ ] T003 [P] [GATE:conformance] Extend the four-place completeness scan in
+- [X] T003 [P] [GATE:conformance] Extend the four-place completeness scan in
       `tests/unit/test_console_controlled_paths.py` to cover `endorsed-sources` — grant ↔ gate
       list ↔ code's closed set. A set enforced in four places is a set that can disagree in
       four places (E1's scan half).
-- [ ] T004 [P] The `EndorsedSource` record parser in `src/surfaces/api/console.py`:
+- [X] T004 [P] The `EndorsedSource` record parser in `src/surfaces/api/console.py`:
       endorse / withdraw / adopt shapes, immutable `name`, location-only vocabulary
       (**no credential field to fill** — 044's FR-018b posture); `endorsed-sources` added to
       `CONSOLE_RECORDS` in `src/surfaces/api/authority_submit.py`. Unit rows for the parser and
       [GATE:no-secret-leak] for the vocabulary.
-- [ ] T005 [GATE:fail-closed] The content store in `src/core/answering/endorsed_store.py`
+- [X] T005 [GATE:fail-closed] The content store in `src/core/answering/endorsed_store.py`
       (new): immutable content-addressed `SyncedVersion` rows in the harness Postgres —
       `candidate` / `adopted` / `superseded`, superseded **retained** because runs may pin them
       (R3/R4). Read verifies each document against its digest and **refuses** on mismatch, the
       way `CorpusUnavailable` refuses — a refusal, never a fallback (E7).
-- [ ] T006 [GATE:fail-closed] `EndorsedCorpus` + `load_endorsed` + the combined view in
+- [X] T006 [GATE:fail-closed] `EndorsedCorpus` + `load_endorsed` + the combined view in
       `src/core/answering/endorsed.py` (new, **beside** `corpus.py`, never inside it):
       `resolves(path, anchor)` true only for the adopted version of a non-withdrawn source for
       this tenant; paths under the reserved `/endorsed/<source>/…` namespace (R2); the combined

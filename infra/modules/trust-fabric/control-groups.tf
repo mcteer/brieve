@@ -64,6 +64,7 @@ locals {
     "${vault_mount.harness_authority.path}/data/claim-mappings/*",
     "${vault_mount.harness_authority.path}/data/ask-bindings",
     "${vault_mount.harness_authority.path}/data/product-connections",
+    "${vault_mount.harness_authority.path}/data/endorsed-sources",
   ]
 }
 

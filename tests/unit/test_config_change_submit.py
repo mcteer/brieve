@@ -231,7 +231,15 @@ def test_the_writable_set_is_exactly_what_the_grant_covers() -> None:
     """The code's closed set and the trust fabric's grant are two statements of one fact.
 
     `test_console_controlled_paths.py` asserts the grant against the Control Group's list;
-    this asserts the code against the same three records, so a widening needs three edits in
-    three files rather than one that slips.
+    this asserts the code against the same records, so a widening needs several edits in
+    several files rather than one that slips.
+
+    045 added the fourth, `endorsed-sources`. That it had to be added *here* — as a
+    deliberate edit to a literal, not as a set that grew on its own — is the row working.
     """
-    assert CONSOLE_RECORDS == {"ask-bindings", "product-connections", "claim-mappings"}
+    assert CONSOLE_RECORDS == {
+        "ask-bindings",
+        "product-connections",
+        "claim-mappings",
+        "endorsed-sources",
+    }
