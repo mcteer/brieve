@@ -240,6 +240,11 @@ def surface_under_test(
     # a deployment that has not configured one has, and keeps every pre-044 row's operation
     # snapshot unchanged. Rows that read configuration supply one.
     console_config: object | None = None,
+    #: 045's second corpus, shared by BOTH surfaces like the twelve collaborators above.
+    #: `None` leaves each with nothing endorsed, which is what every estate has until an
+    #: administrator endorses something — and the parity rows then compare two surfaces on the
+    #: platform as it was, which is US6 asserted at the fixture as well as in the code.
+    endorsed_reader: object | None = None,
     #: An explicit submitter, for rows about what the fabric decided. `None` keeps
     #: `ScriptedSubmitter`, which is what the mappings rows have always driven.
     authority_submitter: object | None = None,
@@ -331,6 +336,7 @@ def surface_under_test(
             relevance_judges if relevance_judges is not None else _default_relevance_judges()
         ),
         relevance_model=relevance_model,
+        endorsed_reader=endorsed_reader,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
@@ -353,6 +359,7 @@ def surface_under_test(
             relevance_judges if relevance_judges is not None else _default_relevance_judges()
         ),
         relevance_model=relevance_model,
+        endorsed_reader=endorsed_reader,
     )
     return SurfaceUnderTest(
         app=app,

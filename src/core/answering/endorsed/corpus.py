@@ -107,6 +107,27 @@ class CombinedCorpus:
     pinned: Any
     endorsed: EndorsedCorpus = field(default_factory=EndorsedCorpus)
 
+    @property
+    def synced_at(self) -> Any:
+        """The age the answer discloses: **the older of the two**, never the fresher (FR-017b).
+
+        An answer can rest on both, and the disclosure must describe the staleness a reader
+        could actually be affected by. Reporting the fresher would let a corpus re-pinned this
+        morning vouch for the currency of customer material synced months ago — a currency
+        claim the platform has not earned, which is the one direction `_parse_synced_at`'s own
+        reasoning refuses.
+
+        `None` from either side means unknown, and unknown wins: the pinned corpus has no
+        timestamp and never will, and "age unknown" is what the answering path already
+        discloses rather than inventing a date.
+        """
+        pinned = getattr(self.pinned, "synced_at", None)
+        if self.endorsed.empty:
+            return pinned
+        if pinned is None or self.endorsed.synced_at is None:
+            return None
+        return min(pinned, self.endorsed.synced_at)
+
     def resolves(self, path: str, anchor: str) -> bool:
         if self.pinned is not None and self.pinned.resolves(path, anchor):
             return True
@@ -144,6 +165,52 @@ class CombinedCorpus:
     @property
     def endorsed_version(self) -> str:
         return self.endorsed.digest
+
+
+def resolve_endorsed(
+    *,
+    read_sources: Any,
+    store: Any,
+    tenant_id: str = "",
+    pinned_version: str = "",
+) -> EndorsedCorpus:
+    """The endorsed corpus in force **right now**, or at a version a run already pinned (US4).
+
+    **Once per request, and the ask path gets that for free.** One question is one resolution;
+    there is no window during which a mid-request adoption could move the ground under a single
+    answer. A dispatched run is the case that needs care, and `pinned_version` is how it gets
+    it: resume passes the identity written into its checkpoint at start, and this loads *that*
+    rather than re-resolving to whatever is current. The exact parallel of "re-authenticates,
+    never replays" — the authority is fetched fresh, the ground is not.
+
+    **Fails open to nothing, never to stale content.** Any failure returns an empty corpus:
+    citations into customer material stop resolving and the answer declines or narrows, which
+    is a visible, disclosed outcome. The alternative — carrying on with whatever was last
+    loaded — would answer from content whose endorsement the platform could no longer confirm.
+    """
+    from core.authority.endorsed_sources import citable_sources
+
+    if pinned_version:
+        version = store.read_version(pinned_version)
+        return build_endorsed_corpus([version] if version is not None else [])
+
+    try:
+        sources = citable_sources(read_sources())
+    except Exception:  # noqa: BLE001 — an unreadable record resolves nothing; see the note
+        return EndorsedCorpus()
+
+    versions = []
+    for name, source in sources.items():
+        try:
+            version = store.read_version(source.adopted_version)
+        except Exception:  # noqa: BLE001 — one unreadable source must not silence the others,
+            # and a digest mismatch on one body of material is not a reason to stop citing
+            # everything else somebody endorsed.
+            continue
+        if version is not None and version.source == name:
+            versions.append(version)
+
+    return build_endorsed_corpus(versions)
 
 
 def provenance_of(path: str) -> str:

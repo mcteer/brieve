@@ -174,18 +174,18 @@ resume (FR-017f–h).
 **Independent Test**: adopt mid-run; the run finishes on its original version; one started
 after uses the new one; a run interrupted before and resumed after continues on its original.
 
-- [ ] T016 [US4] Version pinning: the ask path resolves the adopted version **once per
+- [X] T016 [US4] Version pinning: the ask path resolves the adopted version **once per
       request** (free — one short request); a dispatched run writes `endorsed_version` into the
       checkpoint blob's existing `payload` dict at start, and resume **reads the pin and loads
       that version** rather than re-resolving to current (R4). The version joins
       `corpus_digest` on the ask/run record as **one bounded value** (FR-017h).
-- [ ] T017 [US4] [GATE:conformance] Rows **E15–E17** in
+- [X] T017 [US4] [GATE:conformance] Rows **E15–E17** in
       `tests/conformance/endorsed/test_run_isolation.py`: a run started before an adoption
       completes on its original version while one started after uses the new one, **both in one
       process** (E15); **across a resume** — interrupted before, resumed after, still on the
       original (E16); every record names exactly one content identity (E17). A record listing
       two is a run whose ground moved underneath it.
-- [ ] T018 [US4] Extend the ask-record exact-key-set row in
+- [X] T018 [US4] Extend the ask-record exact-key-set row in
       `tests/component/test_answering.py` to admit `endorsed_version` and bound it — the
       seventh feature in seven to extend that payload, and the exactness is what has made each
       of them a decision somebody wrote down.
@@ -200,19 +200,19 @@ after uses the new one; a run interrupted before and resumed after continues on 
 **Independent Test**: ask a question only the customer's documents answer — answered, citations
 resolve, provenance visible per claim, age disclosed.
 
-- [ ] T019 [US5] The combined view wired into both surfaces —
+- [X] T019 [US5] The combined view wired into both surfaces —
       `src/surfaces/api/ask.py` and `src/surfaces/mcp/transport.py` (ADR-0033 parity, and 043
       shipped that asymmetry once) — with `provenance: validated-design | customer-endorsed` on
       **every citation as data**, the summary note naming validated designs / endorsed material
       / both, and the age of endorsed content disclosed by `describe_ground`'s own rule
       (FR-017b).
-- [ ] T020 [US5] [GATE:conformance] Rows **E18–E21** in
+- [X] T020 [US5] [GATE:conformance] Rows **E18–E21** in
       `tests/conformance/endorsed/test_citing.py`: a customer-only question is answered with
       resolving citations (E18); per-citation provenance as data, and a mixed answer naming
       both while each citation says which (E19); a document with no addressable sections is not
       citable and is reported (E20); a path in **neither** pin does not resolve (E18/FR-013);
       the age disclosed is the adopted version's (E21).
-- [ ] T021 [US5] [GATE:conformance] **E23** in
+- [X] T021 [US5] [GATE:conformance] **E23** in
       `tests/conformance/endorsed/test_no_answer_time_fetch.py`: **zero outbound requests
       during answering**, asserted by instrumentation with an endorsed source configured — not
       by the absence of code, which proves nothing about a path nobody exercised.

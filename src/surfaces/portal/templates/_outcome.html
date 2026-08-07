@@ -101,11 +101,22 @@
                     is the document and its section, humanised; the href is untouched, and
                     `title` keeps the exact URL one hover away, so nothing is hidden.
                   #}
-                  {% set _url = citation.split("#") %}
+                  {#
+                    TWO SHAPES, AND BOTH ARE CURRENT. 045 made a citation an object carrying
+                    its `url` and its `provenance`, because where a claim's evidence came from
+                    is a fact about the answer rather than a decoration. Exchanges recorded
+                    BEFORE that stored a bare URL string, and `ask_exchanges` replays the
+                    outcome verbatim — deliberately, so reopening a conversation shows what the
+                    person actually saw. So the older shape is not legacy to be migrated; it is
+                    what those answers were, and the template reads both.
+                  #}
+                  {% set _href = citation.url if citation is mapping else citation %}
+                  {% set _provenance = citation.provenance if citation is mapping else "" %}
+                  {% set _url = _href.split("#") %}
                   {% set _doc = _url[0].rstrip("/").split("/")[-1] | replace("-", " ") | title %}
                   {% set _section = (_url[1] | replace("-", " ")) if _url | length > 1 else "" %}
                   <li>
-                    <a href="{{ citation }}" rel="noopener" title="{{ citation }}">{{ _doc }}{% if _section %} <span class="citation-section">&rsaquo; {{ _section }}</span>{% endif %}</a>
+                    <a href="{{ _href }}" rel="noopener" title="{{ _href }}">{{ _doc }}{% if _section %} <span class="citation-section">&rsaquo; {{ _section }}</span>{% endif %}</a>{% if _provenance == "customer-endorsed" %} <span class="citation-provenance">your organisation&rsquo;s endorsed material</span>{% endif %}
                   </li>
                 {% endfor %}
               </ul>
@@ -147,6 +158,15 @@
           "recent", which is exactly the unfounded currency claim the note exists to remove.
         #}
         <p class="meta ground">{{ response.payload.ground_note }}</p>
+      {% endif %}
+      {% if (response.payload or {}).get("grounding_note") %}
+        {#
+          WHAT THIS ANSWER RESTS ON (045, FR-016). "The platform's validated designs say so"
+          and "your own endorsed standard says so" are different claims, and a reader acting
+          on one should not believe they are acting on the other. Present only when something
+          was cited, because an answer with no citations has nothing to characterise.
+        #}
+        <p class="meta grounding">{{ response.payload.grounding_note }}</p>
       {% endif %}
       </div>
       {% if (response.payload or {}).get("source") %}

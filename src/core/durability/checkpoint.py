@@ -46,6 +46,25 @@ def stop_requested(run: GovernedRun) -> str | None:
     return blob.outcome.stop_reason or "stopped"
 
 
+#: Where a run's endorsed-version pin lives inside the checkpoint payload (045).
+#:
+#: A key in the payload dict the blob already carries — **not a new column**. The alternative
+#: considered and rejected was snapshotting the content itself into the checkpoint, which would
+#: put megabytes of somebody else's documents into the durability store to guarantee a read the
+#: version-addressed store already guarantees (research R4).
+ENDORSED_VERSION_KEY = "endorsed_version"
+
+
+def pinned_endorsed_version(blob: Any) -> str:
+    """What version a checkpointed run was reading, or empty.
+
+    One reader, beside the one writer, so "resume loads the pinned version" is a property of
+    two functions in one file rather than of a string literal repeated at every resume site.
+    """
+    payload = getattr(blob, "payload", None) or {}
+    return str(payload.get(ENDORSED_VERSION_KEY, "") or "")
+
+
 def checkpoint_run(
     run: GovernedRun,
     *,
@@ -72,9 +91,23 @@ def checkpoint_run(
         existing = provider.load(blob_id)
         payload = dict(existing.payload) if existing is not None else {}
 
+    # THE ENDORSED-VERSION PIN, stamped here for `resume_count`'s reason (045, FR-017f–h).
+    #
+    # Every step checkpoint passes `payload={"step": n}`, which REPLACES the payload — so a pin
+    # written once at run start would survive exactly until the first step and then be gone.
+    # A resumed run would then re-resolve to whatever is currently adopted rather than to the
+    # ground it started on, finish successfully, and cite content adopted after it began. The
+    # run would look correct at every point; only the record would disagree with itself.
+    #
+    # Stamped rather than merged so the run's field is the authority: a payload key nobody set
+    # cannot outlive the run that set it.
+    stamped = dict(payload)
+    if run.endorsed_version:
+        stamped[ENDORSED_VERSION_KEY] = run.endorsed_version
+
     blob = CheckpointBlob(
         blob_id=blob_id,
-        payload=dict(payload),
+        payload=stamped,
         correlation_id=run.correlation_id,
         grant_id=run.grant.grant_id if run.grant else "",
         step_index=run.step_index,

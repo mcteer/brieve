@@ -132,6 +132,19 @@ class GovernedRun:
     #: only one; it exists so the in-memory blob agrees with the row instead of merely
     #: failing to corrupt it.
     resume_count: int = 0
+    #: WHICH version of the customer's endorsed material this run reads (045, FR-017f–h).
+    #:
+    #: On the run for exactly `resume_count`'s reason: `checkpoint_run` is the single place a
+    #: checkpoint is built and it has only the run to build from. Without a field here, every
+    #: step checkpoint — which replaces the payload wholesale — would drop the pin, and a
+    #: resumed run would re-resolve to whatever is *current* rather than to the ground it
+    #: started on. That is the exact failure US4 exists to prevent, and it would be invisible:
+    #: the run would finish, cite correctly, and rest on content adopted after it began.
+    #:
+    #: Empty when nothing is endorsed, which is most estates. Resolved once at run start and
+    #: never re-resolved, the mirror image of "re-authenticates, never replays" — the authority
+    #: is fetched fresh on resume and the ground deliberately is not.
+    endorsed_version: str = ""
     probe_log: list[str] = field(default_factory=list)
     # Recomputed by the authority hook on every invoke; issue-time authority never widens it.
     live_effective: AuthorityScope | None = None
