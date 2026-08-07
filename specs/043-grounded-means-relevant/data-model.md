@@ -74,7 +74,7 @@ chain's floor and vocabulary are untouched.
 ### Trust fabric (`infra/modules/trust-fabric/`)
 
 - The ask-binding record gains `relevance_cell`; the dev estate gains a fixture judge cell
-  (its own key, `qualified_by="fixture"`) so `make dev-up` has the gate present and bound.
+  (its own cell identity, fixture-qualified) so `make dev-up` has the gate present and bound.
 
 ## State transitions
 

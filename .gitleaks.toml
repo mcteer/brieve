@@ -29,8 +29,21 @@
 [extend]
 useDefault = true
 
+# THE SECOND EXEMPTION (043) rides in the SAME rule block, because two [[rules]] entries with
+# one id would leave whichever parses last holding the only allowlist. Within one allowlist the
+# conditions are OR'd: the corpus path OR this one regex.
+#
+# The regex, and why it is a regex rather than a path: `specs/043-.../data-model.md` wrote the
+# prose `(its own key, qualified_by="fixture")` — "key" beside a quoted value, and the entropy
+# heuristic read design prose as a credential. This repository has counted five of its own
+# checks matching prose instead of code; this is the vendor's turn. NOT a path exemption for
+# `specs/`: specs are ours, and a real secret pasted into one must still fail. The allowlist
+# admits exactly the benign token that fired — a matrix cell's provenance field — and nothing
+# else. Rewording alone would not clear it, because the scanner walks the commit RANGE and the
+# original commit carries the string forever.
 [[rules]]
 id = "generic-api-key"
 [rules.allowlist]
 paths = ['''corpus/documents/.*\.json''']
+regexes = ['''qualified_by\s*=\s*"fixture"''']
 regexTarget = "line"
