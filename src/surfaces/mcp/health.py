@@ -67,4 +67,122 @@ class HealthChecker:
         return results
 
 
-__all__ = ["HealthChecker", "Probe"]
+@dataclass(frozen=True)
+class DriftFlag:
+    """An endorsed source has moved upstream. **Noticing changes nothing** (FR-017a).
+
+    A notification, not an adoption. The console renders it; what answers rest on moves only
+    when an administrator reviews and adopts. That separation is what makes the detection safe
+    to run automatically at all — the cheap frequent operation cannot alter behaviour, and the
+    operation that alters behaviour is a person's act with a name against it.
+    """
+
+    source: str
+    upstream_tip: str
+    adopted_tip: str
+    detected_at: str
+    #: Why detection could not answer, when it could not. A source that cannot be reached is
+    #: **not** a source that has not moved, and reporting it as unchanged would tell an
+    #: administrator their content is current when the platform has no idea.
+    error: str = ""
+
+    @property
+    def moved(self) -> bool:
+        return bool(self.upstream_tip) and self.upstream_tip != self.adopted_tip
+
+
+@dataclass
+class DriftChecker:
+    """Whether each endorsed source still matches the version answers rest on (045, T013).
+
+    **Rides the existing checker rather than a schedule of its own** (research R5, Principle
+    VI). The persistent MCP service already hosts the dependency health checker, the resume
+    sweeper and 042's scratch sweep for the same reason: they need a long-lived home. A second
+    periodic mechanism would be the thousand-optional-dependencies death by another name.
+
+    **A refs listing, never a clone.** Detection transfers no content, which is what makes it
+    cheap enough to ride somebody else's cadence — and what keeps ADR-0070's egress bound to
+    "did it move" rather than "give us everything".
+    """
+
+    #: Reads the endorsement record. A callable so this module depends on no fabric, matching
+    #: every other reader in this tree.
+    read_sources: Callable[[], dict[str, object]]
+    #: `adopted_tip(tenant_id=..., source=...)` — what the adopted version recorded.
+    store: object
+    #: Lists the upstream tip. Injected so a row can exercise the comparison without a network.
+    list_tip: Callable[[str], str]
+    tenant_id: str = ""
+    #: Supplies the timestamp. Injected rather than called, so a row asserts what was recorded
+    #: rather than that something was.
+    now: Callable[[], str] | None = None
+
+    def sweep(self) -> list[DriftFlag]:
+        """One comparison per endorsed source. Records nothing about content.
+
+        A source that cannot be reached produces a flag carrying the error and **no claim
+        either way** — `moved` is false because nothing was learned, and the error is what the
+        console renders. Silently reporting "unchanged" would be the failure with the worst
+        consequence here: an administrator told their material is current when the platform
+        could not look.
+        """
+        from datetime import UTC, datetime
+
+        from core.authority.endorsed_sources import citable_sources
+
+        stamp = self.now() if self.now is not None else datetime.now(UTC).isoformat()
+        flags: list[DriftFlag] = []
+
+        try:
+            record = self.read_sources()
+        except Exception:  # noqa: BLE001 — an unreadable record means nothing is checked, and
+            # saying nothing is the honest answer: inventing flags from a record we could not
+            # read would report drift on sources that may not even be endorsed any more.
+            return flags
+
+        for name, source in citable_sources(record).items():
+            adopted = ""
+            try:
+                adopted = str(
+                    self.store.adopted_tip(tenant_id=self.tenant_id, source=name)  # type: ignore[attr-defined]
+                    or ""
+                )
+            except Exception as exc:  # noqa: BLE001
+                flags.append(
+                    DriftFlag(
+                        source=name,
+                        upstream_tip="",
+                        adopted_tip="",
+                        detected_at=stamp,
+                        error=f"{type(exc).__name__}",
+                    )
+                )
+                continue
+
+            try:
+                upstream = self.list_tip(source.location)
+            except Exception as exc:  # noqa: BLE001 — an unreachable source is not an unchanged
+                # one, and the flag says so rather than reporting currency nobody verified.
+                flags.append(
+                    DriftFlag(
+                        source=name,
+                        upstream_tip="",
+                        adopted_tip=adopted,
+                        detected_at=stamp,
+                        error=f"{type(exc).__name__}",
+                    )
+                )
+                continue
+
+            flags.append(
+                DriftFlag(
+                    source=name,
+                    upstream_tip=upstream,
+                    adopted_tip=adopted,
+                    detected_at=stamp,
+                )
+            )
+        return flags
+
+
+__all__ = ["DriftChecker", "DriftFlag", "HealthChecker", "Probe"]

@@ -40,6 +40,7 @@ from core.authority.endorsed_sources import (
 )
 from core.authority.errors import ResolutionRefused
 from core.authority.matrix import parse_matrix_record
+from core.endorsed_sync import compare_versions
 from surfaces.api.authority_submit import (
     CONSOLE_RECORDS,
     AuthorityChangeRefused,
@@ -108,6 +109,17 @@ class ConsoleConfig:
     #: merely *ungated* — FR-007's disclosure, and the difference between a development
     #: posture and a production one.
     quorum_configured: bool = False
+    #: 045's content store. `None` means this deployment cannot review or sync endorsed
+    #: content, which is a real state — the governance record can be written before the store
+    #: exists — and the route says so rather than failing as though something broke.
+    endorsed_store: Any = None
+    #: Performs one sync. Injected for the reason every other collaborator here is: what
+    #: reaches a customer's repository is assembly's decision, and neither this module nor its
+    #: rows should know whether a network is involved.
+    sync_source: Any = None
+    #: Which tenant this console serves. Single-tenant today; the key exists from day one so
+    #: ADR-0046 finds a boundary rather than a rewrite (research R9).
+    tenant_id: str = ""
 
 
 def _kv_body(record: Any) -> dict[str, Any]:
@@ -681,7 +693,7 @@ def build_router(*, config: ConsoleConfig, submitter: Any) -> APIRouter:
             requester=subject.subject_user_id,
             cas=body.cas,
         )
-        return _submit_and_render(
+        rendered = _submit_and_render(
             change,
             subject=subject,
             audit=audit,
@@ -689,6 +701,138 @@ def build_router(*, config: ConsoleConfig, submitter: Any) -> APIRouter:
             submitter=submitter,
             detail={"operation": body.operation, "source": body.source},
         )
+
+        # **The store's labels follow the fabric's decision, and only after it.** The record is
+        # the authority on which version answers rest on; this keeps the store's own view
+        # consistent so detection can compare tips without asking the fabric. Deliberately NOT
+        # done for a pending change — marking a version adopted while the quorum is still
+        # deciding would make "awaiting approval" false in the one place a reader would not
+        # think to check.
+        if (
+            body.operation == ADOPT
+            and rendered.status_code == status.HTTP_200_OK
+            and config.endorsed_store is not None
+        ):
+            try:
+                config.endorsed_store.mark_adopted(
+                    tenant_id=config.tenant_id,
+                    source=body.source,
+                    version_id=body.version_id.strip(),
+                )
+            except Exception:  # noqa: BLE001 — the governance decision has applied and stands;
+                # a store that could not be labelled is a detection problem, not an adoption
+                # one, and failing here would tell the administrator their adoption did not
+                # happen when it did.
+                _record_console_event(
+                    audit,
+                    subject,
+                    event=AuditEventType.AUTHORITY_REFUSED,
+                    payload={
+                        "reason_code": "sync_failed",
+                        "record": "endorsed-sources",
+                        "source": body.source,
+                    },
+                )
+
+        return rendered
+
+    @router.post("/endorsed-sources/{source}/review")
+    def review_endorsed_source(source: str, subject: SubjectDep, audit: AuditDep) -> Any:
+        """Sync a **candidate** and show what changed against the adopted version (FR-017c).
+
+        **The candidate is synced at review time, and that is the design.** A source that moved
+        again while awaiting review is then reviewed against what is *currently* upstream,
+        rather than against whatever a detection pass happened to see days ago — which is the
+        spec's own edge case, and the only reading under which "review then adopt" means the
+        administrator adopted what they looked at.
+
+        Reviewing changes nothing. A candidate is not citable (E4), so opening this page cannot
+        move what answers rest on — the failure that would otherwise make the administrator's
+        decision by the act of looking at it.
+        """
+        require_admin(subject, audit)
+
+        if config.endorsed_store is None or config.sync_source is None:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "this deployment holds endorsements but cannot sync or review their content",
+            )
+
+        try:
+            sources = parse_endorsed_sources(_kv_body(config.read_versioned(ENDORSED_SOURCES_PATH)))
+        except Exception as unreadable:  # noqa: BLE001
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "the endorsement record could not be read",
+            ) from unreadable
+
+        endorsed = sources.get(source)
+        if endorsed is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"{source!r} is not an endorsed source")
+
+        try:
+            version, outcome = config.sync_source(
+                tenant_id=config.tenant_id,
+                source=source,
+                location=endorsed.location,
+                triggered_by=subject.subject_user_id,
+            )
+            config.endorsed_store.write_version(version)
+        except Exception as failed:  # noqa: BLE001 — the three sync states are distinguished by
+            # `reason_code`, which is what the console renders; collapsing them here would undo
+            # the distinction FR-018 exists for.
+            reason = getattr(failed, "reason_code", "sync_failed")
+            _record_console_event(
+                audit,
+                subject,
+                event=AuditEventType.AUTHORITY_REFUSED,
+                payload={"reason_code": reason, "record": "endorsed-sources", "source": source},
+            )
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                # The exception's own message, which by construction carries no content and no
+                # credential (`endorsed_sync` never echoes git's stderr).
+                f"{reason}: {failed}",
+            ) from failed
+
+        adopted_paths: list[str] = []
+        if endorsed.adopted_version:
+            try:
+                adopted = config.endorsed_store.read_version(endorsed.adopted_version)
+                adopted_paths = sorted((adopted.documents if adopted else {}) or {})
+            except Exception:  # noqa: BLE001 — an unreadable adopted version makes every path
+                # read as added, which overstates the change; the empty list plus the flag below
+                # is the honest rendering.
+                adopted_paths = []
+
+        difference = compare_versions(adopted_paths, sorted(version.documents))
+
+        _record_console_event(
+            audit,
+            subject,
+            event=AuditEventType.RECORD_READ,
+            payload={
+                "surface": "console",
+                "records": ["endorsed-sources"],
+                "source": source,
+                "candidate_version": version.version_id,
+            },
+        )
+
+        return {
+            "source": source,
+            "candidate_version": version.version_id,
+            "adopted_version": endorsed.adopted_version,
+            "upstream_tip": version.upstream_tip,
+            # PATHS, never words. The same line the trail draws, for the same reason: this is
+            # somebody else's material and the console shows what moved, not what it says.
+            "added": list(difference["added"]),
+            "removed": list(difference["removed"]),
+            "common": list(difference["common"]),
+            "uncitable": list(outcome.uncitable),
+            # FR-017a, stated on the page rather than implied by the absence of a change.
+            "in_force": "nothing has changed; adopting is a separate act",
+        }
 
     return router
 

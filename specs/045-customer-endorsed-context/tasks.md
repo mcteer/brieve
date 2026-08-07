@@ -148,16 +148,16 @@ drift is detectable rather than silent.
 **Independent Test**: change upstream — the console reports it, shows what changed, answers are
 unaffected until adoption, and adoption is recorded.
 
-- [ ] T013 [US3] The drift probe in `src/surfaces/mcp/health.py`: per endorsed source, compare
+- [X] T013 [US3] The drift probe in `src/surfaces/mcp/health.py`: per endorsed source, compare
       the upstream tip against the adopted version's recorded tip — **a refs listing, no clone,
       no content transfer** — and write a drift flag. **Noticing changes nothing** (FR-017a).
       Rides the existing checker; no new operated component (Principle VI).
-- [ ] T014 [US3] Review and adopt in `src/surfaces/api/console.py`: opening a pending change
+- [X] T014 [US3] Review and adopt in `src/surfaces/api/console.py`: opening a pending change
       syncs a **candidate** version and presents added / removed / altered against the adopted
       one (FR-017c) — reviewing against a candidate synced *at review time* is what makes "the
       source moved again while awaiting review" behave correctly. Adoption flips
       `adopted_version` through the same request-and-decide path and is recorded (FR-017e).
-- [ ] T015 [US3] [GATE:conformance] Rows **E11–E14** in
+- [X] T015 [US3] [GATE:conformance] Rows **E11–E14** in
       `tests/conformance/endorsed/test_drift.py`: drift flagged and unadopted changes nothing,
       with the age still reflecting what is in use (E11); the review names added/removed/
       altered (E12); a source moving again is reviewed against current upstream (E13); adoption
