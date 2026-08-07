@@ -127,6 +127,7 @@ resource "vault_kv_secret_v2" "ask_binding" {
     schema_version = 1
     guidance_cell  = var.ask_binding.guidance_cell
     estate_cell    = var.ask_binding.estate_cell
+    relevance_cell = var.ask_binding.relevance_cell
   })
 }
 

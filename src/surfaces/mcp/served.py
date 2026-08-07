@@ -29,6 +29,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from pydantic import AnyHttpUrl
 
 from adapters.anthropic_answering import build_ask_provider
+from adapters.anthropic_relevance import build_relevance_judge
 from core.answering.conversations.postgres import PostgresConversationStore
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
@@ -79,6 +80,23 @@ DB_HOST_ENV = "HARNESS_DB_HOST"
 #: ask binding says whether it may, and the trust store says whether the platform holds the
 #: authority to. Three separate facts, three separate places, three distinguishable refusals.
 ASK_MODEL_ENV = "ASK_MODEL"
+
+#: WHICH model this surface can build a relevance JUDGE for (043), as a qualified-matrix
+#: identifier. Separate from `ASK_MODEL` and required to be so: ADR-0067 forbids a model
+#: judging its own output, so the two are never the same value, and one variable serving both
+#: would make the forbidden configuration the easy one to write.
+#:
+#: Unset means no judge can be built and every ask refuses `relevance_unbound` — which is what
+#: a deployment that has not chosen one actually has. It does NOT mean unqualified: governance
+#: still refuses first, so an operator who sets this without authoring a binding is told about
+#: the binding, not about the wiring.
+RELEVANCE_MODEL_ENV = "RELEVANCE_MODEL"
+
+#: The vendor whose credential the judge is brokered against. Derived from nothing: the store
+#: is keyed by vendor, and the one vendor this platform calls is named once here rather than
+#: split out of a model identifier in two assemblies that could drift.
+_RELEVANCE_VENDOR = "anthropic"
+
 
 _REGISTRY = build_registry()[0]
 KNOWN_TOOLS = known_tools(_REGISTRY)
@@ -139,6 +157,7 @@ def build_transport() -> McpTransport:
     # hidden. It does NOT mean unqualified: governance still refuses first, so an operator who
     # sets this without authoring a binding is told about the binding, not about the wiring.
     ask_model = os.environ.get(ASK_MODEL_ENV, "").strip()
+    relevance_model = os.environ.get(RELEVANCE_MODEL_ENV, "").strip()
 
     return McpTransport(
         # THE SCHEDULER'S ADDRESS IS CONFIGURATION, and leaving it defaulted is a defect
@@ -194,6 +213,29 @@ def build_transport() -> McpTransport:
         # the reader to the factory in `adapters`, which is what lets
         # `test_no_static_credentials.py` keep asserting — with no exemption — that no surface
         # names one.
+        # 043's RELEVANCE JUDGE, wired on exactly the ask provider's terms.
+        #
+        # A FACTORY, not a judge: called once per question, and the credential it holds was
+        # brokered for that question and is dropped with it. A judge built at assembly would
+        # hold a vendor key for the life of the process, which is the standing credential
+        # Principle IV forbids relocated rather than removed.
+        #
+        # ADR-0067 decides WHICH model this may be, and the trust fabric records it: the
+        # binding names a `judge` cell, and `resolve_relevance` refuses one naming the
+        # answering model. This assembly supplies the mechanism and decides nothing.
+        relevance_model=relevance_model or "unconfigured",
+        relevance_judges=(
+            (
+                lambda cell: build_relevance_judge(
+                    cell,
+                    BrokeredModelCredential(read=_fabric.read_versioned)
+                    .obtain(_RELEVANCE_VENDOR)
+                    .secret,
+                )
+            )
+            if relevance_model
+            else None
+        ),
         ask_model=ask_model or "unconfigured",
         ask_providers=(
             (lambda source, secret: build_ask_provider(source, secret, model=ask_model))

@@ -157,3 +157,23 @@ def test_the_prompt_resolves_this_platform_to_the_asker_not_a_documented_product
     assert "does NOT answer it" not in _SYSTEM, (
         "the broad phrasing over-refuses: it cost four correct seed cases when measured"
     )
+
+
+def test_the_prompt_asks_about_subject_not_about_sufficiency() -> None:
+    """Measured, and the second number is what makes it safe (043).
+
+    Opus 5 scored 7/10 against the seed set and every miss was the same shape: it refused
+    claims like *"Vault's initial configuration guidance covers enabling an audit device"* as
+    answers to *"How do I enable an audit device in Vault?"* — on-subject, citation resolving
+    to the exact section that answers it, but thin. It was scoring whether the claim SUFFICES.
+
+    This gate's defect is claims about the **wrong subject**, per the spec; sufficiency is a
+    different standard and not this one. Naming that took Opus to 10/10 and left Sonnet at
+    10/10 — and, the number that mattered, left BOTH at 3/3 on the supported-but-irrelevant
+    cases. A clarification that had bought the overall number by loosening the discriminating
+    one would have been the gate quietly ceasing to gate.
+    """
+    from adapters.anthropic_relevance import _SYSTEM
+
+    assert "Judge SUBJECT, not sufficiency" in _SYSTEM
+    assert "irrelevant only when it is about something else" in _SYSTEM

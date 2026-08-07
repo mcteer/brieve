@@ -207,7 +207,7 @@ qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009)
       `tests/unit/test_relevance_qualification.py`: the qualification scoring itself, driven
       with a rigged always-affirm candidate against the loaded seed set — passes the majority
       floor, fails the supported-but-irrelevant number, and is refused.
-- [ ] T022 [US1] Add the fixture judge cell and `relevance_cell` binding to
+- [X] T022 [US1] Add the fixture judge cell and `relevance_cell` binding to
       `infra/modules/trust-fabric/` (dev estate defaults), **following the estate's
       fixture-cell precedent for provenance fields** (`qualified_by = "fixture"`, `judge =
       "seed"` — a judge-role cell with empty provenance is the shape promotion refuses), so

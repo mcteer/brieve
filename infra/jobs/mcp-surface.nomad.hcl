@@ -85,6 +85,15 @@ variable "ask_model" {
   default = ""
 }
 
+variable "relevance_model" {
+  type = string
+  # 043. WHICH model the surface may build a relevance judge for. Never equal to `ask_model`:
+  # ADR-0067 forbids a model judging its own output, and the surface refuses
+  # `self_judged_relevance` at resolution if a binding pairs them. Empty means no judge can be
+  # built and every ask refuses `relevance_unbound`, honestly.
+  default = ""
+}
+
 variable "oidc_tenant_claim" {
   type    = string
   default = "tenant"
@@ -235,7 +244,8 @@ job "mcp-surface" {
         # which model to call, which is configuration rather than authority — and
         # `tests/conformance/identity/test_posture_matches_constitution.py` fails this file if a
         # vendor key ever appears beside it.
-        ASK_MODEL = var.ask_model
+        ASK_MODEL       = var.ask_model
+        RELEVANCE_MODEL = var.relevance_model
 
         MCP_SURFACE_HOST = "0.0.0.0"
         MCP_SURFACE_PORT = var.surface_port

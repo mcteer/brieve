@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 
 from adapters.anthropic_answering import build_ask_provider
+from adapters.anthropic_relevance import build_relevance_judge
 from core.answering.conversations.postgres import PostgresConversationStore
 from core.audit.destination_postgres import build_destination
 from core.audit.local_store import run_connection_factory
@@ -97,6 +98,16 @@ def build() -> object:
     # deployment does, so the collaborators are wired in both places or the guarantee is a claim
     # about a test harness.
     ask_model = os.environ.get("ASK_MODEL", "").strip()
+
+    # WHICH model this surface can build a relevance JUDGE for (043). Separate from
+    # `ASK_MODEL` and required to be so: ADR-0067 forbids a model judging its own output, so the
+    # two are never the same value, and one variable serving both would make the forbidden
+    # configuration the easy one to write. Unset means every ask refuses `relevance_unbound`.
+    relevance_model = os.environ.get("RELEVANCE_MODEL", "").strip()
+
+    #: The vendor whose credential the judge is brokered against, named once rather than split
+    #: out of a model identifier in two assemblies that could drift.
+    _RELEVANCE_VENDOR = "anthropic"
     # Idempotent, and run at start rather than by a migration step: every one of these is
     # IF NOT EXISTS, and a surface that cannot create its own tables cannot serve anyway.
     audit_sink.migrate()
@@ -187,6 +198,29 @@ def build() -> object:
         # a qualification.
         ask_authority=AskAuthority(
             read_binding=fabric.read_ask_binding, read_matrix=fabric.read_matrix
+        ),
+        # 043's RELEVANCE JUDGE, wired on exactly the ask provider's terms.
+        #
+        # A FACTORY, not a judge: called once per question, and the credential it holds was
+        # brokered for that question and is dropped with it. A judge built at assembly would
+        # hold a vendor key for the life of the process, which is the standing credential
+        # Principle IV forbids relocated rather than removed.
+        #
+        # ADR-0067 decides WHICH model this may be, and the trust fabric records it: the
+        # binding names a `judge` cell, and `resolve_relevance` refuses one naming the
+        # answering model. This assembly supplies the mechanism and decides nothing.
+        relevance_model=relevance_model or "unconfigured",
+        relevance_judges=(
+            (
+                lambda cell: build_relevance_judge(
+                    cell,
+                    BrokeredModelCredential(read=fabric.read_versioned)
+                    .obtain(_RELEVANCE_VENDOR)
+                    .secret,
+                )
+            )
+            if relevance_model
+            else None
         ),
         ask_model=ask_model or "unconfigured",
         # A FACTORY, called once per question with material brokered for that question and

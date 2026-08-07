@@ -237,6 +237,47 @@ variable "model_matrix_cells" {
       judge        = "seed"
     },
 
+    # 043's RELEVANCE judge, fixture-qualified, on the same precedent as the fixture `ask` cell
+    # above: it is what keeps the matrix coherent for an estate with no vendor key. `judge` is
+    # its own role in ADR-0039's vocabulary, and a cell qualified to `ask` does not license it —
+    # the binding parser refuses a relevance cell whose role is anything else.
+    {
+      pack         = "fixture"
+      model        = "fixture/relevance-judge@1"
+      role         = "judge"
+      qualified_by = "fixture"
+      judge        = "seed"
+    },
+
+    # THE FIRST RELEVANCE JUDGE THIS PLATFORM HAS EARNED AGAINST A REAL MODEL (043).
+    #
+    # Qualified 2026-08-07 against the human-labelled relevance seed set at majority-of-three,
+    # scored on TWO numbers because one would not have caught a rubber stamp:
+    #
+    # - overall agreement, three runs: 10/10, 9/10, 10/10 against the >=90% floor. It clears
+    #   the floor in all three and landed exactly on it once. Not a comfortable margin.
+    # - supported-but-irrelevant cases: 3/3 EVERY run. This is the number with teeth — those
+    #   cases are the defect itself (true claims, resolving citations, wrong subject), and a
+    #   judge that cannot see them is measuring fluency.
+    #
+    # The same lane refused an always-affirming stub at 40%, so the qualification can lose.
+    #
+    # `judge = "seed"`: this is a FIRST judge in its chain and roots at the human-labelled seed
+    # set with no scoring model above it — ADR-0052's one permitted case, a provenance record
+    # rather than a circular one.
+    #
+    # Opus rather than Sonnet is ADR-0067, not a ranking: the binding answers with Sonnet, and
+    # a model does not judge its own output. Opus scored 7/10 before the judge prompt
+    # distinguished SUBJECT from sufficiency — it was refusing on-subject claims for being thin,
+    # which is a stricter standard than this gate's and not the one it was asked for.
+    {
+      pack         = "vault"
+      model        = "anthropic/claude-opus@5"
+      role         = "judge"
+      qualified_by = "live"
+      judge        = "seed"
+    },
+
     # THE FIRST CELLS THIS PLATFORM HAS EVER EARNED AGAINST A REAL MODEL.
     #
     # Every cell above says `qualified_by = "fixture"`: qualified against a recording, which is
@@ -338,8 +379,9 @@ variable "model_matrix_cells" {
 variable "ask_binding" {
   description = "Which qualified cell an ask may use, per source (026)."
   type = object({
-    guidance_cell = optional(string, "")
-    estate_cell   = optional(string, "")
+    guidance_cell  = optional(string, "")
+    estate_cell    = optional(string, "")
+    relevance_cell = optional(string, "")
   })
   # **Bound to the live cell the eval lane earned**, not the fixture one.
   #
@@ -356,9 +398,21 @@ variable "ask_binding" {
   # vendor at all, and nothing else has to change for that to work.
   # Repointed to Sonnet 2026-08-03 (032): same role, same packs, evidence one clean lane run
   # deep, ~5x cheaper per answer. The Opus cells remain qualified; reverting is one line.
+  #
+  # 043 adds the relevance judge, and ADR-0067 decides WHICH model it may be: not the one
+  # answering. Sonnet answers, so Opus judges — the pairing is the point, not the ranking.
+  # Binding Sonnet here would be refused at resolution (`self_judged_relevance`), which is the
+  # check working rather than a misconfiguration to route around.
+  #
+  # Opus qualified as a relevance judge on 2026-08-07 against the human-labelled seed set at
+  # majority-of-three: **three runs, 10/10, 9/10, 10/10 overall** (floor 90%) and **3/3 on the
+  # supported-but-irrelevant cases every time**. It clears the floor in all three and landed
+  # exactly on it once, which is worth knowing before anyone treats the margin as comfortable.
+  # `make evals-relevance-qualify ARGS=anthropic/claude-opus@5` re-runs it.
   default = {
-    guidance_cell = "vault:anthropic/claude-sonnet@5:ask"
-    estate_cell   = "vault:anthropic/claude-sonnet@5:ask"
+    guidance_cell  = "vault:anthropic/claude-sonnet@5:ask"
+    estate_cell    = "vault:anthropic/claude-sonnet@5:ask"
+    relevance_cell = "vault:anthropic/claude-opus@5:judge"
   }
 }
 

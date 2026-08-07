@@ -9,6 +9,11 @@ each of which has been wrong here at least once.
 
 **Sealed-core additive class**, named in the plan's Principle V row.
 
+**Two instructions here were bought with live calls, and both are load-bearing.** The deixis
+line and the subject-not-sufficiency line each fixed a real misjudgement, and each was measured
+against the WHOLE seed set before shipping because the tempting version of both over-refuses.
+`tests/unit/test_live_relevance_adapter.py` pins them with the numbers.
+
 **The protocol is a leading token, and the burden is the harness's.** 032 recorded the rule
 after Sonnet refused correctly and said "I can't" — semantically right and invisible to the
 platform's vocabulary. A verdict this module had to *search* prose for is one it would
@@ -49,7 +54,11 @@ RELEVANT: none
 if none of them do.
 
 When the question says "this platform", "this product", "our system" or "we", it refers to the
-asker's own system — not to any of the products the statements are about."""
+asker's own system — not to any of the products the statements are about.
+
+Judge SUBJECT, not sufficiency. A statement that is about what was asked is relevant even if it
+is partial, or general, or only says where the full answer is documented. Mark a statement
+irrelevant only when it is about something else."""
 
 #: **Not "enough for one line" — that reasoning was wrong and measured wrong.** The first draft
 #: set 256 on the grounds that the protocol only uses one line, and 043's live probe hit
@@ -120,4 +129,26 @@ class LiveRelevanceJudge:
         return parse_verdict(response, claim_count=len(claims), model=self.model)
 
 
-__all__ = ["LiveRelevanceJudge"]
+def build_relevance_judge(cell_reference: str, secret: str) -> LiveRelevanceJudge:
+    """The judge for a resolved cell, holding a credential brokered for THIS ask.
+
+    Mirrors `build_ask_provider` deliberately, and for the same reason: the surfaces call it
+    once per question with material brokered for that question, and drop the result with the
+    answer. A judge built at assembly would hold the credential for the life of the process —
+    the standing credential Principle IV forbids, moved rather than removed.
+
+    The cell reference is `pack:model:role`; the model is the middle field. Parsed here rather
+    than in each assembly so the two surfaces cannot drift on it — which is exactly how the API
+    came to emit `model_gate` while MCP did not.
+    """
+    parts = cell_reference.split(":")
+    if len(parts) != 3:
+        raise RelevanceRefused(
+            f"the relevance cell reference {cell_reference!r} is not `pack:model:role`; "
+            f"a judge cannot be built for a cell that cannot be read",
+            reason_code="relevance_unavailable",
+        )
+    return LiveRelevanceJudge(parts[1], api_key=secret)
+
+
+__all__ = ["LiveRelevanceJudge", "build_relevance_judge"]
