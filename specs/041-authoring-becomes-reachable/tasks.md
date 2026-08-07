@@ -135,7 +135,7 @@ qualified `write` cell (SC-002's first half, SC-003).
 **Independent Test**: Dispatch an analyzer run against a fixture repository; the file exists in
 the workspace, the read is recorded, the lens saw the content, task scope beat the ceiling.
 
-- [ ] T012 [US2] Create `src/core/authoring/acquisition.py`: `AcquiredSubject`, shallow
+- [X] T012 [US2] Create `src/core/authoring/acquisition.py`: `AcquiredSubject`, shallow
       single-branch clone of `target_repository`, recorded `commit`, 512 MiB bound with the
       size in the refusal, reason codes `subject_unreachable` / `revision_missing` /
       `acquisition_refused` (FR-026/028, research R3/R4; data-model entity).
@@ -145,7 +145,7 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
       produced path, delete the checkout at terminal state (FR-027; clone credential minted in
       this context via T002). **The resume path re-acquires at the recorded `commit`, never at
       HEAD** — two attempts of one run analyse one tree; asserted by A10's resume half.
-- [ ] T014 [US2] Give the `analyzer` task its `args` in
+- [X] T014 [US2] Give the `analyzer` task its `args` in
       `infra/jobs/authoring-tier.nomad.hcl` — run the dispatch entrypoint with the env
       contract the jobspec already declares (FR-014).
 - [ ] T015 [US2] Resolve the `write` cell in the authoring branch of
@@ -159,7 +159,7 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
 - [ ] T017 [P] [US2] [GATE:fail-closed] Row A9 in
       `tests/conformance/authoring/test_governed_path.py`: analyzer scope cannot publish,
       proposer scope cannot author — both refusals carry the task-scope reason.
-- [ ] T018 [P] [US2] [GATE:fail-closed] Rows A10–A12 in
+- [X] T018 [P] [US2] [GATE:fail-closed] Rows A10–A12 in
       `tests/conformance/authoring/test_acquisition.py` (new file): subject is the target
       repository at `commit` by construction; three acquisition refusals with no workspace
       created; bound disclosed, content never.

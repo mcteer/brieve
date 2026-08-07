@@ -89,6 +89,22 @@ job "authoring-tier" {
           target   = "/subject"
           readonly = true
         }
+
+        # THE COMMAND, ADDED BY 041. Until now both tasks declared `entrypoint = /bin/sh -c`
+        # and no `args`, so each started a shell with nothing to run — the tier was carefully
+        # specified and could not execute. `agent-run.nomad.hcl` has carried its args since it
+        # was written; this file never did, and nothing noticed because nothing dispatched it.
+        #
+        # `--extra adapters --extra surfaces` matches agent-run: the dispatch entrypoint needs
+        # the framework binding and the surfaces extra (which is also where `pyjwt[crypto]` is
+        # pinned, for the App-key exchange the proposer performs).
+        #
+        # NO `--extra evals`: this task calls a model through the ordinary run path and needs
+        # no scoring machinery, and 027 recorded what happens when an extra is wrong in a
+        # deployed allocation — the failure arrives at the last step, in front of a user.
+        args = [
+          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.dispatch.entrypoint"
+        ]
       }
 
       env {
@@ -153,6 +169,18 @@ job "authoring-tier" {
         # contained proposal through the shared allocation directory and publishes it. That is
         # strictly safer than mounting the subject twice: the task holding the credential holds
         # only bytes that already passed containment.
+
+        # THE COMMAND (041), and it VERIFIES ITS TOOLING FIRST.
+        #
+        # `git` and `gh` are this task's publishing path (ADR-0066). The base image is a Python
+        # image and carries neither reliably, so the task fails `tooling_missing` at start
+        # rather than at the last step of a run that already did all its analysis. A runtime
+        # `apt-get install` was the obvious alternative and is refused: an unpinned network
+        # fetch inside a tier that processes untrusted repository content is exactly what the
+        # static-allowlist posture exists to prevent.
+        args = [
+          "set -e; command -v git >/dev/null || { echo 'tooling_missing: git' >&2; exit 3; }; command -v gh >/dev/null || { echo 'tooling_missing: gh' >&2; exit 3; }; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.dispatch.entrypoint"
+        ]
       }
 
       env {
