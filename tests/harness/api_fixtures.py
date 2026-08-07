@@ -62,6 +62,31 @@ class ScriptedSubmitter:
         return ChangeDisposition.APPROVED
 
 
+#: The model the fixture authority binds for RELEVANCE. **Deliberately not `model`** (043): the
+#: gate exists to judge an answer, and a judge that is the same model as the generator is
+#: grading its own work. The fixtures encode the separation so a row cannot pass by accident
+#: with a self-judging binding.
+#:
+#: **A fixture identifier, not a vendor one, and that is the second fix.** It was
+#: `anthropic/claude-sonnet@5`, which collided the moment a row passed `model=` that same
+#: vendor string — and ADR-0067's runtime check then refused the row for a reason the row was
+#: not about. A name no answering cell will ever carry cannot collide by accident, which is
+#: what a shared fixture constant is for.
+FIXTURE_RELEVANCE_MODEL = "fixture/relevance-judge@1"
+
+
+def _default_relevance_judges() -> object:
+    """A judge that affirms, so rows about other properties keep asserting those properties.
+
+    Scaffolding, and the contract says so: the gate's REFUSING branches are driven by rows that
+    construct their own verdicts, and its presence on the production path is proven by R8
+    against `ask.py`. This default makes neither of those weaker.
+    """
+    from tests.harness.fixture_relevance import FixtureRelevanceJudge
+
+    return lambda cell: FixtureRelevanceJudge()
+
+
 DEFAULT_MAPPINGS = [
     ClaimMapping(claim_name="groups", claim_value="platform", role="operator"),
 ]
@@ -203,6 +228,20 @@ def surface_under_test(
     # exact equation this feature exists to break. Rows that answer call
     # `qualified_ask_authority()` explicitly.
     ask_authority: object | None = None,
+    # 043's collaborator, and the ONE that defaults to present rather than absent — which
+    # breaks the pattern of the eleven before it, so here is why.
+    #
+    # Those defaults are absent because each grants something: a credential, a qualification, a
+    # provider. A harness that supplied one by default would rebuild "configured = permitted"
+    # inside the tests, which is the equation 026 exists to break.
+    #
+    # A relevance judge grants NOTHING. It only narrows what ships. Defaulting it absent would
+    # make forty-six rows about routing, records and parity fail for a reason none of them is
+    # about — and the useful assertion is not "this row remembered to pass a judge" but "the
+    # PRODUCTION surface constructs one", which is R8's job and is driven against `ask.py`
+    # itself. The guard belongs there, not in every row's setup.
+    relevance_judges: object | None = None,
+    relevance_model: str = FIXTURE_RELEVANCE_MODEL,
     # 035's collaborator, shared like the ten before it. A REAL memory store by default rather
     # than `None`, because unlike a credential or a qualification a conversation store grants
     # nothing — it groups a person's own questions. Defaulting it absent would leave every
@@ -269,6 +308,10 @@ def surface_under_test(
         ask_model=ask_model,
         ask_authority=ask_authority,
         credential_source=credential_source,
+        relevance_judges=(
+            relevance_judges if relevance_judges is not None else _default_relevance_judges()
+        ),
+        relevance_model=relevance_model,
     )
     mcp = McpTransport(
         run_dispatcher=dispatcher,
@@ -287,6 +330,10 @@ def surface_under_test(
         ask_model=ask_model,
         ask_authority=ask_authority,
         credential_source=credential_source,
+        relevance_judges=(
+            relevance_judges if relevance_judges is not None else _default_relevance_judges()
+        ),
+        relevance_model=relevance_model,
     )
     return SurfaceUnderTest(
         app=app,
@@ -338,7 +385,10 @@ def fake_definitions_fabric(subject: str) -> Any:
 
 
 def qualified_ask_authority(
-    *, model: str = "anthropic/claude-opus@5", packs: tuple[str, str] = ("vault", "terraform")
+    *,
+    model: str = "anthropic/claude-opus@5",
+    packs: tuple[str, str] = ("vault", "terraform"),
+    relevance_model: str = FIXTURE_RELEVANCE_MODEL,
 ) -> AskAuthority:
     """An in-memory binding + matrix qualifying `model` for both sources.
 
@@ -353,6 +403,7 @@ def qualified_ask_authority(
             "schema_version": 1,
             "guidance_cell": f"{guidance}:{model}:ask",
             "estate_cell": f"{estate}:{model}:ask",
+            "relevance_cell": f"{guidance}:{relevance_model}:judge",
         },
         read_matrix=lambda: {
             "schema_version": 1,
@@ -365,6 +416,15 @@ def qualified_ask_authority(
                     "judge": "seed",
                 }
                 for pack in (guidance, estate)
+            ]
+            + [
+                {
+                    "pack": guidance,
+                    "model": relevance_model,
+                    "role": "judge",
+                    "qualified_by": "fixture",
+                    "judge": "seed",
+                }
             ],
         },
     )

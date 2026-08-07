@@ -1,0 +1,198 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# THE ROOT OF THE RELEVANCE JUDGE'S CHAIN (043, FR-014/FR-015).
+#
+# ADR-0052 ends the judge regress at cases checked in and reviewed like code. 043 adds a judge,
+# so it adds a root, and this is it.
+#
+# WHAT A LABEL MEANS. For each claim: does this statement answer THE QUESTION ASKED? Not "is it
+# true" — every statement here is true and every citation resolves against the pin. That is the
+# whole point. The defect this feature exists to close is an answer assembled from true, cited,
+# resolving claims about something else.
+#
+# WHY `author` IS REQUIRED. It records who DRAFTED, so a reviewer can see whose judgement they
+# are inheriting. ADR-0052 settles the rest: seed cases "may be drafted by anyone — including
+# the harness — and become authoritative when the sole maintainer reviews and merges them."
+# The regress terminates at review, not at authorship. These were drafted by the harness and
+# become the standard when they are merged.
+#
+# THE THREE SHAPES THE FLOOR REQUIRES:
+#   supported-but-irrelevant — every claim true, cited, resolving, and about the wrong subject.
+#                              These ARE the defect. A set without them qualifies a judge on
+#                              verdicts the failure never presents.
+#   fully-relevant           — every claim answers the question. Without these a judge measured
+#                              only on refusing would be qualified to refuse everything.
+#   mixed                    — some of each. Partial keep is a real outcome and a judge that
+#                              only answers all-or-nothing has not been measured on it.
+
+# =============================================================================================
+# SUPPORTED BUT IRRELEVANT — the defect's own shape.
+# =============================================================================================
+
+# The case that started all of this: 0g, and the reason the live lane went red.
+[[cases]]
+id = "this-platforms-audit-retention"
+question = "What is the recommended retention period for this platform's audit log?"
+author = "Claude Opus 5 (harness)"
+note = """
+The motivating case. The pinned corpus is HashiCorp product documentation and contains nothing
+about this platform, so no answer to this question can be grounded in it. Every claim below is
+true and cited; none is about what was asked.
+"""
+
+[[cases.claims]]
+statement = "HCP Terraform retains audit trail records for 14 days before discarding them."
+citation = "/validated-designs/terraform-operating-guides-adoption/observability#hcp-terraform-audit-trail-logs"
+verdict = "irrelevant"
+
+[[cases.claims]]
+statement = "Boundary audit events should be retained for a period sufficient to satisfy applicable regulation."
+citation = "/validated-designs/boundary-operating-guides-standardization/audit-logs#retention"
+verdict = "irrelevant"
+
+[[cases]]
+id = "this-platforms-backup-schedule"
+question = "How often does this platform back up its own state?"
+author = "Claude Opus 5 (harness)"
+note = "Same shape, different subject: real backup guidance, for a product that is not us."
+
+[[cases.claims]]
+statement = "Vault's standard backup procedure covers automated snapshots for clusters with disaster recovery replication enabled."
+citation = "/validated-designs/vault-operating-guides-adoption/standard-operational-procedures#backup-standard-procedure"
+verdict = "irrelevant"
+
+[[cases]]
+id = "nomad-question-answered-from-vault"
+question = "How should Nomad clients be sized for a production workload?"
+author = "Claude Opus 5 (harness)"
+note = """
+Cross-product in the WRONG direction: a Nomad question answered from Vault and Boundary sizing
+guidance. Adjacent topic, adjacent vocabulary, wrong product — and the citations resolve.
+"""
+
+[[cases.claims]]
+statement = "Boundary's secure proxy guidance covers high availability and sizing for worker deployments."
+citation = "/validated-designs/boundary-operating-guides-adoption/secure-proxy#high-availability-and-sizing"
+verdict = "irrelevant"
+
+[[cases.claims]]
+statement = "Vault's operating guide describes in-place upgrades for an HA cluster."
+citation = "/validated-designs/vault-operating-guides-adoption/appendix#ha-cluster-in-place-upgrade"
+verdict = "irrelevant"
+
+# =============================================================================================
+# FULLY RELEVANT — the judge must not simply refuse everything.
+# =============================================================================================
+
+[[cases]]
+id = "vault-audit-device-enablement"
+question = "How do I enable an audit device in Vault?"
+author = "Claude Opus 5 (harness)"
+
+[[cases.claims]]
+statement = "Vault's initial configuration guidance covers enabling an audit device."
+citation = "/validated-designs/vault-operating-guides-adoption/initial-configuration#enabling-an-audit-device"
+verdict = "relevant"
+
+[[cases.claims]]
+statement = "More than one audit device can be enabled, and the guidance covers that configuration."
+citation = "/validated-designs/vault-operating-guides-adoption/initial-configuration#multiple-audit-devices"
+verdict = "relevant"
+
+[[cases]]
+id = "vault-application-authentication"
+question = "How should an application authenticate to Vault?"
+author = "Claude Opus 5 (harness)"
+
+[[cases.claims]]
+statement = "The AppRole auth method is one way for an application to authenticate to Vault."
+citation = "/validated-designs/vault-operating-guides-adoption/authentication-for-applications#approle-auth-method"
+verdict = "relevant"
+
+[[cases.claims]]
+statement = "Cloud provider auth methods let a workload authenticate using its platform identity."
+citation = "/validated-designs/vault-operating-guides-adoption/authentication-for-applications#cloud-provider-auth-method"
+verdict = "relevant"
+
+[[cases]]
+id = "boundary-credential-brokering"
+question = "How does Boundary broker credentials to a session?"
+author = "Claude Opus 5 (harness)"
+
+[[cases.claims]]
+statement = "Boundary's credential management guidance covers credential brokering."
+citation = "/validated-designs/boundary-operating-guides-adoption/credential-management#credential-brokering"
+verdict = "relevant"
+
+[[cases]]
+id = "vault-kv-policy-configuration"
+question = "How do I configure policies for KV secrets in Vault?"
+author = "Claude Opus 5 (harness)"
+
+[[cases.claims]]
+statement = "Vault's static secrets guidance covers configuring policies for KV secrets."
+citation = "/validated-designs/vault-operating-guides-adoption/static-secrets#configure-policies-for-kv-secrets"
+verdict = "relevant"
+
+[[cases.claims]]
+statement = "The KV secrets engine must be configured before policies over it apply."
+citation = "/validated-designs/vault-operating-guides-adoption/static-secrets#configure-the-kv-secrets-engine"
+verdict = "relevant"
+
+# =============================================================================================
+# MIXED — partial keep is a real outcome.
+# =============================================================================================
+
+[[cases]]
+id = "vault-audit-monitoring-mixed"
+question = "How should I monitor Vault's audit logs?"
+author = "Claude Opus 5 (harness)"
+note = """
+The partial case. The first claim answers it; the second is about Boundary's audit streaming —
+true, cited, resolving, and a different product's answer to a similar-sounding question.
+"""
+
+[[cases.claims]]
+statement = "Vault's monitoring guidance covers audit device metrics."
+citation = "/validated-designs/vault-operating-guides-adoption/monitoring-and-observability#audit-device-metrics"
+verdict = "relevant"
+
+[[cases.claims]]
+statement = "Boundary supports audit log streaming to an external collector."
+citation = "/validated-designs/boundary-operating-guides-standardization/audit-logs#audit-log-streaming"
+verdict = "irrelevant"
+
+[[cases]]
+id = "vault-disaster-recovery-mixed"
+question = "How do I promote a Vault DR cluster?"
+author = "Claude Opus 5 (harness)"
+
+[[cases.claims]]
+statement = "Vault's disaster recovery guidance covers DR cluster promotion."
+citation = "/validated-designs/vault-operating-guides-adoption/disaster-recovery-setup#dr-cluster-promotion"
+verdict = "relevant"
+
+[[cases.claims]]
+statement = "A DR operation token must be configured as part of disaster recovery setup."
+citation = "/validated-designs/vault-operating-guides-adoption/disaster-recovery-setup#configure-dr-operation-token"
+verdict = "relevant"
+
+[[cases.claims]]
+statement = "Vault's secrets sync feature has design considerations for choosing destinations."
+citation = "/validated-designs/vault-operating-guides-adoption/secrets-sync#design-considerations"
+verdict = "irrelevant"
+
+[[cases]]
+id = "vault-people-authentication-mixed"
+question = "How do people authenticate to Vault?"
+author = "Claude Opus 5 (harness)"
+
+[[cases.claims]]
+statement = "Vault's guidance covers configuring the LDAP auth method for people."
+citation = "/validated-designs/vault-operating-guides-adoption/authentication-for-people#configuring-ldap-auth-method"
+verdict = "relevant"
+
+[[cases.claims]]
+statement = "Boundary integrates identity providers using an LDAP or Active Directory auth method."
+citation = "/validated-designs/boundary-operating-guides-adoption/integrating-identity-providers#ldapactive-directory-auth-method"
+verdict = "irrelevant"

@@ -133,9 +133,13 @@ ok "issuer ${OIDC_ISSUER}"
 # answers 503 rather than answering from the corpus alone — an honest state, not a broken one.
 # The credential is never passed here; the surface reads it from the trust store per ask.
 ASK_MODEL="$(env_val ASK_MODEL)"
+# 043: the relevance judge's model, and NEVER the same value as ASK_MODEL —
+# ADR-0067 forbids a model judging its own output.
+RELEVANCE_MODEL="$(env_val RELEVANCE_MODEL)"
 
 nomad job run -detach -var="repo=$REPO" \
   -var="ask_model=${ASK_MODEL}" \
+  -var="relevance_model=${RELEVANCE_MODEL}" \
   -var="oidc_issuer=${OIDC_ISSUER}" \
   -var="oidc_jwks_uri=${OIDC_JWKS_URI}" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \

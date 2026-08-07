@@ -43,6 +43,14 @@ variable "ask_binding" {
     # "not yet" legibly rather than a malformed record.
     guidance_cell = optional(string, "")
     estate_cell   = optional(string, "")
+    # 043: which cell may judge whether an answer addresses the question. Role MUST be `judge`,
+    # not `ask` — a qualification licenses one role. Absent means every ask refuses
+    # `relevance_unbound`, which is an operator saying "nobody has decided" legibly.
+    #
+    # **It may not name the model either source cell names (ADR-0067).** The surface refuses
+    # `self_judged_relevance` at resolution, so a self-judging binding fails loudly here rather
+    # than quietly returning a model's opinion of its own output to a person.
+    relevance_cell = optional(string, "")
   })
   default = {}
 }

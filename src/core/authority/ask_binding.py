@@ -49,17 +49,41 @@ GUIDANCE: Final[str] = "guidance"
 ESTATE: Final[str] = "estate"
 SOURCES: Final[frozenset[str]] = frozenset({GUIDANCE, ESTATE})
 
-#: The only role an ask binding may name. A green `plan` cell licenses planning; roles exist
+#: The role a SOURCE binding may name. A green `plan` cell licenses planning; roles exist
 #: precisely so that one qualification does not license everything.
 ASK_ROLE: Final[str] = "ask"
+
+#: The relevance gate's binding (043). Not a source — it consults nothing — so it sits beside
+#: `SOURCES` rather than in it, and every loop over sources is unchanged by its arrival.
+RELEVANCE: Final[str] = "relevance"
+
+#: The role the relevance binding may name. **A judge, not an ask** (043, FR-013): the gate
+#: renders a verdict on an answer, which is judging, and a cell qualified to answer is not
+#: qualified to judge. ADR-0039's closed vocabulary is not widened — this reuses `judge` under
+#: its own cell identity.
+RELEVANCE_ROLE: Final[str] = "judge"
+
+#: Field name → the role that field's cell must carry. **Per field, because 043 added a field
+#: whose role differs**, and the parser previously refused every non-`ask` cell outright — so
+#: the record would have refused the very field being added to it. The refusal is unchanged in
+#: strength and now runs in both directions: a `judge` cell in a source field and an `ask` cell
+#: in the relevance field each refuse at parse.
+EXPECTED_ROLE: Final[Mapping[str, str]] = {
+    GUIDANCE: ASK_ROLE,
+    ESTATE: ASK_ROLE,
+    RELEVANCE: RELEVANCE_ROLE,
+}
 
 
 @dataclass(frozen=True)
 class AskBinding:
-    """Which cell each source is bound to. Either may be absent."""
+    """Which cell each source is bound to, and which judges relevance. Any may be absent."""
 
     guidance_cell: str = ""
     estate_cell: str = ""
+    #: The relevance gate's cell (043). Absent means **nobody decided**, which the surface
+    #: surfaces as `relevance_unbound` before any question of availability — 026's rule.
+    relevance_cell: str = ""
 
     def cell_for(self, source: str) -> str:
         return self.guidance_cell if source == GUIDANCE else self.estate_cell
@@ -85,28 +109,33 @@ def parse_ask_binding_record(record: Mapping[str, Any]) -> AskBinding:
         )
 
     cells: dict[str, str] = {}
-    for source in sorted(SOURCES):
-        raw = record.get(f"{source}_cell")
+    for field_name in sorted(EXPECTED_ROLE):
+        raw = record.get(f"{field_name}_cell")
         if raw is None or raw == "":
             continue
         reference = str(raw)
         parts = reference.split(":")
         if len(parts) != 3:
             raise ResolutionRefused(
-                f"ask-binding names {reference!r} for {source}; a cell reference is "
+                f"ask-binding names {reference!r} for {field_name}; a cell reference is "
                 f"pack:model:role",
                 reason_code="malformed_record",
             )
-        if parts[2] != ASK_ROLE:
+        expected = EXPECTED_ROLE[field_name]
+        if parts[2] != expected:
             raise ResolutionRefused(
-                f"ask-binding names {reference!r} for {source}, whose role is {parts[2]!r} rather "
-                f"than {ASK_ROLE!r}. A cell qualified for another role licenses that role, not "
-                f"this one",
+                f"ask-binding names {reference!r} for {field_name}, whose role is {parts[2]!r} "
+                f"rather than {expected!r}. A cell qualified for another role licenses that "
+                f"role, not this one",
                 reason_code="malformed_record",
             )
-        cells[source] = reference
+        cells[field_name] = reference
 
-    return AskBinding(guidance_cell=cells.get(GUIDANCE, ""), estate_cell=cells.get(ESTATE, ""))
+    return AskBinding(
+        guidance_cell=cells.get(GUIDANCE, ""),
+        estate_cell=cells.get(ESTATE, ""),
+        relevance_cell=cells.get(RELEVANCE, ""),
+    )
 
 
 def resolve_ask_cell(
@@ -148,6 +177,73 @@ def resolve_ask_cell(
         # does not exist.
         agent_definition_id="ask-binding",
     )
+
+
+def resolve_relevance_cell(
+    binding: AskBinding,
+    cells: Mapping[str, QualifiedCell],
+    *,
+    available: frozenset[str],
+) -> tuple[QualifiedCell, MatrixFallback | None]:
+    """The cell the relevance gate is bound to, or another qualified judge, or refuse (043).
+
+    **`relevance_unbound` is its own reason, and it arrives before any question of
+    availability.** 026's rule, applied to a second decision: "nobody decided which model may
+    judge relevance" and "the model we chose cannot be reached" send an operator to the trust
+    fabric and to a vendor's status page respectively, and one code for both sends them to
+    argue with governance during an outage.
+
+    Everything past the binding is `resolve_with_fallback`'s, exactly as the source path does
+    it — absent, withdrawn and wrong-role all refuse there, and a fallback only ever lands on
+    another qualified **judge** cell.
+    """
+    pinned = binding.relevance_cell
+    if not pinned:
+        raise ResolutionRefused(
+            "no ask binding names a cell for relevance; an operator has not decided which "
+            "model may judge whether an answer addresses the question",
+            reason_code="relevance_unbound",
+        )
+
+    resolved, fallback = resolve_with_fallback(
+        RELEVANCE_ROLE,  # type: ignore[arg-type]
+        pinned,
+        cells,
+        available=available,
+        agent_definition_id="ask",
+    )
+
+    # ADR-0067's SECOND binding point, and the one the ADR wrote down while 043 first
+    # implemented only the first. `promote_model_version` refuses a matrix cell whose `judge`
+    # names its own model; nothing stopped an operator BINDING relevance to the same model the
+    # answering cell names, which is the same defect arriving through configuration instead of
+    # through promotion — and it is the one that reaches a person, because this verdict decides
+    # whether an answer is shown at all.
+    #
+    # Checked against the RESOLVED cell, not the pinned one: a fallback lands on a different
+    # judge, and it is the model that will actually judge whose identity matters.
+    #
+    # Both sources, because one relevance cell serves both and the record does not say which
+    # will generate. Refusing on either is the narrower reading, and a gate that permitted
+    # self-judgement for one source would fail exactly when that source was asked.
+    generating = {
+        source: reference.split(":")[1]
+        for source, reference in (
+            (GUIDANCE, binding.guidance_cell),
+            (ESTATE, binding.estate_cell),
+        )
+        if reference.count(":") >= 2
+    }
+    for source, model in generating.items():
+        if model == resolved.model:
+            raise ResolutionRefused(
+                f"the relevance judge resolved to {resolved.model}, which is the model the "
+                f"{source} cell names; a model does not judge its own output (ADR-0067), and "
+                f"this verdict decides whether a person is shown an answer at all",
+                reason_code="self_judged_relevance",
+            )
+
+    return resolved, fallback
 
 
 class AskAuthority:
@@ -193,9 +289,35 @@ class AskAuthority:
         cells = parse_matrix_record(matrix_record)
         return resolve_ask_cell(source, binding, cells, available=available)
 
+    def resolve_relevance(
+        self, *, available: frozenset[str]
+    ) -> tuple[QualifiedCell, MatrixFallback | None]:
+        """The relevance judge's cell (043), read from the same records as the sources.
+
+        Same fabric, same parse, same refusal vocabulary — a second reader would be a second
+        answer to "what did the operator decide", and they would disagree exactly when it
+        mattered.
+        """
+        try:
+            binding_record = self._read_binding()
+            matrix_record = self._read_matrix()
+        except ResolutionRefused:
+            raise
+        except Exception as exc:  # noqa: BLE001 — any read fault is a read fault
+            raise ResolutionRefused(
+                f"the trust fabric could not be read: {type(exc).__name__}",
+                reason_code="fabric_unreachable",
+            ) from exc
+
+        binding = parse_ask_binding_record(binding_record)
+        cells = parse_matrix_record(matrix_record)
+        return resolve_relevance_cell(binding, cells, available=available)
+
 
 __all__ = [
     "ASK_ROLE",
+    "RELEVANCE",
+    "RELEVANCE_ROLE",
     "ESTATE",
     "GUIDANCE",
     "SOURCES",
@@ -204,4 +326,5 @@ __all__ = [
     "AskBinding",
     "parse_ask_binding_record",
     "resolve_ask_cell",
+    "resolve_relevance_cell",
 ]

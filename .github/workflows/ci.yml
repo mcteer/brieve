@@ -45,6 +45,14 @@ jobs:
       # specs/005-durable-execution/contracts/conformance-durability.md. They are not
       # skipped silently; they simply are not run here, and `make conformance` (which
       # does run them) is the gate a human must pass locally.
+      # R9 in 043 asserts "no answering eval case was edited" as a DIFF from the merge-base,
+      # so it needs the trunk resolvable. `actions/checkout` leaves it as a remote-tracking
+      # ref only — the row asked for a local `main`, passed on a developer's clone and failed
+      # here with an empty baseline. The row now tries `origin/<base>` too; this fetch is the
+      # same guard the spec-lint step already carries, for fork PRs and shallow clones.
+      - name: Fetch the trunk, so diff-from-baseline rows have a baseline
+        run: git fetch --no-tags origin "${{ github.base_ref || 'main' }}" 2>/dev/null || true
+
       - name: Conformance (hermetic rows)
         run: make conformance-hermetic
 

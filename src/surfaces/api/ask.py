@@ -32,9 +32,10 @@ from core.answering.estate import (
 )
 from core.answering.focus import focus_types
 from core.answering.ground import describe_ground
-from core.answering.record import record_ask
+from core.answering.record import ask_stream_for, record_ask
 from core.answering.routing import Route, route_with_signal, window_phrase
 from core.answering.scope import visible_event_types
+from core.audit.schema import AuditEventType
 from core.audit.sink import AuditSink
 from core.identity.types import AuthenticatedSubject
 from surfaces.api.dependencies import AuditDep, SubjectDep
@@ -67,6 +68,38 @@ GUIDANCE_SOURCE = str(Route.GUIDANCE)
 RECORDS_PER_TYPE = 200
 
 
+def _record_relevance_gate(
+    *,
+    audit: AuditSink,
+    subject: AuthenticatedSubject,
+    answer: Any,
+    model: str,
+    cell: str,
+) -> None:
+    """`MODEL_GATE` for the relevance verdict — the event type's first production writer (043).
+
+    **Counts and the cell, never statements.** The ask record already carries the surviving
+    claims once; a second copy here would be a second place a reader must redact, and the gate's
+    job is to say a model decided, not to restate what it decided about.
+    """
+    audit.append_event(
+        correlation_id=ask_stream_for(subject.tenant_id),
+        tenant_id=subject.tenant_id,
+        event_type=AuditEventType.MODEL_GATE,
+        payload={
+            "subject_user_id": subject.subject_user_id,
+            "gate": "relevance",
+            # A MODEL judged, and the payload says so in the shape Principle IX asks for: a
+            # gate, distinguishable from an approval a policy assigns to a person.
+            "model": model,
+            "cell": cell,
+            "disposition": answer.disposition,
+            "kept_count": len(answer.claims),
+            "irrelevant_count": len(answer.irrelevant),
+        },
+    )
+
+
 def ask_for(
     *,
     question: str,
@@ -83,6 +116,7 @@ def ask_for(
     context: str = "",
     conversation_id: str = "",
     carried_context: dict[str, Any] | None = None,
+    relevance: Any = None,
 ) -> dict[str, Any]:
     """Answer or decline, and record that someone asked.
 
@@ -96,7 +130,36 @@ def ask_for(
     was carried, because "a conversation existed and none of it was used" and "there was no
     conversation" are different facts and an auditor needs to tell them apart (FR-022).
     """
-    answer = answer_question(question=question, corpus=corpus, provider=provider, context=context)
+    answer = answer_question(
+        question=question,
+        corpus=corpus,
+        provider=provider,
+        context=context,
+        # THE RELEVANCE GATE (043). Supplied here, always, by the route below — the parameter
+        # is optional on `answer_question` only so the recorded eval scorers keep working
+        # untouched, and a conformance row drives THIS function to prove the surface passes
+        # one. A gate nothing calls is the defect 041 spent a feature closing.
+        relevance=relevance,
+    )
+
+    # `MODEL_GATE`'s FIRST PRODUCTION WRITER. The event type has existed since the audit schema
+    # named it and nothing had ever written one — Principle IX requires a model's verdict be
+    # distinguishable in the trail from a human approval, and this is the first verdict the
+    # platform has taken from a model in a governed path.
+    #
+    # BEFORE the ask record, on 031's ordering precedent: a reader meets the gate before the
+    # outcome it produced, rather than discovering afterwards that something decided.
+    #
+    # Counts and the cell, never statements — the ask record already carries the surviving
+    # claims once, and a second copy in the gate payload would be a second place to redact.
+    if relevance is not None and answer.relevance_note:
+        _record_relevance_gate(
+            audit=audit,
+            subject=subject,
+            answer=answer,
+            model=getattr(relevance, "model", "") or model,
+            cell=cell,
+        )
 
     # HOW OLD THE GROUND IS (033), composed HERE for the same reason the estate window note is:
     # `answer_question` has no clock and should not grow one, and a module that calls the clock
@@ -125,6 +188,7 @@ def ask_for(
         model_authority=model_authority,
         conversation_id=conversation_id,
         carried_context=carried_context,
+        declined_reason=answer.declined_reason,
     )
 
     # `source` on BOTH paths, which it was not until the third route went away.
@@ -591,6 +655,76 @@ def authorise_ask(
     raise AskNotQualified(disposition, detail)
 
 
+#: Reason codes this path may name in the record as-is. Anything outside it becomes
+#: `relevance_unqualified`, because a disposition an auditor cannot look up is worse than a
+#: coarse one — but every code the resolver actually raises belongs here.
+RELEVANCE_DISPOSITIONS: frozenset[str] = frozenset(
+    {"relevance_unbound", "relevance_unqualified", "self_judged_relevance"}
+)
+
+
+def relevance_judge_for(
+    *,
+    subject: AuthenticatedSubject,
+    audit: AuditSink,
+    authority: Any,
+    judges: Any,
+    available: frozenset[str],
+) -> Any:
+    """The relevance judge this surface may use, or refuse (043, FR-017).
+
+    **Same ordering as `authorise_ask`, and for the same reason.** Governance precedes
+    availability: `relevance_unbound` means nobody decided which model may judge relevance, and
+    an operator needs that before "the judge could not be reached". The reverse order sends
+    them to a vendor's status page during a governance gap.
+
+    **Refusing is not optional.** An ask that cannot establish relevance must not proceed as
+    though the gate passed — so this raises, and the route turns it into a refusal the record
+    names. A `None` judge would be a silently absent gate, which is the shape 041 spent a
+    feature closing one layer over.
+    """
+    from core.authority.errors import ResolutionRefused
+
+    if authority is None or judges is None:
+        raise AskNotQualified(
+            "relevance_unbound",
+            "no relevance judge is configured for this surface; an answer whose relevance "
+            "nobody can establish is not an answer this platform will give",
+        )
+
+    try:
+        cell, _fallback = authority.resolve_relevance(available=available)
+    except ResolutionRefused as refused:
+        # The reason code carried through, not bucketed. An earlier version collapsed
+        # everything that was not `relevance_unbound` into `relevance_unqualified`, which
+        # swallowed ADR-0067's `self_judged_relevance` the day it was added: the operator
+        # would have been sent to re-run the eval lane for a cell that is already qualified,
+        # watched it pass, and been no closer. The whole value of a distinct code is that it
+        # survives to the record.
+        disposition = (
+            refused.reason_code
+            if refused.reason_code in RELEVANCE_DISPOSITIONS
+            else "relevance_unqualified"
+        )
+        record_ask(
+            audit=audit,
+            subject=subject,
+            corpus_digest="",
+            evidence_stream="",
+            model="unresolved",
+            disposition=disposition,
+            source=GUIDANCE_SOURCE,
+            cell="",
+            bound_cell="",
+            cell_disposition=f"refused:{disposition}",
+            model_authority="",
+            declined_reason=str(refused),
+        )
+        raise AskNotQualified(disposition, str(refused)) from refused
+
+    return judges(cell.reference)
+
+
 class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -615,6 +749,12 @@ def build_router(
     conversations: Any = None,
     ask_authority: Any = None,
     credential_source: Any = None,
+    relevance_judges: Any = None,
+    #: Which model this surface can build a relevance JUDGE for (043). Separate from
+    #: `ask_model` and narrow for the same reason `_available` is: a wider set would let
+    #: fallback pick a judge cell this surface cannot call, and the record would name a
+    #: judgement that never happened.
+    relevance_model: str = "unconfigured",
 ) -> APIRouter:
     """The provider is a **parameter**, so a deployment can supply one and a test can share one.
 
@@ -787,6 +927,20 @@ def build_router(
         except AskNotQualified as refused:
             raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
 
+        # THE RELEVANCE GATE'S OWN GOVERNANCE (043), resolved beside the answering cell and
+        # before the corpus is loaded — one qualification does not license the other, and an
+        # ask nobody permitted to be checked is an ask this surface does not answer.
+        try:
+            relevance = relevance_judge_for(
+                subject=subject,
+                audit=audit,
+                authority=ask_authority,
+                judges=relevance_judges,
+                available=_available(relevance_model, relevance_judges),
+            )
+        except AskNotQualified as refused:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(refused)) from refused
+
         try:
             corpus = load_corpus()
         except CorpusUnavailable as unavailable:
@@ -851,6 +1005,7 @@ def build_router(
                 context=context.text,
                 conversation_id=body.conversation_id or "",
                 carried_context=context.descriptor if body.conversation_id else None,
+                relevance=relevance,
             )
             return _remember(
                 conversations=conversations,

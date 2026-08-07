@@ -73,6 +73,15 @@ variable "ask_model" {
   default = ""
 }
 
+variable "relevance_model" {
+  type = string
+  # 043. WHICH model the surface may build a relevance judge for. Never equal to `ask_model`:
+  # ADR-0067 forbids a model judging its own output, and the surface refuses
+  # `self_judged_relevance` at resolution if a binding pairs them. Empty means no judge can be
+  # built and every ask refuses `relevance_unbound`, honestly.
+  default = ""
+}
+
 variable "oidc_tenant_claim" {
   type        = string
   default     = "tenant"
@@ -221,7 +230,8 @@ job "api" {
         # would write changes that look approved.
         AUTHORITY_CONTROLLED_PATH = var.authority_controlled_path
 
-        ASK_MODEL = var.ask_model
+        ASK_MODEL       = var.ask_model
+        RELEVANCE_MODEL = var.relevance_model
 
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
 

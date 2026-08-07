@@ -34,6 +34,25 @@ RESOLUTION_REASONS: Final[dict[str, str]] = {
     "fabric_timeout": "the trust fabric answered too slowly",
     "entitlement_unavailable": "the product could not be asked",
     "broker_not_implemented": "the brokered credential path does not exist yet",
+    # --- 043: nobody decided who may judge whether an answer addresses the question
+    #
+    # A FOURTH place between a question and an answer, and it earns its own code for the
+    # reason the three above do. `unbound_ask_source` means no operator decided which model
+    # may ANSWER; this means none decided which may JUDGE the answer — and one qualification
+    # never licenses the other, so an operator who bound an ask cell and stopped is in a
+    # state the platform must be able to name precisely.
+    #
+    # Distinct from `unqualified_cell` (the matrix has not qualified the named judge) and from
+    # `fabric_unreachable` (nobody could read the record at all). Governance precedes
+    # availability: "nobody decided" is what an operator needs before "it could not be
+    # reached", and collapsing them sends them to a vendor's status page during a governance
+    # gap.
+    "relevance_unbound": "no binding names a cell to judge whether an answer is relevant",
+    "relevance_unqualified": "the relevance judge's cell is not qualified, or was withdrawn",
+    # ADR-0067's runtime binding point. Distinct from `relevance_unqualified` because the cell
+    # IS qualified — the operator bound a judge that shares the answering cell's model, and the
+    # fix is to bind a different one, not to qualify anything.
+    "self_judged_relevance": "the bound relevance judge is the model that generated the answer",
     # --- 027: the cell is qualified, and the credential to call it could not be obtained
     #
     # Three codes now sit between a question and a model, and each sends someone somewhere

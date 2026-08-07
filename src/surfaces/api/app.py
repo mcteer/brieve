@@ -65,6 +65,10 @@ def create_app(
     # 027. Absent means every ask refuses `credential_unavailable` — a qualified cell is not
     # authority to call a vendor, and the platform holds that authority nowhere but the store.
     credential_source: Any | None = None,
+    #: 043's relevance-judge factory, threaded like every other ask collaborator. `None`
+    #: means every ask refuses `relevance_unbound` — the gate is a property of the surface.
+    relevance_judges: Any | None = None,
+    relevance_model: str = "unconfigured",
     # 035. Where a person's own asks are grouped so they can come back to them. Absent means
     # asks are answered and recorded exactly as before and remembered by no transcript —
     # deliberately not fatal, because the evidence record is the platform's memory and this
@@ -125,6 +129,8 @@ def create_app(
             evidence_query=evidence_query,
             ask_authority=ask_authority,
             credential_source=credential_source,
+            relevance_judges=relevance_judges,
+            relevance_model=relevance_model,
             # 035. Absent in an assembly with no store, and an ask then behaves exactly as it
             # did before conversations existed — answered, recorded, and remembered by nobody.
             conversations=ask_conversations_store,

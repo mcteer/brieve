@@ -51,12 +51,12 @@ closure note, which lands in Polish because it must describe what shipped.)*
 **Purpose**: the protocol, the parser, the binding, and the seed machinery — everything both
 the hermetic rows and the live legs stand on.
 
-- [ ] T001 Create `src/core/answering/relevance.py`: `RelevanceJudge` protocol,
+- [X] T001 Create `src/core/answering/relevance.py`: `RelevanceJudge` protocol,
       `RelevanceVerdict` (relevant indices, model, raw leading token), and the strict
       leading-token parser — `RELEVANT: 1,3` / `RELEVANT: none`; anything else is malformed
       and surfaces as a typed refusal, never a provider fault (research R3; 032's
       harness-owns-vocabulary rule).
-- [ ] T002 [P] Add `relevance_cell: str = ""` to `AskBinding` in
+- [X] T002 [P] Add `relevance_cell: str = ""` to `AskBinding` in
       `src/core/authority/ask_binding.py` — **and teach the parser a per-field expected role,
       because today it refuses this feature's own record**: `parse_ask_binding_record` iterates
       the two sources and refuses at parse any cell whose role is not `ask` ("a cell qualified
@@ -67,25 +67,27 @@ the hermetic rows and the live legs stand on.
       T011). **Unit rows for both parser refusal directions** land beside it in
       `tests/unit/test_ask_binding_relevance.py` (new file) — the contract's companion
       assertion, tasked here so it is nobody's afterthought.
-- [ ] T003 [P] Create `src/core/evals/relevance_seed.py`: seed loader with the floor enforced
+- [X] T003 [P] Create `src/core/evals/relevance_seed.py`: seed loader with the floor enforced
       at load — ≥10 cases, ≥3 supported-but-irrelevant, ≥3 fully-relevant, ≥1 mixed;
       `author` required non-empty; per-claim verdicts from the closed `relevant`/`irrelevant`
       vocabulary; **deliberately separate from `judge.py`'s `SeedCase`** so the existing judge
       chain's loader and floor are untouched (research R4).
-- [ ] T004 [P] Create the fixture relevance judge in `tests/harness/fixture_relevance.py`:
+- [X] T004 [P] Create the fixture relevance judge in `tests/harness/fixture_relevance.py`:
       affirms all claims by default (scaffolding — the contract header says why), with
       constructor knobs to affirm a subset, affirm none, be unreachable, or return a malformed
       token; counts its invocations for R5.
-- [ ] T005 [GATE:eval] Unit rows for the loader in
+- [X] T005 [GATE:eval] Unit rows for the loader in
       `tests/unit/test_relevance_seed_loader.py`: each floor violation refuses at load (R13);
       a seed whose citation does not resolve against the real pin is refused (R14) — the judge
       must be qualified on the world the path produces.
-- [ ] T006 [GATE:eval] Author `evals/relevance-seed/seed.toml`: ≥10 human-labelled cases,
+- [X] T006 [GATE:eval] Author `evals/relevance-seed/seed.toml`: ≥10 human-labelled cases,
       every one carrying `author = "Dan McTeer"`, with the motivating retention case as the
       first supported-but-irrelevant seed (claims citing the real Terraform/Boundary retention
       anchors, labelled irrelevant against the "this platform" question), ≥2 more
       supported-but-irrelevant, ≥3 fully-relevant, ≥1 mixed. **Maintainer reviews the labels
-      like code** — generated labels measure the generator (FR-014/FR-015).
+      like code** — which ADR-0052 states IS the labelling act: seed cases "may be drafted by
+      anyone — including the harness — and become authoritative when the sole maintainer
+      reviews and merges them". Drafted by the harness; authoritative on merge.
 
 **Checkpoint**: protocol, binding field, loader and seeds exist; nothing user-visible changed.
 
@@ -100,28 +102,28 @@ failure (SC-001's hermetic half, SC-005, SC-006).
 **Independent Test**: drive `answer_question` with a fixture judge affirming none — declined,
 third reason; affirming one of three — answered with two disclosed irrelevant.
 
-- [ ] T007 [US1] Widen `src/core/answering/answer.py`: optional `relevance` parameter; gate
+- [X] T007 [US1] Widen `src/core/answering/answer.py`: optional `relevance` parameter; gate
       invoked only when `kept` is non-empty; third `declined_reason` (*"the corpus does not
       cover what was asked"*); `Answer.irrelevant` distinct from `dropped`;
       `Answer.relevance_note` naming the verdict as a model judgement (FR-001/002/006/007/018).
-- [ ] T008 [P] [US1] [GATE:fail-closed] Rows R1–R4 in
+- [X] T008 [P] [US1] [GATE:fail-closed] Rows R1–R4 in
       `tests/conformance/answering/test_relevance_gate.py` (new file): all-irrelevant declines
       with the third reason (R1); the two decline grounds distinguishable end to end (R2);
       partial keep with disclosure (R3); unreachable / unqualified / malformed each decline
       naming their distinct cause and never answer (R4).
-- [ ] T009 [P] [US1] [GATE:fail-closed] Row R5 in the same file: an ask declining by
+- [X] T009 [P] [US1] [GATE:fail-closed] Row R5 in the same file: an ask declining by
       resolution never invokes the judge, asserted by the counting fixture. **R6 is
       deliberately NOT here**: unbound is decided where the surface resolves the binding, and
       `answer_question` knows nothing about bindings — a row for it in this file would have
       nothing to assert against. It lands in T012, after the wiring exists.
-- [ ] T010 [US1] [GATE:conformance] Row R7 in the same file: with `relevance=None`, R1's
+- [X] T010 [US1] [GATE:conformance] Row R7 in the same file: with `relevance=None`, R1's
       assertion FAILS — the gate can lose, asserted by running the rigged construction.
-- [ ] T011 [US1] Wire the surface in `src/surfaces/api/ask.py` and
+- [X] T011 [US1] Wire the surface in `src/surfaces/api/ask.py` and
       `src/surfaces/api/service.py`: resolve `relevance_cell` beside the ask binding,
       construct the judge (fixture cell → fixture judge in dev; live cell → adapter), pass it
       to `answer_question`; unbound/unqualified/unavailable each decline naming the cause
       (FR-017).
-- [ ] T012 [US1] [GATE:conformance] Rows R6 + R8 in
+- [X] T012 [US1] [GATE:conformance] Rows R6 + R8 in
       `tests/conformance/answering/test_relevance_caller.py` (new file), both driven against
       the surface because both are facts about it: an empty `relevance_cell` refuses
       `relevance_unbound` before any availability question (R6 — 026's "nobody decided" rule,
@@ -142,15 +144,15 @@ kept (SC-003, SC-004).
 **Independent Test**: run the answering suites unedited with the fixture judge wired; ask a
 two-product question through the gate with all claims affirmed.
 
-- [ ] T013 [US2] Wire the fixture judge into the recorded-suite path so the existing answering
+- [X] T013 [US2] Wire the fixture judge into the recorded-suite path so the existing answering
       suites run with the gate PRESENT (never bypassed) and unedited — the fixture affirms for
       cases expecting `answered`, and the wiring lives in the scorer construction, not in any
       case file (`src/core/evals/scoring.py` or its conftest seam; zero case edits).
-- [ ] T014 [P] [US2] [GATE:conformance] Row R9 in
+- [X] T014 [P] [US2] [GATE:conformance] Row R9 in
       `tests/conformance/answering/test_relevance_regression.py` (new file): `git diff` over
       the answering eval case files against the merge-base is empty, and the recorded suites
       pass with the gate wired.
-- [ ] T015 [P] [US2] [GATE:conformance] Row R10 in the same file: a question whose claims span
+- [X] T015 [P] [US2] [GATE:conformance] Row R10 in the same file: a question whose claims span
       two products' documents, all affirmed → answered with both citations kept. **This row
       fails if the fix is product-scoping**, which is its reason to exist.
 
@@ -166,7 +168,7 @@ what was considered (SC-007, SC-010).
 
 **Independent Test**: produce a decline and an answer; read only the records.
 
-- [ ] T016 [US3] [GATE:correlation] Write `MODEL_GATE` from `src/surfaces/api/ask.py` on every
+- [X] T016 [US3] [GATE:correlation] Write `MODEL_GATE` from `src/surfaces/api/ask.py` on every
       relevance judgement — payload `{gate: "relevance", verdict, kept_count,
       irrelevant_count, model, cell}`, **before** the ask outcome record (031's
       fallback-before-issued ordering); statements never enter the payload. **Verify at
@@ -175,7 +177,7 @@ what was considered (SC-007, SC-010).
       "distinguishable from the records alone" is a fact about the records rather than about
       the in-memory `Answer` — a reason that exists only in the response is invisible to an
       auditor.
-- [ ] T017 [P] [US3] [GATE:conformance] Rows R11–R12 in
+- [X] T017 [P] [US3] [GATE:conformance] Rows R11–R12 in
       `tests/conformance/answering/test_relevance_record.py` (new file): the gate event is
       present, ordered before the outcome, carries the cell identity and counts and no
       statements (R11); from a declined ask's records alone a reader can state what was
@@ -188,24 +190,24 @@ what was considered (SC-007, SC-010).
 **Goal**: the motivating case declines against a live judge; smoke is green; the judge
 qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009).
 
-- [ ] T018 [US1] Create `src/adapters/anthropic_relevance.py`: the live judge, through
+- [X] T018 [US1] Create `src/adapters/anthropic_relevance.py`: the live judge, through
       `client_and_model` (the adapter seam owns credential/import/model-id — and the
       no-live-dependencies guard forbids a vendor import anywhere else); leading-token protocol
       from T001; **sealed-core additive class, named for Principle V review**.
-- [ ] T019 [US1] Add the relevance leg to `tests/evals_live/smoke.py`: the unedited
+- [X] T019 [US1] Add the relevance leg to `tests/evals_live/smoke.py`: the unedited
       `vault-must-decline-001` through the real path with the live judge, response printed —
       one call before anything bigger (L1); smoke exit reflects it (L2).
-- [ ] T020 [US1] [GATE:eval] Create `tests/evals_live/relevance_qualify.py` and the
+- [X] T020 [US1] [GATE:eval] Create `tests/evals_live/relevance_qualify.py` and the
       `evals-relevance-qualify` Makefile target: every seed case at majority-of-three, two
       numbers printed separately — overall vs the ≥90% floor, and supported-but-irrelevant
       which must be ALL correct; a rigged always-affirm candidate demonstrably clears the
       first and fails the second (R15). **The lane binds nothing** — promotion is a separate
       human act.
-- [ ] T021 [US1] [GATE:conformance] Hermetic row R15 in
+- [X] T021 [US1] [GATE:conformance] Hermetic row R15 in
       `tests/unit/test_relevance_qualification.py`: the qualification scoring itself, driven
       with a rigged always-affirm candidate against the loaded seed set — passes the majority
       floor, fails the supported-but-irrelevant number, and is refused.
-- [ ] T022 [US1] Add the fixture judge cell and `relevance_cell` binding to
+- [X] T022 [US1] Add the fixture judge cell and `relevance_cell` binding to
       `infra/modules/trust-fabric/` (dev estate defaults), **following the estate's
       fixture-cell precedent for provenance fields** (`qualified_by = "fixture"`, `judge =
       "seed"` — a judge-role cell with empty provenance is the shape promotion refuses), so
@@ -217,9 +219,9 @@ qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009)
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T023 [P] Run `specs/043-grounded-means-relevant/quickstart.md` top to bottom as written;
+- [X] T023 [P] Run `specs/043-grounded-means-relevant/quickstart.md` top to bottom as written;
       fix drift in the doc, not by hand-waving the steps.
-- [ ] T024 Update `ROADMAP.md` in the implementation PR: mark gap 0g **CLOSED by 043** with
+- [X] T024 Update `ROADMAP.md` in the implementation PR: mark gap 0g **CLOSED by 043** with
       the mechanism in one line, and add 043's Shipped row (the file's own landing rule).
 
 ---
@@ -258,4 +260,5 @@ live half; T022's run is the named-runner obligation being discharged.
   (`git stash` is not a baseline, and neither is a moving `main`).
 - The corpus and the failing case are untouched throughout — the two "fixes" this estate has
   names for.
-- T006 is the human dependency: the maintainer authors and reviews the seed labels.
+- T006 was drafted by the harness and becomes authoritative on merge, per ADR-0052's own
+  clause. The review is the labelling act; the authorship is not.

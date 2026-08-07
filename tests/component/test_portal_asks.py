@@ -30,6 +30,7 @@ from tests.harness.api_fixtures import (
     qualified_ask_authority,
     surface_under_test,
 )
+from tests.harness.fixture_relevance import FixtureRelevanceJudge
 
 GUIDANCE_QUESTION = "How does an AI agent obtain an identity with Vault?"
 #: Deliberately WITHOUT a time phrase. "last night" resolves to a real window
@@ -128,6 +129,9 @@ def _answering_surface(**kwargs: Any) -> Any:
     kwargs.setdefault("ask_provider", _Answers())
     kwargs.setdefault("ask_model", MODEL)
     kwargs.setdefault("ask_authority", qualified_ask_authority(model=MODEL))
+    # 043: answering now requires a relevance judge, and a surface without one refuses. The
+    # fixture affirms, so these rows keep asserting what they were written to assert.
+    kwargs.setdefault("relevance_judges", lambda cell: FixtureRelevanceJudge())
     kwargs.setdefault("credential_source", available_credential())
     return surface_under_test(**kwargs)
 

@@ -204,6 +204,25 @@ def promote_model_version(
             f"seed-qualified first judge has nothing above it",
             reason_code="promotion_incomplete",
         )
+    # A MODEL DOES NOT JUDGE ITS OWN OUTPUT (ADR-0067).
+    #
+    # ADR-0052 constrains how a judge earns its place and says nothing about which model may
+    # judge which output — so every live cell this platform had promoted was qualified by the
+    # model it qualifies. The failure mode is correlated blindness rather than dishonesty: a
+    # judge sharing the generator's misconceptions is least equipped to see exactly the errors
+    # the generator systematically makes, and the resulting high score is evidence of nothing.
+    #
+    # 032 paid for the near miss — the same scorer served subject and judge, the judge
+    # inherited the agent's protocol, and qualification moved from >90% to 55%. That was
+    # visible because a NUMBER moved. Judgement bleed moves no number: a cell agreeing with
+    # itself looks exactly like a cell that is right.
+    if judge.strip() and judge.strip() == model.strip():
+        raise PromotionRefused(
+            f"cell {pack}:{model}:{role} names itself as its own judge. A model does not "
+            f"judge its own output (ADR-0067) — a judge that shares the generator's blind "
+            f"spots measures fluency, not correctness",
+            reason_code="self_judged_cell",
+        )
     return {
         "pack": pack,
         "model": model,
