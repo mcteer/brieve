@@ -85,18 +85,18 @@ no route exists yet.
 **Independent Test**: sign in as an admin, compare the console against the fabric's records,
 confirm no secret value and a recorded read; a non-admin is refused.
 
-- [ ] T006 [US1] Console read routes in `src/surfaces/api/console.py` (new):
+- [X] T006 [US1] Console read routes in `src/surfaces/api/console.py` (new):
       `GovernanceConfiguration` assembled per request from the fabric (bindings + toggle
       state, qualified cells, protected policies, connections, gating posture); requires
       `admin` in the resolved subject's roles (the evidence-read check pattern); an
       unreadable record renders **unavailable** (C10); every read audited with the
       administrator's identity on the EVIDENCE_READ precedent (FR-004); registered in
       `src/surfaces/api/app.py`.
-- [ ] T007 [US1] The portal page: `/settings` in `src/surfaces/portal/app.py` +
+- [X] T007 [US1] The portal page: `/settings` in `src/surfaces/portal/app.py` +
       `src/surfaces/portal/templates/settings.html`, through the existing relay only — the
       page renders what the API returned, including `unavailable` and the FR-023b gating
       posture, and holds no logic (C8's architecture half).
-- [ ] T008 [US1] [GATE:conformance] Rows **C9–C14** in
+- [X] T008 [US1] [GATE:conformance] Rows **C9–C14** in
       `tests/conformance/console/test_console_read.py` (new dir): field-for-field agreement
       (C9), unavailable-not-empty (C10), [GATE:no-secret-leak] no credential in any
       response (C11), reads recorded (C12), non-admin refused and recorded — including

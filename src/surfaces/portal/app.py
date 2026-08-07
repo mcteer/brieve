@@ -162,6 +162,38 @@ def create_portal(
             },
         )
 
+    # --------------------------------------------------------------- settings (044)
+
+    @app.get("/settings", response_class=HTMLResponse)
+    def settings(request: Request) -> Response:
+        """The admin console, rendered from what the API returned and nothing else.
+
+        **No governance logic here, and none possible.** The page has no view of the trust
+        fabric, no credential, and no way to distinguish a permitted change from a refused one
+        except by what the API said. That is the thin-client rule (Principle II) doing real
+        work rather than being asserted: a reader looking for the decision will not find it
+        in this file, because it is not here.
+
+        A non-admin gets the API's 403 rendered as a refusal — the platform answering, not a
+        portal error. `relay.py`'s docstring already draws that line and this page keeps it.
+        """
+        session = _session(request)
+        if session is None:
+            return templates.TemplateResponse(request=request, name="signed_out.html", context={})
+
+        posture = app.state.relay.request(
+            "GET", "/console/configuration", token=session.access_token
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="settings.html",
+            context={
+                "posture": posture.payload if posture.ok else {},
+                "reachable": posture.reachable,
+                "refused": not posture.ok and posture.reachable,
+            },
+        )
+
     # ------------------------------------------------------------------- ask
 
     def _rendered(exchanges: list[dict[str, Any]]) -> list[dict[str, Any]]:

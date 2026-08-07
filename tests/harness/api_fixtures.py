@@ -89,6 +89,11 @@ def _default_relevance_judges() -> object:
 
 DEFAULT_MAPPINGS = [
     ClaimMapping(claim_name="groups", claim_value="platform", role="operator"),
+    # 044. A SEPARATE claim value, so a row must ask for the admin role to get it — the
+    # default subject is an operator and stays one. A mapping that granted both from one
+    # claim would make every existing row an administrator and quietly turn C13's "a
+    # non-admin is refused" into a row that could not fail.
+    ClaimMapping(claim_name="groups", claim_value="platform-admin", role="admin"),
 ]
 
 
@@ -228,6 +233,10 @@ def surface_under_test(
     # exact equation this feature exists to break. Rows that answer call
     # `qualified_ask_authority()` explicitly.
     ask_authority: object | None = None,
+    # 044's console reader. `None` leaves the surface with no console at all — which is what
+    # a deployment that has not configured one has, and keeps every pre-044 row's operation
+    # snapshot unchanged. Rows that read configuration supply one.
+    console_config: object | None = None,
     # 043's collaborator, and the ONE that defaults to present rather than absent — which
     # breaks the pattern of the eleven before it, so here is why.
     #
@@ -288,6 +297,7 @@ def surface_under_test(
     )
     submitter = ScriptedSubmitter(submit_outcome)
     app = create_app(
+        console_config=console_config,
         token_verifier=verifier,
         run_dispatcher=dispatcher,
         evidence_query=evidence,
