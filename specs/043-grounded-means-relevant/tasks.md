@@ -57,8 +57,14 @@ the hermetic rows and the live legs stand on.
       and surfaces as a typed refusal, never a provider fault (research R3; 032's
       harness-owns-vocabulary rule).
 - [ ] T002 [P] Add `relevance_cell: str = ""` to `AskBinding` in
-      `src/core/authority/ask_binding.py`, parsed from the binding record; absent stays empty
-      (the refusal itself lands with the surface wiring, T013).
+      `src/core/authority/ask_binding.py` — **and teach the parser a per-field expected role,
+      because today it refuses this feature's own record**: `parse_ask_binding_record` iterates
+      the two sources and refuses at parse any cell whose role is not `ask` ("a cell qualified
+      for another role licenses that role, not this one"). The relevance field expects `judge`,
+      with the SAME parse-time refusal in both directions — a relevance cell naming an
+      `ask`-role cell refuses identically, because one qualification must not license another
+      either way. Absent stays empty (the unbound refusal lands with the surface wiring,
+      T011).
 - [ ] T003 [P] Create `src/core/evals/relevance_seed.py`: seed loader with the floor enforced
       at load — ≥10 cases, ≥3 supported-but-irrelevant, ≥3 fully-relevant, ≥1 mixed;
       `author` required non-empty; per-claim verdicts from the closed `relevant`/`irrelevant`
@@ -101,10 +107,11 @@ third reason; affirming one of three — answered with two disclosed irrelevant.
       with the third reason (R1); the two decline grounds distinguishable end to end (R2);
       partial keep with disclosure (R3); unreachable / unqualified / malformed each decline
       naming their distinct cause and never answer (R4).
-- [ ] T009 [P] [US1] [GATE:fail-closed] Rows R5–R6 in the same file: an ask declining by
-      resolution never invokes the judge, asserted by the counting fixture (R5); an empty
-      `relevance_cell` refuses `relevance_unbound` before any availability question (R6 —
-      026's "nobody decided" rule).
+- [ ] T009 [P] [US1] [GATE:fail-closed] Row R5 in the same file: an ask declining by
+      resolution never invokes the judge, asserted by the counting fixture. **R6 is
+      deliberately NOT here**: unbound is decided where the surface resolves the binding, and
+      `answer_question` knows nothing about bindings — a row for it in this file would have
+      nothing to assert against. It lands in T012, after the wiring exists.
 - [ ] T010 [US1] [GATE:conformance] Row R7 in the same file: with `relevance=None`, R1's
       assertion FAILS — the gate can lose, asserted by running the rigged construction.
 - [ ] T011 [US1] Wire the surface in `src/surfaces/api/ask.py` and
@@ -112,10 +119,13 @@ third reason; affirming one of three — answered with two disclosed irrelevant.
       construct the judge (fixture cell → fixture judge in dev; live cell → adapter), pass it
       to `answer_question`; unbound/unqualified/unavailable each decline naming the cause
       (FR-017).
-- [ ] T012 [US1] [GATE:conformance] Row R8 in
-      `tests/conformance/answering/test_relevance_caller.py` (new file): driven against
-      `ask.py` itself — the surface constructs and passes a judge, and stopping fails this row
-      while R1–R7 stay green (`verify-the-production-caller`).
+- [ ] T012 [US1] [GATE:conformance] Rows R6 + R8 in
+      `tests/conformance/answering/test_relevance_caller.py` (new file), both driven against
+      the surface because both are facts about it: an empty `relevance_cell` refuses
+      `relevance_unbound` before any availability question (R6 — 026's "nobody decided" rule,
+      asserted where the binding is resolved); and the surface constructs and passes a judge,
+      so stopping fails this row while R1–R7 stay green (R8,
+      `verify-the-production-caller`).
 
 **Checkpoint**: the gate works, refuses correctly, can lose, and the production caller is the
 thing proven.
@@ -157,7 +167,12 @@ what was considered (SC-007, SC-010).
 - [ ] T016 [US3] [GATE:correlation] Write `MODEL_GATE` from `src/surfaces/api/ask.py` on every
       relevance judgement — payload `{gate: "relevance", verdict, kept_count,
       irrelevant_count, model, cell}`, **before** the ask outcome record (031's
-      fallback-before-issued ordering); statements never enter the payload.
+      fallback-before-issued ordering); statements never enter the payload. **Verify at
+      implement whether `record_ask` carries the decline REASON** (the visible call passes
+      `disposition=` only): if the record drops it, widen `record_ask` additively so R2/R12's
+      "distinguishable from the records alone" is a fact about the records rather than about
+      the in-memory `Answer` — a reason that exists only in the response is invisible to an
+      auditor.
 - [ ] T017 [P] [US3] [GATE:conformance] Rows R11–R12 in
       `tests/conformance/answering/test_relevance_record.py` (new file): the gate event is
       present, ordered before the outcome, carries the cell identity and counts and no
@@ -189,9 +204,12 @@ qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009)
       with a rigged always-affirm candidate against the loaded seed set — passes the majority
       floor, fails the supported-but-irrelevant number, and is refused.
 - [ ] T022 [US1] Add the fixture judge cell and `relevance_cell` binding to
-      `infra/modules/trust-fabric/` (dev estate defaults), so `make dev-up` yields a surface
-      with the gate present and bound; run the live legs (L1–L3) and record the results —
-      re-seed the model credential if an apply intervenes (the apply clobbers it).
+      `infra/modules/trust-fabric/` (dev estate defaults), **following the estate's
+      fixture-cell precedent for provenance fields** (`qualified_by = "fixture"`, `judge =
+      "seed"` — a judge-role cell with empty provenance is the shape promotion refuses), so
+      `make dev-up` yields a surface with the gate present and bound; run the live legs
+      (L1–L3) and record the results — re-seed the model credential if an apply intervenes
+      (the apply clobbers it).
 
 ---
 
@@ -209,7 +227,8 @@ qualifies at majority-of-three with two numbers (SC-001, SC-002, SC-008, SC-009)
 - **Foundational**: T001 → T004 (the fixture implements the protocol); T002, T003 ∥ T001;
   T005 after T003; T006 after T003 (the loader validates the seeds as written).
 - **US1**: T007 after T001; rows T008–T010 after T007+T004; T011 after T002+T007;
-  T012 after T011.
+  T012 after T011 — **R6 lives in T012 because the unbound refusal does not exist until
+  T011 wires it**; placing it earlier was pass 1's M1 finding.
 - **US2**: T013 after T007+T004; T014/T015 [P] after T013.
 - **US3**: T016 after T011; T017 after T016.
 - **Live**: T018 after T001; T019 after T011+T018; T020 after T003+T006+T018; T021 after

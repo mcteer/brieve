@@ -23,7 +23,10 @@ third vocabulary entry, distinguishable in the record from "did not resolve".
 
 ### R2 — The two decline grounds are distinguishable end to end (FR-002, SC-006)
 One ask declining by resolution, one by relevance: the records differ in `declined_reason`, and
-the irrelevant statements appear under `irrelevant`, never under `dropped`.
+the irrelevant statements appear under `irrelevant`, never under `dropped`. **"The records"
+means the audit records, not the in-memory answer** — if `record_ask` carries only the
+disposition today, it is widened additively (T016), because a reason that exists only in the
+response is invisible to an auditor.
 
 ### R3 — Partial keep (edge case)
 Judge affirms one claim of three: answered; the kept claim ships; two statements disclosed as
@@ -40,7 +43,11 @@ fixture judge, not by reading the code.
 
 ### R6 — Unbound refuses before unavailable (FR-017; 026's rule)
 No `relevance_cell` in the binding record: `relevance_unbound`, distinguishable from a
-provider outage — "nobody decided" surfaces first.
+provider outage — "nobody decided" surfaces first. **Driven against the surface**, where the
+binding is resolved — `answer_question` knows nothing about bindings, and a row for this
+against the gate module would have nothing to assert. A companion assertion covers the parser
+in both directions: a judge-role cell in a source field and an ask-role cell in the relevance
+field each refuse at parse.
 
 ## The gate can lose (US1, FR-009)
 

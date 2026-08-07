@@ -33,6 +33,12 @@ distinct from the eval judge's cell). Which cell the answering path uses is an
 an unqualified or withdrawn cell declines with the resolution reason — both distinguishable
 from a provider outage.
 
+**Measured constraint the first draft missed (analysis C1)**: `parse_ask_binding_record`
+refuses **at parse** any cell whose role is not `ask` — so the record this feature extends
+would refuse this feature's own field. The parser therefore learns a per-field expected role
+(relevance → `judge`), keeping the same discipline in both directions: an `ask` cell in the
+relevance field refuses identically.
+
 **Rationale**: 026 already decided this shape: *which* model is permitted is governance, *where*
 one is reachable from is assembly, and "nobody decided" must surface before "nothing is wired".
 FR-013's "own cell" is satisfied by cell identity plus its own qualification evidence — a new
