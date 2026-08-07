@@ -118,7 +118,7 @@ exclusion land together (FR-014/015/017).
 **Independent Test**: propose a change with a quorum — pending, not in force; approve out of
 band — in force. Propose a refused change — refused. From a dispatched run, reach nothing.
 
-- [ ] T009 [US2] The change-request route in `src/surfaces/api/console.py`: validate against
+- [X] T009 [US2] The change-request route in `src/surfaces/api/console.py`: validate against
       the record's own parser **before** the fabric is asked (C1 — an unqualified cell
       refuses `unqualified_cell` with zero fabric writes); submit via T003's `ConfigChange`;
       render the three outcomes distinctly with the **ungated disclosure** when no quorum is
@@ -127,12 +127,12 @@ band — in force. Propose a refused change — refused. From a dispatched run, 
       the requester's own subject (`self_grant_refused`, FR-017); record every request,
       decision, and refusal (FR-008); pending shows the wrapping token's accessor and expiry
       (R11's native withdrawal).
-- [ ] T010 [US2] [GATE:conformance] Rows **C1–C5, C7–C8, C21** in
+- [X] T010 [US2] [GATE:conformance] Rows **C1–C5, C7–C8, C21** in
       `tests/conformance/console/test_console_write.py`: validation-first, the three
       outcomes never collapsed (C2 fails if they are), truthiness not membership (C3),
       refusal recorded (C4), ungated disclosed (C5), stale CAS (C7), no apply path (C8),
       self-grant refused in several wordings of "own subject" (C21).
-- [ ] T011 [US4] [GATE:conformance] Rows **C19, C20, C22** in
+- [X] T011 [US4] [GATE:conformance] Rows **C19, C20, C22** in
       `tests/conformance/console/test_console_exclusion.py`: a dispatched run resolves no
       tool to the console's read or write and a planted instruction records an attempt and
       changes nothing (C19); **the rigged-on construction** — with the exclusion removed,

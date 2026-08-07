@@ -112,7 +112,10 @@ class SurfaceUnderTest:
     #: "both surfaces read the same records" a fact rather than an inference.
     evidence: InMemoryEvidenceQuery
     dispatcher: InProcessDispatcher
-    submitter: ScriptedSubmitter
+    #: Widened for 044: a row may supply its own submitter, and the console's speaks
+    #: `submit_change` rather than `ScriptedSubmitter`'s `submit`. Rows that inspect the
+    #: scripted one still get it by default.
+    submitter: Any
     thread_store: InMemoryThreadStore
 
     #: The fake identity fabric the dispatcher resolves through. Exposed so a row can grant a
@@ -237,6 +240,9 @@ def surface_under_test(
     # a deployment that has not configured one has, and keeps every pre-044 row's operation
     # snapshot unchanged. Rows that read configuration supply one.
     console_config: object | None = None,
+    #: An explicit submitter, for rows about what the fabric decided. `None` keeps
+    #: `ScriptedSubmitter`, which is what the mappings rows have always driven.
+    authority_submitter: object | None = None,
     # 043's collaborator, and the ONE that defaults to present rather than absent — which
     # breaks the pattern of the eleven before it, so here is why.
     #
@@ -295,7 +301,10 @@ def surface_under_test(
         mappings=DEFAULT_MAPPINGS,
         key_loader=lambda: {idp.key_id: idp.jwks_public_key()},
     )
-    submitter = ScriptedSubmitter(submit_outcome)
+    # 044: a row may supply its own, because the console needs `submit_change`'s three
+    # outcomes as data and `ScriptedSubmitter` speaks the older `submit` shape. Defaulted, so
+    # every pre-044 row keeps the scripted one it was written against.
+    submitter: Any = authority_submitter or ScriptedSubmitter(submit_outcome)
     app = create_app(
         console_config=console_config,
         token_verifier=verifier,

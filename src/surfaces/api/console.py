@@ -33,6 +33,7 @@ from core.audit.schema import AuditEventType
 from core.authority.ask_binding import parse_ask_binding_record
 from core.authority.matrix import parse_matrix_record
 from surfaces.api.authority_submit import (
+    CONSOLE_RECORDS,
     AuthorityChangeRefused,
     AuthoritySubmitUnavailable,
     ConfigChange,
@@ -198,6 +199,76 @@ def probe_connection(product: str, address: str) -> str:
         return "unreachable"
 
 
+def _validate_payload(body: Any, config: ConsoleConfig) -> None:
+    """Refuse a change the platform would refuse anyway, before the fabric is asked.
+
+    **Two checks, and both are about not offering what cannot be accepted.**
+
+    A binding may name only a cell the Qualified Model Matrix carries — otherwise an
+    administrator is invited to choose something that will be refused, which reads as the
+    platform being broken rather than as governance working. `unqualified_cell` is the
+    matrix's own word, reused so the trail says the same thing at both ends.
+
+    A connection may carry only *locations*. The vocabulary has no field a credential could
+    be written into (FR-018b), so this is a closed set rather than a filter over a
+    credential-shaped one — a filter is something a future field slips past.
+    """
+    # THE RECORD NAME, checked at the route as well as in the submitter (defence in depth).
+    # `ConfigChange.path_within` refuses anything outside the closed set — but only when it is
+    # called, which makes the refusal a property of the submitter that happens to be wired.
+    # The route refuses regardless, so scoping does not depend on assembly.
+    if body.record not in CONSOLE_RECORDS:
+        raise ValueError(
+            f"{body.record!r} is not a record the console may change. The writable set is "
+            f"{sorted(CONSOLE_RECORDS)}; ceilings, the model matrix and the protected set are "
+            f"estate governance this feature deliberately left in Terraform."
+        )
+
+    if body.record == "ask-bindings":
+        cells = _qualified_cells(config)
+        for field in ("guidance_cell", "estate_cell", "relevance_cell"):
+            reference = str(body.payload.get(field, "")).strip()
+            if reference and cells is not None and reference not in cells:
+                raise ValueError(
+                    f"{reference!r} is not a qualified cell. A binding may name only what the "
+                    f"Qualified Model Matrix carries — promotion is an eval-gated act "
+                    f"(Principle VIII), not something an interface can grant."
+                )
+    if body.record == "product-connections":
+        for product, fields in body.payload.items():
+            if product == "set_by":
+                continue
+            permitted = CONNECTION_FIELDS.get(product)
+            if permitted is None:
+                raise ValueError(
+                    f"{product!r} is not a product this console configures; the set is "
+                    f"{sorted(CONNECTION_FIELDS)}"
+                )
+            if not isinstance(fields, dict):
+                raise ValueError(f"{product!r} must carry named location fields")
+            unknown = sorted(set(fields) - permitted)
+            if unknown:
+                raise ValueError(
+                    f"{unknown} are not location fields for {product!r}. Connections name "
+                    f"WHERE a product is; the material used to authenticate to it lives in "
+                    f"the trust store and is never entered here."
+                )
+
+
+def _qualified_cells(config: ConsoleConfig) -> frozenset[str] | None:
+    """What a binding may name, or `None` when the matrix cannot be read.
+
+    `None` rather than an empty set, and the caller skips the check: an unreadable matrix must
+    not refuse every binding as unqualified. That would present a fabric outage as an estate
+    of misconfigured cells — the exact confusion `read_matrix`'s own docstring names.
+    """
+    try:
+        cells = parse_matrix_record(config.read_matrix())
+    except Exception:  # noqa: BLE001 — unreadable is not empty
+        return None
+    return frozenset(reference for reference, cell in cells.items() if not cell.withdrawn)
+
+
 def require_admin(subject: Any, audit: Any = None) -> None:
     """Refuse anyone without the console's role, **and record the attempt**.
 
@@ -282,6 +353,21 @@ def build_router(*, config: ConsoleConfig, submitter: Any) -> APIRouter:
                     "an administrator may not grant themselves the admin role; ask another "
                     "administrator, which is what makes the role a grant rather than a claim",
                 )
+
+        # VALIDATION BEFORE THE FABRIC IS ASKED (C1, FR-009). A change the platform would
+        # refuse anyway must not reach Vault: a rejected write still costs a round trip, a
+        # log line, and — where a quorum is configured — an approver's attention on a request
+        # that was never going to be applied.
+        try:
+            _validate_payload(body, config)
+        except ValueError as invalid:
+            _record_console_event(
+                audit,
+                subject,
+                event=AuditEventType.AUTHORITY_REFUSED,
+                payload={"reason_code": "invalid_change", "record": body.record},
+            )
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(invalid)) from invalid
 
         change = ConfigChange(
             record=body.record,
