@@ -84,6 +84,19 @@ class AskBinding:
     #: The relevance gate's cell (043). Absent means **nobody decided**, which the surface
     #: surfaces as `relevance_unbound` before any question of availability — 026's rule.
     relevance_cell: str = ""
+    #: Whether the relevance gate runs at all (044, an administrator's switch).
+    #:
+    #: **Absent means ENABLED**, and that default is the whole compatibility story: every
+    #: binding record written before 044 carries no such field, and each one must keep meaning
+    #: exactly what it meant — the gate on. A default of `False` would silently disable the
+    #: relevance check across every estate the moment this field shipped, which is gap 0g
+    #: reintroduced by a dataclass default.
+    #:
+    #: Distinct from `relevance_cell` being absent. Unbound means *nobody decided who judges*
+    #: and refuses; disabled means *somebody decided not to judge* and answers with the
+    #: absence disclosed. One is a gap, the other is a decision, and they read differently to
+    #: whoever finds them.
+    relevance_enabled: bool = True
 
     def cell_for(self, source: str) -> str:
         return self.guidance_cell if source == GUIDANCE else self.estate_cell
@@ -131,10 +144,17 @@ def parse_ask_binding_record(record: Mapping[str, Any]) -> AskBinding:
             )
         cells[field_name] = reference
 
+    # `is not False` rather than a truthiness check or `bool(...)`: the field is absent on
+    # every pre-044 record and must read as enabled, while an explicit `false` — the only way
+    # an administrator turns it off — must be honoured. A record carrying a nonsense value
+    # (`"no"`, `0`) reads as enabled, which is the safe direction for a gate.
+    enabled = record.get("relevance_enabled") is not False
+
     return AskBinding(
         guidance_cell=cells.get(GUIDANCE, ""),
         estate_cell=cells.get(ESTATE, ""),
         relevance_cell=cells.get(RELEVANCE, ""),
+        relevance_enabled=enabled,
     )
 
 

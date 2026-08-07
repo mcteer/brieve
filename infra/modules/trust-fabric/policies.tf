@@ -218,6 +218,12 @@ resource "vault_policy" "harness_authority_read" {
     path "${vault_mount.harness_authority.path}/data/protected-policies" {
       capabilities = ["read"]
     }
+    # Product connections (044). **The exact path, no glob** — one record, no subpath, the
+    # same finding two blocks up and one block down. A run reads this to know where its
+    # products are; writing it is the console's, through `authority_submit`.
+    path "${vault_mount.harness_authority.path}/data/product-connections" {
+      capabilities = ["read"]
+    }
     # The ASK BINDING (026). Which qualified cell an ask may use, per source.
     #
     # Beside the matrix and read-only for the same reason: a surface that could write its own

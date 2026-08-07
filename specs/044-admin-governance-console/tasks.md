@@ -45,7 +45,7 @@ Single project: `src/`, `tests/`, `infra/` at repository root.
 
 **Purpose**: the principal, the gate coverage, the record shapes — what every story stands on.
 
-- [ ] T001 Trust-fabric additions: `infra/modules/trust-fabric/authority-submit.tf` (new) —
+- [X] T001 Trust-fabric additions: `infra/modules/trust-fabric/authority-submit.tf` (new) —
       the `authority_submit` policy granting `create`/`update` on exactly the console's
       records (`claim-mappings/*`, `ask-bindings`, `product-connections`), with
       `control_group` blocks when `control_groups_enabled` (R1), attached to the **api**
@@ -53,22 +53,22 @@ Single project: `src/`, `tests/`, `infra/` at repository root.
       paths (Q3/FR-023a); extend `harness_authority_read` in `policies.tf` with
       `product-connections` as an **exact path, no glob** (042's 020-lesson). `terraform
       validate` clean.
-- [ ] T002 [P] Unit scan **C6** in `tests/unit/test_console_controlled_paths.py`: every
+- [X] T002 [P] Unit scan **C6** in `tests/unit/test_console_controlled_paths.py`: every
       record the console can write appears in `controlled_paths` — completeness against the
       module's own list, 042's V6 shape; plus the R1 regression guard — the
       `authority_submit` policy is attached to the api role, so the mechanism keeps its
       principal.
-- [ ] T003 [P] Generalise the submitter in `src/surfaces/api/authority_submit.py`:
+- [X] T003 [P] Generalise the submitter in `src/surfaces/api/authority_submit.py`:
       `ConfigChange` (record ∈ R2's closed set, payload, `cas`, requester) through the same
       three-outcome mapping as `ClaimMapping`; the submitter authenticates as the API's
       attested identity rather than a configured token (R1/R8); unit rows including **C3**
       (`wrap_info` present-as-null, read by truthiness — 007's shape driven directly) and
       `unknown_record` refusal.
-- [ ] T004 [P] [GATE:fail-closed] Binding-record field in
+- [X] T004 [P] [GATE:fail-closed] Binding-record field in
       `src/core/authority/ask_binding.py`: `relevance_enabled`, **absent = enabled** so
       every pre-044 record keeps its meaning; unit rows **C18** in
       `tests/unit/test_ask_binding_toggle.py`.
-- [ ] T005 [P] The disjoint role in `src/core/answering/scope.py`:
+- [X] T005 [P] The disjoint role in `src/core/answering/scope.py`:
       `ROLE_VISIBILITY["admin"] = frozenset()` with the R6 reasoning in a comment; unit rows
       asserting **both directions** of FR-016a — admin confers no audit visibility, and
       neither existing role gains configuration authority by this change.

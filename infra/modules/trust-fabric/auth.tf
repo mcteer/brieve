@@ -220,7 +220,7 @@ resource "vault_jwt_auth_backend_role" "api" {
     nomad_job_id = var.api_job_id
   }
 
-  token_policies = [
+  token_policies = concat([
     # The run index, thread store, audit sink, durability provider and change-request
     # store — every one of which the assembly migrates at start.
     vault_policy.harness_database.name,
@@ -235,7 +235,18 @@ resource "vault_jwt_auth_backend_role" "api" {
     # posture wired into one assembly and not the other would make surface parity a claim
     # about a test fixture.
     vault_policy.model_credential_read.name,
-  ]
+    # 044: THE FIRST WRITE CAPABILITY THIS SURFACE HAS EVER HELD against the trust fabric.
+    #
+    # Every grant above is read-only, and that was true of every role in this module until
+    # 042 gave a dispatched run its scratch namespace. This one is bounded the same way —
+    # by the RECORDS it names, not by withholding the verb — and what it enables is a person
+    # originating a governance change without holding estate credentials.
+    #
+    # The gated variant is attached alongside when a quorum is configured; with none, this
+    # grant applies changes directly and the console is required to disclose that.
+    vault_policy.authority_submit.name,
+    ],
+  local.control_groups_enabled ? [vault_policy.authority_submit_gated[0].name] : [])
   # Long-lived by design, like the mcp service, and still a TTL rather than none — the
   # difference between a re-issued identity and a standing credential.
   token_ttl  = 3600
