@@ -132,7 +132,10 @@ cannot reintroduce the wait-forever suspension.
 
 **Rationale**: The sweeper matches suspensions by product; today the trio would suspend on a
 tool name no product recovery ever matches (`toolset.py` states the consequence). The probe is
-keyed by product, which is what the checker probes.
+keyed by product, which is what the checker probes. **Adding the probe to `PLATFORM_PROBES`
+alone is insufficient** — `bindings.probes` is consumed only by pack loading, so the
+checker-facing table (`probes_for()`) must also learn platform products, or the probe is a
+dict entry nothing reads (analysis C3; task T004a).
 
 **Alternatives considered**: Making publishing failure terminal (clarification Q4 option B —
 rejected by the user's A); teaching the sweeper to match tool names (rejected: the sweeper's

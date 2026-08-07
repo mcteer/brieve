@@ -101,8 +101,12 @@ entrypoint-built registry, confirm it resolves; confirm the three refusal reason
       `src/surfaces/dispatch/entrypoint.py`: build `Trees` from the mounted `/subject` and the
       allocation workspace, construct `AuthoredArtifact`, call `register_authoring_tools`
       after `build_registry()`, and feed the widened vocabulary to the fabric
-      (`known_tools`/`known_actions`) — research R1. The trio joins the derived vocabulary
-      only in authoring runs; non-authoring runs are untouched (FR-001/002/003).
+      (`known_tools`/`known_actions`) — research R1. **The branch lands as an importable
+      construction helper** (e.g. `authoring_registry_for(role, trees, artifact)`) called by
+      the run function — the registry construction is inline today, and A1/A3/A4/A5 must drive
+      the construction rigged on and off, which a private inline block cannot offer. The trio
+      joins the derived vocabulary only in authoring runs; non-authoring runs are untouched
+      (FR-001/002/003).
 - [ ] T008 [US1] Extend the harness fixtures so hermetic rows can drive the entrypoint's
       authoring construction without Nomad (role env + tmp trees), in
       `tests/harness/` (new module beside `scripted_chooser.py`; declared, never a silent

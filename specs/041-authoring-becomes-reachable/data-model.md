@@ -59,7 +59,10 @@ note when the read was partial (FR-031). Assembled at compose time; exists only 
 - **New**: `PLATFORM_TOOL_PRODUCTS: dict[str, str]` — tool → product for platform tools
   (`open_proposal` → `github`). `dependency_products()` merges it with the pack-derived map
   (FR-029). A registered suspendable tool absent from both maps fails a unit row (FR-030).
-- `PLATFORM_PROBES` gains `github` (FR-029).
+- `PLATFORM_PROBES` gains `github`, **and the table the health checker consumes learns platform
+  products** — `probes_for()` merges platform product→probe pairs, because `bindings.probes`
+  is consumed only by pack loading and a probe in a dict nothing reads never fires (FR-029,
+  T004a).
 
 ### Trust fabric records (`infra/modules/trust-fabric/`)
 
@@ -70,8 +73,13 @@ note when the read was partial (FR-031). Assembled at compose time; exists only 
 
 ### Capability ledger (`tests/unit/capability_inventory.py`)
 
-`DELIBERATELY_UNREACHABLE` loses `read_subject`, `author_file`, `open_proposal` (FR-015). The
-sweep then requires all three reachable — which is the row that fails if registration regresses
+The trio **moves** from `DELIBERATELY_UNREACHABLE` to a new declared record
+`REACHABLE_PER_RUN: dict[str, Registrar]`, each entry naming its registrar (the dispatch
+entrypoint's analyzer / proposer branch) — it does not vanish (FR-015). The static sweep cannot
+observe per-run registration (`registered_capabilities()` reads `build_registry()` and
+`PLATFORM_HANDLERS` only), so a declaration carries it and `unaccounted()` treats declared
+names as accounted. A5 keeps the declaration honest by driving the registering construction:
+every declared name must actually register, and with the branch rigged off that check fails
 (FR-018 partner, US4).
 
 ### `AuthoringCredentials.token_for()` (`core/authoring/credential.py`)
