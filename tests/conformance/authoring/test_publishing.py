@@ -316,3 +316,35 @@ def test_a_failed_list_refuses_rather_than_risking_a_duplicate(tmp_path: Path) -
         _publisher(forge, source, tmp_path)()
 
     assert exc.value.reason_code == "forge_unreachable"
+
+
+def test_row_a17_a_publishing_suspension_carries_a_product(tmp_path: Path) -> None:
+    """A17 — the sweeper watches products, so a suspension must name one (FR-029/030).
+
+    Until 041 `open_proposal` mapped to nothing: `dependency_products` was built from pack
+    manifests and this is a platform tool. A run suspended on it carried a tool name that no
+    product recovery could ever match, and `toolset.py` already states the consequence — it
+    would have waited forever.
+    """
+    from surfaces.toolset import PLATFORM_TOOL_PRODUCTS, build_registry, dependency_products
+
+    _registry, loaded = build_registry(packs=["vault"])
+    mapped = dependency_products(loaded)
+
+    assert mapped["open_proposal"] == "github"
+    assert PLATFORM_TOOL_PRODUCTS["open_proposal"] == "github"
+
+
+def test_row_a17_the_product_is_probed_by_the_table_the_checker_reads(tmp_path: Path) -> None:
+    """The half that was actually missing: a probe in a dict nothing consults never fires."""
+    from surfaces.probes import probes_for
+    from surfaces.toolset import build_registry
+
+    _registry, loaded = build_registry(packs=["vault"])
+    table = probes_for(loaded)
+
+    assert "github" in table, (
+        "the health checker's product->probe table must carry `github`, or the dependency "
+        "gate denies open_proposal while the forge is up"
+    )
+    assert callable(table["github"])

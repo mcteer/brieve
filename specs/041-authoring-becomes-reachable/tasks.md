@@ -139,7 +139,7 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
       single-branch clone of `target_repository`, recorded `commit`, 512 MiB bound with the
       size in the refusal, reason codes `subject_unreachable` / `revision_missing` /
       `acquisition_refused` (FR-026/028, research R3/R4; data-model entity).
-- [ ] T013 [US2] Wire acquisition into the dispatcher in `src/surfaces/dispatch/nomad.py`
+- [X] T013 [US2] Wire acquisition into the dispatcher in `src/surfaces/dispatch/nomad.py`
       (`NomadDispatcher`): acquire after `AuthoringRequest.validate()` and before dispatch,
       pass the checkout as `NOMAD_META_subject_path`, run `resolve_subject_mount` against the
       produced path, delete the checkout at terminal state (FR-027; clone credential minted in
@@ -148,7 +148,7 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
 - [X] T014 [US2] Give the `analyzer` task its `args` in
       `infra/jobs/authoring-tier.nomad.hcl` — run the dispatch entrypoint with the env
       contract the jobspec already declares (FR-014).
-- [ ] T015 [US2] Resolve the `write` cell in the authoring branch of
+- [X] T015 [US2] Resolve the `write` cell in the authoring branch of
       `src/surfaces/dispatch/entrypoint.py` via `resolve_write_cell` feeding `_chooser_for`'s
       ordering (validate before build; no default on a missing binding) so 040's structured
       recordings supply `path`/`content` (FR-012, research R11).
@@ -170,7 +170,7 @@ the workspace, the read is recorded, the lens saw the content, task scope beat t
       ADR-0047's exact refusal. Add the earned cells to `model_matrix_cells` in
       `infra/modules/trust-fabric/`, apply, and re-seed the model credential after the apply
       (it clobbers the KV generation — known estate behaviour). FR-012a/b; research R6.
-- [ ] T020 [US2] [GATE:conformance] Rows A18 + A19 in
+- [X] T020 [US2] [GATE:conformance] Rows A18 + A19 in
       `tests/conformance/authoring/test_qualification_dispatch.py` (new file — 038's
       qualification file stays unedited): unqualified stops `unqualified_cell` through
       dispatch, never `provider_unavailable`; the bound cell names Sonnet 5 with ADR-0063
@@ -195,11 +195,11 @@ observably cannot publish; healthy handoff consumes no resume attempt.
       `gh pr create`; description assembled as model rationale + provenance block
       (correlation ID, consulted paths, digests, truncation note when partial). FR-020/021,
       FR-023a, FR-025, FR-031; research R9/R10.
-- [ ] T022 [US3] Route the description through containment before publish in
+- [X] T022 [US3] Route the description through containment before publish in
       `src/core/authoring/publish.py`: the rationale joins `scannable_text()`'s units and a
       `Finding` refuses via the existing `ContainmentRefused` path; the platform-authored
       provenance block is appended after the scan of the model half (FR-032, research R12).
-- [ ] T023 [US3] Add the `HARNESS_AUTHORING_ROLE=proposer` branch to
+- [X] T023 [US3] Add the `HARNESS_AUTHORING_ROLE=proposer` branch to
       `src/surfaces/dispatch/entrypoint.py`: `RUN_CONTINUE` path (already checked before the
       resume branch), `register_proposal_tool` with the publish handler and the observer,
       task-scoped to `open_proposal` (FR-008/009/010).
@@ -207,19 +207,19 @@ observably cannot publish; healthy handoff consumes no resume attempt.
       `CANNOT_DETERMINE` by querying the head branch — existing open PR → observed, absent →
       not performed; never a second proposal (FR-010, research R10; plugs into
       `core/observation` types).
-- [ ] T024a [US3] [GATE:no-secret-leak] Scrub an authoring run's kept model requests at
+- [X] T024a [US3] [GATE:no-secret-leak] Scrub an authoring run's kept model requests at
       terminal state (FR-033): the terminal path in `src/surfaces/dispatch/entrypoint.py`
       calls a scoped scrub on the durability provider (`src/core/durability/` — both
       providers), removing `author_file`-class argument payloads for the finished run. Safe by
       040's own design: resume reads arguments only for pending steps, and the request was
       left removable rather than load-bearing. Non-authoring runs untouched.
-- [ ] T024b [US3] [GATE:conformance] Row A22 in
+- [X] T024b [US3] [GATE:conformance] Row A22 in
       `tests/conformance/authoring/test_publishing.py` (hermetic) plus a durability leg in
       `tests/conformance/durability/test_authoring_requests_scrubbed.py` (new file): after
       terminal state no subject-derived bytes remain in either provider's request records —
       the in-memory provider passes for free, so the Postgres leg is the one that counts
       (040's M7 shape).
-- [ ] T025 [US3] Give the `proposer` task its `args` in
+- [X] T025 [US3] Give the `proposer` task its `args` in
       `infra/jobs/authoring-tier.nomad.hcl`, and settle research R8 in `infra/`: verify the
       task image carries pinned `git` and `gh`, add a derived pinned image if the base lacks
       them; the task start fails `tooling_missing` rather than installing at runtime (FR-014).
@@ -235,20 +235,20 @@ observably cannot publish; healthy handoff consumes no resume attempt.
       `tests/conformance/authoring/test_publishing.py`: planted secret and analysed-content
       span in the rationale each refuse publish; truncated-without-note still refuses compose
       through the production path.
-- [ ] T029 [US3] [GATE:conformance] Row A17 in
+- [X] T029 [US3] [GATE:conformance] Row A17 in
       `tests/conformance/authoring/test_publishing.py`: an `open_proposal` suspension carries
       product `github`, the sweeper's map resolves it, **and the probe is present in the
       table the health checker actually consumes** — not merely in `PLATFORM_PROBES`
       (depends T003/T004/T004a).
-- [ ] T030 [US3] [GATE:correlation] Row E1 (enclave-marked, fails-never-skips) in
+- [X] T030 [US3] [GATE:correlation] Row E1 (enclave-marked, fails-never-skips) in
       `tests/conformance/authoring/test_enclave_publish.py` (new file): clone → read → author
       → contain → checkpoint → continue → publish; real PR, digests match, description carries
       rationale + provenance, trail walkable under one correlation ID (FR-016/024, SC-002/009).
-- [ ] T031 [US3] Rows E2–E4 in `tests/conformance/authoring/test_enclave_publish.py`:
+- [X] T031 [US3] Rows E2–E4 in `tests/conformance/authoring/test_enclave_publish.py`:
       re-dispatch keeps the head-branch PR count at one; the analyzer's credential read fails
       for want of attested identity, observed in-allocation; the healthy handoff consumes no
       resume attempt and `RUN_RESUME` is unset on both tasks.
-- [ ] T032 [US3] Run the enclave lane end to end (named runner: Dan, driving the agent
+- [X] T032 [US3] Run the enclave lane end to end (named runner: Dan, driving the agent
       harness — recorded in the contract): `make dev-up`, seed the App key, dispatch, verify
       E1–E4 green, record the run in the implementation record. Requires the operator
       prerequisite (App installed on the target repository).
@@ -292,7 +292,7 @@ in the same task, and a person can merge what the agent proposed.
       `main`** — main moves during implementation, and this estate has already recorded what
       a wrong baseline reports: false parity. Record the command and result in the
       implementation record (FR-017).
-- [ ] T036 [US5] Row A21 verification: the four recording-driven suites and 008–012's
+- [X] T036 [US5] Row A21 verification: the four recording-driven suites and 008–012's
       fixture-tool lanes pass with zero edits — non-authoring vocabulary, resolution, and
       records unchanged (`make check && make conformance-hermetic`).
 
@@ -300,9 +300,9 @@ in the same task, and a person can merge what the agent proposed.
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T037 [P] Run `specs/041-authoring-becomes-reachable/quickstart.md` top to bottom as
+- [X] T037 [P] Run `specs/041-authoring-becomes-reachable/quickstart.md` top to bottom as
       written; fix drift in the doc, not by hand-waving the steps.
-- [ ] T038 Update `ROADMAP.md` in the implementation PR: 041's Shipped row; the
+- [X] T038 Update `ROADMAP.md` in the implementation PR: 041's Shipped row; the
       change-proposal workflow table's "author the changes" and "PR back" rows close; the
       trio's ledger note updates (the file's own landing rule).
 
@@ -394,17 +394,56 @@ already recorded what a wrong baseline reports — false parity.
 should always have had. And the fake-fabric scanner crashed on any `global` statement in the
 tests tree (`ast.Global.names` holds strings, not aliases) — a guard failing by falling over.
 
-## What has NOT run, and why
+## T019, and why it is the one task not done
 
-- **T019** (qualify and bind the `write` cell) — needs the live estate and a Sonnet 5 lane run.
-- **T030–T032** (E1–E4, the real proposal) — need the enclave *and* the operator prerequisite: a
-  GitHub App installed on a maintainer-owned repository with its key seeded at
-  `harness-authority/data/authoring/vcs-app`. The rows fail rather than skip when it is absent,
-  which is why they are not marked done.
-- **T013** (dispatcher wiring), **T015** (write-cell resolution in the entrypoint), **T020**,
-  **T022**'s provenance block, **T023** (proposer branch), **T024a/b** (the FR-033 scrub),
-  **T029**, **T036–T038** — buildable, not yet built.
+**41 of 42.** T019 asks for a **live** `write` cell, qualified through ADR-0063's mechanical
+scorer and bound in the estate. Everything around it ran: `make eval-authoring` passes (13
+rows), terraform is present, and the fixture-qualified terraform `write` cell 038 declared is
+in the dev estate.
 
-**The feature does not ship at this point**, and the tasks file said so before any code was
-written: *ship at the US5 checkpoint or not at all*. A registered analyzer whose proposer branch
-is unwired is 038's gap moved one layer, not closed.
+**What is missing is a property detector, and it does not exist.** `score_corpus` takes a
+`properties_of(task, artifact, contents) -> frozenset[str]` callable, and every implementation
+in this repository is a literal map inside a row (`properties_of=lambda t, _a, _c:
+properties[t.name]`). Qualifying a live model means having it author the five golden tasks and
+then **mechanically detecting** whether each artefact `reads_credentials_from_secret_store`,
+carries `no_literal_credential_in_source`, and gives the credential a lease.
+
+Writing that detector hastily is the one thing this feature must not do. It is the load-bearing
+half of the qualification: a lenient detector qualifies a model on a check that cannot fail,
+which is the shape ADR-0047 refuses and the reason `valid_but_wrong` exists in the corpus at
+all — `static_credential_lookalike` passes gate one and must fail gate two. Binding a live cell
+on a detector written in the last hour of a feature would be an unearned cell, which is exactly
+what this task's own text warns against.
+
+So the cell stays fixture-qualified, the gate stays honest, and the detector is named as its
+own piece of work.
+
+## The live eval lane is red on main, independent of this feature
+
+Measured twice on this branch and twice in a worktree at the merge-base `dbf5ce1`: identical
+failure sets. `vault-must-decline-001` answers where it must decline (subject prompt *and*
+answering path), the judge disagrees with a human REJECT on `seed-deny-002`, and the citation
+and estate cases fail. `LIVE_MODEL` is `anthropic/claude-sonnet@5`, correct per 032, so the
+configuration is right and the failures are content. Harness-protocol work, in the answering
+subsystem, and not 041's.
+
+## Implementation record — what ran
+
+**`make check`: 1280 passed.** **`make conformance-hermetic`: 528 passed** (the merge-blocking
+lane). Lint and mypy clean over 582 files. Authoring conformance: **141 rows**, of which 038's
+80 are unedited.
+
+**E1–E4 ran against a live forge — twice.** First by hand, proving the path; then as rows,
+which is the difference between "it happened once" and "it keeps happening". The row run opened
+`mcteer/brieve#177`, verified state, head branch, file set, provenance section and the absence
+of any credential on disk, then republished to prove idempotency (one proposal, `reused=true`)
+and observed it. 6 passed in 13.23s. The proposal and its branch were closed and deleted.
+
+**FR-017 verified from the merge-base**, not from `main`: only NEW files appear under
+`tests/conformance/authoring/`, and all seven of 038's row files report UNEDITED.
+
+**Findings the rows produced rather than the plan** are recorded in the ROADMAP's 041 row: the
+refusal discriminator's real location, the ceiling/task-scope collapse, two more unexecutable
+tiers in 037, `plan` and `apply` carrying the wait-forever shape, and three guards extended
+rather than worked around — including `core/authoring/credential.py` naming the substrate,
+caught by the repository's own product-blindness gate.

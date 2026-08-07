@@ -133,6 +133,20 @@ class DurabilityProvider(Protocol):
         """Intents with no result — exactly what resume must resolve by observation."""
         ...
 
+    def scrub_closed_arguments(self, run_id: str) -> int:
+        """Clear model-supplied arguments on this run's CLOSED brackets. Returns how many.
+
+        **Finished acts only, and 040 wrote down why.** Resume reads arguments for *pending*
+        steps, so clearing a closed bracket costs nothing and clearing an open one would make
+        that revival re-invoke with an empty request. The schema comment states the same bound;
+        this is the first caller to consume it.
+
+        Exists because 041's `author_file` puts a customer's file CONTENT in that column —
+        derived from a private repository, resting in the control plane. 040 deliberately left
+        the request removable rather than load-bearing, and this is what removes it.
+        """
+        ...
+
     def closed_intents(self, run_id: str) -> list[IntentRecord]:
         """Intents that DO have results — steps whose effect is recorded as complete.
 

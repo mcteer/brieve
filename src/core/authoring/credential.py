@@ -57,7 +57,7 @@ _APP_JWT_TTL = timedelta(minutes=9)
 _APP_JWT_BACKDATE = timedelta(seconds=60)
 
 
-class VaultReader(Protocol):
+class TrustStoreReader(Protocol):
     """Reads one path from the trust fabric under the caller's own attested identity.
 
     A *reader*, never a credential: `AuthoringCredentials` still accepts nothing that could
@@ -103,7 +103,7 @@ class AuthoringCredentials:
         self,
         *,
         identity: WorkloadIdentity,
-        reader: VaultReader | None = None,
+        reader: TrustStoreReader | None = None,
         app_key_path: str = DEFAULT_APP_KEY_PATH,
         ttl: timedelta = DEFAULT_TTL,
         api_root: str | None = None,
@@ -118,17 +118,21 @@ class AuthoringCredentials:
         )
         self._timeout = timeout
 
-    def _vault(self) -> VaultReader:
-        """The trust-fabric reader, built from this task's identity if none was supplied.
+    def _trust_store(self) -> TrustStoreReader:
+        """The trust-fabric reader, which a caller supplies.
 
-        Constructed lazily rather than in ``__init__`` so that merely *holding* an
-        `AuthoringCredentials` — which the analysing task does, to assert it cannot publish —
-        opens no connection and needs no fabric.
+        **Supplied rather than constructed, because `core` is product-blind.** An earlier draft
+        of this method imported the concrete trust-fabric client here and was caught by the
+        repository's own guard: naming the substrate in `core` is how product knowledge gets in,
+        and 038's record already lists one instance of it (`terraform_apply` hardcoded in a
+        hook). The surface that knows which fabric this deployment runs constructs the reader;
+        this module knows only that something can read a path.
         """
         if self._reader is None:
-            from core.durability.credentials import VaultDatabaseCredentials
-
-            self._reader = VaultDatabaseCredentials(identity=self._identity, role="agent-run")
+            raise CredentialUnavailableError(
+                "no trust-fabric reader was supplied; `core` does not know which fabric this "
+                "deployment runs, so the surface that does must pass one"
+            )
         return self._reader
 
     def available(self) -> bool:
@@ -149,10 +153,10 @@ class AuthoringCredentials:
 
         Returns the pair rather than caching it on the instance: the key is the long-lived
         secret in this whole path, and holding it as process state for the life of a task
-        widens the window in which a heap dump contains it. Reading it twice costs one Vault
+        widens the window in which a heap dump contains it. Reading it twice costs one trust-store
         round trip and is the cheaper mistake.
         """
-        data = self._vault().read_path(self._app_key_path)
+        data = self._trust_store().read_path(self._app_key_path)
         if not data:
             raise CredentialUnavailableError(
                 f"no App key at {self._app_key_path!r}; the authoring credential is "
@@ -275,6 +279,6 @@ __all__ = [
     "DEFAULT_TTL",
     "InstallationToken",
     "AuthoringCredentials",
-    "VaultReader",
+    "TrustStoreReader",
     "analysing_task_holds_no_credential",
 ]

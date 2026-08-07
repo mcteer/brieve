@@ -22,11 +22,13 @@ That does not weaken the opt-in property: registration makes a name *resolvable*
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from core.authoring.artifact import AuthoredArtifact
+from core.authoring.proposal import Proposal, ProposalState, ProposedFile
 from core.authoring.tool import (
     AUTHOR_FILE,
     OPEN_PROPOSAL,
@@ -140,7 +142,56 @@ __all__ = [
     "PROPOSER",
     "SUBJECT_MOUNT",
     "AuthoringRegistration",
+    "PROPOSAL_PAYLOAD_KEY",
+    "proposal_from_payload",
+    "proposal_payload",
     "authoring_registry_for",
     "authoring_role",
     "trees_for",
 ]
+
+
+#: The checkpoint payload key the analyzer writes and the proposer reads.
+#:
+#: The handoff carries the composed PROPOSAL rather than the workspace, because the publishing
+#: task has no subject mount and must not acquire one: it receives bytes that already passed
+#: containment. That is 038's central safety property, and this key is where it lives.
+PROPOSAL_PAYLOAD_KEY = "authoring_proposal"
+
+
+def proposal_payload(proposal: Proposal) -> dict[str, Any]:
+    """Serialise the proposal for the checkpoint the proposer will read.
+
+    Files carry their bodies: the publishing task cannot recompute them, having no subject.
+    That is a deliberate widening of what a checkpoint holds, bounded by the same rule the
+    trail keeps — this is the control plane, not the append-only store, and the run's terminal
+    scrub (FR-033) removes it.
+    """
+    return {
+        "target_repository": proposal.target_repository,
+        "branch": proposal.branch,
+        "task": proposal.task,
+        "rationale": proposal.rationale,
+        "disclosures": list(proposal.disclosures),
+        "provenance": list(proposal.provenance),
+        "state": str(proposal.state),
+        "files": [{"path": f.path, "body": f.body, "is_diff": f.is_diff} for f in proposal.files],
+    }
+
+
+def proposal_from_payload(payload: Mapping[str, Any]) -> Proposal:
+    """Rebuild what the analyzer composed. Raises KeyError when the handoff is absent."""
+    raw = payload[PROPOSAL_PAYLOAD_KEY]
+    return Proposal(
+        target_repository=str(raw["target_repository"]),
+        branch=str(raw["branch"]),
+        task=str(raw["task"]),
+        files=[
+            ProposedFile(path=str(f["path"]), body=str(f["body"]), is_diff=bool(f["is_diff"]))
+            for f in raw.get("files", [])
+        ],
+        rationale=str(raw.get("rationale", "")),
+        disclosures=[str(d) for d in raw.get("disclosures", [])],
+        provenance=[str(p) for p in raw.get("provenance", [])],
+        state=ProposalState(str(raw.get("state", ProposalState.COMPOSED))),
+    )

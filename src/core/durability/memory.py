@@ -74,6 +74,22 @@ class InMemoryDurabilityProvider:
             if rid == run_id and (rid, key) not in self._results
         ]
 
+    def scrub_closed_arguments(self, run_id: str) -> int:
+        """Clear arguments on closed brackets. See the protocol for why closed only.
+
+        **The in-memory provider round-trips this for free**, which is exactly why 040's M7
+        exists: a row proven here says nothing about the SQL. The Postgres leg is the one that
+        counts, and the conformance row runs both.
+        """
+        scrubbed = 0
+        for key, record in list(self._intents.items()):
+            if key[0] != run_id or key not in self._results:
+                continue
+            if record.arguments is not None:
+                self._intents[key] = record.model_copy(update={"arguments": None})
+                scrubbed += 1
+        return scrubbed
+
     def closed_intents(self, run_id: str) -> list[IntentRecord]:
         return [
             record
