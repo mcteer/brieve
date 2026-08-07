@@ -73,7 +73,6 @@ def _matrix() -> dict[str, Any]:
 
 def _config(**over: Any) -> ConsoleConfig:
     defaults: dict[str, Any] = {
-        "read_binding": lambda: {"schema_version": 1, "guidance_cell": f"vault:{MODEL}:ask"},
         "read_matrix": _matrix,
         "read_versioned": lambda path: None if path == CONNECTIONS_PATH else None,
         "quorum_configured": False,

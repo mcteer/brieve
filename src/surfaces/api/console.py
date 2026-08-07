@@ -49,6 +49,10 @@ ADMIN_ROLE = "admin"
 #: console labels it as such rather than implying a consumer it does not have (FR-022).
 CONNECTIONS_PATH = "harness-authority/data/product-connections"
 
+#: The ask binding, read WITH its metadata. `AskAuthority.read_binding_record` unwraps to the
+#: secret alone, which loses the version a CAS guard needs and the `set_by` provenance carries.
+ASK_BINDING_PATH = "harness-authority/data/ask-bindings"
+
 #: What a connection record may contain. **Locations only** — there is no field here a
 #: credential could be written into, which is FR-018b enforced by vocabulary rather than by
 #: a filter somebody has to remember to apply.
@@ -80,8 +84,13 @@ class ConsoleConfig:
     fabric, tests supply dictionaries, and neither this module nor its rows know which.
     """
 
-    read_binding: Any
+    #: The matrix, which `AskAuthority` already exposes unwrapped — a resolver wants the
+    #: cells, not their metadata.
     read_matrix: Any
+    #: Every OTHER record, **with its KV metadata**. The console needs the version for a CAS
+    #: guard and `set_by` for provenance, and both live in metadata that an unwrapping reader
+    #: discards. One reader for all of them, so no record's provenance depends on which
+    #: accessor happened to be used.
     read_versioned: Any
     #: Whether a quorum is configured. Decides whether an applied change is *approved* or
     #: merely *ungated* — FR-007's disclosure, and the difference between a development
@@ -127,14 +136,29 @@ def read_configuration(config: ConsoleConfig) -> dict[str, Any]:
     posture: dict[str, Any] = {}
 
     try:
-        binding_record = config.read_binding()
-        binding = parse_ask_binding_record(binding_record)
+        # **`read_versioned`, not `read_binding`** — and this was a real defect, not a
+        # preference. `read_ask_binding` UNWRAPS the KV record to the secret alone, which is
+        # right for a resolver that wants a binding and wrong here: it discards the metadata,
+        # so the version would always have been `None` and the CAS guard would have guarded
+        # nothing. `read_versioned` exists for exactly this distinction — 027 added it because
+        # a credential's rotation generation is the fact the trail carries — and provenance is
+        # the same shape of fact one record over.
+        binding_record = config.read_versioned(ASK_BINDING_PATH)
+        binding = parse_ask_binding_record(_kv_body(binding_record))
         posture["bindings"] = {
             "guidance_cell": binding.guidance_cell,
             "estate_cell": binding.estate_cell,
             "relevance_cell": binding.relevance_cell,
             "relevance_enabled": binding.relevance_enabled,
             "version": _version_of(binding_record),
+            # WHO WROTE IT LAST (FR-019/US5), read from the record itself.
+            #
+            # The console stamps `set_by` on every change; a record written by an estate apply
+            # carries none. So "last set by" needs no second store to consult — and no second
+            # store means no two answers that disagree exactly when somebody needs to know
+            # which writer won. An estate apply overwriting a console change is visible as a
+            # version bump with the field gone.
+            "set_by": _kv_body(binding_record).get("set_by", "") or "an estate apply",
         }
     except Exception:  # noqa: BLE001 — any read fault renders unavailable, never empty
         posture["bindings"] = {"unavailable": True}
@@ -155,7 +179,7 @@ def read_configuration(config: ConsoleConfig) -> dict[str, Any]:
         posture["connections"] = {
             "products": {k: v for k, v in body.items() if k in CONNECTION_FIELDS},
             "version": _version_of(record),
-            "set_by": body.get("set_by", ""),
+            "set_by": body.get("set_by", "") or "an estate apply",
             # FR-022's honest middle: the record exists and nothing consumes it yet. Saying
             # so beats both silence and implying a consumer that does not exist.
             "consumed_by": "not yet consumed by dispatched runs",
@@ -332,6 +356,33 @@ def build_router(*, config: ConsoleConfig, submitter: Any) -> APIRouter:
             payload={"records": sorted(posture), "surface": "console"},
         )
         return posture
+
+    @router.post("/connections/verify")
+    def verify_connection(subject: SubjectDep, audit: AuditDep) -> dict[str, Any]:
+        """Ask each configured product whether it is there. **A separate act** (FR-018c).
+
+        Verification is not part of a change's outcome and must never be folded into one: a
+        connection can be perfectly well-governed and simply wrong, which is the failure mode
+        a binding does not have. "The fabric accepted it" and "the product answered" are two
+        facts, and an interface that reports the first as the second has told the
+        administrator the opposite of what happened.
+        """
+        require_admin(subject, audit)
+        posture = read_configuration(config)
+        connections = posture.get("connections") or {}
+        products = connections.get("products") or {} if isinstance(connections, dict) else {}
+
+        results = {
+            product: probe_connection(product, str((fields or {}).get("address", "")))
+            for product, fields in products.items()
+        }
+        _record_console_event(
+            audit,
+            subject,
+            event=AuditEventType.RECORD_READ,
+            payload={"surface": "console", "records": ["connection-verification"]},
+        )
+        return {"verification": results}
 
     @router.post("/changes")
     def request_change(body: ChangeRequest, subject: SubjectDep, audit: AuditDep) -> Any:

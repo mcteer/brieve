@@ -208,7 +208,6 @@ def build() -> object:
         # write's outcome would mean the first change of the day teaches the console what
         # estate it is in. An operator states it.
         console_config=ConsoleConfig(
-            read_binding=fabric.read_ask_binding,
             read_matrix=fabric.read_matrix,
             read_versioned=fabric.read_versioned,
             quorum_configured=os.environ.get("HARNESS_QUORUM_CONFIGURED", "").strip().lower()

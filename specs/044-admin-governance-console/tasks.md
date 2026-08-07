@@ -176,7 +176,7 @@ administrator decided. Re-enable; the next ask judges. No restart.
 unreachable — `unreachable`, never "applied and working"; try to enter a credential — no
 field will take one.
 
-- [ ] T014 [US2] `ProductConnection` in `src/surfaces/api/console.py`, beside its only
+- [X] T014 [US2] `ProductConnection` in `src/surfaces/api/console.py`, beside its only
       consumers (R5 — the probe and the display): the record parser (product ∈
       {tfe, vault}, locations only — the vocabulary has no credential field, FR-018b), the
       reachability probe (stdlib urllib, unauthenticated health endpoints, R5), and the
@@ -187,7 +187,7 @@ field will take one.
       unreachable);
       the console labels the record "not yet consumed by dispatched runs" (R5's honest
       middle, FR-022).
-- [ ] T015 [US2] [GATE:conformance] Rows **C23–C25** in
+- [X] T015 [US2] [GATE:conformance] Rows **C23–C25** in
       `tests/conformance/console/test_console_connections.py`: same three-outcome path
       (C23), accepted-but-unreachable renders `unreachable` and never folds into applied
       (C24), [GATE:no-secret-leak] the parser rejects fields outside the location
@@ -202,7 +202,7 @@ field will take one.
 **Independent Test**: change a value in the console; apply the estate; the outcome is
 visible, and provenance says who wrote last.
 
-- [ ] T016 [US5] Provenance through the read path: the console writes `set_by:
+- [X] T016 [US5] Provenance through the read path: the console writes `set_by:
       console/<subject>` into every record payload (T009 carries it; this task renders it) —
       "last set by" readable from the record itself in `settings.html` and the read payload;
       rows in `tests/conformance/console/test_console_provenance.py`: a Terraform-shaped

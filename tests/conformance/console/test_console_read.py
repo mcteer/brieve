@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from surfaces.api.console import CONNECTIONS_PATH, ConsoleConfig
+from surfaces.api.console import ASK_BINDING_PATH, CONNECTIONS_PATH, ConsoleConfig
 from tests.harness.api_fixtures import surface_under_test
 
 MODEL = "anthropic/claude-sonnet@5"
@@ -70,14 +70,28 @@ def _connections() -> dict[str, Any]:
     }
 
 
+def _wrapped(body: dict[str, Any], version: int = 3) -> dict[str, Any]:
+    """The KV v2 shape the fabric returns: data wrapping data, plus metadata."""
+    return {"data": {"data": body, "metadata": {"version": version}}}
+
+
+def _read_versioned(path: str) -> dict[str, Any] | None:
+    """ONE reader, keyed by path — the shape the console takes, so a row cannot supply a
+    record through a path production does not use."""
+    if path == ASK_BINDING_PATH:
+        return _wrapped(_binding())
+    if path == CONNECTIONS_PATH:
+        return _connections()
+    return None
+
+
 def _config(**over: Any) -> ConsoleConfig:
     defaults: dict[str, Any] = {
-        "read_binding": lambda: _binding(),
         "read_matrix": _matrix,
-        "read_versioned": lambda path: _connections() if path == CONNECTIONS_PATH else None,
+        "read_versioned": _read_versioned,
         "quorum_configured": False,
     }
-    return ConsoleConfig(**{**defaults, "quorum_configured": False, **over})
+    return ConsoleConfig(**{**defaults, **over})
 
 
 def _surface(**over: Any) -> Any:
@@ -136,10 +150,12 @@ def test_row_c10_an_unreadable_record_is_unavailable_not_empty() -> None:
     taking the console down would make a small gap look like an outage.
     """
 
-    def _down() -> dict[str, Any]:
-        raise ConnectionError("vault unreachable")
+    def _down(path: str) -> dict[str, Any]:
+        if path == ASK_BINDING_PATH:
+            raise ConnectionError("vault unreachable")
+        return _connections()
 
-    surface = _surface(read_binding=_down)
+    surface = _surface(read_versioned=_down)
 
     posture = (
         TestClient(surface.app)
