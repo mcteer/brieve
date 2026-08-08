@@ -77,6 +77,27 @@
     {% endif %}
   {% endif %}
 
+  {% if outcome %}
+    {#
+      WHICH OF THE THREE THINGS THE FABRIC DID (044's FR-006), rendered rather than swallowed.
+      A page that redirected on success would collapse "applied" and "awaiting approval" into
+      each other, and an administrator who read the second as the first would believe a change
+      was in force when it was not.
+    #}
+    <p role="status" class="notice">
+      {% if outcome.pending %}
+        <strong>{{ outcome.operation }} {{ outcome.source }} is awaiting approval.</strong>
+        It is NOT in force.
+      {% elif outcome.ok %}
+        <strong>{{ outcome.operation }} {{ outcome.source }}: applied.</strong>
+        {{ outcome.message }}
+      {% else %}
+        <strong>{{ outcome.operation }} {{ outcome.source }} was refused.</strong>
+        {{ outcome.message }}
+      {% endif %}
+    </p>
+  {% endif %}
+
   <h2>Endorsed sources</h2>
   {#
     045. The customer's own documents, and what the platform may cite from them.
@@ -140,6 +161,17 @@
                 <form method="post" action="/settings/endorsed/{{ name }}/review">
                   <button type="submit">Review changes to {{ name }}</button>
                 </form>
+                <form method="post" action="/settings/endorsed/{{ name }}/withdraw">
+                  <button type="submit">Withdraw {{ name }}</button>
+                </form>
+              {% else %}
+                <form method="post" action="/settings/endorsed">
+                  <input type="hidden" name="source" value="{{ name }}">
+                  {# No location: re-endorsing keeps the one already recorded, and keeps the
+                     adopted version too, so restoring trust does not cost the ground every
+                     run record names. #}
+                  <button type="submit">Re-endorse {{ name }}</button>
+                </form>
               {% endif %}
             </td>
           </tr>
@@ -156,6 +188,37 @@
       endorsed it, and that a citation resolves to the version the answer actually rested on.
     </p>
   {% endif %}
+
+  <h3>Endorse a source</h3>
+  {#
+    Two fields, because an endorsement is a location and a name. **There is nowhere here to
+    put a credential** — that is the vocabulary doing the work rather than a filter somebody
+    has to remember to apply, and a private source's material stays trust-store material
+    referenced per sync.
+
+    WHO endorsed and WHEN are not fields: the platform takes them from the signed-in subject.
+    An endorsement whose author could be typed by whoever is editing would be a claim rather
+    than a trust statement.
+  #}
+  <form method="post" action="/settings/endorsed" class="endorse">
+    <p>
+      <label for="endorse-source">Name</label>
+      <input id="endorse-source" name="source" required
+             aria-describedby="endorse-source-help">
+      <span id="endorse-source-help" class="meta">
+        Used in every citation into this source, as <code>/endorsed/&lt;name&gt;/…</code>.
+      </span>
+    </p>
+    <p>
+      <label for="endorse-location">Location</label>
+      <input id="endorse-location" name="location" required
+             aria-describedby="endorse-location-help">
+      <span id="endorse-location-help" class="meta">
+        Where the documents live. A location, never a credential.
+      </span>
+    </p>
+    <button type="submit">Endorse this source</button>
+  </form>
 
 {% endif %}
 {% endblock %}

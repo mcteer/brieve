@@ -130,6 +130,185 @@ def test_the_navigation_links_nothing_that_is_not_a_page() -> None:
     assert not dangling, f"the navigation links {dangling}, which the portal does not serve"
 
 
+def _console_forms() -> list[str]:
+    """Every `<form>` on the console and its review page, as whole blocks.
+
+    **Whole blocks rather than actions**, and that was a correction. The first version
+    collected action attributes alone, and could not tell the endorse form (`/settings/endorsed`,
+    with a location) from the re-endorse control on a withdrawn source (`/settings/endorsed`,
+    without one) — so deleting the endorse form left the row green. A gate that cannot fail is
+    the thing this estate refuses, and it took removing the form to find out.
+
+    Rendered rather than grepped, for the reason `_nav_targets` is: a control inside a comment
+    or behind a condition that never fires is not a control.
+    """
+    from fastapi.templating import Jinja2Templates
+
+    from surfaces.portal.app import TEMPLATES
+
+    templates = Jinja2Templates(directory=str(TEMPLATES))
+    forms: list[str] = []
+    for name, context in (
+        ("settings.html", {"posture": _POSTURE, "reachable": True, "refused": False}),
+        (
+            "endorsed_review.html",
+            {
+                "source": "acme",
+                "review": _REVIEW,
+                "reachable": True,
+                "refused": False,
+                "failed": False,
+                "failure": "",
+            },
+        ),
+    ):
+        body = templates.get_template(name).render(request=_FakeRequest(), **context)
+        forms.extend(re.findall(r"<form\b.*?</form>", body, re.S))
+    return forms
+
+
+def _form_posting_to(action: str, *, carrying: str = "") -> str | None:
+    """The form for one operation, identified by where it posts and what it carries.
+
+    `carrying` is what makes two forms with the same action distinguishable — an endorsement
+    of a NEW source needs a location; restoring a withdrawn one deliberately does not, because
+    re-endorsing keeps the location and the adopted version already recorded.
+    """
+    for form in _console_forms():
+        if f'action="{action}"' not in form:
+            continue
+        if carrying and f'name="{carrying}"' not in form:
+            continue
+        return form
+    return None
+
+
+class _FakeRequest:
+    """Enough of a request for the templates to render: they read `url.path` and nothing else."""
+
+    class _Url:
+        path = "/settings"
+
+    url = _Url()
+
+
+#: A console posture with one endorsed source and one withdrawn one, so the row sees the
+#: controls that only appear in each state. A fixture showing one state would assert nothing
+#: about the other, which is how the re-endorse control could go missing unnoticed.
+_POSTURE = {
+    "gating": "ungated",
+    "bindings": {"unavailable": True},
+    "qualified_cells": {"unavailable": True},
+    "connections": {"unavailable": True},
+    "endorsed_sources": {
+        "sources": {
+            "acme": {
+                "location": "https://git.example.com/acme",
+                "endorsed_by": "dan",
+                "endorsed_at": "",
+                "adopted_version": "v-one",
+                "adopted_by": "dan",
+                "adopted_at": "",
+                "withdrawn": False,
+                "citable": True,
+            },
+            "retired": {
+                "location": "https://git.example.com/old",
+                "endorsed_by": "dan",
+                "endorsed_at": "",
+                "adopted_version": "",
+                "adopted_by": "",
+                "adopted_at": "",
+                "withdrawn": True,
+                "citable": False,
+            },
+        },
+        "version": 1,
+        "set_by": "console/dan",
+        "consumed_by": "citation resolution, at the adopted version",
+    },
+}
+
+_REVIEW = {
+    "candidate_version": "v-two",
+    "adopted_version": "v-one",
+    "upstream_tip": "abc",
+    "added": [],
+    "removed": [],
+    "common": [],
+    "uncitable": [],
+    "in_force": "nothing has changed; adopting is a separate act",
+}
+
+
+def test_every_console_operation_has_a_control() -> None:
+    """**The gap the navigation row could not see, one level in.**
+
+    045 shipped endorse, withdraw and adopt as API routes and a console that could only read.
+    The one act the feature is named for could not be performed from the interface, and the
+    review page said *"adopting is a separate act"* while offering no way to do it.
+
+    The navigation row checks that pages are reachable. This checks that the operations on them
+    are — because "built and unreachable" has two shapes and the first gate only saw one.
+    """
+    for operation, action, carrying in (
+        ("endorse a new source", "/settings/endorsed", "location"),
+        # Withdraw is offered on the source that is still trusted, not on the one already
+        # withdrawn — which is why the fixture carries one of each.
+        ("withdraw", "/settings/endorsed/acme/withdraw", ""),
+        ("adopt", "/settings/endorsed/acme/adopt", "version_id"),
+        ("review", "/settings/endorsed/acme/review", ""),
+    ):
+        assert _form_posting_to(action, carrying=carrying) is not None, (
+            f"the console exposes no control to {operation}. The API route exists; a person "
+            f"cannot reach it. That is the same defect as an unlinked page, one level in."
+        )
+
+
+def test_the_adopt_control_carries_the_version_that_was_reviewed() -> None:
+    """Not "the latest" — what the administrator actually looked at.
+
+    The source can move between the review and the click, and adopting something other than
+    what was just read is the failure the review step exists to prevent.
+    """
+    form = _form_posting_to("/settings/endorsed/acme/adopt", carrying="version_id")
+
+    assert form is not None
+    assert 'value="v-two"' in form, (
+        "the adopt control does not carry the reviewed candidate, so what gets adopted is "
+        "whatever the server resolves at click time"
+    )
+
+
+def test_a_withdrawn_source_can_be_re_endorsed_from_the_page() -> None:
+    """Withdrawal is reversible and the interface has to say so.
+
+    Without a control, restoring trust would mean deleting and recreating the source — which
+    loses the adopted version, and with it every run record's ability to name ground that
+    still exists. The control carries a source and NO location, which is what distinguishes it
+    from endorsing something new.
+    """
+    restore = _form_posting_to("/settings/endorsed", carrying="source")
+
+    assert restore is not None, "a withdrawn source offers no way back"
+    assert 'value="retired"' in restore
+
+
+def test_there_is_nowhere_on_this_page_to_type_a_credential() -> None:
+    """FR-018b's posture, asserted at the interface rather than only in the record parser.
+
+    The vocabulary has no field a secret could go in; this is the other end of that — no input
+    invites one. A form that asked for a token would make the closed set irrelevant.
+    """
+    for form in _console_forms():
+        for forbidden in ("password", "token", "secret", "credential", "api_key"):
+            assert f'name="{forbidden}"' not in form.lower(), (
+                f"the console asks for {forbidden!r}. A source's material is trust-store "
+                f"material referenced per sync, never entered here."
+            )
+        assert 'type="password"' not in form
+
+
 def test_settings_is_linked() -> None:
     """Named explicitly as well as covered by the sweep above.
 
