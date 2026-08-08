@@ -238,6 +238,18 @@ def build() -> object:
             # that looks approved, which is the one failure mode this whole mechanism
             # exists to prevent.
             controlled_path=_required("AUTHORITY_CONTROLLED_PATH"),
+            # **HOW IT AUTHENTICATES**, and until this line it did not.
+            #
+            # 044 granted `authority_submit` on the records the console may write and attached
+            # it to this role. Nothing exchanged the workload identity for a token, so every
+            # request went to Vault with no `X-Vault-Token` header, Vault answered 403, and the
+            # console rendered "the trust fabric denied this change" — a governance decision
+            # nobody made. Found by an administrator endorsing a source and asking whether
+            # anything had happened.
+            #
+            # `credentials.login` per submit, not a token held at assembly: the same brokered
+            # identity every other collaborator here uses, and nothing standing between calls.
+            token_source=credentials.login,
         ),
         run_index=run_index,
         durability=PostgresDurabilityProvider(credentials=credentials),

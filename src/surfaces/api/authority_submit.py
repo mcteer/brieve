@@ -66,6 +66,21 @@ class VaultAuthoritySubmitter:
         vault_addr: str | None = None,
         controlled_path: str,
         token: str | None = None,
+        #: How this surface authenticates to the fabric, called **per submit**.
+        #:
+        #: **The submitter had no way to authenticate at all until this existed**, and the
+        #: consequence was invisible in exactly the way 044 was written to prevent. That
+        #: feature gave the mechanism a policy and attached it to the `api` role — its own PR
+        #: said "the mechanism had no principal" and considered the matter closed — but nothing
+        #: exchanged the workload identity for a token and handed it here. `_post` omits the
+        #: header when there is no token, so Vault answered 403 and the console reported the
+        #: change as REFUSED BY THE FABRIC. A governance denial and "we never authenticated"
+        #: are indistinguishable to the person reading the page, and one of them is a decision.
+        #:
+        #: A callable rather than a token, because a token obtained once would be held for the
+        #: life of the process — the standing credential Principle IV forbids, relocated rather
+        #: than removed. Same shape `ask_providers` takes for the same reason.
+        token_source: Any = None,
         cacert: str | None = None,
         timeout: float = 10.0,
     ) -> None:
@@ -74,6 +89,7 @@ class VaultAuthoritySubmitter:
         )
         self._path = controlled_path.strip("/")
         self._token = token
+        self._token_source = token_source
         self._timeout = timeout
         # Explicit first, environment second. The control plane serves TLS from its own
         # CA, which is in no system trust store — and urllib does not read VAULT_CACERT,
@@ -203,13 +219,38 @@ class VaultAuthoritySubmitter:
             )
         return ChangeOutcome(state="applied")
 
+    def _authenticate(self) -> str:
+        """The token for THIS submit, or empty when the surface holds no way to get one.
+
+        An explicit token wins — that is what the conformance rows supply. Otherwise the
+        source is called fresh, so nothing is held between requests.
+
+        A failure here deliberately raises `AuthoritySubmitUnavailable` rather than falling
+        through to an unauthenticated write: an unauthenticated write is answered 403, and 403
+        is how the fabric says *no*. Reporting "the trust fabric denied your change" when the
+        truth is "we could not log in" sends an administrator to find an approver who was never
+        asked.
+        """
+        if self._token:
+            return self._token
+        if self._token_source is None:
+            return ""
+        try:
+            return str(self._token_source())
+        except Exception as unavailable:  # noqa: BLE001
+            raise AuthoritySubmitUnavailable(
+                f"this surface could not authenticate to the trust fabric, so the change was "
+                f"never submitted: {type(unavailable).__name__}"
+            ) from unavailable
+
     def _post(self, payload: dict[str, Any], path: str) -> tuple[int, dict[str, Any]]:
+        token = self._authenticate()
         request = urllib.request.Request(  # noqa: S310 — fixed scheme, operator-supplied addr
             f"{self._addr}/v1/{path}",
             data=json.dumps(payload).encode(),
             headers={
                 "Content-Type": "application/json",
-                **({"X-Vault-Token": self._token} if self._token else {}),
+                **({"X-Vault-Token": token} if token else {}),
             },
             method="POST",
         )
