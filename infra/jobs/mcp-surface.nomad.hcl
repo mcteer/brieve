@@ -11,6 +11,11 @@
 # READ THIS JOBSPEC FOR WHAT IS ABSENT: no token, no password, no DSN, no mounted secret.
 # The service presents its workload identity and receives what it is entitled to.
 
+variable "default_tenant" {
+  type        = string
+  description = "The tenant every record written by this surface is filed under. Required: `resolve_tenant` refuses rather than inventing one, because a default tenant chosen by accident is still a tenant."
+}
+
 variable "vault_addr" {
   type        = string
   default     = "https://host.docker.internal:8200"
@@ -226,6 +231,19 @@ job "mcp-surface" {
       }
 
       env {
+        # THE TENANT EVERY RECORD IS FILED UNDER, and it reached no jobspec until 045's
+        # endorsed content made the omission visible.
+        #
+        # `.env` has set this since the estate existed and nothing passed it through, so every
+        # surface read an empty string. It was invisible because `resolve_tenant` is normally
+        # reached WITH a subject claim — the env is the fallback for paths that have no surface
+        # — and because all three surfaces were empty in the same way, so they agreed.
+        #
+        # Accidental agreement, and the failure it hides is silent: set it on one surface and
+        # not another, and the drift probe queries for an adopted version under `tenant-local`,
+        # finds none, and reports permanent drift on every endorsed source while the console
+        # writes under "".
+        HARNESS_DEFAULT_TENANT = var.default_tenant
         VAULT_ADDR   = var.vault_addr
         VAULT_CACERT = var.vault_cacert
         NOMAD_ADDR   = var.nomad_addr

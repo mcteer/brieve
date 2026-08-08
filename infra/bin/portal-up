@@ -53,6 +53,17 @@ env_val() {
 
 AUTH0_DOMAIN="$(env_val AUTH0_DOMAIN)"
 
+# THE TENANT EVERY RECORD IS FILED UNDER. Read here and passed to the jobspec, because
+# `resolve_tenant` REFUSES rather than defaulting — "a default tenant chosen by accident is
+# still a tenant, and silently writing records under an invented value would put them
+# somewhere nobody would think to look for them."
+#
+# `.env` has carried this since the estate existed and no submitter passed it, so every served
+# surface read an empty string until 045's endorsed content made the omission visible.
+HARNESS_DEFAULT_TENANT="$(env_val HARNESS_DEFAULT_TENANT)"
+[ -n "$HARNESS_DEFAULT_TENANT" ] \
+  || die "HARNESS_DEFAULT_TENANT is not set in .env. Every record the platform writes is filed under a tenant, and the surfaces refuse to start rather than invent one."
+
 # `DEV_IDP=1` asks for the double even when `.env` names a real provider — the flag
 # `mcp-surface-up` has always honoured, and which this script silently ignored. Ignoring it
 # is worse than rejecting it: the operator gets a real sign-in page, concludes the flag is
@@ -162,6 +173,7 @@ nomad job run -detach -var="repo=$REPO" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \
   -var="oidc_tenant_claim=${OIDC_TENANT_CLAIM}" \
   -var="harness_started_by=${HARNESS_STARTED_BY}" \
+  -var="default_tenant=${HARNESS_DEFAULT_TENANT}" \
   "$REPO/infra/jobs/api.nomad.hcl" >/dev/null \
   && ok "api submitted (the northbound surface, served for the first time in 012)" \
   || die "could not submit the api service"

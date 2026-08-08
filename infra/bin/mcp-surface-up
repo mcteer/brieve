@@ -41,6 +41,17 @@ say "MCP surface"
 # The defaults are `enclave-up`'s own, copied rather than invented: if it moves the CA, this
 # is wrong in the same direction, which is easier to find than being wrong in a new one.
 VAULT_ADDR_VAL="$(env_val VAULT_ADDR)"; VAULT_ADDR_VAL="${VAULT_ADDR_VAL:-https://127.0.0.1:8200}"
+
+# THE TENANT EVERY RECORD IS FILED UNDER. Read here and passed to the jobspec, because
+# `resolve_tenant` REFUSES rather than defaulting — "a default tenant chosen by accident is
+# still a tenant, and silently writing records under an invented value would put them
+# somewhere nobody would think to look for them."
+#
+# `.env` has carried this since the estate existed and no submitter passed it, so every served
+# surface read an empty string until 045's endorsed content made the omission visible.
+HARNESS_DEFAULT_TENANT="$(env_val HARNESS_DEFAULT_TENANT)"
+[ -n "$HARNESS_DEFAULT_TENANT" ] \
+  || die "HARNESS_DEFAULT_TENANT is not set in .env. Every record the platform writes is filed under a tenant, and the surfaces refuse to start rather than invent one."
 VAULT_CACERT_VAL="$(env_val VAULT_CACERT)"; VAULT_CACERT_VAL="${VAULT_CACERT_VAL:-$REPO/.enclave/ca.pem}"
 
 # A DEVELOPER GETS A PROVIDER WITHOUT KNOWING ONE EXISTS (023 FR-003a).
@@ -145,6 +156,7 @@ nomad job run -detach -var="repo=$REPO" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \
   -var="oidc_tenant_claim=${OIDC_TENANT_CLAIM}" \
   -var="harness_started_by=${HARNESS_STARTED_BY}" \
+  -var="default_tenant=${HARNESS_DEFAULT_TENANT}" \
   "$REPO/infra/jobs/mcp-surface.nomad.hcl" >/dev/null \
   && ok "mcp-surface submitted (bridge mode; the port is published to this machine)" \
   || die "could not submit the mcp-surface job"

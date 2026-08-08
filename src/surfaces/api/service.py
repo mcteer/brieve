@@ -34,6 +34,7 @@ from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCred
 from core.durability.postgres import PostgresDurabilityProvider
 from core.endorsed_sync import git_available, sync_source
 from core.identity.mappings_store import VaultClaimMappings
+from core.identity.tenant import resolve_tenant
 from core.identity.types import SubjectKind
 from core.runs.changes import PostgresChangeRequestStore, VaultChangeStatus
 from core.runs.index import PostgresRunIndex
@@ -173,7 +174,7 @@ def build() -> object:
         return resolve_endorsed(
             read_sources=lambda: _kv_data(fabric.read_versioned(ENDORSED_SOURCES_PATH)),
             store=endorsed_store,
-            tenant_id=os.environ.get("HARNESS_DEFAULT_TENANT", "").strip(),
+            tenant_id=resolve_tenant(),
         )
 
     # The approved claim-to-role mappings, read back from the same gated path the submit
@@ -286,7 +287,7 @@ def build() -> object:
             in {"1", "true", "yes"},
             endorsed_store=endorsed_store,
             sync_source=sync_source,
-            tenant_id=os.environ.get("HARNESS_DEFAULT_TENANT", "").strip(),
+            tenant_id=resolve_tenant(),
         ),
         endorsed_reader=endorsed_reader,
         # 043's RELEVANCE JUDGE, wired on exactly the ask provider's terms.

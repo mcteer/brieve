@@ -49,6 +49,7 @@ from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCred
 from core.durability.postgres import PostgresDurabilityProvider
 from core.durability.sweeper import Sweeper
 from core.hooks.suspension import TRUST_FABRIC_DEPENDENCY
+from core.identity.tenant import resolve_tenant
 from core.registry.memory import ToolRegistry
 from surfaces.dispatch.nomad import DEFAULT_NOMAD_ADDR, NomadDispatcher
 from surfaces.dispatch.types import RunDispatcher
@@ -518,17 +519,23 @@ def main() -> int:
         inner = data.get("data", data) if isinstance(data, dict) else {}
         return inner if isinstance(inner, dict) else {}
 
+    # **`resolve_tenant()` rather than reading the environment**, and the difference is the
+    # whole of this change. That function refuses when no tenant is configured, because "a
+    # default tenant chosen by accident is still a tenant" and records filed under one are
+    # filed where nobody would look for them. Three call sites here read the variable raw with
+    # an empty default, which is exactly the accident it was written to prevent.
+    tenant = resolve_tenant()
+
     drift = DriftChecker(
         read_sources=_endorsement_record,
         store=PostgresEndorsedStore(credentials=credentials),
         list_tip=remote_tip,
-        tenant_id=os.environ.get("HARNESS_DEFAULT_TENANT", "").strip(),
+        tenant_id=tenant,
     )
 
-    tenant = os.environ.get("HARNESS_DEFAULT_TENANT", "").strip()
     interval = float(os.environ.get("MCP_INTERVAL_SECONDS", DEFAULT_INTERVAL_SECONDS))
     print(
-        f"mcp service ready — role={VAULT_ROLE} tenant={tenant or '(unset)'} "
+        f"mcp service ready — role={VAULT_ROLE} tenant={tenant} "
         f"products={registry.products()} interval={interval}s",
         flush=True,
     )

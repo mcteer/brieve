@@ -118,6 +118,17 @@ if ! docker run --rm --network host alpine:3 getent hosts host.docker.internal >
       echo '127.0.0.1 host.docker.internal' | sudo tee -a /etc/hosts"
 fi
 LICENSE="$(env_val VAULT_ENT_LICENSE)"
+
+# THE TENANT EVERY RECORD IS FILED UNDER. Read here and passed to the jobspec, because
+# `resolve_tenant` REFUSES rather than defaulting — "a default tenant chosen by accident is
+# still a tenant, and silently writing records under an invented value would put them
+# somewhere nobody would think to look for them."
+#
+# `.env` has carried this since the estate existed and no submitter passed it, so every served
+# surface read an empty string until 045's endorsed content made the omission visible.
+HARNESS_DEFAULT_TENANT="$(env_val HARNESS_DEFAULT_TENANT)"
+[ -n "$HARNESS_DEFAULT_TENANT" ] \
+  || die "HARNESS_DEFAULT_TENANT is not set in .env. Every record the platform writes is filed under a tenant, and the surfaces refuse to start rather than invent one."
 [ -n "$LICENSE" ] || die "VAULT_ENT_LICENSE is absent from .env"
 [ -d "$ENV_DIR" ] || die "environment root $ENV_DIR does not exist"
 ok "tooling, Docker, licence, environment root"
@@ -509,7 +520,8 @@ say "MCP service"
 # The persistent component. Registered at bring-up rather than left to whoever remembers,
 # because a missing MCP service is invisible until suspended runs stop resuming — which
 # looks like a hang and is not one.
-nomad job run -var="repo=$REPO" "$REPO/infra/jobs/mcp.nomad.hcl" >/dev/null 2>&1 \
+nomad job run -var="repo=$REPO" -var="default_tenant=${HARNESS_DEFAULT_TENANT}" \
+  "$REPO/infra/jobs/mcp.nomad.hcl" >/dev/null 2>&1 \
   && ok "mcp registered (persistent; hosts the health checker and the sweeper)" \
   || die "could not register the mcp service — health checks and the sweeper would not run"
 
