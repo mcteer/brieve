@@ -27,6 +27,22 @@
          so no route had to learn about presentation. #}
       <a href="/"{% if request.url.path == "/" %} aria-current="page"{% endif %}>Run an agent</a>
       <a href="/ask"{% if request.url.path.startswith("/ask") %} aria-current="page"{% endif %}>Ask a question</a>
+      {#
+        SETTINGS, LINKED FOR EVERYONE, AND THE PLATFORM DECIDES (045).
+
+        **044 built this page and linked it from nowhere.** It was reachable only by typing
+        the URL, which is `capability_inventory.py`'s "built and unreachable" one layer up —
+        in the interface, where that gate cannot see. Found by an administrator looking for
+        it and not finding it.
+
+        Shown to every signed-in person rather than gated on a role, because this portal has
+        no view of roles: it holds no credential and asks the API for everything. Deciding
+        here would mean either guessing or a second read whose answer the page then has to
+        trust. The API refuses a non-admin, `/settings` renders that refusal as the platform
+        working rather than as an error, and the a11y lane already walks that state — so the
+        honest thin-client behaviour and the good one are the same behaviour.
+      #}
+      <a href="/settings"{% if request.url.path.startswith("/settings") %} aria-current="page"{% endif %}>Settings</a>
     </nav>
     {% block header_actions %}{% endblock %}
   </header>
