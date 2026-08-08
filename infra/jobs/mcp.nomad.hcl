@@ -138,7 +138,11 @@ job "mcp" {
       }
 
       config {
-        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
+        # **NOT `-slim`, and the difference is `git`.** This service runs the endorsed-source
+        # drift probe, which lists a customer's remote refs — so it reaches a repository just
+        # as the API does. The API's image was fixed first and this one was missed, because
+        # the gate that caught it named a jobspec instead of the property.
+        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm"
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "host"
 
