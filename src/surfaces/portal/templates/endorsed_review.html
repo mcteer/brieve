@@ -81,10 +81,23 @@
     <ul>{% for path in review.uncitable %}<li>{{ path }}</li>{% endfor %}</ul>
   {% endif %}
 
-  <p>
-    Adopting {{ review.candidate_version }} is a separate act and is recorded against you.
-    A run already under way keeps the version it started on.
-  </p>
+  {#
+    THE ADOPT CONTROL, carrying the candidate this page is showing.
+
+    The version is a hidden field rather than resolved server-side as "the latest", because
+    the source can move between the review and the click — and adopting something other than
+    what the administrator just read is the failure the whole review step exists to prevent.
+  #}
+  <form method="post" action="/settings/endorsed/{{ source }}/adopt">
+    <input type="hidden" name="version_id" value="{{ review.candidate_version }}">
+    <p>
+      Adopting {{ review.candidate_version }} is a separate act and is recorded against you.
+      A run already under way keeps the version it started on.
+    </p>
+    <button type="submit">Adopt this version</button>
+  </form>
+
+  <p><a href="/settings">Back to settings without adopting</a></p>
 
 {% endif %}
 {% endblock %}

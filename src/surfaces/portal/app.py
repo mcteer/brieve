@@ -230,6 +230,97 @@ def create_portal(
             },
         )
 
+    @app.post("/settings/endorsed", response_class=HTMLResponse)
+    def endorse_source(
+        request: Request, source: str = Form(""), location: str = Form("")
+    ) -> Response:
+        """Endorse a source of the customer's own documents (045, US1).
+
+        **The console had no control for this and the API route existed the whole time.** 045
+        shipped endorse, withdraw and adopt as routes, and a page that could only read — so the
+        one act the feature is named for could not be performed from the interface. Same shape
+        as `/settings` being unlinked, one level in, and the navigation gate could not see it
+        because it checks pages rather than operations.
+
+        No governance logic here, like every other portal route: the API composes the record,
+        stamps who and when from the authenticated subject, and the fabric decides. This
+        collects two strings and relays them.
+        """
+        return _endorsement_operation(
+            request, operation="endorse", source=source, location=location
+        )
+
+    @app.post("/settings/endorsed/{source}/adopt", response_class=HTMLResponse)
+    def adopt_version(request: Request, source: str, version_id: str = Form("")) -> Response:
+        """Adopt a reviewed version, which is what moves the ground answers rest on.
+
+        Reached from the review page, carrying the candidate the administrator was looking at —
+        so what they adopt is what they saw. A control that adopted "the latest" would let the
+        source move between the review and the click.
+        """
+        return _endorsement_operation(
+            request, operation="adopt", source=source, version_id=version_id
+        )
+
+    @app.post("/settings/endorsed/{source}/withdraw", response_class=HTMLResponse)
+    def withdraw_source(request: Request, source: str) -> Response:
+        """Stop trusting a source. Citations into it stop resolving at the next question."""
+        return _endorsement_operation(request, operation="withdraw", source=source)
+
+    def _endorsement_operation(
+        request: Request,
+        *,
+        operation: str,
+        source: str,
+        location: str = "",
+        version_id: str = "",
+    ) -> Response:
+        """Relay one endorsement act and render the settings page around its outcome.
+
+        **The outcome is rendered, never swallowed.** 044's whole point is that the fabric
+        answers one of three ways — applied, awaiting approval, refused — and a page that
+        redirected on success would collapse the first two into each other. So the settings
+        page comes back carrying what happened.
+        """
+        session = _session(request)
+        if session is None:
+            return templates.TemplateResponse(request=request, name="signed_out.html", context={})
+
+        result = app.state.relay.request(
+            "POST",
+            "/console/endorsed-sources",
+            token=session.access_token,
+            json_body={
+                "operation": operation,
+                "source": source,
+                "location": location,
+                "version_id": version_id,
+            },
+        )
+        posture = app.state.relay.request(
+            "GET", "/console/configuration", token=session.access_token
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="settings.html",
+            context={
+                "posture": posture.payload if posture.ok else {},
+                "reachable": posture.reachable,
+                "refused": not posture.ok and posture.reachable,
+                # What the fabric did, in the vocabulary the page already renders for a change.
+                "outcome": {
+                    "operation": operation,
+                    "source": source,
+                    "state": (result.payload or {}).get("state", ""),
+                    "message": (result.payload or {}).get(
+                        "message", (result.payload or {}).get("detail", "")
+                    ),
+                    "ok": result.ok,
+                    "pending": result.status == 202,
+                },
+            },
+        )
+
     # ------------------------------------------------------------------- ask
 
     def _rendered(exchanges: list[dict[str, Any]]) -> list[dict[str, Any]]:
