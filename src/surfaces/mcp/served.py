@@ -44,6 +44,7 @@ from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
 from core.identity.mappings_store import VaultClaimMappings
+from core.identity.tenant import resolve_tenant
 from core.identity.types import AuthenticatedSubject, SubjectKind
 from core.runs.changes import PostgresChangeRequestStore, VaultChangeStatus
 from core.runs.index import PostgresRunIndex
@@ -231,7 +232,7 @@ def build_transport() -> McpTransport:
         endorsed_reader=lambda: resolve_endorsed(
             read_sources=lambda: _kv_data(_fabric.read_versioned(ENDORSED_SOURCES_PATH)),
             store=endorsed_store,
-            tenant_id=os.environ.get("HARNESS_DEFAULT_TENANT", "").strip(),
+            tenant_id=resolve_tenant(),
         ),
         # 027 — the posture three features deferred, now decided (ADR-0058).
         #
