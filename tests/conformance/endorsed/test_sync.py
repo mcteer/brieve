@@ -16,7 +16,6 @@ git puts the remote URL in `stderr`.
 
 from __future__ import annotations
 
-import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -34,7 +33,6 @@ from core.endorsed_sync import (
     sync_source,
 )
 
-ROOT = Path(__file__).resolve().parents[3]
 LOCATION = "https://git.example.com/acme/standards"
 SECRET = "ghp_thisisnotarealtokenxxxxxxxxxxxxxxxx"
 
@@ -376,32 +374,6 @@ def test_a_hidden_directory_is_not_customer_documentation(tmp_path: Path) -> Non
     documents, _ = documents_in(root, source="acme", location=LOCATION)
 
     assert set(documents) == {"/endorsed/acme/logging.md"}
-
-
-def test_the_surface_that_syncs_declares_an_image_that_can(tmp_path: Path) -> None:
-    """**Found on the served process, and it is the gap the whole feature sat in.**
-
-    045 wired endorsed sync into the API assembly, and the API ran a `-slim` Python image with
-    no `git`. The console rendered the endorsed-sources section perfectly and every Review
-    failed at the click — which an administrator reads as a problem with their repository,
-    because that is what a sync failure normally is.
-
-    Asserted against the jobspec rather than against the running container, so it is a merge
-    gate rather than something somebody notices in a dev enclave. The check is deliberately
-    narrow: **the surface that performs the sync must not declare a `-slim` image.** A wider
-    rule — "every image must have git" — would be false of the surfaces that never clone
-    anything and would push people to widen images for no reason.
-    """
-    jobspec = (ROOT / "infra" / "jobs" / "api.nomad.hcl").read_text()
-    images = re.findall(r'image\s*=\s*"([^"]+)"', jobspec)
-
-    assert images, "the api jobspec declares no image"
-    assert not any(image.endswith("-slim") for image in images), (
-        f"the api runs {images}, and a `-slim` Python image carries no `git`. This surface "
-        f"syncs endorsed sources, so it would render the console and fail every Review — a "
-        f"failure that reads as the customer's repository being wrong when the transport is "
-        f"missing at our end."
-    )
 
 
 def test_a_missing_transport_is_its_own_state_and_not_the_sources_fault() -> None:

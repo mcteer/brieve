@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""GATE:conformance — a surface that reads configuration is given it by the job that runs it.
+"""GATE:conformance — a surface is given what it needs by the job that runs it.
+
+Configuration and tooling, and both arrived here the same way: something the code needs, that
+the job never supplied, failing quietly enough to survive a full green suite.
 
 **`HARNESS_DEFAULT_TENANT` was set in `.env` from the beginning and reached no jobspec.** Every
 served surface read an empty string, and the omission survived because it was invisible twice
@@ -11,8 +14,15 @@ drift probe queries for an adopted version under `tenant-local`, finds none, and
 permanent drift on every endorsed source — while the console writes content under `""`. Nothing
 errors. Nothing looks wrong. The two surfaces simply file records in different places.
 
+**The tooling half was found by writing the gate too narrowly.** 045's endorsed sync needs
+`git`; the API ran a `-slim` Python image without it, and the row written to catch that named
+`api.nomad.hcl` — a jobspec, not a property. The drift probe on the *mcp* service reaches a
+customer's repository too, and its image was missed for exactly as long as it took to run the
+supervisory loop and read the output. A rule that names a file passes while the defect lives
+one file over.
+
 The pairing is derived from the jobspecs themselves rather than listed here, so a new surface
-is covered by existing, and a surface that stops reading a variable stops being asked for it.
+is covered by existing, and a surface that stops needing something stops being asked for it.
 """
 
 from __future__ import annotations
@@ -101,6 +111,51 @@ def test_no_surface_reads_the_tenant_around_its_own_resolver() -> None:
         f"{offenders} read the tenant from the environment directly. `resolve_tenant()` is "
         f"the one place that decides what an unset tenant means, and it refuses — which is "
         f"the posture its own module docstring argues for."
+    )
+
+
+#: Where the platform reaches a customer's repository. A module importing this needs `git` in
+#: whatever image runs it — derived rather than listed, because the first version of this rule
+#: named a jobspec and the second surface that needed it was missed.
+EGRESS_MODULE = "core.endorsed_sync"
+
+
+def test_every_job_running_a_surface_that_clones_declares_an_image_that_can() -> None:
+    """A `-slim` Python image carries no `git`, and the sync shells out to it.
+
+    Without this the console renders perfectly and every sync fails at the click, while the
+    drift probe reports UNKNOWN on every endorsed source — both of which read as the
+    customer's repository being wrong when the transport is missing at our end.
+
+    Narrow on purpose: only the surfaces that actually clone. A rule saying every image needs
+    git would be false of the ones that never reach outward, and would push people to widen
+    images for no reason. **The authoring tier is deliberately out of scope** — it verifies
+    `git` and `gh` in its own command and exits `tooling_missing` at task start, which is the
+    louder posture and the right one for a tier that can do nothing else without them.
+    """
+    offenders = []
+    for jobspec, module, source in _pairs():
+        if EGRESS_MODULE not in source:
+            continue
+        images = re.findall(r'image\s*=\s*"([^"]+)"', jobspec.read_text())
+        if any(image.endswith("-slim") for image in images):
+            offenders.append(f"{jobspec.name} runs {module}, which clones, on {images}")
+
+    assert not offenders, (
+        f"{offenders}. A `-slim` Python image has no `git`, so the surface renders its pages "
+        f"and fails every sync — a failure that reads as the customer's repository being "
+        f"wrong when the transport is missing at ours."
+    )
+
+
+def test_at_least_one_surface_is_known_to_clone() -> None:
+    """The control. If the import moved or was renamed this row would pass over an empty set,
+    and the rule above would assert nothing about anything."""
+    cloning = [module for _, module, source in _pairs() if EGRESS_MODULE in source]
+
+    assert cloning, (
+        f"no surface imports {EGRESS_MODULE}, so the image rule matches nothing. Either the "
+        f"module moved, or the endorsed sync is no longer reachable from a served surface."
     )
 
 
