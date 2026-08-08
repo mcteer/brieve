@@ -14,6 +14,7 @@ by different code.
 from __future__ import annotations
 
 import os
+import sys
 from typing import Any
 
 from adapters.anthropic_answering import build_ask_provider
@@ -31,7 +32,7 @@ from core.authority.model_credential import BrokeredModelCredential
 from core.authority.vault_fabric import VaultIdentityFabric
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.durability.postgres import PostgresDurabilityProvider
-from core.endorsed_sync import sync_source
+from core.endorsed_sync import git_available, sync_source
 from core.identity.mappings_store import VaultClaimMappings
 from core.identity.types import SubjectKind
 from core.runs.changes import PostgresChangeRequestStore, VaultChangeStatus
@@ -126,6 +127,25 @@ def build() -> object:
     thread_store.migrate()
     ask_conversations.migrate()
     endorsed_store.migrate()
+
+    # **THE TRANSPORT, STATED AT START RATHER THAN DISCOVERED AT THE CLICK.**
+    #
+    # This is a Python image and `git` is not a given. Without it the console renders the
+    # endorsed-sources section perfectly, and every Review fails — which an administrator reads
+    # as a problem with their repository, because that is what a sync failure normally is.
+    #
+    # It does NOT refuse to start, unlike the authoring tier's identical check. That tier
+    # exists to publish, so no git means it can do nothing; this surface answers questions,
+    # serves the console and reads evidence, all of which work. Refusing to start over a
+    # capability most estates never use would trade a narrow gap for a total outage. So the
+    # posture is stated once, loudly, where an operator reads it.
+    if not git_available():
+        print(
+            "::endorsed:: tooling_missing: no `git` in this image, so endorsed sources cannot "
+            "be synced or reviewed. Everything else on this surface is unaffected.",
+            file=sys.stderr,
+            flush=True,
+        )
 
     def _kv_data(record: Any) -> dict[str, Any]:
         """KV v2 nests the body two levels down; anything unreadable is an empty mapping here.
