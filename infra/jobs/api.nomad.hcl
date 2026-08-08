@@ -175,7 +175,15 @@ job "api" {
       }
 
       config {
-        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
+        # **NOT `-slim`, and the difference is `git`** (045). This surface syncs a customer's
+        # endorsed sources, which means cloning a repository, and the slim image carries no
+        # git — so every Review failed at the click while the console rendered perfectly.
+        #
+        # The same publisher and the same Python, so this is a one-word change rather than a
+        # new supply chain. A runtime `apt-get` was the obvious alternative and is refused for
+        # the reason the authoring tier records: an unpinned network fetch at task start, on a
+        # surface that then handles repository content.
+        image        = "ghcr.io/astral-sh/uv:python3.12-bookworm"
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "host"
 

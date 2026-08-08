@@ -16,6 +16,7 @@ git puts the remote URL in `stderr`.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,7 @@ from core.endorsed_sync import (
     sync_source,
 )
 
+ROOT = Path(__file__).resolve().parents[3]
 LOCATION = "https://git.example.com/acme/standards"
 SECRET = "ghp_thisisnotarealtokenxxxxxxxxxxxxxxxx"
 
@@ -374,6 +376,62 @@ def test_a_hidden_directory_is_not_customer_documentation(tmp_path: Path) -> Non
     documents, _ = documents_in(root, source="acme", location=LOCATION)
 
     assert set(documents) == {"/endorsed/acme/logging.md"}
+
+
+def test_the_surface_that_syncs_declares_an_image_that_can(tmp_path: Path) -> None:
+    """**Found on the served process, and it is the gap the whole feature sat in.**
+
+    045 wired endorsed sync into the API assembly, and the API ran a `-slim` Python image with
+    no `git`. The console rendered the endorsed-sources section perfectly and every Review
+    failed at the click — which an administrator reads as a problem with their repository,
+    because that is what a sync failure normally is.
+
+    Asserted against the jobspec rather than against the running container, so it is a merge
+    gate rather than something somebody notices in a dev enclave. The check is deliberately
+    narrow: **the surface that performs the sync must not declare a `-slim` image.** A wider
+    rule — "every image must have git" — would be false of the surfaces that never clone
+    anything and would push people to widen images for no reason.
+    """
+    jobspec = (ROOT / "infra" / "jobs" / "api.nomad.hcl").read_text()
+    images = re.findall(r'image\s*=\s*"([^"]+)"', jobspec)
+
+    assert images, "the api jobspec declares no image"
+    assert not any(image.endswith("-slim") for image in images), (
+        f"the api runs {images}, and a `-slim` Python image carries no `git`. This surface "
+        f"syncs endorsed sources, so it would render the console and fail every Review — a "
+        f"failure that reads as the customer's repository being wrong when the transport is "
+        f"missing at our end."
+    )
+
+
+def test_a_missing_transport_is_its_own_state_and_not_the_sources_fault() -> None:
+    """`tooling_missing`, the fourth failure state (FR-018's distinction, extended).
+
+    Reporting it as `sync_failed` would send an administrator to check a repository that was
+    never the problem. The authoring tier already draws this line between its own tooling and
+    the work; this is the same distinction one surface over.
+    """
+    # Patched through `git_available`, the module's own name for the question, rather than by
+    # reaching into its `shutil` import. A row that monkeypatches a transitive import asserts
+    # something about how the module happens to be written; this asserts the behaviour.
+    from core import endorsed_sync
+
+    original = endorsed_sync.git_available
+    endorsed_sync.git_available = lambda: False
+    try:
+        with pytest.raises(SyncFailed) as raised:
+            sync_source(
+                tenant_id="acme",
+                source="acme-standards",
+                location=LOCATION,
+                triggered_by="dan@acme.example",
+            )
+    finally:
+        endorsed_sync.git_available = original
+
+    assert raised.value.reason_code == "tooling_missing"
+    assert "Nothing is wrong with the source" in str(raised.value)
+    assert endorsed_sync.git_available is original, "the patch was not undone"
 
 
 def test_a_citation_url_is_one_a_reader_can_actually_follow(tmp_path: Path) -> None:

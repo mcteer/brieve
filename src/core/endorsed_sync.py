@@ -61,13 +61,20 @@ _HEADING = re.compile(r"^(#{1,3})\s+(.+?)\s*$")
 
 
 class SyncFailed(RuntimeError):
-    """The source could not be synced. **Three distinct states, never collapsed** (FR-018).
+    """The source could not be synced. **Four distinct states, never collapsed** (FR-018).
 
     `sync_failed` (it could not be reached or read), `source_empty` (it was reached and holds
     nothing), and `nothing_citable` (it holds documents and none of them can be addressed) send
     an administrator to three different places: the network, the wrong repository, and the
     documents' own structure. An interface reporting one for another sends them to fix
     something that is not broken.
+
+    **`tooling_missing` is the fourth, and it is about us rather than about them.** The served
+    API is a Python image; if it carries no `git` there is nothing to fix at the customer's end,
+    and reporting that as `sync_failed` would send an administrator to check a repository that
+    was never the problem. The authoring tier already draws this line — it verifies `git` and
+    `gh` at task start and exits `tooling_missing` rather than failing at the last step of a run
+    that had already done all its work. This is the same distinction one surface over.
     """
 
     def __init__(self, message: str, *, reason_code: str) -> None:
@@ -330,6 +337,15 @@ def compare_versions(
     }
 
 
+def git_available() -> bool:
+    """Whether this process can reach a customer's repository at all.
+
+    Public so an assembly can state the posture at start rather than discovering it when an
+    administrator clicks Review — see `SyncFailed`'s note about which end the problem is at.
+    """
+    return shutil.which("git") is not None
+
+
 def _run(command: list[str], *, runner: Any = None, timeout: float) -> str:
     """Run a git command, and turn every failure into one named refusal.
 
@@ -339,6 +355,12 @@ def _run(command: list[str], *, runner: Any = None, timeout: float) -> str:
     """
     if runner is not None:
         return str(runner(command))
+    if not git_available():
+        raise SyncFailed(
+            "this deployment has no `git`, so it cannot reach an endorsed source. Nothing is "
+            "wrong with the source: the platform is missing its transport.",
+            reason_code="tooling_missing",
+        )
     try:
         completed = subprocess.run(  # noqa: S603 — fixed argv, no shell
             command,
