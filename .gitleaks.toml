@@ -41,9 +41,16 @@ useDefault = true
 # admits exactly the benign token that fired — a matrix cell's provenance field — and nothing
 # else. Rewording alone would not clear it, because the scanner walks the commit RANGE and the
 # original commit carries the string forever.
+#
+# `infra/bin/seed-dev-claim-mapping.py` briefly named the derived Vault KV record
+# `MAPPING_KEY = "operator-<digest>"`. That string is the output of `mapping_key()`, not a
+# credential — the script now derives it at runtime instead.
 [[rules]]
 id = "generic-api-key"
 [rules.allowlist]
 paths = ['''corpus/documents/.*\.json''']
-regexes = ['''qualified_by\s*=\s*"fixture"''']
+regexes = [
+  '''qualified_by\s*=\s*"fixture"''',
+  '''MAPPING_KEY\s*=\s*"operator-[0-9a-f]{16}"''',
+]
 regexTarget = "line"
