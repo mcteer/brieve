@@ -18,7 +18,7 @@ import pathlib
 from typing import Any
 
 from core.audit.schema import AuditEventType
-from tests.a11y.conftest import AXE_TAGS, PortalServer, audit, describe
+from tests.a11y.conftest import AXE_TAGS, PortalServer, audit, describe, start_thread_from_home
 
 
 def _thread_with_all_dispositions(page: Any, server: PortalServer) -> str:
@@ -27,16 +27,12 @@ def _thread_with_all_dispositions(page: Any, server: PortalServer) -> str:
     The richest page the portal renders, and therefore the one most likely to carry a
     contrast or landmark problem that the empty states do not.
     """
-    page.goto(f"{server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
-    thread_url = page.url
+    thread_url = start_thread_from_home(page, server, "plan the migration", agent="planner")
 
     # Re-navigate between sends rather than clicking twice on a page that navigated
     # underneath the first click. Each submit is a full round trip — the portal is a thin
     # client, so every state change is a new document, and a locator held across one is
     # stale by construction.
-    _send(page, thread_url, "plan the migration", agent="planner")
     _send(page, thread_url, "what else can you do?")
 
     return str(thread_url)
@@ -67,9 +63,7 @@ def test_the_empty_thread_list_meets_wcag_22_aa(page: Any, portal_server: Portal
 
 
 def test_the_populated_thread_list_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
-    page.goto(f"{portal_server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
+    start_thread_from_home(page, portal_server)
     page.goto(f"{portal_server.base}/")
     violations = audit(page)
     assert violations == [], describe(violations)
@@ -238,9 +232,7 @@ def test_the_composer_labels_its_controls(page: Any, portal_server: PortalServer
     associated with the wrong input is worse than none, because assistive technology
     announces it confidently.
     """
-    page.goto(f"{portal_server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
+    start_thread_from_home(page, portal_server)
 
     assert page.get_attribute("label[for='message']", "for") == "message"
     assert page.get_attribute("#message", "id") == "message"

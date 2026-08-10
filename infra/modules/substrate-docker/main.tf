@@ -71,6 +71,17 @@ resource "docker_container" "vault" {
   command = ["server"]
   restart = "unless-stopped"
 
+  # Group with deploy/local's compose project in OrbStack / Docker Desktop. The name must
+  # match `name:` in deploy/local/docker-compose.yml — Nomad jobs carry the same labels.
+  labels {
+    label = "com.docker.compose.project"
+    value = "brieve-local"
+  }
+  labels {
+    label = "com.docker.compose.service"
+    value = "vault"
+  }
+
   depends_on = [terraform_data.vault_data_chown, terraform_data.tls_material_complete]
 
   volumes {

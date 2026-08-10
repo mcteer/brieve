@@ -734,15 +734,27 @@ main.main--app {
 /* The LEDE goes; the heading stays. Hiding the h1 too was tidier and wrong — a page with no
    level-one heading is a page a screen-reader user cannot orient in, and it carries the
    conversation's own title once one is reopened. */
-.app-main:has(.exchange) > .lede {
+.app-main:has(.exchange) > .lede,
+.app-main:has(.turn) > .lede {
   display: none;
+}
+
+.app-main:has(.exchange) > h1,
+.app-main:has(.turn) > h1 {
+  margin-block-end: var(--space-3);
 }
 
 .transcript {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  /* Room for the composer, so the last answer can always come to rest above it. */
+}
+
+/* Room for the sticky composer — only once there is something to read above it. An empty
+   transcript still sat on the page with 11rem of padding and pushed the composer down from
+   the header on a new conversation. */
+.transcript:has(.exchange),
+.transcript:has(.turn) {
   padding-block-end: 11rem;
 }
 
@@ -765,6 +777,73 @@ main.main--app {
   background: var(--page);
   padding-block: var(--space-4) var(--space-5);
   margin-block-start: var(--space-5);
+}
+
+.app-main .composer {
+  position: sticky;
+  bottom: 0;
+  background: var(--page);
+  padding-block: var(--space-4) var(--space-5);
+  margin-block-start: var(--space-5);
+  margin-top: 0;
+}
+
+.app-main .turns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+}
+
+/* Same transcript rhythm as ask: the person's words in a bubble, the platform's plainly below. */
+.app-main .turn {
+  background: none;
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow: visible;
+}
+
+.app-main .turn .message.asked {
+  align-self: end;
+  max-width: 85%;
+  margin: 0;
+  padding-bottom: var(--space-3);
+  border-bottom: none;
+}
+
+.app-main .turn-body {
+  margin: 0;
+  max-width: 100%;
+}
+
+.app-main .turn[data-pack="vault"] .turn-body {
+  border-left: 3px solid var(--vault);
+  padding-left: var(--space-3);
+}
+
+.app-main .turn[data-pack="terraform"] .turn-body {
+  border-left: 3px solid var(--terraform);
+  padding-left: var(--space-3);
+}
+
+.app-main .turn .result {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: var(--space-3) 0 0;
+}
+
+.app-main .turns a,
+.app-main .turns button,
+.app-main .turns code,
+.app-main .turns [tabindex] {
+  scroll-margin-block-end: 12rem;
 }
 
 /* `ask-field`, NOT `composer` — the thread page has used `.composer` since 012, and naming

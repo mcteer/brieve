@@ -69,6 +69,14 @@ for prefix in harness-ceilings role-bindings; do
   fi
 done
 
+# 3c — the dev-provider claim mapping. Without it, browser sign-in succeeds and every API
+# call answers `unmapped_claim` — which reads as the platform being broken.
+if vault kv get -format=json "harness-authority/claim-mappings/operator-55ad4f49e3f06147" >/dev/null 2>&1; then
+  ok "dev claim mapping present (permissions:platform:operator -> operator)"
+else
+  bad "no dev claim mapping — sign-in succeeds and the API refuses every request as unmapped_claim. Re-run enclave-up to seed it"
+fi
+
 # 3b — the ceiling records the fixture pair depends on. A ceiling row asserts that two
 # definitions get DIFFERENT authority; if either record is absent the row refuses rather
 # than failing, and a refusal reads as the mechanism working.

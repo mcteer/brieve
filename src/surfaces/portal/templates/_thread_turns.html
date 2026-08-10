@@ -1,0 +1,64 @@
+{#
+  THE PRODUCT'S IDENTITY, where the platform actually knows it (034). Each turn names the
+  definition that ran, and the definitions list already in this context carries that
+  definition's packs — so the stripe is a lookup, never a guess from the definition's NAME.
+#}
+{% set packs_by_definition = {} %}
+{% for d in definitions %}{% if packs_by_definition.update({d.agent_definition_id: d.packs}) %}{% endif %}{% endfor %}
+<ol class="turns" id="turns">
+  {% for turn in turns %}
+  {% set turn_packs = packs_by_definition.get(turn.agent_definition_id) or [] %}
+  <li class="turn turn--{{ turn.disposition }}"
+      {%- if turn_packs | length == 1 %} data-pack="{{ turn_packs[0] }}"{% endif %}>
+    <p class="message asked"><span class="asked-label">You said</span>{{ turn.message }}</p>
+
+    <div class="turn-body">
+    {% if turn.disposition == "declined" %}
+      <p class="disposition disposition--declined">
+        <span class="pill pill--declined">declined</span>
+        This platform starts agents. It could not turn that into one &mdash; choose an
+        agent below and send it again.
+      </p>
+    {% elif turn.disposition == "refused" %}
+      <p class="disposition disposition--refused">
+        <span class="pill pill--refused">refused</span>
+        You do not have access to start that agent. It exists, and someone who administers
+        your access can grant it.
+      </p>
+    {% else %}
+      <p class="disposition" data-run-id="{{ turn.run_id }}"
+         aria-live="polite" aria-atomic="true">
+        <span class="visually-hidden">Run status:</span>
+        <span class="state pill">{% if turn.run %}{{ turn.run.state }}{% else %}starting{% endif %}</span>
+        {% if turn.run and turn.run.state not in ["completed", "failed", "stopped"] %}
+          <form method="post" action="/runs/{{ turn.run_id }}/stop" class="inline">
+            <input type="hidden" name="thread_id" value="{{ thread.thread_id }}">
+            <button type="submit" class="link">Stop this run</button>
+          </form>
+        {% endif %}
+      </p>
+
+      {% if turn.result_status == 200 and turn.result and turn.result.result is not none %}
+        <pre class="result">{{ turn.result.result }}</pre>
+      {% elif turn.result_status == 409 %}
+        <p class="pending">Still working. This updates on its own.</p>
+      {% elif turn.result_status == 204 or (turn.run and turn.run.state == "stopped") %}
+        <p class="ended">Ended without a result{% if turn.run and turn.run.stop_reason %}
+          &mdash; {{ turn.run.stop_reason }}{% endif %}.</p>
+      {% endif %}
+    {% endif %}
+
+    {% if turn.context_run_ids %}
+      <p class="context">Carried forward from {{ turn.context_run_ids | length }} earlier
+        result{{ "s" if turn.context_run_ids | length != 1 }}.</p>
+    {% endif %}
+    {% if turn.context_dropped %}
+      <p class="context context--dropped">{{ turn.context_dropped | length }} earlier
+        result{{ "s" if turn.context_dropped | length != 1 }} fell outside what this
+        conversation carries forward, and {{ "were" if turn.context_dropped | length != 1
+        else "was" }} not included.</p>
+    {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ol>

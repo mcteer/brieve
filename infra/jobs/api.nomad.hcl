@@ -180,6 +180,11 @@ job "api" {
       }
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "api"
+        }
+
         # **NOT `-slim`, and the difference is `git`** (045). This surface syncs a customer's
         # endorsed sources, which means cloning a repository, and the slim image carries no
         # git — so every Review failed at the click while the console rendered perfectly.

@@ -188,6 +188,11 @@ job "mcp-surface" {
       }
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "mcp-surface"
+        }
+
         image      = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint = ["/bin/sh", "-c"]
 

@@ -363,6 +363,23 @@ def _sign_in(
     tab.goto(f"{server.base}/callback?code={code}&state={state}")
 
 
+def start_thread_from_home(
+    tab: Any,
+    server: PortalServer,
+    message: str = "hello",
+    *,
+    agent: str = "",
+) -> str:
+    """Open a thread by sending the first message from the run surface home page."""
+    tab.goto(f"{server.base}/")
+    tab.fill("#message", message)
+    if agent:
+        tab.select_option("#agent", agent)
+    tab.click(".composer button[type=submit]")
+    tab.wait_for_load_state()
+    return str(tab.url)
+
+
 def audit(tab: Any) -> list[dict[str, Any]]:
     """Run the pinned axe ruleset and return the violations.
 

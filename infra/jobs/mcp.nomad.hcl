@@ -138,6 +138,11 @@ job "mcp" {
       }
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "mcp"
+        }
+
         # **NOT `-slim`, and the difference is `git`.** This service runs the endorsed-source
         # drift probe, which lists a customer's remote refs — so it reaches a repository just
         # as the API does. The API's image was fixed first and this one was missed, because

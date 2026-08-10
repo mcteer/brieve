@@ -33,6 +33,7 @@ if [ -f "$ENV_DIR/tls.auto.tfvars" ] && [ -f "$CA_FILE" ]; then
   export VAULT_CACERT="${VAULT_CACERT:-$CA_FILE}"
 else
   export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
+  unset VAULT_CACERT
 fi
 
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
@@ -299,8 +300,19 @@ say "Trust fabric"
 TLS_ARGS=()
 [ "${ENCLAVE_TLS:-true}" = "true" ] && TLS_ARGS=(-var enable_tls=true)
 
-terraform apply -input=false -auto-approve -var vault_token="$(env_val VAULT_ROOT_TOKEN)" ${TLS_ARGS[@]+"${TLS_ARGS[@]}"} ${NET_ARGS[@]+"${NET_ARGS[@]}"} >/dev/null
+# Target the trust fabric only. A bare apply also refreshes the substrate container,
+# and the Docker provider currently diffs `user = "vault"` as a replacement on OrbStack
+# — which reseals the store in the middle of configuring it and fails every resource
+# with "connection refused" or "Vault is sealed".
+terraform apply -input=false -auto-approve -target=module.trust_fabric \
+  -var vault_token="$(env_val VAULT_ROOT_TOKEN)" ${TLS_ARGS[@]+"${TLS_ARGS[@]}"} ${NET_ARGS[@]+"${NET_ARGS[@]}"} >/dev/null
 ok "workload identity auth, ceiling policies, agent registry, database engine, dynamic role"
+
+# The dev-provider mapping that lets browser sign-in reach the API. Terraform seeds it on
+# fresh applies; this covers estates that were already configured before the resource existed.
+export VAULT_TOKEN="${VAULT_TOKEN:-$(env_val VAULT_ROOT_TOKEN)}"
+python3 "$REPO/infra/bin/seed-dev-claim-mapping.py" \
+  || die "could not seed the development claim mapping — without it sign-in succeeds and every API call is refused unmapped_claim"
 
 # ---------------------------------------------------------------- 4b. transport
 #

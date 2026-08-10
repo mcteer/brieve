@@ -33,7 +33,7 @@ from typing import Any
 
 import pytest
 
-from tests.a11y.conftest import PortalServer
+from tests.a11y.conftest import PortalServer, start_thread_from_home
 
 #: WCAG 2.5.8 AA. 24×24 CSS pixels, the AA threshold (2.5.5 AAA asks 44).
 MIN_TARGET_PX = 24
@@ -115,9 +115,7 @@ def test_every_interactive_element_has_an_accessible_name(
     accessibility snapshot rather than the DOM, so it catches the case where a visible
     label exists but is not *associated* — which looks fine and reads as nothing.
     """
-    page.goto(f"{portal_server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
+    start_thread_from_home(page, portal_server)
 
     # The browser's own accessibility tree, via CDP. Playwright removed `page.accessibility`
     # in 1.58, and reaching for the protocol underneath is the better answer anyway: this is
@@ -289,13 +287,7 @@ def test_a_screen_reader_is_told_when_a_run_changes_state(
     happened, which on a surface whose whole job is watching work is the difference between
     usable and not.
     """
-    page.goto(f"{portal_server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
-    page.fill("#message", "plan the migration")
-    page.select_option("#agent", "planner")
-    page.click(".composer button[type=submit]")
-    page.wait_for_load_state()
+    start_thread_from_home(page, portal_server, "plan the migration", agent="planner")
 
     live = page.evaluate(
         """() => {
@@ -412,9 +404,7 @@ def test_every_target_meets_the_minimum_size(page: Any, portal_server: PortalSer
     """2.5.8: a control smaller than 24×24 is one a person with a tremor cannot hit."""
     # BOTH surfaces. This row walked the thread page alone, and the ask composer's textarea
     # measured 22px from the day it shipped — a real 2.5.8 failure nothing was looking at.
-    page.goto(f"{portal_server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
+    start_thread_from_home(page, portal_server)
     small = page.evaluate(_TARGET_SIZE_PROBE, MIN_TARGET_PX)
     assert small == [], f"thread-page targets below {MIN_TARGET_PX}px: {small}"
 
@@ -453,9 +443,7 @@ def test_alt_text_is_not_present_but_useless(page: Any, portal_server: PortalSer
 
 def test_no_interaction_requires_dragging(page: Any, portal_server: PortalServer) -> None:
     """2.5.7: asserted as an absence rather than reviewed by eye."""
-    page.goto(f"{portal_server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
+    start_thread_from_home(page, portal_server)
 
     draggable = page.evaluate(
         """() => Array.from(document.querySelectorAll('[draggable="true"]'))
@@ -475,9 +463,7 @@ def test_the_page_reflows_without_horizontal_scrolling(
 ) -> None:
     """1.4.10: at 320 CSS px nothing may require sideways scrolling to read."""
     page.set_viewport_size({"width": width, "height": height})
-    page.goto(f"{portal_server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
+    start_thread_from_home(page, portal_server)
     page.fill("#message", "a message long enough to test wrapping " * 6)
     page.click(".composer button[type=submit]")
     page.wait_for_load_state()
@@ -524,9 +510,7 @@ def test_text_spacing_overrides_do_not_clip_content(page: Any, portal_server: Po
     """
     # BOTH surfaces, because the pattern this row exists to catch is a fixed height and the
     # ask surface is the one with a composer sharing a row with a control.
-    page.goto(f"{portal_server.base}/")
-    page.click("form[action='/threads'] button[type=submit]")
-    page.wait_for_load_state()
+    start_thread_from_home(page, portal_server)
     clipped = page.evaluate(_TEXT_SPACING_PROBE)
     assert clipped == [], f"text is clipped on the thread page under 1.4.12 spacing: {clipped}"
 
@@ -544,7 +528,7 @@ def test_the_document_declares_a_language_and_a_title(
     assert page.evaluate("() => document.documentElement.lang") == "en"
     assert "Harness" in page.title()
 
-    page.click("form[action='/threads'] button[type=submit]")
+    start_thread_from_home(page, portal_server)
     page.wait_for_load_state()
     # Titles must differ between states, or a person with twenty tabs cannot tell them
     # apart — which is the whole point of the criterion.

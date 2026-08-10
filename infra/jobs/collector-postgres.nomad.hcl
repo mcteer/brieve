@@ -61,6 +61,11 @@ job "collector-postgres" {
         image = "postgres:17-alpine"
         ports = ["pg"]
 
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "collector-postgres"
+        }
+
         # Its OWN volume, deliberately not shared with the platform's store. A second copy
         # on the same volume would fail the same disk, which is the least interesting of
         # the failure modes but the easiest to overlook.

@@ -1,45 +1,62 @@
 {% extends "base.html" %}
-{% block title %}Run an agent — Harness Portal{% endblock %}
+{% block title %}{% if thread %}{{ thread.title or "Conversation" }}{% else %}Run an agent{% endif %} — Harness Portal{% endblock %}
 {% block header_actions %}
 <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
 {% endblock %}
+{% block main_class %}main--app{% endblock %}
 {% block content %}
-<h1>Run an agent</h1>
+<div class="app-layout{% if not threads %} app-layout--alone{% endif %}">
+
+{% if threads %}
+<nav class="app-rail" aria-label="Your conversations">
+  <a class="button rail-new" href="/">New conversation</a>
+  <p class="rail-heading" id="rail-heading">Conversations</p>
+  <ul aria-labelledby="rail-heading">
+    {% for item in threads %}
+      <li>
+        <a href="/threads/{{ item.thread_id }}"
+           title="{{ item.title or 'Untitled conversation' }}"
+           {% if thread and item.thread_id == thread.thread_id %}aria-current="page"{% endif %}>
+          <span>{{ item.title or "Untitled conversation" }}</span>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+  {% if thread %}
+    <div class="rail-danger">
+      <a class="link-button" href="/threads/{{ thread.thread_id }}/delete">Delete this conversation</a>
+    </div>
+  {% endif %}
+</nav>
+{% endif %}
+
+<div class="app-main">
+<h1>{% if thread %}{{ thread.title or "Untitled conversation" }}{% else %}Run an agent{% endif %}</h1>
+{% if not turns %}
 <p class="lede">An agent acts on your behalf here &mdash; every step governed, every effect
    recorded. To get an answer without anything happening,
    <a href="/ask">ask a question</a>.</p>
-<form method="post" action="/threads">
-  <button type="submit" class="button">Start a conversation</button>
-</form>
+{% endif %}
 
 {% if not reachable %}
   <p class="notice">The platform could not be reached, so this list is not showing your
      conversations. They have not been lost.</p>
 {% elif refused %}
   <p class="notice">The platform refused to list your conversations.</p>
-{% elif threads %}
-  {#
-    NO PRODUCT COLOUR HERE, and the absence is deliberate (034). A thread record carries its
-    id, owner, tenant, creation time and title — it does not know which product its turns
-    touched, and deriving one would mean joining every thread through its turns to a
-    definition to its packs. That is API design, not presentation, so the stripe lives on the
-    thread page where each turn already names its definition. Deferred rather than
-    approximated: a stripe guessed from a title would be the platform pretending to know.
-  #}
-  <ul class="threads">
-    {% for thread in threads %}
-      <li>
-        <a href="/threads/{{ thread.thread_id }}">{{ thread.title or "Untitled conversation" }}</a>
-        {# The exact instant stays on the page in `datetime`, machine-readable and unrounded;
-           the words are for the person reading the list. #}
-        <span class="meta">started
-          <time datetime="{{ thread.created_at }}">{{ thread.created_at | readable_instant }}</time>
-        </span>
-      </li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p class="empty">You have not started any conversations yet. This list is empty because
-     there is nothing in it &mdash; not because anything went wrong.</p>
+{% endif %}
+
+<div id="thread-transcript" class="transcript">
+{% include "_thread_turns.html" %}
+</div>
+
+{% include "_thread_composer.html" %}
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if thread %}
+<script src="/static/portal.js" data-thread-id="{{ thread.thread_id }}"></script>
 {% endif %}
 {% endblock %}
