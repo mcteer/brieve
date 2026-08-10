@@ -12,6 +12,7 @@ only; production mappings are approved through the Control Group (ADR-0016).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import ssl
@@ -23,13 +24,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = "harness-authority/data/claim-mappings"
 METADATA_PATH = "harness-authority/metadata/claim-mappings"
-MAPPING_KEY = "operator-55ad4f49e3f06147"
 RECORD = {
     "claim_name": "permissions",
     "claim_value": "platform:operator",
     "role": "operator",
     "requested_by": "enclave-bootstrap",
 }
+
+
+def _mapping_key(claim_name: str, claim_value: str, role: str) -> str:
+    """Stable record name — same algorithm as `core.identity.mappings_store.mapping_key`."""
+    digest = hashlib.sha256("\x00".join((claim_name, claim_value, role)).encode()).hexdigest()[:16]
+    return f"{role.lower()}-{digest}"
 
 
 def _env(key: str) -> str:
@@ -81,18 +87,20 @@ def main() -> int:
         print("seed-dev-claim-mapping: no Vault token available", file=sys.stderr)
         return 1
 
+    mapping_key = _mapping_key(RECORD["claim_name"], RECORD["claim_value"], RECORD["role"])
+
     status, body = _request(addr, METADATA_PATH, token=token, cacert=cacert, method="LIST")
     if status == 200:
         keys = body.get("data", {})
         if isinstance(keys, dict):
             listed = keys.get("keys", [])
-            if isinstance(listed, list) and MAPPING_KEY in listed:
+            if isinstance(listed, list) and mapping_key in listed:
                 print("ok dev claim mapping already present")
                 return 0
 
     status, body = _request(
         addr,
-        f"{DATA_PATH}/{MAPPING_KEY}",
+        f"{DATA_PATH}/{mapping_key}",
         token=token,
         cacert=cacert,
         method="POST",
