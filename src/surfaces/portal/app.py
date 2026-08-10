@@ -53,7 +53,6 @@ _AGENT_LABELS: dict[str, str] = {
     "planner": "Plan",
     "applier": "Apply",
     "demo": "Demo",
-    "vault": "Vault",
     "authoring": "Author",
 }
 

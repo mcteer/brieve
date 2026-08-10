@@ -395,12 +395,14 @@ def test_the_page_scrolls_rather_than_a_box_inside_it() -> None:
         pathlib.Path(__file__).resolve().parents[2] / "src/surfaces/portal/static/portal.css"
     ).read_text()
     rule = css.split(".transcript {", 1)[1].split("}", 1)[0]
+    active_transcript = css.split(".transcript:has(.exchange)", 1)[1].split("}", 1)[0]
 
     assert "overflow-y: auto" not in rule and "overflow: auto" not in rule, (
         "the transcript owns a scroll region again — the page is what scrolls"
     )
-    assert "padding-block-end" in rule, (
-        "no room reserved for the composer, so the last answer cannot be scrolled clear of it"
+    assert "padding-block-end" in active_transcript, (
+        "no room reserved for the composer once a conversation exists, "
+        "so the last answer cannot be scrolled clear of it"
     )
 
 
