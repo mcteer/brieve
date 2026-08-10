@@ -203,7 +203,7 @@ class _Handler(BaseHTTPRequestHandler):
                 # Whoever asks. There is no authentication here, which is the whole reason
                 # this file is quarantined in tests/.
                 subject=_one(query, "subject") or "alice",
-                tenant=_one(query, "tenant") or "tenant-test",
+                tenant=_one(query, "tenant") or "tenant-local",
                 # CLAIMS THE CALLER ASKS FOR, because a fixed set makes the platform's own
                 # refusal unfalsifiable. This was `{"groups": ["platform"]}` always — so
                 # every development token carried the same claim, and a row could never

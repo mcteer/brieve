@@ -111,7 +111,7 @@ def test_a_verdict_is_carried_by_more_than_colour() -> None:
     third signal rather than the only one — so the meaning survives greyscale, a colour-blind
     reader, and a printed page."""
     css = CSS.read_text()
-    thread = (TEMPLATES / "thread.html").read_text()
+    thread = (TEMPLATES / "_thread_turns.html").read_text()
 
     assert ".pill {" in css
     pill_rule = css.split(".pill {", 1)[1].split("}", 1)[0]
@@ -195,10 +195,13 @@ def _render_thread(turns: list[dict[str, object]], definitions: list[dict[str, o
     from surfaces.portal.app import TEMPLATES as TEMPLATE_DIR  # noqa: PLC0415
 
     environment = Jinja2Templates(directory=str(TEMPLATE_DIR)).env
-    return environment.get_template("thread.html").render(
+    return environment.get_template("threads.html").render(
         request=_FakeRequest(),
         thread={"thread_id": "t-1", "title": "A conversation"},
         turns=turns,
+        threads=[],
+        reachable=True,
+        refused=False,
         definitions=definitions,
         definitions_reachable=True,
     )
@@ -288,8 +291,8 @@ def test_the_stripe_is_a_lookup_not_a_guess_from_the_name() -> None:
 def test_the_thread_list_carries_no_product_at_all() -> None:
     """Deferred, and asserted so the deferral cannot rot into an accidental implementation."""
     threads_template = (TEMPLATES / "threads.html").read_text()
+    turns_partial = (TEMPLATES / "_thread_turns.html").read_text()
 
     assert "data-pack" not in threads_template
-    assert "does not know which product" in threads_template, (
-        "the deferral lost its reason — a future reader would see only an absence"
-    )
+    assert "does not know which product" not in threads_template
+    assert "data-pack" in turns_partial

@@ -143,6 +143,11 @@ job "agent-run" {
       }
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "agent-run"
+        }
+
         image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "host"

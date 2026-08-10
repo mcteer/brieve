@@ -127,6 +127,11 @@ job "portal" {
       driver = "docker"
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "portal"
+        }
+
         image      = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint = ["/bin/sh", "-c"]
 

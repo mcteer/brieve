@@ -28,6 +28,11 @@ job "harness" {
       }
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "harness"
+        }
+
         image      = "postgres:17-alpine"
         entrypoint = ["/bin/sh", "-c"]
         args = [<<-EOS

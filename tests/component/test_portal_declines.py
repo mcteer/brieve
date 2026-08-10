@@ -36,8 +36,12 @@ def _turns_only(html: str) -> str:
     read the same, which is a defect in the row rather than in the page. Scoping to the
     turns is what makes the comparison about the dispositions.
     """
-    body = html.split('<form method="post" action="/threads/')[0]
-    return _visible(body)
+    marker = '<ol class="turns"'
+    if marker in html:
+        start = html.index(marker)
+        end = html.index("</ol>", start) + len("</ol>")
+        return _visible(html[start:end])
+    return _visible(html.split('class="composer"')[0])
 
 
 def _portal_over_api() -> tuple[TestClient, TestClient, object]:

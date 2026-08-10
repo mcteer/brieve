@@ -1,0 +1,27 @@
+<form method="post"
+      action="{% if thread %}/threads/{{ thread.thread_id }}/turns{% else %}/threads{% endif %}"
+      class="composer">
+  <label for="agent">Agent</label>
+  {% if not definitions_reachable %}
+    <p class="notice">The list of agents could not be reached.</p>
+  {% endif %}
+  <select name="agent_definition_id" id="agent">
+    <option value="">None &mdash; just leave a note</option>
+    {% for d in definitions %}
+      <option value="{{ d.agent_definition_id }}" {% if not d.may_start %}disabled{% endif %}
+              title="{{ d.agent_definition_id }}">
+        {{ d.label }}{% if not d.may_start %} (you do not have access){% endif %}
+      </option>
+    {% endfor %}
+  </select>
+
+  <label for="message">Message</label>
+  <div class="field-with-control">
+    <textarea name="message" id="message" rows="2" required
+              placeholder="Describe what you want done&hellip;"
+              aria-describedby="recorded-note"></textarea>
+    <button type="submit" class="button field-control">Send</button>
+  </div>
+  <p id="recorded-note" class="note">This message is recorded as evidence before anything
+     acts on it.</p>
+</form>

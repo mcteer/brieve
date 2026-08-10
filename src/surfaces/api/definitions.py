@@ -79,6 +79,20 @@ def definition_views(
     unmarked or empty list: both read as fail-closed and are wrong answers about a person's
     authority (FR-018).
     """
+    from core.authority.vault_fabric import SubjectScopedVaultFabric, VaultIdentityFabric
+
+    # The production assembly hands in a fabric that deliberately refuses to invent roles.
+    # The verified subject already carries them — scope to those rather than asking the
+    # base fabric to re-derive identity from a user id alone.
+    if isinstance(fabric, VaultIdentityFabric) and not isinstance(fabric, SubjectScopedVaultFabric):
+        fabric = SubjectScopedVaultFabric(
+            roles=subject.roles,
+            credentials=fabric._credentials,
+            known_tools=fabric._known_tools,
+            known_actions=fabric._known_actions,
+            entitlement_source=fabric._entitlements,
+        )
+
     scope = fabric.resolve_user_scope(subject.subject_user_id)
 
     views: list[AgentDefinitionView] = []

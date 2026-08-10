@@ -61,6 +61,11 @@ job "conformance" {
       }
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "conformance"
+        }
+
         image      = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint = ["/bin/sh", "-c"]
         network_mode = "host"

@@ -58,4 +58,5 @@ module "trust_fabric" {
   # construction without a real key existing anywhere in dev. Production leaves this false and
   # writes the record out of band, so an apply can never overwrite a real credential with a dud.
   seed_model_credential_placeholder = true
+  seed_dev_claim_mapping            = true
 }

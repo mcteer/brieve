@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The development identity provider — a compose-local stand-in for Auth0/Okta.
+# AUTHENTICATES NOBODY by design; see tests/harness/dev_idp.py.
+
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+COPY tests/harness ./tests/harness
+
+RUN uv sync --extra surfaces --no-dev
+
+ENV DEV_IDP_HOST=0.0.0.0
+ENV DEV_IDP_PORT=8090
+
+EXPOSE 8090
+
+CMD ["uv", "run", "--extra", "surfaces", "python", "-m", "tests.harness.dev_idp"]

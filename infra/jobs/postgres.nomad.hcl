@@ -24,6 +24,11 @@ job "postgres" {
         image = "postgres:17-alpine"
         ports = ["pg"]
 
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "postgres"
+        }
+
         # A Docker named volume rather than a Nomad host volume: it needs no
         # client configuration, so `nomad agent -dev` can use it unchanged. The
         # data outlives both the allocation and the Nomad agent, which is the

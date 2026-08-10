@@ -161,8 +161,8 @@ def test_definitions_are_shown_with_the_ones_they_cannot_start_flagged() -> None
     page = setup.portal.get(created.headers["location"])
 
     # `planner` is startable for this subject; `applier` is not, and must still appear.
-    assert "planner" in page.text
-    assert "applier" in page.text
+    assert "Plan" in page.text
+    assert "Apply" in page.text
     assert "you do not have access" in page.text
     assert "disabled" in page.text
 

@@ -69,6 +69,21 @@ for prefix in harness-ceilings role-bindings; do
   fi
 done
 
+# 3c — the dev-provider claim mapping. Without it, browser sign-in succeeds and every API
+# call answers `unmapped_claim` — which reads as the platform being broken.
+dev_mapping_key="$(python3 <<'PY'
+import hashlib
+claim_name, claim_value, role = "permissions", "platform:operator", "operator"
+digest = hashlib.sha256("\x00".join((claim_name, claim_value, role)).encode()).hexdigest()[:16]
+print(f"{role.lower()}-{digest}")
+PY
+)"
+if vault kv get -format=json "harness-authority/claim-mappings/${dev_mapping_key}" >/dev/null 2>&1; then
+  ok "dev claim mapping present (permissions:platform:operator -> operator)"
+else
+  bad "no dev claim mapping — sign-in succeeds and the API refuses every request as unmapped_claim. Re-run enclave-up to seed it"
+fi
+
 # 3b — the ceiling records the fixture pair depends on. A ceiling row asserts that two
 # definitions get DIFFERENT authority; if either record is absent the row refuses rather
 # than failing, and a refusal reads as the mechanism working.

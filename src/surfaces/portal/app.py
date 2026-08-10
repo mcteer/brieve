@@ -48,6 +48,28 @@ FALLBACK_SESSION_LIFETIME = timedelta(hours=1)
 #: — that an ask carries this, and that a listing in the same session does not.
 ASK_PATIENCE = 180.0
 
+#: Short labels for the agent picker — presentation only; the posted value stays the id.
+_AGENT_LABELS: dict[str, str] = {
+    "planner": "Plan",
+    "applier": "Apply",
+    "demo": "Demo",
+    "authoring": "Author",
+}
+
+
+def agent_label(definition_id: str) -> str:
+    """A definition id in words someone would pick from a menu.
+
+    PRESENTATION, NOT CLASSIFICATION — the id is what the form submits and what the API
+    expects; this affects only what the dropdown shows.
+    """
+    stem = (
+        definition_id.removesuffix("-agent") if definition_id.endswith("-agent") else definition_id
+    )
+    if stem in _AGENT_LABELS:
+        return _AGENT_LABELS[stem]
+    return stem.replace("-", " ").title()
+
 
 def create_portal(
     *,
@@ -88,6 +110,7 @@ def create_portal(
         return f"{moment.day} {moment:%B %Y} at {moment:%H:%M} UTC"
 
     templates.env.filters["readable_instant"] = _readable_instant
+    templates.env.filters["agent_label"] = agent_label
     app.state.templates = templates
 
     def _session(request: Request) -> Any:
@@ -151,14 +174,19 @@ def create_portal(
         if session is None:
             return templates.TemplateResponse(request=request, name="signed_out.html", context={})
 
-        threads = app.state.relay.request("GET", "/threads", token=session.access_token)
+        threads, reachable, refused = _threads(session)
+        definitions, definitions_reachable = _definitions(session)
         return templates.TemplateResponse(
             request=request,
             name="threads.html",
             context={
-                "threads": (threads.payload or {}).get("threads", []) if threads.ok else [],
-                "reachable": threads.reachable,
-                "refused": not threads.ok and threads.reachable,
+                "thread": None,
+                "turns": [],
+                "threads": threads,
+                "reachable": reachable,
+                "refused": refused,
+                "definitions": definitions,
+                "definitions_reachable": definitions_reachable,
             },
         )
 
@@ -353,6 +381,29 @@ def create_portal(
         conversations: list[dict[str, Any]] = (listed.payload or {}).get("conversations", [])
         return conversations
 
+    def _threads(session: Any) -> tuple[list[dict[str, Any]], bool, bool]:
+        """This person's agent threads for the rail, and whether the list could be read."""
+        listed = app.state.relay.request("GET", "/threads", token=session.access_token)
+        if not listed.reachable:
+            return [], False, False
+        if not listed.ok:
+            return [], True, True
+        threads: list[dict[str, Any]] = (listed.payload or {}).get("threads", [])
+        return threads, True, False
+
+    def _definitions(session: Any) -> tuple[list[dict[str, Any]], bool]:
+        listed = app.state.relay.request("GET", "/agent-definitions", token=session.access_token)
+        if not listed.ok:
+            return [], listed.reachable
+        definitions: list[dict[str, Any]] = (listed.payload or {}).get("definitions", [])
+        return [
+            {
+                **definition,
+                "label": agent_label(str(definition.get("agent_definition_id", ""))),
+            }
+            for definition in definitions
+        ], listed.reachable
+
     @app.get("/ask", response_class=HTMLResponse)
     def ask_form(request: Request) -> Response:
         """A new conversation: the composer, and the rail of earlier ones.
@@ -527,7 +578,11 @@ def create_portal(
         )
 
     @app.post("/threads")
-    def new_thread(request: Request) -> Response:
+    def new_thread(
+        request: Request,
+        message: str = Form(""),
+        agent_definition_id: str = Form(""),
+    ) -> Response:
         session = _session(request)
         if session is None:
             return _login_redirect(request, "/")
@@ -539,7 +594,25 @@ def create_portal(
                 context={"what": "start a conversation", "response": created},
                 status_code=created.status or 503,
             )
-        return RedirectResponse(f"/threads/{created.payload['thread_id']}", status_code=303)
+        thread_id = created.payload["thread_id"]
+        if message.strip():
+            body: dict[str, Any] = {"message": message}
+            if agent_definition_id:
+                body["agent_definition_id"] = agent_definition_id
+            sent = app.state.relay.request(
+                "POST",
+                f"/threads/{thread_id}/turns",
+                token=session.access_token,
+                json_body=body,
+            )
+            if not sent.ok:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="refused.html",
+                    context={"what": "send that message", "response": sent},
+                    status_code=sent.status or 503,
+                )
+        return RedirectResponse(f"/threads/{thread_id}", status_code=303)
 
     @app.get("/threads/{thread_id}", response_class=HTMLResponse)
     def thread(request: Request, thread_id: str) -> Response:
@@ -555,20 +628,20 @@ def create_portal(
                 context={"what": "open this conversation", "response": detail},
                 status_code=detail.status or 503,
             )
-        definitions = app.state.relay.request(
-            "GET", "/agent-definitions", token=session.access_token
-        )
+        threads, reachable, refused = _threads(session)
+        definitions, definitions_reachable = _definitions(session)
         turns = _with_run_state(app.state.relay, session.access_token, detail.payload["turns"])
         return templates.TemplateResponse(
             request=request,
-            name="thread.html",
+            name="threads.html",
             context={
                 "thread": detail.payload["thread"],
                 "turns": turns,
-                "definitions": (definitions.payload or {}).get("definitions", [])
-                if definitions.ok
-                else [],
-                "definitions_reachable": definitions.reachable,
+                "threads": threads,
+                "reachable": reachable,
+                "refused": refused,
+                "definitions": definitions,
+                "definitions_reachable": definitions_reachable,
             },
         )
 

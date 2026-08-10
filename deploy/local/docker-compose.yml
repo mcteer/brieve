@@ -1,0 +1,35 @@
+# The local sandbox — the one-command start for OrbStack / Docker Desktop.
+#
+# The enclave itself (Vault, Nomad, Postgres, the trust fabric, dispatched runs) is
+# orchestrated by `stack.sh` via `make dev-up`, because those components are the product's
+# deployment tree rather than a lighter compose substitute (ADR-0025, ADR-0048). This file
+# holds the compose-native peers a person connects to: the development identity provider.
+#
+# Use deploy/local/stack.sh rather than driving compose directly — it holds the ordering
+# SC-016 asks for (enclave before surfaces) and the env-file discipline inkantOS uses.
+#
+# Nomad and Terraform workloads carry `com.docker.compose.project=brieve-local` so OrbStack
+# and Docker Desktop group the whole stack here, not only this file's services.
+name: brieve-local
+
+services:
+  dev-idp:
+    build:
+      context: ../..
+      dockerfile: deploy/local/Dockerfile.dev-idp
+    environment:
+      DEV_IDP_HOST: 0.0.0.0
+      DEV_IDP_PORT: "8090"
+      DEV_IDP_ISSUER: http://127.0.0.1:${DEV_IDP_PORT:-8090}
+      DEV_IDP_TOKEN_MINUTES: ${DEV_IDP_TOKEN_MINUTES:-480}
+    ports:
+      - "${DEV_IDP_PORT:-8090}:8090"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/jwks')\"",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30

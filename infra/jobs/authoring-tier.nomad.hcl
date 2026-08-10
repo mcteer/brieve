@@ -71,6 +71,11 @@ job "authoring-tier" {
       # it structurally rather than trusting this comment.
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "authoring-analyzer"
+        }
+
         image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "bridge"
@@ -161,6 +166,11 @@ job "authoring-tier" {
       }
 
       config {
+        labels = {
+          "com.docker.compose.project" = "brieve-local"
+          "com.docker.compose.service"  = "authoring-proposer"
+        }
+
         image        = "ghcr.io/astral-sh/uv:python3.12-bookworm-slim"
         entrypoint   = ["/bin/sh", "-c"]
         network_mode = "bridge"
