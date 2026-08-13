@@ -135,7 +135,7 @@ def test_row_e23_answering_from_endorsed_material_opens_no_socket(no_egress: lis
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["disposition"] == "answered"
-    assert body["claims"][0]["citations"][0]["provenance"] == "customer-endorsed"
+    assert body["citations"][0]["provenance"] == "customer-endorsed"
     assert attempts_are_empty(no_egress)
 
 
@@ -156,7 +156,7 @@ def test_row_e23_the_mcp_surface_fetches_nothing_either(no_egress: list[str]) ->
     # an MCP result that declined would satisfy `ok` while fetching nothing for the same
     # reason a path that does not run fetches nothing.
     assert result.payload["disposition"] == "answered"
-    assert result.payload["claims"][0]["citations"][0]["provenance"] == "customer-endorsed"
+    assert result.payload["citations"][0]["provenance"] == "customer-endorsed"
     assert result.payload["endorsed_version"] == "v-one"
     assert attempts_are_empty(no_egress)
 

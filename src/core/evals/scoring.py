@@ -29,7 +29,13 @@ from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
 from core.evals.fidelity import score_fidelity
-from core.evals.suites import ESTATE_SUITES, MEASURED_SUITES, EvalCase, UnrunnableSuite
+from core.evals.suites import (
+    ESTATE_SUITES,
+    MEASURED_SUITES,
+    SUFFICIENCY_SUITES,
+    EvalCase,
+    UnrunnableSuite,
+)
 
 #: The ONE name for the live lane's credential. Asserted against by the no-secret-leak row
 #: as `scoring.EVAL_PROVIDER_KEY`, imported — a row matching a string literal that nothing
@@ -171,11 +177,16 @@ class AnsweringScorer:
             # A decline is a real response and is scored as one — `must_decline` exists precisely
             # to check that the platform declines when it should.
             return f"Declined: {answer.declined_reason}"
-        return " ".join(
-            f"{claim.statement} [{citation.url(self._corpus)}]"
+        # Statement text first, then citation URLs. `citation_accuracy` still needs `https://`
+        # in the scored string after 046's primary-answer shape (research R5); sufficiency
+        # judges substrings against this same product-path text (primary statements included).
+        primary = "\n\n".join(claim.statement for claim in answer.claims)
+        urls = " ".join(
+            f"[{citation.url(self._corpus)}]"
             for claim in answer.claims
             for citation in claim.citations
         )
+        return f"{primary} {urls}".strip()
 
 
 @dataclass(frozen=True)
@@ -300,6 +311,22 @@ class SuiteResult:
         return bool(self.verdicts) and all(v.passed for v in self.verdicts)
 
 
+def _normalise_space(text: str) -> str:
+    """Case-fold and collapse whitespace for sufficiency substring checks (046)."""
+    return " ".join(text.casefold().split())
+
+
+def _judge_sufficiency(case: EvalCase, response: str) -> tuple[bool, str]:
+    """Whether the product path's primary answer includes every required fact."""
+    if response.startswith("Declined:") or response == PROVIDER_REFUSAL:
+        return (False, "declined")
+    haystack = _normalise_space(response)
+    missing = [item for item in case.must_contain if _normalise_space(item) not in haystack]
+    if missing:
+        return (False, f"missing:{missing[0]}")
+    return (True, "sufficient")
+
+
 def _judge_response(case: EvalCase, response: str) -> tuple[bool, str]:
     """Whether a response satisfies a case's expectation.
 
@@ -390,7 +417,12 @@ def run_suite(
             )
             continue
         response = scorer.respond(subject, case)
-        passed, observed = _judge_response(case, response)
+        if suite in SUFFICIENCY_SUITES:
+            # 046: product path, then every `must_contain` substring in the primary answer.
+            # Not the cited/decline verb judge — that cannot fail a true locator (research R5).
+            passed, observed = _judge_sufficiency(case, response)
+        else:
+            passed, observed = _judge_response(case, response)
         verdicts.append(Verdict(case_id=case.id, suite=suite, passed=passed, observed=observed))
     return SuiteResult(
         suite=suite,

@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Protocol
 
-from core.evals.suites import MEASURED_SUITES, SUITES, UnrunnableSuite
+from core.evals.suites import MEASURED_SUITES, SUFFICIENCY_SUITES, SUITES, UnrunnableSuite
 
 #: The floor (ADR-0052). Mechanical, so "representative" is checkable at its edges.
 MINIMUM_SEED_CASES: Final[int] = 20
@@ -107,7 +107,11 @@ def _assert_floor(cases: tuple[SeedCase, ...]) -> None:
     # only way to satisfy the requirement would be to write seed cases nothing reads — a floor
     # met with material that exists solely to meet it, which is the shape ADR-0052's floor exists
     # to prevent.
-    missing = set(SUITES) - MEASURED_SUITES - suites_present
+    # SUFFICIENCY SUITES ARE EXCLUDED too (046). `answer_sufficiency` is scored by product-path
+    # substring checks over `must_contain`, not by a model judge rendering cited/decline/deny
+    # verdicts. Requiring seeds for it would invent judge material nothing judges — the same
+    # shape MEASURED exclusion already refuses for report_fidelity.
+    missing = set(SUITES) - MEASURED_SUITES - SUFFICIENCY_SUITES - suites_present
     if missing:
         raise UnrunnableSuite(
             f"seed set spans no cases for {sorted(missing)}; a judge qualified without them "

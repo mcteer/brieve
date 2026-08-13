@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+# terraform pack — answer_sufficiency suite (046). Five cases at the floor.
+#
+# Same load/score rules as vault (Principle VII): both packs ship the suite. Locator-shaped
+# omissions fail; including the fact passes.
+
+[[cases]]
+id = "terraform-answer-sufficiency-omit-001"
+suite = "answer_sufficiency"
+prompt = "What should happen when a Terraform application server node fails?"
+must_contain = ["automatically replace"]
+recorded = '{"answer": "The Terraform operating guide covers backup and recovery for application servers.", "citations": [{"path": "/validated-designs/terraform-operating-guides-adoption/backup", "anchor": "application-server"}]}'
+
+[[cases]]
+id = "terraform-answer-sufficiency-include-001"
+suite = "answer_sufficiency"
+prompt = "What should happen when a Terraform application server node fails?"
+must_contain = ["automatically replace"]
+recorded = '{"answer": "We recommend you automatically replace application server nodes when a node or availability zone fails.", "citations": [{"path": "/validated-designs/terraform-operating-guides-adoption/backup", "anchor": "application-server"}]}'
+
+[[cases]]
+id = "terraform-answer-sufficiency-include-002"
+suite = "answer_sufficiency"
+prompt = "What business objective does Terraform adoption name for time to market?"
+must_contain = ["standard workflow"]
+recorded = '{"answer": "Reduce time to market: This guide assists you in establishing a robust standard workflow for provisioning, configuring, and managing the lifecycle of hybrid/multi cloud infrastructure.", "citations": [{"path": "/validated-designs/terraform-operating-guides-adoption", "anchor": "business-objectives"}]}'
+
+[[cases]]
+id = "terraform-answer-sufficiency-omit-002"
+suite = "answer_sufficiency"
+prompt = "What business objective does Terraform adoption name for time to market?"
+must_contain = ["standard workflow"]
+recorded = '{"answer": "The Terraform adoption guide lists business objectives for the platform team.", "citations": [{"path": "/validated-designs/terraform-operating-guides-adoption", "anchor": "business-objectives"}]}'
+
+[[cases]]
+id = "terraform-answer-sufficiency-include-003"
+suite = "answer_sufficiency"
+prompt = "Why automate Boundary with Terraform?"
+must_contain = ["automation and repeatability"]
+recorded = '{"answer": "The first milestones of standardizing your Boundary installation are automation and repeatability.", "citations": [{"path": "/validated-designs/boundary-operating-guides-standardization/automating-with-terraform", "anchor": "automating-with-terraform"}]}'

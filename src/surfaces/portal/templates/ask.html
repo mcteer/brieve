@@ -143,8 +143,9 @@
 {% endblock %}
 {% block scripts %}
 {#
-  Loaded only where it has work to do. The ask page is the one page whose action takes long
-  enough that a blank browser tab is a usability problem worth a script.
+  Loaded only where they have work to do. Ask posts without navigating; copy buttons put an
+  answer or code panel on the clipboard. Both are progressive enhancement.
 #}
 <script src="/static/portal-ask.js" defer></script>
+<script src="/static/portal-copy.js" defer></script>
 {% endblock %}

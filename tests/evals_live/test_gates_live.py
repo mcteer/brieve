@@ -42,6 +42,7 @@ from core.evals.suites import (
     ANSWERING_SUITES,
     ESTATE_SUITES,
     MEASURED_SUITES,
+    SUFFICIENCY_SUITES,
     SUITES,
     load_pack_cases,
 )
@@ -91,7 +92,9 @@ def _grounding_for(pack: str, suite: str) -> str:
 #: cannot run must fail. But it had failed on every invocation since `report_fidelity` came into
 #: force in 021, because this file was written in 013 and nothing since had run it — the same shape
 #: as the finding 024 exists to close, one lane over.
-LIVE_SUITES: tuple[str, ...] = tuple(s for s in SUITES if s not in MEASURED_SUITES)
+LIVE_SUITES: tuple[str, ...] = tuple(
+    s for s in SUITES if s not in MEASURED_SUITES and s not in SUFFICIENCY_SUITES
+)
 
 
 #: Which subject roles each suite earns evidence for (031).

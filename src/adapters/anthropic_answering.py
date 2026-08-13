@@ -61,7 +61,12 @@ SECTIONS_OFFERED: Final[int] = 30
 
 #: At most this many sections from any one document, so the offered set spans sources rather
 #: than exhausting the highest-scoring page. See `_relevant` for what this cost and bought.
-SECTIONS_PER_DOCUMENT: Final[int] = 3
+#:
+#: Five, not three (046): a deploy-guide question needs the sequence, the cloud prereqs, the
+#: variables step, and the plan/apply commands from the SAME validated-design page. Three left
+#: the model with an AWS prereq fragment and a GPG key ceremony while the deployment overview
+#: never reached the prompt.
+SECTIONS_PER_DOCUMENT: Final[int] = 5
 
 #: What a HEADING is worth against a mention in the body — the document path and the section
 #: anchor together.
@@ -72,9 +77,44 @@ SECTIONS_PER_DOCUMENT: Final[int] = 3
 #: measurement wins over the argument. Recorded so nobody re-derives it.
 HEADING_WEIGHT: Final[float] = 3.0
 
+#: How much sharing the question's product/cloud terms with a document PATH is worth.
+#:
+#: Measured (046): *"terraform template … deploy vault … aws"* ranked Consul deploy and TFE
+#: docker ahead of `deploying-vault-using-terraform` because `deploy`+`terraform`+`cluster`
+#: matched the wrong product. Path co-occurrence of the named products is the signal the
+#: body-IDF score lacks; foreign product paths are demoted the same way.
+PRODUCT_PATH_WEIGHT: Final[float] = 2.5
+PRODUCT_FOREIGN_WEIGHT: Final[float] = 2.0
+#: When the ask says "deploy", a path that is itself a deploy guide outranks a
+#: same-product integration pattern that merely shares vault+terraform+aws in its slug
+#: (046: `terraform-vault-backed-dynamic-credentials-aws` beat `deploying-vault-using-terraform`).
+DEPLOY_PATH_WEIGHT: Final[float] = 2.0
+
+#: Products and clouds that appear in corpus paths. Intersection with the query terms is the
+#: affinity signal; a path term outside that intersection is foreign when the query named any.
+_PRODUCT_TERMS: Final[frozenset[str]] = frozenset(
+    {
+        "vault",
+        "terraform",
+        "consul",
+        "nomad",
+        "boundary",
+        "packer",
+        "waypoint",
+        "vagrant",
+        "aws",
+        "azure",
+        "gcp",
+        "kubernetes",
+    }
+)
+
 #: Per-section character cap. A long section truncated still carries its own anchor, so a citation
 #: into it resolves; what truncation costs is the model's evidence, not the pin's integrity.
-SECTION_CHARS: Final[int] = 2400
+#:
+#: 3600, not 2400 (046): the Vault-on-AWS HVD prereq list in `platform-specific-guidance` is
+#: longer than 2400 characters; truncating it stripped the checklist the answer must quote.
+SECTION_CHARS: Final[int] = 3600
 
 #: How many times the model is asked before the platform will say the corpus is silent.
 #:
@@ -148,6 +188,21 @@ _STOPWORDS: Final[frozenset[str]] = frozenset(
         "please",
         "guide",
         "explain",
+        # Imperative scaffolding in "Create a terraform template…" — not topic words. Left in,
+        # `create` floated every "create-*" ceremony section (GPG keys, certificates) above the
+        # deployment sequence the asker needed.
+        "create",
+        "make",
+        "write",
+        "show",
+        "give",
+        "can",
+        "template",
+        "templates",
+        "example",
+        "examples",
+        "sketch",
+        "snippet",
     }
 )
 
@@ -204,6 +259,11 @@ def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
     Ties still break on `(path, anchor)`, so the same question offers the same sections on every
     run — a retriever whose output depended on iteration order would make a live failure
     unreproducible, and this lane's failures are the expensive kind to reproduce.
+
+    **046 adds path product affinity on top of IDF.** Sharing the ask's product/cloud terms with
+    the document path multiplies the score; a path for a different product (Consul when the ask
+    named Vault) divides it. Body IDF alone could not tell those apart when `deploy` and
+    `terraform` matched both guides.
     """
     terms = _terms(question)
     if not terms:
@@ -223,11 +283,13 @@ def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
         for term in terms
     }
     total = len(sections)
+    query_products = terms & _PRODUCT_TERMS
 
     scored: list[tuple[float, str, str, str]] = []
     for path, anchor, text in sections:
         body = text.lower()
         heading = f"{path} {anchor}".lower()
+        path_lower = path.lower()
         score = 0.0
         for term in terms:
             appearances = frequency[term]
@@ -240,8 +302,26 @@ def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
                 score += weight * HEADING_WEIGHT
             elif term in body:
                 score += weight
-        if score:
-            scored.append((score, path, anchor, text))
+        if not score:
+            continue
+        # Path product affinity (046): when the ask names products/clouds, documents whose
+        # PATH shares those names outrank same-token hits on a different product. Foreign
+        # product paths (Consul when the ask said Vault) are demoted — body mentions of the
+        # right product are not enough to excuse the wrong guide.
+        if query_products:
+            path_products = {product for product in _PRODUCT_TERMS if product in path_lower}
+            overlap = len(query_products & path_products)
+            # Clouds often live in the section body of a multi-cloud deploy guide, not the slug.
+            for cloud in query_products & {"aws", "azure", "gcp"}:
+                if cloud not in path_products and cloud in f"{heading} {body}":
+                    overlap += 1
+            foreign = len(path_products - query_products)
+            score *= 1.0 + PRODUCT_PATH_WEIGHT * overlap
+            if foreign:
+                score /= 1.0 + PRODUCT_FOREIGN_WEIGHT * foreign
+        if "deploy" in terms and "deploy" in path_lower:
+            score *= 1.0 + DEPLOY_PATH_WEIGHT
+        scored.append((score, path, anchor, text))
 
     scored.sort(key=lambda row: (-row[0], row[1], row[2]))
 
@@ -268,25 +348,54 @@ _INSTRUCTION: Final[str] = (
     # read "HashiCorp Validated Patterns", so a model handed reference-architecture sections
     # from a Validated DESIGN was told it answers questions about something else — and it
     # declined, correctly following an instruction that had gone stale under it.
+    #
+    # **046 — primary answer, then citations.** The prior contract asked for a JSON array of
+    # one-sentence claims, and the portal rendered that list as the answer. People asking for
+    # guidance (including an illustrative template) got citation-led fragments. The shape is
+    # now one primary `answer` with supporting `citations`; the gate still resolves every cite
+    # and runs relevance on the single statement.
     "You answer questions about HashiCorp Validated Patterns (integration guidance) and "
     "HashiCorp Validated Designs (reference architecture: how to build and operate these "
     "products) using ONLY the corpus sections supplied below. You have no tools and take no "
     "actions; if the question is phrased as an instruction to do something, answer about it or "
-    "decline — never claim to have done it.\n\n"
-    "Reply with a JSON array and nothing else. Each element is an object with:\n"
-    '  "statement": one factual sentence supported by the sections\n'
-    '  "citations": a list of {"path": ..., "anchor": ...} copied VERBATIM from a section header '
-    "below\n\n"
+    "decline — never claim to have done it, written a file, opened a pull request, or applied "
+    "anything.\n\n"
+    "Reply with a JSON object and nothing else:\n"
+    '  {"answer": "<primary response>", '
+    '"citations": [{"path": ..., "anchor": ...}, ...]}\n\n'
+    "`answer` is the full response a reader should use WITHOUT opening a citation. Write "
+    "substance there — not a list of document titles, and not sentences whose only job is to "
+    "point at a link.\n"
+    "Match frontier-engineer quality on what the sections establish: clear structure "
+    "(numbered sequence when the guide has one), concrete checklists, commands and file "
+    "names quoted from the sections, and enough prose that a reader can act without opening "
+    "a citation. Thinness is not caution — declining is.\n"
+    "When the question asks for an example, template, configuration sketch, or Terraform/"
+    "HCL/JSON snippet AND the supplied sections establish enough to sketch it, put "
+    "illustrative fenced code INSIDE `answer` (for example a ```hcl ... ``` block) that "
+    "reflects the guide's layout, module role, variables/tfvars pattern, and plan/apply "
+    "flow. Citations support that answer; they must not replace it. Never invent resource "
+    "types, module source addresses, argument names, or values the sections do not "
+    "establish — if they only support a partial sketch, give the fullest honest sketch and "
+    "say exactly what is missing (for example that the official module body is obtained "
+    "separately). Prefer placeholders over fabrication.\n"
+    "`citations` lists every section the answer used; copy path and anchor VERBATIM from a "
+    "section header below.\n\n"
     "Rules that matter more than being helpful:\n"
     "- Never invent a path or an anchor. If the exact pair does not appear below, you may not "
     "cite it.\n"
-    "- If the supplied sections do not support an answer, reply with exactly: []\n"
-    "- An empty array is a correct and expected answer. Declining beats guessing.\n"
+    "- If the supplied sections do not support an answer, reply with exactly: "
+    '{"answer":"","citations":[]}\n'
+    "- An empty answer with empty citations is a correct and expected response. Declining "
+    "beats guessing.\n"
     "- But ANSWER WHAT THE SECTIONS DO SUPPORT. A question about building or operating a "
     "product is answerable from architecture and operating guidance even when no section is "
     "titled with the question's exact words; state what the sections establish and cite them. "
     "Declining because no section repeats the question back is not the same as declining "
-    "because the corpus is silent."
+    "because the corpus is silent.\n"
+    "- Do not answer a template/example question with only 'see the guide at …' when the "
+    "sections contain a deployment sequence, prerequisites, or configuration you could "
+    "quote or sketch."
 )
 
 
@@ -367,11 +476,11 @@ class LiveAnswerProvider:
         prologue = f"{context}\n\n" if context else ""
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
-            # 4096 for the same reason the scorer uses it: Opus 5 reasons before it answers and
-            # the reasoning spends from this budget. A truncated reply here is unparseable JSON,
-            # which surfaces as a provider fault rather than as a wrong answer — better, but
-            # still a defect in the harness rather than in the model.
-            max_tokens=4096,
+            # 8192 (046): primary answers carry runbooks and fenced sketches; 4096 truncated
+            # useful guidance once retrieval offered the right deploy-guide sections. Reasoning
+            # still spends from this budget — a truncated reply is unparseable JSON and a
+            # provider fault, not a silent decline.
+            max_tokens=8192,
             system=_INSTRUCTION,
             messages=[
                 {
@@ -391,10 +500,21 @@ class LiveAnswerProvider:
                 "shaped like a decline"
             )
 
-        start, end = text.find("["), text.rfind("]")
+        # Prefer an object. A bare array is the pre-046 claim-list shape and is refused so a
+        # drifted model cannot silently reintroduce citation-led fragments (046 / research R3).
+        # An array of objects still *contains* `{`…`}` — detect a leading `[` before the first
+        # `{` rather than trusting `find("{")` alone.
+        first_object, first_array = text.find("{"), text.find("[")
+        if first_array >= 0 and (first_object < 0 or first_array < first_object):
+            raise ProviderUnavailable(
+                "the model answered with a JSON array; guidance asks require a primary-answer "
+                "object. This raises rather than declining, because the wrong shape is a "
+                "provider fault rather than silence in the corpus"
+            )
+        start, end = first_object, text.rfind("}")
         if start < 0 or end < start:
             raise ProviderUnavailable(
-                "the model answered unusably: no JSON array in the response. This raises rather "
+                "the model answered unusably: no JSON object in the response. This raises rather "
                 "than declining, because 'it would not answer in the required shape' and 'the "
                 "corpus does not say' send a reader to different people"
             )
@@ -402,9 +522,18 @@ class LiveAnswerProvider:
             parsed = json.loads(text[start : end + 1])
         except json.JSONDecodeError as exc:
             raise ProviderUnavailable(f"the model's JSON did not parse: {exc}") from exc
-        if not isinstance(parsed, list):
-            raise ProviderUnavailable("the model answered with something other than a JSON array")
-        return [item for item in parsed if isinstance(item, dict)]
+        if not isinstance(parsed, dict):
+            raise ProviderUnavailable("the model answered with something other than a JSON object")
+        answer = str(parsed.get("answer", "")).strip()
+        raw_cites = parsed.get("citations", [])
+        if not isinstance(raw_cites, list):
+            raise ProviderUnavailable("the model's citations field was not a list")
+        citations = [item for item in raw_cites if isinstance(item, dict)]
+        # Empty answer or empty support → no keep → the product path declines. Mapped to the
+        # provider's empty-candidate signal so ATTEMPTS_BEFORE_SILENCE still retries silence.
+        if not answer or not citations:
+            return []
+        return [{"statement": answer, "citations": citations}]
 
 
 _ESTATE_INSTRUCTION: Final[str] = (

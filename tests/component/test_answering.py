@@ -485,3 +485,46 @@ def test_no_single_document_takes_every_offered_slot() -> None:
 
     assert len(from_hog) <= SECTIONS_PER_DOCUMENT
     assert any(row[0] == "/other" for row in offered), "a second source never got a slot"
+
+
+def test_imperative_scaffolding_is_not_a_retrieval_term() -> None:
+    """'Create a template…' must not float every create-* ceremony heading."""
+    from adapters.anthropic_answering import _terms
+
+    terms = _terms("Create a terraform template that can deploy vault to an aws cluster group")
+    assert "terraform" in terms and "vault" in terms and "aws" in terms
+    assert "create" not in terms
+    assert "template" not in terms
+    assert "can" not in terms
+
+
+def test_path_product_affinity_prefers_the_named_product_guide() -> None:
+    """When the ask names Vault + Terraform, a Consul deploy guide must not win on shared verbs.
+
+    Measured (046): the same deploy/terraform/cluster tokens ranked
+    `deploying-consul-using-terraform` above `deploying-vault-using-terraform`.
+    """
+    from adapters.anthropic_answering import _relevant
+    from core.answering.corpus import Corpus, Document
+
+    vault = Document(
+        path="/validated-designs/vault-solution/deploying-vault-using-terraform",
+        url="https://example.test/vault",
+        digest="d" * 64,
+        anchors=frozenset({"sequence"}),
+        sections={"sequence": "deploy vault with terraform on aws"},
+    )
+    consul = Document(
+        path="/validated-designs/consul-solution/deploying-consul-using-terraform",
+        url="https://example.test/consul",
+        digest="e" * 64,
+        anchors=frozenset({"sequence"}),
+        sections={"sequence": "deploy consul with terraform on aws cluster"},
+    )
+    corpus = Corpus(digest="c" * 64, documents={vault.path: vault, consul.path: consul})
+
+    best = _relevant("deploy vault with terraform on aws", corpus)[0]
+
+    assert best[0] == vault.path, (
+        f"wrong-product deploy guide won on shared tokens; got {best[0]!r}"
+    )

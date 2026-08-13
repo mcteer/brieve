@@ -77,6 +77,10 @@ def test_row_r9_no_answering_eval_case_was_edited() -> None:
 
     A fix that bought its decline by editing the cases would pass every other row in this
     feature. This is the one that makes that impossible to do quietly.
+
+    **Adds are allowed.** A new suite (046 `answer_sufficiency.toml`) is not retuning a case
+    that already failed — it is a new gate. Only modify/delete of a file that existed at the
+    merge-base is the quiet retune this row refuses (`--diff-filter=MD`).
     """
     base = _merge_base()
     assert base, (
@@ -85,7 +89,7 @@ def test_row_r9_no_answering_eval_case_was_edited() -> None:
     )
 
     changed = subprocess.run(
-        ["git", "diff", "--name-only", base, "HEAD", "--", f"{EVAL_CASES}/"],
+        ["git", "diff", "--name-only", "--diff-filter=MD", base, "HEAD", "--", f"{EVAL_CASES}/"],
         cwd=ROOT,
         capture_output=True,
         text=True,

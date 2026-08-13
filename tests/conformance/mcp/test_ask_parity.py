@@ -92,7 +92,10 @@ def test_row_an_answer_is_the_same_on_both() -> None:
 
     assert api.status_code == mcp.status == 200
     assert api.json()["disposition"] == mcp.payload["disposition"] == "answered"
-    assert api.json()["claims"] == mcp.payload["claims"]
+    assert api.json()["primary_answer"] == mcp.payload["primary_answer"]
+    assert api.json()["citations"] == mcp.payload["citations"]
+    assert api.json()["primary_answer"]
+    assert api.json()["citations"]
     assert api.json()["corpus_digest"] == mcp.payload["corpus_digest"] == CORPUS.digest
 
 

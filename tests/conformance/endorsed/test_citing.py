@@ -137,7 +137,7 @@ def test_row_e18_a_question_only_the_customers_documents_answer_is_answered() ->
     body = response.json()
     assert response.status_code == 200
     assert body["disposition"] == "answered"
-    assert body["claims"][0]["citations"][0]["url"].startswith("https://git.example.com")
+    assert body["citations"][0]["url"].startswith("https://git.example.com")
 
 
 def test_row_e18_a_path_in_neither_corpus_does_not_resolve() -> None:
@@ -169,7 +169,7 @@ def test_row_e19_every_citation_carries_its_provenance_as_data() -> None:
     every consumer is how conventions decay (038's payload table)."""
     _, response = _ask([(ENDORSED_PATH, "retention")], endorsed=_endorsed())
 
-    citation = response.json()["claims"][0]["citations"][0]
+    citation = response.json()["citations"][0]
     assert citation["provenance"] == CUSTOMER_ENDORSED
 
 
@@ -177,7 +177,7 @@ def test_row_e19_a_validated_design_citation_says_so_too() -> None:
     """Both directions, because a field only ever taking one value asserts nothing."""
     _, response = _ask([(PINNED_PATH, PINNED_ANCHOR)], endorsed=_endorsed())
 
-    citation = response.json()["claims"][0]["citations"][0]
+    citation = response.json()["citations"][0]
     assert citation["provenance"] == VALIDATED_DESIGN
 
 
@@ -192,7 +192,7 @@ def test_row_e19_a_mixed_answer_names_both_and_each_citation_says_which() -> Non
     )
 
     body = response.json()
-    kinds = {c["provenance"] for c in body["claims"][0]["citations"]}
+    kinds = {c["provenance"] for c in body["citations"]}
     assert kinds == {VALIDATED_DESIGN, CUSTOMER_ENDORSED}
     assert "both" in body["grounding_note"]
 

@@ -26,6 +26,7 @@ from core.evals.suites import (
     ESTATE_SUITES,
     MEASURED_SUITES,
     OWED,
+    SUFFICIENCY_SUITES,
     SUITES,
     EvalCase,
     UnrunnableSuite,
@@ -77,7 +78,7 @@ def _scorer_for(suite: str, pack: str = "vault") -> Scorer:
         # ANSWERING_SUITES would route this to the corpus scorer, whose provider parses
         # documentation URLs out of recordings that contain none — every case would decline.
         return EstateAnsweringScorer(estate=load_estate_records(PACKS / pack))
-    if suite in ANSWERING_SUITES:
+    if suite in ANSWERING_SUITES or suite in SUFFICIENCY_SUITES:
         from core.answering.corpus import load_corpus
         from core.evals.scoring import AnsweringScorer
 
@@ -89,7 +90,7 @@ def _scorer_for(suite: str, pack: str = "vault") -> Scorer:
 def _expected_scorer(suite: str) -> str:
     if suite in ESTATE_SUITES:
         return "EstateAnsweringScorer"
-    if suite in ANSWERING_SUITES:
+    if suite in ANSWERING_SUITES or suite in SUFFICIENCY_SUITES:
         return "AnsweringScorer"
     return "FixtureScorer"
 
@@ -103,6 +104,10 @@ def test_all_five_suites_pass_against_both_shipped_packs() -> None:
     **Two of them score the product now** (024). Before that, all five replayed authored strings —
     including two suites for a capability that did not exist, which is the defect 024 was written
     to remove rather than to describe.
+
+    **`answer_sufficiency` (046) is different:** the shipped pack files deliberately include a
+    fact-omitting case that must FAIL and a fact-including case that must pass — that is how
+    the suite proves it can fail (ADR-0047). Other suites remain all-green.
     """
     for pack in ("vault", "terraform"):
         for suite in SUITES:
@@ -114,13 +119,22 @@ def test_all_five_suites_pass_against_both_shipped_packs() -> None:
                 scorer=_scorer_for(suite, pack),
                 compile_for=_compile_for,
             )
-            assert result.passed, (
-                f"{pack}/{suite} failed: {[v.case_id for v in result.verdicts if not v.passed]}"
-            )
             expected = _expected_scorer(suite)
             assert result.scorer == expected, (
                 f"{suite} scored with {result.scorer}, expected {expected} — a suite that "
                 "silently reverts to replaying its recording stops testing the product"
+            )
+            if suite in SUFFICIENCY_SUITES:
+                passed = [v.case_id for v in result.verdicts if v.passed]
+                failed = [v.case_id for v in result.verdicts if not v.passed]
+                assert passed, f"{pack}/{suite} had no passing case — the suite cannot pass"
+                assert failed, (
+                    f"{pack}/{suite} had no failing case — a usefulness suite that cannot fail "
+                    f"is a governance hole (ADR-0047)"
+                )
+                continue
+            assert result.passed, (
+                f"{pack}/{suite} failed: {[v.case_id for v in result.verdicts if not v.passed]}"
             )
 
 
@@ -259,9 +273,12 @@ def test_the_live_lane_scores_only_suites_it_can_score() -> None:
     """
     from tests.evals_live.test_gates_live import LIVE_SUITES
 
-    assert set(LIVE_SUITES) | MEASURED_SUITES == set(SUITES)
+    assert set(LIVE_SUITES) | MEASURED_SUITES | SUFFICIENCY_SUITES == set(SUITES)
     assert not set(LIVE_SUITES) & MEASURED_SUITES, (
         "a measured suite in the live parametrisation fails deterministically, 24 minutes in"
+    )
+    assert not set(LIVE_SUITES) & SUFFICIENCY_SUITES, (
+        "answer_sufficiency is hermetic; live SC-002 is a named-runner bar (046), not this lane"
     )
     assert ANSWERING_SUITES <= set(LIVE_SUITES), (
         "the answering suites are the ask cell's qualification; dropping them from the live "

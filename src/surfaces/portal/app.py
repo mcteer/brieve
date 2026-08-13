@@ -15,22 +15,95 @@ all"), asserted by comparing what the relay reached against what the catalogue e
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup, escape
 
 from surfaces.portal.events import thread_event_stream
+from surfaces.portal.highlight import highlight_code
 from surfaces.portal.oidc import LoginRefused, OidcClient
 from surfaces.portal.relay import ApiRelay, ApiResponse
 from surfaces.portal.session import COOKIE_NAME, SessionStore, cookie_attributes
 
 TEMPLATES = Path(__file__).parent / "templates"
 STATIC = Path(__file__).parent / "static"
+
+#: Opening fence for a model-authored code block in a primary answer (046).
+_FENCE: Final[str] = "```"
+
+#: Inline emphasis the model already wrote — presentation only. Escape first, then wrap.
+_BOLD: Final[re.Pattern[str]] = re.compile(r"\*\*(.+?)\*\*")
+_INLINE_CODE: Final[re.Pattern[str]] = re.compile(r"`([^`\n]+)`")
+
+
+def answer_segments(text: object) -> tuple[dict[str, str], ...]:
+    """Split a primary answer into prose and fenced-code segments for display.
+
+    **Presentation, not classification** (ADR-0034). The model already put ``` fences in the
+    answer; this only chooses HTML shapes so a Terraform sketch reads as a code block rather
+    than as backticks mixed into a prose blob. Nothing about grounding or disposition is
+    decided here — unfenced text stays prose; inline emphasis is applied by `answer_markup`.
+    """
+    raw = str(text or "")
+    if not raw:
+        return ()
+    segments: list[dict[str, str]] = []
+    prose: list[str] = []
+    lines = raw.splitlines(keepends=True)
+    index = 0
+
+    def _flush_prose() -> None:
+        body = "".join(prose).strip("\n")
+        prose.clear()
+        if body.strip():
+            segments.append({"kind": "prose", "lang": "", "text": body})
+
+    while index < len(lines):
+        line = lines[index]
+        if line.startswith(_FENCE):
+            _flush_prose()
+            lang = line[len(_FENCE) :].strip()
+            index += 1
+            code: list[str] = []
+            while index < len(lines) and not lines[index].startswith(_FENCE):
+                code.append(lines[index])
+                index += 1
+            segments.append(
+                {
+                    "kind": "code",
+                    "lang": lang,
+                    "text": "".join(code).rstrip("\n"),
+                }
+            )
+            if index < len(lines) and lines[index].startswith(_FENCE):
+                index += 1
+            continue
+        prose.append(line)
+        index += 1
+    _flush_prose()
+    if not segments and raw.strip():
+        return ({"kind": "prose", "lang": "", "text": raw.rstrip("\n")},)
+    return tuple(segments)
+
+
+def answer_markup(text: object) -> Markup:
+    """Escape prose, then honour the model's own ``**bold**`` and `` `code` `` markers.
+
+    **Not a markdown engine.** Full markdown would pull a dependency into the portal for a
+    shape the model rarely uses beyond emphasis and inline identifiers. Unmatched markers
+    stay visible as text; nothing here invents structure the answer did not already write.
+    """
+    escaped = str(escape(str(text or "")))
+    emphasised = _BOLD.sub(r"<strong>\1</strong>", escaped)
+    return Markup(_INLINE_CODE.sub(r"<code>\1</code>", emphasised))
+
 
 #: How long a portal session lasts when the token carries no usable expiry.
 FALLBACK_SESSION_LIFETIME = timedelta(hours=1)
@@ -111,6 +184,9 @@ def create_portal(
 
     templates.env.filters["readable_instant"] = _readable_instant
     templates.env.filters["agent_label"] = agent_label
+    templates.env.filters["answer_segments"] = answer_segments
+    templates.env.filters["answer_markup"] = answer_markup
+    templates.env.filters["highlight_code"] = highlight_code
     app.state.templates = templates
 
     def _session(request: Request) -> Any:
