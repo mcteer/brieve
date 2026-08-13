@@ -87,6 +87,15 @@ variable "relevance_model" {
   default = ""
 }
 
+variable "propose_owned_repositories" {
+  type        = string
+  default     = ""
+  description = <<-DESC
+    047. Comma-separated owner/repo identifiers Propose may target. Empty refuses every
+    repository (fail closed). Dev commonly sets mcteer/brieve-demo.
+  DESC
+}
+
 variable "oidc_tenant_claim" {
   type        = string
   default     = "tenant"
@@ -263,6 +272,9 @@ job "api" {
 
         ASK_MODEL       = var.ask_model
         RELEVANCE_MODEL = var.relevance_model
+
+        # 047. Fail closed when empty — see var.propose_owned_repositories.
+        PROPOSE_OWNED_REPOSITORIES = var.propose_owned_repositories
 
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
 

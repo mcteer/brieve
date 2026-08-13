@@ -165,9 +165,16 @@ ASK_MODEL="$(env_val ASK_MODEL)"
 # 043: the relevance judge's model, and NEVER the same value as ASK_MODEL —
 # ADR-0067 forbids a model judging its own output.
 RELEVANCE_MODEL="$(env_val RELEVANCE_MODEL)"
+# 047: repositories Propose may target (owner/repo). Default the local demo repo when unset
+# so a fresh stack can exercise Propose; empty would refuse every URL (fail closed in code).
+PROPOSE_OWNED_REPOSITORIES="$(env_val PROPOSE_OWNED_REPOSITORIES)"
+if [ -z "$PROPOSE_OWNED_REPOSITORIES" ]; then
+  PROPOSE_OWNED_REPOSITORIES="mcteer/brieve-demo"
+fi
 nomad job run -detach -var="repo=$REPO" \
   -var="ask_model=${ASK_MODEL}" \
   -var="relevance_model=${RELEVANCE_MODEL}" \
+  -var="propose_owned_repositories=${PROPOSE_OWNED_REPOSITORIES}" \
   -var="oidc_issuer=${OIDC_ISSUER}" \
   -var="oidc_jwks_uri=${OIDC_JWKS_URI}" \
   -var="oidc_audience=${OIDC_AUDIENCE}" \
