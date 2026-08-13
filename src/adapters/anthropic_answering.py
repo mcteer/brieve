@@ -61,7 +61,12 @@ SECTIONS_OFFERED: Final[int] = 30
 
 #: At most this many sections from any one document, so the offered set spans sources rather
 #: than exhausting the highest-scoring page. See `_relevant` for what this cost and bought.
-SECTIONS_PER_DOCUMENT: Final[int] = 3
+#:
+#: Five, not three (046): a deploy-guide question needs the sequence, the cloud prereqs, the
+#: variables step, and the plan/apply commands from the SAME validated-design page. Three left
+#: the model with an AWS prereq fragment and a GPG key ceremony while the deployment overview
+#: never reached the prompt.
+SECTIONS_PER_DOCUMENT: Final[int] = 5
 
 #: What a HEADING is worth against a mention in the body — the document path and the section
 #: anchor together.
@@ -72,9 +77,44 @@ SECTIONS_PER_DOCUMENT: Final[int] = 3
 #: measurement wins over the argument. Recorded so nobody re-derives it.
 HEADING_WEIGHT: Final[float] = 3.0
 
+#: How much sharing the question's product/cloud terms with a document PATH is worth.
+#:
+#: Measured (046): *"terraform template … deploy vault … aws"* ranked Consul deploy and TFE
+#: docker ahead of `deploying-vault-using-terraform` because `deploy`+`terraform`+`cluster`
+#: matched the wrong product. Path co-occurrence of the named products is the signal the
+#: body-IDF score lacks; foreign product paths are demoted the same way.
+PRODUCT_PATH_WEIGHT: Final[float] = 2.5
+PRODUCT_FOREIGN_WEIGHT: Final[float] = 2.0
+#: When the ask says "deploy", a path that is itself a deploy guide outranks a
+#: same-product integration pattern that merely shares vault+terraform+aws in its slug
+#: (046: `terraform-vault-backed-dynamic-credentials-aws` beat `deploying-vault-using-terraform`).
+DEPLOY_PATH_WEIGHT: Final[float] = 2.0
+
+#: Products and clouds that appear in corpus paths. Intersection with the query terms is the
+#: affinity signal; a path term outside that intersection is foreign when the query named any.
+_PRODUCT_TERMS: Final[frozenset[str]] = frozenset(
+    {
+        "vault",
+        "terraform",
+        "consul",
+        "nomad",
+        "boundary",
+        "packer",
+        "waypoint",
+        "vagrant",
+        "aws",
+        "azure",
+        "gcp",
+        "kubernetes",
+    }
+)
+
 #: Per-section character cap. A long section truncated still carries its own anchor, so a citation
 #: into it resolves; what truncation costs is the model's evidence, not the pin's integrity.
-SECTION_CHARS: Final[int] = 2400
+#:
+#: 3600, not 2400 (046): the Vault-on-AWS HVD prereq list in `platform-specific-guidance` is
+#: longer than 2400 characters; truncating it stripped the checklist the answer must quote.
+SECTION_CHARS: Final[int] = 3600
 
 #: How many times the model is asked before the platform will say the corpus is silent.
 #:
@@ -148,6 +188,21 @@ _STOPWORDS: Final[frozenset[str]] = frozenset(
         "please",
         "guide",
         "explain",
+        # Imperative scaffolding in "Create a terraform template…" — not topic words. Left in,
+        # `create` floated every "create-*" ceremony section (GPG keys, certificates) above the
+        # deployment sequence the asker needed.
+        "create",
+        "make",
+        "write",
+        "show",
+        "give",
+        "can",
+        "template",
+        "templates",
+        "example",
+        "examples",
+        "sketch",
+        "snippet",
     }
 )
 
@@ -204,6 +259,11 @@ def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
     Ties still break on `(path, anchor)`, so the same question offers the same sections on every
     run — a retriever whose output depended on iteration order would make a live failure
     unreproducible, and this lane's failures are the expensive kind to reproduce.
+
+    **046 adds path product affinity on top of IDF.** Sharing the ask's product/cloud terms with
+    the document path multiplies the score; a path for a different product (Consul when the ask
+    named Vault) divides it. Body IDF alone could not tell those apart when `deploy` and
+    `terraform` matched both guides.
     """
     terms = _terms(question)
     if not terms:
@@ -223,11 +283,13 @@ def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
         for term in terms
     }
     total = len(sections)
+    query_products = terms & _PRODUCT_TERMS
 
     scored: list[tuple[float, str, str, str]] = []
     for path, anchor, text in sections:
         body = text.lower()
         heading = f"{path} {anchor}".lower()
+        path_lower = path.lower()
         score = 0.0
         for term in terms:
             appearances = frequency[term]
@@ -240,8 +302,26 @@ def _relevant(question: str, corpus: Corpus) -> list[tuple[str, str, str]]:
                 score += weight * HEADING_WEIGHT
             elif term in body:
                 score += weight
-        if score:
-            scored.append((score, path, anchor, text))
+        if not score:
+            continue
+        # Path product affinity (046): when the ask names products/clouds, documents whose
+        # PATH shares those names outrank same-token hits on a different product. Foreign
+        # product paths (Consul when the ask said Vault) are demoted — body mentions of the
+        # right product are not enough to excuse the wrong guide.
+        if query_products:
+            path_products = {product for product in _PRODUCT_TERMS if product in path_lower}
+            overlap = len(query_products & path_products)
+            # Clouds often live in the section body of a multi-cloud deploy guide, not the slug.
+            for cloud in query_products & {"aws", "azure", "gcp"}:
+                if cloud not in path_products and cloud in f"{heading} {body}":
+                    overlap += 1
+            foreign = len(path_products - query_products)
+            score *= 1.0 + PRODUCT_PATH_WEIGHT * overlap
+            if foreign:
+                score /= 1.0 + PRODUCT_FOREIGN_WEIGHT * foreign
+        if "deploy" in terms and "deploy" in path_lower:
+            score *= 1.0 + DEPLOY_PATH_WEIGHT
+        scored.append((score, path, anchor, text))
 
     scored.sort(key=lambda row: (-row[0], row[1], row[2]))
 
@@ -286,12 +366,19 @@ _INSTRUCTION: Final[str] = (
     "`answer` is the full response a reader should use WITHOUT opening a citation. Write "
     "substance there — not a list of document titles, and not sentences whose only job is to "
     "point at a link.\n"
+    "Match frontier-engineer quality on what the sections establish: clear structure "
+    "(numbered sequence when the guide has one), concrete checklists, commands and file "
+    "names quoted from the sections, and enough prose that a reader can act without opening "
+    "a citation. Thinness is not caution — declining is.\n"
     "When the question asks for an example, template, configuration sketch, or Terraform/"
     "HCL/JSON snippet AND the supplied sections establish enough to sketch it, put "
-    "illustrative fenced code INSIDE `answer` (for example a ```hcl ... ``` block). Citations "
-    "support that answer; they must not replace it. Never invent resources, arguments, or "
-    "values the sections do not establish — if they only support a partial sketch, give that "
-    "partial sketch and say what is missing.\n"
+    "illustrative fenced code INSIDE `answer` (for example a ```hcl ... ``` block) that "
+    "reflects the guide's layout, module role, variables/tfvars pattern, and plan/apply "
+    "flow. Citations support that answer; they must not replace it. Never invent resource "
+    "types, module source addresses, argument names, or values the sections do not "
+    "establish — if they only support a partial sketch, give the fullest honest sketch and "
+    "say exactly what is missing (for example that the official module body is obtained "
+    "separately). Prefer placeholders over fabrication.\n"
     "`citations` lists every section the answer used; copy path and anchor VERBATIM from a "
     "section header below.\n\n"
     "Rules that matter more than being helpful:\n"
@@ -307,7 +394,8 @@ _INSTRUCTION: Final[str] = (
     "Declining because no section repeats the question back is not the same as declining "
     "because the corpus is silent.\n"
     "- Do not answer a template/example question with only 'see the guide at …' when the "
-    "sections contain configuration you could quote or sketch."
+    "sections contain a deployment sequence, prerequisites, or configuration you could "
+    "quote or sketch."
 )
 
 
@@ -388,11 +476,11 @@ class LiveAnswerProvider:
         prologue = f"{context}\n\n" if context else ""
         response = client.messages.create(  # type: ignore[attr-defined]
             model=api_model,
-            # 4096 for the same reason the scorer uses it: Opus 5 reasons before it answers and
-            # the reasoning spends from this budget. A truncated reply here is unparseable JSON,
-            # which surfaces as a provider fault rather than as a wrong answer — better, but
-            # still a defect in the harness rather than in the model.
-            max_tokens=4096,
+            # 8192 (046): primary answers carry runbooks and fenced sketches; 4096 truncated
+            # useful guidance once retrieval offered the right deploy-guide sections. Reasoning
+            # still spends from this budget — a truncated reply is unparseable JSON and a
+            # provider fault, not a silent decline.
+            max_tokens=8192,
             system=_INSTRUCTION,
             messages=[
                 {
