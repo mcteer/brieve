@@ -129,6 +129,7 @@ def test_the_ask_page_offers_somewhere_for_an_answer_to_land(portal: TestClient)
     body = portal.get("/ask").text
 
     assert "/static/portal-ask.js" in body
+    assert "/static/portal-copy.js" in body
     # `ask-outcome` became `ask-transcript` in 035: the region stopped being where THE answer
     # goes and became where EVERY answer accumulates. The name change is the behaviour change.
     assert 'id="ask-transcript"' in body, "there is nowhere for answers to accumulate"

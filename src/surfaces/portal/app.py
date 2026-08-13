@@ -27,6 +27,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
 from surfaces.portal.events import thread_event_stream
+from surfaces.portal.highlight import highlight_code
 from surfaces.portal.oidc import LoginRefused, OidcClient
 from surfaces.portal.relay import ApiRelay, ApiResponse
 from surfaces.portal.session import COOKIE_NAME, SessionStore, cookie_attributes
@@ -185,6 +186,7 @@ def create_portal(
     templates.env.filters["agent_label"] = agent_label
     templates.env.filters["answer_segments"] = answer_segments
     templates.env.filters["answer_markup"] = answer_markup
+    templates.env.filters["highlight_code"] = highlight_code
     app.state.templates = templates
 
     def _session(request: Request) -> Any:

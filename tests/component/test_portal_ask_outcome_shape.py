@@ -8,11 +8,13 @@ from typing import Any
 from fastapi.templating import Jinja2Templates
 
 from surfaces.portal.app import TEMPLATES, answer_markup, answer_segments
+from surfaces.portal.highlight import highlight_code
 from surfaces.portal.relay import ApiResponse
 
 _TEMPLATES = Jinja2Templates(directory=str(TEMPLATES))
 _TEMPLATES.env.filters["answer_segments"] = answer_segments
 _TEMPLATES.env.filters["answer_markup"] = answer_markup
+_TEMPLATES.env.filters["highlight_code"] = highlight_code
 
 
 def _render(payload: dict[str, Any]) -> str:
@@ -81,12 +83,16 @@ def test_fenced_code_renders_as_a_code_panel_not_a_prose_blob() -> None:
         }
     )
 
+    assert 'class="answer-code-frame"' in html
     assert 'class="answer-code"' in html
     assert 'data-lang="hcl"' in html
     assert "aws_instance" in html
+    assert 'class="tok-keyword"' in html
     assert "```" not in html
     assert "primary-answer-prose" in html
     assert "Here is a sketch" in html
+    assert 'data-copy-scope="answer"' in html
+    assert 'data-copy-scope="code"' in html
 
 
 def test_answer_segments_splits_fences_without_inventing_structure() -> None:

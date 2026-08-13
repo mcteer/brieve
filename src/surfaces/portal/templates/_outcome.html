@@ -86,7 +86,14 @@
 
   {% else %}
     <section class="answer" aria-labelledby="outcome">
-      <h2 id="outcome">Answer</h2>
+      <div class="answer-toolbar">
+        <h2 id="outcome">Answer</h2>
+        {#
+          COPY THE ANSWER as plain text — for pasting into a ticket, PR, or chat. The button
+          is inert without `portal-copy.js`; with it, `.copy-body` is what lands on the clipboard.
+        #}
+        <button type="button" class="copy-control" data-copy-scope="answer">Copy</button>
+      </div>
       {#
         PRIMARY ANSWER FIRST (046). New guidance outcomes carry `primary_answer` + top-level
         `citations`. Stored conversations may still hold pre-046 `claims[]` only — replay them
@@ -94,15 +101,22 @@
       #}
       {% set _primary = (response.payload or {}).get("primary_answer") %}
       {% set _top_citations = (response.payload or {}).get("citations") %}
+      <div class="copy-body">
       {% if _primary %}
         <div class="primary-answer">
           {#
             Fenced ``` blocks become real code panels; surrounding text stays prose.
             The filter only recognises fences the model already wrote (046 presentation).
           #}
-            {% for segment in _primary | answer_segments %}
+          {% for segment in _primary | answer_segments %}
             {% if segment.kind == "code" %}
-              <pre class="answer-code"{% if segment.lang %} data-lang="{{ segment.lang }}"{% endif %}><code>{{ segment.text }}</code></pre>
+              <figure class="answer-code-frame"{% if segment.lang %} data-lang="{{ segment.lang }}"{% endif %}>
+                <figcaption class="answer-code-bar">
+                  {% if segment.lang %}<span class="answer-code-lang">{{ segment.lang }}</span>{% endif %}
+                  <button type="button" class="copy-control" data-copy-scope="code">Copy</button>
+                </figcaption>
+                <pre class="answer-code"><code>{{ segment.text | highlight_code(segment.lang) }}</code></pre>
+              </figure>
             {% else %}
               {# Escape + honour **bold** / `code` the model already wrote (046 presentation). #}
               <div class="primary-answer-prose">{{ segment.text | answer_markup }}</div>
@@ -174,6 +188,7 @@
         {% endfor %}
       </ol>
       {% endif %}
+      </div>
       <div class="provenance">
       {% if (response.payload or {}).get("window_note") %}
         {#

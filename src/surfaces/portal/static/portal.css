@@ -92,6 +92,19 @@
   --font-prose: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-control: system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-evidence: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Code panels — a darker inset so fenced sketches scan like an editor, not page prose.
+     Token colours clear AA against `--code-surface` (computed before use). */
+  --code-surface: #16181d;
+  --code-bar: #1e2229;
+  --code-ink: #e8eaed;
+  --code-rule: #2c3038;
+  --tok-keyword: #c4a1ff;
+  --tok-string: #8fd6a8;
+  --tok-comment: #9aa0a8;
+  --tok-number: #e8a35c;
+  --tok-name: #9ecbff;
+  --tok-punct: #a3a7b0;
 }
 
 /* DESIGNED, NOT INVERTED. The accent that clears AA on white is not the one that clears it on
@@ -117,6 +130,16 @@
     --lift: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 1px rgb(0 0 0 / 0.3);
     --inset: inset 0 1px 2px rgb(0 0 0 / 0.25);
     --lift-strong: 0 4px 14px rgb(0 0 0 / 0.5);
+    --code-surface: #0e1014;
+    --code-bar: #161a21;
+    --code-ink: #e8eaed;
+    --code-rule: #2a2e36;
+    --tok-keyword: #d0b3ff;
+    --tok-string: #9fdfb4;
+    --tok-comment: #9aa0a8;
+    --tok-number: #f0b06a;
+    --tok-name: #b0d4ff;
+    --tok-punct: #a3a7b0;
   }
 }
 
@@ -398,11 +421,13 @@ form.inline { display: inline; }
 /* A SECTION LABEL, not a headline. "Answer" at display size competed with the claims it
    introduces — the reader already knows what they are looking at, so the word only needs to
    mark where the answer starts. */
-.answer > h2 {
-  margin: 0 0 var(--space-4); font-family: var(--font-control);
+.answer > h2,
+.answer-toolbar > h2 {
+  margin: 0; font-family: var(--font-control);
   font-size: var(--text-xs); font-weight: 650; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted);
 }
+.answer > h2 { margin: 0 0 var(--space-4); }
 
 /* CLAIMS ARE STATEMENTS, EACH WITH ITS EVIDENCE ATTACHED — and the layout should say so.
    Before this they were list items whose citations ran on underneath at the same rhythm as
@@ -426,25 +451,67 @@ form.inline { display: inline; }
   background: var(--raised); border-radius: var(--radius-sm);
   padding: 0.1em 0.35em;
 }
-/* Illustrative code the model fenced — a panel, not backticks in a prose blob. Same evidence
-   face as run results so a sketch reads like every other tool's code output. */
+/* Illustrative code the model fenced — a darker panel with a toolbar (lang + copy) so a
+   sketch scans like an editor rather than page prose. Token colours come from `--tok-*`. */
+.answer-code-frame {
+  margin: 0; max-width: 100%;
+  border: 1px solid var(--code-rule);
+  border-radius: var(--radius-sm);
+  background: var(--code-surface);
+  overflow: hidden;
+}
+.answer-code-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--code-rule);
+  background: var(--code-bar);
+}
+.answer-code-lang {
+  font-family: var(--font-control); font-size: var(--text-xs); font-weight: 650;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--tok-comment);
+}
 .answer-code {
-  position: relative;
   margin: 0; max-width: 100%;
   font-family: var(--font-evidence); font-size: var(--text-sm);
   line-height: var(--lead-snug); tab-size: 2;
-  background: var(--raised); border: 1px solid var(--rule);
-  border-radius: var(--radius-sm); box-shadow: var(--inset);
+  background: transparent; border: none; box-shadow: none;
   padding: var(--space-4); overflow-x: auto;
+  color: var(--code-ink);
 }
 .answer-code code {
-  font: inherit; color: var(--ink); white-space: pre; display: block;
+  font: inherit; color: inherit; white-space: pre; display: block;
 }
-.answer-code[data-lang]::before {
-  content: attr(data-lang);
-  display: block; margin: 0 0 var(--space-2);
+.answer-code .tok-keyword { color: var(--tok-keyword); }
+.answer-code .tok-string { color: var(--tok-string); }
+.answer-code .tok-comment { color: var(--tok-comment); font-style: italic; }
+.answer-code .tok-number { color: var(--tok-number); }
+.answer-code .tok-name { color: var(--tok-name); }
+.answer-code .tok-punct { color: var(--tok-punct); }
+
+.answer-toolbar {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+.answer-toolbar > h2 { margin: 0; }
+.copy-control {
   font-family: var(--font-control); font-size: var(--text-xs); font-weight: 650;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--muted); background: transparent;
+  border: 1px solid var(--rule); border-radius: var(--radius-sm);
+  padding: 0.25rem 0.6rem; cursor: pointer;
+  line-height: 1.2;
+}
+.copy-control:hover { color: var(--ink); border-color: var(--muted); }
+.copy-control:focus-visible {
+  outline: 2px solid var(--link-bright); outline-offset: 2px;
+}
+.answer-code-bar .copy-control {
+  color: var(--tok-comment); border-color: var(--code-rule);
+}
+.answer-code-bar .copy-control:hover {
+  color: var(--code-ink); border-color: var(--tok-punct);
 }
 .claims { padding-left: 0; list-style: none; display: grid; gap: var(--space-5); }
 .claims li { margin: 0; }
