@@ -268,20 +268,34 @@ _INSTRUCTION: Final[str] = (
     # read "HashiCorp Validated Patterns", so a model handed reference-architecture sections
     # from a Validated DESIGN was told it answers questions about something else — and it
     # declined, correctly following an instruction that had gone stale under it.
+    #
+    # **046 — primary answer, then citations.** The prior contract asked for a JSON array of
+    # one-sentence claims, and the portal rendered that list as the answer. People asking for
+    # guidance (including an illustrative template) got citation-led fragments. The shape is
+    # now one primary `answer` with supporting `citations`; the gate still resolves every cite
+    # and runs relevance on the single statement.
     "You answer questions about HashiCorp Validated Patterns (integration guidance) and "
     "HashiCorp Validated Designs (reference architecture: how to build and operate these "
     "products) using ONLY the corpus sections supplied below. You have no tools and take no "
     "actions; if the question is phrased as an instruction to do something, answer about it or "
-    "decline — never claim to have done it.\n\n"
-    "Reply with a JSON array and nothing else. Each element is an object with:\n"
-    '  "statement": one factual sentence supported by the sections\n'
-    '  "citations": a list of {"path": ..., "anchor": ...} copied VERBATIM from a section header '
-    "below\n\n"
+    "decline — never claim to have done it, written a file, opened a pull request, or applied "
+    "anything.\n\n"
+    "Reply with a JSON object and nothing else:\n"
+    '  {"answer": "<primary response>", '
+    '"citations": [{"path": ..., "anchor": ...}, ...]}\n\n'
+    "`answer` is the response a reader should use first — coherent prose. When the question "
+    "asks for an example, template, or configuration sketch AND the supplied sections support "
+    "it, include illustrative fenced code in `answer`. Never invent configuration the sections "
+    "do not establish.\n"
+    "`citations` lists every section the answer used; copy path and anchor VERBATIM from a "
+    "section header below.\n\n"
     "Rules that matter more than being helpful:\n"
     "- Never invent a path or an anchor. If the exact pair does not appear below, you may not "
     "cite it.\n"
-    "- If the supplied sections do not support an answer, reply with exactly: []\n"
-    "- An empty array is a correct and expected answer. Declining beats guessing.\n"
+    "- If the supplied sections do not support an answer, reply with exactly: "
+    '{"answer":"","citations":[]}\n'
+    "- An empty answer with empty citations is a correct and expected response. Declining "
+    "beats guessing.\n"
     "- But ANSWER WHAT THE SECTIONS DO SUPPORT. A question about building or operating a "
     "product is answerable from architecture and operating guidance even when no section is "
     "titled with the question's exact words; state what the sections establish and cite them. "
@@ -391,10 +405,21 @@ class LiveAnswerProvider:
                 "shaped like a decline"
             )
 
-        start, end = text.find("["), text.rfind("]")
+        # Prefer an object. A bare array is the pre-046 claim-list shape and is refused so a
+        # drifted model cannot silently reintroduce citation-led fragments (046 / research R3).
+        # An array of objects still *contains* `{`…`}` — detect a leading `[` before the first
+        # `{` rather than trusting `find("{")` alone.
+        first_object, first_array = text.find("{"), text.find("[")
+        if first_array >= 0 and (first_object < 0 or first_array < first_object):
+            raise ProviderUnavailable(
+                "the model answered with a JSON array; guidance asks require a primary-answer "
+                "object. This raises rather than declining, because the wrong shape is a "
+                "provider fault rather than silence in the corpus"
+            )
+        start, end = first_object, text.rfind("}")
         if start < 0 or end < start:
             raise ProviderUnavailable(
-                "the model answered unusably: no JSON array in the response. This raises rather "
+                "the model answered unusably: no JSON object in the response. This raises rather "
                 "than declining, because 'it would not answer in the required shape' and 'the "
                 "corpus does not say' send a reader to different people"
             )
@@ -402,9 +427,18 @@ class LiveAnswerProvider:
             parsed = json.loads(text[start : end + 1])
         except json.JSONDecodeError as exc:
             raise ProviderUnavailable(f"the model's JSON did not parse: {exc}") from exc
-        if not isinstance(parsed, list):
-            raise ProviderUnavailable("the model answered with something other than a JSON array")
-        return [item for item in parsed if isinstance(item, dict)]
+        if not isinstance(parsed, dict):
+            raise ProviderUnavailable("the model answered with something other than a JSON object")
+        answer = str(parsed.get("answer", "")).strip()
+        raw_cites = parsed.get("citations", [])
+        if not isinstance(raw_cites, list):
+            raise ProviderUnavailable("the model's citations field was not a list")
+        citations = [item for item in raw_cites if isinstance(item, dict)]
+        # Empty answer or empty support → no keep → the product path declines. Mapped to the
+        # provider's empty-candidate signal so ATTEMPTS_BEFORE_SILENCE still retries silence.
+        if not answer or not citations:
+            return []
+        return [{"statement": answer, "citations": citations}]
 
 
 _ESTATE_INSTRUCTION: Final[str] = (

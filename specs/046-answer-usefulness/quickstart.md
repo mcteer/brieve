@@ -65,3 +65,10 @@ FR-010 outcomes in notes at the bottom of this file when run.
 - Relevance adapter instruction still judges subject, not sufficiency.
 - Estate ask UX unchanged.
 - No authoring side effects from Ask.
+
+## Notes
+
+- **2026-08-13 (implement):** Hermetic §§1–4 green via `make check` on `feat/046-answer-usefulness`.
+  Pack `answer_sufficiency` ships for vault + terraform (omit cases fail; include cases pass).
+  **L1–L4 / T026–T028 still owed to Dan McTeer** before claiming the ROADMAP entry closed.
+  **T029** sealed-core review owed for `src/adapters/anthropic_answering.py`.

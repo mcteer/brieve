@@ -409,6 +409,11 @@ form.inline { display: inline; }
    the prose, so a reader scanning for "what does this rest on" had to parse rather than
    glance. Now each claim is a block: the sentence at reading size, its sources indented
    beneath in the evidence face, and real space between claims so two never blur into one. */
+/* PRIMARY ANSWER (046) — the response itself; citations support it underneath. */
+.primary-answer { max-width: var(--measure); margin-bottom: var(--space-5); }
+.primary-answer-body {
+  white-space: pre-wrap; margin: 0; font: inherit; max-width: var(--measure);
+}
 .claims { padding-left: 0; list-style: none; display: grid; gap: var(--space-5); }
 .claims li { margin: 0; }
 .claims li > p, .claims li { max-width: var(--measure); }
@@ -671,7 +676,7 @@ main.main--app {
 
 /* THE QUESTION, as a shape rather than a colour — the one turn that gets a container, which
    is how every chat interface separates the two voices.
-   
+
    Aligned to the end of the column, and that is the whole visual difference: a transcript
    whose two voices differ only by HUE stops working in greyscale, so position and a border do
    the distinguishing and the tint is only reinforcement (the 1.4.1 argument the verdict pills
@@ -725,7 +730,7 @@ main.main--app {
 }
 
 /* THE INTRO IS FOR AN EMPTY CONVERSATION, and goes the moment there is one.
-   
+
    The template hides it when the SERVER renders exchanges, which is right on a reload and
    wrong during the conversation you are actually having: answers are appended by script, so
    the "asking never acts" preamble sat above three exchanges telling somebody what the page
@@ -766,7 +771,7 @@ main.main--app {
 }
 
 /* THE COMPOSER IS THE FIELD, not a band across the page.
-   
+
    It used to be a bordered strip with the ground painted behind it, which drew a frame around
    the one part of the page that should feel like an input. The strip is gone; what remains is
    the page's own ground (so the transcript does not show through while scrolling under it) and
@@ -899,7 +904,7 @@ main.main--app {
    and invisible now except as a centring error, because `align-items: center` centres the
    margin box rather than the border box. Measured: textarea centre 490.16, button centre
    496.17, half of the 12px margin.
-   
+
    Uppercase in CSS rather than in the markup, so the accessible name stays "Ask". A screen
    reader given the literal string "ASK" may spell it. */
 /* Shared by both composers — the run surface uses the same field with a different verb in it. */

@@ -87,6 +87,33 @@
   {% else %}
     <section class="answer" aria-labelledby="outcome">
       <h2 id="outcome">Answer</h2>
+      {#
+        PRIMARY ANSWER FIRST (046). New guidance outcomes carry `primary_answer` + top-level
+        `citations`. Stored conversations may still hold pre-046 `claims[]` only — replay them
+        rather than migrate evidence (research R4). Estate keeps claim + reference lists.
+      #}
+      {% set _primary = (response.payload or {}).get("primary_answer") %}
+      {% set _top_citations = (response.payload or {}).get("citations") %}
+      {% if _primary %}
+        <div class="primary-answer">
+          {# Preserve fenced code / newlines the model put in the answer. #}
+          <div class="primary-answer-body">{{ _primary }}</div>
+        </div>
+        {% if _top_citations %}
+          <ul class="citations supporting">
+            {% for citation in _top_citations %}
+              {% set _href = citation.url if citation is mapping else citation %}
+              {% set _provenance = citation.provenance if citation is mapping else "" %}
+              {% set _url = _href.split("#") %}
+              {% set _doc = _url[0].rstrip("/").split("/")[-1] | replace("-", " ") | title %}
+              {% set _section = (_url[1] | replace("-", " ")) if _url | length > 1 else "" %}
+              <li>
+                <a href="{{ _href }}" rel="noopener" title="{{ _href }}">{{ _doc }}{% if _section %} <span class="citation-section">&rsaquo; {{ _section }}</span>{% endif %}</a>{% if _provenance == "customer-endorsed" %} <span class="citation-provenance">your organisation&rsquo;s endorsed material</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% else %}
       <ol class="claims">
         {% for claim in (response.payload or {}).get("claims") or [] %}
           <li>
@@ -136,6 +163,7 @@
           </li>
         {% endfor %}
       </ol>
+      {% endif %}
       <div class="provenance">
       {% if (response.payload or {}).get("window_note") %}
         {#

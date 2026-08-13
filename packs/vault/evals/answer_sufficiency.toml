@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+# vault pack — answer_sufficiency suite (046). Five cases at the floor.
+#
+# Usefulness that can fail: a true / cited / on-subject answer that omits the asked-for fact
+# must fail the suite (ADR-0047). Passing cases include the fact. Cases encode facts that
+# were available on the path (Q1-C); they do not require a locator-disclosure form.
+#
+# `recorded` is the model candidate JSON object (LiveAnswerProvider shape). The product path
+# resolves citations and keeps the primary answer; scoring checks `must_contain` against that
+# text — not the cited/decline verb judge.
+
+[[cases]]
+id = "vault-answer-sufficiency-omit-001"
+suite = "answer_sufficiency"
+prompt = "How do applications authenticate to Vault with AppRole?"
+must_contain = ["AppRole auth method"]
+recorded = '{"answer": "Vault documents authentication for applications in its operating guides.", "citations": [{"path": "/validated-designs/vault-operating-guides-adoption/authentication-for-applications", "anchor": "approle-auth-method"}]}'
+
+[[cases]]
+id = "vault-answer-sufficiency-include-001"
+suite = "answer_sufficiency"
+prompt = "How do applications authenticate to Vault with AppRole?"
+must_contain = ["AppRole auth method"]
+recorded = '{"answer": "The AppRole auth method allows machines or applications to authenticate with Vault using custom roles defined in Vault.", "citations": [{"path": "/validated-designs/vault-operating-guides-adoption/authentication-for-applications", "anchor": "approle-auth-method"}]}'
+
+[[cases]]
+id = "vault-answer-sufficiency-include-002"
+suite = "answer_sufficiency"
+prompt = "What is authentication in Vault for people?"
+must_contain = ["auth methods"]
+recorded = '{"answer": "Authentication in Vault is the process by which user- or machine-supplied information is verified against an internal or external system. Vault supports multiple auth methods.", "citations": [{"path": "/validated-designs/vault-operating-guides-adoption/authentication-for-people", "anchor": "authentication-for-people"}]}'
+
+[[cases]]
+id = "vault-answer-sufficiency-omit-002"
+suite = "answer_sufficiency"
+prompt = "What is authentication in Vault for people?"
+must_contain = ["auth methods"]
+recorded = '{"answer": "Vault has operating guidance covering authentication for people.", "citations": [{"path": "/validated-designs/vault-operating-guides-adoption/authentication-for-people", "anchor": "authentication-for-people"}]}'
+
+[[cases]]
+id = "vault-answer-sufficiency-include-003"
+suite = "answer_sufficiency"
+prompt = "What business objectives does the Vault adoption guide name for security?"
+must_contain = ["centralizing"]
+recorded = '{"answer": "Enhance security: Ensure asset, resource, and data security by centralizing and managing access to sensitive information.", "citations": [{"path": "/validated-designs/vault-operating-guides-adoption", "anchor": "business-objectives"}]}'

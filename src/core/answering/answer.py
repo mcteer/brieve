@@ -291,18 +291,37 @@ class RecordedProvider:
         # `context` is accepted and IGNORED, deliberately. A recording is a recording: replaying
         # it under different conversation history would produce the same claims while implying
         # the history mattered, and the eval lane's determinism rests on it not mattering.
+        import json as _json
         import re as _re
 
-        urls = _re.findall(
-            r"https://developer\.hashicorp\.com(/[\w\-/]+)#([\w\-]+)", self._recorded
-        )
+        text = self._recorded.strip()
+        # 046 sufficiency (and any hermetic primary-shape recording): the model candidate is the
+        # JSON object LiveAnswerProvider returns. Parse it into the claim seam the path gates.
+        if text.startswith("{"):
+            try:
+                parsed = _json.loads(text)
+            except _json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, dict) and "answer" in parsed:
+                answer = str(parsed.get("answer", "")).strip()
+                raw = parsed.get("citations") or []
+                citations = [
+                    {"path": str(c["path"]), "anchor": str(c["anchor"])}
+                    for c in raw
+                    if isinstance(c, dict) and "path" in c and "anchor" in c
+                ]
+                if not answer or not citations:
+                    return [{"statement": answer or text, "citations": []}]
+                return [{"statement": answer, "citations": citations}]
+
+        urls = _re.findall(r"https://developer\.hashicorp\.com(/[\w\-/]+)#([\w\-]+)", text)
         if not urls:
             # A model that cited nothing. The path will decline, which is correct and is what
             # `must_decline` exists to observe.
-            return [{"statement": self._recorded.strip(), "citations": []}]
+            return [{"statement": text, "citations": []}]
         return [
             {
-                "statement": self._recorded.strip(),
+                "statement": text,
                 "citations": [{"path": path, "anchor": anchor} for path, anchor in urls],
             }
         ]

@@ -271,21 +271,26 @@ def ask_for(
         # "your own standard says so" are different claims and a reader acting on one should
         # not believe they are acting on the other.
         **({"grounding_note": _grounding_note(answer)} if _grounding_note(answer) else {}),
-        "claims": [
-            {
-                "statement": claim.statement,
-                "citations": [
-                    # PROVENANCE AS DATA, per citation (clarify Q2, research R2). Derivable
-                    # from the path and emitted explicitly anyway: deriving it in every
-                    # consumer is a convention, and 038's payload table records what
-                    # conventions become.
-                    {"url": c.url(corpus), "provenance": provenance_of(c.path)}
-                    for c in claim.citations
-                ],
-            }
-            for claim in answer.claims
-        ],
+        # PRIMARY ANSWER FIRST (046). The kept claim's statement is the response; citations
+        # support it. Legacy `claims[]` is omitted on new guidance answers so the wire has one
+        # source of truth (research R4). Estate keeps `claims` + `references` unchanged (Q2-B).
+        "primary_answer": "\n\n".join(claim.statement for claim in answer.claims),
+        "citations": _supporting_citations(answer, corpus),
     }
+
+
+def _supporting_citations(answer: Any, corpus: Any) -> list[dict[str, str]]:
+    """Deduped `{url, provenance}` from every citation that survived the gate."""
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for claim in answer.claims:
+        for citation in claim.citations:
+            url = citation.url(corpus)
+            if url in seen:
+                continue
+            seen.add(url)
+            out.append({"url": url, "provenance": provenance_of(citation.path)})
+    return out
 
 
 def _grounding_note(answer: Any) -> str:

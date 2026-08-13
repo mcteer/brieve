@@ -52,7 +52,7 @@ exists.)*
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T001 Change guidance `_INSTRUCTION` and parse path in
+- [x] T001 Change guidance `_INSTRUCTION` and parse path in
       `src/adapters/anthropic_answering.py` so the model returns a JSON **object**
       `{ "answer": "...", "citations": [{"path","anchor"}] }` (research R3); permit fenced
       illustrative code in `answer` when the question asks for an example/template and sections
@@ -60,16 +60,16 @@ exists.)*
       object to a single `Claim(statement=answer, citations=…)` before `answer_question`; retain
       fail-closed parse (`ProviderUnavailable` on unusable shape); empty answer or empty
       citations → no keep → decline via existing gate.
-- [ ] T002 Compose guidance answered wire fields in `src/surfaces/api/ask.py`: set
+- [x] T002 Compose guidance answered wire fields in `src/surfaces/api/ask.py`: set
       `primary_answer` from the kept claim's statement and top-level `citations` as deduped
       `{url, provenance}` from resolved citations (research R1/R2); **estate branch unchanged**
       (`claims` + `references`); omit legacy `claims` on **new** guidance answers once
       consumers are updated (research R4 preference).
-- [ ] T003 [P] Unit coverage for the new provider parse/mapping in
+- [x] T003 [P] Unit coverage for the new provider parse/mapping in
       `tests/unit/test_live_answer_provider_primary_shape.py` (new file): object → one Claim;
       array-shaped legacy model output refused or mapped only if explicitly supported — prefer
       refuse; malformed JSON → `ProviderUnavailable`.
-- [ ] T004 [GATE:fail-closed] Component/conformance row in
+- [x] T004 [GATE:fail-closed] Component/conformance row in
       `tests/conformance/answering/test_primary_answer_grounding.py` (new file): candidate with
       unresolvable citations does not ship answered with those citations; answered guidance
       without citations is impossible when the gate held (contract S2/S3).
@@ -90,21 +90,21 @@ without opening a link.
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] [GATE:conformance] Assert answered guidance JSON shape (S1) in
+- [x] T005 [P] [US1] [GATE:conformance] Assert answered guidance JSON shape (S1) in
       `tests/conformance/answering/test_primary_answer_shape.py` (new file).
-- [ ] T006 [P] [US1] [GATE:conformance] Extend API/MCP ask parity in
+- [x] T006 [P] [US1] [GATE:conformance] Extend API/MCP ask parity in
       `tests/conformance/mcp/test_ask_parity.py` (or sibling new file if edits would tangle) so
       guidance parity covers `disposition`, `primary_answer`, and `citations` (S5 / SC-006).
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Update `src/surfaces/portal/templates/_outcome.html` to render
+- [x] T007 [US1] Update `src/surfaces/portal/templates/_outcome.html` to render
       `primary_answer` first, then supporting citations; **dual-shape replay** for legacy
       outcomes that only have `claims[]` (research R4; contract S4).
-- [ ] T008 [US1] Update any portal/API helpers that assume guidance answers are only
+- [x] T008 [US1] Update any portal/API helpers that assume guidance answers are only
       `claims[]` (search `src/surfaces/portal/` and conversation context renderers) so new
       outcomes display correctly without breaking reopen of old threads.
-- [ ] T009 [US1] [GATE:conformance] Portal/component assertion for primary-first render +
+- [x] T009 [US1] [GATE:conformance] Portal/component assertion for primary-first render +
       legacy `claims[]` replay in `tests/component/test_portal_ask_outcome_shape.py` (new file)
       (S4).
 
@@ -122,20 +122,20 @@ may include fenced code; Ask still never acts (FR-004/FR-005, N1/N2, SC-004).
 
 ### Tests for User Story 2
 
-- [ ] T010 [P] [US2] [GATE:conformance] Row in
+- [x] T010 [P] [US2] [GATE:conformance] Row in
       `tests/conformance/answering/test_illustrative_code_in_answer.py` (new file): recorded
       primary with fenced code + resolving citations → answered; `primary_answer` contains the
       fence; no authoring side effects (N2).
-- [ ] T011 [P] [US2] [GATE:fail-closed] Row in the same file (or sibling): code-only / template
+- [x] T011 [P] [US2] [GATE:fail-closed] Row in the same file (or sibling): code-only / template
       request whose citations do not resolve → declined or stripped — never uncited
       configuration (FR-005).
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Verify T001's `_INSTRUCTION` in `src/adapters/anthropic_answering.py` already
+- [x] T012 [US2] Verify T001's `_INSTRUCTION` in `src/adapters/anthropic_answering.py` already
       covers illustrative-code permission and the no-invention / never-acted rules (no second
       rewrite); adjust only if T010/T011 expose a gap.
-- [ ] T013 [US2] Confirm never-acts conformance still passes
+- [x] T013 [US2] Confirm never-acts conformance still passes
       `tests/conformance/answering/test_asking_never_acts.py` (N1) — fix only if the new
       instruction accidentally implies tools; do not weaken the row.
 
@@ -153,30 +153,30 @@ including facts passes; `anthropic_relevance.py` instruction unchanged.
 
 ### Tests for User Story 3
 
-- [ ] T014 [P] [US3] [GATE:eval] Loader rows in
+- [x] T014 [P] [US3] [GATE:eval] Loader rows in
       `tests/unit/test_answer_sufficiency_suite.py` (new file): empty `must_contain` refused at
       load (U1); suite membership wiring covered.
-- [ ] T015 [P] [US3] [GATE:eval] Scorer rows in
+- [x] T015 [P] [US3] [GATE:eval] Scorer rows in
       `tests/component/test_answer_sufficiency_scorer.py` (new file): fact-omitting recorded
       answer **fails** (U2); fact-including passes (U3).
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Add `answer_sufficiency` suite + `must_contain` field to
+- [x] T016 [US3] Add `answer_sufficiency` suite + `must_contain` field to
       `src/core/evals/suites.py` (research R5); refuse empty `must_contain` at load; do **not**
       force into `expected: str` / `ANSWERING_SUITES` verb judge.
-- [ ] T017 [US3] Wire scoring in `src/core/evals/scoring.py`: product path → require every
+- [x] T017 [US3] Wire scoring in `src/core/evals/scoring.py`: product path → require every
       `must_contain` substring in `primary_answer` (case-insensitive, whitespace-normalised);
       update `AnsweringScorer` / related helpers so citation_accuracy still sees `https://` after
       the shape change (research R5).
-- [ ] T018 [US3] [GATE:fail-closed] Author
+- [x] T018 [US3] [GATE:fail-closed] Author
       `packs/vault/evals/answer_sufficiency.toml` with ≥1 case whose `recorded` is
       true/cited/on-subject and omits the fact (must fail) and ≥1 case that includes the fact
       (must pass); include a retention-shaped fact case aligned with the ROADMAP example when
       fixture material allows.
-- [ ] T019 [P] [US3] Author `packs/terraform/evals/answer_sufficiency.toml` with the same
+- [x] T019 [P] [US3] Author `packs/terraform/evals/answer_sufficiency.toml` with the same
       load/score rules as vault — **required** (Principle VII; both packs ship the suite).
-- [ ] T020 [US3] [GATE:eval] Assert `src/adapters/anthropic_relevance.py` subject-vs-sufficiency
+- [x] T020 [US3] [GATE:eval] Assert `src/adapters/anthropic_relevance.py` subject-vs-sufficiency
       instruction is **unchanged** (U4) via a focused unit/diff row in
       `tests/unit/test_relevance_prompt_untouched_by_046.py` (new file) — pin the critical
       sentence about not judging sufficiency.
@@ -193,15 +193,15 @@ and green (SC-005, N3); estate shape unchanged.
 **Independent Test**: `make evals` (and relevance hermetic rows) green; estate ask JSON still
 uses `claims`/`references` without requiring `primary_answer`.
 
-- [ ] T021 [US4] Reauthor or adapt any answering eval `recorded` strings that break solely
+- [x] T021 [US4] Reauthor or adapt any answering eval `recorded` strings that break solely
       because of the provider JSON object shape — **record each change's cause in the commit
       message / task note**; never weaken `expected` outcomes (SC-005).
-- [ ] T022 [US4] [GATE:conformance] Estate guidance isolation row in
+- [x] T022 [US4] [GATE:conformance] Estate guidance isolation row in
       `tests/conformance/answering/test_estate_shape_unchanged_046.py` (new file): estate
       answered payloads are not required to carry `primary_answer` (Q2-B).
-- [ ] T023 [US4] [GATE:eval] Run and green the existing answering + relevance hermetic suites
+- [x] T023 [US4] [GATE:eval] Run and green the existing answering + relevance hermetic suites
       (`make evals` / project targets); fix regressions without retuning the relevance judge.
-- [ ] T024 [US4] [GATE:conformance] Confirm never-acts + ask parity suites green after
+- [x] T024 [US4] [GATE:conformance] Confirm never-acts + ask parity suites green after
       T021–T023.
 
 **Checkpoint**: Feature complete for merge-bar hermetic properties; live legs remain named-runner.
@@ -210,7 +210,7 @@ uses `claims`/`references` without requiring `primary_answer`.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] [GATE:correlation] Assert `ask_answered` audit payloads still omit question and
+- [x] T025 [P] [GATE:correlation] Assert `ask_answered` audit payloads still omit question and
       answer text and still carry authorising cell, corpus digest, disposition, and
       relevance-gate metadata (FR-008 as remediated) in
       `tests/conformance/answering/test_ask_record_content_free.py` (new or extend existing)
@@ -229,7 +229,7 @@ uses `claims`/`references` without requiring `primary_answer`.
       `specs/046-answer-usefulness/quickstart.md` notes — **Dan McTeer**.
 - [ ] T029 Request sealed-core / security review for
       `src/adapters/anthropic_answering.py` changes (plan Constitution Check Principle V).
-- [ ] T030 Run `specs/046-answer-usefulness/quickstart.md` hermetic sections (§1–§4) and fix
+- [x] T030 Run `specs/046-answer-usefulness/quickstart.md` hermetic sections (§1–§4) and fix
       gaps; `make check` green.
 
 ---

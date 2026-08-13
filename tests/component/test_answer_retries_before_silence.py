@@ -78,14 +78,15 @@ def replaying(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 
 _CLAIM = (
-    '[{"statement": "A Vault cluster spans availability zones.",'
-    ' "citations": [{"path": "/patterns/vault/clustering", "anchor": "clustering"}]}]'
+    '{"answer": "A Vault cluster spans availability zones.",'
+    ' "citations": [{"path": "/patterns/vault/clustering", "anchor": "clustering"}]}'
 )
+_EMPTY = '{"answer":"","citations":[]}'
 
 
 def test_an_empty_draw_is_asked_again_rather_than_reported_as_silence(replaying: Any) -> None:
     """The maintainer's failure, made impossible: empty then answered returns the answer."""
-    client = replaying("[]", _CLAIM)
+    client = replaying(_EMPTY, _CLAIM)
 
     claims = LiveAnswerProvider("anthropic/claude-sonnet@5", api_key="k").answer(
         "How do I build a Vault cluster in AWS?", _corpus()
@@ -112,7 +113,7 @@ def test_a_model_that_answered_is_never_asked_twice(replaying: Any) -> None:
 
 def test_a_corpus_that_really_is_silent_still_declines(replaying: Any) -> None:
     """Retrying must not remove declining. Every attempt empty means the platform says so."""
-    client = replaying("[]")
+    client = replaying(_EMPTY)
 
     claims = LiveAnswerProvider("anthropic/claude-sonnet@5", api_key="k").answer(
         "How do I build a Vault cluster in AWS?", _corpus()
@@ -127,7 +128,7 @@ def test_a_corpus_that_really_is_silent_still_declines(replaying: Any) -> None:
 
 def test_nothing_to_read_costs_no_model_call_at_all(replaying: Any) -> None:
     """Retrieval finding nothing is not a question for the model, and never was."""
-    client = replaying("[]")
+    client = replaying(_EMPTY)
 
     claims = LiveAnswerProvider("anthropic/claude-sonnet@5", api_key="k").answer(
         "zzz", Corpus(documents={}, digest="d", synced_at=None)

@@ -37,13 +37,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-#: The four suites in force. A tuple rather than a set so output order is stable.
+#: The suites in force. A tuple rather than a set so output order is stable.
 SUITES: Final[tuple[str, ...]] = (
     "must_deny",
     "must_decline",
     "citation_accuracy",
     "estate_state",
     "report_fidelity",
+    "answer_sufficiency",
 )
 
 #: **The intake analyzer is qualified, and deliberately NOT from `SUITES` above** (037).
@@ -112,6 +113,13 @@ MEASURED_SUITES: Final[frozenset[str]] = frozenset({"report_fidelity"})
 #: that costs money to run.
 ANSWERING_SUITES: Final[frozenset[str]] = frozenset({"citation_accuracy", "must_decline"})
 
+#: Suites scored by whether the product path's **primary answer** contains required facts (046).
+#:
+#: **Not `ANSWERING_SUITES`.** That set routes to the `cited`/`decline` verb judge; sufficiency
+#: uses non-empty `must_contain` substrings and must be able to fail a true/cited/on-subject
+#: answer that omits the fact (ADR-0047). Hermetic merge gate; live SC-002 is a named-runner bar.
+SUFFICIENCY_SUITES: Final[frozenset[str]] = frozenset({"answer_sufficiency"})
+
 #: Suites scored by driving the **estate** answering path and measuring which references survived
 #: (025). The last suite to stop scoring authored recordings.
 #:
@@ -178,6 +186,9 @@ class EvalCase:
     #: Never defaulted. A defaulted role would be the implicit assumption 030 removes,
     #: reappearing one field over — `parse_cases` refuses instead.
     asker_role: str = ""
+    #: For `answer_sufficiency` only (046): substrings the primary answer must include.
+    #: Empty is refused at load — a suite that cannot fail is a governance hole (ADR-0047).
+    must_contain: tuple[str, ...] = ()
 
 
 def parse_cases(document: dict[str, object], *, source: str) -> tuple[EvalCase, ...]:
@@ -198,13 +209,25 @@ def parse_cases(document: dict[str, object], *, source: str) -> tuple[EvalCase, 
                 recorded=str(entry.get("recorded", "")),
                 events=tuple(str(e) for e in (entry.get("events") or ())),
                 asker_role=str(entry.get("asker_role", "")),
+                must_contain=tuple(str(m) for m in (entry.get("must_contain") or ())),
             )
         except KeyError as exc:
             raise UnrunnableSuite(f"{source}: case missing required field {exc}") from exc
         if case.suite not in SUITES:
             raise UnrunnableSuite(f"{source}: case {case.id!r} names unknown suite {case.suite!r}")
 
-        if case.suite in ESTATE_SUITES:
+        if case.suite in SUFFICIENCY_SUITES:
+            if not case.must_contain:
+                raise UnrunnableSuite(
+                    f"{source}: case {case.id!r} is an answer_sufficiency case and names an "
+                    f"empty must_contain; a suite that cannot fail is a governance hole"
+                )
+            if any(not item.strip() for item in case.must_contain):
+                raise UnrunnableSuite(
+                    f"{source}: case {case.id!r} has a blank must_contain entry; empty "
+                    f"substrings pass for any answer"
+                )
+        elif case.suite in ESTATE_SUITES:
             # `events` is the expected REFERENCE set, and it must be non-empty for the same
             # reason a measured suite's must: precision and recall over an empty expected set
             # pass for any answer at all. Decline behaviour is asserted in component rows
@@ -241,7 +264,7 @@ def parse_cases(document: dict[str, object], *, source: str) -> tuple[EvalCase, 
                     f"{source}: case {case.id!r} is a {case.suite!r} case and names no material "
                     f"events; precision and recall over an empty set pass for any report"
                 )
-        elif case.suite not in ESTATE_SUITES:
+        elif case.suite not in ESTATE_SUITES and case.suite not in SUFFICIENCY_SUITES:
             allowed = EXPECTED_OUTCOMES[case.suite]
             if case.expected not in allowed:
                 raise UnrunnableSuite(
@@ -289,6 +312,7 @@ __all__ = [
     "ESTATE_SUITES",
     "MEASURED_SUITES",
     "OWED",
+    "SUFFICIENCY_SUITES",
     "SUITES",
     "EvalCase",
     "UnrunnableSuite",

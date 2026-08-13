@@ -84,12 +84,19 @@ class CarriedContext:
 
 
 def _statements(outcome: dict[str, Any]) -> list[str]:
-    """The claim statements from a stored outcome — and nothing else from it.
+    """The answer text from a stored outcome — and nothing else from it.
 
     Citations, notes and the source label are deliberately not read. What comes back here is
     the platform's own already-gated prose: each statement survived citation resolution when
     it shipped, so carrying it re-introduces nothing unvetted.
+
+    **046 dual-shape:** new guidance outcomes carry `primary_answer`; pre-046 and estate
+    outcomes still use `claims[].statement`. Read both so a follow-up after a new answer still
+    receives the subject (T008).
     """
+    primary = str(outcome.get("primary_answer", "")).strip()
+    if primary:
+        return [primary]
     claims = outcome.get("claims")
     if not isinstance(claims, list):
         return []
