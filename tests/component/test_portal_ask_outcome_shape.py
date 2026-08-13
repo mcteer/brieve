@@ -83,7 +83,7 @@ def test_fenced_code_renders_as_a_code_panel_not_a_prose_blob() -> None:
         }
     )
 
-    assert 'class="answer-code-frame"' in html
+    assert "answer-code-frame" in html
     assert 'class="answer-code"' in html
     assert 'data-lang="hcl"' in html
     assert "aws_instance" in html
@@ -93,6 +93,9 @@ def test_fenced_code_renders_as_a_code_panel_not_a_prose_blob() -> None:
     assert "Here is a sketch" in html
     assert 'data-copy-scope="answer"' in html
     assert 'data-copy-scope="code"' in html
+    assert 'aria-label="Copy"' in html
+    assert "has-copy" in html
+    assert html.count('class="copy-control"') >= 2
 
 
 def test_answer_segments_splits_fences_without_inventing_structure() -> None:

@@ -22,10 +22,13 @@
   }
 
   function flash(button, label) {
-    var previous = button.textContent;
-    button.textContent = label;
+    // Icon stays; only the accessible name and a brief class change — never replace the SVG.
+    var previous = button.getAttribute("aria-label") || "Copy";
+    button.setAttribute("aria-label", label);
+    if (label === "Copied") button.classList.add("copy-control--done");
     window.setTimeout(function () {
-      button.textContent = previous;
+      button.setAttribute("aria-label", previous);
+      button.classList.remove("copy-control--done");
     }, 1600);
   }
 

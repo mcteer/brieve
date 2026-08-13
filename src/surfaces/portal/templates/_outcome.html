@@ -85,14 +85,11 @@
     </section>
 
   {% else %}
-    <section class="answer" aria-labelledby="outcome">
+    <section class="answer has-copy" aria-labelledby="outcome">
+      {# Top-right double-page icon; `.copy-body` is what lands on the clipboard. #}
+      {% with copy_scope="answer" %}{% include "_copy_control.html" %}{% endwith %}
       <div class="answer-toolbar">
         <h2 id="outcome">Answer</h2>
-        {#
-          COPY THE ANSWER as plain text — for pasting into a ticket, PR, or chat. The button
-          is inert without `portal-copy.js`; with it, `.copy-body` is what lands on the clipboard.
-        #}
-        <button type="button" class="copy-control" data-copy-scope="answer">Copy</button>
       </div>
       {#
         PRIMARY ANSWER FIRST (046). New guidance outcomes carry `primary_answer` + top-level
@@ -110,10 +107,10 @@
           #}
           {% for segment in _primary | answer_segments %}
             {% if segment.kind == "code" %}
-              <figure class="answer-code-frame"{% if segment.lang %} data-lang="{{ segment.lang }}"{% endif %}>
+              <figure class="answer-code-frame has-copy"{% if segment.lang %} data-lang="{{ segment.lang }}"{% endif %}>
+                {% with copy_scope="code" %}{% include "_copy_control.html" %}{% endwith %}
                 <figcaption class="answer-code-bar">
                   {% if segment.lang %}<span class="answer-code-lang">{{ segment.lang }}</span>{% endif %}
-                  <button type="button" class="copy-control" data-copy-scope="code">Copy</button>
                 </figcaption>
                 <pre class="answer-code"><code>{{ segment.text | highlight_code(segment.lang) }}</code></pre>
               </figure>
