@@ -96,8 +96,17 @@
       {% set _top_citations = (response.payload or {}).get("citations") %}
       {% if _primary %}
         <div class="primary-answer">
-          {# Preserve fenced code / newlines the model put in the answer. #}
-          <div class="primary-answer-body">{{ _primary }}</div>
+          {#
+            Fenced ``` blocks become real code panels; surrounding text stays prose.
+            The filter only recognises fences the model already wrote (046 presentation).
+          #}
+          {% for segment in _primary | answer_segments %}
+            {% if segment.kind == "code" %}
+              <pre class="answer-code"{% if segment.lang %} data-lang="{{ segment.lang }}"{% endif %}><code>{{ segment.text }}</code></pre>
+            {% else %}
+              <div class="primary-answer-prose">{{ segment.text }}</div>
+            {% endif %}
+          {% endfor %}
         </div>
         {% if _top_citations %}
           <ul class="citations supporting">

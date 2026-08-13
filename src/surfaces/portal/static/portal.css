@@ -410,9 +410,33 @@ form.inline { display: inline; }
    glance. Now each claim is a block: the sentence at reading size, its sources indented
    beneath in the evidence face, and real space between claims so two never blur into one. */
 /* PRIMARY ANSWER (046) — the response itself; citations support it underneath. */
-.primary-answer { max-width: var(--measure); margin-bottom: var(--space-5); }
-.primary-answer-body {
+.primary-answer {
+  max-width: var(--measure); margin-bottom: var(--space-5);
+  display: grid; gap: var(--space-4);
+}
+.primary-answer-prose {
   white-space: pre-wrap; margin: 0; font: inherit; max-width: var(--measure);
+  line-height: var(--lead-prose);
+}
+/* Illustrative code the model fenced — a panel, not backticks in a prose blob. Same evidence
+   face as run results so a sketch reads like every other tool's code output. */
+.answer-code {
+  position: relative;
+  margin: 0; max-width: 100%;
+  font-family: var(--font-evidence); font-size: var(--text-sm);
+  line-height: var(--lead-snug); tab-size: 2;
+  background: var(--raised); border: 1px solid var(--rule);
+  border-radius: var(--radius-sm); box-shadow: var(--inset);
+  padding: var(--space-4); overflow-x: auto;
+}
+.answer-code code {
+  font: inherit; color: var(--ink); white-space: pre; display: block;
+}
+.answer-code[data-lang]::before {
+  content: attr(data-lang);
+  display: block; margin: 0 0 var(--space-2);
+  font-family: var(--font-control); font-size: var(--text-xs); font-weight: 650;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
 }
 .claims { padding-left: 0; list-style: none; display: grid; gap: var(--space-5); }
 .claims li { margin: 0; }
