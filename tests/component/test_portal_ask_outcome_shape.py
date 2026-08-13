@@ -91,11 +91,31 @@ def test_fenced_code_renders_as_a_code_panel_not_a_prose_blob() -> None:
     assert "```" not in html
     assert "primary-answer-prose" in html
     assert "Here is a sketch" in html
-    assert 'data-copy-scope="answer"' in html
     assert 'data-copy-scope="code"' in html
+    assert 'data-copy-scope="answer"' not in html
     assert 'aria-label="Copy"' in html
     assert "has-copy" in html
-    assert html.count('class="copy-control"') >= 2
+
+
+def test_exchange_question_bubble_has_a_copy_control() -> None:
+    html = _TEMPLATES.get_template("_exchange.html").render(
+        question="How should I deploy Vault on AWS?",
+        response=ApiResponse(
+            status=200,
+            payload={
+                "disposition": "answered",
+                "source": "guidance",
+                "conversation_id": "c1",
+                "primary_answer": "Use the HVD module.",
+                "citations": [],
+            },
+        ),
+    )
+
+    assert 'data-copy-scope="asked"' in html
+    assert 'class="asked-text"' in html
+    assert "How should I deploy Vault on AWS?" in html
+    assert 'data-copy-scope="answer"' not in html
 
 
 def test_answer_segments_splits_fences_without_inventing_structure() -> None:

@@ -491,11 +491,10 @@ form.inline { display: inline; }
 
 .answer-toolbar {
   margin: 0 0 var(--space-4);
-  padding-inline-end: 2.5rem; /* room for the top-right copy icon */
 }
 .answer-toolbar > h2 { margin: 0; }
 
-/* Double-page copy icon — same corner on every `.has-copy` box (answer + code panels). */
+/* Double-page copy icon — same corner on every `.has-copy` box (question bubbles + code). */
 .has-copy { position: relative; }
 .copy-control {
   position: absolute;
@@ -514,6 +513,9 @@ form.inline { display: inline; }
   outline: 2px solid var(--link-bright); outline-offset: 2px;
 }
 .copy-control--done { color: var(--allowed); border-color: var(--allowed); }
+.asked > .copy-control {
+  background: var(--raised);
+}
 .answer-code-frame > .copy-control {
   color: var(--tok-comment);
   background: var(--code-bar);
@@ -799,7 +801,7 @@ main.main--app {
   background: var(--raised);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) 2.5rem var(--space-3) var(--space-4);
 }
 
 .asked-label {
@@ -810,6 +812,11 @@ main.main--app {
   letter-spacing: 0.06em;
   color: var(--muted);
   margin-block-end: var(--space-1);
+}
+
+.asked-text {
+  display: block;
+  white-space: pre-wrap;
 }
 
 /* THE PAGE SCROLLS, NOT A BOX INSIDE IT — which is how every chat interface a person has

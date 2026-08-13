@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// COPY CONTROLS on Ask answers and code panels. Progressive enhancement: without this
-// script the buttons are inert; with it, each copies plain text via the clipboard API.
+// COPY CONTROLS on Ask question bubbles and code panels. Progressive enhancement: without
+// this script the buttons are inert; with it, each copies plain text via the clipboard API.
 //
 // Event delegation so exchanges appended by `portal-ask.js` work without a second pass.
 // textContent only — this file must never insert markup (portal containment).
@@ -14,9 +14,9 @@
       var frame = button.closest(".answer-code-frame");
       return frame ? frame.querySelector("code") : null;
     }
-    if (scope === "answer") {
-      var answer = button.closest(".answer");
-      return answer ? answer.querySelector(".copy-body") : null;
+    if (scope === "asked") {
+      var bubble = button.closest(".asked");
+      return bubble ? bubble.querySelector(".asked-text") : null;
     }
     return null;
   }

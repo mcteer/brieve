@@ -85,9 +85,7 @@
     </section>
 
   {% else %}
-    <section class="answer has-copy" aria-labelledby="outcome">
-      {# Top-right double-page icon; `.copy-body` is what lands on the clipboard. #}
-      {% with copy_scope="answer" %}{% include "_copy_control.html" %}{% endwith %}
+    <section class="answer" aria-labelledby="outcome">
       <div class="answer-toolbar">
         <h2 id="outcome">Answer</h2>
       </div>
@@ -95,10 +93,11 @@
         PRIMARY ANSWER FIRST (046). New guidance outcomes carry `primary_answer` + top-level
         `citations`. Stored conversations may still hold pre-046 `claims[]` only — replay them
         rather than migrate evidence (research R4). Estate keeps claim + reference lists.
+        Copy sits on code panels and on the asker's bubble (`_exchange.html`), not on the
+        answer prose — the whole response is for reading; a sketch is for pasting.
       #}
       {% set _primary = (response.payload or {}).get("primary_answer") %}
       {% set _top_citations = (response.payload or {}).get("citations") %}
-      <div class="copy-body">
       {% if _primary %}
         <div class="primary-answer">
           {#
@@ -185,7 +184,6 @@
         {% endfor %}
       </ol>
       {% endif %}
-      </div>
       <div class="provenance">
       {% if (response.payload or {}).get("window_note") %}
         {#

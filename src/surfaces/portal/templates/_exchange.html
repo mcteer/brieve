@@ -21,6 +21,14 @@
   platform's answer where the next post can read it.
 #}
 <article class="exchange" data-conversation="{{ (response.payload or {}).get("conversation_id", "") }}">
-  <p class="asked"><span class="asked-label">You asked</span>{{ question }}</p>
+  {#
+    The asker's bubble is the historic request — copy puts their words (not the "You asked"
+    label) on the clipboard so a reopened conversation can hand the question to somewhere else.
+  #}
+  <div class="asked has-copy">
+    {% with copy_scope="asked" %}{% include "_copy_control.html" %}{% endwith %}
+    <span class="asked-label">You asked</span>
+    <span class="asked-text">{{ question }}</span>
+  </div>
   {% include "_outcome.html" %}
 </article>
