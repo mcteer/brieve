@@ -78,7 +78,10 @@ Practical consequences when re-running:
 Bug fixes and trivial changes (typos, comments, doc clarity) skip the spec: fix, add a
 regression test, open a PR linking the issue.
 
-The spec PR merges before the implementation PR opens. Branch names bind them:
+**Push and open the spec PR as soon as plan + tasks exist** (and after analyze
+remediations that change those artifacts). Do not wait for the human to say “PR” or
+“merge”; do not start `/speckit.implement` from unpushed or unmerged plan/tasks. The
+spec PR merges before the implementation PR opens. Branch names bind them:
 `spec/NNN-short-name`, then `feat/NNN-short-name` with the same NNN. After any PR
 merges successfully, **delete its head branch** on the remote (and locally if present)
 — prefer `gh pr merge --squash --delete-branch`. Do not leave merged branches around.
