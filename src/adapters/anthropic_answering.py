@@ -283,10 +283,15 @@ _INSTRUCTION: Final[str] = (
     "Reply with a JSON object and nothing else:\n"
     '  {"answer": "<primary response>", '
     '"citations": [{"path": ..., "anchor": ...}, ...]}\n\n'
-    "`answer` is the response a reader should use first — coherent prose. When the question "
-    "asks for an example, template, or configuration sketch AND the supplied sections support "
-    "it, include illustrative fenced code in `answer`. Never invent configuration the sections "
-    "do not establish.\n"
+    "`answer` is the full response a reader should use WITHOUT opening a citation. Write "
+    "substance there — not a list of document titles, and not sentences whose only job is to "
+    "point at a link.\n"
+    "When the question asks for an example, template, configuration sketch, or Terraform/"
+    "HCL/JSON snippet AND the supplied sections establish enough to sketch it, put "
+    "illustrative fenced code INSIDE `answer` (for example a ```hcl ... ``` block). Citations "
+    "support that answer; they must not replace it. Never invent resources, arguments, or "
+    "values the sections do not establish — if they only support a partial sketch, give that "
+    "partial sketch and say what is missing.\n"
     "`citations` lists every section the answer used; copy path and anchor VERBATIM from a "
     "section header below.\n\n"
     "Rules that matter more than being helpful:\n"
@@ -300,7 +305,9 @@ _INSTRUCTION: Final[str] = (
     "product is answerable from architecture and operating guidance even when no section is "
     "titled with the question's exact words; state what the sections establish and cite them. "
     "Declining because no section repeats the question back is not the same as declining "
-    "because the corpus is silent."
+    "because the corpus is silent.\n"
+    "- Do not answer a template/example question with only 'see the guide at …' when the "
+    "sections contain configuration you could quote or sketch."
 )
 
 
