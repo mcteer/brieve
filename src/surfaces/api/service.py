@@ -27,6 +27,7 @@ from core.audit.local_store import run_connection_factory
 from core.audit.postgres_query import PostgresEvidenceQuery
 from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.reconcile_service import PostgresReconciler
+from core.authoring.owned import owned_repositories_from_env
 from core.authority.ask_binding import AskAuthority
 from core.authority.model_credential import BrokeredModelCredential
 from core.authority.vault_fabric import VaultIdentityFabric
@@ -225,6 +226,8 @@ def build() -> object:
         # only runs where somebody enabled it.
         token_verifier=FederatedVerifier(verifiers),
         run_dispatcher=NomadDispatcher(run_index=run_index),
+        # 047. Fail closed when unset — Propose refuses every repository.
+        propose_owned_repositories=owned_repositories_from_env(),
         evidence_query=PostgresEvidenceQuery(
             credentials=VaultDatabaseCredentials(
                 identity=NomadWorkloadIdentity(),

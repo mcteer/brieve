@@ -26,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from surfaces.portal.events import thread_event_stream
+from surfaces.portal.events import propose_event_stream, thread_event_stream
 from surfaces.portal.highlight import highlight_code
 from surfaces.portal.oidc import LoginRefused, OidcClient
 from surfaces.portal.relay import ApiRelay, ApiResponse
@@ -480,6 +480,91 @@ def create_portal(
             for definition in definitions
         ], listed.reachable
 
+    @app.get("/propose", response_class=HTMLResponse)
+    def propose_form(request: Request) -> Response:
+        """047 — single Propose chat: repository URL + task, no agent picker."""
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/propose")
+        return templates.TemplateResponse(
+            request=request,
+            name="propose.html",
+            context={},
+        )
+
+    @app.post("/propose")
+    def propose_submit(
+        request: Request,
+        repository: str = Form(""),
+        task: str = Form(""),
+    ) -> Response:
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/propose")
+        started = app.state.relay.request(
+            "POST",
+            "/propose",
+            token=session.access_token,
+            json_body={"repository": repository, "task": task},
+        )
+        if not started.ok:
+            detail = "Propose could not be started"
+            if isinstance(started.payload, dict) and started.payload.get("detail"):
+                detail = str(started.payload["detail"])
+            return templates.TemplateResponse(
+                request=request,
+                name="propose.html",
+                context={
+                    "repository": repository,
+                    "task": task,
+                    "error": detail,
+                },
+                status_code=started.status or 503,
+            )
+        run_id = (started.payload or {}).get("run_id")
+        return RedirectResponse(f"/propose/runs/{run_id}", status_code=303)
+
+    @app.get("/propose/runs/{run_id}", response_class=HTMLResponse)
+    def propose_run(request: Request, run_id: str) -> Response:
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, f"/propose/runs/{run_id}")
+        state = app.state.relay.request("GET", f"/runs/{run_id}", token=session.access_token)
+        result = app.state.relay.request(
+            "GET", f"/runs/{run_id}/result", token=session.access_token
+        )
+        progress = _propose_phases(result)
+        pr_url = None
+        ended_reason = None
+        if result.ok and isinstance(result.payload, dict):
+            body = result.payload.get("result")
+            if isinstance(body, dict):
+                pr_url = body.get("pr_url")
+                if not pr_url:
+                    ended_reason = body.get("reason") or result.payload.get("stop_reason")
+            if result.payload.get("disposition") == "ended_without_result":
+                ended_reason = result.payload.get("stop_reason") or ended_reason
+        return templates.TemplateResponse(
+            request=request,
+            name="propose_run.html",
+            context={
+                "run_id": run_id,
+                "state": (state.payload or {}).get("state", "starting") if state.ok else "unknown",
+                "phases": progress,
+                "pr_url": pr_url,
+                "ended_reason": ended_reason,
+            },
+        )
+
+    @app.get("/propose/runs/{run_id}/events")
+    def propose_events(request: Request, run_id: str) -> Response:
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, f"/propose/runs/{run_id}")
+        return propose_event_stream(
+            relay=app.state.relay, token=session.access_token, run_id=run_id
+        )
+
     @app.get("/ask", response_class=HTMLResponse)
     def ask_form(request: Request) -> Response:
         """A new conversation: the composer, and the rail of earlier ones.
@@ -819,6 +904,37 @@ def create_portal(
         )
 
     return app
+
+
+def _propose_phases(result: ApiResponse) -> list[dict[str, str]]:
+    """Phase strip from the platform payload only — portal invents no order (047)."""
+    names = ("research", "plan", "write", "judge", "propose")
+    default = [{"name": n, "status": "pending", "reason": ""} for n in names]
+    if not result.ok or not isinstance(result.payload, dict):
+        return default
+    progress = None
+    body = result.payload.get("result")
+    if isinstance(body, dict):
+        progress = body.get("propose_progress")
+    if progress is None:
+        progress = result.payload.get("propose_progress")
+    if not isinstance(progress, dict):
+        return default
+    phases = progress.get("phases")
+    if not isinstance(phases, list):
+        return default
+    rendered: list[dict[str, str]] = []
+    for item in phases:
+        if not isinstance(item, dict):
+            continue
+        rendered.append(
+            {
+                "name": str(item.get("name", "")),
+                "status": str(item.get("status", "pending")),
+                "reason": str(item.get("reason") or ""),
+            }
+        )
+    return rendered or default
 
 
 def _with_run_state(

@@ -70,7 +70,12 @@ from surfaces.dispatch.authoring import (
     proposal_from_payload,
     trees_for,
 )
-from surfaces.toolset import build_registry, content_pins, dependency_products
+from surfaces.toolset import (
+    AUTHORING_VOCABULARY,
+    build_registry,
+    content_pins,
+    dependency_products,
+)
 
 #: What every pre-040 invoke ran with, kept for exactly two jobs — neither on the ask path.
 #:
@@ -669,6 +674,22 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
         print(f"run {run.correlation_id}: publishing refused ({result.reason_code})", flush=True)
         return 1
     print(f"run {run.correlation_id}: {result.tool_result}", flush=True)
+    # 047 — success payload carries the PR URL for Propose UI / get_run_result.
+    tool_result = result.tool_result if isinstance(result.tool_result, dict) else {}
+    pr_url = None
+    if isinstance(tool_result, dict):
+        pr_url = tool_result.get("pr_url") or tool_result.get("url")
+    if pr_url:
+        # Same key `surfaces.api.runs.run_result_for` reads — keep the literal here so
+        # the entrypoint does not import the API package.
+        payload = dict(checkpoint.payload)
+        progress = payload.get("propose_progress")
+        payload["__run_result__"] = {
+            "pr_url": pr_url,
+            "propose_progress": progress,
+            "plan_evidence": getattr(proposal, "evidence", None),
+        }
+        checkpoint_run(run, payload=payload)
     return 0
 
 
@@ -1252,7 +1273,7 @@ def main() -> int:
     fabric = SubjectScopedVaultFabric(
         roles=roles,
         credentials=credentials,
-        known_tools=registry.tool_names(),
+        known_tools=frozenset(registry.tool_names()) | AUTHORING_VOCABULARY,
         known_actions=registry.product_actions(),
     )
     # THE `write` CELL (041, FR-012). Earliest point the matrix is readable, and still before

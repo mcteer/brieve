@@ -180,8 +180,16 @@ def _authenticated(repository: str, token: str | None) -> str:
     the credential helper the publishing path also uses, so there is one delivery mechanism
     rather than two — and this function exists to make that absence explicit rather than
     accidental.
+
+    Bare ``owner/repo`` (047 ownership form) expands to GitHub HTTPS; full URLs pass through.
     """
-    return repository
+    _ = token  # authenticated via credential helper, never embedded
+    text = repository.strip()
+    if "://" in text or text.startswith("git@"):
+        return text
+    if text.count("/") == 1:
+        return f"https://github.com/{text}.git"
+    return text
 
 
 def _tree_size(root: Path) -> int:

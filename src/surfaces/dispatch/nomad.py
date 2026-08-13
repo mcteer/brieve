@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -33,6 +34,7 @@ from surfaces.dispatch.types import RunHandle
 
 DEFAULT_NOMAD_ADDR = "http://127.0.0.1:4646"
 DEFAULT_JOB_ID = "agent-run"
+AUTHORING_JOB_ID = "authoring-tier"
 
 
 class DispatchError(CoreError):
@@ -106,6 +108,8 @@ class NomadDispatcher:
         invoke_tools: bool = False,
         resume: bool = False,
         choice_recording: str = "",
+        job_id: str | None = None,
+        meta: Mapping[str, str] | None = None,
     ) -> RunHandle:
         """Schedule the run and return immediately.
 
@@ -114,56 +118,81 @@ class NomadDispatcher:
         which is the whole point of ADR-0048's attestation path. A dispatcher that handed
         the job a token would put a static credential in a jobspec — the single thing this
         architecture is built to avoid.
+
+        ``job_id`` / ``meta`` (047): Propose dispatches ``authoring-tier`` with
+        ``subject_path`` from ``prepare_authoring_run``. Ordinary callers leave both unset
+        and keep the ``agent-run`` contract unchanged.
         """
         # Resume state travels as metadata, like everything else the job is told. A
         # resumed allocation still manufactures its own credentials — knowing WHICH run it
         # is resuming grants it nothing.
-        payload = {
-            "Meta": {
-                "correlation_id": correlation_id,
-                "subject_user_id": subject_user_id,
-                "tenant_id": tenant_id,
-                "agent_definition_id": agent_definition_id,
-                "requested_tools": ",".join(sorted(requested_tools)),
-                # What the surface established about who is asking. Still metadata: the
-                # run resolves what these roles MEAN from the trust fabric, so a
-                # dispatcher cannot grant authority by writing a scope into a jobspec.
-                "subject_roles": ",".join(sorted(subject_roles)),
-                # Absent unless asked for. A run given neither behaves exactly as before.
-                "steps": str(steps) if steps is not None else "",
-                # 013. Empty means none, which is every pre-013 dispatch unchanged.
-                "packs": ",".join(sorted(packs)),
-                "invoke_tools": "1" if invoke_tools else "",
-                # 014, D1: a resume is DECLARED, never inferred.
-                #
-                # The entrypoint takes the resume path if and only if this is set, and the
-                # sweeper's resume dispatch is the only caller that sets it. The
-                # alternatives were both worse in the same way — they turn a coincidence
-                # into a resume. Inferring from `step_index > 0` misses a run interrupted at
-                # step zero; inferring from "a checkpoint exists for this run_id" turns an
-                # id collision into a silent resume, which is precisely what the
-                # `meta_required` comment in the jobspec warns about for `run_id` itself.
-                #
-                # The dispatcher KNOWS whether it is resuming, so the knowledge travels as
-                # data rather than being reconstructed downstream from evidence that is
-                # consistent with two different histories.
-                "resume": "1" if resume else "",
-                # 020. The answers a `fixture/...` model replays instead of calling a
-                # provider, so the merge lane's dispatched rows need no vendor (FR-011).
-                #
-                # **It grants nothing on its own**, which is the property that keeps this
-                # from being a scripted sequence reachable in production. The branch that
-                # reads it is chosen by the MATRIX — a cell whose model names the `fixture`
-                # provider — so a recording travelling beside an `anthropic/...` binding is
-                # ignored entirely. Two operator-authored records have to say so before any
-                # of this is reachable, which is the difference between a stand-in and the
-                # `_tool_for_step` fallback FR-002 removed.
-                "choice_recording": choice_recording,
-                "run_id": run_id or correlation_id,
-                "step_index": str(step_index if step_index is not None else 0),
-            },
+        target_job = job_id or self._job_id
+        meta_fields: dict[str, str] = {
+            "correlation_id": correlation_id,
+            "subject_user_id": subject_user_id,
+            "tenant_id": tenant_id,
+            "agent_definition_id": agent_definition_id,
+            "requested_tools": ",".join(sorted(requested_tools)),
+            # What the surface established about who is asking. Still metadata: the
+            # run resolves what these roles MEAN from the trust fabric, so a
+            # dispatcher cannot grant authority by writing a scope into a jobspec.
+            "subject_roles": ",".join(sorted(subject_roles)),
+            # Absent unless asked for. A run given neither behaves exactly as before.
+            "steps": str(steps) if steps is not None else "",
+            # 013. Empty means none, which is every pre-013 dispatch unchanged.
+            "packs": ",".join(sorted(packs)),
+            "invoke_tools": "1" if invoke_tools else "",
+            # 014, D1: a resume is DECLARED, never inferred.
+            #
+            # The entrypoint takes the resume path if and only if this is set, and the
+            # sweeper's resume dispatch is the only caller that sets it. The
+            # alternatives were both worse in the same way — they turn a coincidence
+            # into a resume. Inferring from `step_index > 0` misses a run interrupted at
+            # step zero; inferring from "a checkpoint exists for this run_id" turns an
+            # id collision into a silent resume, which is precisely what the
+            # `meta_required` comment in the jobspec warns about for `run_id` itself.
+            #
+            # The dispatcher KNOWS whether it is resuming, so the knowledge travels as
+            # data rather than being reconstructed downstream from evidence that is
+            # consistent with two different histories.
+            "resume": "1" if resume else "",
+            # 020. The answers a `fixture/...` model replays instead of calling a
+            # provider, so the merge lane's dispatched rows need no vendor (FR-011).
+            #
+            # **It grants nothing on its own**, which is the property that keeps this
+            # from being a scripted sequence reachable in production. The branch that
+            # reads it is chosen by the MATRIX — a cell whose model names the `fixture`
+            # provider — so a recording travelling beside an `anthropic/...` binding is
+            # ignored entirely. Two operator-authored records have to say so before any
+            # of this is reachable, which is the difference between a stand-in and the
+            # `_tool_for_step` fallback FR-002 removed.
+            "choice_recording": choice_recording,
+            "run_id": run_id or correlation_id,
+            "step_index": str(step_index if step_index is not None else 0),
         }
-        result = self._request(f"job/{self._job_id}/dispatch", payload)
+        if meta:
+            # Authoring-tier required keys (subject_path, …) join here. Callers must not
+            # smuggle credentials through meta — values are paths and forge ids only.
+            for key, value in meta.items():
+                meta_fields[str(key)] = str(value)
+        # authoring-tier's parameterized job only admits a short meta list; strip keys the
+        # jobspec does not declare when targeting that job so Nomad does not refuse.
+        if target_job == AUTHORING_JOB_ID:
+            # Exact keys from infra/jobs/authoring-tier.nomad.hcl parameterized stanza.
+            allowed = frozenset(
+                {
+                    "correlation_id",
+                    "tenant_id",
+                    "agent_definition_id",
+                    "run_id",
+                    "subject_path",
+                    "packs",
+                    "steps",
+                }
+            )
+            meta_fields = {k: v for k, v in meta_fields.items() if k in allowed}
+        payload = {"Meta": meta_fields}
+        result = self._request(f"job/{target_job}/dispatch", payload)
         dispatched_id = str(result.get("DispatchedJobID", "") or "")
         if not dispatched_id:
             raise DispatchError("scheduler accepted the dispatch but named no job")

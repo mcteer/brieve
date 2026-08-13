@@ -26,6 +26,7 @@
          same attribute so the visual and the announced state cannot drift. Template-only,
          so no route had to learn about presentation. #}
       <a href="/"{% if request.url.path == "/" %} aria-current="page"{% endif %}>Run an agent</a>
+      <a href="/propose"{% if request.url.path.startswith("/propose") %} aria-current="page"{% endif %}>Propose</a>
       <a href="/ask"{% if request.url.path.startswith("/ask") %} aria-current="page"{% endif %}>Ask a question</a>
       {#
         SETTINGS, LINKED FOR EVERYONE, AND THE PLATFORM DECIDES (045).

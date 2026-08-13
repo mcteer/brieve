@@ -286,13 +286,21 @@ form.inline { display: inline; }
 .composer label, .ask label {
   font-family: var(--font-control); font-weight: 600; font-size: 0.8125rem;
 }
-.composer select, .composer textarea, .ask textarea {
+.composer select, .composer textarea, .composer input, .ask textarea {
   font-family: var(--font-prose); font-size: var(--text-base);
   padding: var(--space-3); border: 1px solid var(--rule); border-radius: var(--radius-sm);
   background: var(--surface); color: var(--ink); width: 100%;
   box-shadow: var(--inset);
 }
-.composer select:hover, .composer textarea:hover, .ask textarea:hover { border-color: var(--muted); }
+.composer select:hover, .composer textarea:hover, .composer input:hover, .ask textarea:hover { border-color: var(--muted); }
+.phase-strip { list-style: none; padding: 0; margin: 1rem 0; display: grid; gap: 0.35rem; }
+.phase { display: flex; gap: 0.75rem; align-items: baseline; font-family: var(--font-control); font-size: 0.875rem; }
+.phase--pending { color: var(--muted); }
+.phase--active { color: var(--ink); font-weight: 600; }
+.phase--completed { color: var(--allowed); }
+.phase--failed { color: var(--denied); }
+.phase-name { text-transform: capitalize; min-width: 5.5rem; }
+.phase-reason { color: var(--muted); }
 /* The native select arrow is the other unmistakable default-browser tell. Replaced with a
    drawn chevron so the control matches the ones beside it. */
 .composer select {

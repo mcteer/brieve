@@ -66,6 +66,18 @@ def thread_event_stream(*, relay: Any, token: str, thread_id: str) -> StreamingR
     )
 
 
+def propose_event_stream(*, relay: Any, token: str, run_id: str) -> StreamingResponse:
+    """Stream run state + propose_progress for one Propose run (047). Cadence only."""
+    return StreamingResponse(
+        _propose_events(relay=relay, token=token, run_id=run_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 async def _events(*, relay: Any, token: str, thread_id: str) -> AsyncIterator[str]:
     deadline = time.monotonic() + MAX_STREAM_SECONDS
     last: dict[str, str] = {}
@@ -106,8 +118,49 @@ async def _events(*, relay: Any, token: str, thread_id: str) -> AsyncIterator[st
     yield _frame("closed", {"reason": "budget"})
 
 
+async def _propose_events(*, relay: Any, token: str, run_id: str) -> AsyncIterator[str]:
+    deadline = time.monotonic() + MAX_STREAM_SECONDS
+    last_state = ""
+    last_progress = ""
+
+    while time.monotonic() < deadline:
+        state = relay.request("GET", f"/runs/{run_id}", token=token)
+        if not state.ok:
+            yield _frame("closed", {"reason": "refused", "status": state.status})
+            return
+        current = str((state.payload or {}).get("state", ""))
+        result = relay.request("GET", f"/runs/{run_id}/result", token=token)
+        progress = None
+        if result.ok and isinstance(result.payload, dict):
+            body = result.payload.get("result")
+            if isinstance(body, dict):
+                progress = body.get("propose_progress")
+            if progress is None:
+                progress = result.payload.get("propose_progress")
+        progress_key = json.dumps(progress, sort_keys=True) if progress is not None else ""
+        if current != last_state or progress_key != last_progress:
+            last_state = current
+            last_progress = progress_key
+            payload: dict[str, Any] = {"run_id": run_id, "state": current}
+            if progress is not None:
+                payload["propose_progress"] = progress
+            yield _frame("run", payload)
+        if current in TERMINAL_STATES:
+            yield _frame("closed", {"reason": "settled"})
+            return
+        await asyncio.sleep(POLL_SECONDS)
+
+    yield _frame("closed", {"reason": "budget"})
+
+
 def _frame(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-__all__ = ["MAX_STREAM_SECONDS", "POLL_SECONDS", "TERMINAL_STATES", "thread_event_stream"]
+__all__ = [
+    "MAX_STREAM_SECONDS",
+    "POLL_SECONDS",
+    "TERMINAL_STATES",
+    "propose_event_stream",
+    "thread_event_stream",
+]

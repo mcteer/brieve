@@ -20,7 +20,17 @@ from core.audit.sink import AuditSink
 from core.runs.changes import ChangeRequestStore, InMemoryChangeRequestStore
 from core.runs.index import InMemoryRunIndex, RunIndex
 from core.threads.store import InMemoryThreadStore, ThreadStore
-from surfaces.api import ask, ask_conversations, console, evidence, mappings, reports, runs, threads
+from surfaces.api import (
+    ask,
+    ask_conversations,
+    console,
+    evidence,
+    mappings,
+    propose,
+    reports,
+    runs,
+    threads,
+)
 from surfaces.api import definitions as definitions_routes
 from surfaces.api.verification import IdentityVerifier
 from surfaces.dispatch.types import RunDispatcher
@@ -82,6 +92,9 @@ def create_app(
     #: deployment that has not configured one actually has, and is legible rather than a
     #: route that exists and answers 503.
     console_config: Any | None = None,
+    #: 047. Repositories this deployment permits Propose into. ``None`` reads
+    #: ``PROPOSE_OWNED_REPOSITORIES`` at request time (fail closed when empty).
+    propose_owned_repositories: frozenset[str] | None = None,
 ) -> FastAPI:
     """Build the application with its collaborators supplied rather than imported.
 
@@ -150,6 +163,14 @@ def create_app(
     # operation snapshot depend on how the app was built — which 011 paid for once already.
     app.include_router(ask_conversations.build_router(conversations=ask_conversations_store))
     app.include_router(threads.build_router())
+    # 047. Propose intake — mounted unconditionally like ask/threads so the operation
+    # snapshot does not depend on assembly. Refuses when ownership or dispatcher cannot.
+    app.include_router(
+        propose.build_router(
+            dispatcher=run_dispatcher,
+            owned_repositories=propose_owned_repositories,
+        )
+    )
     if authority_submitter is not None:
         app.include_router(mappings.build_router())
         # 044. Registered on the SAME condition as the mappings route, because both are the

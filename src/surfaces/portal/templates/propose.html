@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Propose — Harness Portal{% endblock %}
+{% block body %}
+<section class="propose">
+  <h1>Propose</h1>
+  <p class="lede">Paste a repository URL and describe the infrastructure change. The
+     platform researches, plans, writes, judges, and opens a pull request — you do not
+     pick an agent.</p>
+
+  {% if error %}
+    <p class="notice" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <form method="post" action="/propose" class="composer propose-composer">
+    <label for="repository">Repository URL</label>
+    <input type="url" name="repository" id="repository" required
+           placeholder="https://github.com/owner/repo"
+           value="{{ repository or '' }}">
+
+    <label for="task">What should change</label>
+    <div class="field-with-control">
+      <textarea name="task" id="task" rows="4" required
+                placeholder="Write a Terraform template that provisions AWS for this application…">{{ task or '' }}</textarea>
+      <button type="submit" class="button field-control">Propose</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Propose run — Harness Portal{% endblock %}
+{% block body %}
+<section class="propose" data-propose-run="{{ run_id }}">
+  <h1>Propose</h1>
+  <p class="note"><a href="/propose">New propose</a></p>
+
+  <ol class="phase-strip" aria-live="polite" aria-atomic="true" id="phase-strip">
+    {% for phase in phases %}
+      <li class="phase phase--{{ phase.status }}" data-phase="{{ phase.name }}">
+        <span class="phase-name">{{ phase.name }}</span>
+        <span class="phase-status">{{ phase.status }}</span>
+        {% if phase.reason %}<span class="phase-reason">{{ phase.reason }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+
+  <p class="disposition" data-run-id="{{ run_id }}">
+    <span class="visually-hidden">Run status:</span>
+    <span class="state pill">{{ state }}</span>
+  </p>
+
+  {% if pr_url %}
+    <p class="result"><a href="{{ pr_url }}">Pull request</a></p>
+  {% elif ended_reason %}
+    <p class="ended">Ended without a pull request — {{ ended_reason }}</p>
+  {% else %}
+    <p class="pending">Working. Phases update on their own.</p>
+  {% endif %}
+</section>
+<script src="/static/portal-propose.js" defer></script>
+{% endblock %}
