@@ -100,11 +100,12 @@
             Fenced ``` blocks become real code panels; surrounding text stays prose.
             The filter only recognises fences the model already wrote (046 presentation).
           #}
-          {% for segment in _primary | answer_segments %}
+            {% for segment in _primary | answer_segments %}
             {% if segment.kind == "code" %}
               <pre class="answer-code"{% if segment.lang %} data-lang="{{ segment.lang }}"{% endif %}><code>{{ segment.text }}</code></pre>
             {% else %}
-              <div class="primary-answer-prose">{{ segment.text }}</div>
+              {# Escape + honour **bold** / `code` the model already wrote (046 presentation). #}
+              <div class="primary-answer-prose">{{ segment.text | answer_markup }}</div>
             {% endif %}
           {% endfor %}
         </div>

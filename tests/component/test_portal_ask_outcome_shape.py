@@ -7,11 +7,12 @@ from typing import Any
 
 from fastapi.templating import Jinja2Templates
 
-from surfaces.portal.app import TEMPLATES, answer_segments
+from surfaces.portal.app import TEMPLATES, answer_markup, answer_segments
 from surfaces.portal.relay import ApiResponse
 
 _TEMPLATES = Jinja2Templates(directory=str(TEMPLATES))
 _TEMPLATES.env.filters["answer_segments"] = answer_segments
+_TEMPLATES.env.filters["answer_markup"] = answer_markup
 
 
 def _render(payload: dict[str, Any]) -> str:
@@ -93,3 +94,39 @@ def test_answer_segments_splits_fences_without_inventing_structure() -> None:
     assert [s["kind"] for s in segments] == ["prose", "code", "prose"]
     assert segments[1]["lang"] == "hcl"
     assert segments[1]["text"] == "foo = 1"
+
+
+def test_primary_answer_prose_renders_model_bold_and_escapes_html() -> None:
+    html = _render(
+        {
+            "disposition": "answered",
+            "source": "guidance",
+            "primary_answer": (
+                "**Prerequisites to provision before writing/applying the template** "
+                "(from the AWS platform guidance):\n\n"
+                "Use `terraform init` after you obtain the module.\n"
+                "<script>alert(1)</script>"
+            ),
+            "citations": [
+                {
+                    "url": "https://developer.hashicorp.com/patterns/vault/clustering#clustering",
+                    "provenance": "validated-design",
+                }
+            ],
+        }
+    )
+
+    assert (
+        "<strong>Prerequisites to provision before writing/applying the template</strong>" in html
+    )
+    assert "<code>terraform init</code>" in html
+    assert "**Prerequisites" not in html
+    assert "<script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_answer_markup_leaves_unmatched_markers_visible() -> None:
+    rendered = str(answer_markup("half **open and `unclosed"))
+    assert "**open" in rendered
+    assert "`unclosed" in rendered
+    assert "<strong>" not in rendered

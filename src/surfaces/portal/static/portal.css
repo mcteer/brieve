@@ -409,14 +409,22 @@ form.inline { display: inline; }
    the prose, so a reader scanning for "what does this rest on" had to parse rather than
    glance. Now each claim is a block: the sentence at reading size, its sources indented
    beneath in the evidence face, and real space between claims so two never blur into one. */
-/* PRIMARY ANSWER (046) — the response itself; citations support it underneath. */
+/* PRIMARY ANSWER (046) — the response itself; citations support it underneath.
+   Fills the ask column rather than the short reading `--measure`: runbooks and fenced
+   sketches need the wider frame; marketing ledes keep the tighter measure. */
 .primary-answer {
-  max-width: var(--measure); margin-bottom: var(--space-5);
+  max-width: 100%; margin-bottom: var(--space-5);
   display: grid; gap: var(--space-4);
 }
 .primary-answer-prose {
-  white-space: pre-wrap; margin: 0; font: inherit; max-width: var(--measure);
+  white-space: pre-wrap; margin: 0; font: inherit; max-width: 100%;
   line-height: var(--lead-prose);
+}
+.primary-answer-prose strong { font-weight: 650; }
+.primary-answer-prose code {
+  font-family: var(--font-evidence); font-size: 0.92em;
+  background: var(--raised); border-radius: var(--radius-sm);
+  padding: 0.1em 0.35em;
 }
 /* Illustrative code the model fenced — a panel, not backticks in a prose blob. Same evidence
    face as run results so a sketch reads like every other tool's code output. */
@@ -749,7 +757,9 @@ main.main--app {
 
 .app-main > * {
   width: 100%;
-  max-width: 46rem;
+  /* Slightly wider than the first ask shell (46rem): primary answers carry runbooks and
+     code panels that felt cramped inside a chat column sized for short claims. */
+  max-width: 54rem;
   margin-inline: auto;
 }
 
