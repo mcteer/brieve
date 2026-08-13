@@ -48,7 +48,12 @@ from surfaces.api.verification import (
     TokenVerifier,
 )
 from surfaces.dispatch.nomad import NomadDispatcher
-from surfaces.toolset import build_registry, known_actions, known_tools
+from surfaces.toolset import (
+    build_registry,
+    known_actions,
+    known_tools,
+    register_authoring_vocabulary,
+)
 
 #: What the platform can do, as the ceiling records name it — **derived from what actually
 #: registered**, not declared here.
@@ -67,6 +72,8 @@ from surfaces.toolset import build_registry, known_actions, known_tools
 VAULT_ROLE = "api"
 
 _REGISTRY = build_registry()[0]
+# Authoring ceilings/role bindings name these; the tier attaches real handlers (041).
+register_authoring_vocabulary(_REGISTRY)
 KNOWN_TOOLS = known_tools(_REGISTRY)
 KNOWN_ACTIONS = known_actions(_REGISTRY)
 

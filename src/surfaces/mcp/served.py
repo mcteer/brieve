@@ -59,7 +59,12 @@ from surfaces.api.verification import (
 from surfaces.dispatch.nomad import NomadDispatcher
 from surfaces.mcp.operations import governance_sentence, operations
 from surfaces.mcp.transport import McpResult, McpTransport
-from surfaces.toolset import build_registry, known_actions, known_tools
+from surfaces.toolset import (
+    build_registry,
+    known_actions,
+    known_tools,
+    register_authoring_vocabulary,
+)
 
 #: The workload identity this surface presents. Its own role, not the API's — a role bound to
 #: a different job id is a service that starts and authenticates as nothing, which the API
@@ -103,6 +108,7 @@ _RELEVANCE_VENDOR = "anthropic"
 
 
 _REGISTRY = build_registry()[0]
+register_authoring_vocabulary(_REGISTRY)
 KNOWN_TOOLS = known_tools(_REGISTRY)
 KNOWN_ACTIONS = known_actions(_REGISTRY)
 

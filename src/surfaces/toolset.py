@@ -79,6 +79,36 @@ def register_fixture_tools(registry: ToolRegistry) -> None:
     )
 
 
+def _authoring_not_on_this_surface(_arguments: Mapping[str, Any]) -> dict[str, str]:
+    """Vocabulary placeholder — real handlers attach only in the authoring tier (041)."""
+    raise RuntimeError(
+        "authoring tools run in the authoring tier, not on this surface; "
+        "the name is registered so ceilings and role bindings may declare it"
+    )
+
+
+def register_authoring_vocabulary(registry: ToolRegistry) -> None:
+    """Make authoring tool names known to surfaces that resolve ceilings (038/041).
+
+    **Names, not the tier.** `authoring-agent`'s ceiling and the operator role binding name
+    `read_subject` / `author_file` / `open_proposal`. The API derives `known_tools` from this
+    registry; without these names, `parse_ceiling_record` refuses the ceiling and the portal
+    marks Author permanently unstartable (`may_start=False`) — or, once the role binding
+    includes them, refuses the whole definitions list. Handlers that actually author attach in
+    `surfaces.dispatch.authoring`; here the names only join the vocabulary.
+    """
+    from core.authoring.tool import AUTHOR_FILE, OPEN_PROPOSAL, READ_SUBJECT
+
+    registry.register(READ_SUBJECT, _authoring_not_on_this_surface, risk_class="read")
+    registry.register(AUTHOR_FILE, _authoring_not_on_this_surface, risk_class="write")
+    registry.register(
+        OPEN_PROPOSAL,
+        _authoring_not_on_this_surface,
+        risk_class="write",
+        repeatable=False,
+    )
+
+
 def build_registry(
     *,
     packs: list[str] | None = None,
@@ -189,5 +219,6 @@ __all__ = [
     "dependency_products",
     "known_actions",
     "known_tools",
+    "register_authoring_vocabulary",
     "register_fixture_tools",
 ]
