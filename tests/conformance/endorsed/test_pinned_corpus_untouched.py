@@ -46,7 +46,15 @@ FROZEN = (
 #: its ask-record exact-key-set row with `endorsed_version` (T018) — the seventh feature in
 #: seven to do so. That extension is admitted here by name so the freeze keeps its teeth
 #: everywhere else in the file rather than being dropped wholesale.
-PERMITTED_EDITS = {"tests/component/test_answering.py"}
+#:
+#: `test_relevance_regression.py` (046): R9 originally treated *any* packs/*/evals/*.toml
+#: change as retuning. Additive suites (`answer_sufficiency.toml`) are new gates, not quiet
+#: retunes — R9 now diffs modify/delete only. Named here so that one-line semantics fix is not
+#: blocked by a freeze written for a different feature's temptation.
+PERMITTED_EDITS = {
+    "tests/component/test_answering.py",
+    "tests/conformance/answering/test_relevance_regression.py",
+}
 
 
 def _baseline_refs() -> list[str]:
