@@ -43,6 +43,12 @@ NOT_NAVIGATION = {
     "/docs": "generated API documentation",
     "/docs/oauth2-redirect": "generated API documentation",
     "/redoc": "generated API documentation",
+    # 047: home is Build. `/propose` 303s there so old bookmarks still work — linking
+    # both would put the same page in the nav twice.
+    "/propose": "alias of `/`; not a distinct page",
+    # Operator agent-picker. 047 moved the primary act to Build; `/run` stays for
+    # people who still start a named agent, reached by URL rather than the main nav.
+    "/run": "operator Run surface; not the primary product path",
 }
 
 

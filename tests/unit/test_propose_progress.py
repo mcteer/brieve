@@ -13,7 +13,27 @@ from core.authoring.progress import (
     complete,
     fail,
     initial_progress,
+    phase_to_fail,
 )
+
+
+def test_fail_after_plan_marks_write_not_research() -> None:
+    """Write never started; failing must not rewind Research/Plan (portal strip)."""
+    progress = advance(initial_progress(), into=PhaseName.RESEARCH)
+    progress = complete(progress, phase=PhaseName.RESEARCH)
+    progress = advance(progress, into=PhaseName.PLAN)
+    progress = complete(progress, phase=PhaseName.PLAN)
+    assert progress.current is None
+    assert phase_to_fail(progress) == PhaseName.WRITE
+    progress = fail(progress, phase=phase_to_fail(progress), reason="the model chose not to act")
+    assert [p.status for p in progress.phases] == [
+        PhaseStatus.COMPLETED,
+        PhaseStatus.COMPLETED,
+        PhaseStatus.FAILED,
+        PhaseStatus.PENDING,
+        PhaseStatus.PENDING,
+    ]
+    assert progress.phases[2].reason == "the model chose not to act"
 
 
 def test_advance_activates_research_and_completes_nothing_prior() -> None:

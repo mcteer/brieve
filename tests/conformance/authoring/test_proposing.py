@@ -126,6 +126,7 @@ def test_row_p1b_the_pr_title_is_not_the_intake_string(
     assert gist == proposal.title
     assert gist != long_task
     assert "https://" not in gist
+    assert "## How to use" in body
     short = title_for(
         files=[ProposedFile(path="main.tf", body="x", is_diff=False)],
         task="Wire dynamic database secrets",
@@ -136,6 +137,12 @@ def test_row_p1b_the_pr_title_is_not_the_intake_string(
         task="https://github.com/acme/app",
     )
     assert fallback == "Add main.tf"
+    planned = title_for(
+        files=[ProposedFile(path="main.tf", body="x", is_diff=False)],
+        task=long_task,
+        summary="Terraform template for AWS resources. Files: main.tf, variables.tf",
+    )
+    assert planned == "Terraform template for AWS resources"
 
 
 def test_row_p2_a_repository_the_requester_does_not_own_is_refused_before_producing() -> None:

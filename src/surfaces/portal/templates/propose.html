@@ -16,6 +16,10 @@
   {% if error %}
     <p class="notice" role="alert">{{ error }}</p>
   {% endif %}
+  {% if reachable is defined and not reachable %}
+    <p class="notice">The platform could not be reached, so this list is not showing your
+       builds. They have not been lost.</p>
+  {% endif %}
 
   <form method="post" action="/" class="ask">
     <label class="visually-hidden" for="message">What to build</label>

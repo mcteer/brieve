@@ -79,4 +79,64 @@ def quality_judge_may_publish(
     return bool(allowed), (reason or "judge denied publish") if not allowed else (reason or "ok")
 
 
-__all__ = ["compose_plan_evidence", "judge_may_publish", "quality_judge_may_publish"]
+def usage_notes_for(paths: list[str]) -> str:
+    """How a reviewer applies authored Terraform after merge. Empty when not Terraform."""
+    tf_paths = [p for p in paths if p.endswith((".tf", ".tfvars")) or p.endswith(".tf.json")]
+    if not tf_paths:
+        return ""
+    dirs = sorted({p.rsplit("/", 1)[0] if "/" in p else "." for p in tf_paths})
+    where = dirs[0] if len(dirs) == 1 else "the directory that contains the `.tf` files"
+    if where == ".":
+        where = "the repository root"
+    return (
+        "Nothing in this pull request is applied until a person merges it.\n\n"
+        f"These files are Terraform. After merge, from {where}:\n\n"
+        "1. `terraform init`\n"
+        "2. `terraform plan` — read the plan before going further\n"
+        "3. `terraform apply` only after you accept that plan\n\n"
+        "Set required variables (see `variables.tf` if present) from your own environment "
+        "or a tfvars file you already trust. Do not paste credentials into the pull request."
+    )
+
+
+def reviewer_copy(
+    *,
+    chooser: Any,
+    task: str,
+    write_plan: str,
+    files: dict[str, str],
+) -> tuple[str, str, str]:
+    """Title, rationale, usage. Prefer a model description; never fail the publish on copy."""
+    from core.authoring.proposal import ProposedFile, title_for
+
+    describer = getattr(chooser, "describe_proposal", None)
+    if callable(describer):
+        try:
+            title, rationale, usage = describer(
+                task=task,
+                write_plan=write_plan,
+                files=files,
+            )
+        except Exception:  # noqa: BLE001 — copy is presentation; Judge already gated publish
+            title, rationale, usage = "", "", ""
+        else:
+            title = (title or "").strip()
+            rationale = (rationale or "").strip()
+            usage = (usage or "").strip()
+            if title and rationale:
+                return title, rationale, usage or usage_notes_for(list(files))
+    listed = [ProposedFile(path=path, body="", is_diff=False) for path in files]
+    return (
+        title_for(files=listed, task=task, summary=write_plan),
+        write_plan,
+        usage_notes_for(list(files)),
+    )
+
+
+__all__ = [
+    "compose_plan_evidence",
+    "judge_may_publish",
+    "quality_judge_may_publish",
+    "reviewer_copy",
+    "usage_notes_for",
+]

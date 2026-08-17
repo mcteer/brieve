@@ -40,6 +40,7 @@ from core.authoring.progress import (
     complete,
     fail,
     initial_progress,
+    phase_to_fail,
 )
 from core.authoring.proposal import branch_for, compose
 from core.authoring.publish import ProposalObserver, ProposalPublisher
@@ -85,7 +86,7 @@ from surfaces.dispatch.authoring import (
     proposal_payload,
     trees_for,
 )
-from surfaces.dispatch.terraform_authoring import quality_judge_may_publish
+from surfaces.dispatch.terraform_authoring import quality_judge_may_publish, reviewer_copy
 from surfaces.toolset import (
     AUTHORING_VOCABULARY,
     build_registry,
@@ -218,7 +219,7 @@ def _run_write_plan(
     try:
         drafter = getattr(chooser, "draft_write_plan", None)
         text = (
-            drafter(task=task, consulted=consulted)
+            drafter(task=task, consulted=consulted, max_files=_MAX_AUTHOR_FILES)
             if callable(drafter)
             else "Write the files required by the task."
         )
@@ -235,6 +236,9 @@ def _run_write_plan(
         return reason
     run.write_plan = outline
     run.propose_progress = complete(_current_progress(run), phase=PhaseName.PLAN)
+    # Write is the next work. Activate it here so a later EMPTY/deny cannot rewind
+    # Research — ``current`` would otherwise be None and fail() defaulted to Research.
+    run.propose_progress = advance(_current_progress(run), into=PhaseName.WRITE)
     if author is not None:
         author.plan_ready = True
     checkpoint_run(run, payload=_payload_with_progress({}, run))
@@ -269,6 +273,25 @@ def _authoring_step_tools(
     return list(tools)
 
 
+def _empty_after_plan(*, planned: bool, authored: int, outcome: Any) -> str:
+    """What an empty/exhausted choice means once a write plan exists.
+
+    ``done`` — files exist and the model named nothing further.
+    ``retry`` — nothing authored yet; the next step must ask again (NONE is not a Build end).
+    ``stop`` — not an authoring write loop, or a real bound exhaustion after files exist.
+    """
+    if not planned:
+        return "stop"
+    name = str(outcome)
+    empty = name == str(ChoiceOutcome.EMPTY)
+    exhausted = name == str(ChoiceOutcome.EXHAUSTED)
+    if authored > 0 and empty:
+        return "done"
+    if authored == 0 and (empty or exhausted):
+        return "retry"
+    return "stop"
+
+
 def _mark_write_active(run: Any) -> None:
     progress = _current_progress(run)
     if _phase_status(progress, PhaseName.WRITE) in (PhaseStatus.ACTIVE, PhaseStatus.COMPLETED):
@@ -287,15 +310,7 @@ def _complete_write(run: Any) -> None:
 
 def _fail_current_phase(run: Any, reason: str) -> None:
     progress = _current_progress(run)
-    phase = progress.current
-    if phase is None:
-        for item in reversed(progress.phases):
-            if item.status == PhaseStatus.ACTIVE:
-                phase = item.name
-                break
-        else:
-            phase = PhaseName.RESEARCH
-    run.propose_progress = fail(progress, phase=phase, reason=reason)
+    run.propose_progress = fail(progress, phase=phase_to_fail(progress), reason=reason)
 
 
 #: `_tool_for_step` STOOD HERE, and its deletion is the feature (FR-002, T011).
@@ -450,7 +465,12 @@ def _run_steps(
                         )
                 resolution = resolve_step_tool(
                     run,
-                    task=task,
+                    task=(
+                        f"{task}\n\nYou must call author_file. Answering NONE is not "
+                        "completion — it abandons the pull request."
+                        if write_locked
+                        else task
+                    ),
                     permitted=step_tools,
                     step_index=step,
                     model=model,
@@ -498,21 +518,30 @@ def _run_steps(
                 return _SUSPENDED, executed, skipped, None
 
             if resolution.is_terminal():
-                # After at least one authored file, EMPTY means Write is done — not a
-                # failed run. Failing here was why a model that finished writing never
-                # reached Judge.
-                if (
-                    require_write_plan
-                    and author is not None
-                    and author.contents
-                    and resolution.outcome == ChoiceOutcome.EMPTY
-                ):
+                authored_n = len(author.contents) if author is not None else 0
+                empty_kind = (
+                    _empty_after_plan(
+                        planned=planned,
+                        authored=authored_n,
+                        outcome=resolution.outcome,
+                    )
+                    if require_write_plan
+                    else "stop"
+                )
+                if empty_kind == "done":
                     print(
-                        f"run {run.correlation_id}: write complete "
-                        f"({len(author.contents)} file(s))",
+                        f"run {run.correlation_id}: write complete ({authored_n} file(s))",
                         flush=True,
                     )
                     break
+                if empty_kind == "retry":
+                    print(
+                        f"run {run.correlation_id}: model named nothing; asking again to author",
+                        flush=True,
+                    )
+                    checkpoint_run(run, payload=_payload_with_progress({}, run))
+                    executed.append(step)
+                    continue
                 # The model named nothing, or ground through its re-choice bound. Both are
                 # endings the platform chose, both are already recorded by `resolve_step_tool`,
                 # and neither is a crash — so this exits ZERO, on the same reasoning a
@@ -670,6 +699,7 @@ def _finish_authoring_analyzer(
     steps: int,
     write_model: str = "",
     judge_chooser: Any = None,
+    write_chooser: Any = None,
 ) -> int:
     """Compose the proposal and leave a non-terminal checkpoint for the proposer — or stop.
 
@@ -776,6 +806,14 @@ def _finish_authoring_analyzer(
         return 0
     run.propose_progress = complete(_current_progress(run), phase=PhaseName.JUDGE)
 
+    write_plan = str(getattr(run, "write_plan", "") or "")
+    copy_title, copy_rationale, copy_usage = reviewer_copy(
+        chooser=write_chooser,
+        task=task,
+        write_plan=write_plan,
+        files=author_contents,
+    )
+    print(f"run {correlation_id}: proposal title {copy_title!r}", flush=True)
     proposal = compose(
         artifact=artifact,
         target_repository=repository,
@@ -783,7 +821,10 @@ def _finish_authoring_analyzer(
         task=task or "authored changes",
         authored_content=author_contents,
         subject_content=_subject_content_for(trees, author_contents),
-        rationale=str(getattr(run, "write_plan", "") or ""),
+        title=copy_title,
+        rationale=copy_rationale,
+        usage=copy_usage,
+        summary=write_plan,
         correlation_id=correlation_id,
         consulted=consulted,
         base_commit=os.environ.get("RUN_BASE_COMMIT", "").strip(),
@@ -1028,7 +1069,7 @@ def _judge_chooser_for(
         bound = resolve_bound_model(
             identity_fabric,
             agent_definition_id=agent_definition_id,
-            role="judge",  # type: ignore[arg-type]
+            role="judge",
         )
     except ResolutionRefused:
         bound = ""
@@ -1171,7 +1212,7 @@ def continue_dispatched_run(
         checkpoint.payload.get(PROGRESS_KEY) if isinstance(checkpoint.payload, dict) else None
     )
     if restored is not None:
-        run.propose_progress = restored
+        run.propose_progress = restored  # type: ignore[attr-defined]
 
     # THE PUBLISHING HALF (041). Until now this function re-established the run and
     # checkpointed it, which is everything a continuation needs *except* the act it exists to
@@ -2073,6 +2114,7 @@ def main() -> int:
     # is the check doing its job rather than obstructing.
     effects: dict[int, str] = {}
     model = ""
+    chooser: Any = None
     if steps > 0:
         # THE MODEL, RESOLVED BEFORE THE FIRST STEP AND BEFORE ANY PROVIDER CALL (FR-005,
         # FR-006). A definition binding no model for the role, or binding a cell the matrix
@@ -2081,7 +2123,6 @@ def main() -> int:
         # Only when the run will consult one. `invoke_tools` off is the carve-out (FR-002a):
         # those runs choose nothing, so requiring them to name a qualified cell would refuse
         # every pre-020 durability fixture for a binding it has no use for.
-        chooser: Any = None
         model = ""
         if invoke_tools:
             try:
@@ -2219,6 +2260,7 @@ def main() -> int:
             steps=steps,
             write_model=model,
             judge_chooser=judge_chooser,
+            write_chooser=chooser,
         )
 
     result_body: dict[str, Any] = {

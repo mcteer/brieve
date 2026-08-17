@@ -162,6 +162,24 @@ def fail(progress: ProposeProgress, *, phase: PhaseName, reason: str) -> Propose
     return ProposeProgress(phases=tuple(phases), current=None)
 
 
+def phase_to_fail(progress: ProposeProgress) -> PhaseName:
+    """Which phase actually failed — never rewind a completed prior.
+
+    After Plan completes, ``current`` is None and Write is still pending until the first
+    ``author_file``. Defaulting to Research would paint Research failed and Plan pending,
+    which is the opposite of what happened.
+    """
+    if progress.current is not None:
+        return progress.current
+    for item in reversed(progress.phases):
+        if item.status == PhaseStatus.ACTIVE:
+            return item.name
+    for item in progress.phases:
+        if item.status == PhaseStatus.PENDING:
+            return item.name
+    return PhaseName.RESEARCH
+
+
 __all__ = [
     "PHASE_ORDER",
     "PROGRESS_KEY",
@@ -174,4 +192,5 @@ __all__ = [
     "complete",
     "fail",
     "initial_progress",
+    "phase_to_fail",
 ]

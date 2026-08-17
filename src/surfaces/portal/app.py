@@ -250,10 +250,11 @@ def create_portal(
         session = _session(request)
         if session is None:
             return templates.TemplateResponse(request=request, name="signed_out.html", context={})
+        builds, reachable = _builds(session)
         return templates.TemplateResponse(
             request=request,
             name="propose.html",
-            context={"builds": _builds(session)},
+            context={"builds": builds, "reachable": reachable},
         )
 
     @app.get("/run", response_class=HTMLResponse)
@@ -457,14 +458,16 @@ def create_portal(
             for exchange in exchanges
         ]
 
-    def _builds(session: Any) -> list[dict[str, Any]]:
-        """This person's authoring runs for the Build rail, or nothing to show.
+    def _builds(session: Any) -> tuple[list[dict[str, Any]], bool]:
+        """This person's authoring runs for the Build rail, and whether the list could be read.
 
-        Same collapse as Ask: an unreadable index is rendered as absent, not as empty.
+        Same collapse as Ask: an unreadable index is rendered as absent, not as empty — but
+        the page must still say the platform could not be reached, or an outage looks like
+        a first visit.
         """
         listed = app.state.relay.request("GET", "/runs", token=session.access_token)
         if not listed.reachable or not listed.ok:
-            return []
+            return [], False
         runs = (listed.payload or {}).get("runs") or []
         builds: list[dict[str, Any]] = []
         for run in runs:
@@ -481,7 +484,7 @@ def create_portal(
                     "state": str(run.get("state") or "") or None,
                 }
             )
-        return builds
+        return builds, True
 
     def _conversations(session: Any) -> list[dict[str, Any]]:
         """This person's own conversations for the rail, or nothing to show.
@@ -546,13 +549,15 @@ def create_portal(
             detail = "Build could not be started"
             if isinstance(started.payload, dict) and started.payload.get("detail"):
                 detail = str(started.payload["detail"])
+            builds, reachable = _builds(session)
             return templates.TemplateResponse(
                 request=request,
                 name="propose.html",
                 context={
                     "message": message,
                     "error": detail,
-                    "builds": _builds(session),
+                    "builds": builds,
+                    "reachable": reachable,
                 },
                 status_code=started.status or 503,
             )
@@ -571,6 +576,7 @@ def create_portal(
         progress = _propose_phases(result)
         run_state = str((state.payload or {}).get("state", "starting")) if state.ok else "unknown"
         pr_url, ended_reason = _propose_outcome(result, phases=progress, state=run_state)
+        builds, reachable = _builds(session)
         return templates.TemplateResponse(
             request=request,
             name="propose_run.html",
@@ -580,7 +586,8 @@ def create_portal(
                 "phases": progress,
                 "pr_url": pr_url,
                 "ended_reason": ended_reason,
-                "builds": _builds(session),
+                "builds": builds,
+                "reachable": reachable,
             },
         )
 
