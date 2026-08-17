@@ -80,7 +80,7 @@ The place they type is a single row: field, any context chips, action. It sits c
 
 **Why this priority**: The mockups failed this twice (stacked height, then full-bleed on two cousins). The maintainer's correction is part of the approved direction, not polish.
 
-**Independent Test**: Measure the composer on Ask empty, Ask with a thread, Build empty, and Build in flight: one row; centred; wider than the reading column; not flush to both stage edges.
+**Independent Test**: Measure the posting composer on empty Ask, Ask with a thread, and empty Build: one row; centred; wider than the reading column; not flush to both stage edges. In-flight Build is not a posting composer — assert the **New build** link (US3 scenario 4), not composer geometry.
 
 **Acceptance Scenarios**:
 
@@ -132,7 +132,7 @@ Every criterion the portal passes today it still passes afterwards — automated
 - **FR-006**: Build's thread MUST present the person's intake text, then phase nodes in 047 order. Completed, current, waiting, and failed MUST be distinguishable without colour. Those four words are the person's labels; the 047 `data-phase` statuses they map to are `completed`, `active` (current), `pending` (waiting), and `failed`. The intake text MUST remain visible while the run runs, taken from the platform field in FR-013 — not invented in the template, and not replaced by a truncated list title.
 - **FR-007**: The portal MUST fetch nothing from a third party at runtime — no CDN, no build step, offline-capable exactly as today. **Inter** (prose and controls) and **IBM Plex Mono** (evidence) MUST be self-hosted from the portal's own static assets and MUST carry ADR-0004 provenance (pinned version, digest, licence, provenance record). 034 FR-002 / FR-002a stand.
 - **FR-008**: The palette MUST be defined once as named tokens and referenced everywhere; no page may introduce a colour of its own. 034 FR-003 stands.
-- **FR-009**: Three type roles — prose, controls, evidence — MUST remain. Prose and controls use Inter; evidence uses IBM Plex Mono. 034 FR-001 stands; 034 FR-012's Palatino/Roboto assignment does not.
+- **FR-009**: Three type roles — prose, controls, evidence — MUST remain. Faces are FR-007: prose and controls use Inter; evidence uses IBM Plex Mono. 034 FR-001 stands; 034 FR-012's Palatino/Roboto assignment does not.
 - **FR-010**: Saturated colour MUST be reserved for meaning: the chrome accent (mark, primary action, current conversational state), a product identity, or a verdict. Decorative use is out of bounds. 034 FR-004 as amended by the chrome-accent clarification.
 - **FR-011**: A disposition or phase state MUST be distinguishable without colour, carrying a shape and a label as well as a hue. 034 FR-005 stands, extended to Build phase nodes.
 - **FR-012**: Every existing accessibility criterion MUST still pass on the designed theme: the automated lane over every covered page state, and the keyboard and screen-reader rows. 034 FR-007 / FR-008 / FR-013 stand for the designed theme; 034 FR-011's obligation to ship a second theme does not.

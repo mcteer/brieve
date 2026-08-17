@@ -229,8 +229,10 @@ spine grammar; no second propose from the run page.
 ## Phase 5: Polish & Cross-Cutting
 
 - [ ] T021 [P] Changelog entry for the portal restyle in `CHANGELOG.md`; no new glossary
-      product name (the mockup name does not appear in `docs/glossary.md` or the UI). ROADMAP
-      048 pointer in `ROADMAP.md` if that table lists portal visual work.
+      product name (the mockup name does not appear in `docs/glossary.md` or the UI). In
+      `ROADMAP.md`: add a **Shipped** row for 048 (Ask and Build share one conversational
+      shell) and a one-line note on 034's shipped row that dual-theme / Palatino / Roboto is
+      superseded by 048. Do not add a Next entry — 048 is this feature, landed by the feat PR.
 
 - [ ] T022 [GATE:conformance] `make check` and
       `uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y tests/component/test_portal_identity.py tests/component/test_portal_shell.py tests/component/test_run_result.py tests/conformance/propose -q`
@@ -295,3 +297,6 @@ Surgical edits after `/speckit-analyze` (do not regenerate): SC-009 added (047 P
 pinned to `test_run_result.py` with no API conformance fork; `test_portal_shell.py` in T022 /
 plan / quickstart; F9 comment row on T004 and T014; phase-status aliases in FR-006; reading
 column 680px; `[GATE:fail-closed]` removed from T002; in-flight control named **New build**.
+Pass 2: US3 independent test measures posting composers only (in-flight is **New build**);
+FR-009 defers faces to FR-007; T021 pins a Shipped 048 row plus a one-line 034 supersession
+note (no Next fork).
