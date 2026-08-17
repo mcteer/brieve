@@ -1,0 +1,19 @@
+{# This person's own Builds, newest first. Omitted when there is nothing to list — same
+   collapse as Ask's conversation rail, so a first visit is not a squeezed empty column. #}
+{% if builds %}
+<nav class="app-rail" aria-label="Your builds">
+  <a class="button rail-new" href="/">New build</a>
+  <p class="rail-heading" id="build-rail-heading">Builds</p>
+  <ul aria-labelledby="build-rail-heading">
+    {% for build in builds %}
+      <li>
+        <a href="/propose/runs/{{ build.run_id }}" title="{{ build.title }}"
+           {% if build.run_id == run_id %}aria-current="page"{% endif %}>
+          <span>{{ build.title }}</span>
+          {% if build.state %}<span class="rail-count">{{ build.state }}</span>{% endif %}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}

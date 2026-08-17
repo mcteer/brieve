@@ -50,6 +50,11 @@
     "path": "/evidence/reconciliation"
   },
   {
+    "method": "POST",
+    "name": "propose",
+    "path": "/propose"
+  },
+  {
     "method": "GET",
     "name": "list_runs",
     "path": "/runs"

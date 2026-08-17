@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Build the local authoring-runtime tag and keep one container referencing it.
+#
+# Nomad's Docker driver GCs unused images after ~3 minutes by default. This tag is not
+# on a registry, so the next Build fails immediately with "pull access denied" — the
+# analyzer never starts. A sleeping pin container makes the image "in use".
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+IMAGE="${AUTHORING_IMAGE:-brieve/authoring-runtime:local}"
+PIN="brieve-authoring-runtime-pin"
+
+command -v docker >/dev/null 2>&1 || {
+  printf 'docker is required to build %s\n' "$IMAGE" >&2
+  exit 1
+}
+
+docker build -t "$IMAGE" "$REPO/infra/images/authoring-runtime"
+docker rm -f "$PIN" >/dev/null 2>&1 || true
+docker run -d --name "$PIN" --restart unless-stopped --entrypoint sleep "$IMAGE" infinity >/dev/null

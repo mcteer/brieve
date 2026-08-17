@@ -31,13 +31,27 @@ from core.audit.postgres_sink import PostgresAuditSink
 from core.audit.schema import AuditEventType
 from core.authoring.artifact import AuthoredArtifact
 from core.authoring.credential import AuthoringCredentials
+from core.authoring.progress import (
+    PROGRESS_KEY,
+    PhaseName,
+    PhaseStatus,
+    ProposeProgress,
+    advance,
+    complete,
+    fail,
+    initial_progress,
+    phase_to_fail,
+)
+from core.authoring.proposal import branch_for, compose
 from core.authoring.publish import ProposalObserver, ProposalPublisher
 from core.authoring.retention import scrub_authoring_requests
-from core.authoring.tool import OPEN_PROPOSAL, WRITE_ROLE
+from core.authoring.tool import AUTHOR_FILE, OPEN_PROPOSAL, READ_SUBJECT, WRITE_ROLE
+from core.authoring.workspace import Trees
 from core.authority.clock import Clock, SystemClock
 from core.authority.errors import AuthorityRefuseError, ResolutionRefused
 from core.authority.grant import DEFAULT_MAX_RUN_DURATION, issue_grant
 from core.authority.manufacture import manufacture_authority
+from core.authority.matrix import parse_matrix_record
 from core.authority.model_credential import BrokeredModelCredential
 from core.authority.types import AuthorityScope
 from core.authority.vault_fabric import SubjectScopedVaultFabric
@@ -64,13 +78,30 @@ from core.threads.postgres import PostgresThreadStore
 from core.tools.invoke import invoke_tool
 from surfaces.dispatch.authoring import (
     ANALYZER,
+    PROPOSAL_PAYLOAD_KEY,
     PROPOSER,
     authoring_registry_for,
     authoring_role,
     proposal_from_payload,
+    proposal_payload,
     trees_for,
 )
-from surfaces.toolset import build_registry, content_pins, dependency_products
+from surfaces.dispatch.terraform_authoring import quality_judge_may_publish, reviewer_copy
+from surfaces.toolset import (
+    AUTHORING_VOCABULARY,
+    build_registry,
+    content_pins,
+    dependency_products,
+)
+
+#: Where Postgres answers from inside a bridge-mode allocation (same name as mcp/served.py).
+_DB_HOST_ENV = "HARNESS_DB_HOST"
+
+
+def _db_host() -> str:
+    """Host for Postgres collaborators. Loopback is correct only in host-network jobs."""
+    return os.environ.get(_DB_HOST_ENV, "").strip() or "127.0.0.1"
+
 
 #: What every pre-040 invoke ran with, kept for exactly two jobs — neither on the ask path.
 #:
@@ -127,6 +158,161 @@ def _step_key(blob_id: str, step: int) -> str:
     return f"{blob_id}:step-{step}"
 
 
+def _current_progress(run: Any) -> ProposeProgress:
+    live = getattr(run, "propose_progress", None)
+    if isinstance(live, ProposeProgress):
+        return live
+    parsed = ProposeProgress.from_payload(live if isinstance(live, dict) else None)
+    return parsed or initial_progress()
+
+
+def _phase_status(progress: ProposeProgress, name: PhaseName) -> PhaseStatus:
+    for phase in progress.phases:
+        if phase.name == name:
+            return phase.status
+    return PhaseStatus.PENDING
+
+
+def _payload_with_progress(payload: dict[str, Any], run: Any) -> dict[str, Any]:
+    """Keep Build phases on every blob write — finish-path saves replace the payload."""
+    out = dict(payload)
+    live = getattr(run, "propose_progress", None)
+    if live is None:
+        return out
+    data = live if isinstance(live, dict) else live.to_payload()
+    out[PROGRESS_KEY] = data
+    result = out.get(RESULT_KEY)
+    if isinstance(result, dict):
+        out[RESULT_KEY] = {**result, PROGRESS_KEY: data}
+    return out
+
+
+def _mark_research_active(run: Any) -> None:
+    progress = _current_progress(run)
+    if _phase_status(progress, PhaseName.RESEARCH) == PhaseStatus.PENDING:
+        run.propose_progress = advance(progress, into=PhaseName.RESEARCH)
+    else:
+        run.propose_progress = progress
+
+
+def _run_write_plan(
+    run: Any,
+    *,
+    chooser: Any,
+    task: str,
+    consulted: tuple[str, ...],
+    author: Any,
+) -> str | None:
+    """Research is done: record what will be written, then open Write.
+
+    This is the user-visible Plan phase — an outline of the change, not a product
+    plan oracle. ``author_file`` stays refused until this returns.
+    """
+    progress = _current_progress(run)
+    if _phase_status(progress, PhaseName.RESEARCH) == PhaseStatus.ACTIVE:
+        progress = complete(progress, phase=PhaseName.RESEARCH)
+    if _phase_status(progress, PhaseName.PLAN) != PhaseStatus.ACTIVE:
+        progress = advance(progress, into=PhaseName.PLAN)
+    run.propose_progress = progress
+    checkpoint_run(run, payload=_payload_with_progress({}, run))
+    print(f"run {run.correlation_id}: planning what to write", flush=True)
+    try:
+        drafter = getattr(chooser, "draft_write_plan", None)
+        text = (
+            drafter(task=task, consulted=consulted, max_files=_MAX_AUTHOR_FILES)
+            if callable(drafter)
+            else "Write the files required by the task."
+        )
+    except Exception as exc:  # noqa: BLE001 — plan failure is a phase failure, not a crash
+        reason = f"could not plan the change ({type(exc).__name__})"
+        _fail_current_phase(run, reason)
+        checkpoint_run(run, payload=_payload_with_progress({}, run))
+        return reason
+    outline = (text or "").strip()
+    if not outline:
+        reason = "the write plan was empty"
+        _fail_current_phase(run, reason)
+        checkpoint_run(run, payload=_payload_with_progress({}, run))
+        return reason
+    run.write_plan = outline
+    run.propose_progress = complete(_current_progress(run), phase=PhaseName.PLAN)
+    # Write is the next work. Activate it here so a later EMPTY/deny cannot rewind
+    # Research — ``current`` would otherwise be None and fail() defaulted to Research.
+    run.propose_progress = advance(_current_progress(run), into=PhaseName.WRITE)
+    if author is not None:
+        author.plan_ready = True
+    checkpoint_run(run, payload=_payload_with_progress({}, run))
+    print(f"run {run.correlation_id}: write plan recorded", flush=True)
+    return None
+
+
+#: After the write plan exists, a few more reads are allowed; then only ``author_file``.
+#: Without this cap a live write model burns the whole step budget on research and Judge
+#: never sees a file.
+_POST_PLAN_READ_BUDGET = 2
+#: A live write model will keep emitting files until the step budget dies. Bound it so
+#: Write can finish and Judge can run in a single Build.
+_MAX_AUTHOR_FILES = 6
+
+
+def _authoring_step_tools(
+    tools: list[str],
+    *,
+    planned: bool,
+    post_plan_reads: int,
+) -> list[str]:
+    """Narrow the chooser's permitted set as authoring phases complete.
+
+    Research: ``read_subject`` only. After the plan: both tools for a short read budget,
+    then ``author_file`` only. Narrowing, never widening.
+    """
+    if not planned:
+        return [name for name in tools if name == READ_SUBJECT] or tools
+    if post_plan_reads >= _POST_PLAN_READ_BUDGET:
+        return [name for name in tools if name == AUTHOR_FILE] or tools
+    return list(tools)
+
+
+def _empty_after_plan(*, planned: bool, authored: int, outcome: Any) -> str:
+    """What an empty/exhausted choice means once a write plan exists.
+
+    ``done`` — files exist and the model named nothing further.
+    ``retry`` — nothing authored yet; the next step must ask again (NONE is not a Build end).
+    ``stop`` — not an authoring write loop, or a real bound exhaustion after files exist.
+    """
+    if not planned:
+        return "stop"
+    name = str(outcome)
+    empty = name == str(ChoiceOutcome.EMPTY)
+    exhausted = name == str(ChoiceOutcome.EXHAUSTED)
+    if authored > 0 and empty:
+        return "done"
+    if authored == 0 and (empty or exhausted):
+        return "retry"
+    return "stop"
+
+
+def _mark_write_active(run: Any) -> None:
+    progress = _current_progress(run)
+    if _phase_status(progress, PhaseName.WRITE) in (PhaseStatus.ACTIVE, PhaseStatus.COMPLETED):
+        return
+    run.propose_progress = advance(progress, into=PhaseName.WRITE)
+
+
+def _complete_write(run: Any) -> None:
+    progress = _current_progress(run)
+    if _phase_status(progress, PhaseName.WRITE) == PhaseStatus.PENDING:
+        progress = advance(progress, into=PhaseName.WRITE)
+    if _phase_status(progress, PhaseName.WRITE) == PhaseStatus.ACTIVE:
+        progress = complete(progress, phase=PhaseName.WRITE)
+    run.propose_progress = progress
+
+
+def _fail_current_phase(run: Any, reason: str) -> None:
+    progress = _current_progress(run)
+    run.propose_progress = fail(progress, phase=phase_to_fail(progress), reason=reason)
+
+
 #: `_tool_for_step` STOOD HERE, and its deletion is the feature (FR-002, T011).
 #:
 #: It returned ``tools[step % len(tools)]`` — an index nobody chose. Every governance
@@ -155,7 +341,10 @@ def _run_steps(
     task: str = "",
     already_chosen: Any = None,
     effects: dict[int, str] | None = None,
-) -> tuple[int, list[int], list[int]]:
+    require_write_plan: bool = False,
+    author: Any = None,
+    reader: Any = None,
+) -> tuple[int, list[int], list[int], str | None]:
     """Execute the run's steps, skipping the ones re-observation says already happened.
 
     **Each step is the full 005 bracket**: intent, work, result, checkpoint. A fixture that
@@ -175,7 +364,9 @@ def _run_steps(
     short, and an investigator counting outcomes finds a step missing with nothing to explain
     it (ROADMAP gap 0c).
 
-    Returns ``(exit_code, executed, skipped)``.
+    Returns ``(exit_code, executed, skipped, ended_reason)``. ``ended_reason`` is set when the
+    step loop stops early for a governed ending (empty choice, exhausted re-choice, stop
+    request) so the terminal checkpoint — and the Build UI under Stopped — can say why.
     """
     executed: list[int] = []
     skipped: list[int] = []
@@ -187,6 +378,12 @@ def _run_steps(
     # fourth would be a signature change across four call sites for a mapping only one of them
     # reads.
     ran: dict[int, str] = effects if effects is not None else {}
+    researched = False
+    planned = False
+    post_plan_reads = 0
+    write_locked = False
+    if require_write_plan and author is not None:
+        author.plan_ready = False
 
     for step in range(total_steps):
         if (why := skip_reason(step)) is not None:
@@ -210,7 +407,19 @@ def _run_steps(
             # this one opens an intent. Nothing is left open, which is the whole reason the
             # check sits here rather than in a signal handler.
             print(f"run {run.correlation_id} ending at step {step}: {reason}", flush=True)
-            return 0, executed, skipped
+            return 0, executed, skipped, str(reason)
+
+        if require_write_plan and researched and not planned:
+            plan_failed = _run_write_plan(
+                run,
+                chooser=chooser,
+                task=task,
+                consulted=tuple(reader.consulted) if reader is not None else (),
+                author=author,
+            )
+            if plan_failed:
+                return 0, executed, skipped, plan_failed
+            planned = True
 
         run.step_index = step
 
@@ -235,10 +444,34 @@ def _run_steps(
             tool_name = ""
         else:
             try:
+                step_tools = tools
+                if require_write_plan:
+                    step_tools = _authoring_step_tools(
+                        tools,
+                        planned=planned,
+                        post_plan_reads=post_plan_reads,
+                    )
+                    if planned and not write_locked and post_plan_reads >= _POST_PLAN_READ_BUDGET:
+                        write_locked = True
+                        print(
+                            f"run {run.correlation_id}: write plan complete; "
+                            "remaining steps must author",
+                            flush=True,
+                        )
+                    if write_locked:
+                        print(
+                            f"run {run.correlation_id}: asking model to author (step {step})",
+                            flush=True,
+                        )
                 resolution = resolve_step_tool(
                     run,
-                    task=task,
-                    permitted=tools,
+                    task=(
+                        f"{task}\n\nYou must call author_file. Answering NONE is not "
+                        "completion — it abandons the pull request."
+                        if write_locked
+                        else task
+                    ),
+                    permitted=step_tools,
                     step_index=step,
                     model=model,
                     chooser=chooser,
@@ -278,24 +511,49 @@ def _run_steps(
                         "reason": exc.reason_code,
                     },
                 )
-                return 1, executed, skipped
+                return 1, executed, skipped, str(exc.reason_code)
 
             if resolution.suspended:
                 # A wait, not a refusal. The caller files the index row and exits zero.
-                return _SUSPENDED, executed, skipped
+                return _SUSPENDED, executed, skipped, None
 
             if resolution.is_terminal():
+                authored_n = len(author.contents) if author is not None else 0
+                empty_kind = (
+                    _empty_after_plan(
+                        planned=planned,
+                        authored=authored_n,
+                        outcome=resolution.outcome,
+                    )
+                    if require_write_plan
+                    else "stop"
+                )
+                if empty_kind == "done":
+                    print(
+                        f"run {run.correlation_id}: write complete ({authored_n} file(s))",
+                        flush=True,
+                    )
+                    break
+                if empty_kind == "retry":
+                    print(
+                        f"run {run.correlation_id}: model named nothing; asking again to author",
+                        flush=True,
+                    )
+                    checkpoint_run(run, payload=_payload_with_progress({}, run))
+                    executed.append(step)
+                    continue
                 # The model named nothing, or ground through its re-choice bound. Both are
                 # endings the platform chose, both are already recorded by `resolve_step_tool`,
                 # and neither is a crash — so this exits ZERO, on the same reasoning a
                 # grant-expiry stop does. Exiting non-zero would make every bound look like a
                 # failure to whoever reads allocation states.
+                ended = _ended_reason_for_choice(resolution.outcome, resolution.attempts)
                 print(
                     f"run {run.correlation_id} ending at step {step}: "
                     f"{resolution.outcome} after {resolution.attempts} attempt(s)",
                     flush=True,
                 )
-                return 0, executed, skipped
+                return 0, executed, skipped, ended
 
             # `resolution.executed` rather than `resolution.tool`, because a named tool is
             # not a permitted one — the verdict belongs to `invoke_tool` and only the loop
@@ -303,6 +561,26 @@ def _run_steps(
             # executed is a suspension, which returned above.
             tool_name = resolution.tool
             print(f"tool {tool_name}: allowed={resolution.executed}", flush=True)
+            if tool_name == READ_SUBJECT and resolution.executed:
+                researched = True
+                if planned:
+                    post_plan_reads += 1
+            if tool_name == AUTHOR_FILE and resolution.executed:
+                _mark_write_active(run)
+                payload = getattr(resolution.result, "tool_result", None)
+                authored_path = str(payload.get("path") or "") if isinstance(payload, dict) else ""
+                print(
+                    f"run {run.correlation_id}: authored {authored_path or 'file'}",
+                    flush=True,
+                )
+                checkpoint_run(run, payload=_payload_with_progress({}, run))
+                if author is not None and len(author.contents) >= _MAX_AUTHOR_FILES:
+                    print(
+                        f"run {run.correlation_id}: authored-file budget reached "
+                        f"({len(author.contents)})",
+                        flush=True,
+                    )
+                    break
 
         # WHO OWNS THE BRACKET (T018), and the task's premise needed correcting here.
         #
@@ -377,7 +655,206 @@ def _run_steps(
             # Recorded for the read-back this run performs before it ends (021, FR-006).
             ran[step] = tool_name
 
-    return 0, executed, skipped
+    return 0, executed, skipped, None
+
+
+def _ended_reason_for_choice(outcome: Any, attempts: int) -> str:
+    """User-safe why a model-driven step loop ended without naming a next tool."""
+    name = str(outcome)
+    if name == str(ChoiceOutcome.EMPTY):
+        return "the model chose not to act"
+    if name == str(ChoiceOutcome.EXHAUSTED):
+        return f"the model could not name a permitted tool after {attempts} attempt(s)"
+    return f"{name} after {attempts} attempt(s)"
+
+
+def _subject_content_for(trees: Trees, paths: Any) -> dict[str, str]:
+    """Subject bytes for paths the agent already wrote — only those, for compose diffs."""
+    out: dict[str, str] = {}
+    for path in paths:
+        try:
+            resolved = trees.resolve_in_subject(str(path))
+        except Exception:  # noqa: BLE001 — missing/refused paths are empty before
+            continue
+        if resolved.is_file():
+            out[str(path)] = resolved.read_text(errors="replace")
+    return out
+
+
+def _finish_authoring_analyzer(
+    *,
+    run: Any,
+    durability: Any,
+    blob_id: str,
+    correlation_id: str,
+    grant: Any,
+    artifact: AuthoredArtifact,
+    trees: Trees,
+    author_contents: dict[str, str],
+    consulted: tuple[str, ...],
+    task: str,
+    tools: list[str],
+    ended_reason: str | None,
+    effects: dict[int, str],
+    steps: int,
+    write_model: str = "",
+    judge_chooser: Any = None,
+    write_chooser: Any = None,
+) -> int:
+    """Compose the proposal and leave a non-terminal checkpoint for the proposer — or stop.
+
+    **Must not write COMPLETED** when a proposal is ready: the proposer continues this same
+    allocation (RUN_CONTINUE), and a terminal outcome makes it exit with nothing to publish.
+    """
+    result_body: dict[str, Any] = {
+        "started": True,
+        "tools": sorted(tools),
+        "message": task or None,
+        "received_context": [],
+    }
+    if ended_reason:
+        result_body["reason"] = ended_reason
+        _fail_current_phase(run, ended_reason)
+        durability.save(
+            CheckpointBlob(
+                blob_id=blob_id,
+                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+                correlation_id=correlation_id,
+                grant_id=grant.grant_id,
+                step_index=max(steps - 1, 0),
+                written_by="entrypoint",
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=ended_reason),
+            )
+        )
+        observe_effects(run, observers=run.registry.observers(), executed=effects, run_id=blob_id)
+        return 0
+
+    if not author_contents:
+        reason = "nothing was authored"
+        result_body["reason"] = reason
+        _fail_current_phase(run, reason)
+        durability.save(
+            CheckpointBlob(
+                blob_id=blob_id,
+                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+                correlation_id=correlation_id,
+                grant_id=grant.grant_id,
+                step_index=max(steps - 1, 0),
+                written_by="entrypoint",
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
+            )
+        )
+        observe_effects(run, observers=run.registry.observers(), executed=effects, run_id=blob_id)
+        print(f"run {correlation_id}: {reason}; no proposer handoff", flush=True)
+        return 0
+
+    repository = os.environ.get("RUN_TARGET_REPOSITORY", "").strip()
+    if not repository:
+        reason = "no target repository on the analyzer task"
+        result_body["reason"] = reason
+        _fail_current_phase(run, reason)
+        durability.save(
+            CheckpointBlob(
+                blob_id=blob_id,
+                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+                correlation_id=correlation_id,
+                grant_id=grant.grant_id,
+                step_index=max(steps - 1, 0),
+                written_by="entrypoint",
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
+            )
+        )
+        return 1
+
+    _complete_write(run)
+    run.propose_progress = advance(_current_progress(run), into=PhaseName.JUDGE)
+    durability.save(
+        CheckpointBlob(
+            blob_id=blob_id,
+            payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+            correlation_id=correlation_id,
+            grant_id=grant.grant_id,
+            step_index=max(steps - 1, 0),
+            written_by="entrypoint",
+            outcome=None,
+        )
+    )
+    print(f"run {correlation_id}: judging authored work", flush=True)
+    allowed, judge_reason = quality_judge_may_publish(
+        authored_paths=sorted(author_contents),
+        task=task,
+        write_plan=str(getattr(run, "write_plan", "") or ""),
+        files=author_contents,
+        write_model=write_model,
+        judge_chooser=judge_chooser,
+    )
+    if not allowed:
+        _fail_current_phase(run, judge_reason)
+        result_body["reason"] = judge_reason
+        durability.save(
+            CheckpointBlob(
+                blob_id=blob_id,
+                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+                correlation_id=correlation_id,
+                grant_id=grant.grant_id,
+                step_index=max(steps - 1, 0),
+                written_by="entrypoint",
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=judge_reason),
+            )
+        )
+        print(f"run {correlation_id}: {judge_reason}; no proposer handoff", flush=True)
+        return 0
+    run.propose_progress = complete(_current_progress(run), phase=PhaseName.JUDGE)
+
+    write_plan = str(getattr(run, "write_plan", "") or "")
+    copy_title, copy_rationale, copy_usage = reviewer_copy(
+        chooser=write_chooser,
+        task=task,
+        write_plan=write_plan,
+        files=author_contents,
+    )
+    print(f"run {correlation_id}: proposal title {copy_title!r}", flush=True)
+    proposal = compose(
+        artifact=artifact,
+        target_repository=repository,
+        branch=branch_for(f"{blob_id}:0:{OPEN_PROPOSAL}"),
+        task=task or "authored changes",
+        authored_content=author_contents,
+        subject_content=_subject_content_for(trees, author_contents),
+        title=copy_title,
+        rationale=copy_rationale,
+        usage=copy_usage,
+        summary=write_plan,
+        correlation_id=correlation_id,
+        consulted=consulted,
+        base_commit=os.environ.get("RUN_BASE_COMMIT", "").strip(),
+    )
+    payload = _payload_with_progress(
+        {
+            RESULT_KEY: result_body,
+            PROPOSAL_PAYLOAD_KEY: proposal_payload(proposal),
+        },
+        run,
+    )
+    # NON-TERMINAL. The proposer's RUN_CONTINUE path refuses a terminal checkpoint.
+    durability.save(
+        CheckpointBlob(
+            blob_id=blob_id,
+            payload=payload,
+            correlation_id=correlation_id,
+            grant_id=grant.grant_id,
+            step_index=max(steps - 1, 0),
+            written_by="entrypoint",
+            outcome=None,
+        )
+    )
+    print(
+        f"run {correlation_id}: composed proposal with {len(proposal.files)} file(s); "
+        f"handing off to proposer",
+        flush=True,
+    )
+    observe_effects(run, observers=run.registry.observers(), executed=effects, run_id=blob_id)
+    return 0
 
 
 def _run_task(*, run_id: str, credentials: Any, durability: Any) -> str:
@@ -401,7 +878,7 @@ def _run_task(*, run_id: str, credentials: Any, durability: Any) -> str:
     try:
         resolved = resolve_run_input(
             run_id=run_id,
-            store=PostgresThreadStore(credentials=credentials),
+            store=PostgresThreadStore(credentials=credentials, host=_db_host()),
             durability=durability,
         )
     except Exception:  # noqa: BLE001 — see the docstring; context, not authority
@@ -417,6 +894,7 @@ def _chooser_for(
     tenant_id: str,
     agent_definition_id: str,
     run_id: str,
+    role: str = CHOICE_ROLE,
 ) -> tuple[Any, str]:
     """The model this definition binds, and a chooser for it — or refuse before calling out.
 
@@ -429,6 +907,9 @@ def _chooser_for(
     **Never defaults.** No binding for the role refuses the run — a default model is an
     ungoverned model choice, the same defect as an ungoverned tool choice one level up, and
     ADR-0022 and ADR-0039 exist to prevent exactly it.
+
+    ``role`` defaults to ``CHOICE_ROLE`` (``plan``) for ordinary runs. Authoring analyzer
+    steps pass ``WRITE_ROLE`` — ``authoring-agent`` binds ``write``, not ``plan``.
 
     Raises ``ResolutionRefused``, recorded as `AUTHORITY_REFUSED` first: this is the same
     class of refusal `manufacture` records under that event for `unqualified_cell` and
@@ -447,7 +928,11 @@ def _chooser_for(
     evaporates when the process does.
     """
     try:
-        model = resolve_bound_model(identity_fabric, agent_definition_id=agent_definition_id)
+        model = resolve_bound_model(
+            identity_fabric,
+            agent_definition_id=agent_definition_id,
+            role=role,  # type: ignore[arg-type]
+        )
     except ResolutionRefused as exc:
         _emit(
             audit_sink,
@@ -457,11 +942,36 @@ def _chooser_for(
             payload={
                 "run_id": run_id,
                 "reason_code": str(getattr(exc, "reason_code", "") or "authority_refused"),
-                "role": CHOICE_ROLE,
+                "role": role,
             },
         )
         raise
 
+    return (
+        _chooser_from_model(
+            identity_fabric=identity_fabric,
+            audit_sink=audit_sink,
+            correlation_id=correlation_id,
+            tenant_id=tenant_id,
+            run_id=run_id,
+            model=model,
+            role=role,
+        ),
+        model,
+    )
+
+
+def _chooser_from_model(
+    *,
+    identity_fabric: Any,
+    audit_sink: Any,
+    correlation_id: str,
+    tenant_id: str,
+    run_id: str,
+    model: str,
+    role: str,
+) -> Any:
+    """Build a chooser for a model the matrix has already qualified."""
     # The recording, for a cell whose provider is `fixture`. Read here rather than inside
     # `build_chooser` so the environment stays at the edge of the process, and ignored
     # entirely for a live provider — a recording present alongside an `anthropic/...` cell
@@ -485,25 +995,101 @@ def _chooser_for(
                 payload={
                     "run_id": run_id,
                     "reason_code": str(getattr(exc, "reason_code", "") or "authority_refused"),
-                    "role": CHOICE_ROLE,
+                    "role": role,
                 },
             )
             raise
 
-    return (
-        build_chooser(
-            model,
-            recording=recording,
-            secret=secret,
-            # A BARE NAME IN A RECORDING KEEPS MEANING WHAT IT MEANT (FR-010). Every
-            # pre-040 recording named a tool while the platform supplied these, so
-            # reading one as an empty request would change what it asks for — and
-            # `vault_write` raises without `cas`, so the dispatched suites would fail.
-            # Found exactly that way: hermetic rows passed against a handler that
-            # accepts anything, and the allocation did not.
-            bare_name_arguments=_LEGACY_PRE_040_ARGUMENTS,
-        ),
+    # Authoring tools expect path/content, not the vault probe args a bare name meant for
+    # pre-040 fixture tools. Passing those into `author_file` refuses every attempt and
+    # exhausts the re-choice bound with nothing authored.
+    bare_args = {} if authoring_role(dict(os.environ)) is not None else _LEGACY_PRE_040_ARGUMENTS
+
+    return build_chooser(
         model,
+        recording=recording,
+        secret=secret,
+        # A BARE NAME IN A RECORDING KEEPS MEANING WHAT IT MEANT (FR-010). Every
+        # pre-040 recording named a tool while the platform supplied these, so
+        # reading one as an empty request would change what it asks for — and
+        # `vault_write` raises without `cas`, so the dispatched suites would fail.
+        # Found exactly that way: hermetic rows passed against a handler that
+        # accepts anything, and the allocation did not.
+        bare_name_arguments=bare_args,
+    )
+
+
+def _distinct_live_judge_model(identity_fabric: Any, *, write_model: str) -> str:
+    """A live judge cell whose model is not the writer (ADR-0067). Empty if none."""
+    read = getattr(identity_fabric, "read_matrix", None)
+    if read is None:
+        return ""
+    try:
+        cells = parse_matrix_record(read())
+    except Exception:  # noqa: BLE001 — missing/malformed matrix is "no judge", fail closed later
+        return ""
+    seen: list[str] = []
+    for cell in cells.values():
+        if (
+            cell.role != "judge"
+            or cell.qualified_by != "live"
+            or cell.withdrawn
+            or cell.model == write_model
+            or cell.model.startswith(f"{FIXTURE_PROVIDER}/")
+        ):
+            continue
+        if cell.model not in seen:
+            seen.append(cell.model)
+    for model in seen:
+        if "opus" in model:
+            return model
+    return seen[0] if seen else ""
+
+
+def _judge_chooser_for(
+    *,
+    identity_fabric: Any,
+    audit_sink: Any,
+    correlation_id: str,
+    tenant_id: str,
+    agent_definition_id: str,
+    run_id: str,
+    write_model: str,
+) -> tuple[Any | None, str]:
+    """A chooser that may judge authored work, never the write model.
+
+    Fixture writers have no live work to judge — return ``(None, "")`` and keep the
+    structural gate. A live writer with no distinct judge cell returns the same, and
+    the finish path fail-closes rather than publishing unreviewed.
+    """
+    if not write_model or write_model.startswith(f"{FIXTURE_PROVIDER}/"):
+        return None, ""
+    judge_model = ""
+    try:
+        bound = resolve_bound_model(
+            identity_fabric,
+            agent_definition_id=agent_definition_id,
+            role="judge",
+        )
+    except ResolutionRefused:
+        bound = ""
+    if bound and bound != write_model and not bound.startswith(f"{FIXTURE_PROVIDER}/"):
+        judge_model = bound
+    if not judge_model:
+        judge_model = _distinct_live_judge_model(identity_fabric, write_model=write_model)
+    if not judge_model or judge_model == write_model:
+        return None, ""
+    return (
+        _chooser_from_model(
+            identity_fabric=identity_fabric,
+            audit_sink=audit_sink,
+            correlation_id=correlation_id,
+            tenant_id=tenant_id,
+            run_id=run_id,
+            model=judge_model,
+            role="judge",
+        ),
+        judge_model,
     )
 
 
@@ -548,8 +1134,11 @@ def continue_dispatched_run(
         # A terminal run is not re-entered. The analysing task must leave the run resumable,
         # which a conformance row asserts — `complete_run` at the end of its step loop would
         # break this handoff silently.
+        # Exit zero: the analysing task already recorded the ending. A non-zero here makes
+        # Nomad mark the allocation failed and the Build page shows Stopped with no reason
+        # of its own — the sibling failed for finishing, not for failing.
         print(f"run {correlation_id}: already terminal, nothing to continue", flush=True)
-        return 1
+        return 0
 
     grant = durability.load_grant(checkpoint.grant_id) if checkpoint.grant_id else None
     if grant is None:
@@ -559,10 +1148,34 @@ def continue_dispatched_run(
     lease = RunLease(durability, run_id=blob_id, holder_identity=holder_identity)
     lease.acquire()
 
+    # TASK SCOPE FOR THIS HALF, not the grant's original request (038 / ADR-0038).
+    #
+    # The analyzer manufactures under `RUN_REQUESTED_TOOLS=read_subject,author_file` and that
+    # narrow set is what the grant records. The proposer's jobspec sets
+    # `RUN_REQUESTED_TOOLS=open_proposal` — Principle IV's "task scope may narrow the ceiling"
+    # per task of one run. Re-manufacturing under `grant.requested_scope` would keep the
+    # analyzer's tools and leave `open_proposal` `out_of_scope` on every healthy handoff.
+    #
+    # When the env names tools, they are this task's requested scope. When unset, fall back to
+    # the grant (non-authoring continuations, if any, keep prior behaviour).
+    tools = frozenset(t for t in os.environ.get("RUN_REQUESTED_TOOLS", "").split(",") if t)
+    if tools:
+        requested_scope = AuthorityScope(
+            tool_names=tools,
+            product_actions=frozenset(
+                action
+                for name in tools
+                for action in [_product_action_of(registry, name)]
+                if action
+            ),
+        )
+    else:
+        requested_scope = grant.requested_scope
+
     try:
         authority = manufacture_authority(
             subject_user_id=grant.subject_user_id,
-            requested_scope=grant.requested_scope,
+            requested_scope=requested_scope,
             identity_fabric=identity_fabric,
             clock=clock,
             agent_definition_id=grant.agent_definition_id,
@@ -580,7 +1193,7 @@ def continue_dispatched_run(
         subject_user_id=grant.subject_user_id,
         tenant_id=tenant_id,
         agent_definition_id=grant.agent_definition_id,
-        requested_scope=grant.requested_scope,
+        requested_scope=requested_scope,
         identity_fabric=identity_fabric,
         registry=registry,
         audit_sink=audit_sink,
@@ -595,6 +1208,11 @@ def continue_dispatched_run(
     # asserted by a row, because that untouched zero is the whole point of this mode.
     run.step_index = checkpoint.step_index
     run.resume_count = checkpoint.resume_count
+    restored = ProposeProgress.from_payload(
+        checkpoint.payload.get(PROGRESS_KEY) if isinstance(checkpoint.payload, dict) else None
+    )
+    if restored is not None:
+        run.propose_progress = restored  # type: ignore[attr-defined]
 
     # THE PUBLISHING HALF (041). Until now this function re-established the run and
     # checkpointed it, which is everything a continuation needs *except* the act it exists to
@@ -633,18 +1251,29 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
             f"analysing task did not hand one over",
             flush=True,
         )
+        run.propose_progress = advance(_current_progress(run), into=PhaseName.PROPOSE)
+        _fail_current_phase(run, "the analysing task did not hand over a proposal")
+        checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
         return 1
 
     # The reader is supplied HERE, by the surface that knows which fabric this deployment
     # runs. `core.authoring.credential` deliberately does not know (product blindness).
+    #
+    # Role `authoring-publisher`, not `agent-run`: only this JWT role's policy names
+    # `harness-authority/data/authoring/vcs-app` (ADR-0062). `agent-run` cannot read the App
+    # key, and a dispatch's job id is not in that role's bound claims either — the failure
+    # reads as fabric_unreachable with a claim mismatch rather than a missing secret.
     identity = NomadWorkloadIdentity()
     credentials = AuthoringCredentials(
         identity=identity,
-        reader=VaultDatabaseCredentials(identity=identity, role="agent-run"),
+        reader=VaultDatabaseCredentials(identity=identity, role="authoring-publisher"),
     )
     installation = os.environ.get("RUN_VCS_INSTALLATION", "").strip()
     if not installation:
         print(f"run {run.correlation_id}: no installation named for publishing", flush=True)
+        run.propose_progress = advance(_current_progress(run), into=PhaseName.PROPOSE)
+        _fail_current_phase(run, "no installation named for publishing")
+        checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
         return 1
 
     workspace = Path(os.environ.get("NOMAD_ALLOC_DIR", "/alloc")) / "workspace"
@@ -664,11 +1293,38 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
         PROPOSER, registry=registry, proposal_handler=publisher, proposal_observer=observer
     )
 
+    run.propose_progress = advance(_current_progress(run), into=PhaseName.PROPOSE)
+    checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
+
     result = invoke_tool(run, OPEN_PROPOSAL, {})
     if not result.allowed:
-        print(f"run {run.correlation_id}: publishing refused ({result.reason_code})", flush=True)
+        detail = result.reason_code or "denied"
+        if result.message and result.message != "tool execution failed":
+            detail = f"{detail}: {result.message}"
+        print(f"run {run.correlation_id}: publishing refused ({detail})", flush=True)
+        _fail_current_phase(run, detail)
+        checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
         return 1
     print(f"run {run.correlation_id}: {result.tool_result}", flush=True)
+    # 047 — success payload carries the PR URL for Propose UI / get_run_result.
+    tool_result = result.tool_result if isinstance(result.tool_result, dict) else {}
+    pr_url = None
+    if isinstance(tool_result, dict):
+        pr_url = tool_result.get("pr_url") or tool_result.get("url")
+    if pr_url:
+        run.propose_progress = complete(_current_progress(run), phase=PhaseName.PROPOSE)
+        # Same key `surfaces.api.runs.run_result_for` reads — keep the literal here so
+        # the entrypoint does not import the API package.
+        payload = _payload_with_progress(dict(checkpoint.payload), run)
+        payload[RESULT_KEY] = {
+            "pr_url": pr_url,
+            PROGRESS_KEY: payload.get(PROGRESS_KEY),
+            "plan_evidence": getattr(proposal, "evidence", None),
+        }
+        checkpoint_run(run, payload=payload)
+        return 0
+    _fail_current_phase(run, "publish produced no pull request")
+    checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
     return 0
 
 
@@ -986,13 +1642,14 @@ def resume_dispatched_run(
                 tenant_id=tenant_id,
                 agent_definition_id=grant.agent_definition_id,
                 run_id=blob_id,
+                role=(WRITE_ROLE if authoring_role(dict(os.environ)) == ANALYZER else CHOICE_ROLE),
             )
         except ResolutionRefused as exc:
             print(f"resume refused: {exc}", file=sys.stderr)
             return 1
 
     effects: dict[int, str] = {}
-    code, executed, skipped = _run_steps(
+    code, executed, skipped, ended_reason = _run_steps(
         run,
         durability=durability,
         blob_id=blob_id,
@@ -1025,15 +1682,21 @@ def resume_dispatched_run(
     if code != 0:
         return code
 
+    result_payload: dict[str, Any] = {"resumed": True, "steps": executed}
+    if ended_reason:
+        result_payload["reason"] = ended_reason
     durability.save(
         CheckpointBlob(
             blob_id=blob_id,
-            payload={**checkpoint.payload, RESULT_KEY: {"resumed": True, "steps": executed}},
+            payload={**checkpoint.payload, RESULT_KEY: result_payload},
             correlation_id=correlation_id,
             grant_id=grant.grant_id,
             step_index=max(executed) if executed else checkpoint.step_index,
             written_by=holder_identity,
-            outcome=RunOutcome(state=RunState.COMPLETED.value, stop_reason=None),
+            outcome=RunOutcome(
+                state=(RunState.STOPPED.value if ended_reason else RunState.COMPLETED.value),
+                stop_reason=ended_reason,
+            ),
             resume_count=decision.resume_count,
         )
     )
@@ -1189,14 +1852,23 @@ def main() -> int:
         print(f"dispatch metadata missing: {', '.join(missing)}", file=sys.stderr)
         return 2
 
+    # THE AUTHORING BRANCH (041 / 047). Read before Vault login: authoring-tier tasks use
+    # task-bound JWT roles (`authoring-analyzer` / `authoring-publisher`), not `agent-run`.
+    # Asking for the wrong role fails as a claim mismatch rather than naming the job.
+    authoring = authoring_role(dict(os.environ))
+    if authoring == ANALYZER:
+        vault_role = "authoring-analyzer"
+    elif authoring == PROPOSER:
+        vault_role = "authoring-publisher"
+    else:
+        # Role "agent-run", not "conformance": the Vault role is selected by the job id in the
+        # workload identity's claims, and a dispatched run's id is agent-run/dispatch-*.
+        vault_role = "agent-run"
+
     # The allocation's own identity. No token reaches this process any other way.
-    #
-    # Role "agent-run", not "conformance": the Vault role is selected by the job id in the
-    # workload identity's claims, and a dispatched run's id is agent-run/dispatch-*. Asking
-    # for the wrong role fails as "could not obtain a database credential ... HTTPError",
-    # which names the credential path rather than the identity mismatch that caused it.
-    credentials = VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role="agent-run")
-    audit = PostgresAuditSink(credentials=credentials)
+    credentials = VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role=vault_role)
+    db_host = _db_host()
+    audit = PostgresAuditSink(credentials=credentials, host=db_host)
     audit.migrate()
 
     # The toolset. **This is the line capability packs were signposted to replace**, and
@@ -1211,22 +1883,18 @@ def main() -> int:
         packs=[p for p in os.environ.get("RUN_PACKS", "").split(",") if p]
     )
 
-    # THE AUTHORING BRANCH (041). 038 built the tier, the jobspec has set
-    # HARNESS_AUTHORING_ROLE since it was written, and nothing here ever read it — so
-    # `register_authoring_tools` had no caller and a ceiling naming `author_file` refused
-    # `unknown_ceiling_entry`, because the vocabulary a ceiling may name is derived from what
-    # registered. This is the line that closes that.
-    #
     # AFTER `build_registry` and BEFORE the fabric, which is the only correct position: the
     # fabric derives `known_tools` from the registry, so registering later would leave the
     # vocabulary narrower than the registry and reintroduce the refusal one layer down.
-    authoring = authoring_role(dict(os.environ))
+    authoring_reg: Any = None
+    analyzer_trees: Trees | None = None
+    artifact = AuthoredArtifact()
     if authoring == ANALYZER:
-        artifact = AuthoredArtifact()
-        authoring_registry_for(
+        analyzer_trees = trees_for(Path(os.environ.get("NOMAD_ALLOC_DIR", "/alloc")) / "workspace")
+        authoring_reg = authoring_registry_for(
             ANALYZER,
             registry=registry,
-            trees=trees_for(Path(os.environ.get("NOMAD_ALLOC_DIR", "/alloc")) / "workspace"),
+            trees=analyzer_trees,
             artifact=artifact,
         )
         # THE `write` CELL, RESOLVED BEFORE ANY AUTHORING RUNS (041, FR-012).
@@ -1252,7 +1920,7 @@ def main() -> int:
     fabric = SubjectScopedVaultFabric(
         roles=roles,
         credentials=credentials,
-        known_tools=registry.tool_names(),
+        known_tools=frozenset(registry.tool_names()) | AUTHORING_VOCABULARY,
         known_actions=registry.product_actions(),
     )
     # THE `write` CELL (041, FR-012). Earliest point the matrix is readable, and still before
@@ -1290,7 +1958,7 @@ def main() -> int:
     # accidentally ordered, and RUN_RESUME is asserted unset on both authoring tasks by a
     # conformance row — "the proposer resumes" is the phrasing that invites somebody to set it.
     if os.environ.get("RUN_CONTINUE", "").strip() == "1":
-        durability = PostgresDurabilityProvider(credentials=credentials)
+        durability = PostgresDurabilityProvider(credentials=credentials, host=db_host)
         return continue_dispatched_run(
             durability=durability,
             audit_sink=audit,
@@ -1304,8 +1972,8 @@ def main() -> int:
         )
 
     if os.environ.get("RUN_RESUME", "").strip() == "1":
-        durability = PostgresDurabilityProvider(credentials=credentials)
-        store = PostgresDependencyStore(credentials=credentials)
+        durability = PostgresDurabilityProvider(credentials=credentials, host=db_host)
+        store = PostgresDependencyStore(credentials=credentials, host=db_host)
         return resume_dispatched_run(
             task=_run_task(
                 run_id=blob_id,
@@ -1383,7 +2051,7 @@ def main() -> int:
         duration=DEFAULT_MAX_RUN_DURATION,
         correlation_id=correlation_id,
     )
-    durability = PostgresDurabilityProvider(credentials=credentials)
+    durability = PostgresDurabilityProvider(credentials=credentials, host=db_host)
     durability.save_grant(grant)
     run.grant = grant
     run.run_id = blob_id
@@ -1398,6 +2066,12 @@ def main() -> int:
     # lost contact, so leaving this side unclaimed left the case the requirement is about.
     run.lease = RunLease(durability, run_id=blob_id, holder_identity=holder_identity)
     run.lease.acquire()
+
+    if authoring == ANALYZER:
+        # First live checkpoint the portal can read — intake's 202 progress never reaches
+        # GET /runs/{id}/result, which is what the Build strip polls.
+        _mark_research_active(run)
+        checkpoint_run(run, payload=_payload_with_progress({}, run))
 
     # 013, opt-in: invoke each requested tool once through the real pipeline. This is what
     # makes "a pack tool reaches a live product through the same hooks as any other tool"
@@ -1439,6 +2113,8 @@ def main() -> int:
     # identity protocol — and `tests/unit/test_surface_never_pauses.py` caught it, which
     # is the check doing its job rather than obstructing.
     effects: dict[int, str] = {}
+    model = ""
+    chooser: Any = None
     if steps > 0:
         # THE MODEL, RESOLVED BEFORE THE FIRST STEP AND BEFORE ANY PROVIDER CALL (FR-005,
         # FR-006). A definition binding no model for the role, or binding a cell the matrix
@@ -1447,10 +2123,11 @@ def main() -> int:
         # Only when the run will consult one. `invoke_tools` off is the carve-out (FR-002a):
         # those runs choose nothing, so requiring them to name a qualified cell would refuse
         # every pre-020 durability fixture for a binding it has no use for.
-        chooser: Any = None
         model = ""
         if invoke_tools:
             try:
+                # Authoring analyzer uses the write-bound cell (`authoring-agent` binds
+                # `write`, not `plan`). Ordinary runs keep CHOICE_ROLE.
                 chooser, model = _chooser_for(
                     identity_fabric=fabric,
                     audit_sink=audit,
@@ -1458,6 +2135,7 @@ def main() -> int:
                     tenant_id=tenant_id,
                     agent_definition_id=definition_id,
                     run_id=blob_id,
+                    role=WRITE_ROLE if authoring == ANALYZER else CHOICE_ROLE,
                 )
             except ResolutionRefused as exc:
                 print(f"run refused: {exc}", file=sys.stderr)
@@ -1466,7 +2144,7 @@ def main() -> int:
         # Nothing is already done on a fresh dispatch, and saying so as a predicate rather
         # than as a second loop is what keeps the resumed path from having an execution route
         # of its own.
-        code, _, _ = _run_steps(
+        code, _, _, ended_reason = _run_steps(
             run,
             durability=durability,
             blob_id=blob_id,
@@ -1478,6 +2156,17 @@ def main() -> int:
             model=model,
             task=_run_task(run_id=blob_id, credentials=credentials, durability=durability),
             effects=effects,
+            require_write_plan=authoring == ANALYZER,
+            author=(
+                authoring_reg.tools.author
+                if authoring == ANALYZER and authoring_reg is not None and authoring_reg.tools
+                else None
+            ),
+            reader=(
+                authoring_reg.tools.reader
+                if authoring == ANALYZER and authoring_reg is not None and authoring_reg.tools
+                else None
+            ),
         )
         if code == _SUSPENDED:
             # A FRESH run can suspend too, and this arm is the more common one in production:
@@ -1490,7 +2179,7 @@ def main() -> int:
                 durability=durability,
                 blob_id=blob_id,
                 record_suspension=PostgresDependencyStore(
-                    credentials=credentials
+                    credentials=credentials, host=db_host
                 ).record_suspension,
                 grant=grant,
                 tenant_id=tenant_id,
@@ -1500,6 +2189,8 @@ def main() -> int:
             )
         if code != 0:
             return code
+    else:
+        ended_reason = None
 
     # What this run was asked to do, and what it was given to work from.
     #
@@ -1512,7 +2203,7 @@ def main() -> int:
     #
     # None means this run was started outside a thread. Not an error: those runs behave
     # exactly as they did before this feature existed.
-    thread_store = PostgresThreadStore(credentials=credentials)
+    thread_store = PostgresThreadStore(credentials=credentials, host=db_host)
     resolved = resolve_run_input(
         run_id=blob_id,
         store=thread_store,
@@ -1526,24 +2217,71 @@ def main() -> int:
     # arm of the three-way result disposition was reachable. The result goes under the
     # reserved key in the same write, because the terminal checkpoint is the one place a
     # run's ending is recorded and a second place would eventually disagree with it.
+    # 041 / 047 — authoring analyzer hands a composed proposal to the proposer via a
+    # non-terminal checkpoint. Writing COMPLETED here was why every Build ended with
+    # "already terminal, nothing to continue" after the model only read the subject.
+    if authoring == ANALYZER and analyzer_trees is not None and authoring_reg is not None:
+        authored = (
+            dict(authoring_reg.tools.author.contents) if authoring_reg.tools is not None else {}
+        )
+        consulted = authoring_reg.tools.reader.consulted if authoring_reg.tools is not None else ()
+        judge_chooser = None
+        judge_model = ""
+        if model and not model.startswith(f"{FIXTURE_PROVIDER}/"):
+            try:
+                judge_chooser, judge_model = _judge_chooser_for(
+                    identity_fabric=fabric,
+                    audit_sink=audit,
+                    correlation_id=correlation_id,
+                    tenant_id=tenant_id,
+                    agent_definition_id=definition_id,
+                    run_id=blob_id,
+                    write_model=model,
+                )
+            except ResolutionRefused as exc:
+                print(f"run {correlation_id}: judge refused: {exc}", flush=True)
+                judge_chooser, judge_model = None, ""
+            if judge_model:
+                print(f"run {correlation_id}: judge cell {judge_model}", flush=True)
+        return _finish_authoring_analyzer(
+            run=run,
+            durability=durability,
+            blob_id=blob_id,
+            correlation_id=correlation_id,
+            grant=grant,
+            artifact=artifact,
+            trees=analyzer_trees,
+            author_contents=authored,
+            consulted=consulted,
+            task=(resolved.message if resolved else "") or "",
+            tools=sorted(tools),
+            ended_reason=ended_reason,
+            effects=effects,
+            steps=steps,
+            write_model=model,
+            judge_chooser=judge_chooser,
+            write_chooser=chooser,
+        )
+
+    result_body: dict[str, Any] = {
+        "started": True,
+        "tools": sorted(tools),
+        # Echoed so a row can assert what the run actually received, rather
+        # than asserting that the resolver returned something and hoping the
+        # run read it.
+        "message": resolved.message if resolved else None,
+        "received_context": (
+            [{"run_id": rid, "result": body} for rid, body in resolved.context] if resolved else []
+        ),
+    }
+    if ended_reason:
+        # Build UI reads this under Stopped / Completed — without it the page keeps saying
+        # "Working" after a governed early end (empty choice, exhausted re-choice, stop).
+        result_body["reason"] = ended_reason
     durability.save(
         CheckpointBlob(
             blob_id=blob_id,
-            payload={
-                RESULT_KEY: {
-                    "started": True,
-                    "tools": sorted(tools),
-                    # Echoed so a row can assert what the run actually received, rather
-                    # than asserting that the resolver returned something and hoping the
-                    # run read it.
-                    "message": resolved.message if resolved else None,
-                    "received_context": (
-                        [{"run_id": rid, "result": body} for rid, body in resolved.context]
-                        if resolved
-                        else []
-                    ),
-                }
-            },
+            payload={RESULT_KEY: result_body},
             correlation_id=correlation_id,
             # THE GRANT's id (research F1). This said `run.authority.credential_id` for nine
             # features — a 15-minute task credential in the column ADR-0026 defined as
@@ -1553,7 +2291,10 @@ def main() -> int:
             grant_id=grant.grant_id,
             step_index=max(steps - 1, 0),
             written_by="entrypoint",
-            outcome=RunOutcome(state=RunState.COMPLETED.value, stop_reason=None),
+            outcome=RunOutcome(
+                state=(RunState.STOPPED.value if ended_reason else RunState.COMPLETED.value),
+                stop_reason=ended_reason,
+            ),
         )
     )
 

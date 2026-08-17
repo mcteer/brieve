@@ -104,6 +104,14 @@ def checkpoint_run(
     stamped = dict(payload)
     if run.endorsed_version:
         stamped[ENDORSED_VERSION_KEY] = run.endorsed_version
+    # 047 — phase strip. Step checkpoints pass `payload={"step": n}` which replaces the
+    # blob; without stamping here, Research goes active once and the next step paints
+    # every phase pending again.
+    live_progress = getattr(run, "propose_progress", None)
+    if live_progress is not None:
+        stamped["propose_progress"] = (
+            live_progress if isinstance(live_progress, dict) else live_progress.to_payload()
+        )
 
     blob = CheckpointBlob(
         blob_id=blob_id,

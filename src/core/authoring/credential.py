@@ -162,11 +162,13 @@ class AuthoringCredentials:
                 f"no App key at {self._app_key_path!r}; the authoring credential is "
                 f"operator-seeded (ADR-0062) and this deployment has not seeded it"
             )
-        # `read_path` returns the KV v2 inner data. Both spellings are accepted because the
-        # seeding is operator work and a mismatch here would surface as a signing failure,
-        # which names the wrong thing.
-        app_id = str(data.get("app_id") or data.get("application_id") or "").strip()
-        private_key = str(data.get("private_key") or data.get("pem") or "")
+        # `VaultDatabaseCredentials.read_path` returns the HTTP body. KV v2 wraps the
+        # operator record as `{"data": {"data": {app_id, private_key}, "metadata": …}}`.
+        # A test reader (and a future unwrap) may already hand the inner map. Accept both;
+        # treating the envelope as the record reads as "partially seeded" while Vault is fine.
+        record = _kv_v2_record(data)
+        app_id = str(record.get("app_id") or record.get("application_id") or "").strip()
+        private_key = str(record.get("private_key") or record.get("pem") or "")
         if not app_id or not private_key.strip():
             raise CredentialUnavailableError(
                 "the App key record is missing `app_id` or `private_key`; a partially seeded "
@@ -239,6 +241,30 @@ class AuthoringCredentials:
             installation=installation,
             expires_at=_expiry(payload.get("expires_at"), fallback=now + self._ttl),
         )
+
+
+def _kv_v2_record(data: dict[str, Any]) -> dict[str, Any]:
+    """The operator record, whether `read_path` handed the HTTP body or the inner map.
+
+    Vault KV v2: ``{"data": {"data": {app_id, private_key}, "metadata": …}}``.
+    Already-unwrapped: ``{app_id, private_key}``. Walk at most two ``data`` layers that
+    do not themselves carry the App fields, then stop — a private key that happened to
+    contain a ``data`` key must not be walked through.
+    """
+    record = data
+    for _ in range(2):
+        if (
+            record.get("app_id")
+            or record.get("application_id")
+            or record.get("private_key")
+            or record.get("pem")
+        ):
+            return record
+        inner = record.get("data")
+        if not isinstance(inner, dict):
+            return record
+        record = inner
+    return record
 
 
 def _expiry(raw: object, *, fallback: datetime) -> datetime:

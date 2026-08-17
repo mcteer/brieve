@@ -50,7 +50,6 @@ class _AmbientToken:
     """The ambient `gh` credential, shaped like a token source."""
 
     def token_for(self, installation: str) -> InstallationToken:
-
         out = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=False)
         if out.returncode != 0 or not out.stdout.strip():
             pytest.fail(
@@ -165,7 +164,7 @@ def test_row_e1_the_published_body_is_the_rendering_containment_scanned(publishe
     proposal = published["proposal"]
     scanned = dict(scannable_text(proposal))
     assert scanned["body"] == proposal.render()
-    assert "### Provenance" in proposal.render(), "FR-031 — a reviewer can trace this to a run"
+    assert "## Provenance" in proposal.render(), "FR-031 — a reviewer can trace this to a run"
     assert "corr-041-e1" in proposal.render()
 
 

@@ -247,6 +247,7 @@ def run_pipeline(
     # observation on every call would be correct but expensive, and repeatability is the
     # tool author's declaration.
     execution_error_code: str | None = None
+    execution_error_message: str | None = None
     tool_result: Any = None
     bracket = (
         run.durability is not None
@@ -277,7 +278,13 @@ def run_pipeline(
         else:
             tool_result = registration.handler(arguments)
     except Exception as exc:
-        execution_error_code = safe_error_code(exc)
+        # Prefer a typed reason when the handler raised one (e.g. PublishRefused) over a
+        # generic class-name code — operators need "clone_refused", not "PublishRefused".
+        typed = getattr(exc, "reason_code", None)
+        execution_error_code = (
+            typed if isinstance(typed, str) and typed.strip() else safe_error_code(exc)
+        )
+        execution_error_message = str(exc).strip() or None
 
     try:
         _audit(
@@ -395,8 +402,12 @@ def run_pipeline(
     if post_failed or execution_error_code is not None:
         return PipelineOutcome(
             decision="deny",
-            reason_code=post_reason if post_failed else "tool_error",
-            message=post_message if post_failed else "tool execution failed",
+            reason_code=post_reason if post_failed else (execution_error_code or "tool_error"),
+            message=(
+                post_message
+                if post_failed
+                else (execution_error_message or "tool execution failed")
+            ),
             executed=True,
             tool_result=tool_result,
         )

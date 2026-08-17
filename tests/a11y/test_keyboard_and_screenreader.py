@@ -45,7 +45,7 @@ USELESS_ALT = ("image", "photo", "picture", "icon", "graphic", "spacer", "img")
 def _states(server: PortalServer) -> list[tuple[str, str]]:
     """Every page state worth walking, as (name, path)."""
     return [
-        ("thread list", "/"),
+        ("thread list", "/run"),
     ]
 
 

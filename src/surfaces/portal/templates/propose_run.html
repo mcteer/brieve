@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Build — Harness Portal{% endblock %}
+{% block header_actions %}
+<form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+{% endblock %}
+{% block main_class %}main--app{% endblock %}
+{% block content %}
+<div class="app-layout{% if not builds %} app-layout--alone{% endif %}">
+{% include "_build_rail.html" %}
+<div class="app-main">
+<section class="propose" data-propose-run="{{ run_id }}">
+  <h1>Build</h1>
+
+  <ol class="phase-strip" aria-live="polite" aria-atomic="true" id="phase-strip">
+    {% for phase in phases %}
+      <li class="phase phase--{{ phase.status }}" data-phase="{{ phase.name }}">
+        <span class="phase-name">{{ phase.name }}</span>
+        <span class="phase-status">{{ phase.status }}</span>
+        {% if phase.reason %}<span class="phase-reason">{{ phase.reason }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+
+  <p class="disposition" data-run-id="{{ run_id }}">
+    <span class="visually-hidden">Run status:</span>
+    <span class="state pill">{{ state }}</span>
+  </p>
+
+  <div class="propose-outcome" data-propose-outcome>
+  {% if pr_url %}
+    <p class="result"><a href="{{ pr_url }}">Pull request</a></p>
+  {% elif ended_reason %}
+    <p class="ended">{{ ended_reason }}</p>
+  {% elif state in ("stopped", "completed", "failed") %}
+    <p class="ended">Ended without a pull request.</p>
+  {% else %}
+    <p class="pending">Working. Phases update on their own.</p>
+  {% endif %}
+  </div>
+</section>
+</div>
+</div>
+{# Cache-bust: portal copies static at alloc start; browsers also cache aggressively. #}
+<script src="/static/portal-propose-strip.js?v=20260817a" defer></script>
+<script src="/static/portal-propose.js?v=20260817a" defer></script>
+{% endblock %}

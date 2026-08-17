@@ -119,10 +119,15 @@ def test_the_portal_has_no_route_that_returns_control_to_a_running_run() -> None
     )
     paths = {getattr(route, "path", "") for route in app.routes}
 
-    # The stop path is the ONLY one that reaches into a live run, and it ends it.
+    # Paths that touch a live run. Stop ends it; Propose (047) only watches (SSE + page).
     reaching_into_runs = {p for p in paths if "/runs/" in p}
-    assert reaching_into_runs == {"/runs/{run_id}/stop"}, (
-        f"a portal route reaches into a running run other than to stop it: {reaching_into_runs}"
+    assert reaching_into_runs == {
+        "/runs/{run_id}/stop",
+        "/propose/runs/{run_id}",
+        "/propose/runs/{run_id}/events",
+    }, (
+        f"a portal route reaches into a running run other than to stop or watch Propose: "
+        f"{reaching_into_runs}"
     )
 
 

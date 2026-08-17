@@ -542,6 +542,26 @@ nomad job run -var="repo=$REPO" "$REPO/infra/jobs/agent-run.nomad.hcl" >/dev/nul
   && ok "agent-run registered (parameterized; one allocation and one identity per run)" \
   || die "could not register the agent-run job — dispatched runs would have nothing to run"
 
+# Nomad CNI bridge needs Linux CNI plugins (see authoring-tier var.cni_bridge).
+CNI_BRIDGE=true
+if [ "$(uname -s)" = "Darwin" ]; then
+  CNI_BRIDGE=false
+fi
+
+say "Authoring tier"
+AUTHORING_IMAGE="${AUTHORING_IMAGE:-brieve/authoring-runtime:local}"
+"$REPO/infra/bin/authoring-image" >/dev/null \
+  || die "could not build $AUTHORING_IMAGE — proposer would fail tooling_missing"
+ok "authoring runtime image $AUTHORING_IMAGE (pinned against Nomad image GC)"
+# Optional — absent is fine; Build can author but cannot publish until seeded + set.
+AUTHORING_INSTALLATION_ID="$(grep "^AUTHORING_INSTALLATION_ID=" "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true)"
+nomad job run -var="repo=$REPO" -var="cni_bridge=${CNI_BRIDGE}" \
+  -var="image=$AUTHORING_IMAGE" \
+  -var="vcs_installation=${AUTHORING_INSTALLATION_ID}" \
+  "$REPO/infra/jobs/authoring-tier.nomad.hcl" >/dev/null 2>&1 \
+  && ok "authoring-tier registered (parameterized; Build/Propose; cni_bridge=${CNI_BRIDGE})" \
+  || die "could not register authoring-tier — Build would have nothing to run"
+
 # ---------------------------------------------------------------- 4d. the surfaces
 # The API and the portal are NOT registered here. `make portal-up` does it.
 #

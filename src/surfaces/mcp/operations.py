@@ -44,6 +44,8 @@ OPERATION_BY_TOOL: dict[str, tuple[str, str]] = {
     # 024. Answering is an API operation rather than portal logic (ADR-0034), which is exactly
     # why it appears here too — ADR-0033 binds parity across every implemented pair.
     "ask": ("POST", "/ask"),
+    # 047. Propose intake — same path as the API / portal; ADR-0033 parity.
+    "propose": ("POST", "/propose"),
     "stop_run": ("POST", "/runs/{run_id}/stop"),
     "list_agent_definitions": ("GET", "/agent-definitions"),
     "get_agent_definition": ("GET", "/agent-definitions/{agent_definition_id}"),
@@ -298,6 +300,31 @@ def operations() -> list[McpOperation]:
                 "required": ["question"],
                 # No corpus parameter and no model parameter. Which corpus is pinned and which
                 # model the binding names are not the caller's to choose.
+                "additionalProperties": False,
+            },
+        ),
+        McpOperation(
+            tool_name="propose",
+            audit_disposition=RECORDS_ELSEWHERE,
+            audit_note=(
+                "propose dispatches authoring-tier; the run trail records phases and publish (047)"
+            ),
+            method="POST",
+            path="/propose",
+            description=(
+                "Propose infrastructure changes: send one message that includes a GitHub "
+                "repository URL and what should change (or repository + task). The platform "
+                "runs Research → Plan → Write → Judge → Propose and opens a pull request. "
+                "You do not choose an agent."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "minLength": 1},
+                    "repository": {"type": "string", "minLength": 1},
+                    "task": {"type": "string", "minLength": 1},
+                    "correlation_id": {"type": "string", "minLength": 1},
+                },
                 "additionalProperties": False,
             },
         ),

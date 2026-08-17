@@ -139,6 +139,7 @@ class McpTransport:
             "get_run_result": self._get_run_result,
             "get_run_report": self._get_run_report,
             "ask": self._ask,
+            "propose": self._propose,
             "stop_run": self._stop_run,
             "list_agent_definitions": self._list_agent_definitions,
             "get_agent_definition": self._get_agent_definition,
@@ -208,6 +209,36 @@ class McpTransport:
         if handle is None:
             return McpResult(ok=False, status=404, payload={"reason": "no such run"})
         return McpResult(ok=True, status=200, payload=handle.model_dump(mode="json"))
+
+    def _propose(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
+        """Same Propose intake as the API (047 / ADR-0033)."""
+        from core.authoring.request import RequestRefused
+        from surfaces.api.propose import ProposeRequest, propose_for
+        from surfaces.dispatch.nomad import DispatchError
+
+        try:
+            accepted = propose_for(
+                subject=subject,
+                body=ProposeRequest(
+                    message=str(args["message"]) if args.get("message") else None,
+                    repository=str(args["repository"]) if args.get("repository") else None,
+                    task=str(args["task"]) if args.get("task") else None,
+                    correlation_id=str(args["correlation_id"])
+                    if args.get("correlation_id")
+                    else None,
+                ),
+                dispatcher=self._dispatcher,
+                thread_store=self._threads,
+            )
+        except RequestRefused as refused:
+            code = 403 if refused.reason_code == "repository_not_owned" else 400
+            return McpResult(ok=False, status=code, payload={"reason": str(refused)})
+        except DispatchError as exc:
+            return McpResult(ok=False, status=503, payload={"reason": str(exc)})
+        except Exception:  # noqa: BLE001 — fail closed
+            reason = "Build could not be started"
+            return McpResult(ok=False, status=503, payload={"reason": reason})
+        return McpResult(ok=True, status=202, payload=accepted.model_dump(mode="json"))
 
     def _ask(self, args: dict[str, Any], subject: AuthenticatedSubject) -> McpResult:
         """The same verdict the API gives, from the same implementation (ADR-0033).

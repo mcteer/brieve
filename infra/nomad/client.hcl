@@ -61,5 +61,11 @@ plugin "docker" {
     volumes {
       enabled = true
     }
+    # Default image GC delay is ~3 minutes. The authoring-runtime tag is local-only;
+    # collecting it makes the next Build fail at pull ("access denied") before the
+    # analyzer starts. Leave images in place on this workstation client.
+    gc {
+      image = false
+    }
   }
 }

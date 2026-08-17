@@ -107,6 +107,27 @@ def test_a_running_run_says_so_rather_than_returning_nothing() -> None:
     assert response.result is None
 
 
+def test_a_running_build_returns_live_phase_progress() -> None:
+    """The portal strip polls this while outcome is still None — progress must not wait."""
+    progress = {
+        "current": "research",
+        "phases": [
+            {"name": "research", "status": "active"},
+            {"name": "plan", "status": "pending"},
+        ],
+    }
+    response = run_result_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=Durability(_blob(state=None, payload={"propose_progress": progress})),
+        audit=InMemoryAuditSink(),
+    )
+
+    assert response.disposition == "running"
+    assert response.propose_progress == progress
+
+
 def test_a_stopped_run_returns_its_reason_not_an_empty_result() -> None:
     """A run that failed is not a run that returned nothing.
 

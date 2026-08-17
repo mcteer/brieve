@@ -428,13 +428,53 @@ def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def terraform_plan(arguments: Mapping[str, Any]) -> dict[str, Any]:
-    """FIXTURE — Terraform is not deployed in the enclave.
+    """Run ``terraform plan`` against a working directory, or refuse (047 / ADR-0047).
 
-    Returns a shape, not a plan. Saying so in the payload rather than only in a docstring,
-    because a fixture whose output is indistinguishable from the real thing is how a pack
-    comes to read as proven.
+    **Not an always-green fixture.** A missing binary, a non-zero plan, or an absent
+    working directory refuses rather than inventing ``changes: 0``. Hermetic rows that
+    must script a plan inject ``HARNESS_TERRAFORM_BIN`` pointing at a stub executable.
     """
-    return {"fixture": True, "product": "terraform", "action": "plan", "changes": 0}
+    import os
+    import subprocess
+    from pathlib import Path
+
+    raw_dir = arguments.get("working_directory") or arguments.get("path") or "."
+    workdir = Path(str(raw_dir)).resolve()
+    if not workdir.is_dir():
+        raise RuntimeError(f"terraform plan: working directory {workdir} is not a directory")
+
+    binary = os.environ.get("HARNESS_TERRAFORM_BIN", "terraform").strip() or "terraform"
+    try:
+        finished = subprocess.run(  # noqa: S603 — operator-configured binary, fixed args
+            [binary, "plan", "-input=false", "-no-color", "-detailed-exitcode"],
+            cwd=str(workdir),
+            capture_output=True,
+            text=True,
+            timeout=float(os.environ.get("HARNESS_TERRAFORM_PLAN_TIMEOUT", "300")),
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "terraform plan: binary not available; refuse rather than return a fixture"
+        ) from exc
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(f"terraform plan: {type(exc).__name__}") from exc
+
+    # detailed-exitcode: 0 = empty, 1 = error, 2 = changes present
+    if finished.returncode == 1:
+        raise RuntimeError(
+            "terraform plan failed: "
+            + (finished.stderr or finished.stdout or "unknown error")[:2000]
+        )
+    output = (finished.stdout or "")[-8000:]
+    return {
+        "fixture": False,
+        "product": "terraform",
+        "action": "plan",
+        "exit_code": finished.returncode,
+        "has_changes": finished.returncode == 2,
+        "output": output,
+    }
 
 
 def terraform_apply(arguments: Mapping[str, Any]) -> dict[str, Any]:

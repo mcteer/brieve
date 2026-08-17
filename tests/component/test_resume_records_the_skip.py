@@ -60,7 +60,7 @@ def _run(skip: Any) -> tuple[InMemoryAuditSink, _Durability, list[int], list[int
         audit_sink=audit,
     )
     durability = _Durability()
-    _, executed, skipped = _run_steps(
+    _, executed, skipped, _ended = _run_steps(
         run,
         durability=durability,
         blob_id="corr-skip-records",

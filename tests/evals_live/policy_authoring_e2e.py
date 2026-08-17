@@ -159,8 +159,8 @@ path "secret/metadata/loadtest/*"
 
         # SC-001, checked before publishing rather than hoped for afterwards.
         for question, marker in (
-            ("what changed", "### Files"),
-            ("what it now permits", "### Measured impact"),
+            ("what changed", "## Files"),
+            ("what it now permits", "## Measured impact"),
             ("on what basis", CITATION),
         ):
             if marker not in body:

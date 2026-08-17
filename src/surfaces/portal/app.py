@@ -26,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from surfaces.portal.events import thread_event_stream
+from surfaces.portal.events import propose_event_stream, thread_event_stream
 from surfaces.portal.highlight import highlight_code
 from surfaces.portal.oidc import LoginRefused, OidcClient
 from surfaces.portal.relay import ApiRelay, ApiResponse
@@ -246,9 +246,23 @@ def create_portal(
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> Response:
+        """047 — home is Propose chat, not the agent-picker Run surface."""
         session = _session(request)
         if session is None:
             return templates.TemplateResponse(request=request, name="signed_out.html", context={})
+        builds, reachable = _builds(session)
+        return templates.TemplateResponse(
+            request=request,
+            name="propose.html",
+            context={"builds": builds, "reachable": reachable},
+        )
+
+    @app.get("/run", response_class=HTMLResponse)
+    def run_agents(request: Request) -> Response:
+        """Operator Run surface (agent picker). Not the primary product path (047)."""
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/run")
 
         threads, reachable, refused = _threads(session)
         definitions, definitions_reachable = _definitions(session)
@@ -444,6 +458,34 @@ def create_portal(
             for exchange in exchanges
         ]
 
+    def _builds(session: Any) -> tuple[list[dict[str, Any]], bool]:
+        """This person's authoring runs for the Build rail, and whether the list could be read.
+
+        Same collapse as Ask: an unreadable index is rendered as absent, not as empty — but
+        the page must still say the platform could not be reached, or an outage looks like
+        a first visit.
+        """
+        listed = app.state.relay.request("GET", "/runs", token=session.access_token)
+        if not listed.reachable or not listed.ok:
+            return [], False
+        runs = (listed.payload or {}).get("runs") or []
+        builds: list[dict[str, Any]] = []
+        for run in runs:
+            if not isinstance(run, dict):
+                continue
+            run_id = str(run.get("run_id") or "")
+            definition = str(run.get("agent_definition_id") or "")
+            if definition != "authoring-agent" and not run_id.startswith("propose-"):
+                continue
+            builds.append(
+                {
+                    "run_id": run_id,
+                    "title": _build_rail_title(run_id),
+                    "state": str(run.get("state") or "") or None,
+                }
+            )
+        return builds, True
+
     def _conversations(session: Any) -> list[dict[str, Any]]:
         """This person's own conversations for the rail, or nothing to show.
 
@@ -479,6 +521,84 @@ def create_portal(
             }
             for definition in definitions
         ], listed.reachable
+
+    @app.get("/propose", response_class=HTMLResponse)
+    def propose_form(request: Request) -> Response:
+        """047 — same chat as home; kept so bookmarks to /propose still work."""
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/propose")
+        return RedirectResponse("/", status_code=303)
+
+    @app.post("/")
+    @app.post("/propose")
+    def propose_submit(
+        request: Request,
+        message: str = Form(""),
+    ) -> Response:
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/")
+        started = app.state.relay.request(
+            "POST",
+            "/propose",
+            token=session.access_token,
+            json_body={"message": message},
+        )
+        if not started.ok:
+            detail = "Build could not be started"
+            if isinstance(started.payload, dict) and started.payload.get("detail"):
+                detail = str(started.payload["detail"])
+            builds, reachable = _builds(session)
+            return templates.TemplateResponse(
+                request=request,
+                name="propose.html",
+                context={
+                    "message": message,
+                    "error": detail,
+                    "builds": builds,
+                    "reachable": reachable,
+                },
+                status_code=started.status or 503,
+            )
+        run_id = (started.payload or {}).get("run_id")
+        return RedirectResponse(f"/propose/runs/{run_id}", status_code=303)
+
+    @app.get("/propose/runs/{run_id}", response_class=HTMLResponse)
+    def propose_run(request: Request, run_id: str) -> Response:
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, f"/propose/runs/{run_id}")
+        state = app.state.relay.request("GET", f"/runs/{run_id}", token=session.access_token)
+        result = app.state.relay.request(
+            "GET", f"/runs/{run_id}/result", token=session.access_token
+        )
+        progress = _propose_phases(result)
+        run_state = str((state.payload or {}).get("state", "starting")) if state.ok else "unknown"
+        pr_url, ended_reason = _propose_outcome(result, phases=progress, state=run_state)
+        builds, reachable = _builds(session)
+        return templates.TemplateResponse(
+            request=request,
+            name="propose_run.html",
+            context={
+                "run_id": run_id,
+                "state": run_state,
+                "phases": progress,
+                "pr_url": pr_url,
+                "ended_reason": ended_reason,
+                "builds": builds,
+                "reachable": reachable,
+            },
+        )
+
+    @app.get("/propose/runs/{run_id}/events")
+    def propose_events(request: Request, run_id: str) -> Response:
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, f"/propose/runs/{run_id}")
+        return propose_event_stream(
+            relay=app.state.relay, token=session.access_token, run_id=run_id
+        )
 
     @app.get("/ask", response_class=HTMLResponse)
     def ask_form(request: Request) -> Response:
@@ -819,6 +939,75 @@ def create_portal(
         )
 
     return app
+
+
+def _build_rail_title(run_id: str) -> str:
+    """A one-line rail label. The full id stays on ``title`` / the href."""
+    slug = run_id.removeprefix("propose-")
+    return slug[:16] if slug else run_id
+
+
+def _propose_phases(result: ApiResponse) -> list[dict[str, str]]:
+    """Phase strip from the platform payload only — portal invents no order (047)."""
+    names = ("research", "plan", "write", "judge", "propose")
+    default = [{"name": n, "status": "pending", "reason": ""} for n in names]
+    if not result.ok or not isinstance(result.payload, dict):
+        return default
+    progress = None
+    body = result.payload.get("result")
+    if isinstance(body, dict):
+        progress = body.get("propose_progress")
+    if progress is None:
+        progress = result.payload.get("propose_progress")
+    if not isinstance(progress, dict):
+        return default
+    phases = progress.get("phases")
+    if not isinstance(phases, list):
+        return default
+    rendered: list[dict[str, str]] = []
+    for item in phases:
+        if not isinstance(item, dict):
+            continue
+        rendered.append(
+            {
+                "name": str(item.get("name", "")),
+                "status": str(item.get("status", "pending")),
+                "reason": str(item.get("reason") or ""),
+            }
+        )
+    return rendered or default
+
+
+def _propose_outcome(
+    result: ApiResponse, *, phases: list[dict[str, str]], state: str
+) -> tuple[str | None, str | None]:
+    """PR URL or a reason the Build ended without one — never leave Stopped unexplained."""
+    pr_url: str | None = None
+    ended_reason: str | None = None
+    if result.ok and isinstance(result.payload, dict):
+        body = result.payload.get("result")
+        if isinstance(body, dict):
+            raw_pr = body.get("pr_url")
+            pr_url = str(raw_pr) if raw_pr else None
+            if not pr_url:
+                ended_reason = str(body.get("reason") or "") or None
+        if not ended_reason:
+            ended_reason = str(result.payload.get("stop_reason") or "") or None
+        if result.payload.get("disposition") == "ended_without_result" and not ended_reason:
+            ended_reason = str(result.payload.get("stop_reason") or "") or None
+    if pr_url:
+        return pr_url, None
+    if not ended_reason:
+        for phase in phases:
+            if phase.get("status") == "failed" and phase.get("reason"):
+                ended_reason = str(phase["reason"])
+                break
+    if not ended_reason and state in ("stopped", "completed", "failed"):
+        ended_reason = "Ended without a pull request."
+    elif ended_reason and not ended_reason.startswith("Ended"):
+        # Under the status pill: say what happened, not only a bare platform code.
+        ended_reason = f"Ended without a pull request — {ended_reason}"
+    return None, ended_reason
 
 
 def _with_run_state(

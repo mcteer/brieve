@@ -325,9 +325,9 @@ def test_the_ask_waits_longer_and_nothing_else_does() -> None:
     """SC-004, **both halves** — and the second is the one that matters.
 
     An implementation that raised the relay's shared default would satisfy "the ask waits long
-    enough" and quietly apply an ask's patience to every thread listing, which is the harm the
-    ten-second default was chosen to avoid. So the row asserts the listing still carries `None`
-    (the relay's own), and fails on the tempting simplification.
+    enough" and quietly apply an ask's patience to every listing, which is the harm the
+    ten-second default was chosen to avoid. So the row asserts Ask and Build listings still
+    carry `None` (the relay's own), and fails on the tempting simplification.
     """
     surface = _answering_surface()
     api = TestClient(surface.app)
@@ -348,13 +348,18 @@ def test_the_ask_waits_longer_and_nothing_else_does() -> None:
     portal = _portal(surface, relay=relay)
 
     portal.post("/ask", data={"question": GUIDANCE_QUESTION})
+    portal.get("/ask")
     portal.get("/")
 
     patience = dict(relay.seen)
     assert patience["/ask"] == ASK_PATIENCE, "the ask did not carry its own patience"
-    assert patience["/threads"] is None, (
-        "a thread listing carried an ask's patience — the shared default was widened instead of "
-        "one caller stating its exception"
+    assert patience.get("/ask-conversations") is None, (
+        "a conversation listing carried an ask's patience — the shared default was widened "
+        "instead of one caller stating its exception"
+    )
+    assert patience.get("/runs") is None, (
+        "a Build listing carried an ask's patience — the shared default was widened instead "
+        "of one caller stating its exception"
     )
 
 
@@ -543,17 +548,16 @@ def test_the_two_surfaces_say_which_one_acts() -> None:
     found the composer's agent picker instead — which is the failure exactly, since that picker
     starts governed runs and the ask can never start anything.
 
-    So both surfaces state their consequence, and this row keeps them from drifting back into
-    synonyms. It asserts the *property* — each page says whether anything happens — rather than
-    pinning particular wording, so the copy can improve without the guarantee eroding.
+    047 put the primary act on Build (`/`) and kept Ask as the never-acts surface. This row
+    keeps those two from drifting back into synonyms.
     """
     portal = _portal(_answering_surface())
 
     ask = _visible(portal.get("/ask").text)
-    run = _visible(portal.get("/").text)
+    build = _visible(portal.get("/").text)
 
     assert "never acts" in ask, "the ask page does not say that nothing happens"
-    assert "acts on your behalf" in run, "the run page does not say that something does"
+    assert "pull request" in build, "the Build page does not say that something does"
 
     # And each points at the other, so landing on the wrong one is a click rather than a search.
     assert 'href="/"' in portal.get("/ask").text

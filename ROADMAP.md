@@ -296,7 +296,12 @@ One platform, isolated tenants, using the products' own isolation primitives.
 **Why last of the scheduled set:** it multiplies every guarantee above it. Isolating tenants
 before the things being isolated are stable means doing the work twice.
 
-### The change-proposal workflow, end to end — Terraform first, Vault the same shape (unnumbered)
+### The change-proposal workflow, end to end — Terraform first, Vault the same shape (**047**)
+
+**Specified 2026-08-13** as `specs/047-propose-chat/` — Propose chat (repo URL → phased
+Research/Plan/Write/Judge/Propose → PR) with live phase UI. Implementation on `feat/047-propose-chat`.
+
+### The change-proposal workflow (historical note — was unnumbered)
 
 The product shape the current feature sequence builds toward, stated 2026-08-06 so the pieces
 are aimed at it rather than discovered to almost compose later. **A user defines a workspace, a

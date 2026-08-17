@@ -79,6 +79,14 @@ def register_fixture_tools(registry: ToolRegistry) -> None:
     )
 
 
+#: Authoring tool names a ceiling or role binding may declare (038/041/047).
+#:
+#: Joined into the fabric vocabulary on ordinary runs so role bindings that include them
+#: do not refuse manufacture with ``unknown_ceiling_entry``. Callables still attach only on
+#: the authoring tier — vocabulary is not permission.
+AUTHORING_VOCABULARY: frozenset[str] = frozenset({"read_subject", "author_file", "open_proposal"})
+
+
 def build_registry(
     *,
     packs: list[str] | None = None,

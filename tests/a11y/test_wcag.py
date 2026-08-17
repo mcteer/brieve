@@ -64,7 +64,7 @@ def test_the_empty_thread_list_meets_wcag_22_aa(page: Any, portal_server: Portal
 
 def test_the_populated_thread_list_meets_wcag_22_aa(page: Any, portal_server: PortalServer) -> None:
     start_thread_from_home(page, portal_server)
-    page.goto(f"{portal_server.base}/")
+    page.goto(f"{portal_server.base}/run")
     violations = audit(page)
     assert violations == [], describe(violations)
 

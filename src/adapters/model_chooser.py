@@ -25,7 +25,7 @@ the model, which is re-execution wearing observation's clothes.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from pydantic import BaseModel
@@ -79,6 +79,68 @@ _SYSTEM = (
 #: reads as terminal.
 _NONE = "NONE"
 
+#: Brief schemas for authoring tools (047). The chooser shows the ceiling, never a catalogue;
+#: without these two lines a live write model sees only bare names and often answers NONE.
+_AUTHORING_RESEARCH_HINT = (
+    "Tool arguments: "
+    'read_subject needs {"path": "<path relative to the mounted subject>"}; '
+    'author_file needs {"path": "<path>", "content": "<full file body>"}. '
+    "For a request to create or change files, begin with read_subject "
+    "(e.g. README.md) rather than NONE. author_file is refused until the platform "
+    "has recorded a write plan from what you read — keep reading until you have "
+    "enough, then author_file will be permitted."
+)
+_AUTHORING_WRITE_PREFERRED_HINT = (
+    "Tool arguments: "
+    'read_subject needs {"path": "<path relative to the mounted subject>"}; '
+    'author_file needs {"path": "<path>", "content": "<full file body>"}. '
+    "The write plan is recorded. Prefer author_file with full file bodies. "
+    "Read only if a specific path in the plan is still unknown."
+)
+_AUTHORING_WRITE_ONLY_HINT = (
+    "Tool arguments: "
+    'author_file needs {"path": "<path>", "content": "<full file body>"}. '
+    "The write plan is recorded. You MUST call author_file now for a planned path. "
+    "Do not set the tool to NONE. NONE abandons the pull request. "
+    "Do not invent a second research pass. "
+    "Do not start a larger architecture than the plan named."
+)
+
+_AUTHORING_TOOLS = frozenset({"read_subject", "author_file"})
+_READ_SUBJECT = "read_subject"
+_AUTHOR_FILE = "author_file"
+
+
+def _authoring_hint(permitted: Sequence[str]) -> str:
+    names = set(permitted)
+    if _AUTHOR_FILE in names and _READ_SUBJECT not in names:
+        return _AUTHORING_WRITE_ONLY_HINT
+    if _AUTHOR_FILE in names and _READ_SUBJECT in names:
+        return _AUTHORING_WRITE_PREFERRED_HINT
+    return _AUTHORING_RESEARCH_HINT
+
+
+class _WritePlanDraft(BaseModel):
+    """Structured write plan — paths and intent, never file bodies."""
+
+    summary: str = ""
+    files: list[str] = []
+
+
+class _QualityJudgment(BaseModel):
+    """Judge verdict on authored work. ``allow`` false is a publish deny."""
+
+    allow: bool
+    reason: str = ""
+
+
+class _ProposalCopy(BaseModel):
+    """Reviewer-facing PR title and body slots. Layout stays the platform's."""
+
+    title: str
+    rationale: str = ""
+    usage: str = ""
+
 
 class _ToolCall(BaseModel):
     """The structured answer the framework validates (040, research R1).
@@ -99,6 +161,8 @@ def _prompt(request: ChoiceRequest) -> str:
         f"Permitted tools: {', '.join(request.permitted) or '(none)'}",
         f"Step: {request.step_index}",
     ]
+    if _AUTHORING_TOOLS.intersection(request.permitted):
+        lines.append(_authoring_hint(request.permitted))
     if request.refused:
         # FR-004a: the denial becomes context, so it teaches rather than only blocks. The
         # reason code travels with it — "authority_insufficient" and "unregistered_tool" call
@@ -225,6 +289,142 @@ class ModelChooser:
         # platform carries the request to the capability, which enforces its own rules
         # (040, clarification Q1).
         return Answer(name, output.arguments)
+
+    def draft_write_plan(self, *, task: str, consulted: tuple[str, ...], max_files: int = 6) -> str:
+        """What the analyzer will write, after Research. Not a product plan oracle."""
+        cap = max(1, min(int(max_files), 12))
+        prompt = (
+            f"Task: {task or '(none supplied)'}\n"
+            f"Subject paths already read: {', '.join(consulted) or '(none)'}\n"
+            f"Outline at most {cap} files for a focused first pull request. "
+            "Prefer a small working slice over a complete platform. "
+            "Do not write file bodies. Do not include secrets."
+        )
+        try:
+            agent = build_governed_agent(
+                self._model_for_client(),
+                system_prompt=(
+                    "You plan a file-level change for a governed authoring run. "
+                    f"Answer with a short summary and at most {cap} paths you will write. "
+                    "No file contents. No secrets. No sprawling multi-module estate."
+                ),
+                output_type=_WritePlanDraft,
+            )
+            result = agent.run_sync(prompt)
+        except Exception as exc:
+            raise ChooserUnavailable(
+                f"could not draft a write plan for model {self.model!r}: {type(exc).__name__}",
+                reason_code="provider_unavailable",
+            ) from exc
+        output = getattr(result, "output", None)
+        if not isinstance(output, _WritePlanDraft):
+            raise MalformedAnswer("the model's write plan did not validate")
+        summary = (output.summary or "").strip()
+        paths = [p.strip() for p in output.files if str(p).strip()][:cap]
+        if paths:
+            listed = ", ".join(paths)
+            return f"{summary} Files: {listed}".strip() if summary else f"Files: {listed}"
+        return summary or "Write the files required by the task."
+
+    def judge_authored_work(
+        self,
+        *,
+        task: str,
+        write_plan: str,
+        files: dict[str, str],
+    ) -> tuple[bool, str]:
+        """Quality and accuracy of what was written, against the task. Fail closed."""
+        excerpts: list[str] = []
+        for path, body in list(files.items())[:8]:
+            text = body if len(body) <= 8000 else body[:8000] + "\n…"
+            excerpts.append(f"### {path}\n```\n{text}\n```")
+        prompt = (
+            f"Task: {task or '(none supplied)'}\n"
+            f"Author's plan (a first-PR slice, not a complete platform): "
+            f"{write_plan or '(none recorded)'}\n"
+            "Authored files:\n"
+            f"{chr(10).join(excerpts) or '(none)'}\n"
+            "Decide whether this is a coherent first pull request for the task. "
+            "allow=true if a reviewer should receive these files: they address the task, "
+            "contain no secrets, and are not clearly unsafe or unrelated. "
+            "allow=false if they are unrelated, contain secrets, or would clearly harm "
+            "an estate. Do not deny only because a larger architecture was not fully "
+            "delivered — Write is capped to a small file budget on purpose."
+        )
+        try:
+            agent = build_governed_agent(
+                self._model_for_client(),
+                system_prompt=(
+                    "You judge authored files for a governed Build that opens a first "
+                    "pull request. You do not write files. You do not invent a PR. "
+                    "A focused, sound slice of the task is enough to allow. "
+                    "reason is user-safe: no secrets, no raw credentials."
+                ),
+                output_type=_QualityJudgment,
+            )
+            result = agent.run_sync(prompt)
+        except Exception as exc:
+            raise ChooserUnavailable(
+                f"could not judge authored work for model {self.model!r}: {type(exc).__name__}",
+                reason_code="provider_unavailable",
+            ) from exc
+        output = getattr(result, "output", None)
+        if not isinstance(output, _QualityJudgment):
+            raise MalformedAnswer("the model's judgment did not validate")
+        reason = (output.reason or "").strip() or ("ok" if output.allow else "judge denied publish")
+        return bool(output.allow), reason[:240]
+
+    def describe_proposal(
+        self,
+        *,
+        task: str,
+        write_plan: str,
+        files: dict[str, str],
+    ) -> tuple[str, str, str]:
+        """Short title, markdown rationale, and how-to-use notes for the PR body."""
+        excerpts: list[str] = []
+        for path, body in list(files.items())[:8]:
+            text = body if len(body) <= 2500 else body[:2500] + "\n…"
+            excerpts.append(f"### {path}\n```\n{text}\n```")
+        prompt = (
+            f"User request (do not copy this as the title):\n{task or '(none)'}\n\n"
+            f"Write plan: {write_plan or '(none recorded)'}\n\n"
+            "Authored files:\n"
+            f"{chr(10).join(excerpts) or '(none)'}\n\n"
+            "Write pull-request copy. title: a short noun-phrase a reviewer would scan "
+            "in a list (example: 'Terraform template for AWS resources'). "
+            "Not a sentence copied from the user request. No URL. At most 72 characters. "
+            "rationale: markdown — short paragraphs, then a bullet list of files and what "
+            "each is for. Do not paste the user request. No secrets and no large source. "
+            "usage: markdown steps to use the files after a person merges. If they are "
+            "Terraform, include init, plan, and apply, and where to set variables. "
+            "Remind the reviewer that nothing is applied until merge."
+        )
+        try:
+            agent = build_governed_agent(
+                self._model_for_client(),
+                system_prompt=(
+                    "You write pull-request copy for a governed authoring run. "
+                    "You do not invent files. You do not include secrets. "
+                    "The platform owns the section layout; you fill title, rationale, "
+                    "and usage only."
+                ),
+                output_type=_ProposalCopy,
+            )
+            result = agent.run_sync(prompt)
+        except Exception as exc:
+            raise ChooserUnavailable(
+                f"could not describe the proposal for model {self.model!r}: {type(exc).__name__}",
+                reason_code="provider_unavailable",
+            ) from exc
+        output = getattr(result, "output", None)
+        if not isinstance(output, _ProposalCopy):
+            raise MalformedAnswer("the model's proposal copy did not validate")
+        return (
+            (output.title or "").strip(),
+            (output.rationale or "").strip(),
+            (output.usage or "").strip(),
+        )
 
 
 def build_chooser(

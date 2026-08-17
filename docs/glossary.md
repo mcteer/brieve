@@ -586,6 +586,13 @@ records are never read at all and the access record shows what was actually aske
 **Empty refuses.** A subject whose roles map to nothing is refused before any read happens, so the
 refusal leaves no access record — there was no access. Empty never means "everything".
 
+## Propose
+
+The portal (and matching API/MCP) surface where a person pastes a **repository URL** and a
+task; the platform runs ordered phases (Research → Plan → Write → Judge → Propose) and opens
+a pull request. Distinct from **Ask** (answers, never acts) and from **Run**’s agent picker.
+See `specs/047-propose-chat/`.
+
 ## Ask binding
 
 The operator-authored record naming, **per source**, which qualified cell an ask may use. Lives in

@@ -119,6 +119,12 @@ class SubjectReader:
         return {"path": path, "content": content, "present": True}
 
 
+class WritePlanIncomplete(Exception):
+    """`author_file` before the analyzer has recorded what it will write (047 Plan)."""
+
+    reason_code = "write_plan_incomplete"
+
+
 class FileAuthor:
     """`author_file`'s handler: write into the workspace, and nowhere else.
 
@@ -131,8 +137,13 @@ class FileAuthor:
         self._trees = trees
         self._artifact = artifact
         self.contents: dict[str, str] = {}
+        #: Analyzer Build sets this False until Plan records what will be written. Other
+        #: callers (conformance, evals) leave the default so existing rows stay intact.
+        self.plan_ready = True
 
     def __call__(self, arguments: Mapping[str, Any]) -> dict[str, Any]:
+        if not self.plan_ready:
+            raise WritePlanIncomplete("author_file is refused until the write plan is recorded")
         path = str(arguments.get("path", "")).strip()
         content = arguments.get("content")
         if not path:
@@ -225,6 +236,7 @@ __all__ = [
     "FileAuthor",
     "ResolutionRefused",
     "SubjectReader",
+    "WritePlanIncomplete",
     "WorkspaceRefused",
     "register_authoring_tools",
     "register_proposal_tool",

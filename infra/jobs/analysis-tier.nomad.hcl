@@ -17,6 +17,13 @@
 # and its analyzer's egress allowlist is EMPTY (it reads a mount and fetches nothing, where
 # this one fetches the pinned upstream). A change to one that does not need the other is
 # probably wrong.
+
+variable "cni_bridge" {
+  type        = bool
+  default     = true
+  description = "Nomad CNI group bridge when true; see authoring-tier.nomad.hcl for Darwin."
+}
+
 job "analysis-tier" {
   type        = "batch"
   datacenters = ["dc1"]
@@ -32,13 +39,13 @@ job "analysis-tier" {
     # not complete is blocked, not retried until it passes.
     restart { attempts = 0 }
 
-    network {
-      # BRIDGE, NEVER HOST. `portal.nomad.hcl` records finding the same setting wrong for the
-      # opposite reason — host mode shares the Docker VM's network namespace, which made a
-      # browser-facing surface unreachable. Here the consequence runs the other way: a
-      # workload reading hostile-by-assumption content would sit on the machine's own network,
-      # beside every other allocation. This is the single most important line in the file.
-      mode = "bridge"
+    # BRIDGE, NEVER HOST. Host mode would put hostile-by-assumption content on the machine's
+    # own network. CNI group bridge when fingerprinted; otherwise Docker network_mode=bridge.
+    dynamic "network" {
+      for_each = var.cni_bridge ? [1] : []
+      content {
+        mode = "bridge"
+      }
     }
 
     task "analyzer" {

@@ -87,6 +87,15 @@ variable "relevance_model" {
   default = ""
 }
 
+variable "propose_owned_repositories" {
+  type        = string
+  default     = ""
+  description = <<-DESC
+    047. Comma-separated owner/repo identifiers Propose may target. Empty refuses every
+    repository (fail closed). Dev commonly sets mcteer/brieve-demo.
+  DESC
+}
+
 variable "oidc_tenant_claim" {
   type        = string
   default     = "tenant"
@@ -221,6 +230,16 @@ job "api" {
           readonly = false
         }
 
+        # 047 — Propose/Build clones the owned repository here before dispatching
+        # authoring-tier. The path must be host-visible so Nomad can bind-mount the same
+        # checkout into the analyzer (`PROPOSE_SUBJECT_HOST_ROOT` below).
+        mount {
+          type     = "bind"
+          source   = "${var.repo}/.enclave/propose-subjects"
+          target   = "/propose-subjects"
+          readonly = false
+        }
+
         args = [
           # The watchdog runs beside the service and restarts the task when the workload
           # identity on disk has expired — see `infra/bin/identity-watchdog` for what it is
@@ -263,6 +282,11 @@ job "api" {
 
         ASK_MODEL       = var.ask_model
         RELEVANCE_MODEL = var.relevance_model
+
+        # 047. Fail closed when empty — see var.propose_owned_repositories.
+        PROPOSE_OWNED_REPOSITORIES = var.propose_owned_repositories
+        PROPOSE_ACQUIRE_ROOT       = "/propose-subjects"
+        PROPOSE_SUBJECT_HOST_ROOT  = "${var.repo}/.enclave/propose-subjects"
 
         UV_PROJECT_ENVIRONMENT = "/tmp/venv"
 

@@ -45,10 +45,17 @@ WRITE_CALLS = frozenset(
 #: That distinction is asserted rather than argued: `test_acquisition.py` drives acquisition
 #: and checks every path it creates lies under the directory its caller named. An exemption
 #: whose justification lives only in a comment is the shape ADR-0047 refuses.
+#: Acquisition writes the subject checkout BEFORE dispatch. Publishing writes already-
+#: composed files onto a clone in the proposer task — the analyzer never reaches that
+#: tree, and the model cannot cause those writes. SC-002 is a claim about writes an
+#: agent can cause; these two are the platform preparing an input and emitting an
+#: already-judged artefact.
 PERMITTED = {
     ("tool.py", "FileAuthor.__call__"),
     ("acquisition.py", "acquire_subject"),
     ("acquisition.py", "release_subject"),
+    ("publish.py", "ProposalPublisher._clone_and_materialize"),
+    ("publish.py", "ProposalPublisher._materialize"),
 }
 
 
@@ -64,9 +71,9 @@ def _qualified_functions(path: pathlib.Path) -> list[tuple[str, ast.AST]]:
             out += [
                 (f"{node.name}.{child.name}", child)
                 for child in node.body
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
             ]
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             out.append((node.name, node))
     return out
 
