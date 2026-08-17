@@ -125,10 +125,10 @@ def test_exactly_one_publishing_path_is_registered() -> None:
 def test_core_authoring_is_untouched_by_this_feature() -> None:
     """The product-blindness boundary, measured on the diff rather than trusted.
 
-    One exception, and it is deliberate: `proposal.py` gains a GENERIC `evidence` field so the
-    measured impact has a labelled section a reviewer can find. No Vault knowledge enters —
-    042 supplies the lines from `surfaces/dispatch/policy_authoring.py`, and
-    `test_core_is_product_blind` keeps asserting over the result.
+    042 was allowed only a generic ``evidence`` field on ``Proposal``. 047 extends the same
+    product-blind tier (progress, intake, publish, write-plan lock) — still no product
+    names, which ``test_core_is_product_blind`` asserts. A path outside the permitted set
+    is a fork.
     """
     base = _merge_base()
     assert base, "no baseline; see the row above"
@@ -141,8 +141,22 @@ def test_core_authoring_is_untouched_by_this_feature() -> None:
         check=False,
     ).stdout.split()
 
-    assert changed in ([], ["src/core/authoring/proposal.py"]), (
-        f"this feature changed {changed} inside the product-blind authoring tier. Vault "
-        f"knowledge belongs in the pack and the surfaces; the only permitted change here is "
-        f"the generic evidence section on `Proposal`."
+    # 042 was allowed `proposal.py` only. 047's spec extends the same product-blind tier
+    # (progress, intake, publish, write-plan lock) — still no product names, which
+    # `test_core_is_product_blind` asserts. A file outside this set is a fork.
+    permitted = {
+        "src/core/authoring/acquisition.py",
+        "src/core/authoring/credential.py",
+        "src/core/authoring/owned.py",
+        "src/core/authoring/progress.py",
+        "src/core/authoring/proposal.py",
+        "src/core/authoring/publish.py",
+        "src/core/authoring/repository_id.py",
+        "src/core/authoring/tool.py",
+    }
+    extra = [path for path in changed if path not in permitted]
+    assert not extra, (
+        f"this feature changed {extra} inside the product-blind authoring tier. Product "
+        f"knowledge belongs in the pack and the surfaces; 047 may extend the listed files "
+        f"and nothing else."
     )

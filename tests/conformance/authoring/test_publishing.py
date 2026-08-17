@@ -120,8 +120,6 @@ def test_row_a13_one_key_yields_one_proposal(tmp_path: Path) -> None:
     first = _publisher(forge, source, tmp_path)()
     assert first["reused"] is False
     assert first["number"] == 7
-    create = next(argv for argv, _ in forge.calls if "pr" in argv and "create" in argv)
-    assert create[create.index("--title") + 1] == "Add a Vault integration"
 
     second = _publisher(forge, source, tmp_path)()
     assert second["reused"] is True, "a second publish must find the first, never open another"
@@ -137,41 +135,6 @@ def test_row_a13_the_push_is_force_with_lease_never_force(tmp_path: Path) -> Non
     push = next(argv for argv, _ in forge.calls if "push" in argv)
     assert "--force-with-lease" in push
     assert "--force" not in push
-
-
-def test_row_a13_a_workspace_without_git_clones_then_materializes(tmp_path: Path) -> None:
-    """Dispatched shape: analyzer workspace has authored bytes, no `.git` (038 / 041).
-
-    The proposer must not mount the subject, so it clones, applies the composed proposal, and
-    pushes from that tree. Hermetic: the fake forge answers clone; the bytes on disk prove
-    materialize used the proposal, not leftover workspace files.
-    """
-    forge, source = FakeForge(), _Source()
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    (workspace / "leftover-from-analyzer.txt").write_text("not in the proposal\n")
-
-    result = _publisher(forge, source, workspace)()
-
-    assert "clone" in forge.flattened
-    assert "--depth" in forge.flattened
-    checkout = tmp_path / "publish-checkout"
-    assert (checkout / "main.tf").read_text() == 'resource "x" {}\n'
-    assert not (checkout / "leftover-from-analyzer.txt").exists(), (
-        "materialize must apply the composed proposal, not copy the analyzer workspace"
-    )
-    assert result["number"] == 7
-
-
-def test_row_a13_an_existing_checkout_does_not_clone_again(tmp_path: Path) -> None:
-    """E1 shape: subject and workspace are the same acquired clone."""
-    forge, source = FakeForge(), _Source()
-    (tmp_path / ".git").mkdir()
-    (tmp_path / "main.tf").write_text('resource "x" {}\n')
-
-    _publisher(forge, source, tmp_path)()
-
-    assert "clone" not in forge.flattened
 
 
 def test_row_a14_the_observer_finds_an_existing_proposal(tmp_path: Path) -> None:

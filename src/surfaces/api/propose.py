@@ -32,9 +32,9 @@ from surfaces.api.dependencies import SubjectDep, ThreadStoreDep
 from surfaces.dispatch.authoring_dispatch import prepare_authoring_run
 from surfaces.dispatch.nomad import AUTHORING_JOB_ID, DispatchError
 from surfaces.dispatch.types import RunHandle
+from surfaces.toolset import AUTHORING_VOCABULARY
 
 AUTHORING_DEFINITION_ID = "authoring-agent"
-AUTHORING_TOOLS = frozenset({"read_subject", "author_file", "open_proposal"})
 
 
 class ProposeRequest(BaseModel):
@@ -159,13 +159,13 @@ def propose_for(
     )
     # Steps + invoke_tools: the analyzer consults the write-cell model per step. steps=0 with
     # invoke_tools would take the "invoke every tool once with empty args" path and die on
-    # author_file before any research happens.
+    # the first write before any research happens.
     handle: RunHandle = dispatcher.dispatch(
         correlation_id=correlation_id,
         subject_user_id=subject.subject_user_id,
         tenant_id=subject.tenant_id,
         agent_definition_id=AUTHORING_DEFINITION_ID,
-        requested_tools=AUTHORING_TOOLS,
+        requested_tools=AUTHORING_VOCABULARY,
         subject_roles=frozenset(subject.roles),
         packs=frozenset({request.pack}),
         invoke_tools=True,
@@ -229,7 +229,6 @@ def build_router(
 
 __all__ = [
     "AUTHORING_DEFINITION_ID",
-    "AUTHORING_TOOLS",
     "PROGRESS_KEY",
     "ProposeAccepted",
     "ProposeRequest",
