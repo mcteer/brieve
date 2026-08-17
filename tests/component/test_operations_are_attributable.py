@@ -52,7 +52,7 @@ NEW_OPERATIONS = [
     # 024. Answering is an API operation (ADR-0034), so it answers to these rows like any other.
     ("POST", "/ask", "ask", {"question": "anything"}),
     # 047. Propose intake — same authentication bar as every other northbound act.
-    ("POST", "/propose", "propose", {"repository": "acme/app", "task": "add terraform"}),
+    ("POST", "/propose", "propose", {"message": "add terraform for https://github.com/acme/app"}),
     ("POST", "/runs/r/stop", "stop_run", {"run_id": "r"}),
     ("GET", "/claim-mappings/a", "collect_mapping_change", {"accessor": "a"}),
     ("GET", "/agent-definitions", "list_agent_definitions", {}),

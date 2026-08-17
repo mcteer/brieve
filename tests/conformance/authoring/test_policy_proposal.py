@@ -78,7 +78,7 @@ def test_row_v18_the_body_says_what_the_change_permits() -> None:
     )
 
     body = proposal.render()
-    assert "### Measured impact" in body
+    assert "## Measured impact" in body
     assert "**grants** create, update" in body
     assert "**revokes** read" in body
 
@@ -189,4 +189,4 @@ def test_the_evidence_section_precedes_the_limits() -> None:
         proposal=_proposal("x"), impact=IMPACT, resolves=_resolves
     ).render()
 
-    assert body.index("### Measured impact") < body.index("### Limits")
+    assert body.index("## Measured impact") < body.index("## Limits")

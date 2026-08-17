@@ -14,9 +14,11 @@
 # token is manufactured per task and evaporates with it, which is the same shape as the database
 # credentials every other allocation takes.
 #
-# READ BY THE PUBLISHING TASK ONLY. The analysing task holds no attested identity at all
-# (`authoring-tier.nomad.hcl` declares no `identity` stanza for it), so it cannot reach this path
-# even if a policy allowed it to. Two controls, and the absence is the stronger one.
+# READ BY THE PUBLISHING TASK ONLY. The analysing task holds an attested identity for audit
+# and the model matrix (role `authoring-analyzer` below) but that role's policies never name
+# this path — so it cannot mint an installation token even if it tried. Two controls: the
+# publisher role is bound to `nomad_task = "proposer"`, and the analyzer role omits this
+# policy entirely.
 
 resource "vault_kv_secret_v2" "authoring_vcs_app" {
   mount = vault_mount.harness_authority.path
@@ -54,9 +56,8 @@ resource "vault_policy" "authoring_publisher" {
   EOT
 }
 
-# Bound to the publishing task's workload identity. The analysing task's role is deliberately
-# absent rather than present-and-empty: a role that exists with no capabilities still says
-# somebody thought this task might need one, and the design says it must not.
+# Bound to the publishing task's workload identity. The analysing task uses a different role
+# (below) that cannot read the App key — that split is the control, not "analyzer has no JWT".
 resource "vault_jwt_auth_backend_role" "authoring_publisher" {
   backend         = vault_jwt_auth_backend.workload.path
   role_name       = "authoring-publisher"
@@ -64,14 +65,47 @@ resource "vault_jwt_auth_backend_role" "authoring_publisher" {
   user_claim      = "nomad_job_id"
   bound_audiences = ["vault.io"]
 
+  # Parent job id only. Nomad's workload identity carries `authoring-tier`, not the
+  # dispatch-derived `authoring-tier/dispatch-*` shown in `nomad job status` (same lesson as
+  # `agent-run`). A glob attempt that listed both forms broke analyzer login in the local
+  # estate — keep the exact parent id that already works.
   bound_claims = {
     nomad_job_id = "authoring-tier"
     nomad_task   = "proposer"
   }
 
-  token_policies = [vault_policy.authoring_publisher.name]
+  # App key + audit DB + fabric reads. The entrypoint always opens Postgres under this role
+  # name when HARNESS_AUTHORING_ROLE=proposer; without harness_database the publisher dies
+  # in audit.migrate() after the analyzer already did the work.
+  token_policies = [
+    vault_policy.authoring_publisher.name,
+    vault_policy.harness_database.name,
+    vault_policy.harness_authority_read.name,
+  ]
   # An hour, matching the identity's own TTL. Long enough to open a proposal, short enough that
   # a leaked token is a window rather than a key.
+  token_ttl     = 3600
+  token_max_ttl = 3600
+}
+
+# Analyzer: audit + matrix + model credential. Never the App key (authoring_publisher policy).
+resource "vault_jwt_auth_backend_role" "authoring_analyzer" {
+  backend         = vault_jwt_auth_backend.workload.path
+  role_name       = "authoring-analyzer"
+  role_type       = "jwt"
+  user_claim      = "nomad_job_id"
+  bound_audiences = ["vault.io"]
+
+  bound_claims = {
+    nomad_job_id = "authoring-tier"
+    nomad_task   = "analyzer"
+  }
+
+  token_policies = [
+    vault_policy.harness_database.name,
+    vault_policy.harness_authority_read.name,
+    vault_policy.model_credential_read.name,
+  ]
   token_ttl     = 3600
   token_max_ttl = 3600
 }

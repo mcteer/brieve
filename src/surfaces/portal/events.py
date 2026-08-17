@@ -118,6 +118,11 @@ async def _events(*, relay: Any, token: str, thread_id: str) -> AsyncIterator[st
     yield _frame("closed", {"reason": "budget"})
 
 
+def _access_ended(response: Any) -> bool:
+    """A 401/403 ends the stream. A blip (5xx, unreachable, not-yet-indexed) does not."""
+    return getattr(response, "status", 0) in {401, 403}
+
+
 async def _propose_events(*, relay: Any, token: str, run_id: str) -> AsyncIterator[str]:
     deadline = time.monotonic() + MAX_STREAM_SECONDS
     last_state = ""
@@ -125,26 +130,56 @@ async def _propose_events(*, relay: Any, token: str, run_id: str) -> AsyncIterat
 
     while time.monotonic() < deadline:
         state = relay.request("GET", f"/runs/{run_id}", token=token)
-        if not state.ok:
+        if _access_ended(state):
             yield _frame("closed", {"reason": "refused", "status": state.status})
             return
+        if not state.ok:
+            # Keep the socket alive; the next poll may see the run. Closing here as
+            # `refused` is what left the Build page silent after an API restart.
+            yield ": keepalive\n\n"
+            await asyncio.sleep(POLL_SECONDS)
+            continue
         current = str((state.payload or {}).get("state", ""))
         result = relay.request("GET", f"/runs/{run_id}/result", token=token)
+        if _access_ended(result):
+            yield _frame("closed", {"reason": "refused", "status": result.status})
+            return
         progress = None
+        pr_url: str | None = None
+        ended_reason: str | None = None
         if result.ok and isinstance(result.payload, dict):
             body = result.payload.get("result")
             if isinstance(body, dict):
                 progress = body.get("propose_progress")
+                raw_pr = body.get("pr_url")
+                pr_url = str(raw_pr) if raw_pr else None
+                if not pr_url:
+                    ended_reason = str(body.get("reason") or "") or None
             if progress is None:
                 progress = result.payload.get("propose_progress")
-        progress_key = json.dumps(progress, sort_keys=True) if progress is not None else ""
+            if not ended_reason:
+                ended_reason = str(result.payload.get("stop_reason") or "") or None
+        progress_key = json.dumps(
+            {"progress": progress, "pr_url": pr_url, "ended_reason": ended_reason},
+            sort_keys=True,
+        )
         if current != last_state or progress_key != last_progress:
             last_state = current
             last_progress = progress_key
             payload: dict[str, Any] = {"run_id": run_id, "state": current}
             if progress is not None:
                 payload["propose_progress"] = progress
+            if pr_url:
+                payload["pr_url"] = pr_url
+            if ended_reason and not pr_url:
+                payload["ended_reason"] = ended_reason
+            elif current in TERMINAL_STATES and not pr_url:
+                payload["ended_reason"] = ended_reason or "Ended without a pull request."
             yield _frame("run", payload)
+        else:
+            # Comment frame: EventSource ignores it, proxies and browsers do not
+            # treat the socket as idle during a long model step.
+            yield ": keepalive\n\n"
         if current in TERMINAL_STATES:
             yield _frame("closed", {"reason": "settled"})
             return

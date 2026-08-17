@@ -186,8 +186,14 @@ class NomadDispatcher:
                     "agent_definition_id",
                     "run_id",
                     "subject_path",
+                    "subject_user_id",
+                    "subject_roles",
                     "packs",
                     "steps",
+                    "invoke_tools",
+                    "choice_recording",
+                    "target_repository",
+                    "base_commit",
                 }
             )
             meta_fields = {k: v for k, v in meta_fields.items() if k in allowed}

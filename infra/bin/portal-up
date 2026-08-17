@@ -156,6 +156,36 @@ fi
 # `-detach`, because `nomad job run` on a SERVICE job blocks until its deployment settles.
 # Without it a service that cannot start holds this script for as long as Nomad keeps
 # trying, and the failure reads as a hang rather than as a failure.
+# 047 — Build clones owned repositories here; Nomad bind-mounts the same path into
+# authoring-tier. Created before the API job so the bind source exists on first submit.
+mkdir -p "$REPO/.enclave/propose-subjects"
+
+# Nomad CNI bridge needs Linux CNI plugins. Darwin agents (Nomad on macOS) cannot fingerprint
+# them; Docker network_mode=bridge on the tasks still keeps work off the host network.
+CNI_BRIDGE=true
+if [ "$(uname -s)" = "Darwin" ]; then
+  CNI_BRIDGE=false
+fi
+
+say "Authoring tier"
+# 041 R8 / ADR-0066: proposer needs pinned git+gh in the image. Build the local tag before
+# registering the job so a fresh machine does not dispatch into tooling_missing.
+AUTHORING_IMAGE="${AUTHORING_IMAGE:-brieve/authoring-runtime:local}"
+"$REPO/infra/bin/authoring-image" \
+  || die "could not build $AUTHORING_IMAGE — proposer would fail tooling_missing"
+ok "authoring runtime image $AUTHORING_IMAGE (pinned against Nomad image GC)"
+# 041 / ADR-0062: installation id for proposer publish. App private key is Vault-only.
+AUTHORING_INSTALLATION_ID="$(env_val AUTHORING_INSTALLATION_ID)"
+if [ -z "$AUTHORING_INSTALLATION_ID" ]; then
+  say "note: AUTHORING_INSTALLATION_ID unset — Build can author but cannot open a PR"
+fi
+nomad job run -var="repo=$REPO" -var="cni_bridge=${CNI_BRIDGE}" \
+  -var="image=$AUTHORING_IMAGE" \
+  -var="vcs_installation=${AUTHORING_INSTALLATION_ID}" \
+  "$REPO/infra/jobs/authoring-tier.nomad.hcl" >/dev/null \
+  && ok "authoring-tier registered (Build/Propose dispatches this job; cni_bridge=${CNI_BRIDGE})" \
+  || die "could not register authoring-tier — Build would have nothing to run"
+
 say "API service"
 # 027. Which model `ask` may call, from .env — the same variable `mcp-surface-up` passes, because
 # the two deployed surfaces must take the same configuration or ADR-0033's parity guarantee is a

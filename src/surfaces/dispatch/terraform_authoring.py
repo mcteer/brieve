@@ -44,4 +44,39 @@ def judge_may_publish(*, authored_paths: list[str], task: str) -> tuple[bool, st
     return True, "ok"
 
 
-__all__ = ["compose_plan_evidence", "judge_may_publish"]
+def quality_judge_may_publish(
+    *,
+    authored_paths: list[str],
+    task: str,
+    write_plan: str,
+    files: dict[str, str],
+    write_model: str,
+    judge_chooser: Any,
+) -> tuple[bool, str]:
+    """Structural pre-check, then a language-model quality gate when the writer is live.
+
+    A fixture write cell keeps the structural check only — hermetic rows must not call a
+    vendor. A live write cell MUST be judged by a distinct model (ADR-0067); missing or
+    failing judgement denies publish. Always-allow after a live write is invalid (FR-010).
+    """
+    allowed, reason = judge_may_publish(authored_paths=authored_paths, task=task)
+    if not allowed:
+        return allowed, reason
+    write_is_live = bool(write_model) and not write_model.startswith("fixture/")
+    if not write_is_live:
+        return True, reason
+    judger = getattr(judge_chooser, "judge_authored_work", None)
+    if not callable(judger):
+        return False, "could not judge the change"
+    try:
+        allowed, reason = judger(
+            task=task,
+            write_plan=write_plan,
+            files=files,
+        )
+    except Exception:  # noqa: BLE001 — provider/schema failure is a deny, not a skip
+        return False, "could not judge the change"
+    return bool(allowed), (reason or "judge denied publish") if not allowed else (reason or "ok")
+
+
+__all__ = ["compose_plan_evidence", "judge_may_publish", "quality_judge_may_publish"]

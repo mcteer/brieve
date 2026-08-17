@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,6 +46,13 @@ _HELPER_ARGS = (
     "-c",
     "credential.helper=!gh auth git-credential",
 )
+
+#: Sibling of the analyzer workspace when that directory is not itself a checkout.
+#: The analyzing task writes authored bytes into `/alloc/…/workspace` with no `.git` (the
+#: subject mount is read-only and separate). The publishing task must not mount the subject,
+#: so it clones here, applies the composed proposal, and pushes — the checkpoint carries the
+#: bytes; this directory is only the forge checkout they land on.
+_PUBLISH_CHECKOUT = "publish-checkout"
 
 
 class PublishRefused(CoreError):
@@ -191,7 +199,8 @@ class ProposalPublisher:
         if already is not None:
             return _as_payload(already)
 
-        self._push(env)
+        tree = self._tree_for_push(env)
+        self._push(env, cwd=tree)
 
         opened = self._runner(
             [
@@ -204,11 +213,11 @@ class ProposalPublisher:
                 self._proposal.branch,
                 *(["--base", self._base] if self._base else []),
                 "--title",
-                self._proposal.task,
+                self._proposal.title,
                 "--body",
                 self._proposal.render(),
             ],
-            cwd=self._workspace,
+            cwd=tree,
             env=env,
         )
         if opened.returncode != 0:
@@ -236,7 +245,63 @@ class ProposalPublisher:
             )
         )
 
-    def _push(self, env: dict[str, str]) -> None:
+    def _tree_for_push(self, env: dict[str, str]) -> Path:
+        """A git checkout carrying the proposal's files.
+
+        **Two shapes, one property.** The enclave row authors into the acquired clone (subject
+        and workspace are the same path), so `.git` is already here. The dispatched tier keeps
+        them apart: the analyzer's workspace holds authored bytes with no history, and the
+        proposer — which must not mount the subject — clones under the allocation, applies the
+        composed proposal (the checkpoint is the source of truth), and pushes from that tree.
+        """
+        if (self._workspace / ".git").is_dir():
+            return self._workspace
+        return self._clone_and_materialize(env)
+
+    def _clone_and_materialize(self, env: dict[str, str]) -> Path:
+        """Fresh shallow clone, then write every proposed file into it."""
+        root = self._workspace.parent / _PUBLISH_CHECKOUT
+        if root.exists():
+            shutil.rmtree(root)
+        url = f"https://github.com/{self._proposal.target_repository}.git"
+        cloned = self._runner(
+            ["git", *_HELPER_ARGS, "clone", "--depth", "1", "--single-branch", url, str(root)],
+            cwd=None,
+            env=env,
+        )
+        if cloned.returncode != 0:
+            raise PublishRefused(
+                f"could not clone {self._proposal.target_repository!r} for publishing",
+                reason_code="clone_refused",
+            )
+        self._materialize(root, env=env)
+        return root
+
+    def _materialize(self, root: Path, *, env: dict[str, str]) -> None:
+        """Lay the composed proposal onto ``root``. Created files write; edits apply as patches."""
+        for proposed in self._proposal.files:
+            target = _bounded_path(root, proposed.path)
+            if proposed.is_diff:
+                patch = root / ".brieve-authoring.patch"
+                patch.write_text(
+                    proposed.body if proposed.body.endswith("\n") else proposed.body + "\n"
+                )
+                applied = self._runner(
+                    ["git", *_HELPER_ARGS, "apply", "--whitespace=nowarn", str(patch)],
+                    cwd=root,
+                    env=env,
+                )
+                patch.unlink(missing_ok=True)
+                if applied.returncode != 0:
+                    raise PublishRefused(
+                        f"could not apply the authored diff for {proposed.path!r}",
+                        reason_code="materialize_refused",
+                    )
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(proposed.body)
+
+    def _push(self, env: dict[str, str], *, cwd: Path) -> None:
         """Push the authored tree to the deterministic branch.
 
         `--force-with-lease` rather than `--force`: a revival must converge on the latest
@@ -255,7 +320,7 @@ class ProposalPublisher:
                 "user.email=authoring@brieve.invalid",
                 "commit",
                 "-m",
-                self._proposal.task,
+                self._proposal.title,
             ],
             [
                 "git",
@@ -266,7 +331,7 @@ class ProposalPublisher:
                 f"HEAD:{self._proposal.branch}",
             ],
         ):
-            result = self._runner(argv, cwd=self._workspace, env=env)
+            result = self._runner(argv, cwd=cwd, env=env)
             if result.returncode != 0:
                 raise PublishRefused(
                     f"could not publish the authored tree to {self._proposal.branch!r} "
@@ -352,6 +417,27 @@ class ProposalObserver:
             outcome=ObservationOutcome.DID_NOT_HAPPEN,
             detail=f"no open proposal on {branch}",
         )
+
+
+def _bounded_path(root: Path, relative: str) -> Path:
+    """A path inside ``root``, or refuse. Proposal paths are platform-composed, but the
+    publish side still refuses anything that would leave the checkout — a defensive bound
+    rather than trust in the earlier step alone.
+    """
+    if not relative.strip() or relative.startswith("/") or ".." in Path(relative).parts:
+        raise PublishRefused(
+            f"refusing to materialize {relative!r}: path leaves the publish checkout",
+            reason_code="path_refused",
+        )
+    target = (root / relative).resolve()
+    try:
+        target.relative_to(root.resolve())
+    except ValueError as exc:
+        raise PublishRefused(
+            f"refusing to materialize {relative!r}: path leaves the publish checkout",
+            reason_code="path_refused",
+        ) from exc
+    return target
 
 
 def _as_payload(result: PublishResult) -> dict[str, Any]:

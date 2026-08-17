@@ -171,6 +171,7 @@ def proposal_payload(proposal: Proposal) -> dict[str, Any]:
         "target_repository": proposal.target_repository,
         "branch": proposal.branch,
         "task": proposal.task,
+        "title": proposal.title,
         "rationale": proposal.rationale,
         "disclosures": list(proposal.disclosures),
         "provenance": list(proposal.provenance),
@@ -186,6 +187,7 @@ def proposal_from_payload(payload: Mapping[str, Any]) -> Proposal:
         target_repository=str(raw["target_repository"]),
         branch=str(raw["branch"]),
         task=str(raw["task"]),
+        title=str(raw.get("title", "")),
         files=[
             ProposedFile(path=str(f["path"]), body=str(f["body"]), is_diff=bool(f["is_diff"]))
             for f in raw.get("files", [])

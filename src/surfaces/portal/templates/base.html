@@ -12,22 +12,22 @@
     <a href="/" class="brand">Harness</a>
     {#
       LABELLED BY THE VERB, because the difference between these two pages is whether
-      anything happens. "Conversations" and "Ask a question" both read as "talk to the
-      thing" — the first person to use this went looking for the ask on a thread page and
-      found the composer's agent picker instead.
+      anything happens. "Conversations" and "Ask" both read as "talk to the thing" — the
+      first person to use this went looking for the ask on a thread page and found the
+      composer's agent picker instead.
 
       028 chose separate pages so ADR-0039's never-acts rule would be *visible rather than
       explained*, and labels that hid the distinction defeated the reason for the split.
-      Run does things; ask answers.
+      047: Build (Propose under the hood) is the primary act (chat → PR). Ask answers. The
+      old agent-picker Run surface is at /run for operators — not the home path.
     #}
     <nav aria-label="Main">
       {# `aria-current` from the request path rather than from route context: it tells a
          screen-reader user which page they are on, and the nav's underline reads from the
          same attribute so the visual and the announced state cannot drift. Template-only,
          so no route had to learn about presentation. #}
-      <a href="/"{% if request.url.path == "/" %} aria-current="page"{% endif %}>Run an agent</a>
-      <a href="/propose"{% if request.url.path.startswith("/propose") %} aria-current="page"{% endif %}>Propose</a>
-      <a href="/ask"{% if request.url.path.startswith("/ask") %} aria-current="page"{% endif %}>Ask a question</a>
+      <a href="/"{% if request.url.path == "/" or request.url.path.startswith("/propose") %} aria-current="page"{% endif %}>Build</a>
+      <a href="/ask"{% if request.url.path.startswith("/ask") %} aria-current="page"{% endif %}>Ask</a>
       {#
         SETTINGS, LINKED FOR EVERYONE, AND THE PLATFORM DECIDES (045).
 

@@ -220,21 +220,23 @@ class McpTransport:
             accepted = propose_for(
                 subject=subject,
                 body=ProposeRequest(
-                    repository=str(args["repository"]),
-                    task=str(args["task"]),
+                    message=str(args["message"]) if args.get("message") else None,
+                    repository=str(args["repository"]) if args.get("repository") else None,
+                    task=str(args["task"]) if args.get("task") else None,
                     correlation_id=str(args["correlation_id"])
                     if args.get("correlation_id")
                     else None,
                 ),
                 dispatcher=self._dispatcher,
+                thread_store=self._threads,
             )
         except RequestRefused as refused:
             code = 403 if refused.reason_code == "repository_not_owned" else 400
             return McpResult(ok=False, status=code, payload={"reason": str(refused)})
         except DispatchError as exc:
             return McpResult(ok=False, status=503, payload={"reason": str(exc)})
-        except Exception as exc:  # noqa: BLE001 — fail closed
-            reason = f"propose unavailable: {type(exc).__name__}"
+        except Exception:  # noqa: BLE001 — fail closed
+            reason = "Build could not be started"
             return McpResult(ok=False, status=503, payload={"reason": reason})
         return McpResult(ok=True, status=202, payload=accepted.model_dump(mode="json"))
 

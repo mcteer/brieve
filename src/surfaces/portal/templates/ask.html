@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Ask a question — Harness Portal{% endblock %}
+{% block title %}Ask — Harness Portal{% endblock %}
 {% block header_actions %}
 <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
 {% endblock %}
@@ -48,10 +48,10 @@
 {% endif %}
 
 <div class="app-main">
-<h1>{{ title or "Ask a question" }}</h1>
+<h1>{{ title or "Ask" }}</h1>
 {% if not exchanges and not response is defined %}
 <p class="lede">Asking answers; it never acts. Nothing here starts a run, changes anything, or
-   touches your estate &mdash; to have an agent do something, <a href="/">run an agent</a>.</p>
+   touches your estate &mdash; to have work done, <a href="/">Build</a>.</p>
 {% endif %}
 
 {% if missing %}
@@ -124,7 +124,7 @@
                  when the SERVER renders, and exchanges appended by script afterwards do not
                  change it — so mid-conversation the box invited a first question. The label
                  below still varies: it is read on load, which is when it is true. #}
-              placeholder="Ask a question&hellip;"
+              placeholder="Ask&hellip;"
               aria-describedby="ask-expectation"></textarea>
     <button type="submit" class="button ask-send">Ask</button>
   </div>

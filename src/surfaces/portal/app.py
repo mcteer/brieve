@@ -246,9 +246,22 @@ def create_portal(
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> Response:
+        """047 — home is Propose chat, not the agent-picker Run surface."""
         session = _session(request)
         if session is None:
             return templates.TemplateResponse(request=request, name="signed_out.html", context={})
+        return templates.TemplateResponse(
+            request=request,
+            name="propose.html",
+            context={"builds": _builds(session)},
+        )
+
+    @app.get("/run", response_class=HTMLResponse)
+    def run_agents(request: Request) -> Response:
+        """Operator Run surface (agent picker). Not the primary product path (047)."""
+        session = _session(request)
+        if session is None:
+            return _login_redirect(request, "/run")
 
         threads, reachable, refused = _threads(session)
         definitions, definitions_reachable = _definitions(session)
@@ -444,6 +457,32 @@ def create_portal(
             for exchange in exchanges
         ]
 
+    def _builds(session: Any) -> list[dict[str, Any]]:
+        """This person's authoring runs for the Build rail, or nothing to show.
+
+        Same collapse as Ask: an unreadable index is rendered as absent, not as empty.
+        """
+        listed = app.state.relay.request("GET", "/runs", token=session.access_token)
+        if not listed.reachable or not listed.ok:
+            return []
+        runs = (listed.payload or {}).get("runs") or []
+        builds: list[dict[str, Any]] = []
+        for run in runs:
+            if not isinstance(run, dict):
+                continue
+            run_id = str(run.get("run_id") or "")
+            definition = str(run.get("agent_definition_id") or "")
+            if definition != "authoring-agent" and not run_id.startswith("propose-"):
+                continue
+            builds.append(
+                {
+                    "run_id": run_id,
+                    "title": _build_rail_title(run_id),
+                    "state": str(run.get("state") or "") or None,
+                }
+            )
+        return builds
+
     def _conversations(session: Any) -> list[dict[str, Any]]:
         """This person's own conversations for the rail, or nothing to show.
 
@@ -482,42 +521,38 @@ def create_portal(
 
     @app.get("/propose", response_class=HTMLResponse)
     def propose_form(request: Request) -> Response:
-        """047 — single Propose chat: repository URL + task, no agent picker."""
+        """047 — same chat as home; kept so bookmarks to /propose still work."""
         session = _session(request)
         if session is None:
             return _login_redirect(request, "/propose")
-        return templates.TemplateResponse(
-            request=request,
-            name="propose.html",
-            context={},
-        )
+        return RedirectResponse("/", status_code=303)
 
+    @app.post("/")
     @app.post("/propose")
     def propose_submit(
         request: Request,
-        repository: str = Form(""),
-        task: str = Form(""),
+        message: str = Form(""),
     ) -> Response:
         session = _session(request)
         if session is None:
-            return _login_redirect(request, "/propose")
+            return _login_redirect(request, "/")
         started = app.state.relay.request(
             "POST",
             "/propose",
             token=session.access_token,
-            json_body={"repository": repository, "task": task},
+            json_body={"message": message},
         )
         if not started.ok:
-            detail = "Propose could not be started"
+            detail = "Build could not be started"
             if isinstance(started.payload, dict) and started.payload.get("detail"):
                 detail = str(started.payload["detail"])
             return templates.TemplateResponse(
                 request=request,
                 name="propose.html",
                 context={
-                    "repository": repository,
-                    "task": task,
+                    "message": message,
                     "error": detail,
+                    "builds": _builds(session),
                 },
                 status_code=started.status or 503,
             )
@@ -534,25 +569,18 @@ def create_portal(
             "GET", f"/runs/{run_id}/result", token=session.access_token
         )
         progress = _propose_phases(result)
-        pr_url = None
-        ended_reason = None
-        if result.ok and isinstance(result.payload, dict):
-            body = result.payload.get("result")
-            if isinstance(body, dict):
-                pr_url = body.get("pr_url")
-                if not pr_url:
-                    ended_reason = body.get("reason") or result.payload.get("stop_reason")
-            if result.payload.get("disposition") == "ended_without_result":
-                ended_reason = result.payload.get("stop_reason") or ended_reason
+        run_state = str((state.payload or {}).get("state", "starting")) if state.ok else "unknown"
+        pr_url, ended_reason = _propose_outcome(result, phases=progress, state=run_state)
         return templates.TemplateResponse(
             request=request,
             name="propose_run.html",
             context={
                 "run_id": run_id,
-                "state": (state.payload or {}).get("state", "starting") if state.ok else "unknown",
+                "state": run_state,
                 "phases": progress,
                 "pr_url": pr_url,
                 "ended_reason": ended_reason,
+                "builds": _builds(session),
             },
         )
 
@@ -906,6 +934,12 @@ def create_portal(
     return app
 
 
+def _build_rail_title(run_id: str) -> str:
+    """A one-line rail label. The full id stays on ``title`` / the href."""
+    slug = run_id.removeprefix("propose-")
+    return slug[:16] if slug else run_id
+
+
 def _propose_phases(result: ApiResponse) -> list[dict[str, str]]:
     """Phase strip from the platform payload only — portal invents no order (047)."""
     names = ("research", "plan", "write", "judge", "propose")
@@ -935,6 +969,38 @@ def _propose_phases(result: ApiResponse) -> list[dict[str, str]]:
             }
         )
     return rendered or default
+
+
+def _propose_outcome(
+    result: ApiResponse, *, phases: list[dict[str, str]], state: str
+) -> tuple[str | None, str | None]:
+    """PR URL or a reason the Build ended without one — never leave Stopped unexplained."""
+    pr_url: str | None = None
+    ended_reason: str | None = None
+    if result.ok and isinstance(result.payload, dict):
+        body = result.payload.get("result")
+        if isinstance(body, dict):
+            raw_pr = body.get("pr_url")
+            pr_url = str(raw_pr) if raw_pr else None
+            if not pr_url:
+                ended_reason = str(body.get("reason") or "") or None
+        if not ended_reason:
+            ended_reason = str(result.payload.get("stop_reason") or "") or None
+        if result.payload.get("disposition") == "ended_without_result" and not ended_reason:
+            ended_reason = str(result.payload.get("stop_reason") or "") or None
+    if pr_url:
+        return pr_url, None
+    if not ended_reason:
+        for phase in phases:
+            if phase.get("status") == "failed" and phase.get("reason"):
+                ended_reason = str(phase["reason"])
+                break
+    if not ended_reason and state in ("stopped", "completed", "failed"):
+        ended_reason = "Ended without a pull request."
+    elif ended_reason and not ended_reason.startswith("Ended"):
+        # Under the status pill: say what happened, not only a bare platform code.
+        ended_reason = f"Ended without a pull request — {ended_reason}"
+    return None, ended_reason
 
 
 def _with_run_state(

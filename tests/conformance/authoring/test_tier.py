@@ -125,11 +125,21 @@ def test_row_t3_the_analysing_task_holds_no_credential_that_could_publish(jobspe
     analyzer = _task_block(jobspec, "analyzer")
     proposer = _task_block(jobspec, "proposer")
 
-    assert "identity {" not in analyzer, (
-        "the analyzer declares a workload identity; without one it cannot read the App key and "
-        "therefore cannot publish, and that absence is the control"
+    # Analyzer has a JWT for audit/DB (047), but Vault role authoring-analyzer must never
+    # carry the App-key policy — authoring.tf binds authoring-publisher to proposer only.
+    assert "identity {" in analyzer, (
+        "the analyzer needs a workload identity to open the audit sink; publishing is blocked "
+        "by Vault role split, not by omitting the JWT entirely"
     )
     assert "identity {" in proposer
+    authoring_tf = (ROOT / "infra" / "modules" / "trust-fabric" / "authoring.tf").read_text()
+    assert 'role_name       = "authoring-analyzer"' in authoring_tf
+    assert 'nomad_task   = "proposer"' in authoring_tf
+    analyzer_role = authoring_tf.split(
+        'resource "vault_jwt_auth_backend_role" "authoring_analyzer"'
+    )[1].split("resource ")[0]
+    assert "authoring_publisher" not in analyzer_role
+    assert "vcs-app" not in analyzer_role
 
     assert 'RUN_REQUESTED_TOOLS = "read_subject,author_file"' in analyzer
     assert 'RUN_REQUESTED_TOOLS = "open_proposal"' in proposer
@@ -139,6 +149,14 @@ def test_row_t3_the_analysing_task_holds_no_credential_that_could_publish(jobspe
     assert clean, why
     dirty, why = analysing_task_holds_no_credential({"GITHUB_TOKEN": "x"})
     assert not dirty and "GITHUB_TOKEN" in why
+
+    # App-key read on the publish path must use authoring-publisher — agent-run neither
+    # carries the policy nor matches this job's workload identity claims.
+    entrypoint = (ROOT / "src" / "surfaces" / "dispatch" / "entrypoint.py").read_text()
+    publish = entrypoint[entrypoint.index("def _publish_the_proposal(") :]
+    publish = publish[: publish.index("\ndef ", 4)]
+    assert 'role="authoring-publisher"' in publish
+    assert 'role="agent-run"' not in publish
 
 
 def test_row_t6_every_module_is_assigned_to_a_task(jobspec: str) -> None:
@@ -155,8 +173,11 @@ def test_row_t6_every_module_is_assigned_to_a_task(jobspec: str) -> None:
     assert "containment" in package_doc, "the module→task assignment is not recorded"
 
     proposer = _task_block(jobspec, "proposer")
-    assert "mount {" not in proposer, "the proposer mounts the subject; it must never hold it"
+    # Platform `/repo` may be mounted so the entrypoint can run; the *subject* must not.
     assert "/subject" not in proposer
+    assert "NOMAD_META_subject_path" not in proposer, (
+        "the proposer mounts the subject; it must never hold it"
+    )
 
 
 def test_row_t8_run_resume_is_unset_on_both_tasks(jobspec: str) -> None:
@@ -243,6 +264,12 @@ def test_row_t9_the_continuation_mode_exists_and_does_all_four_things() -> None:
     assert "resume_count + 1" not in body and "resume_run(" not in body, (
         "the continuation counts a revival; a planned handoff must not spend a budget that "
         "exists to stop flapping runs"
+    )
+    # 5. THIS task's RUN_REQUESTED_TOOLS, not grant.requested_scope alone — otherwise the
+    # proposer's open_proposal stays out_of_scope under the analyzer's grant (041 handoff).
+    assert "os.environ.get('RUN_REQUESTED_TOOLS'" in body, (
+        "continuation must re-scope from the proposer's RUN_REQUESTED_TOOLS; manufacturing "
+        "under grant.requested_scope alone keeps the analyzer's tools and denies publish"
     )
 
     # And it refuses a terminal run rather than silently doing nothing.

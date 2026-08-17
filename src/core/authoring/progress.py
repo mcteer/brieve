@@ -100,7 +100,11 @@ def initial_progress() -> ProposeProgress:
 
 
 def advance(progress: ProposeProgress, *, into: PhaseName) -> ProposeProgress:
-    """Mark ``into`` active; complete every prior phase. Refuse if a prior phase failed."""
+    """Mark ``into`` active. Complete priors that already ran; leave skipped ones pending.
+
+    Plan and Judge are not always-green fixtures (047). Jumping Research → Write must not
+    paint those unimplemented phases completed. Refuse if a prior phase failed.
+    """
     by_name = {p.name: p for p in progress.phases}
     for name in PHASE_ORDER:
         if name == into:
@@ -108,9 +112,6 @@ def advance(progress: ProposeProgress, *, into: PhaseName) -> ProposeProgress:
         prior = by_name[name]
         if prior.status == PhaseStatus.FAILED:
             raise ProgressRefused(f"cannot advance to {into}: {name} failed")
-        if prior.status not in (PhaseStatus.COMPLETED, PhaseStatus.ACTIVE):
-            # Completing skipped pending priors is the advance semantics for sequential work.
-            pass
 
     phases: list[PhaseState] = []
     for name in PHASE_ORDER:
@@ -120,7 +121,14 @@ def advance(progress: ProposeProgress, *, into: PhaseName) -> ProposeProgress:
             prev = by_name[name]
             if prev.status == PhaseStatus.FAILED:
                 raise ProgressRefused(f"cannot advance to {into}: {name} failed")
-            phases.append(PhaseState(name=name, status=PhaseStatus.COMPLETED, reason=prev.reason))
+            # Only complete work that actually ran. Auto-completing a still-pending prior
+            # (Plan/Judge while Write is live) would paint unimplemented 047 phases green.
+            if prev.status in (PhaseStatus.COMPLETED, PhaseStatus.ACTIVE):
+                phases.append(
+                    PhaseState(name=name, status=PhaseStatus.COMPLETED, reason=prev.reason)
+                )
+            else:
+                phases.append(PhaseState(name=name, status=PhaseStatus.PENDING))
         else:
             phases.append(PhaseState(name=name, status=PhaseStatus.PENDING))
     return ProposeProgress(phases=tuple(phases), current=into)

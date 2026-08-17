@@ -312,19 +312,19 @@ def operations() -> list[McpOperation]:
             method="POST",
             path="/propose",
             description=(
-                "Propose infrastructure changes against a repository you may propose into: "
-                "paste a repository URL and a task. The platform runs Research → Plan → "
-                "Write → Judge → Propose and opens a pull request on success. You do not "
-                "choose an agent."
+                "Propose infrastructure changes: send one message that includes a GitHub "
+                "repository URL and what should change (or repository + task). The platform "
+                "runs Research → Plan → Write → Judge → Propose and opens a pull request. "
+                "You do not choose an agent."
             ),
             input_schema={
                 "type": "object",
                 "properties": {
+                    "message": {"type": "string", "minLength": 1},
                     "repository": {"type": "string", "minLength": 1},
                     "task": {"type": "string", "minLength": 1},
                     "correlation_id": {"type": "string", "minLength": 1},
                 },
-                "required": ["repository", "task"],
                 "additionalProperties": False,
             },
         ),

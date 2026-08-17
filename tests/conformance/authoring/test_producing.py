@@ -13,7 +13,13 @@ import pytest
 from core.audit.schema import AuditEventType
 from core.audit.sink import InMemoryAuditSink
 from core.authoring.artifact import AuthoredArtifact, record_artifact
-from core.authoring.tool import AUTHOR_FILE, READ_SUBJECT, FileAuthor, SubjectReader
+from core.authoring.tool import (
+    AUTHOR_FILE,
+    READ_SUBJECT,
+    FileAuthor,
+    SubjectReader,
+    WritePlanIncomplete,
+)
 from core.authoring.workspace import Trees, WorkspaceRefused
 from core.authority.types import AuthorityScope
 from core.errors import ToolNotRegisteredError
@@ -240,3 +246,16 @@ def test_row_the_write_surface_refuses_a_path_outside_the_workspace(
     for escape in ("/etc/passwd", "../outside.txt", "a/../../outside.txt"):
         with pytest.raises(WorkspaceRefused):
             author({"path": escape, "content": "x"})
+
+
+def test_author_file_is_refused_until_the_write_plan_is_recorded(
+    trees: Trees, artifact: AuthoredArtifact
+) -> None:
+    """047 Plan: writing before the outline exists is a governed refusal, not a skip."""
+    author = FileAuthor(trees, artifact)
+    author.plan_ready = False
+    with pytest.raises(WritePlanIncomplete):
+        author({"path": MODULE, "content": BODY})
+    author.plan_ready = True
+    written = author({"path": MODULE, "content": BODY})
+    assert written["path"] == MODULE

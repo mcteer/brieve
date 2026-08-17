@@ -28,10 +28,28 @@ from __future__ import annotations
 
 import difflib
 import hashlib
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 from core.authoring.artifact import AuthoredArtifact
+
+#: GitHub-comfortable title length. The intake task is often a pasted URL plus a paragraph;
+#: that string is the Request section, never the title.
+TITLE_LIMIT = 72
+
+_URL = re.compile(r"https?://\S+", re.IGNORECASE)
+_REPO_LINE = re.compile(r"^repository:\s*\S+\s*$", re.IGNORECASE | re.MULTILINE)
+#: Conversational lead-in. The gist starts at the verb of the request.
+_FILLER = re.compile(
+    r"^(?:please\s+)?"
+    r"(?:i\s+(?:need|want|would like)\s+you\s+to\s+"
+    r"|can\s+you\s+(?:please\s+)?"
+    r"|could\s+you\s+(?:please\s+)?"
+    r"|would\s+you\s+(?:please\s+)?"
+    r"|please\s+)",
+    re.IGNORECASE,
+)
 
 #: The unconditional limit that containment cannot reach. Present in every proposal, because a
 #: guarantee this feature cannot keep must not read like one it can.
@@ -78,6 +96,62 @@ class ProposedFile:
     is_diff: bool
 
 
+def _clip_title(text: str) -> str:
+    """Fit ``text`` to ``TITLE_LIMIT`` on a word boundary."""
+    text = text.strip()
+    if len(text) <= TITLE_LIMIT:
+        return text
+    cut = text[:TITLE_LIMIT]
+    space = cut.rfind(" ")
+    if space >= TITLE_LIMIT // 2:
+        cut = cut[:space]
+    return cut.rstrip(" ,;:") + "…"
+
+
+def _task_gist(task: str) -> str:
+    """What was asked, short enough for ``--title``. Never a URL, never the whole prompt."""
+    text = _URL.sub("", task)
+    text = _REPO_LINE.sub("", text)
+    text = " ".join(text.split()).strip(" :-")
+    text = _FILLER.sub("", text).strip(" :-")
+    if not text:
+        return ""
+    sentence = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)[0]
+    sentence = sentence.rstrip(".!?").strip()
+    if not sentence:
+        return ""
+    if sentence[0].islower():
+        sentence = sentence[0].upper() + sentence[1:]
+    return _clip_title(sentence)
+
+
+def _files_title(files: list[ProposedFile]) -> str:
+    first = files[0]
+    verb = "Update" if first.is_diff else "Add"
+    shown = first.path if len(first.path) <= 48 else first.path.rsplit("/", 1)[-1]
+    if len(files) == 1:
+        return f"{verb} {shown}"
+    others = len(files) - 1
+    noun = "other file" if others == 1 else "other files"
+    return f"{verb} {shown} and {others} {noun}"
+
+
+def title_for(*, files: list[ProposedFile], task: str) -> str:
+    """A reviewer title: what was asked, not the raw intake and not only a path.
+
+    The intake paragraph is the Request section. Putting it in ``--title`` made every PR
+    the whole prompt. Naming only the first file (``Add main.tf``) made every PR
+    interchangeable. The gist of the request is the title; files are the fallback when
+    the request has no usable prose.
+    """
+    gist = _task_gist(task)
+    if gist:
+        return gist
+    if files:
+        return _files_title(files)
+    return "Authored changes"
+
+
 @dataclass
 class Proposal:
     """What a person reviews."""
@@ -86,6 +160,8 @@ class Proposal:
     branch: str
     task: str
     files: list[ProposedFile] = field(default_factory=list)
+    #: Platform-composed. Empty at construction is filled in ``__post_init__``.
+    title: str = ""
     rationale: str = ""
     disclosures: list[str] = field(default_factory=list)
     state: ProposalState = ProposalState.COMPOSED
@@ -110,6 +186,10 @@ class Proposal:
     #: Generic on purpose: `core.authoring` stays product-blind and 042 supplies the lines.
     evidence: list[str] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        if not self.title.strip():
+            self.title = title_for(files=self.files, task=self.task)
+
     @property
     def limits(self) -> tuple[str, ...]:
         """Unconditional, and last. 037's finding transfers: a reviewer handed a clean artefact
@@ -119,25 +199,37 @@ class Proposal:
         return (DERIVATIVE_LIMIT, *self.disclosures)
 
     def render(self) -> str:
-        """The body a reviewer reads. Structured sections, then the one free-text field, then
-        the limits — which are last so nothing follows them and reframes them.
+        """The body a reviewer reads. One platform template, every proposal.
+
+        The agent does not invent a layout: compose fills these sections. The intake task
+        is **Request**, not the heading — the heading is the short title.
         """
-        lines = [f"## {self.task}", "", "### Files"]
+        lines = [
+            "## Summary",
+            "",
+            self.title,
+            "",
+            "## Request",
+            "",
+            self.task.strip() or "(none supplied)",
+            "",
+            "## Files",
+        ]
         lines += [f"- `{f.path}` ({'edited' if f.is_diff else 'created'})" for f in self.files]
         if self.rationale.strip():
-            lines += ["", "### Rationale", "", self.rationale.strip()]
+            lines += ["", "## Rationale", "", self.rationale.strip()]
         if self.evidence:
             # Between the rationale and the provenance: the reviewer reads what was proposed,
             # then what it MEASURABLY does, then where it came from, then what is not covered.
             # Ahead of provenance because it is the question a policy review actually asks.
-            lines += ["", "### Measured impact", ""]
+            lines += ["", "## Measured impact", ""]
             lines += [f"- {entry}" for entry in self.evidence]
         if self.provenance:
             # After the rationale and before the limits: a reviewer reads what was proposed,
             # then where it came from, then what it does not cover.
-            lines += ["", "### Provenance", ""]
+            lines += ["", "## Provenance", ""]
             lines += [f"- {entry}" for entry in self.provenance]
-        lines += ["", "### Limits"]
+        lines += ["", "## Limits"]
         lines += [f"- {limit}" for limit in self.limits]
         return "\n".join(lines)
 
@@ -222,6 +314,7 @@ def compose(
         target_repository=target_repository,
         branch=branch,
         task=task,
+        title=title_for(files=files, task=task),
         files=files,
         rationale=rationale,
         disclosures=disclosures,
@@ -246,16 +339,19 @@ def scannable_text(proposal: Proposal) -> list[tuple[str, str]]:
             out.append((f"file:{f.path}", added))
         else:
             out.append((f"file:{f.path}", f.body))
+    out.append(("title", proposal.title))
     out.append(("body", proposal.render()))
     return out
 
 
 __all__ = [
     "DERIVATIVE_LIMIT",
+    "TITLE_LIMIT",
     "Proposal",
     "ProposalState",
     "ProposedFile",
     "branch_for",
     "compose",
     "scannable_text",
+    "title_for",
 ]

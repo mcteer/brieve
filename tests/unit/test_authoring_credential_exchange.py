@@ -133,6 +133,16 @@ def test_the_exchange_yields_an_installation_token(forge: str) -> None:
     )
 
 
+def test_a_kv_v2_envelope_is_unwrapped(forge: str) -> None:
+    """`read_path` returns Vault's HTTP body; the App fields live two `data` layers down."""
+    creds, _reader = _credentials(
+        forge,
+        data={"data": {"data": {"app_id": "123", "private_key": _key()}, "metadata": {}}},
+    )
+    token = creds.token_for("inst-42")
+    assert token.token == "ghs_installation_token"
+
+
 def test_the_assertion_is_signed_and_sent_as_a_bearer(forge: str) -> None:
     """The forge sees an App JWT, and the private key is not what travels."""
     creds, _reader = _credentials(forge)

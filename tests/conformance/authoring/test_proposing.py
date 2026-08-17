@@ -8,7 +8,13 @@ from pathlib import Path
 import pytest
 
 from core.authoring.artifact import AuthoredArtifact
-from core.authoring.proposal import Proposal, ProposalState, branch_for, compose
+from core.authoring.proposal import (
+    Proposal,
+    ProposalState,
+    ProposedFile,
+    branch_for,
+    compose,
+)
 from core.authoring.request import AuthoringRequest, RequestRefused
 from core.authoring.tool import FileAuthor
 from core.authoring.workspace import Trees
@@ -82,6 +88,54 @@ def test_row_p1_completed_authoring_is_a_proposal_and_nothing_is_merged_or_appli
     assert platform_writes | observed == set(ProposalState)
     assert not platform_writes & observed
     assert proposal.state in platform_writes
+
+
+def test_row_p1b_the_pr_title_is_not_the_intake_string(
+    trees: Trees, artifact: AuthoredArtifact, author: FileAuthor
+) -> None:
+    """The forge title is a short summary of what was authored, not the Build prompt.
+
+    A pasted URL plus a paragraph is the Request section. Putting it in ``--title`` made
+    every PR unreadable in ``gh pr list``.
+    """
+    from core.authoring.proposal import TITLE_LIMIT, title_for
+
+    author({"path": MODULE, "content": BODY})
+    long_task = (
+        "I need you to create a terraform template that will provision the appropriate "
+        "infrastructure in AWS for this application: https://github.com/mcteer/brieve-demo"
+    )
+    proposal = compose(
+        artifact=artifact,
+        target_repository="acme/app",
+        branch=branch_for("run-title:0:open_proposal"),
+        task=long_task,
+        authored_content=author.contents,
+        subject_content={},
+    )
+    assert proposal.title != long_task
+    assert proposal.title != f"Add {MODULE}"
+    assert "https://" not in proposal.title
+    assert "terraform" in proposal.title.lower()
+    assert len(proposal.title) <= TITLE_LIMIT
+    body = proposal.render()
+    assert body.startswith("## Summary")
+    assert "## Request" in body
+    assert long_task in body
+    gist = title_for(files=[], task=long_task)
+    assert gist == proposal.title
+    assert gist != long_task
+    assert "https://" not in gist
+    short = title_for(
+        files=[ProposedFile(path="main.tf", body="x", is_diff=False)],
+        task="Wire dynamic database secrets",
+    )
+    assert short == "Wire dynamic database secrets"
+    fallback = title_for(
+        files=[ProposedFile(path="main.tf", body="x", is_diff=False)],
+        task="https://github.com/acme/app",
+    )
+    assert fallback == "Add main.tf"
 
 
 def test_row_p2_a_repository_the_requester_does_not_own_is_refused_before_producing() -> None:
@@ -231,9 +285,11 @@ def test_row_p10_the_artefact_reaches_the_publishing_task_under_one_correlation_
     assert jobspec.count('RUN_CORRELATION_ID     = "${NOMAD_META_correlation_id}"') == 2, (
         "the two tasks do not record under one correlation ID"
     )
-    assert "network namespace is shared" in jobspec.lower() or "NAMESPACE IS SHARED" in jobspec, (
-        "the jobspec no longer records that the namespace is shared; that absence is how "
-        "somebody later claims network isolation between the two tasks"
+    assert "network separation between these two tasks is NOT a control" in jobspec or (
+        "network namespace is shared" in jobspec.lower() or "NAMESPACE IS SHARED" in jobspec
+    ), (
+        "the jobspec no longer records that network isolation between the two tasks is not a "
+        "control; that absence is how somebody later claims it is"
     )
 
 

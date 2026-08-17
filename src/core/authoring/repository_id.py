@@ -14,6 +14,12 @@ _GITHUB_HTTPS = re.compile(
 _GITHUB_SSH = re.compile(r"^git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$", re.IGNORECASE)
 _OWNER_REPO = re.compile(r"^([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)$")
 
+#: A GitHub URL embedded in a free-text Propose message (chat bubble).
+_GITHUB_IN_TEXT = re.compile(
+    r"https?://(?:www\.)?github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?/?",
+    re.IGNORECASE,
+)
+
 
 def normalize_repository_url(raw: str) -> str:
     """Return ``owner/repo`` or refuse.
@@ -40,4 +46,30 @@ def normalize_repository_url(raw: str) -> str:
     )
 
 
-__all__ = ["normalize_repository_url"]
+def extract_propose_from_message(message: str) -> tuple[str, str]:
+    """Split a chat message into ``(repository_url, task)`` for Propose intake.
+
+    The person pastes one bubble that names the repo and the ask. The platform finds the
+    first GitHub URL; the rest of the text is the task. No agent picker, no second field.
+    """
+    text = (message or "").strip()
+    if not text:
+        raise RequestRefused("a message is required", reason_code="task_required")
+    match = _GITHUB_IN_TEXT.search(text)
+    if match is None:
+        raise RequestRefused(
+            "include a GitHub repository URL in your message",
+            reason_code="repository_required",
+        )
+    repo_raw = match.group(0)
+    task = (text[: match.start()] + text[match.end() :]).strip()
+    task = re.sub(r"\s+", " ", task).strip(" :,-")
+    if not task:
+        raise RequestRefused(
+            "say what should change, not only which repository",
+            reason_code="task_required",
+        )
+    return repo_raw, task
+
+
+__all__ = ["extract_propose_from_message", "normalize_repository_url"]

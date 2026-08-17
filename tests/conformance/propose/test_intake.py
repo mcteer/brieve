@@ -13,6 +13,7 @@ import pytest
 from core.authoring.request import RequestRefused
 from core.identity.types import AuthenticatedSubject, SubjectKind
 from core.run import RunState
+from core.threads.store import InMemoryThreadStore
 from surfaces.api.propose import ProposeRequest, propose_for
 from surfaces.dispatch.types import RunHandle
 
@@ -81,6 +82,7 @@ def test_p2_unowned_repository_refuses_before_dispatch(tmp_path: Path) -> None:
 def test_p1_owned_repository_dispatches_authoring_tier(tmp_path: Path) -> None:
     (tmp_path / "platform").mkdir()
     dispatcher = _FakeDispatcher()
+    store = InMemoryThreadStore()
     accepted = propose_for(
         subject=_subject(),
         body=ProposeRequest(
@@ -92,6 +94,7 @@ def test_p1_owned_repository_dispatches_authoring_tier(tmp_path: Path) -> None:
         platform_tree=tmp_path / "platform",
         acquire_into=tmp_path / "acq",
         clone_runner=_ok_clone,
+        thread_store=store,
     )
     assert accepted.run_id
     assert dispatcher.calls
@@ -99,6 +102,10 @@ def test_p1_owned_repository_dispatches_authoring_tier(tmp_path: Path) -> None:
     assert call["job_id"] == "authoring-tier"
     assert "subject_path" in (call.get("meta") or {})
     assert call["agent_definition_id"] == "authoring-agent"
+    recorded = store.get_run_input(run_id=accepted.run_id)
+    assert recorded is not None
+    assert "add terraform for the app" in recorded.message
+    assert "mcteer/brieve-demo" in recorded.message
 
 
 def test_empty_task_refused(tmp_path: Path) -> None:
@@ -112,3 +119,44 @@ def test_empty_task_refused(tmp_path: Path) -> None:
             acquire_into=tmp_path / "acq",
             clone_runner=_ok_clone,
         )
+
+
+def test_chat_message_dispatches_authoring_tier(tmp_path: Path) -> None:
+    (tmp_path / "platform").mkdir()
+    dispatcher = _FakeDispatcher()
+    store = InMemoryThreadStore()
+    message = (
+        "I need you to create a terraform template that will provision "
+        "the appropriate infrastructure in AWS for this application: "
+        "https://github.com/mcteer/brieve-demo"
+    )
+    accepted = propose_for(
+        subject=_subject(),
+        body=ProposeRequest(message=message),
+        dispatcher=dispatcher,
+        owned_repositories=frozenset({"mcteer/brieve-demo"}),
+        platform_tree=tmp_path / "platform",
+        acquire_into=tmp_path / "acq",
+        clone_runner=_ok_clone,
+        thread_store=store,
+    )
+    assert accepted.run_id
+    assert dispatcher.calls
+    assert dispatcher.calls[0]["job_id"] == "authoring-tier"
+    recorded = store.get_run_input(run_id=accepted.run_id)
+    assert recorded is not None
+    assert recorded.message == message
+
+
+def test_message_without_url_refused(tmp_path: Path) -> None:
+    with pytest.raises(RequestRefused) as refused:
+        propose_for(
+            subject=_subject(),
+            body=ProposeRequest(message="please add terraform somewhere"),
+            dispatcher=_FakeDispatcher(),
+            owned_repositories=frozenset({"mcteer/brieve-demo"}),
+            platform_tree=tmp_path / "platform",
+            acquire_into=tmp_path / "acq",
+            clone_runner=_ok_clone,
+        )
+    assert refused.value.reason_code == "repository_required"

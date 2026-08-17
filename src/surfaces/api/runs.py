@@ -169,6 +169,21 @@ RESULT_KEY = "__run_result__"
 MAX_RESULT_BYTES = 256 * 1024
 
 
+def _propose_progress_from(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Live or nested Build phases — never invent an order here (047)."""
+    if not payload or not isinstance(payload, dict):
+        return None
+    progress = payload.get("propose_progress")
+    if isinstance(progress, dict) and isinstance(progress.get("phases"), list):
+        return progress
+    result = payload.get(RESULT_KEY)
+    if isinstance(result, dict):
+        nested = result.get("propose_progress")
+        if isinstance(nested, dict) and isinstance(nested.get("phases"), list):
+            return nested
+    return None
+
+
 class RunResultResponse(BaseModel):
     """What a run produced, or why there is nothing to show.
 
@@ -183,6 +198,9 @@ class RunResultResponse(BaseModel):
     disposition: str
     result: Any | None = None
     stop_reason: str | None = None
+    #: Live Build phases (047). Present while running — the result key is terminal-only,
+    #: and without this the portal strip stays pending until the run ends.
+    propose_progress: dict[str, Any] | None = None
 
 
 def run_result_for(
@@ -243,7 +261,11 @@ def run_result_for(
     blob = durability.load(run_id) if durability is not None else None
     if blob is None or blob.outcome is None:
         _shown(0)
-        return RunResultResponse(run_id=run_id, disposition="running")
+        return RunResultResponse(
+            run_id=run_id,
+            disposition="running",
+            propose_progress=_propose_progress_from(blob.payload if blob is not None else None),
+        )
 
     payload = blob.payload or {}
     if RESULT_KEY not in payload:
@@ -255,6 +277,7 @@ def run_result_for(
             run_id=run_id,
             disposition="ended_without_result",
             stop_reason=blob.outcome.stop_reason,
+            propose_progress=_propose_progress_from(payload),
         )
 
     result = payload[RESULT_KEY]
@@ -275,7 +298,12 @@ def run_result_for(
 
     _shown(1)
 
-    return RunResultResponse(run_id=run_id, disposition="complete", result=result)
+    return RunResultResponse(
+        run_id=run_id,
+        disposition="complete",
+        result=result,
+        propose_progress=_propose_progress_from(payload),
+    )
 
 
 def _too_large(result: Any) -> bool:
