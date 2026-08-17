@@ -370,8 +370,11 @@ def start_thread_from_home(
     *,
     agent: str = "",
 ) -> str:
-    """Open a thread by sending the first message from the run surface home page."""
-    tab.goto(f"{server.base}/")
+    """Open a thread from the operator Run surface (``/run``).
+
+    047 made ``GET /`` Build. The agent-picker composer still lives at ``/run``.
+    """
+    tab.goto(f"{server.base}/run")
     tab.fill("#message", message)
     if agent:
         tab.select_option("#agent", agent)
