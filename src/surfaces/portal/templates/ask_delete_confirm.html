@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Delete this conversation? — Harness Portal{% endblock %}
-{% block header_actions %}
-<form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
-{% endblock %}
+{% block main_class %}main--app{% endblock %}
 {% block content %}
+<div class="app-layout app-layout--alone">
+<div class="app-main">
+<header class="stage-top">
+  <p class="crumb">ask / delete</p>
+</header>
+<div class="thread"><div class="inner">
 <h1>Delete this conversation?</h1>
 
 {#
@@ -26,4 +30,7 @@
   <button type="submit" class="button">Delete conversation</button>
 </form>
 <a class="link-button" href="/ask/{{ conversation_id }}">Keep it</a>
+</div></div>
+</div>
+</div>
 {% endblock %}

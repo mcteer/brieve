@@ -43,7 +43,7 @@ def _send(page: Any, thread_url: str, message: str, *, agent: str = "") -> None:
     page.fill("#message", message)
     if agent:
         page.select_option("#agent", agent)
-    page.click(".composer button[type=submit]")
+    page.click(".run-composer button[type=submit]")
     page.wait_for_load_state()
 
 
@@ -386,23 +386,22 @@ def test_the_composer_never_obscures_what_focus_is_on(
 def test_the_page_scrolls_rather_than_a_box_inside_it() -> None:
     """035, after the maintainer said so: answers do not arrive in a scrolling window.
 
-    A nested scroll region satisfied 2.4.11 the easy way and read wrong — it is not what
-    Claude or ChatGPT do, and it is not what anybody expects of a chat. Asserted on the
-    stylesheet rather than in a browser, because the property is "this element does not own a
-    scroll" and a browser can only show that it currently has nothing to scroll.
+    A nested scroll on `.transcript` satisfied 2.4.11 the easy way and read wrong — a little
+    window inside a document. 048's shell puts overflow on `.thread` (the stage's middle
+    band, between a fixed header and a docked composer). The transcript itself still must
+    not own a scroll.
     """
     css = (
         pathlib.Path(__file__).resolve().parents[2] / "src/surfaces/portal/static/portal.css"
     ).read_text()
     rule = css.split(".transcript {", 1)[1].split("}", 1)[0]
-    active_transcript = css.split(".transcript:has(.exchange)", 1)[1].split("}", 1)[0]
+    thread = css.split(".thread {", 1)[1].split("}", 1)[0]
 
     assert "overflow-y: auto" not in rule and "overflow: auto" not in rule, (
-        "the transcript owns a scroll region again — the page is what scrolls"
+        "the transcript owns a scroll region again — the thread pane is what scrolls"
     )
-    assert "padding-block-end" in active_transcript, (
-        "no room reserved for the composer once a conversation exists, "
-        "so the last answer cannot be scrolled clear of it"
+    assert "overflow: auto" in thread, (
+        "the thread pane does not scroll; header and composer would have to overlay it"
     )
 
 

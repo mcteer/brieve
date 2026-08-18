@@ -186,6 +186,8 @@ job "portal" {
         PORTAL_CLIENT_ID        = var.portal_client_id
         PORTAL_REDIRECT_URI     = var.portal_redirect_uri
         PORTAL_BIND             = "0.0.0.0:8082"
+        # Bump when the served templates/CSS must not be the previous allocation's copy.
+        PORTAL_UI_EPOCH         = "20260817p"
 
         # TLS. The paths are as seen INSIDE this container — `/src` is the working tree,
         # bind-mounted read-only above, and `.enclave/` is where bring-up materialises what

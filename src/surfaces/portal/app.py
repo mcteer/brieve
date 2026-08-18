@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -162,6 +162,17 @@ def create_portal(
     app.state.sessions = sessions if sessions is not None else SessionStore()
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     templates = Jinja2Templates(directory=str(TEMPLATES))
+
+    @app.middleware("http")
+    async def _html_is_not_cached(request: Request, call_next: Any) -> Response:
+        """Ask pages were being served from the browser's last copy — a refresh kept the
+        old heading, the old spine gutter, and the old CSS query. HTML is a live view of
+        the conversation, not an asset."""
+        _ = request
+        response = cast(Response, await call_next(request))
+        if "text/html" in response.headers.get("content-type", ""):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     def _readable_instant(value: Any) -> str:
         """An instant in words. `2026-08-05T03:46:53.836216Z` is a machine's way of saying it.
@@ -577,6 +588,10 @@ def create_portal(
         run_state = str((state.payload or {}).get("state", "starting")) if state.ok else "unknown"
         pr_url, ended_reason = _propose_outcome(result, phases=progress, state=run_state)
         builds, reachable = _builds(session)
+        intake = None
+        if result.ok and isinstance(result.payload, dict):
+            raw = result.payload.get("intake_message")
+            intake = raw if isinstance(raw, str) else None
         return templates.TemplateResponse(
             request=request,
             name="propose_run.html",
@@ -588,6 +603,7 @@ def create_portal(
                 "ended_reason": ended_reason,
                 "builds": builds,
                 "reachable": reachable,
+                "intake_message": intake,
             },
         )
 
@@ -1002,7 +1018,15 @@ def _propose_outcome(
             if phase.get("status") == "failed" and phase.get("reason"):
                 ended_reason = str(phase["reason"])
                 break
+    disposition = ""
+    if result.ok and isinstance(result.payload, dict):
+        disposition = str(result.payload.get("disposition") or "")
+    # Nomad "complete" is not "no PR". The durable result can still be running
+    # for a moment after the allocation exits; inventing a failure here is what
+    # hid a real pull request behind "Ended without a pull request."
     if not ended_reason and state in ("stopped", "completed", "failed"):
+        if disposition == "running":
+            return None, None
         ended_reason = "Ended without a pull request."
     elif ended_reason and not ended_reason.startswith("Ended"):
         # Under the status pill: say what happened, not only a bare platform code.

@@ -22,8 +22,7 @@ def test_p7_propose_template_has_no_agent_select() -> None:
     assert 'name="task"' not in html
     assert ">Build<" in html
     assert ">Send<" not in html
-    assert 'class="ask-field"' in html
-    assert 'class="composer' not in html
+    assert 'class="composer"' in html
     assert 'include "_build_rail.html"' in html
 
 
@@ -43,3 +42,13 @@ def test_p7_base_nav_links_build_home_and_ask() -> None:
     assert ">Ask<" in base
     assert "Ask a question" not in base
     assert "Run an agent" not in base
+
+
+def test_p8_ask_has_no_propose_control() -> None:
+    """Ask cannot open a PR (047 P8) — no posting control to Build from the Ask page."""
+    root = Path(__file__).resolve().parents[3]
+    html = (root / "src/surfaces/portal/templates/ask.html").read_text(encoding="utf-8")
+    assert 'action="/ask' in html
+    assert 'action="/"' not in html
+    assert 'action="/propose"' not in html
+    assert 'name="message"' not in html

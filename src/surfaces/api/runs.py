@@ -36,6 +36,7 @@ from surfaces.api.dependencies import (
     DurabilityDep,
     RunIndexDep,
     SubjectDep,
+    ThreadStoreDep,
 )
 from surfaces.api.record_access import (
     RecordAccessUnavailable,
@@ -201,6 +202,23 @@ class RunResultResponse(BaseModel):
     #: Live Build phases (047). Present while running — the result key is terminal-only,
     #: and without this the portal strip stays pending until the run ends.
     propose_progress: dict[str, Any] | None = None
+    #: Opening message stored as `RunInput` (048). Null when missing or unreadable —
+    #: never invented, never substituted from a rail title.
+    intake_message: str | None = None
+
+
+def _intake_message_for(thread_store: Any | None, run_id: str) -> str | None:
+    """Disclose stored intake; miss and error are both null (do not fail the result)."""
+    if thread_store is None:
+        return None
+    try:
+        record = thread_store.get_run_input(run_id=run_id)
+    except Exception:  # noqa: BLE001 — a store fault must not hide phase progress
+        return None
+    if record is None:
+        return None
+    message = getattr(record, "message", None)
+    return message if isinstance(message, str) else None
 
 
 def run_result_for(
@@ -210,6 +228,7 @@ def run_result_for(
     index: Any,
     durability: Any,
     audit: AuditSink,
+    thread_store: Any | None = None,
 ) -> RunResultResponse:
     """A run's output, without the caller reading a single audit entry.
 
@@ -259,15 +278,43 @@ def run_result_for(
         )
 
     blob = durability.load(run_id) if durability is not None else None
-    if blob is None or blob.outcome is None:
+    intake = _intake_message_for(thread_store, run_id)
+    payload = blob.payload if blob is not None and isinstance(blob.payload, dict) else {}
+    stored = payload.get(RESULT_KEY) if payload else None
+    published = isinstance(stored, dict) and bool(stored.get("pr_url"))
+    if blob is None or (blob.outcome is None and not published):
         _shown(0)
         return RunResultResponse(
             run_id=run_id,
             disposition="running",
             propose_progress=_propose_progress_from(blob.payload if blob is not None else None),
+            intake_message=intake,
         )
 
-    payload = blob.payload or {}
+    if published and blob.outcome is None:
+        # Publish writes the PR onto RESULT_KEY; the proposer historically left outcome
+        # unset. Nomad then reports the allocation complete, and the portal treated
+        # "terminal + no disclosed result" as "ended without a pull request" — while
+        # the URL was sitting in the checkpoint. A named PR is a completed result.
+        if _too_large(stored):
+            record_access_refused(
+                audit=audit,
+                subject=subject,
+                operation="get_run_result",
+                reason_code="result_too_large",
+                target_correlation_id=entry.correlation_id,
+                target_id=run_id,
+            )
+            raise OperationRefused("result too large to return", reason_code="result_too_large")
+        _shown(1)
+        return RunResultResponse(
+            run_id=run_id,
+            disposition="complete",
+            result=stored,
+            propose_progress=_propose_progress_from(payload),
+            intake_message=intake,
+        )
+
     if RESULT_KEY not in payload:
         # Terminal with nothing to show — stopped, refused, or simply produced nothing.
         # The reason is what makes this actionable: a run that failed is not a run that
@@ -278,6 +325,7 @@ def run_result_for(
             disposition="ended_without_result",
             stop_reason=blob.outcome.stop_reason,
             propose_progress=_propose_progress_from(payload),
+            intake_message=intake,
         )
 
     result = payload[RESULT_KEY]
@@ -303,6 +351,7 @@ def run_result_for(
         disposition="complete",
         result=result,
         propose_progress=_propose_progress_from(payload),
+        intake_message=intake,
     )
 
 
@@ -505,6 +554,7 @@ def build_router() -> APIRouter:
         index: RunIndexDep,
         durability: DurabilityDep,
         audit: AuditDep,
+        thread_store: ThreadStoreDep,
     ) -> RunResultResponse:
         """What this run produced."""
         try:
@@ -514,6 +564,7 @@ def build_router() -> APIRouter:
                 index=index,
                 durability=durability,
                 audit=audit,
+                thread_store=thread_store,
             )
         except RecordAccessUnavailable as unrecordable:
             raise HTTPException(

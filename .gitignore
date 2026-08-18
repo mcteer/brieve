@@ -43,6 +43,9 @@ node_modules/
 !*.tfvars.example
 crash.log
 
+# Local approval mockups — not product artifacts (048 FR-016)
+tmp-ui-mockups/
+
 # Env and local secrets — never commit
 .env
 .env.*

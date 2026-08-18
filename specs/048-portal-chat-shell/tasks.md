@@ -28,7 +28,7 @@ reads the tokens US1 defines. The only network act is T001's vendoring fetch.
 
 ## Phase 1: Setup
 
-- [ ] T001 Vendor Inter and IBM Plex Mono into `src/surfaces/portal/static/fonts/` per
+- [X] T001 Vendor Inter and IBM Plex Mono into `src/surfaces/portal/static/fonts/` per
       research F5. Pin `google/fonts` at a commit written into `PROVENANCE.md`. Read each
       family's `OFL.txt` at vendoring and copy verbatim to `OFL-inter.txt` and
       `OFL-ibm-plex-mono.txt`; record whether a Reserved Font Name is declared. Convert TTF →
@@ -58,7 +58,7 @@ only. `test_portal_identity.py` green; `roboto-variable.woff2` absent.
 
 ### Tests (write so they can fail, then make them pass)
 
-- [ ] T002 [US4] Rewrite
+- [X] T002 [US4] Rewrite
       `tests/component/test_portal_identity.py`: token block is `:root {` only (remove
       `prefers-color-scheme: dark` from `TOKEN_BLOCKS`); digest row lists
       `inter-variable.woff2`, `ibm-plex-mono-regular.woff2`, `ibm-plex-mono-medium.woff2`,
@@ -67,7 +67,7 @@ only. `test_portal_identity.py` green; `roboto-variable.woff2` absent.
       Palatino/Roboto in `portal.css`; dispositions still greyscale-by-structure. The row
       must fail on leftover Roboto.
 
-- [ ] T003 [US3] In `tests/component/test_portal_identity.py` after T002: assert
+- [X] T003 [US3] In `tests/component/test_portal_identity.py` after T002: assert
       `.composer` in `src/surfaces/portal/static/portal.css` is one flex row (`align-items:
       center`), `max-width: 880px`, `margin-inline: auto` (centering the test reads from the
       rule), and `textarea` inside it is not given a stacked `min-height` that makes a
@@ -75,7 +75,7 @@ only. `test_portal_identity.py` green; `roboto-variable.woff2` absent.
       max-width is strictly greater than the reading column's (research F8). Must fail on
       the current stacked/full-bleed composer.
 
-- [ ] T004 [US1] Template scan in `tests/component/test_portal_identity.py` after T003: icon
+- [X] T004 [US1] Template scan in `tests/component/test_portal_identity.py` after T003: icon
       rail items in `src/surfaces/portal/templates/base.html` expose accessible names
       **Build**, **Ask**, **Settings**, **Sign out**; Ask list heading is Conversations;
       Build list heading in `_build_rail.html` is Builds. Must fail on unnamed SVGs.
@@ -87,7 +87,7 @@ only. `test_portal_identity.py` green; `roboto-variable.woff2` absent.
 
 ### Implementation
 
-- [ ] T005 [US1] Rewrite `src/surfaces/portal/static/portal.css` as the designed-theme token
+- [X] T005 [US1] Rewrite `src/surfaces/portal/static/portal.css` as the designed-theme token
       sheet (data-model + research F4/F5): `:root` only; `html { color-scheme: dark; }`;
       remove `@media (prefers-color-scheme: dark)`. Tokens `--bg` `#0b0c0e`, `--elev`
       `#111318`, `--elev-2` `#171a21`, `--ink` `#e8e6e1`, `--muted` `#8f8c84`, `--line`,
@@ -101,7 +101,7 @@ only. `test_portal_identity.py` green; `roboto-variable.woff2` absent.
       targets, visually-hidden, visible focus, `word-break` on evidence. Every rule below
       `:root` reads tokens only.
 
-- [ ] T006 [US1] `src/surfaces/portal/templates/base.html`: signed-in icon rail (Build, Ask,
+- [X] T006 [US1] `src/surfaces/portal/templates/base.html`: signed-in icon rail (Build, Ask,
       Settings, Sign out) with accessible names matching those verbs; SVG decorative. Ask
       current when path starts `/ask`; Build current on `/` and `/propose`. Never-acts is
       **not** a five-phase meter. Re-read the F9 comments that live in `base.html` in this
@@ -109,7 +109,7 @@ only. `test_portal_identity.py` green; `roboto-variable.woff2` absent.
       and the text-nav premise (never-acts stays visible as Ask status + separate pages,
       FR-014). Skip-to-content remains.
 
-- [ ] T007 [US1] Shared shell on `src/surfaces/portal/templates/ask.html` and
+- [X] T007 [US1] Shared shell on `src/surfaces/portal/templates/ask.html` and
       `src/surfaces/portal/templates/propose.html`: icon rail from base, work list
       (Conversations vs Builds), thread stage, posting composer (Ask → existing ask POST;
       empty Build → existing `POST /`). Empty list still omits the column
@@ -118,12 +118,12 @@ only. `test_portal_identity.py` green; `roboto-variable.woff2` absent.
       control unchanged. Keep/update the F9 comments in `ask.html` (rail omit when empty; no
       `tabindex` on the transcript) — rewrite premises, do not delete the comments (FR-014).
 
-- [ ] T008 [US3] Empty Ask, Ask-with-thread, and empty Build composers in
+- [X] T008 [US3] Empty Ask, Ask-with-thread, and empty Build composers in
       `src/surfaces/portal/templates/ask.html` and
       `src/surfaces/portal/templates/propose.html`: `rows="1"`, chips and action on the same
       row as the field, action labels **Ask** / **Build**. No stacked field-plus-chips block.
 
-- [ ] T009 [US1] Remaining templates inherit tokens and type without inventing colour:
+- [X] T009 [US1] Remaining templates inherit tokens and type without inventing colour:
       `settings.html`, `signed_out.html`, `login_failed.html`, `refused.html`,
       `delete_confirm.html`, `ask_delete_confirm.html`, `endorsed_review.html`,
       `threads.html`, `_thread_composer.html`, `_thread_turns.html`, `_notice.html`,
@@ -131,19 +131,19 @@ only. `test_portal_identity.py` green; `roboto-variable.woff2` absent.
       three-column shell (research F6). Operator `/run` (`threads.html` + composer) inherits
       identity and does not appear as a third primary rail verb.
 
-- [ ] T010 [US4] `tests/a11y/conftest.py`: remove `THEMES = ["light", "dark"]` parametrization.
+- [X] T010 [US4] `tests/a11y/conftest.py`: remove `THEMES = ["light", "dark"]` parametrization.
       `page` / `anonymous_page` create one context with `color_scheme="dark"`. Drop the
       two-subject split that existed only to dodge doubled rate limits. Update the comment
       that claimed 034's doubling — light is withdrawn (research F3).
 
-- [ ] T011 [US4] FR-016 cleanup in the same change as T005's `@font-face`: delete
+- [X] T011 [US4] FR-016 cleanup in the same change as T005's `@font-face`: delete
       `src/surfaces/portal/static/fonts/roboto-variable.woff2` and Roboto `OFL.txt`; rewrite
       `PROVENANCE.md` for Inter + IBM Plex Mono only. Grep the tree for `Roboto`,
       `roboto-variable`, `Palatino`, `Iowan Old Style` under `src/surfaces/portal/` and
       `tests/component/test_portal_identity.py` and remove leftovers. Do not commit
       `tmp-ui-mockups/`.
 
-- [ ] T012 [US4] Run
+- [X] T012 [US4] Run
       `uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y tests/component/test_portal_identity.py -q`
       to green. Contrast findings are fixed by adjusting token values in `:root` — never by
       excluding a state, never by reintroducing a light theme (SC-004).
@@ -165,14 +165,14 @@ has no `method="post" action="/"`. Ask two-exchange page uses the same spine gra
 
 ### Tests
 
-- [ ] T013 [P] [US2] [GATE:fail-closed] Extend `tests/component/test_run_result.py`: a run
+- [X] T013 [P] [US2] [GATE:fail-closed] Extend `tests/component/test_run_result.py`: a run
       whose `ThreadStore` has `RunInput` for that `run_id` returns `intake_message` equal to
       that message (the string comes from the store fixture, not from a literal constructed
       inside the assertion). A run with no `RunInput` returns `intake_message is None` (not
       `""`). Store raising / unreadable still returns `propose_progress` when present.
       Must fail on today's `RunResultResponse` (no field).
 
-- [ ] T014 [P] [US2] Template rows in `tests/component/test_portal_shell.py`:
+- [X] T014 [P] [US2] Template rows in `tests/component/test_portal_shell.py`:
       `propose_run.html` renders `{{ intake_message }}` only inside a truthiness guard;
       contains no `method="post"` form to `/` or `/propose`; keeps `id="phase-strip"` and
       `[data-phase]`. Each `[data-phase]` node has a visible `.phase-status` word and a
@@ -184,24 +184,24 @@ has no `method="post" action="/"`. Ask two-exchange page uses the same spine gra
 
 ### Implementation
 
-- [ ] T015 [US2] `src/surfaces/api/runs.py`: add `intake_message: str | None = None` to
+- [X] T015 [US2] `src/surfaces/api/runs.py`: add `intake_message: str | None = None` to
       `RunResultResponse` (exact name). `get_run_result` / `run_result_for` take
       `ThreadStore` (optional). On success, `get_run_input(run_id=run_id).message`; on miss
       or exception, `None` — do not fail the whole result, do not invent text (F1 failure
       sibling). All existing `RunResultResponse(...)` constructors set the field (explicit
       `None` on the miss path). Transport-shared: MCP gets it by construction.
 
-- [ ] T016 [US2] [GATE:conformance] Assert `intake_message` on the shared
+- [X] T016 [US2] [GATE:conformance] Assert `intake_message` on the shared
       `RunResultResponse` in `tests/component/test_run_result.py` (T013 is the shape). Those
       tests' docstring states API and MCP expose the field by construction — same model, no
       second serializer. Do **not** add a `tests/conformance/api/` run-result file. 047 P8 /
       SC-009 remains a required green row (`tests/conformance/propose/` Ask isolation).
 
-- [ ] T017 [US2] `src/surfaces/portal/app.py` `propose_run`: pass `intake_message` from the
+- [X] T017 [US2] `src/surfaces/portal/app.py` `propose_run`: pass `intake_message` from the
       existing result relay into `propose_run.html`. Do not add a second API call. Do not
       use `_build_rail_title` as a stand-in.
 
-- [ ] T018 [US2] `src/surfaces/portal/templates/propose_run.html`: `.you` from
+- [X] T018 [US2] `src/surfaces/portal/templates/propose_run.html`: `.you` from
       `intake_message` when set; ordered spine keeping `id="phase-strip"`, `data-phase`,
       `.phase-status` (research F7). Node shape + status word for
       `completed` / `active` (current) / `pending` (waiting) / `failed` (FR-011). No
@@ -210,11 +210,11 @@ has no `method="post" action="/"`. Ask two-exchange page uses the same spine gra
       a link to `/` with accessible name **New build** (research F2). SSE outcome block
       stays.
 
-- [ ] T019 [US2] `src/surfaces/portal/static/portal-propose-strip.js`: keep
+- [X] T019 [US2] `src/surfaces/portal/static/portal-propose-strip.js`: keep
       `#phase-strip [data-phase]` and `textContent` updates; change only `className` values
       to match the spine CSS from T005. No `innerHTML`. No new JS file.
 
-- [ ] T020 [US2] `src/surfaces/portal/templates/_exchange.html` + `_outcome.html`: person's
+- [X] T020 [US2] `src/surfaces/portal/templates/_exchange.html` + `_outcome.html`: person's
       words as `.you`; answer as a completed spine node; citations remain evidence role
       (034). One include still serves first load and in-page swap. Do not put 047 phase
       names on Ask. Keep/update the F9 comments in both files (one renderer; conversation
@@ -228,13 +228,13 @@ spine grammar; no second propose from the run page.
 
 ## Phase 5: Polish & Cross-Cutting
 
-- [ ] T021 [P] Changelog entry for the portal restyle in `CHANGELOG.md`; no new glossary
+- [X] T021 [P] Changelog entry for the portal restyle in `CHANGELOG.md`; no new glossary
       product name (the mockup name does not appear in `docs/glossary.md` or the UI). In
       `ROADMAP.md`: add a **Shipped** row for 048 (Ask and Build share one conversational
       shell) and a one-line note on 034's shipped row that dual-theme / Palatino / Roboto is
       superseded by 048. Do not add a Next entry — 048 is this feature, landed by the feat PR.
 
-- [ ] T022 [GATE:conformance] `make check` and
+- [X] T022 [GATE:conformance] `make check` and
       `uv run --extra adapters --extra surfaces --extra portal --extra a11y pytest tests/a11y tests/component/test_portal_identity.py tests/component/test_portal_shell.py tests/component/test_run_result.py tests/conformance/propose -q`
       green. 047 P8 must still fail if Ask grows a propose control. Then the human half
       (contract named-runner row): `DEV_IDP=1 infra/bin/portal-up`, walk empty Ask, empty

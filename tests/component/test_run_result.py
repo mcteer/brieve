@@ -107,6 +107,29 @@ def test_a_running_run_says_so_rather_than_returning_nothing() -> None:
     assert response.result is None
 
 
+def test_a_published_pr_is_complete_even_when_outcome_was_left_unset() -> None:
+    """The proposer wrote pr_url onto RESULT_KEY and returned; Nomad then completed.
+
+    get_run_result treated outcome=None as still running and hid the URL. The portal
+    saw a terminal Nomad state with no result and said the Build ended without a PR.
+    """
+    response = run_result_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=Durability(
+            _blob(
+                state=None,
+                payload={RESULT_KEY: {"pr_url": "https://github.com/example/repo/pull/1"}},
+            )
+        ),
+        audit=InMemoryAuditSink(),
+    )
+
+    assert response.disposition == "complete"
+    assert response.result == {"pr_url": "https://github.com/example/repo/pull/1"}
+
+
 def test_a_running_build_returns_live_phase_progress() -> None:
     """The portal strip polls this while outcome is still None — progress must not wait."""
     progress = {
@@ -224,3 +247,71 @@ def test_break_fixture_the_raw_checkpoint_payload_is_never_returned() -> None:
         "resume-internal state reached the caller, which makes the checkpoint's shape "
         "something clients depend on"
     )
+
+
+def test_intake_message_is_the_stored_run_input() -> None:
+    """048. The string comes from the store fixture, not a literal built inside the assertion.
+
+    API and MCP expose this field by construction: they share ``RunResultResponse``. There is
+    no second serializer.
+    """
+    from core.threads.records import RunInput
+    from core.threads.store import InMemoryThreadStore
+
+    store = InMemoryThreadStore()
+    stored = RunInput(
+        run_id="run-1",
+        message="provision aws for the demo repo",
+        created_at=datetime(2026, 8, 17, tzinfo=UTC),
+    )
+    store.put_run_input(stored)
+    progress = {"current": "write", "phases": [{"name": "write", "status": "active"}]}
+    response = run_result_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=Durability(_blob(state=None, payload={"propose_progress": progress})),
+        audit=InMemoryAuditSink(),
+        thread_store=store,
+    )
+
+    assert response.intake_message is stored.message
+    assert response.propose_progress == progress
+
+
+def test_missing_run_input_yields_null_intake_message() -> None:
+    """Fail-closed miss: None, not an empty string, not a rail title."""
+    from core.threads.store import InMemoryThreadStore
+
+    response = run_result_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=Durability(_blob(state=None)),
+        audit=InMemoryAuditSink(),
+        thread_store=InMemoryThreadStore(),
+    )
+
+    assert response.intake_message is None
+    assert response.intake_message != ""
+
+
+def test_unreadable_store_still_returns_phase_progress() -> None:
+    """Store errors do not invent a prompt and do not drop propose_progress."""
+
+    class _Broken:
+        def get_run_input(self, *, run_id: str) -> None:
+            raise RuntimeError("store unreadable")
+
+    progress = {"current": "plan", "phases": [{"name": "plan", "status": "active"}]}
+    response = run_result_for(
+        run_id="run-1",
+        subject=_subject(),
+        index=_index(),
+        durability=Durability(_blob(state=None, payload={"propose_progress": progress})),
+        audit=InMemoryAuditSink(),
+        thread_store=_Broken(),
+    )
+
+    assert response.intake_message is None
+    assert response.propose_progress == progress

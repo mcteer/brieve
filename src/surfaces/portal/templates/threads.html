@@ -1,16 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{% if thread %}{{ thread.title or "Conversation" }}{% else %}Run an agent{% endif %} — Harness Portal{% endblock %}
-{% block header_actions %}
-<form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
-{% endblock %}
 {% block main_class %}main--app{% endblock %}
 {% block content %}
 <div class="app-layout{% if not threads %} app-layout--alone{% endif %}">
 
 {% if threads %}
 <nav class="app-rail" aria-label="Your conversations">
-  <a class="button rail-new" href="/">New conversation</a>
-  <p class="rail-heading" id="rail-heading">Conversations</p>
+  <div class="rail-head">
+    <p class="rail-heading" id="rail-heading">Conversations</p>
+    <a class="rail-new" href="/run">New</a>
+  </div>
   <ul aria-labelledby="rail-heading">
     {% for item in threads %}
       <li>

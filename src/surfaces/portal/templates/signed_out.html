@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Sign in — Harness Portal{% endblock %}
+{% block body_class %}plain{% endblock %}
+{% block icons %}{% endblock %}
+{% block session_end %}{% endblock %}
+{% block masthead %}
+{% include "_anonymous_header.html" %}
+{% endblock %}
 {% block content %}
 <h1>Sign in</h1>
 <p>This portal lets you build infrastructure changes (research through pull request),

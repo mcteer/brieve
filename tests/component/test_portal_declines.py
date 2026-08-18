@@ -41,7 +41,7 @@ def _turns_only(html: str) -> str:
         start = html.index(marker)
         end = html.index("</ol>", start) + len("</ol>")
         return _visible(html[start:end])
-    return _visible(html.split('class="composer"')[0])
+    return _visible(html.split('class="run-composer"')[0])
 
 
 def _portal_over_api() -> tuple[TestClient, TestClient, object]:

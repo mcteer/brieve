@@ -1,59 +1,47 @@
-# Provenance — Roboto, vendored for the portal
+# Provenance — Inter and IBM Plex Mono, vendored for the portal
 
-**This font was not written here.** It is adopted from upstream under the same discipline
-ADR-0004 applies to the Terraform skills: a font entering this tree is third-party content,
-and it carries a pin, a licence, digests and a review like anything else. A font is not
-exempt for being a font.
+**These fonts were not written here.** They are adopted from upstream under the same
+discipline ADR-0004 applies to the Terraform skills: a font entering this tree is
+third-party content, and it carries a pin, a licence, digests and a review like anything
+else. A font is not exempt for being a font.
 
-## Where it came from
+This record covers the two families 048 actually serves.
+
+## Where they came from
 
 | Field | Value |
 | --- | --- |
 | Distribution repository | [`google/fonts`](https://github.com/google/fonts) |
-| Commit | `2796410152d4f9524b68ed46e69c1b60f8e0f7c3` (2026-07-31) |
-| Upstream path | `ofl/roboto/Roboto[wdth,wght].ttf` |
-| Design source | [`googlefonts/roboto-3-classic`](https://github.com/googlefonts/roboto-3-classic), as recorded in that path's `METADATA.pb` |
-| Licence | **SIL Open Font License 1.1** — `OFL.txt`, copied verbatim beside the font |
-| Retrieved | 2026-08-03 |
+| Commit | `e1118da94a8cb00cf6d06cdac9ef13eb1e5c6ab7` |
+| Inter upstream path | `ofl/inter/Inter[opsz,wght].ttf` |
+| IBM Plex Mono upstream paths | `ofl/ibmplexmono/IBMPlexMono-Regular.ttf`, `ofl/ibmplexmono/IBMPlexMono-Medium.ttf` |
+| Licence | **SIL Open Font License 1.1** — `OFL-inter.txt` and `OFL-ibm-plex-mono.txt`, copied verbatim beside the fonts |
+| Retrieved | 2026-08-17 |
+| Converter | ephemeral `fonttools==4.63.0` with `brotli` (same command shape as 034) |
 
-## The licence is OFL, not Apache-2.0 — and the planning artifacts said otherwise
+## Reserved Font Name
 
-034's spec, plan and tasks each recorded "Apache-2.0 — the same licence as this repository."
-**That was wrong**, and it was wrong in the plausible direction: Roboto *was* Apache-2.0 for
-years before the Google Fonts collection moved to OFL 1.1, so the assumption was stale rather
-than invented. It was caught here, at vendoring, by reading `OFL.txt` instead of trusting the
-plan — which is the entire reason this discipline exists. The artifacts were corrected in the
-same change that added this file.
+Read at vendoring from each family's `OFL.txt`:
 
-**What OFL 1.1 requires of us, and what we do about it:**
-
-- The licence travels with the font — `OFL.txt` is vendored beside it, unmodified.
-- **No Reserved Font Name is declared.** The copyright line reads *"Copyright 2011 The Roboto
-  Project Authors"* with no `with Reserved Font Name` clause, so OFL's rename obligation for
-  Modified Versions does not bite. Recorded because its absence is what makes format
-  conversion and any future subsetting unencumbered — a reader should not have to re-derive
-  that.
-- The font is not sold on its own, and is distributed only as part of this software.
+- **Inter — no Reserved Font Name is declared.** The copyright line reads *"Copyright 2020 The Inter Project Authors"* with no `with Reserved Font Name` clause.
+- **IBM Plex Mono — Reserved Font Name "Plex" is declared.** The copyright line reads *"Copyright © 2017 IBM Corp. with Reserved Font Name "Plex""*. TTF → WOFF2 without touching glyph data is the transformation 034 recorded as not a Modified Version, so the family name is kept.
 
 ## What was taken, and what was done to it
 
-**One file: the variable font.** Upstream no longer ships static Regular/Bold — the directory
-holds `Roboto[wdth,wght].ttf` and its italic, nothing else. The variable font carries weights
-100–900 on the `wght` axis (default 400) and `wdth` 75–100 (default 100), so a single file
-covers every weight the portal asks for, and there is one digest to verify rather than two.
+**Inter: the variable font.** One file covers the weights the portal asks for.
 
-**Italic is not vendored.** The upstream italic is a second 519 KB file for one use — the
-window note — and the browser's synthetic oblique is adequate there. Recorded rather than
-silently omitted so nobody wonders whether it was forgotten.
+**IBM Plex Mono: Regular (400) and Medium (500).** Upstream ships static weights; those two are what evidence text uses.
 
-**The only modification is the container format**, TTF → WOFF2. Glyph data, metrics and name
-table are untouched; this is the same transformation Google Fonts itself performs to serve the
-family, and it is not a Modified Version in OFL's sense. Reproduce it with:
+**Italic is not vendored** for either family. The browser's synthetic oblique is adequate.
+
+**The only modification is the container format**, TTF → WOFF2. Glyph data, metrics and name table are untouched. Reproduce it with:
 
 ```sh
 uv run --with fonttools==4.63.0 --with brotli python -c '
 from fontTools.ttLib import TTFont
-f = TTFont("Roboto[wdth,wght].ttf"); f.flavor = "woff2"; f.save("roboto-variable.woff2")'
+f = TTFont("Inter[opsz,wght].ttf"); f.flavor = "woff2"; f.save("inter-variable.woff2")
+f = TTFont("IBMPlexMono-Regular.ttf"); f.flavor = "woff2"; f.save("ibm-plex-mono-regular.woff2")
+f = TTFont("IBMPlexMono-Medium.ttf"); f.flavor = "woff2"; f.save("ibm-plex-mono-medium.woff2")'
 ```
 
 ## Digests
@@ -63,27 +51,28 @@ row is the verifier, exactly as the pack loader is for skill bytes.
 
 | File | sha256 |
 | --- | --- |
-| Source `Roboto[wdth,wght].ttf` (upstream, not vendored) | `d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134` |
-| `roboto-variable.woff2` (vendored, 222,632 bytes) | `503621f33ee03dbd34032049ee54c0e95889ccf901e05ce9939a91245d16285f` |
-| `OFL.txt` (vendored verbatim) | `061402327a96aadb0bfb694a960ed289ecd38d383e396243831ab81feb109c41` |
+| Source `Inter[opsz,wght].ttf` (upstream, not vendored) | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` |
+| `inter-variable.woff2` (vendored, 350,552 bytes) | `d760441abd945bb960d0960bf94a487ea3cab8dedea16fb1414cc7c6b53bdada` |
+| Source `IBMPlexMono-Regular.ttf` (upstream, not vendored) | `6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46` |
+| `ibm-plex-mono-regular.woff2` | `8d1fd3c10dbce49fc10eb06d1cbe56e3eef7ca17cda57ec6c0c52455ea3ad172` |
+| Source `IBMPlexMono-Medium.ttf` (upstream, not vendored) | `a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755` |
+| `ibm-plex-mono-medium.woff2` | `ec573dfe0897a2ea2afd40f79a7c72018e6cdd0886f3a4d2ed3f6a758c12a713` |
+| `OFL-inter.txt` (vendored verbatim) | `5dd548d31a85f756e01d63e00d7faf1e324103ed3e9102fcbbabf2cc2db6dd39` |
+| `OFL-ibm-plex-mono.txt` (vendored verbatim) | `3ff4395aeb203050b3d4e775861cf0b93b598e0a6d2b16f0eb41df3350b15695` |
 
-The source digest is recorded although the file is not vendored: it is what makes the
-conversion reproducible end to end, so a future reader can re-derive our woff2 from upstream
-bytes and compare rather than taking this document's word for it.
+The source digests are recorded although the files are not vendored: they are what makes the
+conversion reproducible end to end.
 
 ## Size, stated rather than buried
 
-222 KB, served once and cached. The plan estimated ~90 KB for two static weights that upstream
-no longer publishes; the variable font is larger and covers every weight instead of two. It is
-served from the portal's own origin — no CDN, no runtime third-party fetch — and
-`font-display: swap` means text is readable before it arrives. If the size ever matters,
-subsetting to Latin is available and unencumbered (no Reserved Font Name); it is not done now
-because it would add a modification step to verify for a portal that is not on a hot path.
+Inter variable 351 KB plus two Plex weights (~79 KB) are served from the portal's own origin —
+no CDN, no runtime third-party fetch — and `font-display: swap` means text is readable before
+they arrive.
 
 ## Review
 
-Read at vendoring on 2026-08-03: `OFL.txt` in full (licence terms, absence of a Reserved Font
-Name) and the font's axis and name records via `fontTools`. A font carries no instructions to
-an agent, so ADR-0004's injection lens has no purchase here — what it is checked for instead
-is that it is the thing it claims to be, from the source it claims, under the licence it
-claims. It is.
+Read at vendoring on 2026-08-17: both `OFL.txt` files in full (licence terms, Reserved Font
+Name presence or absence) and the font name records via `fontTools`. A font carries no
+instructions to an agent, so ADR-0004's injection lens has no purchase here — what it is
+checked for instead is that it is the thing it claims to be, from the source it claims, under
+the licence it claims. It is.
