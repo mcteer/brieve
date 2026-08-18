@@ -50,7 +50,7 @@ check_prerequisites() {
   command -v docker >/dev/null || die "docker is not on PATH — start OrbStack or Docker Desktop"
   docker info >/dev/null 2>&1 || die "Docker is not running — start OrbStack or Docker Desktop"
   for bin in nomad vault terraform python3 uv; do
-    command -v "$bin" >/dev/null || die "$bin is not on PATH — see CONTRIBUTING.md"
+    command -v "$bin" >/dev/null || die "$bin is not on PATH — see docs/development/local-stack.md"
   done
   if ! docker run --rm --network host alpine:3 getent hosts host.docker.internal >/dev/null 2>&1; then
     die "host.docker.internal does not resolve inside a host-networked container.

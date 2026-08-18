@@ -61,6 +61,10 @@ This repository practices spec-driven development with
 
 Also worth knowing before you contribute:
 
+- **[Run the local stack](docs/development/local-stack.md)** — stand Brieve up on a
+  laptop (OrbStack or Docker Desktop) and open the portal. Ask does not need a demo
+  app; Build that opens a pull request needs a GitHub repo with the Brieve App
+  installed.
 - **[Testing guide](docs/development/testing.md)** — the test taxonomy, the fakes and
   governance assertions, and the rule that catches everyone out: tests are
   deterministic, evals are statistical, and they never mix.

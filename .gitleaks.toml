@@ -45,6 +45,10 @@ useDefault = true
 # `infra/bin/seed-dev-claim-mapping.py` briefly named the derived Vault KV record
 # `MAPPING_KEY = "operator-<digest>"`. That string is the output of `mapping_key()`, not a
 # credential — the script now derives it at runtime instead.
+#
+# Terraform 1.15 rejects `\x00` in quoted strings, so `dev_claim_mapping.tf` cannot compute
+# the same digest and stores the sixteen hex digits as a literal. The unit test pins that
+# literal to Python's `mapping_key`. Same shape, still not a credential.
 [[rules]]
 id = "generic-api-key"
 [rules.allowlist]
@@ -52,5 +56,7 @@ paths = ['''corpus/documents/.*\.json''']
 regexes = [
   '''qualified_by\s*=\s*"fixture"''',
   '''MAPPING_KEY\s*=\s*"operator-[0-9a-f]{16}"''',
+  '''dev_operator_mapping_key\s*=\s*"operator-[0-9a-f]{16}"''',
+  '''SEEDED_KEY\s*=\s*"operator-[0-9a-f]{16}"''',
 ]
 regexTarget = "line"
