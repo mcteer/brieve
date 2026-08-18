@@ -7,8 +7,15 @@
   the platform; this file chooses no words the API did not supply, except the labels.
 #}
 {% block title %}Settings{% endblock %}
+{% block main_class %}main--app{% endblock %}
 {% block content %}
-<h1>Platform settings</h1>
+<div class="app-layout app-layout--alone">
+<div class="app-main">
+<header class="stage-top">
+  <p class="crumb">settings</p>
+</header>
+<div class="thread"><div class="inner">
+<h1>Settings</h1>
 
 {% if not reachable %}
   {% include "_notice.html" %}
@@ -221,4 +228,7 @@
   </form>
 
 {% endif %}
+</div></div>
+</div>
+</div>
 {% endblock %}

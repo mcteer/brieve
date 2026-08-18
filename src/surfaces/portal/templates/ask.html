@@ -1,29 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Ask — Harness Portal{% endblock %}
-{% block header_actions %}
-<form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
-{% endblock %}
 {% block main_class %}main--app{% endblock %}
 {% block content %}
-{# The rail is omitted when there is nothing to list, so the layout has to stop reserving a
-   column for it — otherwise a first-time visitor gets the whole page squeezed into 14rem with
-   the rest of the screen empty. Found by looking at a screenshot; no row would have caught it,
-   because it is correct markup that reads badly. #}
-<div class="app-layout{% if not conversations %} app-layout--alone{% endif %}">
+{# The empty rail stays: omitting it when there is nothing to list turned Ask into a
+   document and Build into a different product. At 320px the list stacks rather than
+   remaining a second column — that is the collapse, not a missing landmark. #}
+<div class="app-layout">
 
 {#
   THE RAIL — this person's own conversations, most recently used first.
 
-  A `nav`, so it is reachable as one and skippable as one. Absent entirely when there is
-  nothing to list: a heading over an empty box is furniture that tells a new person their
-  first question went somewhere it did not.
+  A `nav`, so it is reachable as one and skippable as one. The column is present even
+  when the list is empty, so a first visit still has the same landmarks as a return.
 #}
-{% if conversations %}
 <nav class="app-rail" aria-label="Your conversations">
   {# The whole ROW is the link, not the words inside it — a target you can hit anywhere is what
      makes a sidebar feel like one, and it clears the 24px minimum without a fixed height. #}
-  <a class="button rail-new" href="/ask">New conversation</a>
-  <p class="rail-heading" id="rail-heading">Conversations</p>
+  <div class="rail-head">
+    <p class="rail-heading" id="rail-heading">Conversations</p>
+    <a class="rail-new" href="/ask">New</a>
+  </div>
+  {% if conversations %}
   <ul aria-labelledby="rail-heading">
     {% for conversation in conversations %}
       <li>
@@ -34,24 +31,30 @@
           <span>{{ conversation.title }}</span>
           {# A count is a fact about the conversation, in the role reserved for what a person
              would quote — not decoration. #}
-          <span class="rail-count">{{ conversation.exchanges }}</span>
+          <span class="rail-count">{{ conversation.exchanges }} exchange{% if conversation.exchanges != 1 %}s{% endif %}</span>
         </a>
       </li>
     {% endfor %}
   </ul>
-  {% if conversation_id %}
-    <div class="rail-danger">
-      <a class="link-button" href="/ask/{{ conversation_id }}/delete">Delete this conversation</a>
-    </div>
   {% endif %}
 </nav>
-{% endif %}
 
 <div class="app-main">
-<h1>{{ title or "Ask" }}</h1>
+<header class="stage-top">
+  <p class="crumb">ask{% if conversation_id %} / <b>{{ conversation_id[:8] }}</b>{% endif %}</p>
+  <div class="meta">
+    <span class="live idle"><i aria-hidden="true"></i>Never acts</span>
+    {% if conversation_id %}
+      <a class="quiet-action" href="/ask/{{ conversation_id }}/delete">Delete</a>
+    {% endif %}
+  </div>
+</header>
+
+<div class="thread">
+<div class="inner">
+<h1{% if exchanges or response is defined %} class="visually-hidden"{% endif %}>Ask</h1>
 {% if not exchanges and not response is defined %}
-<p class="lede">Asking answers; it never acts. Nothing here starts a run, changes anything, or
-   touches your estate &mdash; to have work done, <a href="/">Build</a>.</p>
+<p class="lede">Asking answers. It never acts.</p>
 {% endif %}
 
 {% if missing %}
@@ -65,10 +68,10 @@
   swaps in, so a reopened conversation and a fresh answer cannot look different.
 #}
 {#
-  No `tabindex` and no scroll of its own: the PAGE scrolls, as it does in every chat interface
-  a person has used. An earlier version gave this region its own scroll to keep a sticky
-  composer off a focused element — which satisfied 2.4.11 the easy way, cost a tab stop that
-  existed only to escape the box, and read wrong.
+  No `tabindex` and no scroll of its own: the THREAD pane scrolls; this region does
+  not. Header and composer stay put. An earlier version gave this region its own scroll
+  to keep a sticky composer off a focused element — which satisfied 2.4.11 the easy way,
+  cost a tab stop that existed only to escape the box, and read wrong.
 
   NOT `aria-live`: announcing a page of claims the instant it arrives talks over somebody still
   reading. Focus moves to the new answer's heading instead.
@@ -92,6 +95,8 @@
   new answer's heading instead, which is how a person gets there on purpose.
 #}
 <p id="ask-status" role="status" class="meta ask-status"></p>
+</div>
+</div>
 
 {#
   ONE FORM, ONE FIELD. No source selector and no model selector: which corpus is pinned and
@@ -115,10 +120,10 @@
   while the platform is working. A screen-reader user has no such moment, so the description
   stays on the control where `aria-describedby` will read it.
 #}
-<form method="post" class="ask"
+<form method="post" class="ask dock"
       action="/ask{% if conversation_id %}?conversation_id={{ conversation_id }}{% endif %}">
   <label class="visually-hidden" for="question">{% if exchanges or conversation_id %}Ask a follow-up{% else %}Your question{% endif %}</label>
-  <div class="ask-field">
+  <div class="composer">
     <textarea id="question" name="question" rows="1" required
               {# ONE PLACEHOLDER, because the varying one is wrong half the time. It is chosen
                  when the SERVER renders, and exchanges appended by script afterwards do not
@@ -126,7 +131,8 @@
                  below still varies: it is read on load, which is when it is true. #}
               placeholder="Ask&hellip;"
               aria-describedby="ask-expectation"></textarea>
-    <button type="submit" class="button ask-send">Ask</button>
+    <div class="chips"><span class="chip">Never acts</span></div>
+    <button type="submit" class="go">Ask</button>
   </div>
   <p id="ask-expectation" class="visually-hidden">
     Answers come from the platform&rsquo;s pinned documentation or from your own records

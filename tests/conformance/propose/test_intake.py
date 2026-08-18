@@ -160,3 +160,41 @@ def test_message_without_url_refused(tmp_path: Path) -> None:
             clone_runner=_ok_clone,
         )
     assert refused.value.reason_code == "repository_required"
+
+
+def test_proposer_marks_the_run_complete_when_a_pr_url_is_written() -> None:
+    """A PR on RESULT_KEY with no terminal outcome is invisible to get_run_result.
+
+    The page then treats Nomad's completed allocation as 'ended without a pull request'.
+    """
+    source = (
+        Path(__file__).resolve().parents[3] / "src" / "surfaces" / "dispatch" / "entrypoint.py"
+    ).read_text(encoding="utf-8")
+    assert "payload[RESULT_KEY] = {" in source
+    assert '"pr_url": pr_url' in source
+    publish = source.split("047 — success payload", 1)[1].split("def resume_dispatched_run", 1)[0]
+    assert "RunState.COMPLETED.value" in publish
+    assert "checkpoint_run(" in publish
+
+
+def test_api_job_copies_packs_so_propose_can_read_authoring_declarations() -> None:
+    """Build refused every pack, including terraform, when the API allocation had no packs/.
+
+    ``packs_declaring_authoring()`` reads ``pack.toml`` from the tree next to ``src/``. In
+    the allocation that is ``/repo/packs``. The job copied ``src`` and ``corpus`` and not
+    ``packs``, so the set was empty and every Build failed ``pack_declares_no_authoring`` —
+    including the terraform pack that has declared ``author-module`` since 038.
+
+    Packs ship in the tree. The copy is unconditional: ``|| true`` would hide a missing
+    tree the same way the missing copy hid itself.
+    """
+    spec = Path(__file__).resolve().parents[3] / "infra" / "jobs" / "api.nomad.hcl"
+    text = spec.read_text(encoding="utf-8")
+    assert "cp -a /src/packs /repo/" in text, (
+        f"{spec} does not copy packs into the allocation; Build will refuse every pack as "
+        "undeclared regardless of what pack.toml says"
+    )
+    assert "cp -a /src/packs /repo/ 2>/dev/null || true" not in text, (
+        f"{spec} copies packs optionally; a missing tree would start the API and refuse "
+        "every Build instead of failing the allocation"
+    )

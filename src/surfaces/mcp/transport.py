@@ -804,6 +804,7 @@ class McpTransport:
                 index=self._index,
                 durability=self._durability,
                 audit=self._audit,
+                thread_store=self._threads,
             )
         except RecordAccessUnavailable as unrecordable:
             # THE SAME VERDICT THE API RETURNS. Research F7 found the evidence path's

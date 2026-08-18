@@ -72,7 +72,7 @@
       if (!li) {
         return;
       }
-      var nextClass = "phase phase--" + phase.status;
+      var nextClass = "node node--" + phase.status;
       if (li.className !== nextClass) {
         li.className = nextClass;
       }

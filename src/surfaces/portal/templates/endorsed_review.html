@@ -12,7 +12,14 @@
   review is reviewed against its current state, not against a days-old detection.
 #}
 {% block title %}Review {{ source }}{% endblock %}
+{% block main_class %}main--app{% endblock %}
 {% block content %}
+<div class="app-layout app-layout--alone">
+<div class="app-main">
+<header class="stage-top">
+  <p class="crumb">settings / review</p>
+</header>
+<div class="thread"><div class="inner">
 <h1>Review changes to {{ source }}</h1>
 
 {% if not reachable %}
@@ -100,4 +107,7 @@
   <p><a href="/settings">Back to settings without adopting</a></p>
 
 {% endif %}
+</div></div>
+</div>
+</div>
 {% endblock %}

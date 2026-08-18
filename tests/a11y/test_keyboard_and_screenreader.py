@@ -99,7 +99,9 @@ def test_focus_order_follows_visual_reading_order(page: Any, portal_server: Port
         (sequence[i - 1], sequence[i])
         for i in range(1, len(tops))
         # A tolerance, because elements on one visual row legitimately share a band.
-        if tops[i] < tops[i - 1] - 12
+        # A jump UP is a defect in the same column; starting the next column at its
+        # top (icon rail, then list, then stage) is how this shell is read.
+        if tops[i] < tops[i - 1] - 12 and sequence[i]["left"] <= sequence[i - 1]["left"] + 24
     ]
     assert out_of_order == [], "focus jumps upward against reading order: " + "; ".join(
         f"{a['text']!r} -> {b['text']!r}" for a, b in out_of_order
@@ -465,7 +467,7 @@ def test_the_page_reflows_without_horizontal_scrolling(
     page.set_viewport_size({"width": width, "height": height})
     start_thread_from_home(page, portal_server)
     page.fill("#message", "a message long enough to test wrapping " * 6)
-    page.click(".composer button[type=submit]")
+    page.click(".run-composer button[type=submit]")
     page.wait_for_load_state()
 
     overflow = page.evaluate(

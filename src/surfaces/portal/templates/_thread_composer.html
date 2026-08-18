@@ -1,6 +1,6 @@
 <form method="post"
       action="{% if thread %}/threads/{{ thread.thread_id }}/turns{% else %}/threads{% endif %}"
-      class="composer">
+      class="run-composer">
   <label for="agent">Agent</label>
   {% if not definitions_reachable %}
     <p class="notice">The list of agents could not be reached.</p>

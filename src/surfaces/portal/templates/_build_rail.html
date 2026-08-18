@@ -1,9 +1,11 @@
-{# This person's own Builds, newest first. Omitted when there is nothing to list — same
-   collapse as Ask's conversation rail, so a first visit is not a squeezed empty column. #}
-{% if builds %}
+{# This person's own Builds, newest first. The column stays on a first visit so Ask and
+   Build keep the same landmarks — an empty list is an empty list, not a missing rail. #}
 <nav class="app-rail" aria-label="Your builds">
-  <a class="button rail-new" href="/">New build</a>
-  <p class="rail-heading" id="build-rail-heading">Builds</p>
+  <div class="rail-head">
+    <p class="rail-heading" id="build-rail-heading">Builds</p>
+    <a class="rail-new" href="/">New</a>
+  </div>
+  {% if builds %}
   <ul aria-labelledby="build-rail-heading">
     {% for build in builds %}
       <li>
@@ -15,5 +17,5 @@
       </li>
     {% endfor %}
   </ul>
+  {% endif %}
 </nav>
-{% endif %}

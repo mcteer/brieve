@@ -212,13 +212,9 @@ def portal_server() -> Iterator[PortalServer]:
         credential_source=available_credential(),
         console_config=_console_config(),
     )
-    # THE THEMES ARE TWO PEOPLE (034). Each parametrized run signs in as its own subject so the
-    # platform's per-subject rate window is not shared — see the `page` fixture for why. The
-    # fabric has to know them, and it knows exactly one by default, so the other themes are
-    # granted the same scope `alice` already has rather than a widened one.
-    fabric_users = surface.identity_fabric.users
-    for theme in THEMES:
-        fabric_users.setdefault(f"alice-{theme}", fabric_users["alice"])
+    # 048: one designed theme. Light is withdrawn; doubling the lane only existed to
+    # exercise prefers-color-scheme. One subject is enough — the two-subject split was
+    # only to dodge doubled rate limits.
     api = TestClient(surface.app)
 
     def transport(*, method: str, url: str, token: str, json_body: object) -> ApiResponse:
@@ -290,51 +286,30 @@ def browser() -> Iterator[Any]:
         instance.close()
 
 
-#: BOTH THEMES, EVERY ROW (034). The portal follows `prefers-color-scheme`, so a dark theme
-#: that nothing exercised would be an unverified surface — and this repository's posture is
-#: against exactly that. Parametrizing HERE rather than duplicating rows means every axe state
-#: and every keyboard criterion runs twice with no row edited, and a failure names its theme in
-#: the test id.
+#: ONE DESIGNED THEME (048). Light is withdrawn. A leftover light parametrization would
+#: be an unverified surface of the kind 034 existed to prevent. One context, dark.
 #:
-#: The keyboard rows run in dark too rather than being assumed portable: focus visibility,
-#: target size and reflow are theme-independent claims, but the focus indicator's CONTRAST is
-#: not, and that is one of the things 2.4.13 is about.
-THEMES = ["light", "dark"]
+#: 034 doubled the lane over `prefers-color-scheme`. That doubling is gone with the light
+#: theme. One subject is enough: the two-subject split existed only because doubling the
+#: rows doubled rate-limit counts.
 
 
-@pytest.fixture(params=THEMES)
-def page(request: Any, browser: Any, portal_server: PortalServer) -> Iterator[Any]:
-    """A fresh, signed-in page, once per theme. Each row starts from a clean context.
-
-    **Each theme signs in as its own person, and that is not cosmetic.** The platform rate-
-    limits a subject to `RATE_LIMIT_ACTS` in a five-minute window, counted across thread
-    creations and turns together. Running every row twice as one person doubles that count
-    past the limit, and the rows that then fail do so far from the cause: the composer simply
-    never renders, and the failure reads as a missing label rather than as a refused act.
-    Measured, not guessed — this is what the first doubled run did.
-
-    Two independent passes over the interface are two people's worth of work, so a subject
-    each is the honest model. Widening the platform's limit for the lane's convenience was the
-    alternative and is refused: it would loosen a real control to make a test comfortable.
-    """
-    context = browser.new_context(color_scheme=request.param)
+@pytest.fixture
+def page(browser: Any, portal_server: PortalServer) -> Iterator[Any]:
+    """A fresh, signed-in page. Each row starts from a clean context."""
+    context = browser.new_context(color_scheme="dark")
     tab = context.new_page()
-    _sign_in(tab, portal_server, subject=f"alice-{request.param}")
+    _sign_in(tab, portal_server, subject="alice")
     yield tab
     context.close()
 
 
-@pytest.fixture(params=THEMES)
-def admin_page(request: Any, browser: Any, portal_server: PortalServer) -> Iterator[Any]:
-    """A signed-in ADMINISTRATOR, which is the only subject the console renders for (045).
-
-    Its own subject per theme for the reason the `page` fixture gives: the platform's rate
-    window is per subject, and sharing one makes the second theme's rows fail far from the
-    cause.
-    """
-    context = browser.new_context(color_scheme=request.param)
+@pytest.fixture
+def admin_page(browser: Any, portal_server: PortalServer) -> Iterator[Any]:
+    """A signed-in ADMINISTRATOR, which is the only subject the console renders for (045)."""
+    context = browser.new_context(color_scheme="dark")
     tab = context.new_page()
-    subject = f"admin-{request.param}"
+    subject = "admin-alice"
     fabric_users = portal_server.surface.identity_fabric.users
     fabric_users.setdefault(subject, fabric_users["alice"])
     _sign_in(tab, portal_server, subject=subject, groups=["platform-admin"])
@@ -342,10 +317,10 @@ def admin_page(request: Any, browser: Any, portal_server: PortalServer) -> Itera
     context.close()
 
 
-@pytest.fixture(params=THEMES)
-def anonymous_page(request: Any, browser: Any, portal_server: PortalServer) -> Iterator[Any]:
-    """A page with no session, for the signed-out state — once per theme."""
-    context = browser.new_context(color_scheme=request.param)
+@pytest.fixture
+def anonymous_page(browser: Any, portal_server: PortalServer) -> Iterator[Any]:
+    """A page with no session, for the signed-out state."""
+    context = browser.new_context(color_scheme="dark")
     tab = context.new_page()
     yield tab
     context.close()
@@ -378,7 +353,7 @@ def start_thread_from_home(
     tab.fill("#message", message)
     if agent:
         tab.select_option("#agent", agent)
-    tab.click(".composer button[type=submit]")
+    tab.click(".run-composer button[type=submit]")
     tab.wait_for_load_state()
     return str(tab.url)
 

@@ -15,7 +15,7 @@
       return frame ? frame.querySelector("code") : null;
     }
     if (scope === "asked") {
-      var bubble = button.closest(".asked");
+      var bubble = button.closest(".you, .asked");
       return bubble ? bubble.querySelector(".asked-text") : null;
     }
     return null;
@@ -67,5 +67,6 @@
     if (!text) return;
     event.preventDefault();
     write(text, button);
+    button.blur();
   });
 })();

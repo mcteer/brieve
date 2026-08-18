@@ -37,8 +37,8 @@ PROVENANCE = STATIC / "fonts" / "PROVENANCE.md"
 #: exactly one place, so the check should catch a value however it is spelled.
 COLOUR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(")
 
-#: Where colour IS allowed: the token declarations themselves.
-TOKEN_BLOCKS = (":root {", "@media (prefers-color-scheme: dark) {")
+#: Where colour IS allowed: the token declarations themselves. One designed theme (048).
+TOKEN_BLOCKS = (":root {",)
 
 
 def _token_block_lines(source: str) -> set[int]:
@@ -87,20 +87,35 @@ def test_no_template_carries_its_own_colour() -> None:
     assert offenders == [], f"inline colour in templates: {offenders}"
 
 
+def _font_face_lines(source: str) -> set[int]:
+    """`@font-face` names the family it is defining rather than using a role token."""
+    inside: set[int] = set()
+    depth = 0
+    for number, line in enumerate(source.splitlines(), start=1):
+        if "@font-face" in line:
+            depth += line.count("{")
+            inside.add(number)
+            continue
+        if depth:
+            inside.add(number)
+            depth += line.count("{") - line.count("}")
+    return inside
+
+
 def test_every_typeface_is_a_role() -> None:
     """FR-001. Three roles plus a display face; a fourth stack appearing inline is a role
     nobody named, and the next person will not know which content belongs to it."""
     source = CSS.read_text()
     allowed = _token_block_lines(source)
+    face_lines = _font_face_lines(source)
 
     strays = [
         (number, line.strip())
         for number, line in enumerate(source.splitlines(), start=1)
         if number not in allowed
+        and number not in face_lines
         and "font-family:" in line
         and "var(--font-" not in line
-        # `@font-face` names the family it is DEFINING rather than using one.
-        and "Roboto;" not in line
     ]
 
     assert strays == [], f"a typeface outside the role tokens: {strays}"
@@ -130,23 +145,42 @@ def test_the_vendored_font_is_what_the_record_says() -> None:
     digests = dict(re.findall(r"`([^`]+)`[^|]*\|\s*`([0-9a-f]{64})`", record))
     assert digests, "the provenance record carries no digests to verify"
 
-    for name in ("roboto-variable.woff2", "OFL.txt"):
+    fonts_dir = STATIC / "fonts"
+    for name in (
+        "inter-variable.woff2",
+        "ibm-plex-mono-regular.woff2",
+        "ibm-plex-mono-medium.woff2",
+        "OFL-inter.txt",
+        "OFL-ibm-plex-mono.txt",
+    ):
         recorded = next((d for key, d in digests.items() if name in key), None)
         assert recorded, f"{name} has no recorded digest"
-        actual = hashlib.sha256((STATIC / "fonts" / name).read_bytes()).hexdigest()
+        actual = hashlib.sha256((fonts_dir / name).read_bytes()).hexdigest()
         assert actual == recorded, (
             f"{name} does not match its provenance record: {actual} != {recorded}. Either the "
             f"file changed without the record, or the record without the file — both are the "
             f"drift this check exists to stop"
         )
 
+    leftover = fonts_dir / "roboto-variable.woff2"
+    leftover_licence = fonts_dir / "OFL.txt"
+    assert not leftover.exists(), "roboto-variable.woff2 must leave with the restyle (FR-016)"
+    assert not leftover_licence.exists(), "Roboto OFL.txt must leave with the restyle (FR-016)"
+
 
 def test_the_licence_travels_with_the_font() -> None:
     """OFL 1.1's own requirement, and a supply-chain fact: adopted content carries its terms."""
-    licence = (STATIC / "fonts" / "OFL.txt").read_text()
+    inter = (STATIC / "fonts" / "OFL-inter.txt").read_text()
+    plex = (STATIC / "fonts" / "OFL-ibm-plex-mono.txt").read_text()
+    record = PROVENANCE.read_text()
 
-    assert "SIL Open Font License" in licence
-    assert "OFL" in PROVENANCE.read_text(), "the provenance record does not name the licence"
+    assert "SIL Open Font License" in inter
+    assert "SIL Open Font License" in plex
+    assert "OFL" in record, "the provenance record does not name the licence"
+    assert "Reserved Font Name" in record, "Plex RFN presence must be recorded"
+    assert "Palatino" not in CSS.read_text()
+    assert "Roboto" not in CSS.read_text()
+    assert "Iowan Old Style" not in CSS.read_text()
 
 
 @pytest.mark.parametrize("path", sorted(TEMPLATES.glob("*.html")), ids=lambda p: p.name)
@@ -180,9 +214,11 @@ def test_the_stylesheet_fetches_nothing_external() -> None:
         f"the stylesheet fetches from off-origin: {urls}"
     )
     assert "@import" not in source, "@import is a runtime fetch the offline property forbids"
-    assert urls == ["fonts/roboto-variable.woff2"], (
-        f"unexpected asset references: {urls} — every one is a fetch a reader pays for"
-    )
+    assert set(urls) == {
+        "fonts/inter-variable.woff2",
+        "fonts/ibm-plex-mono-regular.woff2",
+        "fonts/ibm-plex-mono-medium.woff2",
+    }, f"unexpected asset references: {urls} — every one is a fetch a reader pays for"
 
 
 # ------------------------------------------------------------------ US2: the product stripe
@@ -296,3 +332,57 @@ def test_the_thread_list_carries_no_product_at_all() -> None:
     assert "data-pack" not in threads_template
     assert "does not know which product" not in threads_template
     assert "data-pack" in turns_partial
+
+
+def _css_block(source: str, selector: str) -> str:
+    needle = selector + " {"
+    assert needle in source, f"missing rule {selector}"
+    return source.split(needle, 1)[1].split("}", 1)[0]
+
+
+def test_composer_is_one_centred_row_wider_than_the_reading_column() -> None:
+    """US3 / SC-003. 880px composer, 680px reading column — not stacked, not full-bleed."""
+    css = CSS.read_text()
+    composer = _css_block(css, ".composer")
+    reading = _css_block(css, ".thread .inner")
+
+    assert "display: flex" in composer
+    assert "align-items: center" in composer
+    assert "max-width: 880px" in composer
+    assert "margin-inline: auto" in composer
+
+    assert "max-width: 680px" in reading
+    assert "margin-inline: auto" in reading
+    assert 880 > 680
+
+    textarea = _css_block(css, ".composer textarea")
+    assert "14rem" not in textarea, "a tall min-height stacks the composer into a second row"
+
+
+def test_icon_rail_names_the_verbs() -> None:
+    """US1 / FR-001. Icons are not the accessible name."""
+    base = (TEMPLATES / "base.html").read_text()
+    ask = (TEMPLATES / "ask.html").read_text()
+    builds = (TEMPLATES / "_build_rail.html").read_text()
+
+    for verb in ("Build", "Ask", "Settings", "Sign out"):
+        assert f'aria-label="{verb}"' in base or f">{verb}<" in base, f"rail missing {verb}"
+
+    assert ">Conversations<" in ask or "Conversations" in ask
+    assert ">Builds<" in builds
+
+
+def test_decision_comments_survive_on_base_and_ask() -> None:
+    """FR-014 / research F9. Premises update; comments are not deleted."""
+    base = (TEMPLATES / "base.html").read_text()
+    ask = (TEMPLATES / "ask.html").read_text()
+
+    assert "LABELLED BY THE VERB" in base
+    assert "028 chose separate pages" in base
+    assert "SETTINGS, LINKED FOR EVERYONE" in base
+    assert "aria-current" in base
+    assert "Ask is no longer the only full-width surface" in base
+    assert "the only one that wants the whole viewport" not in base
+
+    assert "empty rail stays" in ask or "omitted when there is nothing to list" in ask
+    assert "No `tabindex`" in ask or "No tabindex" in ask

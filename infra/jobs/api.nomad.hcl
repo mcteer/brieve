@@ -245,7 +245,11 @@ job "api" {
           # identity on disk has expired — see `infra/bin/identity-watchdog` for what it is
           # repairing and why a restart is the whole repair. Started before the server so a
           # surface that comes up with an already-dead identity recovers too.
-          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cp -a /src/corpus /repo/ 2>/dev/null || true; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; sh /src/infra/bin/identity-watchdog /secrets/nomad_vault.jwt 60 surfaces.api.service & uv run --extra adapters --extra surfaces python -m surfaces.api.service"
+          #
+          # Packs are copied (not optional): Propose reads pack.toml from /repo/packs to
+          # decide which products have declared an authoring workflow. Missing that tree
+          # refuses every Build as undeclared, including terraform.
+          "set -e; mkdir -p /repo; cp -a /src/pyproject.toml /src/uv.lock /src/README.md /src/src /repo/; cp -a /src/corpus /repo/ 2>/dev/null || true; cp -a /src/packs /repo/; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; sh /src/infra/bin/identity-watchdog /secrets/nomad_vault.jwt 60 surfaces.api.service & uv run --extra adapters --extra surfaces python -m surfaces.api.service"
         ]
       }
 

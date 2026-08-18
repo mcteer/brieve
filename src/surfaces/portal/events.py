@@ -147,7 +147,9 @@ async def _propose_events(*, relay: Any, token: str, run_id: str) -> AsyncIterat
         progress = None
         pr_url: str | None = None
         ended_reason: str | None = None
+        disposition = ""
         if result.ok and isinstance(result.payload, dict):
+            disposition = str(result.payload.get("disposition") or "")
             body = result.payload.get("result")
             if isinstance(body, dict):
                 progress = body.get("propose_progress")
@@ -159,6 +161,7 @@ async def _propose_events(*, relay: Any, token: str, run_id: str) -> AsyncIterat
                 progress = result.payload.get("propose_progress")
             if not ended_reason:
                 ended_reason = str(result.payload.get("stop_reason") or "") or None
+        durable_settled = disposition in {"complete", "ended_without_result"}
         progress_key = json.dumps(
             {"progress": progress, "pr_url": pr_url, "ended_reason": ended_reason},
             sort_keys=True,
@@ -173,14 +176,14 @@ async def _propose_events(*, relay: Any, token: str, run_id: str) -> AsyncIterat
                 payload["pr_url"] = pr_url
             if ended_reason and not pr_url:
                 payload["ended_reason"] = ended_reason
-            elif current in TERMINAL_STATES and not pr_url:
+            elif current in TERMINAL_STATES and durable_settled and not pr_url:
                 payload["ended_reason"] = ended_reason or "Ended without a pull request."
             yield _frame("run", payload)
         else:
             # Comment frame: EventSource ignores it, proxies and browsers do not
             # treat the socket as idle during a long model step.
             yield ": keepalive\n\n"
-        if current in TERMINAL_STATES:
+        if current in TERMINAL_STATES and (pr_url or durable_settled):
             yield _frame("closed", {"reason": "settled"})
             return
         await asyncio.sleep(POLL_SECONDS)

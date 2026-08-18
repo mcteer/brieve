@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Not permitted — Harness Portal{% endblock %}
+{% block body_class %}plain{% endblock %}
+{% block icons %}{% endblock %}
+{% block session_end %}{% endblock %}
+{% block masthead %}
+{% include "_anonymous_header.html" %}
+{% endblock %}
 {% block content %}
 <h1>The platform did not {{ what }}</h1>
 {% if not response.reachable %}

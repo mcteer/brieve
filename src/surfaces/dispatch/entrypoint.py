@@ -1321,7 +1321,15 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
             PROGRESS_KEY: payload.get(PROGRESS_KEY),
             "plan_evidence": getattr(proposal, "evidence", None),
         }
-        checkpoint_run(run, payload=payload)
+        # Terminal: get_run_result only discloses RESULT_KEY once an outcome exists
+        # (or, after the 048 follow-up, when pr_url is already on the payload).
+        # Leaving this non-terminal made Nomad's "complete" look like a Build that
+        # produced nothing.
+        checkpoint_run(
+            run,
+            payload=payload,
+            outcome=RunOutcome(state=RunState.COMPLETED.value),
+        )
         return 0
     _fail_current_phase(run, "publish produced no pull request")
     checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
