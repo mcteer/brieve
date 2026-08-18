@@ -356,6 +356,9 @@ make dev-up        # Terraform -> Vault -> Nomad -> Postgres
 make conformance   # includes the seven durability rows
 ```
 
+To also open the portal in a browser, use `bash deploy/local/stack.sh up` —
+see [Run Brieve on your computer](local-stack.md).
+
 Enclave-dependent tests carry the `enclave` marker. `make check` deselects them, so the
 hermetic inner loop stays hermetic; `make conformance` runs them. The marker is how the
 requirement is expressed — a test that decides *inside itself* to skip reports the same

@@ -231,7 +231,7 @@ would mean the identity and durability paths are never exercised until productio
 
 | Tool | Why | Install |
 | --- | --- | --- |
-| **Docker** | Nomad's task driver; runs Postgres and the harness container | Docker Desktop, or Colima |
+| **Docker** | Nomad's task driver; runs Postgres and the harness container | OrbStack (Mac), Docker Desktop, or Colima |
 | **Nomad** | Schedules the harness container and the enclave's supporting services | Binary on `PATH` |
 | **Vault** | Control-plane trust fabric — agent registry, ceiling policies, token exchange | Binary on `PATH`, **or** a standalone container. Enterprise features are used — see licensing below |
 | **Terraform** | Stands up the trust fabric before any agent exists — the product's front door | Binary on `PATH` |
@@ -264,22 +264,20 @@ Running Vault *as a Nomad job* is not.
 way you run it. Keep it in `.env` as `VAULT_ENT_LICENSE` — `.env` is gitignored, and the license
 is secret-class material under the same rule as every other credential in this project: never in
 code, config, fixtures, logs, commit messages, or PR bodies, including "obviously fake" ones. A
-container reads it from the environment rather than baking it into an image:
-
-```bash
-# illustrative — the real invocation lands with the local-environment feature
-docker run -d --name vault-dev \
-  -e VAULT_LICENSE="${VAULT_ENT_LICENSE:?set VAULT_ENT_LICENSE in .env}" \
-  -p 8200:8200 hashicorp/vault-enterprise:<pinned-version>
-```
-
-Never pass a license on a command line in a shared environment — it lands in shell history and
+container reads it from the environment rather than baking it into an image. Do not pass
+the licence on a command line in a shared environment — it lands in shell history and
 process listings.
 
-> `make dev-up` is the command that stands this up, and it is **still a reserved stub** — it
-> exits 2 until the local-environment feature lands (see [ROADMAP.md](ROADMAP.md)). Until then,
-> the prerequisites above are what you need installed to work on that feature; suites that do
-> not touch identity or durability run without any of it.
+The laptop stack is started with one command:
+
+```bash
+bash deploy/local/stack.sh up
+```
+
+That starts the enclave, development sign-in, API, MCP surface, and portal. Step-by-step
+(tools, `.env`, browser): [Run Brieve on your computer](docs/development/local-stack.md).
+`make dev-up` is the enclave half of that; `stack.sh` is what you run to also get the
+portal. Suites that do not touch identity or durability still run without any of it.
 
 ### Python toolchain
 
@@ -292,14 +290,16 @@ uv run pre-commit install  # formatting, linting, and hygiene hooks
 make check               # lint + typecheck + unit tests — your inner loop
 make conformance         # the conformance suite — required before any adapter/provider PR
 make test-full           # PR-tier tests: integration, scenario, fault injection, adversarial
-make dev-up              # local stack: dev-mode identity fabric, Postgres, collector, harness
+make dev-up              # enclave only: identity fabric, Postgres, collector, harness
 ```
 
 These six commands are the stable contract; their implementations may evolve, their
-names will not. `make dev-up` brings up a local stack running the same harness that runs
-in production, hooks in **warn mode**, with dev-mode backing services — so "works
+names will not. `make dev-up` brings up a local enclave running the same harness that
+runs in production, hooks in **warn mode**, with dev-mode backing services — so "works
 locally, fails governance in CI" should not happen; if it does, that is itself a bug
-worth filing. The portal (Node/TypeScript) has its own setup in its package directory.
+worth filing. To also start the portal and development sign-in, use
+`bash deploy/local/stack.sh up` ([guide](docs/development/local-stack.md)). The portal
+(Node/TypeScript) has its own setup in its package directory.
 
 **Which work needs the enclave running, and which does not.** The test harness provides fakes for
 things outside our boundary — product APIs, model providers, external identity providers — and

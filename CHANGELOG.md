@@ -5,6 +5,16 @@ durable record.
 
 ## Unreleased
 
+### Local stack
+
+- Laptop bring-up is `bash deploy/local/stack.sh up`, with a step-by-step guide in
+  `docs/development/local-stack.md`. Ask does not need a demo app; Build that opens a
+  pull request still needs a GitHub repo with the Brieve App installed.
+- Terraform 1.15 no longer fails seeding the development sign-in mapping (`\x00` in a
+  quoted string). The key is stored as a literal that must match Python's `mapping_key`.
+- Nomad keeps running after the start command returns (detached session), so the portal
+  no longer looks healthy while the scheduler is already gone.
+
 ### Build
 
 - The API allocation now copies capability packs into the process tree, so Build can

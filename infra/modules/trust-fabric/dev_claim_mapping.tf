@@ -17,9 +17,11 @@ locals {
     claim_value = "platform:operator"
     role        = "operator"
   }
-  # Must match `core.identity.mappings_store.mapping_key` — the digest is over the three
-  # fields joined by NUL bytes, truncated to sixteen hex digits, prefixed by the role name.
-  dev_operator_mapping_key = "operator-${substr(sha256("${local.dev_operator_claim_mapping.claim_name}\x00${local.dev_operator_claim_mapping.claim_value}\x00${local.dev_operator_claim_mapping.role}"), 0, 16)}"
+  # Must match `core.identity.mappings_store.mapping_key` for these three fields
+  # (NUL-joined SHA-256, first sixteen hex digits). Written as a literal because
+  # Terraform 1.15 rejects `\x00` in quoted strings, and a different separator
+  # would seed a record the verifier never reads.
+  dev_operator_mapping_key = "operator-55ad4f49e3f06147"
 }
 
 resource "vault_kv_secret_v2" "dev_operator_claim_mapping" {

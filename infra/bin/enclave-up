@@ -153,8 +153,32 @@ if scheduler_ready; then
 else
   # The container driver refuses volume mounts unless the AGENT enables them. A correct
   # jobspec fails anyway, with a message pointing at the jobspec.
-  nohup nomad agent -dev -bind 0.0.0.0 -config="$REPO/infra/nomad/client.hcl" \
-    > "${TMPDIR:-/tmp}/brieve-nomad.log" 2>&1 &
+  # Double-fork into a new session. `nohup` is not enough: a parent that reaps its
+  # process group (closing some terminals, or a wrapping tool) still kills the agent,
+  # while Docker allocations keep answering — so the portal looks up and `stack.sh
+  # status` says Nomad is down. macOS has no `setsid` binary; Python's os.setsid is
+  # the portable call. `python3` is already a bring-up prerequisite.
+  python3 - "$REPO/infra/nomad/client.hcl" "${TMPDIR:-/tmp}/brieve-nomad.log" <<'PY'
+import os
+import sys
+
+config, log_path = sys.argv[1], sys.argv[2]
+if os.fork() > 0:
+    os._exit(0)
+os.setsid()
+if os.fork() > 0:
+    os._exit(0)
+os.chdir("/")
+os.umask(0)
+log = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+os.dup2(log, 1)
+os.dup2(log, 2)
+os.close(log)
+devnull = os.open(os.devnull, os.O_RDWR)
+os.dup2(devnull, 0)
+os.close(devnull)
+os.execvp("nomad", ["nomad", "agent", "-dev", "-bind", "0.0.0.0", "-config", config])
+PY
   for _ in $(seq 1 45); do scheduler_ready && break; sleep 1; done
   scheduler_ready \
     || die "scheduler has no ready client node — log: ${TMPDIR:-/tmp}/brieve-nomad.log. A stale advertised RPC address is the usual cause; see infra/nomad/client.hcl"
