@@ -17,6 +17,9 @@ durable record.
 
 ### Build
 
+- The signed-in operator can start Build: the role binding includes the authoring tools
+  the definition's ceiling already names. Without them, manufacture refused even though
+  the portal accepted the request.
 - The API allocation now copies capability packs into the process tree, so Build can
   see that terraform declares an authoring workflow. Without that copy every Build was
   refused as undeclared.
