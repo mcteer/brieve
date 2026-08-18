@@ -57,8 +57,8 @@ row is the verifier, exactly as the pack loader is for skill bytes.
 | `ibm-plex-mono-regular.woff2` | `8d1fd3c10dbce49fc10eb06d1cbe56e3eef7ca17cda57ec6c0c52455ea3ad172` |
 | Source `IBMPlexMono-Medium.ttf` (upstream, not vendored) | `a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755` |
 | `ibm-plex-mono-medium.woff2` | `ec573dfe0897a2ea2afd40f79a7c72018e6cdd0886f3a4d2ed3f6a758c12a713` |
-| `OFL-inter.txt` (vendored verbatim) | `5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57` |
-| `OFL-ibm-plex-mono.txt` (vendored verbatim) | `7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da` |
+| `OFL-inter.txt` (vendored verbatim) | `5dd548d31a85f756e01d63e00d7faf1e324103ed3e9102fcbbabf2cc2db6dd39` |
+| `OFL-ibm-plex-mono.txt` (vendored verbatim) | `3ff4395aeb203050b3d4e775861cf0b93b598e0a6d2b16f0eb41df3350b15695` |
 
 The source digests are recorded although the files are not vendored: they are what makes the
 conversion reproducible end to end.

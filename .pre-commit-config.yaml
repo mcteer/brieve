@@ -5,6 +5,7 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^src/surfaces/portal/static/fonts/OFL-.*\.txt$
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-toml

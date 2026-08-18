@@ -1290,7 +1290,7 @@ body.has-icons:has(main.main--app) .app-stage > footer {
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted);
+  color: var(--ink);
   margin-block-end: var(--space-1);
 }
 
