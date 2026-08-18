@@ -28,7 +28,12 @@ from core.durability.credentials import (
     VaultDatabaseCredentials,
 )
 from core.registry.memory import ToolRegistry
-from surfaces.toolset import build_registry, known_actions, known_tools
+from surfaces.toolset import (
+    AUTHORING_VOCABULARY,
+    build_registry,
+    known_actions,
+    known_tools,
+)
 from tests.harness.operator_credentials import OperatorCredentials
 
 #: What this platform can do, as the ceiling records name it — **derived from a registry**,
@@ -37,7 +42,7 @@ from tests.harness.operator_credentials import OperatorCredentials
 #: make a correct ceiling record refuse `unknown_ceiling_entry` against the LIVE fabric,
 #: and the error would name the ceiling rather than this file.
 _VOCABULARY_REGISTRY = build_registry()[0]
-KNOWN_TOOLS = known_tools(_VOCABULARY_REGISTRY)
+KNOWN_TOOLS = known_tools(_VOCABULARY_REGISTRY) | AUTHORING_VOCABULARY
 KNOWN_ACTIONS = known_actions(_VOCABULARY_REGISTRY)
 
 

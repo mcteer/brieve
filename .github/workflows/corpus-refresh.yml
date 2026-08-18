@@ -81,7 +81,7 @@ jobs:
           git commit -m "chore(corpus): weekly refresh — $(date -u +%Y-%m-%d)"
           git push --force origin chore/corpus-refresh
 
-          if gh pr view chore/corpus-refresh --json number >/dev/null 2>&1; then
+          if gh pr list --head chore/corpus-refresh --state open --json number --jq 'length > 0' | grep -q true; then
             echo "the open proposal was updated in place"
             exit 0
           fi

@@ -49,7 +49,12 @@ from surfaces.api.verification import (
     TokenVerifier,
 )
 from surfaces.dispatch.nomad import NomadDispatcher
-from surfaces.toolset import build_registry, known_actions, known_tools
+from surfaces.toolset import (
+    AUTHORING_VOCABULARY,
+    build_registry,
+    known_actions,
+    known_tools,
+)
 
 #: What the platform can do, as the ceiling records name it — **derived from what actually
 #: registered**, not declared here.
@@ -68,7 +73,10 @@ from surfaces.toolset import build_registry, known_actions, known_tools
 VAULT_ROLE = "api"
 
 _REGISTRY = build_registry()[0]
-KNOWN_TOOLS = known_tools(_REGISTRY)
+# Role bindings and ceilings may name authoring tools; handlers attach only in the
+# authoring tier. Without the union, a correct operator binding refuses
+# `unknown_ceiling_entry` on this surface and Build cannot start.
+KNOWN_TOOLS = known_tools(_REGISTRY) | AUTHORING_VOCABULARY
 KNOWN_ACTIONS = known_actions(_REGISTRY)
 
 

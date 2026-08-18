@@ -460,7 +460,17 @@ variable "role_bindings" {
     # ceiling is bounded by the CEILING rather than by the person — which is the case the
     # ceiling rows need in order to be about ceilings at all.
     "operator" = {
-      tool_names      = ["echo", "plan", "apply"]
+      tool_names = [
+        "echo",
+        "plan",
+        "apply",
+        # Build (047) dispatches `authoring-agent` for the signed-in operator. Manufacture
+        # is role ∩ ceiling ∩ task; omitting these left the only dev-IdP role unable to
+        # start a Build even though the definition's ceiling already names them.
+        "read_subject",
+        "author_file",
+        "open_proposal",
+      ]
       product_actions = ["product.workspace.read", "product.workspace.write"]
     }
     # Deliberately narrower, and the reason it exists: with only one role, "two users get

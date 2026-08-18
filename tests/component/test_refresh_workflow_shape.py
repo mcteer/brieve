@@ -114,3 +114,7 @@ def test_one_standing_branch_rather_than_a_weekly_pile(steps: list[dict[str, Any
 
     assert "chore/corpus-refresh" in body
     assert "--force" in body, "without a force-push the standing branch cannot be updated"
+    assert "--state open" in body, (
+        "gh pr view finds a MERGED PR on this head and then skips create — "
+        "list open heads only, or the weekly pin never becomes a reviewable proposal"
+    )
