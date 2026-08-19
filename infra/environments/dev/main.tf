@@ -37,6 +37,17 @@ module "substrate" {
   tls_private_key = var.tls_private_key
 }
 
+locals {
+  # Override only authoring-agent's write pin. Every other definition is passed through
+  # unchanged so a laptop auto.tfvars cannot silently rebind planner/applier/ask.
+  agent_definitions = {
+    for name, definition in var.agent_definitions :
+    name => merge(definition, name == "authoring-agent" ? {
+      binding_map = merge(definition.binding_map, { write = var.authoring_write_cell })
+    } : {})
+  }
+}
+
 module "trust_fabric" {
   source = "../../modules/trust-fabric"
 
@@ -46,10 +57,10 @@ module "trust_fabric" {
   profile            = "development"
   enable_tls         = var.enable_tls
 
-  agent_definitions   = var.agent_definitions
+  agent_definitions   = local.agent_definitions
   role_bindings       = var.role_bindings
   definition_policies = var.definition_policies
-  model_matrix_cells  = var.model_matrix_cells
+  model_matrix_cells  = concat(var.model_matrix_cells, var.extra_model_matrix_cells)
   ask_binding         = var.ask_binding
 
   # 027. Dev seeds a clearly-marked non-functional credential so `make dev-up`'s ask

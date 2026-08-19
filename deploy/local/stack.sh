@@ -159,6 +159,8 @@ cmd_up() {
     echo "note: ASK_MODEL is not set in .env — ask refuses before reaching a vendor."
     echo "      model-run-demo needs model-credentials/anthropic in Vault."
   fi
+
+  bash "${REPO}/infra/bin/seed-laptop-operator"
 }
 
 cmd_down() {
@@ -174,6 +176,7 @@ cmd_reset() {
   docker volume rm brieve-dev-pgdata brieve-dev-vault-data 2>/dev/null || true
   rm -rf "${REPO}/.enclave" 2>/dev/null || true
   rm -f "${REPO}/infra/environments/dev/tls.auto.tfvars" 2>/dev/null || true
+  rm -f "${REPO}/infra/environments/dev/laptop.auto.tfvars" 2>/dev/null || true
   rm -f "${REPO}/infra/environments/dev/terraform.tfstate" \
         "${REPO}/infra/environments/dev/terraform.tfstate.backup" 2>/dev/null || true
   echo "reset: enclave volumes, .enclave, TLS tfvars, and terraform state removed"

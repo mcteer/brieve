@@ -54,6 +54,7 @@ def test_propose_run_shows_intake_only_from_the_field() -> None:
         assert f"node--{status}" in source or "phase.status" in source
     assert "node--" in source
     assert "phase-status" in source
+    assert "phase-reason" not in source
 
 
 def test_exchange_uses_you_for_the_question() -> None:

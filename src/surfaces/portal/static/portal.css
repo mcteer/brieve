@@ -580,14 +580,6 @@ html[data-input="keyboard"] .composer .go:focus-visible {
   text-transform: capitalize;
   white-space: nowrap;
 }
-.phase-reason {
-  grid-column: 3;
-  color: var(--muted);
-  display: block;
-  margin-top: 0;
-  font-size: var(--text-sm);
-  white-space: normal;
-}
 .you {
   margin: 0 0 18px auto;
   max-width: 85%;

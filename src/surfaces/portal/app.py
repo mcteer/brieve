@@ -207,6 +207,21 @@ def create_portal(
         _state, url = app.state.oidc.begin(next_path=next_path)
         return RedirectResponse(url, status_code=303)
 
+    def _reauthenticate(request: Request) -> RedirectResponse:
+        """The API refused the session's token. That is not an outage.
+
+        `relay.py` keeps reachable and ok distinct: a 401 is the platform answering that
+        this token cannot be verified (development IdP key rotation, expiry). Folding that
+        into "could not be reached" tells the person the list is missing because of an
+        outage, when the list was never asked under a live identity. 012: expired session
+        → clean re-auth redirect, not an error.
+        """
+        app.state.sessions.destroy(request.cookies.get(COOKIE_NAME))
+        next_path = request.url.path or "/"
+        response = _login_redirect(request, next_path)
+        response.delete_cookie(COOKIE_NAME, path="/")
+        return response
+
     # ------------------------------------------------------------------ auth
 
     @app.get("/login")
@@ -261,7 +276,10 @@ def create_portal(
         session = _session(request)
         if session is None:
             return templates.TemplateResponse(request=request, name="signed_out.html", context={})
-        builds, reachable = _builds(session)
+        listed = _builds(session)
+        if listed is None:
+            return _reauthenticate(request)
+        builds, reachable = listed
         return templates.TemplateResponse(
             request=request,
             name="propose.html",
@@ -469,14 +487,19 @@ def create_portal(
             for exchange in exchanges
         ]
 
-    def _builds(session: Any) -> tuple[list[dict[str, Any]], bool]:
+    def _builds(session: Any) -> tuple[list[dict[str, Any]], bool] | None:
         """This person's authoring runs for the Build rail, and whether the list could be read.
 
         Same collapse as Ask: an unreadable index is rendered as absent, not as empty — but
         the page must still say the platform could not be reached, or an outage looks like
         a first visit.
+
+        ``None`` means the token was refused (401). That is identity, not reachability —
+        the caller must re-authenticate rather than render the outage copy.
         """
         listed = app.state.relay.request("GET", "/runs", token=session.access_token)
+        if listed.status == 401:
+            return None
         if not listed.reachable or not listed.ok:
             return [], False
         runs = (listed.payload or {}).get("runs") or []
@@ -556,11 +579,16 @@ def create_portal(
             token=session.access_token,
             json_body={"message": message},
         )
+        if started.status == 401:
+            return _reauthenticate(request)
         if not started.ok:
             detail = "Build could not be started"
             if isinstance(started.payload, dict) and started.payload.get("detail"):
                 detail = str(started.payload["detail"])
-            builds, reachable = _builds(session)
+            listed = _builds(session)
+            if listed is None:
+                return _reauthenticate(request)
+            builds, reachable = listed
             return templates.TemplateResponse(
                 request=request,
                 name="propose.html",
@@ -584,10 +612,15 @@ def create_portal(
         result = app.state.relay.request(
             "GET", f"/runs/{run_id}/result", token=session.access_token
         )
+        if state.status == 401 or result.status == 401:
+            return _reauthenticate(request)
         progress = _propose_phases(result)
         run_state = str((state.payload or {}).get("state", "starting")) if state.ok else "unknown"
         pr_url, ended_reason = _propose_outcome(result, phases=progress, state=run_state)
-        builds, reachable = _builds(session)
+        listed = _builds(session)
+        if listed is None:
+            return _reauthenticate(request)
+        builds, reachable = listed
         intake = None
         if result.ok and isinstance(result.payload, dict):
             raw = result.payload.get("intake_message")

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Operator writes that Terraform must not own: the model vendor key and the GitHub App
+# private key. An apply that carried either would put it in state.
+#
+# Called from stack.sh after the enclave is up. Missing keys are a warning, not a
+# failure — Ask/Build then refuse honestly instead of bring-up dying.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+env_val() {
+  [ -f "$REPO/.env" ] || return 0
+  grep "^$1=" "$REPO/.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true
+}
+
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+ok()  { printf '    \033[32mok\033[0m %s\n' "$*"; }
+warn() { printf '    \033[33mwarn\033[0m %s\n' "$*" >&2; }
+
+export VAULT_ADDR="$(env_val VAULT_ADDR)"
+export VAULT_CACERT="$(env_val VAULT_CACERT)"
+export VAULT_TOKEN="$(env_val VAULT_ROOT_TOKEN)"
+
+if [ -z "${VAULT_ADDR:-}" ] || [ -z "${VAULT_TOKEN:-}" ]; then
+  warn "Vault address/token not in .env yet — skip operator seeding (run again after a successful up)"
+  exit 0
+fi
+
+say "Laptop operator secrets (Vault; values not printed)"
+
+KEY="$(env_val ANTHROPIC_API_KEY)"
+if [ -n "$KEY" ]; then
+  vault kv put -mount=model-credentials anthropic api_key="$KEY" >/dev/null
+  ok "model-credentials/anthropic (Ask and live Build write)"
+else
+  warn "ANTHROPIC_API_KEY unset — Ask and live Build will refuse the vendor"
+fi
+
+APP_ID="$(env_val AUTHORING_APP_ID)"
+INSTALLATION_ID="$(env_val AUTHORING_INSTALLATION_ID)"
+KEY_FILE="$(env_val AUTHORING_APP_KEY_FILE)"
+if [ -n "$APP_ID" ] && [ -n "$INSTALLATION_ID" ] && [ -n "$KEY_FILE" ] && [ -f "$KEY_FILE" ]; then
+  vault kv put -mount=harness-authority authoring/vcs-app \
+    app_id="$APP_ID" \
+    installation_id="$INSTALLATION_ID" \
+    private_key=@"$KEY_FILE" >/dev/null
+  ok "harness-authority/authoring/vcs-app (GitHub App; key from disk, not .env)"
+elif [ -n "$APP_ID" ] || [ -n "$INSTALLATION_ID" ] || [ -n "$KEY_FILE" ]; then
+  warn "AUTHORING_APP_ID / AUTHORING_INSTALLATION_ID / AUTHORING_APP_KEY_FILE incomplete — Build can research but cannot open a PR"
+fi

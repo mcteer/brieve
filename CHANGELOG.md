@@ -12,10 +12,23 @@ durable record.
   pull request still needs a GitHub repo with the Brieve App installed.
 - Terraform 1.15 no longer fails seeding the development sign-in mapping (`\x00` in a
   quoted string). The key is stored as a literal that must match Python's `mapping_key`.
-- Nomad keeps running after the start command returns (detached session), so the portal
-  no longer looks healthy while the scheduler is already gone.
+- After `git pull`, run `stack.sh up` again. A stack left running still has yesterday’s
+  Vault role bindings; Build then dies immediately with `task scope exceeds user or
+  ceiling`. On the laptop, `ASK_MODEL` also binds Build’s write cell (gitignored
+  `laptop.auto.tfvars`); CI stays on the fixture. `stack.sh up` seeds the vendor key
+  and GitHub App key into Vault from `.env` paths. Without `ASK_MODEL`, Research still
+  fails in seconds (`could not name a permitted tool after 3 attempt(s)`).
+  The in-flight **New build** control is a link to empty Build, not a renamed submit.
+  After `up` recreates the sign-in helper, Sign in again — a leftover session is
+  unverifiable, not an outage, and the build list is not lost.
 
 ### Build
+
+- Write refuses dotenv templates (``.env``, ``.env.example``) instead of
+  opening a pull request that only adds placeholder env files.
+- Write no longer treats “named nothing” as done while planned files are still
+  missing, and tells the model which paths remain instead of rewriting one
+  module three times. Judge deny reasons are no longer cut off mid-sentence.
 
 - The signed-in operator can start Build: the role binding includes the authoring tools
   the definition's ceiling already names. Without them, manufacture refused even though
@@ -23,11 +36,14 @@ durable record.
 - The API allocation now copies capability packs into the process tree, so Build can
   see that terraform declares an authoring workflow. Without that copy every Build was
   refused as undeclared.
-- A finished Build that opened a pull request now shows the link. Publish wrote the
-  URL but left the run unmarked, so the page reported "Ended without a pull request."
+- A finished Build that opened a pull request now shows the link. Publish wrote
+  the URL, then the proposer restored the analyzer snapshot and wiped it, so the
+  page reported "Ended without a pull request" while GitHub had the PR.
 
 ### Portal
 
+- The Build phase table shows only the phase status. The failure write-up
+  stays under the table, not in the Judge row.
 - Ask and Build share one dark conversational shell (icon rail, per-verb list, thread,
   one-row centred composer). Inter and IBM Plex Mono replace the previous type stack; the
   light theme is withdrawn. In-flight Build shows the stored opening message when the

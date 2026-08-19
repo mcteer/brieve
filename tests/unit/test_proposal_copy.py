@@ -8,10 +8,24 @@ from core.authoring.proposal import (
     DEFAULT_USAGE,
     ProposedFile,
     compose,
+    files_from_write_plan,
     format_rationale,
     title_for,
 )
 from surfaces.dispatch.terraform_authoring import reviewer_copy, usage_notes_for
+
+
+def test_files_from_write_plan_reads_the_trailing_list() -> None:
+    assert files_from_write_plan(
+        "Add a focused AWS slice. Files: main.tf, variables.tf, outputs.tf"
+    ) == ["main.tf", "variables.tf", "outputs.tf"]
+    assert files_from_write_plan("no file list here") == []
+
+
+def test_files_from_write_plan_drops_dotenv_templates() -> None:
+    assert files_from_write_plan(
+        "Vault slice. Files: src/vault/client.js, .env.example, src/vault/README.md"
+    ) == ["src/vault/client.js", "src/vault/README.md"]
 
 
 def test_format_rationale_turns_a_write_plan_blob_into_a_list() -> None:
