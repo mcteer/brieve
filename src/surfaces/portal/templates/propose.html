@@ -36,3 +36,13 @@
 </div>
 </div>
 {% endblock %}
+{% block scripts %}
+{#
+  Loaded only where they have work to do. Submit posts without navigating; strip and watch
+  take over once the run column is in the page. Progressive enhancement: without these the
+  form is an ordinary POST and still 303s to the run page.
+#}
+<script src="/static/portal-propose-strip.js?v=20260819r" defer></script>
+<script src="/static/portal-propose.js?v=20260819r" defer></script>
+<script src="/static/portal-propose-submit.js?v=20260819r" defer></script>
+{% endblock %}

@@ -37,18 +37,19 @@ def test_html_pages_are_not_cached() -> None:
 
 
 def test_propose_run_shows_intake_only_from_the_field() -> None:
-    source = (TEMPLATES / "propose_run.html").read_text()
+    page = (TEMPLATES / "propose_run.html").read_text()
+    source = (TEMPLATES / "_propose_run_main.html").read_text()
 
+    assert 'include "_propose_run_main.html"' in page
     assert "{{ intake_message }}" in source
     assert re.search(r"\{%\s*if\s+intake_message\s*%\}", source)
     assert 'id="phase-strip"' in source
     assert "data-phase" in source
-    assert 'method="post"' not in source.lower() or (
-        'action="/"' not in source and 'action="/propose"' not in source
-    )
-    assert 'action="/"' not in source
+    assert not re.search(r'action="/(?:propose)?"[\s>]', source)
     assert 'action="/propose"' not in source
-    assert 'aria-label="New build"' in source or ">New build<" in source
+    assert ">New build<" not in source
+    assert ">Stop<" in source
+    assert "/runs/" in source and "/stop" in source
 
     for status in ("completed", "active", "pending", "failed"):
         assert f"node--{status}" in source or "phase.status" in source
@@ -78,13 +79,13 @@ def test_ask_answer_is_not_a_two_column_spine() -> None:
 
 
 def test_thread_and_composer_share_a_horizontal_inset() -> None:
-    """Mismatched padding-inline centers the 680px column and the 880px composer
+    """Mismatched padding-inline puts the reading column and the composer
     in different boxes, so the answer, code, and field never share an edge."""
     css = (TEMPLATES.parent / "static" / "portal.css").read_text()
     thread = css.split(".thread {", 1)[1].split("}", 1)[0]
     dock = css.split(".ask,\n.dock {", 1)[1].split("}", 1)[0]
-    assert "28px 28px 20px" in thread
-    assert "12px 28px 16px" in dock
+    assert "26px 30px 8px" in thread
+    assert "14px 30px 18px" in dock
     assert "62ch" not in css.split(".primary-answer-prose {", 1)[1].split("}", 1)[0]
     exchange = css.split(".exchange .primary-answer-prose,", 1)
     assert exchange[0]  # selector exists via the grouped answer rule

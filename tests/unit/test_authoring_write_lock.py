@@ -8,6 +8,7 @@ from core.choice import ChoiceOutcome
 from surfaces.dispatch.entrypoint import (
     _MAX_AUTHOR_FILES,
     _POST_PLAN_READ_BUDGET,
+    _authored_excerpts,
     _authoring_step_tools,
     _empty_after_plan,
     _remaining_planned,
@@ -82,6 +83,27 @@ def test_write_locked_task_names_what_is_still_missing() -> None:
     assert "Already authored: src/vault/vaultClient.js" in task
     assert "still to write" in task.lower()
     assert "NONE is not completion" in task
+
+
+def test_write_locked_task_includes_authored_bodies_so_later_files_match() -> None:
+    """Judge was denying slices whose outputs.tf named a stack main.tf never created."""
+    task = _write_locked_task(
+        "Add AWS",
+        write_plan="Slice. Files: main.tf, outputs.tf",
+        authored={
+            "main.tf": 'resource "aws_instance" "app" {\n  ami = "ami-1"\n}\n',
+        },
+    )
+    assert 'resource "aws_instance" "app"' in task
+    assert "do not start a second architecture" in task
+    assert "same resources, variables, and outputs" in task
+
+
+def test_authored_excerpts_bound_the_prompt() -> None:
+    huge = "x" * 10_000
+    text = _authored_excerpts({"a.tf": huge, "b.tf": huge})
+    assert text.count("…") >= 1
+    assert len(text) < 20_000
 
 
 def test_write_locked_task_allows_none_when_the_plan_is_written() -> None:

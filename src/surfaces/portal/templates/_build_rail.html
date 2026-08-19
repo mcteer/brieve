@@ -1,6 +1,6 @@
 {# This person's own Builds, newest first. The column stays on a first visit so Ask and
    Build keep the same landmarks — an empty list is an empty list, not a missing rail. #}
-<nav class="app-rail" aria-label="Your builds">
+<nav class="app-rail app-rail--builds" aria-label="Your builds">
   <div class="rail-head">
     <p class="rail-heading" id="build-rail-heading">Builds</p>
     <a class="rail-new" href="/">New</a>
@@ -11,11 +11,13 @@
       <li>
         <a href="/propose/runs/{{ build.run_id }}" title="{{ build.title }}"
            {% if build.run_id == run_id %}aria-current="page"{% endif %}>
+          <span class="status-dot" data-status="{{ build.state or 'pending' }}" aria-hidden="true"></span>
           <span>{{ build.title }}</span>
-          {% if build.state %}<span class="rail-count">{{ build.state }}</span>{% endif %}
         </a>
       </li>
     {% endfor %}
   </ul>
+  {% elif reachable is not defined or reachable %}
+  <p class="list-empty">No builds yet.</p>
   {% endif %}
 </nav>
