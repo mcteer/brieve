@@ -1,20 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Propose run watcher (047). Same-origin SSE only. No reload; reconnect on blips.
-(function () {
+(function (global) {
   "use strict";
-
-  var root = document.querySelector("[data-propose-run]");
-  if (!root || typeof EventSource === "undefined" || !window.BRIEVE_PROPOSE) {
-    return;
-  }
-  var runId = root.getAttribute("data-propose-run");
-  if (!runId) {
-    return;
-  }
 
   var stopped = false;
   var source = null;
   var reconnectTimer = 0;
+  var runId = "";
 
   function scheduleReconnect() {
     if (stopped || reconnectTimer) {
@@ -27,7 +19,7 @@
   }
 
   function connect() {
-    if (stopped) {
+    if (stopped || !runId) {
       return;
     }
     if (source) {
@@ -65,5 +57,19 @@
     };
   }
 
-  connect();
-})();
+  function start(id) {
+    if (!id || typeof EventSource === "undefined" || !window.BRIEVE_PROPOSE) {
+      return;
+    }
+    stopped = false;
+    runId = id;
+    connect();
+  }
+
+  global.BRIEVE_PROPOSE_WATCH = { start: start };
+
+  var root = document.querySelector("[data-propose-run]");
+  if (root) {
+    start(root.getAttribute("data-propose-run"));
+  }
+})(window);

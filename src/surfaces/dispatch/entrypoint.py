@@ -253,6 +253,10 @@ _POST_PLAN_READ_BUDGET = 2
 #: A live write model will keep emitting files until the step budget dies. Bound it so
 #: Write can finish and Judge can run in a single Build.
 _MAX_AUTHOR_FILES = 6
+#: Later author_file calls otherwise invent a second design (outputs.tf naming ECS
+#: while main.tf created an EC2 instance). Bound so the prompt stays a prompt.
+_AUTHORED_EXCERPT_PER_FILE = 2000
+_AUTHORED_EXCERPT_TOTAL = 8000
 
 
 def _authoring_step_tools(
@@ -286,6 +290,30 @@ def _remaining_planned(*, write_plan: str, authored: dict[str, str] | None) -> l
     return remaining
 
 
+def _authored_excerpts(authored: dict[str, str] | None) -> str:
+    """Bounded bodies of files already written, so the next file can match them."""
+    if not authored:
+        return ""
+    parts: list[str] = []
+    used = 0
+    for path in sorted(authored):
+        if used >= _AUTHORED_EXCERPT_TOTAL:
+            break
+        body = authored[path] or ""
+        budget = min(_AUTHORED_EXCERPT_PER_FILE, _AUTHORED_EXCERPT_TOTAL - used)
+        if budget <= 0:
+            break
+        text = body if len(body) <= budget else body[:budget] + "\n…"
+        parts.append(f"### {path}\n```\n{text}\n```")
+        used += len(text)
+    if not parts:
+        return ""
+    return (
+        "Already authored file bodies (later files MUST match these names and this "
+        "design; do not start a second architecture):\n" + "\n".join(parts)
+    )
+
+
 def _write_locked_task(
     task: str,
     *,
@@ -297,20 +325,26 @@ def _write_locked_task(
     remaining = _remaining_planned(write_plan=write_plan, authored=authored)
     authored_txt = ", ".join(have) or "(none yet)"
     plan_txt = (write_plan or "").strip() or "(none recorded)"
+    excerpts = _authored_excerpts(authored)
+    bodies = f"\n{excerpts}\n" if excerpts else ""
     if remaining:
         still = ", ".join(remaining)
         return (
             f"{task}\n\nWrite plan: {plan_txt}\n"
             f"Already authored: {authored_txt}\n"
+            f"{bodies}"
             f"Still to write: {still}\n"
             "You must call author_file for one path that is still to write, with a full "
-            "file body. Do not write a second copy of an already-authored module under a "
-            "different folder. Do not overwrite an already-authored path unless its body "
-            "is incomplete. Answering NONE is not completion — it abandons the pull request."
+            "file body. That body must stay consistent with the files already authored — "
+            "same resources, variables, and outputs; no parallel stack. Do not write a "
+            "second copy of an already-authored module under a different folder. Do not "
+            "overwrite an already-authored path unless its body is incomplete. Answering "
+            "NONE is not completion — it abandons the pull request."
         )
     return (
         f"{task}\n\nWrite plan: {plan_txt}\n"
         f"Already authored: {authored_txt}\n"
+        f"{bodies}"
         "The planned files are written. Do not add duplicate copies under other folders. "
         "If you have nothing new, answering NONE ends Write and the run proceeds to Judge."
     )

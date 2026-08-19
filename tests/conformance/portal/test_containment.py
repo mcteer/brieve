@@ -233,18 +233,21 @@ def _served_scripts() -> list[pathlib.Path]:
     return scripts
 
 
-#: The one script allowed to insert markup, and the reason it is allowed.
+#: The scripts allowed to insert markup, and the reason they are allowed.
 #:
-#: Asking takes a minute or two, and a full-page POST for it costs a person their scroll
-#: position and leaves them on a blank tab wondering whether the platform broke. The fix posts
-#: the same form to the same endpoint and swaps in the outcome THIS SERVER RENDERED — the same
-#: `_outcome.html` a full page load produces, fetched from a relative path on this origin.
+#: Asking takes a minute or two, and starting a Build used to navigate away to a new document.
+#: A full-page POST costs a person their place in the shell and reads as a broken chat. Each
+#: named file posts its own form to its own endpoint and swaps in markup THIS SERVER RENDERED
+#: — Ask: `_exchange.html`; Build: `_propose_run_main.html` — fetched from a relative path on
+#: this origin.
 #:
 #: That is a narrower permission than "the client may build markup". It may not construct an
-#: answer, and it has nothing to construct one from: no client-side rendering, no vendor call,
-#: no state of its own. Every other script is still held to `textContent`, which is what keeps
-#: this an exception a reader can check rather than a door left open.
-MAY_INSERT_SERVER_MARKUP: Final[str] = "portal-ask.js"
+#: answer or a run column, and it has nothing to construct one from: no client-side rendering,
+#: no vendor call, no state of its own. Every other script is still held to `textContent`,
+#: which is what keeps this an exception a reader can check rather than a door left open.
+MAY_INSERT_SERVER_MARKUP: Final[frozenset[str]] = frozenset(
+    {"portal-ask.js", "portal-propose-submit.js"}
+)
 
 
 def test_row_the_served_client_is_small_enough_to_read() -> None:
@@ -296,32 +299,35 @@ def test_row_no_served_client_reaches_beyond_this_origin() -> None:
             assert forbidden not in body, f"{script.name} evaluates or injects via {forbidden}"
 
 
-def test_row_only_the_ask_script_may_insert_markup_and_only_the_servers() -> None:
+def test_row_only_named_scripts_may_insert_markup_and_only_the_servers() -> None:
     """The narrowed rule, asserted in both directions.
 
     The blanket ban this replaces was written when the client only updated a state label, and
     re-expressing it beat contorting the feature around it. What must stay true is that the
-    exception is exactly one file, that the markup it inserts came from THIS server over a
-    relative path, and that no other script has quietly acquired the same power.
+    exception is exactly these named files, that the markup each inserts came from THIS server
+    over a relative path, and that no other script has quietly acquired the same power.
     """
+    allowed_names = ", ".join(sorted(MAY_INSERT_SERVER_MARKUP))
     for script in _served_scripts():
         body = re.sub(r"//.*", "", script.read_text())
-        if script.name == MAY_INSERT_SERVER_MARKUP:
+        if script.name in MAY_INSERT_SERVER_MARKUP:
             continue
         assert "innerHTML" not in body, (
-            f"{script.name} writes markup rather than text. Only {MAY_INSERT_SERVER_MARKUP} may, "
+            f"{script.name} writes markup rather than text. Only {allowed_names} may, "
             f"and only with markup this server rendered"
         )
 
-    allowed = re.sub(r"//.*", "", (PORTAL / "static" / MAY_INSERT_SERVER_MARKUP).read_text())
-    assert "innerHTML" in allowed, (
-        "the exception is unused — delete it rather than leaving a permission nobody needs"
-    )
-    # What it inserts must come from a fetch of this origin. `form.action` is the page's own
-    # form, and there is no other URL in the file (asserted above: no absolute URLs at all).
-    assert "fetch(form.action" in allowed, (
-        "the ask script inserts markup from somewhere other than a post of the page's own form"
-    )
+    for name in sorted(MAY_INSERT_SERVER_MARKUP):
+        allowed = re.sub(r"//.*", "", (PORTAL / "static" / name).read_text())
+        assert "innerHTML" in allowed, (
+            f"the exception for {name} is unused — delete it rather than leaving a "
+            "permission nobody needs"
+        )
+        # What it inserts must come from a fetch of this origin. `form.action` is the page's
+        # own form, and there is no other URL in the file (asserted above: no absolute URLs).
+        assert "fetch(form.action" in allowed, (
+            f"{name} inserts markup from somewhere other than a post of the page's own form"
+        )
 
 
 def test_row_nothing_the_browser_holds_survives_the_session() -> None:

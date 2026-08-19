@@ -105,6 +105,7 @@ _AUTHORING_WRITE_ONLY_HINT = (
     "Do not set the tool to NONE. NONE abandons the pull request. "
     "Do not invent a second research pass. "
     "Do not start a larger architecture than the plan named. "
+    "Match files already authored: same resource and variable names, one design. "
     "Do not author .env or .env.example files."
 )
 

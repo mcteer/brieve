@@ -18,7 +18,6 @@ durable record.
   `laptop.auto.tfvars`); CI stays on the fixture. `stack.sh up` seeds the vendor key
   and GitHub App key into Vault from `.env` paths. Without `ASK_MODEL`, Research still
   fails in seconds (`could not name a permitted tool after 3 attempt(s)`).
-  The in-flight **New build** control is a link to empty Build, not a renamed submit.
   After `up` recreates the sign-in helper, Sign in again — a leftover session is
   unverifiable, not an outage, and the build list is not lost.
 
@@ -28,7 +27,9 @@ durable record.
   opening a pull request that only adds placeholder env files.
 - Write no longer treats “named nothing” as done while planned files are still
   missing, and tells the model which paths remain instead of rewriting one
-  module three times. Judge deny reasons are no longer cut off mid-sentence.
+  module three times. Later files now see bounded bodies of files already
+  written, so outputs and variables cannot invent a second stack. Judge deny
+  reasons are no longer cut off mid-sentence.
 
 - The signed-in operator can start Build: the role binding includes the authoring tools
   the definition's ceiling already names. Without them, manufacture refused even though
@@ -45,7 +46,13 @@ durable record.
 - The Build phase table shows only the phase status. The failure write-up
   stays under the table, not in the Judge row.
 - Ask and Build share one dark conversational shell (icon rail, per-verb list, thread,
-  one-row centred composer). Inter and IBM Plex Mono replace the previous type stack; the
-  light theme is withdrawn. In-flight Build shows the stored opening message when the
-  platform already holds it (`intake_message` on `GET /runs/{run_id}/result`), and does
-  not offer a second propose from that page.
+  composer). The composer is 56% width, with the action at
+  the bottom right. Enter sends; Shift+Enter writes a line. While Ask is in flight the
+  same control becomes **Stop**. An in-flight Build has no second composer — **New** in
+  the Builds list starts another run, and **Stop** sits in the header. Starting a Build
+  no longer reloads the page: the run column lands in the existing shell and the address
+  updates, matching Ask. Without JavaScript the form still 303s to the run page. Header
+  Stop (and Ask Delete) use the same chip as New, not a native browser button. The
+  Nocturne palette (violet accent, semantic stage colours) replaces the copper theme;
+  Inter and IBM Plex Mono stay (048). In-flight Build shows the stored opening message
+  when the platform already holds it (`intake_message` on `GET /runs/{run_id}/result`).

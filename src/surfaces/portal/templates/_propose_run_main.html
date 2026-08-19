@@ -1,0 +1,58 @@
+<section class="propose" data-propose-run="{{ run_id }}">
+  <header class="stage-top">
+    <p class="crumb">build / <b>{{ run_id[:8] }}</b></p>
+    <div class="meta">
+      {% set ns = namespace(current="") %}
+      {% for phase in phases %}
+        {% if phase.status == "active" %}{% set ns.current = phase.name %}{% endif %}
+      {% endfor %}
+      {% if ns.current %}
+        <span class="live"><i aria-hidden="true"></i>{{ ns.current }}</span>
+      {% else %}
+        <span class="live idle"><i aria-hidden="true"></i>{{ state }}</span>
+      {% endif %}
+      {% set terminal = state in ("stopped", "completed", "failed") %}
+      <form method="post" action="/runs/{{ run_id }}/stop" data-stop-form
+            {% if terminal %}hidden{% endif %}>
+        <button type="submit" class="quiet-action">Stop</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="thread">
+    <div class="inner">
+      <h1>Build</h1>
+      {% if intake_message %}
+        <p class="you">{{ intake_message }}</p>
+      {% endif %}
+
+      <ol class="phase-strip" aria-live="polite" aria-atomic="true" id="phase-strip">
+        {% for phase in phases %}
+          <li class="node node--{{ phase.status }}" data-phase="{{ phase.name }}">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="phase-name">{{ phase.name }}</span>
+            <span class="phase-status">{{ phase.status }}</span>
+          </li>
+        {% endfor %}
+      </ol>
+
+      <p class="disposition" data-run-id="{{ run_id }}">
+        <span class="visually-hidden">Run status:</span>
+        <span class="state pill">{{ state }}</span>
+      </p>
+
+      <div class="propose-outcome" data-propose-outcome>
+      {% if pr_url %}
+        <p class="result"><a href="{{ pr_url }}">Pull request</a></p>
+      {% elif ended_reason %}
+        <p class="ended">{{ ended_reason }}</p>
+      {% elif state in ("stopped", "completed", "failed") %}
+        <p class="ended">Ended without a pull request.</p>
+      {% else %}
+        <p class="pending">Working. Phases update on their own.</p>
+      {% endif %}
+      </div>
+    </div>
+  </div>
+
+</section>

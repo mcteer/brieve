@@ -1,102 +1,133 @@
 /* SPDX-License-Identifier: Apache-2.0
  *
- * The portal's visual identity (048): one designed dark theme. Ask and Build share a shell.
+ * The portal's visual identity: Nocturne (one designed dark theme). Ask and Build share a
+ * shell. Faces stay Inter + IBM Plex Mono (048 FR-007 / FR-009) — self-hosted, no CDN.
  *
  * **Two rules govern this file.** Every colour and every typeface is a TOKEN, declared once
  * below and referenced everywhere — a component row fails on a colour literal outside the
- * token block, which is what makes "no page invents its own colour" checkable rather than
- * aspirational. And saturated colour MEANS something: chrome accent, a product identity, or a
- * verdict. Nothing here is decorative.
+ * token block. Saturated colour MEANS something: one accent (active nav + primary button),
+ * semantic status (complete / running / blocked / pending), or a product identity.
  *
- * **Three type roles.** Prose and controls are Inter. Evidence is IBM Plex Mono. Headings
- * use the prose stack (the heading token remains addressable). Secondary text uses `--muted`
- * only — mockup faint fails AA as text.
+ * Secondary text uses `--muted`, raised from the mockup's faint until it clears 4.5 on every
+ * ground. White on the accent fill does not clear 4.5, so `--text-on-accent` is page ink.
  *
- * Hand-written, no build step. Contrast table is research F4; axe holds it at runtime on this
- * theme. Focus styles are visible rather than removed (2.4.13).
+ * Hand-written, no build step. Axe holds contrast at runtime. Focus styles are visible
+ * rather than removed (2.4.13).
  */
 
 /* ---------------------------------------------------------------- the tokens */
 
 :root {
-  --bg: #0b0c0e;
-  --elev: #111318;
-  --elev-2: #171a21;
-  --bubble: #4a5362;
-  --ink: #e8e6e1;
-  --muted: #8f8c84;
-  --line: rgba(232, 230, 225, 0.08);
-  --copper: #c4a574;
-  --copper-dim: #7a6548;
-  --cta: var(--copper);
-  --cta-ink: #1a1610;
-  --ok: #6eab7c;
-  --denied: #ff8a8a;
+  /* Nocturne surfaces — darkest to lightest */
+  --bg-rail: #0a0c10;
+  --bg-page: #0c0e12;
+  --bg-sidebar: #101319;
+  --bg-surface: #181c24;
+  --bg-selected: #1d2230;
+  --bg-bubble: #1d2230;
+
+  --border: #212630;
+  --border-strong: #333a48;
+  --border-bubble: #2a3040;
+
+  --text-primary: #e9edf3;
+  --text-secondary: #9aa4b6;
+  /* Mockup faint fails 4.5 as text on page / sidebar / surface; raised until it clears. */
+  --text-muted: #848c9e;
+  --text-bubble: #dfe3ec;
+  /* White on `--accent` is 3.39:1. Page ink on the same fill clears 4.5. */
+  --text-on-accent: #0c0e12;
+
+  --accent: #8b7bf0;
+  --accent-hover: #9d8ff5;
+  --accent-bg: rgb(139 123 240 / 0.14);
+
+  --success: #22c98e;
+  --success-bg: rgb(34 201 142 / 0.12);
+  --warning: #eda94a;
+  --warning-bg: rgb(237 169 74 / 0.12);
+  --danger: #ef6461;
+  --danger-bg: rgb(239 100 97 / 0.12);
+  --info: #5b9bf0;
+  --info-bg: rgb(91 155 240 / 0.12);
 
   /* Aliases so existing rules keep reading tokens rather than literals. */
-  --page: var(--bg);
-  --surface: var(--elev);
-  --raised: var(--elev-2);
-  --rule: var(--line);
-  --rule-soft: var(--line);
-  --link: var(--copper);
-  --link-bright: var(--copper);
-  --allowed: var(--ok);
+  --bg: var(--bg-page);
+  --elev: var(--bg-sidebar);
+  --elev-2: var(--bg-selected);
+  --bubble: var(--bg-bubble);
+  --ink: var(--text-primary);
+  --muted: var(--text-muted);
+  --line: var(--border);
+  --copper: var(--accent);
+  --copper-dim: var(--border-strong);
+  --cta: var(--accent);
+  --cta-ink: var(--text-on-accent);
+  --ok: var(--success);
+  --denied: var(--danger);
+  --page: var(--bg-page);
+  --surface: var(--bg-surface);
+  --raised: var(--bg-selected);
+  --rule: var(--border);
+  --rule-soft: var(--border);
+  --link: var(--accent);
+  --link-bright: var(--accent);
+  --allowed: var(--success);
 
   /* Product identity. Unused as chrome; never inverted (034 US2). */
   --vault: #ffcf25;
   --terraform: #7b42bc;
 
-  /* Depth, kept shallow on purpose: one ambient shadow for surfaces that sit on the page and
-     a stronger one for the things that float above it. A product that shadows everything
-     reads as decorated; one that shadows nothing reads as a document. */
-  --lift: 0 1px 2px rgb(12 12 14 / 0.06), 0 1px 1px rgb(12 12 14 / 0.04);
-  --inset: inset 0 1px 2px rgb(12 12 14 / 0.03);
-  --lift-strong: 0 4px 12px rgb(12 12 14 / 0.08);
-  --radius: 8px;
+  --lift: var(--shadow-panel);
+  --inset: inset 0 1px 2px rgb(0 0 0 / 0.03);
+  --lift-strong: var(--shadow-panel);
+  --shadow-panel: 0 1px 3px rgb(0 0 0 / 0.15), 0 12px 32px rgb(0 0 0 / 0.14);
+  --radius: 10px;
   --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --control-height: 2.5rem;
 
-  /* A SCALE, not a pile of one-off values. Every size and gap below reads one of these, so
-     the page has a rhythm a reader feels rather than a set of numbers someone happened to
-     type. 1.25 ratio on type, 4px base on space — both chosen because they land on whole
-     pixels at the default font size, which keeps hairlines crisp. */
-  --text-xs: 0.6875rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.84375rem;
-  --text-lg: 0.9375rem;
-  --text-xl: 1.375rem;
-  --text-2xl: 1.75rem;
+  --text-xs: 11px;
+  --text-sm: 11.5px;
+  --text-base: 12.5px;
+  --text-md: 13px;
+  --text-lg: 14px;
+  --text-xl: 20px;
+  --text-2xl: 22px;
 
   --lead-tight: 1.2;
-  --lead-snug: 1.4;
-  --lead-prose: 1.45;
+  --lead-snug: 1.5;
+  --lead-prose: 1.65;
+  --line-desc: 1.65;
+  --line-body: 1.5;
 
-  /* Halo on the live-status dot — colour lives here so the rule can reference a token. */
-  --copper-glow: rgb(196 165 116 / 0.16);
-  --ok-glow: rgb(110 171 124 / 0.16);
-  --copper-wash: rgb(196 165 116 / 0.08);
+  --copper-glow: var(--warning-bg);
+  --ok-glow: var(--success-bg);
+  --copper-wash: var(--accent-bg);
 
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.5rem;
-  --space-6: 2rem;
-  --space-7: 3rem;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 32px;
 
-  /* Roughly 65 characters at the base size — the width prose is comfortable at. Applied to
-     text that is READ; controls and evidence are exempt because they are scanned. */
   --measure: 34rem;
 
-  /* The three roles. Heading token equals the prose stack (F5). */
-  --font-prose: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-control: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-heading: var(--font-prose);
-  --font-evidence: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 700;
 
-  /* Code panels — a darker inset so fenced sketches scan like an editor, not page prose.
-     Token colours clear AA against `--code-surface` (computed before use). */
+  --font-ui: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-prose: var(--font-ui);
+  --font-control: var(--font-ui);
+  --font-heading: var(--font-ui);
+  --font-evidence: var(--font-mono);
+
   --code-surface: #16181d;
   --code-bar: #1e2229;
   --code-ink: #e8eaed;
@@ -175,7 +206,7 @@ p:last-child { margin-bottom: 0; }
 .app-shell { min-height: 100vh; }
 body.has-icons .app-shell {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   grid-template-rows: 1fr auto;
   min-height: 100vh;
 }
@@ -192,41 +223,46 @@ body.plain .app-shell { display: block; }
 body.has-icons:has(main.main--app) .app-stage { overflow: hidden; height: 100%; }
 .icons {
   grid-column: 1; grid-row: 1;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--border);
   display: flex; flex-direction: column; align-items: center;
-  padding: 16px 0 14px; gap: 4px;
-  background: var(--bg);
+  padding: 14px 0; gap: 4px;
+  background: var(--bg-rail);
 }
 .icons .mark {
-  width: 22px; height: 22px; margin-bottom: 20px;
-  background: var(--copper); border-radius: 3px;
+  width: 26px; height: 26px; margin-bottom: 18px;
+  background: var(--accent); border-radius: 7px;
 }
 .icons a,
 .icons button {
-  width: 36px; height: 36px; display: grid; place-items: center;
-  color: var(--muted); text-decoration: none; border-radius: 6px;
+  width: 34px; height: 34px; display: grid; place-items: center;
+  color: var(--text-secondary); text-decoration: none; border-radius: var(--radius-sm);
   background: transparent; border: 0; cursor: pointer; padding: 0;
   font: inherit;
 }
 .icons a[aria-current],
-.icons a[aria-current="page"] { color: var(--ink); background: var(--elev-2); }
+.icons a[aria-current="page"] {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+.icons a:hover,
+.icons button:hover { background: var(--bg-selected); }
 .icons a:focus-visible,
 .icons button:focus-visible {
-  outline: 3px solid var(--link-bright); outline-offset: 2px;
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .icons svg,
-.icons-end svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+.icons-end svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; }
 .icons-end {
   grid-column: 1; grid-row: 2;
   display: flex; justify-content: center;
   padding: 0 0 14px;
-  border-right: 1px solid var(--line);
-  background: var(--bg);
+  border-right: 1px solid var(--border);
+  background: var(--bg-rail);
   margin: 0;
 }
 .icons-end button {
-  width: 36px; height: 36px; display: grid; place-items: center;
-  color: var(--muted); border-radius: 6px;
+  width: 34px; height: 34px; display: grid; place-items: center;
+  color: var(--text-muted); border-radius: var(--radius-sm);
   background: transparent; border: 0; cursor: pointer; padding: 0;
   font: inherit;
 }
@@ -234,12 +270,12 @@ body.has-icons:has(main.main--app) .app-stage { overflow: hidden; height: 100%; 
   outline: 3px solid var(--link-bright); outline-offset: 2px;
 }
 .stage-top {
-  height: 48px; display: flex; align-items: center; gap: 16px;
-  padding: 0 28px; border-bottom: 1px solid var(--line); flex: 0 0 auto;
+  height: 42px; display: flex; align-items: center; gap: 16px;
+  padding: 0 20px; border-bottom: 1px solid var(--border); flex: 0 0 auto;
 }
 .crumb {
   font-family: var(--font-evidence);
-  font-size: var(--text-xs);
+  font-size: 12px;
   color: var(--muted);
   margin: 0;
   overflow: hidden;
@@ -259,37 +295,38 @@ body.has-icons:has(main.main--app) .app-stage { overflow: hidden; height: 100%; 
   font-size: var(--text-xs);
 }
 .live {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-family: var(--font-evidence); font-size: var(--text-xs); color: var(--copper);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-prose); font-size: var(--text-xs); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 3px var(--space-3);
 }
-.live.idle { color: var(--muted); }
+.live.idle { color: var(--text-secondary); }
 .live:not(.idle) { text-transform: capitalize; }
 .live i {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--copper);
+  width: 6px; height: 6px; border-radius: 50%; background: var(--warning);
   display: inline-block;
-  box-shadow: 0 0 0 3px var(--copper-glow);
 }
 .live.idle i {
-  background: var(--ok);
-  box-shadow: 0 0 0 3px var(--ok-glow);
+  background: var(--success);
+  box-shadow: none;
 }
 .dock {
-  padding: 12px 28px 16px;
-  border-top: 1px solid var(--line);
+  padding: 14px 30px 18px;
+  border-top: 0;
   flex: 0 0 auto;
-  background: var(--bg);
+  background: var(--bg-page);
 }
 .thread {
   flex: 1;
   min-height: 0;
-  padding: 28px 28px 20px;
+  padding: 26px 30px 8px;
   overflow: auto;
 }
 .thread .inner > h1 {
   margin: 0 0 8px;
-  font-size: var(--text-xl);
-  font-weight: 550;
-  letter-spacing: -0.03em;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
   line-height: 1.25;
   max-width: none;
 }
@@ -384,13 +421,12 @@ footer {
 footer p { max-width: var(--measure); }
 
 h1, h2, h3 {
-  font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.012em;
+  font-family: var(--font-heading); font-weight: var(--weight-medium); letter-spacing: 0;
   line-height: var(--lead-tight); text-wrap: balance; max-width: var(--measure);
 }
 h1 {
-  font-size: var(--text-xl); margin: 0 0 var(--space-3); letter-spacing: -0.018em;
-  /* Down a step from the display size. At 28px the serif dominated every page and pushed a
-     two-line title into the content; a heading should announce the page, not become it. */
+  font-size: var(--text-2xl); margin: 0 0 var(--space-3); letter-spacing: 0;
+  font-weight: var(--weight-semibold);
 }
 h2 { font-size: var(--text-xl); margin: var(--space-6) 0 var(--space-2); }
 h3 { font-size: var(--text-lg); margin: var(--space-5) 0 var(--space-2); }
@@ -415,10 +451,10 @@ button { min-height: 24px; }
   min-height: var(--control-height); padding: 0 var(--space-4);
   border-radius: var(--radius-sm);
   background: var(--cta); color: var(--cta-ink); border: 1px solid transparent;
-  text-decoration: none; font-size: var(--text-sm); font-weight: 550;
-  box-shadow: var(--lift); transition: opacity 120ms ease;
+  text-decoration: none; font-size: var(--text-base); font-weight: var(--weight-medium);
+  box-shadow: none; transition: background 120ms ease;
 }
-.button:hover { opacity: 0.88; }
+.button:hover { opacity: 1; background: var(--accent-hover); }
 .button--danger { background: var(--denied); color: var(--surface); }
 
 /* SECONDARY ACTIONS ARE BUTTONS, NOT RAW LINKS. "Delete this conversation", "Stop this run"
@@ -439,29 +475,36 @@ form.inline { display: inline; }
 
 .composer {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  max-width: 880px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  position: relative;
+  width: 56%;
+  max-width: 56%;
   margin-inline: auto;
-  background: var(--elev);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 6px 6px 6px 14px;
+  min-height: 60px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 9px 11px 36px 11px;
 }
 .composer textarea {
   flex: 1;
   min-width: 0;
-  height: 28px;
-  min-height: 24px;
-  max-height: 28px;
+  height: 42px;
+  min-height: 42px;
+  max-height: 12rem;
   resize: none;
   border: 0;
   background: transparent;
   padding: 0;
-  line-height: 28px;
+  line-height: 1.5;
   box-shadow: none;
-  field-sizing: fixed;
+  field-sizing: content;
+  color: var(--text-primary);
+}
+.composer textarea::placeholder {
+  color: var(--text-muted);
 }
 .composer textarea:focus,
 .composer textarea:focus-visible {
@@ -478,29 +521,51 @@ html[data-input="keyboard"] .composer .go:focus-visible {
 }
 .composer .ask-send,
 .composer .go {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
   flex: 0 0 auto;
   margin: 0;
-  min-height: 32px;
-  height: 32px;
-  padding: 0 14px;
+  min-height: 24px;
+  height: 24px;
+  padding: 0 11px;
   background: var(--cta);
   color: var(--cta-ink);
   text-transform: none;
   letter-spacing: 0;
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
 }
-.chips { display: flex; gap: 6px; flex: 0 0 auto; }
+.composer .go:hover { background: var(--accent-hover); }
+.composer .go--stop,
+.ask[aria-busy="true"] .go {
+  background: var(--danger);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  opacity: 1;
+}
+.composer .go--stop:hover,
+.ask[aria-busy="true"] .go:hover { background: var(--danger); opacity: 0.92; }
+.chips {
+  position: absolute;
+  left: 14px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
 .chip {
-  font-family: var(--font-evidence); font-size: var(--text-xs);
-  color: var(--muted); border: 1px solid var(--line); padding: 2px 7px; border-radius: 3px;
+  font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--text-muted); border: 1px solid var(--border-strong); padding: 7px 11px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
+  background: none;
 }
 
 .run-composer { display: grid; gap: 0.35rem; margin-top: 1.5rem; }
@@ -514,85 +579,106 @@ html[data-input="keyboard"] .composer .go:focus-visible {
   box-shadow: var(--inset);
 }
 .run-composer select:hover, .run-composer textarea:hover, .run-composer input:hover { border-color: var(--muted); }
-.phase-strip { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 0; }
+.phase-strip { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 0; position: relative; }
+.phase-strip::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: var(--border);
+}
 .node {
   display: grid;
-  grid-template-columns: 12px 1fr;
-  gap: 14px;
-  align-items: start;
+  grid-template-columns: 17px 1fr;
+  gap: 12px;
+  align-items: center;
   font-family: var(--font-prose);
-  font-size: var(--text-sm);
-  padding: 0 0 18px;
+  font-size: var(--text-md);
+  padding: 9px 0;
   position: relative;
 }
 .phase-strip .node {
-  grid-template-columns: 8px 6.75rem minmax(0, 1fr);
-  column-gap: 14px;
-  row-gap: 2px;
+  grid-template-columns: 17px 76px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 0;
   align-items: center;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
+  padding: 9px 0;
+  border-top: 0;
 }
 .phase-strip .node:first-child { border-top: 0; }
-.node::before {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 16px;
-  bottom: -2px;
-  width: 1px;
-  background: var(--line);
-}
-.node:last-child::before { content: none; }
+.node::before { content: none; }
 .phase-strip .node::before { content: none; }
 .dot {
-  width: 11px; height: 11px; border-radius: 50%;
-  border: 1px solid var(--copper-dim);
-  background: var(--bg);
-  margin-top: 4px;
+  width: 17px; height: 17px; border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  background: var(--bg-page);
+  margin-top: 0;
   position: relative;
   z-index: 1;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
 }
 .phase-strip .dot {
-  width: 8px; height: 8px;
+  width: 17px; height: 17px;
   margin-top: 0;
 }
-.node--completed .dot { background: var(--ok); border-color: var(--ok); }
-.node--active .dot { background: var(--copper); border-color: var(--copper); }
-.node--pending .dot { background: transparent; border-color: var(--muted); }
-.node--failed .dot { background: transparent; border-color: var(--denied); box-shadow: 0 0 0 1px var(--denied); }
+.node--completed .dot { background: var(--bg-page); border-color: var(--success); color: var(--success); }
+.node--completed .dot::after {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg) translate(0, -1px);
+}
+.node--active .dot {
+  background: var(--bg-page);
+  border-color: var(--warning);
+  box-shadow: 0 0 0 3px var(--warning-bg);
+}
+.node--pending .dot { background: var(--bg-page); border-color: var(--border-strong); }
+.node--failed .dot {
+  background: var(--bg-page);
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-bg);
+}
 .phase-name {
-  font-family: var(--font-evidence);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
   text-transform: capitalize;
   white-space: nowrap;
 }
-.node--active .phase-name { color: var(--copper); }
-.node--active .phase-status { color: var(--copper); }
-.node--pending .phase-status { color: var(--muted); }
-.node--failed .phase-status { color: var(--denied); }
+.node--active .phase-name { color: var(--text-primary); }
+.node--active .phase-status { color: var(--warning); }
+.node--pending .phase-status { color: var(--text-muted); }
+.node--completed .phase-status { color: var(--success); }
+.node--failed .phase-status { color: var(--danger); }
 .phase-status {
   display: block;
   font-size: var(--text-sm);
-  color: var(--muted);
+  font-family: var(--font-evidence);
+  color: var(--text-muted);
   text-transform: capitalize;
   white-space: nowrap;
 }
 .you {
-  margin: 0 0 18px auto;
-  max-width: 85%;
-  padding: 12px 2.5rem 12px 14px;
-  background: var(--bubble);
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--copper);
-  border-radius: 12px 12px 4px 12px;
+  margin: 0 0 16px auto;
+  max-width: 315px;
+  padding: 8px 11px;
+  background: var(--bg-bubble);
+  border: 1px solid var(--border-bubble);
+  border-radius: var(--radius-md);
   font-size: var(--text-base);
-  line-height: 1.5;
-  color: var(--ink);
+  line-height: var(--line-body);
+  color: var(--text-bubble);
   -webkit-tap-highlight-color: transparent;
 }
+.you.has-copy { padding-right: 2.5rem; }
 .you:focus,
 .you:focus-visible,
 .you:focus-within {
@@ -647,14 +733,34 @@ html[data-input="keyboard"] .composer .go:focus-visible {
   box-shadow: none;
 }
 
+/* Header actions (Stop, Delete) share the New chip, not the browser's default button. */
 .quiet-action {
+  appearance: none;
   font-family: var(--font-control);
-  font-size: var(--text-xs);
-  color: var(--muted);
+  font-size: 11px;
+  font-weight: var(--weight-regular);
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   text-decoration: none;
   min-height: 24px;
+  min-width: 24px;
+  padding: 3px 10px;
+  margin: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: none;
+}
+.quiet-action:hover {
+  color: var(--text-primary);
+  background: var(--bg-selected);
+}
+.quiet-action:focus-visible {
+  outline: 3px solid var(--link-bright);
+  outline-offset: 2px;
 }
 .thread .inner label {
   display: block;
@@ -768,10 +874,10 @@ tbody th { font-weight: 500; color: var(--ink); }
    it. If this ever needs to grow, the link comes out of the sentence first. */
 .page-actions { margin: 0 0 var(--space-5); }
 .lede {
-  color: var(--muted); max-width: 54ch;
-  font-size: var(--text-sm);
-  line-height: var(--lead-prose);
-  margin: 0 0 28px;
+  color: var(--text-secondary); max-width: 480px;
+  font-size: var(--text-md);
+  line-height: var(--line-desc);
+  margin: 0 0 22px;
 }
 
 /* ---------------------------------------------------------------- turns and verdicts */
@@ -1027,10 +1133,8 @@ tbody th { font-weight: 500; color: var(--ink); }
   margin-block: var(--space-3) 0;
 }
 
-/* The button while the platform is working. It keeps its size and its label position — only
-   the word changes — so the target stays over 24x24 and focus stays on something real. */
+/* The button while the platform is working becomes Stop — same size, a different word. */
 .ask[aria-busy="true"] .button,
-.ask[aria-busy="true"] .go,
 .button[aria-disabled="true"] {
   cursor: progress;
   opacity: 0.75;
@@ -1075,7 +1179,7 @@ body.has-icons:has(main.main--app) .app-stage > footer {
 
 .app-layout {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 226px minmax(0, 1fr);
   align-items: stretch;
   min-height: 0;
   flex: 1;
@@ -1102,9 +1206,9 @@ body.has-icons:has(main.main--app) .app-stage > footer {
 .app-rail {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--line);
-  background: var(--elev);
-  padding: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  padding: 14px 12px;
   min-height: 0;
   overflow-y: auto;
 }
@@ -1113,74 +1217,103 @@ body.has-icons:has(main.main--app) .app-stage > footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 16px 10px;
+  padding: 0 2px 10px;
   gap: 8px;
 }
 .rail-heading {
   font-family: var(--font-control);
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-size: 10.5px;
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-muted);
   margin: 0;
   padding: 0;
 }
 
-.app-rail ul { list-style: none; margin: 0; padding: 0 0 16px; }
+.app-rail ul { list-style: none; margin: 0; padding: 0; }
 .app-rail li { margin: 0; }
 
 .app-rail li > a {
-  display: grid;
-  gap: 3px;
-  margin: 0 8px;
-  padding: 10px;
-  border-radius: 6px;
-  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
   text-decoration: none;
   font-size: var(--text-sm);
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: var(--weight-regular);
+  letter-spacing: 0;
   line-height: var(--lead-snug);
 }
 
-.app-rail li > a > span:first-child {
+.app-rail--builds li > a {
+  font-family: var(--font-evidence);
+  font-size: var(--text-sm);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+.status-dot[data-status="completed"] { background: var(--success); }
+.status-dot[data-status="running"],
+.status-dot[data-status="active"],
+.status-dot[data-status="dispatched"] { background: var(--warning); }
+.status-dot[data-status="failed"],
+.status-dot[data-status="stopped"],
+.status-dot[data-status="denied"] { background: var(--danger); }
+
+.list-empty {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  padding: 8px 2px;
+  margin: 0;
+}
+
+.app-rail li > a > span:not(.status-dot):not(.rail-count) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
 }
 
-.app-rail li > a:hover { background: var(--elev-2); text-decoration: none; }
+.app-rail li > a:hover { background: var(--bg-selected); text-decoration: none; color: var(--text-primary); }
 
 .app-rail li > a[aria-current="page"] {
-  background: var(--elev-2);
+  background: var(--bg-selected);
+  color: var(--text-primary);
 }
 
 .rail-count {
   font-family: var(--font-evidence);
   font-size: var(--text-xs);
-  color: var(--muted);
+  color: var(--text-muted);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
+  margin-left: auto;
 }
-.app-rail li > a[aria-current="page"] .rail-count { color: var(--copper); }
+.app-rail li > a[aria-current="page"] .rail-count { color: var(--text-muted); }
 
-/* NEW sits in the rail head, a quiet outline, not a copper slab the width of the column. */
 .rail-new {
-  height: 26px;
+  height: auto;
   min-height: 24px;
   min-width: 24px;
   width: auto;
-  padding: 0 9px;
+  padding: 3px 10px;
   margin: 0;
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
   font-family: var(--font-control);
-  font-size: var(--text-xs);
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: var(--weight-regular);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -1188,8 +1321,35 @@ body.has-icons:has(main.main--app) .app-stage > footer {
   box-shadow: none;
   cursor: pointer;
 }
-.rail-new:hover { color: var(--ink); background: var(--elev-2); }
+.rail-new:hover { color: var(--text-primary); background: var(--bg-selected); }
 .rail-new:focus-visible { outline: 3px solid var(--link-bright); outline-offset: 2px; }
+
+/* Builds list: New is the way to start another run (not a second composer on the run). */
+.app-rail--builds .rail-new {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: transparent;
+  font-weight: var(--weight-medium);
+  padding: 4px 12px;
+}
+.app-rail--builds .rail-new:hover {
+  background: var(--accent-hover);
+  color: var(--text-on-accent);
+}
+
+.stage-top [data-stop-form] {
+  margin: 0;
+  display: inline-flex;
+}
+.stage-top [data-stop-form] .quiet-action {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+.stage-top [data-stop-form] .quiet-action:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
 
 .rail-danger {
   margin-block-start: auto;
@@ -1212,7 +1372,7 @@ body.has-icons:has(main.main--app) .app-stage > footer {
 .exchange .you {
   align-self: end;
   margin: 0;
-  max-width: min(85%, 36rem);
+  max-width: 315px;
 }
 .exchange .node {
   display: block;
@@ -1267,13 +1427,12 @@ body.has-icons:has(main.main--app) .app-stage > footer {
    already answer). */
 .asked {
   align-self: end;
-  max-width: 85%;
+  max-width: 315px;
   margin: 0 0 0 auto;
-  background: var(--bubble);
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--copper);
-  border-radius: 12px 12px 4px 12px;
-  padding: var(--space-3) 2.5rem var(--space-3) var(--space-4);
+  background: var(--bg-bubble);
+  border: 1px solid var(--border-bubble);
+  border-radius: var(--radius-md);
+  padding: 8px 11px;
 }
 
 .asked-label {
@@ -1349,19 +1508,19 @@ section.propose {
 .dock {
   position: static;
   bottom: auto;
-  background: var(--bg);
-  padding: 12px 28px 16px;
+  background: var(--bg-page);
+  padding: 14px 30px 18px;
   margin: 0;
-  border-top: 1px solid var(--line);
+  border-top: 0;
   flex: 0 0 auto;
 }
 
 .app-main .run-composer {
   position: static;
-  background: var(--bg);
-  padding: 12px 24px 16px;
+  background: var(--bg-page);
+  padding: 14px 30px 18px;
   margin: 0;
-  border-top: 1px solid var(--line);
+  border-top: 0;
 }
 
 .app-main .turns {
@@ -1386,7 +1545,7 @@ section.propose {
 
 .app-main .turn .message.asked {
   align-self: end;
-  max-width: 85%;
+  max-width: 315px;
   margin-left: auto;
 }
 

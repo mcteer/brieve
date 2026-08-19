@@ -137,6 +137,21 @@ def test_a_turn_after_a_stop_is_a_new_run_not_a_resumption() -> None:
     assert runs[1] != runs[0], "the second turn resumed the stopped run rather than starting one"
 
 
+def test_stopping_without_a_thread_returns_to_the_build_run() -> None:
+    """Build's Stop uses the catalogue operation and returns to the run, not a thread."""
+    portal, api, surface = _portal_over_api()
+    thread_path, _thread_id = _start_a_turn(portal)
+    detail = api.get(thread_path, headers=surface.bearer())  # type: ignore[attr-defined]
+    run_id = detail.json()["turns"][0]["run_id"]
+
+    portal.relay_log.clear()  # type: ignore[attr-defined]
+    stopped = portal.post(f"/runs/{run_id}/stop", follow_redirects=False)
+
+    assert stopped.status_code == 303
+    assert stopped.headers["location"] == f"/propose/runs/{run_id}"
+    assert ("POST", f"/runs/{run_id}/stop") in portal.relay_log  # type: ignore[attr-defined]
+
+
 def test_the_portal_offers_no_stop_for_a_run_it_does_not_own() -> None:
     """Relaying is not authorizing: the API refuses and the portal renders the refusal."""
     portal, api, surface = _portal_over_api()

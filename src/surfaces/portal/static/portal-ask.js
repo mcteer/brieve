@@ -16,78 +16,64 @@
   if (!form || !outcome || !note || !window.fetch) return;
   var button = form.querySelector("button[type=submit]");
   var field = form.querySelector("#question");
-
-  // ENTER SENDS; SHIFT+ENTER writes a new line — what every chat interface does and the
-  // opposite of a textarea's default. `requestSubmit` runs the handler below and honours
-  // `required`. `isComposing` guards an IME, where Enter chooses a character.
-  if (field) {
-    field.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
-        e.preventDefault();
-        if (form.requestSubmit) form.requestSubmit(); else form.submit();
-      }
-    });
-  }
+  var inflight = null;
+  var label = button ? button.textContent : "";
 
   form.addEventListener("submit", function (event) {
-    if (!field || !field.value.trim()) return;  // The browser's own `required` speaks first.
+    if (inflight) {
+      event.preventDefault();
+      inflight.abort();
+      return;
+    }
+    if (!field || !field.value.trim()) return;
     event.preventDefault();
 
-    var label = button ? button.textContent : "";  // Size and name kept; only the word changes.
+    inflight = new AbortController();
     if (button) {
-      button.disabled = true;
-      button.setAttribute("aria-disabled", "true");
-      button.textContent = "Asking…";
+      button.textContent = "Stop";
+      button.classList.add("go--stop");
     }
     form.setAttribute("aria-busy", "true");
     note.textContent = "Working on your question. This takes a minute or two; you can stay here.";
 
-    // The header is what the server branches on; without this file the whole page comes back.
     fetch(form.action, {
       method: "POST",
       headers: { "X-Portal-Fragment": "exchange" },
       body: new FormData(form),
-      credentials: "same-origin"
+      credentials: "same-origin",
+      signal: inflight.signal,
     })
       .then(function (r) { return r.text(); })
       .then(function (html) {
-        // APPEND, never replace — overwriting the last answer is the page this replaced.
         var landing = document.createElement("div");
         landing.innerHTML = html;
         while (landing.firstChild) outcome.appendChild(landing.firstChild);
         note.textContent = "";
         field.value = "";
-        // The conversation the server put this in. Until the first answer there is none to
-        // post to, so the composer learns it here — otherwise every follow-up starts a new
-        // one, which the served walk-through caught.
         var landed = outcome.querySelectorAll("[data-conversation]");
         var id = landed.length ? landed[landed.length - 1].getAttribute("data-conversation") : "";
         if (id && form.action.indexOf("conversation_id=") === -1) {
           form.action = "/ask?conversation_id=" + encodeURIComponent(id);
-          // And the address follows it, so reloading keeps you in the conversation you are
-          // having rather than starting a new one. `replaceState`, not `pushState`: asking is
-          // not a navigation and Back should leave the page, not undo a question.
           if (history.replaceState) history.replaceState(null, "", "/ask/" + encodeURIComponent(id));
         }
-        // Focus the NEWEST EXCHANGE, not a live region — a page of claims read aloud talks
-        // over somebody already reading. The exchange rather than its heading, because the
-        // indicator then outlines the thing that arrived instead of boxing a two-word label.
         var seen = outcome.querySelectorAll(".exchange");
         var last = seen[seen.length - 1];
         if (last) { last.setAttribute("tabindex", "-1"); last.focus(); }
       })
-      .catch(function () {
-        // The portal's own failure in its own voice, never dressed as an answer or a decline.
-        // The transcript is left alone: earlier exchanges happened.
+      .catch(function (err) {
+        if (err && err.name === "AbortError") {
+          note.textContent = "Stopped waiting. The question was already sent.";
+          return;
+        }
         note.textContent =
           "The question could not be sent from this page. Nothing was asked and nothing changed.";
       })
       .then(function () {
+        inflight = null;
         form.removeAttribute("aria-busy");
         if (!button) return;
-        button.disabled = false;
-        button.removeAttribute("aria-disabled");
         button.textContent = label;
+        button.classList.remove("go--stop");
       });
   });
 })();

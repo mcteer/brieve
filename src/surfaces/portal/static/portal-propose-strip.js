@@ -50,6 +50,13 @@
     if (stateNode && typeof data.state === "string" && stateNode.textContent !== data.state) {
       stateNode.textContent = data.state;
     }
+    if (typeof data.state === "string") {
+      var stopForm = document.querySelector("[data-stop-form]");
+      if (stopForm) {
+        var done = data.state === "stopped" || data.state === "completed" || data.state === "failed";
+        stopForm.hidden = done;
+      }
+    }
     if (typeof data.pr_url === "string" && data.pr_url) {
       setOutcome("result", "Pull request", data.pr_url);
     } else if (typeof data.ended_reason === "string" && data.ended_reason) {

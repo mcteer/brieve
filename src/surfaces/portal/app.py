@@ -564,15 +564,53 @@ def create_portal(
             return _login_redirect(request, "/propose")
         return RedirectResponse("/", status_code=303)
 
+    def _propose_run_fields(
+        session: Any, run_id: str, *, intake_fallback: str | None = None
+    ) -> dict[str, Any] | None:
+        """Shared run-page fields. ``None`` means the token was refused."""
+        state = app.state.relay.request("GET", f"/runs/{run_id}", token=session.access_token)
+        result = app.state.relay.request(
+            "GET", f"/runs/{run_id}/result", token=session.access_token
+        )
+        if state.status == 401 or result.status == 401:
+            return None
+        progress = _propose_phases(result)
+        run_state = str((state.payload or {}).get("state", "starting")) if state.ok else "unknown"
+        pr_url, ended_reason = _propose_outcome(result, phases=progress, state=run_state)
+        intake = None
+        if result.ok and isinstance(result.payload, dict):
+            raw = result.payload.get("intake_message")
+            intake = raw if isinstance(raw, str) else None
+        if not intake and intake_fallback:
+            stripped = intake_fallback.strip()
+            intake = stripped or None
+        return {
+            "run_id": run_id,
+            "state": run_state,
+            "phases": progress,
+            "pr_url": pr_url,
+            "ended_reason": ended_reason,
+            "intake_message": intake,
+        }
+
     @app.post("/")
     @app.post("/propose")
     def propose_submit(
         request: Request,
         message: str = Form(""),
     ) -> Response:
+        """Start a Build. Whole page or just the run column — the same render either way.
+
+        `portal-propose-submit.js` posts this form without navigating and swaps the result into
+        the shell, so starting a Build no longer replaces the page. It sends ``X-Portal-Fragment``;
+        a browser with no JavaScript sends nothing and gets the 303 to the run page, which is
+        why the form still works with the script removed. The branch chooses an envelope, never
+        a rendering: both arms end at ``_propose_run_main.html``.
+        """
         session = _session(request)
         if session is None:
             return _login_redirect(request, "/")
+        fragment = bool(request.headers.get("x-portal-fragment"))
         started = app.state.relay.request(
             "POST",
             "/propose",
@@ -585,6 +623,13 @@ def create_portal(
             detail = "Build could not be started"
             if isinstance(started.payload, dict) and started.payload.get("detail"):
                 detail = str(started.payload["detail"])
+            if fragment:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="_alert.html",
+                    context={"message": detail},
+                    status_code=started.status or 503,
+                )
             listed = _builds(session)
             if listed is None:
                 return _reauthenticate(request)
@@ -601,6 +646,22 @@ def create_portal(
                 status_code=started.status or 503,
             )
         run_id = (started.payload or {}).get("run_id")
+        if fragment:
+            if not run_id:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="_alert.html",
+                    context={"message": "Build could not be started"},
+                    status_code=503,
+                )
+            fields = _propose_run_fields(session, str(run_id), intake_fallback=message)
+            if fields is None:
+                return _reauthenticate(request)
+            return templates.TemplateResponse(
+                request=request,
+                name="_propose_run_main.html",
+                context=fields,
+            )
         return RedirectResponse(f"/propose/runs/{run_id}", status_code=303)
 
     @app.get("/propose/runs/{run_id}", response_class=HTMLResponse)
@@ -608,36 +669,17 @@ def create_portal(
         session = _session(request)
         if session is None:
             return _login_redirect(request, f"/propose/runs/{run_id}")
-        state = app.state.relay.request("GET", f"/runs/{run_id}", token=session.access_token)
-        result = app.state.relay.request(
-            "GET", f"/runs/{run_id}/result", token=session.access_token
-        )
-        if state.status == 401 or result.status == 401:
+        fields = _propose_run_fields(session, run_id)
+        if fields is None:
             return _reauthenticate(request)
-        progress = _propose_phases(result)
-        run_state = str((state.payload or {}).get("state", "starting")) if state.ok else "unknown"
-        pr_url, ended_reason = _propose_outcome(result, phases=progress, state=run_state)
         listed = _builds(session)
         if listed is None:
             return _reauthenticate(request)
         builds, reachable = listed
-        intake = None
-        if result.ok and isinstance(result.payload, dict):
-            raw = result.payload.get("intake_message")
-            intake = raw if isinstance(raw, str) else None
         return templates.TemplateResponse(
             request=request,
             name="propose_run.html",
-            context={
-                "run_id": run_id,
-                "state": run_state,
-                "phases": progress,
-                "pr_url": pr_url,
-                "ended_reason": ended_reason,
-                "builds": builds,
-                "reachable": reachable,
-                "intake_message": intake,
-            },
+            context={**fields, "builds": builds, "reachable": reachable},
         )
 
     @app.get("/propose/runs/{run_id}/events")
@@ -952,11 +994,13 @@ def create_portal(
         return RedirectResponse("/", status_code=303)
 
     @app.post("/runs/{run_id}/stop")
-    def stop(request: Request, run_id: str, thread_id: str = Form(...)) -> Response:
+    def stop(request: Request, run_id: str, thread_id: str | None = Form(default=None)) -> Response:
         """Stop through the catalogue's own operation. No thread-local stop exists."""
         session = _session(request)
         if session is None:
-            return _login_redirect(request, f"/threads/{thread_id}")
+            return _login_redirect(
+                request, f"/threads/{thread_id}" if thread_id else f"/propose/runs/{run_id}"
+            )
         stopped = app.state.relay.request(
             "POST", f"/runs/{run_id}/stop", token=session.access_token
         )
@@ -967,7 +1011,9 @@ def create_portal(
                 context={"what": "stop that run", "response": stopped},
                 status_code=stopped.status or 503,
             )
-        return RedirectResponse(f"/threads/{thread_id}", status_code=303)
+        if thread_id:
+            return RedirectResponse(f"/threads/{thread_id}", status_code=303)
+        return RedirectResponse(f"/propose/runs/{run_id}", status_code=303)
 
     # ------------------------------------------------------------------ live
 

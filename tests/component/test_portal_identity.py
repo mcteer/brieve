@@ -341,22 +341,58 @@ def _css_block(source: str, selector: str) -> str:
 
 
 def test_composer_is_one_centred_row_wider_than_the_reading_column() -> None:
-    """US3 / SC-003. 880px composer, 680px reading column — not stacked, not full-bleed."""
+    """US3 / SC-003. Composer is a 56% field with the action at the bottom right."""
     css = CSS.read_text()
     composer = _css_block(css, ".composer")
     reading = _css_block(css, ".thread .inner")
 
     assert "display: flex" in composer
-    assert "align-items: center" in composer
-    assert "max-width: 880px" in composer
-    assert "margin-inline: auto" in composer
+    assert "flex-direction: column" in composer
+    assert "max-width: 56%" in composer
+    assert "min-height: 60px" in composer
 
     assert "max-width: 680px" in reading
     assert "margin-inline: auto" in reading
-    assert 880 > 680
 
     textarea = _css_block(css, ".composer textarea")
+    assert "min-height: 42px" in textarea
     assert "14rem" not in textarea, "a tall min-height stacks the composer into a second row"
+    go = _css_block(css, ".composer .ask-send,\n.composer .go")
+    assert "position: absolute" in go
+    assert "right: 6px" in go
+    assert "bottom: 6px" in go
+
+
+def test_header_actions_are_themed_chips_not_native_buttons() -> None:
+    """Stop in the Build header was a browser-default button on a dark page."""
+    css = CSS.read_text()
+    quiet = _css_block(css, ".quiet-action")
+    chip = _css_block(css, ".rail-new")
+
+    assert "appearance: none" in quiet
+    assert "background: var(--bg-surface)" in quiet
+    assert "border: 1px solid var(--border-strong)" in quiet
+    assert "border-radius: var(--radius-sm)" in quiet
+    assert "background: var(--bg-surface)" in chip
+    assert "border: 1px solid var(--border-strong)" in chip
+
+
+def test_ask_script_turns_the_action_into_stop() -> None:
+    """While a question is in flight the same control aborts the wait, like every chat UI."""
+    script = (STATIC / "portal-ask.js").read_text()
+    assert "AbortController" in script
+    assert '"Stop"' in script
+    assert "inflight.abort" in script
+
+
+def test_propose_submit_script_turns_the_action_into_stop() -> None:
+    """While a Build POST is in flight the same control aborts the wait, like Ask."""
+    script = (STATIC / "portal-propose-submit.js").read_text()
+    assert "AbortController" in script
+    assert '"Stop"' in script
+    assert "inflight.abort" in script
+    assert "fetch(form.action" in script
+    assert "BRIEVE_PROPOSE_WATCH" in script
 
 
 def test_icon_rail_names_the_verbs() -> None:
@@ -370,6 +406,7 @@ def test_icon_rail_names_the_verbs() -> None:
 
     assert ">Conversations<" in ask or "Conversations" in ask
     assert ">Builds<" in builds
+    assert 'class="rail-new"' in builds
 
 
 def test_decision_comments_survive_on_base_and_ask() -> None:
