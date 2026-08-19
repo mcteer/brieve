@@ -34,7 +34,6 @@
             <span class="dot" aria-hidden="true"></span>
             <span class="phase-name">{{ phase.name }}</span>
             <span class="phase-status">{{ phase.status }}</span>
-            {% if phase.reason %}<span class="phase-reason">{{ phase.reason }}</span>{% endif %}
           </li>
         {% endfor %}
       </ol>
@@ -67,6 +66,6 @@
 </div>
 </div>
 {# Cache-bust: portal copies static at alloc start; browsers also cache aggressively. #}
-<script src="/static/portal-propose-strip.js?v=20260817b" defer></script>
-<script src="/static/portal-propose.js?v=20260817b" defer></script>
+<script src="/static/portal-propose-strip.js?v=20260819a" defer></script>
+<script src="/static/portal-propose.js?v=20260819a" defer></script>
 {% endblock %}

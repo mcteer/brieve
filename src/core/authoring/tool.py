@@ -125,6 +125,25 @@ class WritePlanIncomplete(Exception):
     reason_code = "write_plan_incomplete"
 
 
+class EnvTemplateRefused(Exception):
+    """`author_file` of a dotenv template — placeholders, not the change."""
+
+    reason_code = "env_template_refused"
+
+
+def is_dotenv_template(path: str) -> bool:
+    """True for ``.env``, ``.env.example``, and other dotenv-style basenames.
+
+    Application config such as ``src/config/vaultConfig.js`` is not a dotenv file.
+    """
+    name = path.replace("\\", "/").rsplit("/", 1)[-1].strip().lower()
+    if not name:
+        return False
+    if name == ".env" or name.startswith(".env."):
+        return True
+    return name in {".envrc", "env.example", "env.sample"}
+
+
 class FileAuthor:
     """`author_file`'s handler: write into the workspace, and nowhere else.
 
@@ -150,6 +169,10 @@ class FileAuthor:
             raise ValueError("author_file requires a 'path' argument")
         if not isinstance(content, str):
             raise ValueError("author_file requires a string 'content' argument")
+        if is_dotenv_template(path):
+            raise EnvTemplateRefused(
+                "author_file refuses dotenv templates such as .env.example; they are not the change"
+            )
         # Refuses absolute paths and any traversal that escapes, resolved rather than
         # string-matched. This is the only write surface in the platform (W3a).
         target = self._trees.resolve_in_workspace(path)
@@ -233,11 +256,13 @@ __all__ = [
     "READ_BUDGET_BYTES",
     "READ_SUBJECT",
     "WRITE_ROLE",
+    "EnvTemplateRefused",
     "FileAuthor",
     "ResolutionRefused",
     "SubjectReader",
     "WritePlanIncomplete",
     "WorkspaceRefused",
+    "is_dotenv_template",
     "register_authoring_tools",
     "register_proposal_tool",
     "resolve_write_cell",

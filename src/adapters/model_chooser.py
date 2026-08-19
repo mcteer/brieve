@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from adapters.pydantic_ai.agent import build_governed_agent
+from core.authoring.tool import is_dotenv_template
 from core.choice.chooser import (
     Answer,
     ChoiceRequest,
@@ -103,12 +104,16 @@ _AUTHORING_WRITE_ONLY_HINT = (
     "The write plan is recorded. You MUST call author_file now for a planned path. "
     "Do not set the tool to NONE. NONE abandons the pull request. "
     "Do not invent a second research pass. "
-    "Do not start a larger architecture than the plan named."
+    "Do not start a larger architecture than the plan named. "
+    "Do not author .env or .env.example files."
 )
 
 _AUTHORING_TOOLS = frozenset({"read_subject", "author_file"})
 _READ_SUBJECT = "read_subject"
 _AUTHOR_FILE = "author_file"
+#: Deny reasons are shown on the Build page. 240 characters cut this run's verdict
+#: mid-clause ("three near-duplicate copies of").
+_JUDGE_REASON_LIMIT = 720
 
 
 def _authoring_hint(permitted: Sequence[str]) -> str:
@@ -298,6 +303,8 @@ class ModelChooser:
             f"Subject paths already read: {', '.join(consulted) or '(none)'}\n"
             f"Outline at most {cap} files for a focused first pull request. "
             "Prefer a small working slice over a complete platform. "
+            "Each path must be a distinct piece of the slice, not a duplicate of another. "
+            "Do not include dotenv templates (.env, .env.example). "
             "Do not write file bodies. Do not include secrets."
         )
         try:
@@ -306,7 +313,8 @@ class ModelChooser:
                 system_prompt=(
                     "You plan a file-level change for a governed authoring run. "
                     f"Answer with a short summary and at most {cap} paths you will write. "
-                    "No file contents. No secrets. No sprawling multi-module estate."
+                    "No file contents. No secrets. No dotenv templates. "
+                    "No sprawling multi-module estate."
                 ),
                 output_type=_WritePlanDraft,
             )
@@ -320,7 +328,9 @@ class ModelChooser:
         if not isinstance(output, _WritePlanDraft):
             raise MalformedAnswer("the model's write plan did not validate")
         summary = (output.summary or "").strip()
-        paths = [p.strip() for p in output.files if str(p).strip()][:cap]
+        paths = [
+            p.strip() for p in output.files if str(p).strip() and not is_dotenv_template(str(p))
+        ][:cap]
         if paths:
             listed = ", ".join(paths)
             return f"{summary} Files: {listed}".strip() if summary else f"Files: {listed}"
@@ -347,9 +357,14 @@ class ModelChooser:
             "Decide whether this is a coherent first pull request for the task. "
             "allow=true if a reviewer should receive these files: they address the task, "
             "contain no secrets, and are not clearly unsafe or unrelated. "
+            "A smaller slice than the plan named is enough when those files are distinct "
+            "and coherent. "
             "allow=false if they are unrelated, contain secrets, or would clearly harm "
-            "an estate. Do not deny only because a larger architecture was not fully "
-            "delivered — Write is capped to a small file budget on purpose."
+            "an estate, or if they are near-duplicate copies of one module in several "
+            "folders instead of distinct planned pieces. "
+            "Do not deny only because a larger architecture was not fully "
+            "delivered — Write is capped to a small file budget on purpose. "
+            "reason must be a complete sentence; do not trail off mid-clause."
         )
         try:
             agent = build_governed_agent(
@@ -372,7 +387,7 @@ class ModelChooser:
         if not isinstance(output, _QualityJudgment):
             raise MalformedAnswer("the model's judgment did not validate")
         reason = (output.reason or "").strip() or ("ok" if output.allow else "judge denied publish")
-        return bool(output.allow), reason[:240]
+        return bool(output.allow), reason[:_JUDGE_REASON_LIMIT]
 
     def describe_proposal(
         self,

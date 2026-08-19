@@ -3,8 +3,6 @@
 (function (global) {
   "use strict";
 
-  var terminal = { completed: true, failed: true, stopped: true };
-
   function setOutcome(htmlClass, text, href) {
     var box = document.querySelector("[data-propose-outcome]");
     if (!box) {
@@ -60,9 +58,11 @@
         reason = "Ended without a pull request — " + reason;
       }
       setOutcome("ended", reason, null);
-    } else if (typeof data.state === "string" && terminal[data.state]) {
-      setOutcome("ended", "Ended without a pull request.", null);
     }
+    // Nomad "complete" is not "no PR". Inventing that copy from allocation
+    // state hid real pull requests while the durable result still had the URL
+    // (or had it wiped by a later checkpoint). The server sends ended_reason
+    // when the durable result settled without one.
     var progress = data.propose_progress;
     if (!progress || !Array.isArray(progress.phases)) {
       return;
@@ -79,18 +79,6 @@
       var statusNode = li.querySelector(".phase-status");
       if (statusNode && statusNode.textContent !== phase.status) {
         statusNode.textContent = phase.status;
-      }
-      if (!phase.reason) {
-        return;
-      }
-      var reasonNode = li.querySelector(".phase-reason");
-      if (!reasonNode) {
-        reasonNode = document.createElement("span");
-        reasonNode.className = "phase-reason";
-        li.appendChild(reasonNode);
-      }
-      if (reasonNode.textContent !== phase.reason) {
-        reasonNode.textContent = phase.reason;
       }
     });
   }

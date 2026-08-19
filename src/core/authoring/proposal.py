@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from core.authoring.artifact import AuthoredArtifact
+from core.authoring.tool import is_dotenv_template
 
 #: GitHub-comfortable title length. The intake task is often a pasted URL plus a paragraph;
 #: that string is the Request section, never the title.
@@ -134,6 +135,20 @@ def _task_gist(task: str) -> str:
 #: Trailing ``Files: a, b`` from ``draft_write_plan`` — a list, not a paragraph.
 _PLAN_FILES = re.compile(r"(?i)^(.*?)\s+files:\s+(.+)$")
 
+
+def files_from_write_plan(text: str) -> list[str]:
+    """Paths listed after ``Files:`` in a write-plan blob. Empty if the blob has none."""
+    raw = (text or "").strip()
+    match = _PLAN_FILES.match(raw)
+    if match is None:
+        return []
+    return [
+        p.strip().strip("`")
+        for p in match.group(2).split(",")
+        if p.strip() and not is_dotenv_template(p.strip().strip("`"))
+    ]
+
+
 #: Platform fallback when the writer did not supply usage notes. Author → propose → a
 #: person merges → a person applies (038).
 DEFAULT_USAGE = (
@@ -153,7 +168,7 @@ def format_rationale(text: str) -> str:
     if match is None:
         return raw
     summary = match.group(1).strip()
-    paths = [p.strip().strip("`") for p in match.group(2).split(",") if p.strip()]
+    paths = files_from_write_plan(raw)
     lines: list[str] = []
     if summary:
         lines.extend([summary, ""])

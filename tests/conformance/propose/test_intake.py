@@ -177,6 +177,26 @@ def test_proposer_marks_the_run_complete_when_a_pr_url_is_written() -> None:
     assert "checkpoint_run(" in publish
 
 
+def test_proposer_does_not_restore_the_analyzer_payload_after_publish() -> None:
+    """After open_proposal writes pr_url, continue used to re-save checkpoint.payload.
+
+    That snapshot is the analyzer handoff (no URL). Nomad then reports complete, and
+    the Build page says 'Ended without a pull request' while GitHub has the PR.
+    """
+    source = (
+        Path(__file__).resolve().parents[3] / "src" / "surfaces" / "dispatch" / "entrypoint.py"
+    ).read_text(encoding="utf-8")
+    body = source.split("def continue_dispatched_run(", 1)[1].split(
+        "def _publish_the_proposal(", 1
+    )[0]
+    assert "if published != 0:" in body
+    success_arm = body.split("if published != 0:", 1)[1]
+    # The success path must not re-save the analyzer snapshot. The else of this
+    # proposer arm is the non-proposer continuation, which may still checkpoint.
+    before_else = success_arm.split("else:", 1)[0]
+    assert "payload=dict(checkpoint.payload)" not in before_else
+
+
 def test_api_job_copies_packs_so_propose_can_read_authoring_declarations() -> None:
     """Build refused every pack, including terraform, when the API allocation had no packs/.
 

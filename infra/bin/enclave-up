@@ -202,6 +202,33 @@ ok "listening (data on brieve-dev-pgdata, which outlives the allocation)"
 say "Trust store"
 cd "$ENV_DIR"
 export TF_VAR_vault_license="$LICENSE"
+
+# Laptop live Build. When ASK_MODEL is a real vendor model, bind authoring-agent's
+# write cell to it and add that cell to the matrix. Absent or fixture → remove the
+# override so a later vendor-less up does not keep yesterday's live pin.
+# Gitignored (*.auto.tfvars). CI never has this file.
+ASK_MODEL_FOR_WRITE="$(env_val ASK_MODEL)"
+LAPTOP_TFVARS="$ENV_DIR/laptop.auto.tfvars"
+if [ -n "$ASK_MODEL_FOR_WRITE" ] && [ "${ASK_MODEL_FOR_WRITE#fixture/}" = "$ASK_MODEL_FOR_WRITE" ]; then
+  case "$ASK_MODEL_FOR_WRITE" in
+    *'"'*|*$'*\n'*) die "ASK_MODEL contains characters that cannot be written into Terraform" ;;
+  esac
+  cat > "$LAPTOP_TFVARS" <<EOF
+authoring_write_cell = "terraform:${ASK_MODEL_FOR_WRITE}:write"
+extra_model_matrix_cells = [
+  {
+    pack         = "terraform"
+    model        = "${ASK_MODEL_FOR_WRITE}"
+    role         = "write"
+    qualified_by = "live"
+    scorer       = "authoring-reference-comparison"
+  },
+]
+EOF
+  ok "laptop write cell terraform:${ASK_MODEL_FOR_WRITE}:write (Ask model, write role)"
+else
+  rm -f "$LAPTOP_TFVARS"
+fi
 [ -d .terraform ] || terraform init -input=false >/dev/null
 
 # Stopping the container drops it from state on the next refresh, so a plain apply then

@@ -8,14 +8,21 @@ that is FR-015 failing** — record what you had to look up.
 
 ## 1. Bring it up
 
+On a laptop, `bash deploy/local/stack.sh up` already starts the enclave, the
+development sign-in helper, and this surface (`http://127.0.0.1:8083/mcp`). Skip
+the two `make` commands below if that is how you brought Brieve up.
+
+Otherwise:
+
 ```
 make dev-up              # the trust store, the scheduler, the databases
 DEV_IDP=1 make mcp-surface-up   # the served surface AND a development identity provider
 ```
 
-**Two commands, not one.** `make dev-up` brings up the enclave only — the surfaces are kept
-separate from it deliberately. `DEV_IDP=1` is what starts the development identity provider
-alongside the surface; without it the surface uses the real provider from your `.env`.
+**If you used those two `make` commands:** `make dev-up` brings up the enclave only —
+the surfaces are kept separate from it deliberately. `DEV_IDP=1` is what starts the
+development identity provider alongside the surface; without it the surface uses the
+real provider from your `.env`.
 
 The surface announces itself:
 

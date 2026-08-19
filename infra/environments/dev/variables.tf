@@ -151,6 +151,32 @@ variable "agent_definitions" {
   }
 }
 
+# Laptop Build. The default above stays the fixture cell so CI and a vendor-less
+# `make dev-up` never call out. When `.env` names a live ASK_MODEL, enclave-up writes
+# `laptop.auto.tfvars` (gitignored) that points this at a live write cell of the same
+# model. Distinct from ASK_MODEL on the API job: that variable still only drives Ask.
+# The write cell is what the analyzer consults.
+variable "authoring_write_cell" {
+  type        = string
+  default     = "terraform:fixture/scripted@1:write"
+  description = "Write cell bound on authoring-agent. Fixture by default; laptop live override via auto.tfvars."
+}
+
+# Extra matrix rows for the laptop live write cell. Empty in CI. Concatenated, never
+# replacing the fixture cells the merge lane resolves against.
+variable "extra_model_matrix_cells" {
+  type = list(object({
+    pack         = string
+    model        = string
+    role         = string
+    qualified_by = string
+    judge        = optional(string, "")
+    scorer       = optional(string, "")
+    withdrawn    = optional(bool, false)
+  }))
+  default = []
+}
+
 # The Qualified Model Matrix for the dev enclave.
 #
 # **These are the first cells this repository has ever authored.** 013 built the matrix

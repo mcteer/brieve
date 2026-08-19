@@ -274,6 +274,11 @@ def test_row_t9_the_continuation_mode_exists_and_does_all_four_things() -> None:
 
     # And it refuses a terminal run rather than silently doing nothing.
     assert "is_terminal()" in body
+    # After a successful publish it must not restore the analyzer snapshot
+    # (that wipe is "Ended without a pull request" with a live GitHub PR).
+    assert "if published != 0:" in body
+    success = body.split("if published != 0:", 1)[1].split("else:", 1)[0]
+    assert "payload=dict(checkpoint.payload)" not in success
 
 
 def test_row_t7_the_analyzer_leaves_the_run_non_terminal() -> None:

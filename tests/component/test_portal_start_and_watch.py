@@ -221,3 +221,46 @@ def test_an_unreachable_api_says_so_rather_than_showing_an_empty_platform() -> N
     assert "not started any conversations" not in page.text, (
         "an unreachable platform was rendered as an empty one"
     )
+
+
+def test_an_unverifiable_session_is_not_rendered_as_an_outage() -> None:
+    """401 is the platform answering. Collapsing it into unreachable is the lie.
+
+    The development IdP mints a new key per process. After `stack.sh up` recreates
+    that container, the portal still holds a JWT the API correctly refuses as
+    `unverifiable_identity`. That used to print "could not be reached" while the
+    API was up. 012: a dead session is a re-auth redirect, not an error page.
+    """
+
+    def unverifiable(*, method: str, url: str, token: str, json_body: object) -> ApiResponse:
+        return ApiResponse(
+            status=401,
+            payload={"detail": {"reason_code": "unverifiable_identity"}},
+        )
+
+    surface = surface_under_test()
+    oidc = OidcClient(
+        issuer=surface.idp.issuer,
+        client_id="portal",
+        redirect_uri="http://testserver/callback",
+        authorize_endpoint="http://idp.test/authorize",
+        token_endpoint="http://idp.test/token",
+        exchange=lambda code, code_verifier: surface.idp.exchange(
+            code=code, code_verifier=code_verifier, redirect_uri="http://localhost/callback"
+        ),
+    )
+    app = create_portal(
+        relay=ApiRelay(base_url="http://api.test", transport=unverifiable),
+        oidc=oidc,
+    )
+    portal = TestClient(app, base_url="http://testserver")
+    state, _ = oidc.begin()
+    code = surface.idp.authorize(code_challenge=code_challenge_for(oidc._pending[state].verifier))
+    signed = portal.get(f"/callback?code={code}&state={state}", follow_redirects=False)
+    portal.cookies.set(COOKIE_NAME, str(signed.cookies.get(COOKIE_NAME)))
+
+    page = portal.get("/", follow_redirects=False)
+
+    assert page.status_code == 303
+    assert "could not be reached" not in page.text
+    assert page.headers["location"].startswith("http://idp.test/authorize")

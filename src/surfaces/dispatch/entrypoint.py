@@ -42,7 +42,7 @@ from core.authoring.progress import (
     initial_progress,
     phase_to_fail,
 )
-from core.authoring.proposal import branch_for, compose
+from core.authoring.proposal import branch_for, compose, files_from_write_plan
 from core.authoring.publish import ProposalObserver, ProposalPublisher
 from core.authoring.retention import scrub_authoring_requests
 from core.authoring.tool import AUTHOR_FILE, OPEN_PROPOSAL, READ_SUBJECT, WRITE_ROLE
@@ -273,11 +273,60 @@ def _authoring_step_tools(
     return list(tools)
 
 
-def _empty_after_plan(*, planned: bool, authored: int, outcome: Any) -> str:
+def _remaining_planned(*, write_plan: str, authored: dict[str, str] | None) -> list[str]:
+    """Planned paths that have not been authored yet (exact path or matching basename)."""
+    have = set((authored or {}).keys())
+    have_base = {p.rsplit("/", 1)[-1] for p in have}
+    remaining: list[str] = []
+    for path in files_from_write_plan(write_plan):
+        base = path.rsplit("/", 1)[-1]
+        if path in have or base in have_base:
+            continue
+        remaining.append(path)
+    return remaining
+
+
+def _write_locked_task(
+    task: str,
+    *,
+    write_plan: str,
+    authored: dict[str, str] | None,
+) -> str:
+    """Steer the write-cell model at remaining planned paths, not a second copy of one file."""
+    have = sorted((authored or {}).keys())
+    remaining = _remaining_planned(write_plan=write_plan, authored=authored)
+    authored_txt = ", ".join(have) or "(none yet)"
+    plan_txt = (write_plan or "").strip() or "(none recorded)"
+    if remaining:
+        still = ", ".join(remaining)
+        return (
+            f"{task}\n\nWrite plan: {plan_txt}\n"
+            f"Already authored: {authored_txt}\n"
+            f"Still to write: {still}\n"
+            "You must call author_file for one path that is still to write, with a full "
+            "file body. Do not write a second copy of an already-authored module under a "
+            "different folder. Do not overwrite an already-authored path unless its body "
+            "is incomplete. Answering NONE is not completion — it abandons the pull request."
+        )
+    return (
+        f"{task}\n\nWrite plan: {plan_txt}\n"
+        f"Already authored: {authored_txt}\n"
+        "The planned files are written. Do not add duplicate copies under other folders. "
+        "If you have nothing new, answering NONE ends Write and the run proceeds to Judge."
+    )
+
+
+def _empty_after_plan(
+    *,
+    planned: bool,
+    authored: int,
+    outcome: Any,
+    remaining: int = 0,
+) -> str:
     """What an empty/exhausted choice means once a write plan exists.
 
-    ``done`` — files exist and the model named nothing further.
-    ``retry`` — nothing authored yet; the next step must ask again (NONE is not a Build end).
+    ``done`` — files exist, remaining planned paths are empty, and the model named nothing.
+    ``retry`` — nothing authored yet, or planned paths are still missing (NONE is not a Build end).
     ``stop`` — not an authoring write loop, or a real bound exhaustion after files exist.
     """
     if not planned:
@@ -286,6 +335,8 @@ def _empty_after_plan(*, planned: bool, authored: int, outcome: Any) -> str:
     empty = name == str(ChoiceOutcome.EMPTY)
     exhausted = name == str(ChoiceOutcome.EXHAUSTED)
     if authored > 0 and empty:
+        if remaining > 0:
+            return "retry"
         return "done"
     if authored == 0 and (empty or exhausted):
         return "retry"
@@ -466,8 +517,11 @@ def _run_steps(
                 resolution = resolve_step_tool(
                     run,
                     task=(
-                        f"{task}\n\nYou must call author_file. Answering NONE is not "
-                        "completion — it abandons the pull request."
+                        _write_locked_task(
+                            task,
+                            write_plan=str(getattr(run, "write_plan", "") or ""),
+                            authored=author.contents if author is not None else None,
+                        )
                         if write_locked
                         else task
                     ),
@@ -523,6 +577,12 @@ def _run_steps(
                     _empty_after_plan(
                         planned=planned,
                         authored=authored_n,
+                        remaining=len(
+                            _remaining_planned(
+                                write_plan=str(getattr(run, "write_plan", "") or ""),
+                                authored=author.contents if author is not None else None,
+                            )
+                        ),
                         outcome=resolution.outcome,
                     )
                     if require_write_plan
@@ -1223,8 +1283,12 @@ def continue_dispatched_run(
         published = _publish_the_proposal(run, checkpoint=checkpoint, registry=registry)
         if published != 0:
             return published
-
-    checkpoint_run(run, payload=dict(checkpoint.payload))
+        # `_publish_the_proposal` already wrote the terminal payload (PR URL, or a
+        # phase failure). Re-saving `checkpoint.payload` here restored the analyzer
+        # snapshot, wiped `pr_url`, and left Nomad "complete" looking like
+        # "Ended without a pull request."
+    else:
+        checkpoint_run(run, payload=dict(checkpoint.payload))
 
     # FR-033: the finished acts' arguments are a customer's file content, and they do not
     # outlive the run. Closed brackets only — 040's own bound, because an open one revives by
