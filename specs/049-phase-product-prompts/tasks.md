@@ -45,7 +45,7 @@ Single project: `src/`, `tests/`, `packs/`, `evals/`, `docs/` at repository root
       broker (ADR-0058); not a new served egress class; extra name is `prompt-tune`; pin is
       `dspy==3.3.0` (PyPI `dspy`, not the `dspy-ai` alias)
 - [ ] T002 [P] Create `tests/conformance/phase_agents/` (package `__init__.py`) for A1–A13
-      hermetic rows named in
+      and A4b hermetic rows named in
       `specs/049-phase-product-prompts/contracts/conformance-phase-product-prompts.md`
 
 ---
@@ -157,7 +157,10 @@ Omit Write → Write fails, no PR.
 - [ ] T024 [P] [US1] Add five `[[agents]]` rows with matching SHA-256 digests to
       `packs/terraform/pack.toml`; add non-empty
       `packs/terraform/agents/<phase>/PROVENANCE.md` siblings (may be brief; US3 completes
-      sources-and-date)
+      sources-and-date). These pins are the **seed set** so US1 can load files; they are
+      not `promote_phase_agents` output. T036 must score these shipped paths. T041 may
+      overwrite them from `evals/prompt-tune/candidates/` only after both qualifications
+      pass.
 - [ ] T025 [US1] Confirm `src/surfaces/api/propose.py` still sets
       `AuthoringRequest.pack` to the terraform pack name explicitly; dispatch uses
       `bind_phase_agents` on that single pack for every 047 phase (T009/T012)
@@ -190,7 +193,8 @@ Terraform Research text. 042 policy authoring is not this walk.
       `packs/vault/agents/{research,plan,write,judge,propose}/AGENTS.md` (not a renamed
       copy of Terraform; Write must not instruct Terraform resources)
 - [ ] T029 [P] [US2] Add five `[[agents]]` rows and digests to `packs/vault/pack.toml`
-      plus `packs/vault/agents/<phase>/PROVENANCE.md` siblings
+      plus `packs/vault/agents/<phase>/PROVENANCE.md` siblings (seed set, same rule as
+      T024: T036 scores these paths; T041 overwrites only after both qualifications)
 - [ ] T030 [US2] Hermetic driver that constructs `AuthoringRequest` with the vault pack
       name and walks five phases, asserting pins in
       `tests/conformance/phase_agents/test_vault_phase_pins.py` (new)
@@ -251,7 +255,9 @@ must fail. Losing either blocks promotion. Production path does not import `dspy
 - [ ] T036 [P] [US4] [GATE:eval] `phase_agents` / `build_agents` floors and known-fail
       fixtures via `load_phase_agents_cases` / `load_build_agents_cases` in
       `tests/conformance/phase_agents/test_agents_eval_can_fail.py` (new) (A11, SC-004);
-      assert `test_eval_gates` still iterates only `SUITES`
+      assert `test_eval_gates` still iterates only `SUITES`; assert at least one `pass`
+      case per phase (and one `build_agents` `pass`) names the shipped
+      `packs/<pack>/agents/<phase>/AGENTS.md` path or digest
 - [ ] T037 [P] [US4] [GATE:fail-closed] `promote_phase_agents` refuses missing
       qualifications (`promotion_incomplete`) and missing extra (`refinement_unavailable`)
       in `tests/conformance/phase_agents/test_promote_phase_agents.py` (new) (A12)
@@ -270,9 +276,11 @@ must fail. Losing either blocks promotion. Production path does not import `dspy
 - [ ] T039 [P] [US4] Ship `packs/terraform/evals/phase_agents.toml` and
       `packs/terraform/evals/build_agents.toml` loaded **only** by T057: `phase_agents`
       has ≥5 cases **per phase** and ≥1 `fail` **per phase**; `build_agents` has ≥5
-      cases and ≥1 jointly poisonous `fail`
-- [ ] T040 [P] [US4] Ship the same two files and floors under `packs/vault/evals/`,
-      loaded only by T057
+      cases and ≥1 jointly poisonous `fail`; **at least one `pass` case per phase**
+      (and one `build_agents` `pass`) sets `instruction_ref` / `set_ref` to the shipped
+      `packs/terraform/agents/<phase>/AGENTS.md` path or digest
+- [ ] T040 [P] [US4] Ship the same two files, floors, and shipped-path `pass` refs under
+      `packs/vault/evals/`, loaded only by T057
 - [ ] T041 [US4] Implement `promote_phase_agents` in `src/core/evals/promotion.py` per
       `specs/049-phase-product-prompts/contracts/prompt-tune.md` (digest, lens, both
       suites, provenance sibling; authored files do not invent `upstream_commit`)
@@ -290,7 +298,10 @@ must fail. Losing either blocks promotion. Production path does not import `dspy
 - [ ] T045 [US4] In `evals/prompt-tune/gepa_phase.py` and
       `evals/prompt-tune/dspy_build.py` (and `promote_phase_agents` in
       `src/core/evals/promotion.py`): missing `dspy` import → `refinement_unavailable`;
-      never stamp seed files promoted without both suites
+      `promote_phase_agents` MUST NOT update `[[agents]]` without both suites. T024/T029
+      seed pins are a different writer; they stay until this function overwrites them
+      after both qualifications pass. Never treat a seed pin as evidence that GEPA/DSPy
+      ran.
 - [ ] T046 [US4] [GATE:eval] Document named-runner SC-006 / E2 / E3 in
       `evals/prompt-tune/README.md`: n, generic-steer pass rate, promoted pass rate,
       **positive delta** on `evals/authoring` golden tasks (not pytest wording

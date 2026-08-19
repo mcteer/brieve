@@ -49,8 +49,10 @@ src/core/evals/phase_agents_corpus.py
 
 Files: `packs/<pack>/evals/phase_agents.toml`, `packs/<pack>/evals/build_agents.toml`.
 Floors: `phase_agents` ≥5 cases **per phase** and ≥1 `fail` **per phase**; `build_agents`
-≥5 cases and ≥1 jointly poisonous `fail`. Refuse with `CorpusRefused` / `UnrunnableSuite`
-below floor. **Never** add these names to `SUITES`. **Never** parse them with
+≥5 cases and ≥1 jointly poisonous `fail`. **At least one `pass` case per phase** (and one
+`build_agents` `pass` case) MUST set `instruction_ref` / `set_ref` to the shipped
+`packs/<pack>/agents/<phase>/AGENTS.md` path or digest so T036 scores production bytes,
+not only synthetic fixtures. Refuse with `CorpusRefused` / `UnrunnableSuite` below floor. **Never** add these names to `SUITES`. **Never** parse them with
 `parse_cases` / `load_pack_cases`. `test_eval_gates` must not iterate them.
 
 ## Promotion helper (named)

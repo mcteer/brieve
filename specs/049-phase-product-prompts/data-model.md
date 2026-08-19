@@ -108,7 +108,7 @@ instruction body in audit.
 | `id` | Unique per pack file |
 | `suite` | `phase_agents` |
 | `phase` | One `PhaseName` |
-| `instruction_ref` | Path or digest under test |
+| `instruction_ref` | Path or digest under test. **At least one `pass` case per phase** MUST name the shipped file `packs/<pack>/agents/<phase>/AGENTS.md` (or that file's digest). `fail` cases MAY name a synthetic bad instruction (e.g. generic “write files”); they must not be the only cases. |
 | `expected` | Mechanical: `pass` or `fail` |
 | Floor | ≥5 cases per phase; **at least one `fail`** case per phase (ADR-0047) |
 
@@ -123,7 +123,7 @@ GEPA uses the same case identities. Parsed **only** by
 | --- | --- |
 | `id` | Unique |
 | `suite` | `build_agents` |
-| `set_ref` | The five-file set |
+| `set_ref` | The five-file set. **At least one `pass` case** MUST name the five shipped `packs/<pack>/agents/<phase>/AGENTS.md` paths (or their digests). The required `fail` case MAY name a jointly poisonous synthetic set. |
 | `expected` | `pass` or `fail` |
 | Floor | ≥5 cases; **at least one `fail`** for a set that is individually plausible and jointly poisonous |
 

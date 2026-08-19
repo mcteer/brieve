@@ -15,7 +15,7 @@
 | A8 | Ask path never sets `ChoiceRequest.instruction` from pack agents | Ask choose sees a Build `AGENTS.md` body |
 | A9 | Judge bind uses judge cell + Judge file; Write bind uses write cell + Write file | Same binding for both, or Write file used at Judge |
 | A10 | `src/core` stays product-blind; `dspy`/`gepa` not imported from served packages | New terraform identifier in core, or `import dspy` under `src/core` / served adapters/surfaces |
-| A11 | `phase_agents` and `build_agents` each include known-fail fixtures at the data-model floor; loaders are `load_phase_agents_cases` / `load_build_agents_cases`, not `parse_cases` | Suites with only passing cases, or names added to `SUITES` / scored by `test_eval_gates` |
+| A11 | `phase_agents` and `build_agents` each include known-fail fixtures at the data-model floor; loaders are `load_phase_agents_cases` / `load_build_agents_cases`, not `parse_cases`; at least one `pass` case per phase names the shipped `AGENTS.md` | Suites with only passing cases, only synthetic refs, or names added to `SUITES` / scored by `test_eval_gates` |
 | A12 | `promote_phase_agents` refuses when either qualification is missing; a single-phase GEPA loss copies **zero** files | Promote returns evidence without both suites, or four files copy after one loss |
 | A13 | Portal templates/JS do not contain phase instruction bodies or a prompt composer for them | Portal ships or selects `AGENTS.md` text |
 
