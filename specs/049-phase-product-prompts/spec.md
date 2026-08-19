@@ -68,6 +68,12 @@ promotion is blocked when it loses. That is already this platform's eval rule fo
 - Q: Can an existing pack `SKILL.md` stand in for a missing phase `AGENTS.md`? → A:
   **No.** Skills remain skills (ADR-0004). A skill is not a phase instruction. Absence
   of the phase file is FR-004 (fail closed).
+- Q: What does **unpromoted** mean at phase start (FR-004 / SC-003)? → A: The phase
+  `AGENTS.md` is **not digest-pinned in the bound pack's deployed `pack.toml`**. Files
+  under `evals/prompt-tune/candidates/` are never loaded. There is no runtime
+  `promoted=true` flag. A missing pin is `agents_missing` — the same fail-closed stop
+  as an absent file. `promote_phase_agents` is the only path that copies candidates into
+  `packs/` and updates the pin.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -106,8 +112,10 @@ generic substitute.
 **Why this priority**: Two packs are how this platform proves packs are independent
 (013). One product's instructions would leave the "per product" claim untested.
 
-**Independent Test**: Same as US1, with Vault as the bound product. Cross-check that
-Vault Research is not the Terraform Research text.
+**Independent Test**: Same pin/fail-closed properties as US1, with Vault as the bound
+pack, via a hermetic five-phase walk (`AuthoringRequest` / `RUN_PACKS` size 1).
+Cross-check that Vault Research is not the Terraform Research text. 042 policy authoring
+is not this walk.
 
 **Acceptance Scenarios**:
 
@@ -211,7 +219,9 @@ instruction set that loses either gate is not the set a production Build execute
 - **FR-003**: Phase instructions for the same product MUST be distinct from each other
   (Research is not Write with the tools changed).
 - **FR-004**: A phase MUST NOT start if its product-phase instruction is missing,
-  empty, or unpromoted. The run stops fail-closed; no pull request opens.
+  empty, or unpromoted (not digest-pinned in the bound pack's deployed `pack.toml`;
+  candidates under `evals/prompt-tune/candidates/` are never loaded). The run stops
+  fail-closed; no pull request opens.
 - **FR-005**: The platform core MUST remain product-blind: Terraform and Vault knowledge
   lives in those packs. Adding Consul (or any further HashiCorp product) is a new pack
   that ships the same five phase `AGENTS.md` files, not a core change.
@@ -272,9 +282,10 @@ instruction set that loses either gate is not the set a production Build execute
 - **SC-005**: Connected, restricted, and air-gapped profiles execute the same pinned
   instructions; none of them require a public-internet fetch to start a phase.
 - **SC-006**: After promotion, a full Terraform Build and a full Vault Build each show
-  (in eval, not in a unit test) a higher rate of coherent, product-correct proposals
-  than the generic pre-feature steer, on the same tasks the suites already use to
-  score authoring.
+  (in eval, not in a unit test) a **strictly higher** pass rate than the generic
+  pre-feature steer on the same `evals/authoring` golden tasks, same n. The named-runner
+  record in `evals/prompt-tune/README.md` states n, both rates, and that the delta is
+  positive. A non-positive delta is a failed eval, not a documentation note.
 
 ## Assumptions
 
@@ -285,6 +296,10 @@ instruction set that loses either gate is not the set a production Build execute
   product (047 is Terraform-shaped; 042 is Vault-shaped). This feature does not invent
   a new "pick your product" control. If binding is ambiguous, FR-004's fail-closed path
   applies rather than a default product.
+- **Vault five-phase steering (US2)**: Proven as a property by a hermetic
+  `AuthoringRequest` / `RUN_PACKS` size-1 walk of the 047 phases. This feature does **not**
+  rewrite 042 policy authoring onto that spine. Production Propose stays explicitly
+  Terraform-bound.
 - **Published practice is authored, then pinned**: Maintainers (and the specified
   refinement passes) consult current public product documentation and style guidance
   *when writing or revising* an instruction. The Build does not.

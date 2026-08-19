@@ -178,13 +178,22 @@ Required suites for an authoring pack's instruction set:
 
 These are **not** members of `SUITES` (per-pack Ask suites). Same shape as
 `AUTHORING_QUALIFICATION`: required of packs that declare an authoring workflow.
+Case files live at `packs/<pack>/evals/phase_agents.toml` and `build_agents.toml` but
+**must not** be loaded by `load_pack_cases` / `parse_cases` (those refuse unknown
+`SUITES` names, and `test_eval_gates` asserts every `SUITES` member all-green). Named
+loaders: `core.evals.phase_agents_corpus.load_phase_agents_cases` and
+`load_build_agents_cases`. Adding these names to `SUITES` is a defect.
+
+**Set promotion, not per-file copy.** If any one phase loses GEPA **or** the five-predictor
+DSPy program loses `build_agents`, **none** of the five files are copied into `packs/` and
+no `[[agents]]` digest is updated. Partial sets are forbidden.
 
 Runtime "unpromoted": the only files an allocation executes are those whose digests are in
 the deployed `pack.toml`. Candidates live under `evals/prompt-tune/candidates/` until
-promotion copies them into `packs/<pack>/agents/` and updates the pin. A digest in the
-manifest without both qualifications in `suites_passed` is refused at promote time; a
-missing pin is refused at load/phase start. There is no `promoted=true` boolean that can
-be set by hand without the function.
+promotion copies **the whole set** into `packs/<pack>/agents/` and updates the pin. A
+digest in the manifest without both qualifications in `suites_passed` is refused at
+promote time; a missing pin is refused at load/phase start (`agents_missing`). There is
+no `promoted=true` boolean that can be set by hand without the function.
 
 Authored provenance: Terraform phase files are **authored** content inside an adopted pack
 (they are not in `hashicorp/agent-skills`). Vault files are authored in an authored pack.
@@ -213,16 +222,20 @@ Hermetic / merge-blocking (deterministic; no live model):
   `agents_missing`.
 - Ask: answering path never reads `packs/*/agents/`.
 - Pin: mutate bytes without digest update → `digest_mismatch` at load.
-- Suite floors: `phase_agents.toml` / `build_agents.toml` include **known-fail fixtures**
-  (a generic "write files" instruction; a five-file set that poisons Write). Scoring those
-  fixtures must be able to report fail (ADR-0047). Fixture scoring uses recorded outcomes
-  / mechanical properties (existing authoring corpus style), never a live model.
+- Suite floors: `phase_agents.toml` / `build_agents.toml` are parsed **only** by
+  `load_phase_agents_cases` / `load_build_agents_cases` in
+  `src/core/evals/phase_agents_corpus.py` (not `parse_cases`). `phase_agents` has **≥5
+  cases per phase** and **≥1 fail case per phase**. `build_agents` has **≥5 cases** and
+  **≥1 fail** for a jointly poisonous set. Scoring those fixtures must be able to report
+  fail (ADR-0047). Fixture scoring uses recorded outcomes / mechanical properties
+  (existing authoring corpus style), never a live model. `test_eval_gates` must not
+  iterate these suite names.
 
 Eval / named-runner (statistical; SC-006):
 
-- After promotion, full Terraform and Vault Builds beat the generic pre-feature steer on
-  the existing authoring corpus tasks. Thresholds live in the eval README, not in pytest
-  assertions on model wording.
+- After promotion, full Terraform and Vault Builds show a **strictly higher** pass rate
+  than the generic pre-feature steer on `evals/authoring` golden tasks, same n. The
+  named-runner README records n, both rates, and a positive delta.
 
 **Rationale**: `docs/development/testing.md` — tests vs evals never mix.
 
@@ -253,19 +266,24 @@ resources; Research is not Write with the tools changed (FR-003).
 ## R9 — Evidence keys
 
 **Decision**: Extend `content_pins` (and the `RUN_START` payload it feeds) with
-`{pack}/agents/{phase}` → digest for every bound phase instruction the run actually
-started. Phase start also records `version` from `AgentPin` on the propose-progress /
-run checkpoint so FR-012 is joinable without inferring from git. Correlation ID is
-unchanged.
+
+```text
+{pack}/agents/{phase}@{version} = <digest>
+```
+
+for every bound phase instruction the run actually started. The key carries identity
+(pack, phase) **and** version (FR-012); the value is the executed digest. Correlation ID
+is unchanged.
 
 Do not log instruction **bodies** in audit (volume and injection surface). Identity,
 version, digest, phase, pack name.
 
 **Rationale**: FR-012, Principle IX, existing `pack@version` and `pack/skill` keys.
 
-**Alternatives considered**: Hash only the pack version (cannot tell which phase file).
-Store full prompt text in Postgres (bodies are large and not needed for reconstruction
-if the pin is in git).
+**Alternatives considered**: `{pack}/agents/{phase}` → digest only (drops version from the
+joinable record). Hash only the pack version (cannot tell which phase file). Store full
+prompt text in Postgres (bodies are large and not needed for reconstruction if the pin is
+in git).
 
 ---
 
@@ -281,3 +299,22 @@ for those seams (Principle V). Named reviewer: Dan.
 **Alternatives considered**: Hardcoding terraform hints in `model_chooser` (caught by
 product-blindness if moved to core; still wrong in the adapter). New portal API for
 prompts (FR-013).
+
+---
+
+## R11 — 013 loader list is amended, not forked
+
+**Decision**: `specs/013-capability-packs/contracts/pack-manifest.md` declared its load
+sequence **closed**. 049 adds `[[agents]]` verification on that same sequence (skills
+digests then agents digests/completeness for authoring packs). Implement **surgically
+edits** that 013 contract: expand step 2 to cover skill **and** `AgentPin` digests, add
+authoring-pack completeness after step 2, and replace “this list is closed” with “closed
+except as amended by a later feature's pack-manifest contract — 049 amends it here.”
+049's `contracts/pack-agents.md` is the amendment text; 013 must not keep claiming an
+unamended closed list after 049 merges.
+
+**Rationale**: Named contracts bind; two merged documents that disagree are a review
+blocker (AGENTS.md).
+
+**Alternatives considered**: Leave 013 untouched (silent conflict). Duplicate the full
+loader contract only under 049 (readers of 013 would still be wrong).

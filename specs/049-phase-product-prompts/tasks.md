@@ -13,8 +13,8 @@ evals, never pytest-on-model-wording.
 **Organization**: By user story. US1 (Terraform per-phase steer) is MVP. US2 (Vault isolation)
 is the second P1. US3 (published practice + provenance) and US4 (GEPA then DSPy promotion)
 are P2. Named helpers bind exactly: `AgentPin`, `load_phase_agents`, `bind_phase_agents`,
-`promote_phase_agents`. Do not substitute SKILL.md, pack.toml prose, or repository-root
-`AGENTS.md`.
+`promote_phase_agents`, `load_phase_agents_cases`, `load_build_agents_cases`. Do not
+substitute SKILL.md, pack.toml prose, or repository-root `AGENTS.md`.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -22,10 +22,10 @@ are P2. Named helpers bind exactly: `AgentPin`, `load_phase_agents`, `bind_phase
 
 | Gate type | Where |
 | --- | --- |
-| **Fail-closed** | T016–T018, T026, T044 (`agents_missing` / `agents_empty` / `digest_mismatch` / `pack_unbound` / `pack_ambiguous` / `refinement_unavailable`; no PR) |
-| **Conformance** | T019–T021, T027–T028, T035, T047 (A1–A13); T048 named-runner E1–E3 |
-| **Correlation / evidence** | T014–T015, T021 (`{pack}/agents/{phase}` digest on the run, joinable on correlation ID; no instruction bodies in audit) |
-| **Eval** | T036–T046 (`phase_agents`, `build_agents`, GEPA then DSPy; suites include known-fail fixtures) |
+| **Fail-closed** | T016–T018, T026, T056, T044 (`agents_missing` / `agents_empty` / `digest_mismatch` / `pack_unbound` / `pack_ambiguous` / `refinement_unavailable`; no PR; candidates never loaded) |
+| **Conformance** | T019–T021, T027, T035, T047 (A1–A13); T048 named-runner E1–E3 |
+| **Correlation / evidence** | T014–T015, T021 (`{pack}/agents/{phase}@{version}` digest on the run, joinable on correlation ID; no instruction bodies in audit) |
+| **Eval** | T036–T046, T057 (`phase_agents`, `build_agents` via `phase_agents_corpus`, GEPA then DSPy; suites include known-fail fixtures; not `SUITES`) |
 | **No-secret-leak** | T015 — pin identity/version/digest only; never log `AGENTS.md` bodies or secret-shaped values in phase reasons |
 
 ## Path Conventions
@@ -85,7 +85,7 @@ product identifiers (`terraform`, `packer`, `consul`).
       `pack_ambiguous`); call `load_phase_agents`; on failure mark the 047 phase
       `PhaseStatus.FAILED` and do not call `open_proposal`
 - [ ] T010 Extend `content_pins` in `src/surfaces/toolset.py` with keys
-      `{pack}/agents/{phase}` → digest for each phase the run started
+      `{pack}/agents/{phase}@{version}` → digest for each phase the run started (FR-012)
 - [ ] T011 Prepend non-empty `request.instruction` to the system prompt in
       `src/adapters/model_chooser.py`; keep `_AUTHORING_*_HINT` as tool-schema only; do not
       treat those hints as a fallback when Build `instruction` is missing
@@ -99,13 +99,17 @@ product identifiers (`terraform`, `packer`, `consul`).
       empty body, missing provenance, unknown/duplicate phase — using fixture pack names,
       not product identifiers in `src/core`
 - [ ] T014 [P] [GATE:correlation] Unit tests that `content_pins` emits
-      `{pack}/agents/{phase}` in `tests/component/test_run_record_names_its_packs.py` (extend)
-      or `tests/component/test_phase_agents_pins.py` (new)
+      `{pack}/agents/{phase}@{version}` in `tests/component/test_run_record_names_its_packs.py`
+      (extend) or `tests/component/test_phase_agents_pins.py` (new)
 - [ ] T015 [GATE:no-secret-leak] Assert phase-fail reasons and audit payloads do not contain
       instruction bodies or secret-shaped values in
       `tests/conformance/phase_agents/test_pins_are_identity_only.py` (new)
 - [ ] T016 [GATE:fail-closed] Missing/empty instruction fails the phase and blocks PR in
       `tests/conformance/phase_agents/test_missing_agents_fail_closed.py` (new) (A4, A5)
+- [ ] T056 [GATE:fail-closed] A file under `evals/prompt-tune/candidates/` is never loaded
+      as a phase instruction; missing `[[agents]]` pin is `agents_missing` in
+      `tests/conformance/phase_agents/test_candidates_are_not_executed.py` (new) (A4b,
+      FR-004 unpromoted)
 - [ ] T017 [GATE:fail-closed] Root `AGENTS.md` and pack `SKILL.md` are not stand-ins in
       `tests/conformance/phase_agents/test_no_standin_instruction.py` (new) (A6, FR-016)
 - [ ] T018 [GATE:fail-closed] Zero packs → `pack_unbound`; two packs → `pack_ambiguous`;
@@ -130,8 +134,8 @@ per phase, recorded on the run. Propose intake stays `pack="terraform"` in
 `src/surfaces/api/propose.py` (explicit 047 binding, not a default).
 
 **Independent Test**: Start a terraform-bound authoring run (hermetic). Each executed phase
-records `terraform/agents/<phase>` with a digest distinct from the other four. Omit Write
-→ Write fails, no PR.
+records `terraform/agents/<phase>@<version>` with a digest distinct from the other four.
+Omit Write → Write fails, no PR.
 
 ### Tests for User Story 1
 
@@ -139,7 +143,7 @@ records `terraform/agents/<phase>` with a digest distinct from the other four. O
 
 - [ ] T021 [P] [US1] [GATE:conformance] A1/A3 rows for terraform in
       `tests/conformance/phase_agents/test_terraform_phase_pins.py` (new): five files load;
-      run pins `terraform/agents/<phase>` only
+      run pins `terraform/agents/<phase>@<version>` only
 - [ ] T022 [P] [US1] [GATE:conformance] A9 judge-vs-write binding row in
       `tests/conformance/phase_agents/test_judge_file_not_write_file.py` (new)
 
@@ -169,8 +173,8 @@ product picker. Vault-bound runs are constructed via `AuthoringRequest` / `RUN_P
 (research R3).
 
 **Independent Test**: Vault-bound fake/hermetic five-phase walk records
-`vault/agents/<phase>` and never `terraform/agents/*`. Vault Research text ≠ Terraform
-Research text.
+`vault/agents/<phase>@<version>` and never `terraform/agents/*`. Vault Research text ≠
+Terraform Research text. 042 policy authoring is not this walk.
 
 ### Tests for User Story 2
 
@@ -245,8 +249,9 @@ must fail. Losing either blocks promotion. Production path does not import `dspy
 ### Tests for User Story 4
 
 - [ ] T036 [P] [US4] [GATE:eval] `phase_agents` / `build_agents` floors and known-fail
-      fixtures in `tests/conformance/phase_agents/test_agents_eval_can_fail.py` (new)
-      (A11, SC-004)
+      fixtures via `load_phase_agents_cases` / `load_build_agents_cases` in
+      `tests/conformance/phase_agents/test_agents_eval_can_fail.py` (new) (A11, SC-004);
+      assert `test_eval_gates` still iterates only `SUITES`
 - [ ] T037 [P] [US4] [GATE:fail-closed] `promote_phase_agents` refuses missing
       qualifications (`promotion_incomplete`) and missing extra (`refinement_unavailable`)
       in `tests/conformance/phase_agents/test_promote_phase_agents.py` (new) (A12)
@@ -255,12 +260,19 @@ must fail. Losing either blocks promotion. Production path does not import `dspy
 
 - [ ] T038 [US4] Add `PHASE_AGENTS_QUALIFICATION = "phase_agents"` and
       `BUILD_AGENTS_QUALIFICATION = "build_agents"` beside `AUTHORING_QUALIFICATION` in
-      `src/core/evals/suites.py` — **not** members of `SUITES`
+      `src/core/evals/suites.py` — **not** members of `SUITES`; do not teach
+      `parse_cases` / `load_pack_cases` these names
+- [ ] T057 [US4] Implement `load_phase_agents_cases` and `load_build_agents_cases` in
+      `src/core/evals/phase_agents_corpus.py` (same refusal grain as
+      `authoring_corpus.py`): floors from
+      `specs/049-phase-product-prompts/data-model.md`; `CorpusRefused` /
+      `UnrunnableSuite` below floor; **never** called from `test_eval_gates.py`
 - [ ] T039 [P] [US4] Ship `packs/terraform/evals/phase_agents.toml` and
-      `packs/terraform/evals/build_agents.toml` with ≥5 cases each and **at least one
-      `fail` case** (generic “write files” instruction; jointly poisonous set) per
-      `specs/049-phase-product-prompts/data-model.md`
-- [ ] T040 [P] [US4] Ship the same two files under `packs/vault/evals/`
+      `packs/terraform/evals/build_agents.toml` loaded **only** by T057: `phase_agents`
+      has ≥5 cases **per phase** and ≥1 `fail` **per phase**; `build_agents` has ≥5
+      cases and ≥1 jointly poisonous `fail`
+- [ ] T040 [P] [US4] Ship the same two files and floors under `packs/vault/evals/`,
+      loaded only by T057
 - [ ] T041 [US4] Implement `promote_phase_agents` in `src/core/evals/promotion.py` per
       `specs/049-phase-product-prompts/contracts/prompt-tune.md` (digest, lens, both
       suites, provenance sibling; authored files do not invent `upstream_commit`)
@@ -270,16 +282,19 @@ must fail. Losing either blocks promotion. Production path does not import `dspy
       weaken `licenses/allowlist.txt`)
 - [ ] T043 [P] [US4] Implement `evals/prompt-tune/gepa_phase.py` — `dspy.GEPA` on a
       one-predictor module per `AGENTS.md` against `phase_agents`; candidates write to
-      `evals/prompt-tune/candidates/`; losing metric does not copy into `packs/`
+      `evals/prompt-tune/candidates/`; if **any** phase loses, copy **zero** files into
+      `packs/` (whole-set rule)
 - [ ] T044 [P] [US4] Implement `evals/prompt-tune/dspy_build.py` — five-predictor
       `dspy.Module` compiled with `dspy.GEPA` against `build_agents`; no MIPROv2/COPRO
-      substitute; losing joint metric blocks the set
+      substitute; a losing joint metric copies **zero** files (same whole-set rule as T043)
 - [ ] T045 [US4] In `evals/prompt-tune/gepa_phase.py` and
       `evals/prompt-tune/dspy_build.py` (and `promote_phase_agents` in
       `src/core/evals/promotion.py`): missing `dspy` import → `refinement_unavailable`;
       never stamp seed files promoted without both suites
-- [ ] T046 [US4] [GATE:eval] Document named-runner SC-006 / E2 / E3 steps in
-      `evals/prompt-tune/README.md` (eval thresholds, not pytest wording assertions)
+- [ ] T046 [US4] [GATE:eval] Document named-runner SC-006 / E2 / E3 in
+      `evals/prompt-tune/README.md`: n, generic-steer pass rate, promoted pass rate,
+      **positive delta** on `evals/authoring` golden tasks (not pytest wording
+      assertions); a non-positive delta is a failed eval
 
 **Checkpoint**: Refinement is offline, named, and able to lose; served code still has no
 `dspy`.
@@ -308,6 +323,11 @@ must fail. Losing either blocks promotion. Production path does not import `dspy
       `content_pins` / adapter prompt concatenation (Principle V; named reviewer: Dan) on
       the **implementation** PR, not this spec PR
 - [ ] T055 Run `make check` and walk [quickstart.md](quickstart.md) hermetic steps 1–6
+- [ ] T058 Surgically amend the load sequence in
+      `specs/013-capability-packs/contracts/pack-manifest.md` per research R11: skill
+      **and** `AgentPin` digest verification; authoring-pack five-phase completeness;
+      replace “this list is closed” with a pointer that 049
+      `contracts/pack-agents.md` amends it
 
 ---
 
@@ -337,16 +357,16 @@ must fail. Losing either blocks promotion. Production path does not import `dspy
 
 - T001 ∥ T002
 - T013 ∥ T014 ∥ T015 ∥ T019 ∥ T020 after T010
-- T016 ∥ T017 ∥ T018 after T009
+- T016 ∥ T017 ∥ T018 ∥ T056 after T009
 - T021 ∥ T022 after Phase 2
 - T023 ∥ T024
 - T026 ∥ T027 after both packs' files
 - T028 ∥ T029
 - T031 ∥ T032
 - T033 ∥ T034
-- T036 ∥ T037
-- T039 ∥ T040
-- T043 ∥ T044 after T042
+- T036 ∥ T037 after T057
+- T039 ∥ T040 after T057
+- T043 ∥ T044 after T042 (both obey whole-set copy)
 - T047 ∥ T049 ∥ T050 ∥ T051 ∥ T052
 
 ---
@@ -367,28 +387,35 @@ Task: "[[agents]] pins in packs/terraform/pack.toml"
 
 ## Implementation Strategy
 
-### MVP First (User Story 1 Only)
+US1–US3 files under `packs/*/agents/` are the **seed set**. They are not an eval-gated
+production ship until US4 (`promote_phase_agents` + both qualifications). **Do not merge
+`feat/049-phase-product-prompts` to `main` until US4 (T036–T046, T057) is in that same
+implementation PR.** Principle VIII / FR-011.
+
+### Validate after User Story 1 (in-branch only)
 
 1. Phase 1 Setup (ADR-0071 + test package)
 2. Phase 2 Foundational (pin/load/bind/fail-closed)
 3. Phase 3 US1 Terraform
-4. **STOP and VALIDATE**: terraform-bound hermetic run records five distinct pins; omit
-   Write → no PR
+4. **STOP and VALIDATE in the feature branch**: terraform-bound hermetic run records five
+   distinct `{pack}/agents/{phase}@{version}` pins; omit Write → no PR. Do not open a
+   production merge.
 5. Do not open `feat/049-…` until this spec PR is merged
 
-### Incremental Delivery
+### Incremental Delivery (one implementation PR)
 
 1. Setup + Foundational → bind seam
-2. US1 Terraform → MVP Build quality
+2. US1 Terraform → terraform steer
 3. US2 Vault → isolation claim is real
 4. US3 practice + provenance → content is the point
-5. US4 GEPA then DSPy → promotion can lose
-6. Polish → docs + product-blind + named-runner
+5. US4 GEPA then DSPy + T057 loaders → promotion can lose
+6. Polish T058 (013 contract) + docs + named-runner
+7. Merge `feat/049` only after US4 gates exist
 
 ### Parallel Team Strategy
 
 After Phase 2: one person US1 terraform files, another US2 vault files; US3 rewrites both;
-US4 extra/scripts last so they do not fight US3 bytes.
+US4 extra/scripts last so they do not fight US3 bytes. T057 before T039/T040.
 
 ---
 
@@ -396,7 +423,8 @@ US4 extra/scripts last so they do not fight US3 bytes.
 
 - [P] = different files, no incomplete dependency
 - Named contracts bind exactly — `load_phase_agents`, `bind_phase_agents`,
-  `promote_phase_agents`, `dspy.GEPA`, extra `prompt-tune`, `dspy==3.3.0`
+  `promote_phase_agents`, `load_phase_agents_cases`, `load_build_agents_cases`,
+  `dspy.GEPA`, extra `prompt-tune`, `dspy==3.3.0`
 - Do not cite Proposed ADR-0067 as governing (use ADR-0039 for Judge ≠ Write)
 - Tests never call a live model; evals do, on the named-runner path only
 - Spec PR (`spec/049-phase-product-prompts`) merges before implementation PR

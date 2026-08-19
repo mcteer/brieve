@@ -33,7 +33,7 @@ the existing eval-lane broker (ADR-0058), not a new vendor key.
 
 **Storage**: pack tree + existing Postgres audit / run pins. No new operated datastore.
 Instruction identity is recorded on the run (`content_pins` keys
-`{pack}/agents/{phase}` → digest) joinable on the correlation ID.
+`{pack}/agents/{phase}@{version}` → digest) joinable on the correlation ID.
 
 **Testing**: pytest hermetic for binding, fail-closed omission, product isolation, pinning,
 record-keeping, and "DSPy is not importable from served packages". Eval lane (fixtures that
@@ -75,7 +75,7 @@ ADR-0071 (prompt-optimization libraries stay off the served path).
 | VI — Lean by Default | **Pass** | No new operated component. `prompt-tune` is an extra, not the Lean default install |
 | VII — Anti-Fragmentation | **Pass** | One bind path for every authoring-tier phase (`load_phase_agents`); API/MCP/portal inherit it. Ask does not grow a parallel instruction table |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | **Pass** | Executed `AGENTS.md` is digest-pinned (ADR-0030). GEPA/DSPy never run inside a person's Build. `promote_phase_agents` requires provenance, injection lens, and both qualifications |
-| IX — Evidence Over Claims | **Pass** | Run record names pack, phase, version, digest on the correlation ID. Provenance siblings are reviewable |
+| IX — Evidence Over Claims | **Pass** | Run record names pack, phase, version, digest (`{pack}/agents/{phase}@{version}`) on the correlation ID. Provenance siblings are reviewable |
 | X — The Decision Record Governs | **Pass** | Consumes Accepted ADR-0004, 0022, 0030, 0034, 0039, 0047, 0068. Does not treat Proposed ADR-0067 as authority. Adds ADR-0071 at implement |
 
 **Gate result**: **PASS — proceed to Phase 0.**
@@ -121,8 +121,9 @@ src/core/packs/agents.py                   # load_phase_agents (product-blind)
 src/core/choice/chooser.py                 # ChoiceRequest.instruction
 src/core/choice/bounded.py                 # pass instruction through
 src/core/evals/promotion.py                # promote_phase_agents
-src/core/evals/suites.py                   # PHASE_AGENTS_QUALIFICATION, BUILD_AGENTS_QUALIFICATION
-src/surfaces/toolset.py                    # content_pins keys
+src/core/evals/suites.py                   # PHASE_AGENTS_QUALIFICATION, BUILD_AGENTS_QUALIFICATION (not SUITES)
+src/core/evals/phase_agents_corpus.py      # load_phase_agents_cases, load_build_agents_cases
+src/surfaces/toolset.py                    # content_pins {pack}/agents/{phase}@{version}
 src/surfaces/dispatch/entrypoint.py        # bind at phase start; fail closed
 src/adapters/model_chooser.py              # prepend request.instruction; keep tool-schema hints only
 

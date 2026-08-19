@@ -35,8 +35,23 @@ evals/prompt-tune/dspy_build.py
 ```
 
 Candidates write under `evals/prompt-tune/candidates/`. They are not executed by
-authoring-tier until `promote_phase_agents` copies them into `packs/<pack>/agents/` and
-updates `[[agents]]` digests.
+authoring-tier until `promote_phase_agents` copies **the whole five-file set** into
+`packs/<pack>/agents/` and updates all five `[[agents]]` digests. If any one phase loses
+GEPA **or** the joint program loses `build_agents`, **no** file is copied.
+
+## Case loaders (named) — not `SUITES`
+
+```text
+src/core/evals/phase_agents_corpus.py
+  load_phase_agents_cases(pack_dir) -> tuple[PhaseAgentsCase, ...]
+  load_build_agents_cases(pack_dir) -> tuple[BuildAgentsCase, ...]
+```
+
+Files: `packs/<pack>/evals/phase_agents.toml`, `packs/<pack>/evals/build_agents.toml`.
+Floors: `phase_agents` ≥5 cases **per phase** and ≥1 `fail` **per phase**; `build_agents`
+≥5 cases and ≥1 jointly poisonous `fail`. Refuse with `CorpusRefused` / `UnrunnableSuite`
+below floor. **Never** add these names to `SUITES`. **Never** parse them with
+`parse_cases` / `load_pack_cases`. `test_eval_gates` must not iterate them.
 
 ## Promotion helper (named)
 

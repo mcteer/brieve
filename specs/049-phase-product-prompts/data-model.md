@@ -91,7 +91,7 @@ Existing fields (`task`, `permitted`, `step_index`, `attempt`, `refused`) unchan
 `content_pins` / `RUN_START` payload gains keys:
 
 ```text
-{pack}/agents/{phase} = <digest>
+{pack}/agents/{phase}@{version} = <digest>
 ```
 
 for each phase this run actually started. Join on `correlation_id`. Do not persist the
@@ -113,7 +113,9 @@ instruction body in audit.
 | Floor | ≥5 cases per phase; **at least one `fail`** case per phase (ADR-0047) |
 
 Scored without a live model in the merge-blocking lane (recorded / property checks). Live
-GEPA uses the same case identities.
+GEPA uses the same case identities. Parsed **only** by
+`core.evals.phase_agents_corpus.load_phase_agents_cases` — never `parse_cases` /
+`load_pack_cases`, never a member of `SUITES`.
 
 ### `build_agents` (joint)
 
@@ -124,6 +126,9 @@ GEPA uses the same case identities.
 | `set_ref` | The five-file set |
 | `expected` | `pass` or `fail` |
 | Floor | ≥5 cases; **at least one `fail`** for a set that is individually plausible and jointly poisonous |
+
+Parsed **only** by `core.evals.phase_agents_corpus.load_build_agents_cases`. Same SUITES
+exclusion.
 
 ---
 
@@ -143,9 +148,10 @@ Promotion:
 ```text
 GEPA per file (must be able to lose)
   → DSPy five-predictor compile (must be able to lose)
-  → promote_phase_agents (provenance + lens + both suites)
+  → either loss → refuse; **no file** of the five is copied
+  → both pass → promote_phase_agents (provenance + lens + both suites)
        refuse → candidates stay out of packs/
-       ok     → copy into packs/<pack>/agents/, update [[agents]] digests
+       ok     → copy **the whole set** into packs/<pack>/agents/, update all five [[agents]] digests
 ```
 
 Ask: no transition; `instruction` stays empty.

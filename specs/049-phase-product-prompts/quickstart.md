@@ -32,8 +32,8 @@ Run the conformance rows in
 [contracts/conformance-phase-product-prompts.md](contracts/conformance-phase-product-prompts.md)
 A2–A3.
 
-Expect: a terraform-bound fake run records `terraform/agents/research` and never
-`vault/agents/research`. Vault research text is not a rename of Terraform research.
+Expect: a terraform-bound fake run records `terraform/agents/research@<version>` and never
+`vault/agents/research@…`. Vault research text is not a rename of Terraform research.
 
 ## 3 — Fail closed
 
@@ -54,8 +54,9 @@ Expect: `ChoiceRequest.instruction` is empty; no `packs/*/agents/` read on Ask.
 
 Call `promote_phase_agents` with only `phase_agents` in `suites_passed`.
 
-Expect: `promotion_incomplete`. Fixture suites include at least one failing case each
-(A11).
+Expect: `promotion_incomplete`. Fixture suites include known-fail cases at the data-model
+floor, loaded by `load_phase_agents_cases` / `load_build_agents_cases` (A11). A candidate
+under `evals/prompt-tune/candidates/` is not executed (A4b).
 
 ## 6 — Extra is off the served path
 
@@ -71,9 +72,11 @@ promotion CLI only. Missing extra → `refinement_unavailable`, not a silent pro
 
 With eval broker and `prompt-tune`:
 
-1. `evals/prompt-tune/gepa_phase.py` per file (GEPA). A losing metric must not promote.
+1. `evals/prompt-tune/gepa_phase.py` per file (GEPA). A losing metric must not copy **any**
+   of the five files into `packs/`.
 2. `evals/prompt-tune/dspy_build.py` for the five-predictor program. A losing joint metric
-   must not promote the set.
-3. SC-006 comparison vs the generic pre-feature steer on the authoring corpus.
+   must not copy the set.
+3. SC-006: strictly higher pass rate vs generic steer on `evals/authoring`, same n;
+   record n, both rates, positive delta in `evals/prompt-tune/README.md`.
 
 **Named runner**: Dan McTeer. Skip-green is a failure of this guide.
