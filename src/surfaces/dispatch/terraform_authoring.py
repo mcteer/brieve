@@ -52,6 +52,7 @@ def quality_judge_may_publish(
     files: dict[str, str],
     write_model: str,
     judge_chooser: Any,
+    instruction: str = "",
 ) -> tuple[bool, str]:
     """Structural pre-check, then a language-model quality gate when the writer is live.
 
@@ -73,6 +74,7 @@ def quality_judge_may_publish(
             task=task,
             write_plan=write_plan,
             files=files,
+            instruction=instruction,
         )
     except Exception:  # noqa: BLE001 — provider/schema failure is a deny, not a skip
         return False, "could not judge the change"
@@ -105,6 +107,7 @@ def reviewer_copy(
     task: str,
     write_plan: str,
     files: dict[str, str],
+    instruction: str = "",
 ) -> tuple[str, str, str]:
     """Title, rationale, usage. Prefer a model description; never fail the publish on copy."""
     from core.authoring.proposal import ProposedFile, title_for
@@ -116,6 +119,7 @@ def reviewer_copy(
                 task=task,
                 write_plan=write_plan,
                 files=files,
+                instruction=instruction,
             )
         except Exception:  # noqa: BLE001 — copy is presentation; Judge already gated publish
             title, rationale, usage = "", "", ""

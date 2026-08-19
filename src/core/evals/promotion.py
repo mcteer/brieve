@@ -20,6 +20,7 @@ without building the manual one would make the forbidden route the only one that
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from core.evals.injection_patterns import INJECTION_PATTERNS
 from core.packs.loader import content_digest
@@ -233,6 +234,120 @@ def promote_model_version(
     }
 
 
+def promote_phase_agents(
+    *,
+    pack: str,
+    files: dict[str, bytes],
+    provenance: dict[str, str],
+    expected_digests: dict[str, str],
+    versions: dict[str, str],
+    suites_passed: tuple[str, ...],
+    packs_root: Path,
+    refinement_available: bool,
+) -> dict[str, str]:
+    """Copy a whole five-file instruction set into ``packs/``, or copy none of it.
+
+    Authored files do not invent ``upstream_commit``. Provenance is the sibling file.
+    """
+    from core.authoring.progress import PHASE_ORDER
+    from core.evals.suites import BUILD_AGENTS_QUALIFICATION, PHASE_AGENTS_QUALIFICATION
+
+    if not refinement_available:
+        raise PromotionRefused(
+            f"pack {pack!r} cannot promote phase agents without the prompt-tune extra",
+            reason_code="refinement_unavailable",
+        )
+    required = {phase.value for phase in PHASE_ORDER}
+    if set(files) != required:
+        raise PromotionRefused(
+            f"pack {pack!r} must supply all five phase files or none",
+            reason_code="promotion_incomplete",
+        )
+    missing = tuple(
+        name
+        for name in (PHASE_AGENTS_QUALIFICATION, BUILD_AGENTS_QUALIFICATION)
+        if name not in suites_passed
+    )
+    if missing:
+        raise PromotionRefused(
+            f"pack {pack!r} has not passed {list(missing)}",
+            reason_code="promotion_incomplete",
+        )
+    pack_dir = Path(packs_root) / pack
+    for phase in PHASE_ORDER:
+        name = phase.value
+        body = files[name]
+        actual = content_digest(body)
+        expected = expected_digests.get(name, "")
+        if actual != expected:
+            raise PromotionRefused(
+                f"pack {pack!r} phase {name}: bytes are not the recorded digest",
+                reason_code="digest_mismatch",
+            )
+        note = provenance.get(name, "").strip()
+        if not note:
+            raise PromotionRefused(
+                f"pack {pack!r} phase {name} has no provenance sibling",
+                reason_code="agents_provenance_missing",
+            )
+        lens = injection_lens(body.decode("utf-8", errors="replace"))
+        if not lens.clean:
+            raise PromotionRefused(
+                f"pack {pack!r} phase {name} contains injection-shaped content — {lens.summary}",
+                reason_code="injection_suspected",
+            )
+    # Whole-set copy only after every check. Partial writes are forbidden.
+    recorded: dict[str, str] = {}
+    for phase in PHASE_ORDER:
+        name = phase.value
+        dest_dir = pack_dir / "agents" / name
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        (dest_dir / "AGENTS.md").write_bytes(files[name])
+        (dest_dir / "PROVENANCE.md").write_text(provenance[name], encoding="utf-8")
+        recorded[name] = expected_digests[name]
+        recorded[f"{name}.version"] = versions.get(name, "0.1.0")
+    manifest_path = pack_dir / "pack.toml"
+    if manifest_path.is_file():
+        text = manifest_path.read_text(encoding="utf-8")
+        for phase in PHASE_ORDER:
+            name = phase.value
+            digest = expected_digests[name]
+            version = versions.get(name, "0.1.0")
+            text = _rewrite_agent_pin(text, phase=name, digest=digest, version=version)
+        manifest_path.write_text(text, encoding="utf-8")
+    return recorded
+
+
+def _rewrite_agent_pin(text: str, *, phase: str, digest: str, version: str) -> str:
+    """Update the [[agents]] digest/version for one phase. Whole-file, not a parser."""
+    marker = f'path = "agents/{phase}/AGENTS.md"'
+    start = text.find(marker)
+    if start < 0:
+        return text
+    block_start = text.rfind("[[agents]]", 0, start)
+    nxt = text.find("[[agents]]", start)
+    block_end = nxt if nxt >= 0 else len(text)
+    if block_start < 0:
+        return text
+    block = text[block_start:block_end]
+    block = _replace_field(block, "version", version)
+    block = _replace_field(block, "digest", digest)
+    return text[:block_start] + block + text[block_end:]
+
+
+def _replace_field(block: str, field: str, value: str) -> str:
+    lines = []
+    for line in block.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if stripped.startswith(f"{field}"):
+            indent = line[: len(line) - len(stripped)]
+            eol = "\n" if line.endswith("\n") else ""
+            lines.append(f'{indent}{field} = "{value}"{eol}')
+        else:
+            lines.append(line)
+    return "".join(lines)
+
+
 __all__ = [
     "InjectionFinding",
     "LensResult",
@@ -240,5 +355,6 @@ __all__ = [
     "PromotionRefused",
     "injection_lens",
     "promote_model_version",
+    "promote_phase_agents",
     "promote_skill",
 ]

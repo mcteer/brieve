@@ -134,6 +134,9 @@ class ChoiceRequest:
     #: Tools already refused **at this step**, with the reason the core gave. Carried so the
     #: denial teaches rather than only blocks (FR-004a).
     refused: Sequence[tuple[str, str]] = ()
+    #: Build phase instruction body. Empty for Ask / non-Build (049). Never a substitute
+    #: when a Build bind failed — dispatch fails before choose.
+    instruction: str = ""
 
 
 @dataclass(frozen=True)

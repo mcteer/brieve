@@ -86,6 +86,7 @@ from surfaces.dispatch.authoring import (
     proposal_payload,
     trees_for,
 )
+from surfaces.dispatch.phase_agents import bind_phase_agents
 from surfaces.dispatch.terraform_authoring import quality_judge_may_publish, reviewer_copy
 from surfaces.toolset import (
     AUTHORING_VOCABULARY,
@@ -215,11 +216,19 @@ def _run_write_plan(
         progress = advance(progress, into=PhaseName.PLAN)
     run.propose_progress = progress
     checkpoint_run(run, payload=_payload_with_progress({}, run))
+    if reason := _bind_phase_or_fail(run, PhaseName.PLAN):
+        checkpoint_run(run, payload=_payload_with_progress({}, run))
+        return reason
     print(f"run {run.correlation_id}: planning what to write", flush=True)
     try:
         drafter = getattr(chooser, "draft_write_plan", None)
         text = (
-            drafter(task=task, consulted=consulted, max_files=_MAX_AUTHOR_FILES)
+            drafter(
+                task=task,
+                consulted=consulted,
+                max_files=_MAX_AUTHOR_FILES,
+                instruction=str(getattr(run, "phase_instruction", "") or ""),
+            )
             if callable(drafter)
             else "Write the files required by the task."
         )
@@ -239,6 +248,9 @@ def _run_write_plan(
     # Write is the next work. Activate it here so a later EMPTY/deny cannot rewind
     # Research — ``current`` would otherwise be None and fail() defaulted to Research.
     run.propose_progress = advance(_current_progress(run), into=PhaseName.WRITE)
+    if reason := _bind_phase_or_fail(run, PhaseName.WRITE):
+        checkpoint_run(run, payload=_payload_with_progress({}, run))
+        return reason
     if author is not None:
         author.plan_ready = True
     checkpoint_run(run, payload=_payload_with_progress({}, run))
@@ -396,6 +408,21 @@ def _complete_write(run: Any) -> None:
 def _fail_current_phase(run: Any, reason: str) -> None:
     progress = _current_progress(run)
     run.propose_progress = fail(progress, phase=phase_to_fail(progress), reason=reason)
+
+
+def _bind_phase_or_fail(run: Any, phase: PhaseName) -> str | None:
+    """Bind the phase instruction or fail closed. Returns a reason code on failure."""
+    from core.packs.manifest import ManifestError
+
+    try:
+        bind_phase_agents(run, phase)
+    except ManifestError as exc:
+        _fail_current_phase(run, exc.reason_code)
+        return exc.reason_code
+    except Exception:
+        _fail_current_phase(run, "agents_missing")
+        return "agents_missing"
+    return None
 
 
 #: `_tool_for_step` STOOD HERE, and its deletion is the feature (FR-002, T011).
@@ -570,6 +597,7 @@ def _run_steps(
                     # bracket is open, and the resumed run would then execute something the
                     # first allocation never chose while claiming to have observed it.
                     already_chosen=(already_chosen or {}).get(step),
+                    instruction=str(getattr(run, "phase_instruction", "") or ""),
                 )
             except ChooserUnavailable as exc:
                 # FR-007. Terminal and recorded, with no path back to a non-model selection.
@@ -874,6 +902,21 @@ def _finish_authoring_analyzer(
         )
     )
     print(f"run {correlation_id}: judging authored work", flush=True)
+    if bind_reason := _bind_phase_or_fail(run, PhaseName.JUDGE):
+        result_body["reason"] = bind_reason
+        durability.save(
+            CheckpointBlob(
+                blob_id=blob_id,
+                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+                correlation_id=correlation_id,
+                grant_id=grant.grant_id,
+                step_index=max(steps - 1, 0),
+                written_by="entrypoint",
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
+            )
+        )
+        print(f"run {correlation_id}: {reason}; no proposer handoff", flush=True)
+        return 1
     allowed, judge_reason = quality_judge_may_publish(
         authored_paths=sorted(author_contents),
         task=task,
@@ -881,6 +924,7 @@ def _finish_authoring_analyzer(
         files=author_contents,
         write_model=write_model,
         judge_chooser=judge_chooser,
+        instruction=str(getattr(run, "phase_instruction", "") or ""),
     )
     if not allowed:
         _fail_current_phase(run, judge_reason)
@@ -901,11 +945,34 @@ def _finish_authoring_analyzer(
     run.propose_progress = complete(_current_progress(run), phase=PhaseName.JUDGE)
 
     write_plan = str(getattr(run, "write_plan", "") or "")
+    from core.packs.manifest import ManifestError as _ManifestError
+
+    try:
+        propose_agents = bind_phase_agents(run, PhaseName.PROPOSE)
+        propose_instruction = propose_agents.body
+    except _ManifestError as exc:
+        run.propose_progress = advance(_current_progress(run), into=PhaseName.PROPOSE)
+        _fail_current_phase(run, exc.reason_code)
+        result_body["reason"] = exc.reason_code
+        durability.save(
+            CheckpointBlob(
+                blob_id=blob_id,
+                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+                correlation_id=correlation_id,
+                grant_id=grant.grant_id,
+                step_index=max(steps - 1, 0),
+                written_by="entrypoint",
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=exc.reason_code),
+            )
+        )
+        print(f"run {correlation_id}: {exc.reason_code}; no proposer handoff", flush=True)
+        return 1
     copy_title, copy_rationale, copy_usage = reviewer_copy(
         chooser=write_chooser,
         task=task,
         write_plan=write_plan,
         files=author_contents,
+        instruction=propose_instruction,
     )
     print(f"run {correlation_id}: proposal title {copy_title!r}", flush=True)
     proposal = compose(
@@ -1294,6 +1361,7 @@ def continue_dispatched_run(
         clock=clock,
         manufactured=authority,
     )
+    run.bound_packs = tuple(p for p in os.environ.get("RUN_PACKS", "").split(",") if p)
     run.run_id = blob_id
     run.durability = durability
     run.lease = lease
@@ -1393,6 +1461,9 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
 
     run.propose_progress = advance(_current_progress(run), into=PhaseName.PROPOSE)
     checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
+    if _bind_phase_or_fail(run, PhaseName.PROPOSE):
+        checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
+        return 1
 
     result = invoke_tool(run, OPEN_PROPOSAL, {})
     if not result.allowed:
@@ -1654,6 +1725,7 @@ def resume_dispatched_run(
         clock=clock,
         manufactured=decision.authority,
     )
+    run.bound_packs = tuple(p for p in os.environ.get("RUN_PACKS", "").split(",") if p)
     run.run_id = blob_id
     run.durability = durability
     run.grant = grant
@@ -2134,6 +2206,7 @@ def main() -> int:
         audit_sink=audit,
         content_pins=content_pins(_loaded_packs),
     )
+    run.bound_packs = tuple(_loaded_packs)
     # The audit trail is the evidence that this happened, and the row reads it back
     # through the evidence path rather than trusting this line.
     print(f"run {run.correlation_id} started, state={run.state}")
@@ -2177,6 +2250,10 @@ def main() -> int:
         # First live checkpoint the portal can read — intake's 202 progress never reaches
         # GET /runs/{id}/result, which is what the Build strip polls.
         _mark_research_active(run)
+        if reason := _bind_phase_or_fail(run, PhaseName.RESEARCH):
+            checkpoint_run(run, payload=_payload_with_progress({}, run))
+            print(f"run {run.correlation_id}: {reason}", file=sys.stderr)
+            return 1
         checkpoint_run(run, payload=_payload_with_progress({}, run))
 
     # 013, opt-in: invoke each requested tool once through the real pipeline. This is what

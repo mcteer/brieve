@@ -112,6 +112,38 @@ path    = "skills/vault-secret-access/SKILL.md"
 version = "0.1.0"
 digest  = "b3815739e32a0b1578b04b863a890d91b5c925259a19ed8f283c2e91de5f9d81"
 
+# 049 seed set — executed phase instructions. Digests are SHA-256 of AGENTS.md.
+# T041 overwrite only after both phase_agents and build_agents qualifications.
+[[agents]]
+phase   = "research"
+path    = "agents/research/AGENTS.md"
+version = "0.1.0"
+digest  = "f69beed41b92aa882ebf67b71746d62c62d606a90bb994576b26f47875c1d666"
+
+[[agents]]
+phase   = "plan"
+path    = "agents/plan/AGENTS.md"
+version = "0.1.0"
+digest  = "9552e61157526f59a4780f14ee42d45ad76c33b4a0bfdf25257a299ce015ead8"
+
+[[agents]]
+phase   = "write"
+path    = "agents/write/AGENTS.md"
+version = "0.1.0"
+digest  = "08cd8f45d3d42a165ff1a4693a9270f2bb0feb0c091952ae08273628c83c4698"
+
+[[agents]]
+phase   = "judge"
+path    = "agents/judge/AGENTS.md"
+version = "0.1.0"
+digest  = "a1f6e714e748bc31d3382444667f6eeeb70473c3febd5d84053c95ec7306a0a0"
+
+[[agents]]
+phase   = "propose"
+path    = "agents/propose/AGENTS.md"
+version = "0.1.0"
+digest  = "a0597634b7540daa99b629a2ed9bf1eeeedfce1a9d89d8f6c93b1058bb7bdc6b"
+
 # At least one PAVED workflow, so US5 has something a lowest-tier definition may actually
 # run. A tier bound with nothing beneath it would assert a refusal against an empty set.
 [[workflows]]

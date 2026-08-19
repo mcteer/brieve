@@ -72,7 +72,11 @@ def test_every_shipped_skill_passes_its_own_lens() -> None:
     what an agent must not do. If defensive instructions tripped the lens, the lens would be
     unusable for exactly the content this platform writes.
     """
-    for skill in sorted(PACKS.rglob("SKILL.md")) + sorted(PACKS.rglob("SECURITY.md")):
+    for skill in (
+        sorted(PACKS.rglob("SKILL.md"))
+        + sorted(PACKS.rglob("SECURITY.md"))
+        + sorted(path for path in PACKS.rglob("AGENTS.md") if "agents" in path.parts)
+    ):
         result = injection_lens(skill.read_text())
         assert result.clean, f"{skill.relative_to(PACKS)} flagged: {result.summary}"
 

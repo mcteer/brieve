@@ -136,6 +136,13 @@ evals = [
     "harness[adapters]",
 ]
 
+# Offline GEPA then DSPy (049, ADR-0071). Never on the served path. Pin the PyPI name
+# `dspy`, not the `dspy-ai` alias. Transitives must pass `scripts/check-licenses.sh`.
+prompt-tune = [
+    "harness[evals]",
+    "dspy==3.3.0",
+]
+
 
 [dependency-groups]
 dev = [
@@ -169,7 +176,7 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "evals/prompt-tune"]
 mypy_path = "src"
 explicit_package_bases = true
 
@@ -195,6 +202,12 @@ ignore_missing_imports = true
 # none.
 [[tool.mypy.overrides]]
 module = "anthropic.*"
+ignore_missing_imports = true
+
+# Eval-lane only (ADR-0071). `make check` must typecheck the prompt-tune scripts without
+# installing the extra.
+[[tool.mypy.overrides]]
+module = "dspy.*"
 ignore_missing_imports = true
 
 # The sandbox runtime (036), for the same reason and with a sharper edge: code mode is

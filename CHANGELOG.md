@@ -5,6 +5,28 @@ durable record.
 
 ## Unreleased
 
+### Build
+
+- Each Build phase is steered by a pinned pack file `packs/<pack>/agents/<phase>/AGENTS.md`
+  (Terraform and Vault). Ask and the portal do not compose those files. Missing or empty
+  instructions fail the phase and do not open a pull request.
+- Write refuses dotenv templates (``.env``, ``.env.example``) instead of
+  opening a pull request that only adds placeholder env files.
+- Write no longer treats “named nothing” as done while planned files are still
+  missing, and tells the model which paths remain instead of rewriting one
+  module three times. Later files now see bounded bodies of files already
+  written, so outputs and variables cannot invent a second stack. Judge deny
+  reasons are no longer cut off mid-sentence.
+- The signed-in operator can start Build: the role binding includes the authoring tools
+  the definition's ceiling already names. Without them, manufacture refused even though
+  the portal accepted the request.
+- The API allocation now copies capability packs into the process tree, so Build can
+  see that terraform declares an authoring workflow. Without that copy every Build was
+  refused as undeclared.
+- A finished Build that opened a pull request now shows the link. Publish wrote
+  the URL, then the proposer restored the analyzer snapshot and wiped it, so the
+  page reported "Ended without a pull request" while GitHub had the PR.
+
 ### Local stack
 
 - Laptop bring-up is `bash deploy/local/stack.sh up`, with a step-by-step guide in
@@ -20,26 +42,6 @@ durable record.
   fails in seconds (`could not name a permitted tool after 3 attempt(s)`).
   After `up` recreates the sign-in helper, Sign in again — a leftover session is
   unverifiable, not an outage, and the build list is not lost.
-
-### Build
-
-- Write refuses dotenv templates (``.env``, ``.env.example``) instead of
-  opening a pull request that only adds placeholder env files.
-- Write no longer treats “named nothing” as done while planned files are still
-  missing, and tells the model which paths remain instead of rewriting one
-  module three times. Later files now see bounded bodies of files already
-  written, so outputs and variables cannot invent a second stack. Judge deny
-  reasons are no longer cut off mid-sentence.
-
-- The signed-in operator can start Build: the role binding includes the authoring tools
-  the definition's ceiling already names. Without them, manufacture refused even though
-  the portal accepted the request.
-- The API allocation now copies capability packs into the process tree, so Build can
-  see that terraform declares an authoring workflow. Without that copy every Build was
-  refused as undeclared.
-- A finished Build that opened a pull request now shows the link. Publish wrote
-  the URL, then the proposer restored the analyzer snapshot and wiped it, so the
-  page reported "Ended without a pull request" while GitHub had the PR.
 
 ### Portal
 

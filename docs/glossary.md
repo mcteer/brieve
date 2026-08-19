@@ -266,6 +266,12 @@ parent, on the same correlation ID (ADR-0054). Proposed; upstream is experimenta
 **Skill** — pinned, provenance-checked instruction content the agent *executes by*;
 adopted from upstream skill repositories with overlays authored here (ADR-0004).
 
+**Pack phase AGENTS.md** — the executed Build instruction for one pack × one phase
+(`packs/<pack>/agents/<phase>/AGENTS.md`, pinned by `[[agents]]` in `pack.toml`). Distinct
+from the repository-root contributor **AGENTS.md**, which is human/agent contributor
+guidance for this codebase and is never a Build phase instruction (049, ADR-0030).
+Unpromoted drafts live under `evals/prompt-tune/candidates/` and are never executed.
+
 **Supply-chain sentinel** — the proposed automated intake gauntlet for skill adoption
 (ADR-0053): a poller watches pinned upstream repositories, a narrow-ceilinged analysis agent
 reads the diff in the hardened isolation tier, an automated adversarial read runs before any

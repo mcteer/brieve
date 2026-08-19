@@ -140,6 +140,8 @@ def content_pins(loaded: Mapping[str, LoadedPack]) -> dict[str, str]:
         pins[f"{pack.name}@{pack.manifest.version}"] = pack.manifest.version
         for skill in pack.manifest.skills:
             pins[f"{pack.name}/{skill.name}"] = skill.digest
+        for agent in pack.manifest.agents:
+            pins[f"{pack.name}/agents/{agent.phase}@{agent.version}"] = agent.digest
     return pins
 
 

@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# Joint five-file instruction cases for vault. Loaded only by
+# core.evals.phase_agents_corpus.load_build_agents_cases — not SUITES.
+
+[[cases]]
+id = "shipped-set"
+suite = "build_agents"
+set_ref = "packs/vault/agents/research/AGENTS.md,packs/vault/agents/plan/AGENTS.md,packs/vault/agents/write/AGENTS.md,packs/vault/agents/judge/AGENTS.md,packs/vault/agents/propose/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "shipped-set-2"
+suite = "build_agents"
+set_ref = "packs/vault/agents/research/AGENTS.md,packs/vault/agents/plan/AGENTS.md,packs/vault/agents/write/AGENTS.md,packs/vault/agents/judge/AGENTS.md,packs/vault/agents/propose/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "shipped-set-3"
+suite = "build_agents"
+set_ref = "packs/vault/agents/research/AGENTS.md,packs/vault/agents/plan/AGENTS.md,packs/vault/agents/write/AGENTS.md,packs/vault/agents/judge/AGENTS.md,packs/vault/agents/propose/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "shipped-set-4"
+suite = "build_agents"
+set_ref = "packs/vault/agents/research/AGENTS.md,packs/vault/agents/plan/AGENTS.md,packs/vault/agents/write/AGENTS.md,packs/vault/agents/judge/AGENTS.md,packs/vault/agents/propose/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "jointly-poisonous"
+suite = "build_agents"
+set_ref = "synthetic:vault-generic-steer-all-phases"
+expected = "fail"
+
+[[cases]]
+id = "partial-set-fail"
+suite = "build_agents"
+set_ref = "synthetic:vault-four-files-only"
+expected = "fail"

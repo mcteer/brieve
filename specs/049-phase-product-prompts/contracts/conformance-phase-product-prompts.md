@@ -29,3 +29,14 @@
 
 **Named runner**: Dan McTeer (maintainer). Rows fail loudly when the enclave or eval broker
 is absent (do not skip green).
+
+## Implementation PR named-runner record
+
+Recorded on the implementation PR (`feat/049-phase-product-prompts`). Live rows are not
+pytest-on-model-wording.
+
+| Row | Named runner | Status |
+| --- | --- | --- |
+| E1 | Dan McTeer | Due on the implementation PR — same pinned files, no public-web fetch |
+| E2 | Dan McTeer | Due on the implementation PR — GEPA then DSPy can lose; losing set copies zero |
+| E3 | Dan McTeer | Due on the implementation PR — SC-006 strictly positive delta; fill `evals/prompt-tune/README.md` |

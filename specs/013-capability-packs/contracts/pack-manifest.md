@@ -9,9 +9,10 @@ A pack **declares**; the platform **decides**. Nothing in a manifest grants anyt
 ## Loading, in order
 
 1. **Read the manifest.** A malformed manifest refuses the load; it does not partially load.
-2. **Verify every content digest.** A mismatch refuses with `digest_mismatch` and names the
-   file. Verification happens at load rather than at review, because review is when someone
-   looked and load is when it matters.
+2. **Verify every content digest.** Skills first, then `AgentPin` rows (049). A mismatch
+   refuses with `digest_mismatch` and names the file. A missing or empty phase `AGENTS.md`
+   refuses `agents_missing` / `agents_empty`. Verification happens at load rather than at
+   review, because review is when someone looked and load is when it matters.
 3. **Validate every tool and hook declaration.** A pack hook declaring `capability_kind = governance` refuses `governance_hook_from_pack` — enforcement is the platform's. A non-repeatable tool with no observer refuses
    `observer_required`; a `product_mode` other than `none` without `product` and
    `product_action` refuses `incomplete_product_binding`. Both in the pack's own vocabulary
@@ -19,12 +20,20 @@ A pack **declares**; the platform **decides**. Nothing in a manifest grants anyt
 4. **Check the eval-coverage floor.** A pack shipping fewer than five cases per suite is
    refused `insufficient_eval_coverage` — **at load, not at gate time**. The failure belongs
    where the pack is added rather than where a gate later reports a number nobody reads.
+   Authoring packs additionally require five `[[agents]]` covering every `PhaseName`
+   (`agents_incomplete`) and a non-empty sibling `PROVENANCE.md` per phase
+   (`agents_provenance_missing`).
 5. **Register the tools** into the one governed registry, `risk_class` preserved.
 6. **Record the pack as available**, not as *granted* — availability is not access.
 
-**All manifest validation happens at load, and this list is closed.** A refusal added
-later belongs in this sequence rather than beside it — the point of one ordered list is that
-a reader knows where to look for every way a pack can be rejected.
+**All manifest validation happens at load.** A refusal added later belongs in this sequence
+rather than beside it — the point of one ordered list is that a reader knows where to look
+for every way a pack can be rejected. **049 amends this list** (it is no longer closed):
+see `specs/049-phase-product-prompts/contracts/pack-agents.md`. After skill digest
+verification, an authoring pack (workflow name contains `"author"`) must declare five
+`[[agents]]` covering every phase (`agents_incomplete`); each `AgentPin` digest is
+verified (`digest_mismatch` / `agents_missing` / `agents_empty`); sibling
+`agents/<phase>/PROVENANCE.md` must be present and non-empty (`agents_provenance_missing`).
 
 ## What loading does NOT do
 
