@@ -155,6 +155,8 @@ class GovernedRun:
     #: all four terms to the one place that must explain a refusal. Empty by default, and an
     #: empty map degrades to today's umbrella reason rather than to a wrong one.
     authority_exclusions: Mapping[str, str] = field(default_factory=dict)
+    #: Pack names this Build is bound to (049). Size 1 is required at phase bind.
+    bound_packs: tuple[str, ...] = ()
     #: What the platform believes about the products this run's tools reach (009).
     #:
     #: On the run rather than closed over by the hook, because `builtin_governance_hooks()`

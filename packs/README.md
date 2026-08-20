@@ -30,9 +30,11 @@ somewhere `src/core` is not.
 
 ```text
 packs/<name>/
-├── pack.toml     # The manifest: tools, skills, hooks, workflows, evals, probe
+├── pack.toml     # The manifest: tools, skills, hooks, workflows, evals, probe, [[agents]]
+├── agents/       # Per-phase AGENTS.md + PROVENANCE.md (executed Build instructions, 049)
+│   └── <phase>/  # research | plan | write | judge | propose
 ├── skills/       # Adopted (with PROVENANCE.md) or authored, in the Agent Skills format
-└── evals/        # Cases for each suite this pack ships
+└── evals/        # Cases for each suite this pack ships (plus phase_agents / build_agents, not SUITES)
 ```
 
 **A manifest is data, never code.** Loading executes nothing from a pack. A tool

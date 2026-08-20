@@ -71,6 +71,38 @@ path    = "skills/terraform-style-guide/SECURITY.md"
 version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
 digest  = "3dc8ffa10139e9772c5c102fee6377f66f5167bd043a7c43e6e5df682dc75f92"
 
+# 049 seed set — executed phase instructions. Digests are SHA-256 of AGENTS.md.
+# T041 overwrite only after both phase_agents and build_agents qualifications.
+[[agents]]
+phase   = "research"
+path    = "agents/research/AGENTS.md"
+version = "0.1.0"
+digest  = "2b35fab3f8d1086541ba5115ea9dd4af3fb2dd9e0e5bf628ec21496d63c1d428"
+
+[[agents]]
+phase   = "plan"
+path    = "agents/plan/AGENTS.md"
+version = "0.1.0"
+digest  = "9d8b9e301702fe964e54d84fadb1a67c41246a77e021db381cc7c5895928e4ed"
+
+[[agents]]
+phase   = "write"
+path    = "agents/write/AGENTS.md"
+version = "0.1.0"
+digest  = "54059d0591c30afadf9a1c1ae181753e0b47495d742fe02e513f8b03907e2ed2"
+
+[[agents]]
+phase   = "judge"
+path    = "agents/judge/AGENTS.md"
+version = "0.1.0"
+digest  = "38ce58eedbd17abf9fe765cb0ce18df351789cc6635750a1366ca37ae69328d5"
+
+[[agents]]
+phase   = "propose"
+path    = "agents/propose/AGENTS.md"
+version = "0.1.0"
+digest  = "4d1ddd022559c7dceed6bbafe44d72dfc36ea4e722109ade015a149b0ade487c"
+
 # Tier 1 is paved paths only, so a lowest-tier definition may run this and nothing else.
 [[workflows]]
 name         = "review-configuration"

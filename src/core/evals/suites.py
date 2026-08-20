@@ -85,6 +85,14 @@ AUTHORING_QUALIFICATION = "authoring"
 #: evidence at all.
 AUTHORING_REQUIRED_SUITES: Final[tuple[str, ...]] = (AUTHORING_QUALIFICATION,)
 
+#: Individual then joint instruction qualifications (049). **Not** members of ``SUITES``.
+PHASE_AGENTS_QUALIFICATION = "phase_agents"
+BUILD_AGENTS_QUALIFICATION = "build_agents"
+PHASE_AGENTS_REQUIRED_SUITES: Final[tuple[str, ...]] = (
+    PHASE_AGENTS_QUALIFICATION,
+    BUILD_AGENTS_QUALIFICATION,
+)
+
 #: Suites the constitution names that cannot yet bind. **Empty since 021** — every row in the
 #: eval gate is now in force.
 #:
@@ -307,11 +315,14 @@ def suite_listing() -> dict[str, str]:
 __all__ = [
     "AUTHORING_QUALIFICATION",
     "AUTHORING_REQUIRED_SUITES",
+    "BUILD_AGENTS_QUALIFICATION",
     "EXPECTED_OUTCOMES",
     "ANSWERING_SUITES",
     "ESTATE_SUITES",
     "MEASURED_SUITES",
     "OWED",
+    "PHASE_AGENTS_QUALIFICATION",
+    "PHASE_AGENTS_REQUIRED_SUITES",
     "SUFFICIENCY_SUITES",
     "SUITES",
     "EvalCase",

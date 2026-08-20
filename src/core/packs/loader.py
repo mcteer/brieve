@@ -23,8 +23,10 @@ import tomllib
 from pathlib import Path
 from typing import Any, Protocol
 
+from core.authoring.progress import PHASE_ORDER, PhaseName
 from core.hooks.types import CapabilityKind, HookPhase
 from core.packs.manifest import (
+    AgentPin,
     ManifestError,
     PackHookDeclaration,
     PackManifest,
@@ -116,6 +118,7 @@ def parse_manifest(data: dict[str, Any]) -> PackManifest:
 
     tools = tuple(_parse_tool(entry) for entry in data.get("tools", []))
     skills = tuple(_parse_skill(entry) for entry in data.get("skills", []))
+    agents = tuple(_parse_agent(entry) for entry in data.get("agents", []))
     hooks = tuple(_parse_hook(entry) for entry in data.get("hooks", []))
     workflows = tuple(_parse_workflow(entry) for entry in data.get("workflows", []))
 
@@ -132,6 +135,7 @@ def parse_manifest(data: dict[str, Any]) -> PackManifest:
         upstream=upstream,
         tools=tools,
         skills=skills,
+        agents=agents,
         hooks=hooks,
         workflows=workflows,
         eval_suites=suites,
@@ -208,6 +212,33 @@ def _parse_skill(entry: dict[str, Any]) -> SkillPin:
         raise ManifestError(
             f"skill pin missing required field: {exc}", reason_code="malformed_manifest"
         ) from exc
+
+
+def _parse_agent(entry: dict[str, Any]) -> AgentPin:
+    try:
+        phase = str(entry["phase"])
+        path = str(entry["path"])
+        version = str(entry["version"])
+        digest = str(entry["digest"])
+    except KeyError as exc:
+        raise ManifestError(
+            f"agent pin missing required field: {exc}", reason_code="malformed_manifest"
+        ) from exc
+    try:
+        named = PhaseName(phase)
+    except ValueError as exc:
+        raise ManifestError(
+            f"agent pin names unknown phase {phase!r}", reason_code="unknown_phase"
+        ) from exc
+    canonical = f"agents/{named.value}/AGENTS.md"
+    if ".." in path.split("/") or path != canonical:
+        raise ManifestError(
+            f"agent pin path {path!r} must be {canonical}",
+            reason_code="malformed_manifest",
+        )
+    if not version.strip():
+        raise ManifestError("agent pin version must be non-empty", reason_code="malformed_manifest")
+    return AgentPin(phase=named.value, path=path, version=version, digest=digest)
 
 
 def _parse_hook(entry: dict[str, Any]) -> PackHookDeclaration:
@@ -294,6 +325,24 @@ def validate_manifest(manifest: PackManifest) -> None:
             reason_code="insufficient_eval_coverage",
         )
 
+    seen_phases: set[str] = set()
+    for pin in manifest.agents:
+        _require(
+            pin.phase not in seen_phases,
+            f"pack {manifest.name!r} declares duplicate phase {pin.phase!r}",
+            reason_code="duplicate_phase",
+        )
+        seen_phases.add(pin.phase)
+
+    if any("author" in workflow.name for workflow in manifest.workflows):
+        required = {phase.value for phase in PHASE_ORDER}
+        _require(
+            seen_phases == required,
+            f"pack {manifest.name!r} declares an authoring workflow but [[agents]] does not "
+            f"cover every phase",
+            reason_code="agents_incomplete",
+        )
+
 
 def content_digest(data: bytes) -> str:
     """SHA-256 over content bytes, matching the audit chain's hashing."""
@@ -342,6 +391,33 @@ class FilesystemPackLoader:
                     f"skill {skill.name!r} at {skill.path}: manifest records {skill.digest}, "
                     f"content hashes to {actual}",
                     reason_code="digest_mismatch",
+                )
+
+        for pin in manifest.agents:
+            path = pack_dir / pin.path
+            if not path.is_file():
+                raise ManifestError(
+                    f"phase {pin.phase!r} declares {pin.path} which is not present",
+                    reason_code="agents_missing",
+                )
+            raw = path.read_bytes()
+            if not raw.decode("utf-8", errors="replace").strip():
+                raise ManifestError(
+                    f"phase {pin.phase!r} AGENTS.md is empty",
+                    reason_code="agents_empty",
+                )
+            actual = content_digest(raw)
+            if actual != pin.digest:
+                raise ManifestError(
+                    f"phase {pin.phase!r} at {pin.path}: manifest records {pin.digest}, "
+                    f"content hashes to {actual}",
+                    reason_code="digest_mismatch",
+                )
+            provenance = pack_dir / "agents" / pin.phase / "PROVENANCE.md"
+            if not provenance.is_file() or not provenance.read_text(encoding="utf-8").strip():
+                raise ManifestError(
+                    f"phase {pin.phase!r} is missing a non-empty PROVENANCE.md sibling",
+                    reason_code="agents_provenance_missing",
                 )
 
 

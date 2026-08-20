@@ -178,6 +178,11 @@ def _prompt(request: ChoiceRequest) -> str:
     return "\n".join(lines)
 
 
+def _system_for(instruction: str = "") -> str:
+    body = instruction.strip()
+    return f"{body}\n\n{_SYSTEM}" if body else _SYSTEM
+
+
 class ModelChooser:
     """Asks a real model, through the governed agent, for one tool name."""
 
@@ -198,6 +203,7 @@ class ModelChooser:
         #: it short-lived.
         self._secret = secret
         self._agent: Any | None = None
+        self._system_used = ""
 
     def _model_for_client(self) -> Any:
         """The pinned identifier as the client wants it, carrying explicit credentials (027).
@@ -231,17 +237,19 @@ class ModelChooser:
             reason_code="provider_unavailable",
         )
 
-    def _build(self) -> Any:
-        if self._agent is None:
+    def _build(self, instruction: str = "") -> Any:
+        system = _system_for(instruction)
+        if self._agent is None or self._system_used != system:
             try:
                 # UNCHANGED, and that is the point. Governance is prepended here and also
                 # declares position='outermost', so were this agent ever given a toolset, no
                 # capability downstream could produce an ungoverned execution.
                 self._agent = build_governed_agent(
                     self._model_for_client(),
-                    system_prompt=_SYSTEM,
+                    system_prompt=system,
                     output_type=_ToolCall,
                 )
+                self._system_used = system
             except ChooserUnavailable:
                 raise
             except Exception as exc:
@@ -256,7 +264,7 @@ class ModelChooser:
         return self._agent
 
     def choose(self, request: ChoiceRequest) -> Answer:
-        agent = self._build()
+        agent = self._build(request.instruction)
         try:
             result = agent.run_sync(_prompt(request), deps=None)
         except UnexpectedModelBehavior as exc:
@@ -296,7 +304,14 @@ class ModelChooser:
         # (040, clarification Q1).
         return Answer(name, output.arguments)
 
-    def draft_write_plan(self, *, task: str, consulted: tuple[str, ...], max_files: int = 6) -> str:
+    def draft_write_plan(
+        self,
+        *,
+        task: str,
+        consulted: tuple[str, ...],
+        max_files: int = 6,
+        instruction: str = "",
+    ) -> str:
         """What the analyzer will write, after Research. Not a product plan oracle."""
         cap = max(1, min(int(max_files), 12))
         prompt = (
@@ -308,15 +323,19 @@ class ModelChooser:
             "Do not include dotenv templates (.env, .env.example). "
             "Do not write file bodies. Do not include secrets."
         )
+        plan_system = (
+            "You plan a file-level change for a governed authoring run. "
+            f"Answer with a short summary and at most {cap} paths you will write. "
+            "No file contents. No secrets. No dotenv templates. "
+            "No sprawling multi-module estate."
+        )
+        body = instruction.strip()
+        if body:
+            plan_system = f"{body}\n\n{plan_system}"
         try:
             agent = build_governed_agent(
                 self._model_for_client(),
-                system_prompt=(
-                    "You plan a file-level change for a governed authoring run. "
-                    f"Answer with a short summary and at most {cap} paths you will write. "
-                    "No file contents. No secrets. No dotenv templates. "
-                    "No sprawling multi-module estate."
-                ),
+                system_prompt=plan_system,
                 output_type=_WritePlanDraft,
             )
             result = agent.run_sync(prompt)
@@ -343,6 +362,7 @@ class ModelChooser:
         task: str,
         write_plan: str,
         files: dict[str, str],
+        instruction: str = "",
     ) -> tuple[bool, str]:
         """Quality and accuracy of what was written, against the task. Fail closed."""
         excerpts: list[str] = []
@@ -367,15 +387,19 @@ class ModelChooser:
             "delivered — Write is capped to a small file budget on purpose. "
             "reason must be a complete sentence; do not trail off mid-clause."
         )
+        judge_system = (
+            "You judge authored files for a governed Build that opens a first "
+            "pull request. You do not write files. You do not invent a PR. "
+            "A focused, sound slice of the task is enough to allow. "
+            "reason is user-safe: no secrets, no raw credentials."
+        )
+        body = instruction.strip()
+        if body:
+            judge_system = f"{body}\n\n{judge_system}"
         try:
             agent = build_governed_agent(
                 self._model_for_client(),
-                system_prompt=(
-                    "You judge authored files for a governed Build that opens a first "
-                    "pull request. You do not write files. You do not invent a PR. "
-                    "A focused, sound slice of the task is enough to allow. "
-                    "reason is user-safe: no secrets, no raw credentials."
-                ),
+                system_prompt=judge_system,
                 output_type=_QualityJudgment,
             )
             result = agent.run_sync(prompt)
@@ -396,6 +420,7 @@ class ModelChooser:
         task: str,
         write_plan: str,
         files: dict[str, str],
+        instruction: str = "",
     ) -> tuple[str, str, str]:
         """Short title, markdown rationale, and how-to-use notes for the PR body."""
         excerpts: list[str] = []
@@ -416,15 +441,19 @@ class ModelChooser:
             "Terraform, include init, plan, and apply, and where to set variables. "
             "Remind the reviewer that nothing is applied until merge."
         )
+        copy_system = (
+            "You write pull-request copy for a governed authoring run. "
+            "You do not invent files. You do not include secrets. "
+            "The platform owns the section layout; you fill title, rationale, "
+            "and usage only."
+        )
+        body = instruction.strip()
+        if body:
+            copy_system = f"{body}\n\n{copy_system}"
         try:
             agent = build_governed_agent(
                 self._model_for_client(),
-                system_prompt=(
-                    "You write pull-request copy for a governed authoring run. "
-                    "You do not invent files. You do not include secrets. "
-                    "The platform owns the section layout; you fill title, rationale, "
-                    "and usage only."
-                ),
+                system_prompt=copy_system,
                 output_type=_ProposalCopy,
             )
             result = agent.run_sync(prompt)

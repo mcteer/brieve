@@ -75,6 +75,20 @@ class SkillPin:
 
 
 @dataclass(frozen=True)
+class AgentPin:
+    """Pinned executed instruction for one Build phase of one pack (049, ADR-0030).
+
+    Parallel to ``SkillPin``: a pin, not the instruction body, and not a skill. ``phase``
+    must be a ``PhaseName`` value. ``digest`` is SHA-256 of ``AGENTS.md`` bytes.
+    """
+
+    phase: str
+    path: str
+    version: str
+    digest: str
+
+
+@dataclass(frozen=True)
 class ToolDeclaration:
     """One tool, as the pack declares it.
 
@@ -177,6 +191,7 @@ class PackManifest:
     upstream: UpstreamPin | None = None
     tools: tuple[ToolDeclaration, ...] = ()
     skills: tuple[SkillPin, ...] = ()
+    agents: tuple[AgentPin, ...] = ()
     hooks: tuple[PackHookDeclaration, ...] = ()
     workflows: tuple[WorkflowDeclaration, ...] = ()
     eval_suites: tuple[str, ...] = ()
@@ -190,6 +205,7 @@ class PackManifest:
 
 
 __all__ = [
+    "AgentPin",
     "ManifestError",
     "PackHookDeclaration",
     "PackManifest",

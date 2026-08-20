@@ -279,7 +279,7 @@ evals-authoring-live:
 	  exit 1 ; \
 	} ; \
 	EVAL_PROVIDER_API_KEY=$$K uv run --extra adapters --extra surfaces --extra evals \
-	  python tests/evals_live/authoring.py
+	  python tests/evals_live/authoring.py $${INSTRUCTION_FILE:+--instruction-file $$INSTRUCTION_FILE} $${EVAL_LABEL:+--label $$EVAL_LABEL}
 
 test-full:
 	@echo "make test-full: stub — PR-tier suites not implemented yet" >&2

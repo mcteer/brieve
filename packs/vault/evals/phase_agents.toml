@@ -1,0 +1,178 @@
+# SPDX-License-Identifier: Apache-2.0
+# Individual-phase instruction cases for vault. Loaded only by
+# core.evals.phase_agents_corpus.load_phase_agents_cases — not SUITES.
+
+[[cases]]
+id = "research-shipped"
+suite = "phase_agents"
+phase = "research"
+instruction_ref = "packs/vault/agents/research/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "research-shipped-2"
+suite = "phase_agents"
+phase = "research"
+instruction_ref = "packs/vault/agents/research/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "research-shipped-3"
+suite = "phase_agents"
+phase = "research"
+instruction_ref = "packs/vault/agents/research/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "research-shipped-4"
+suite = "phase_agents"
+phase = "research"
+instruction_ref = "packs/vault/agents/research/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "research-generic-fail"
+suite = "phase_agents"
+phase = "research"
+instruction_ref = "synthetic:vault-research-generic-write-files"
+expected = "fail"
+
+[[cases]]
+id = "plan-shipped"
+suite = "phase_agents"
+phase = "plan"
+instruction_ref = "packs/vault/agents/plan/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "plan-shipped-2"
+suite = "phase_agents"
+phase = "plan"
+instruction_ref = "packs/vault/agents/plan/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "plan-shipped-3"
+suite = "phase_agents"
+phase = "plan"
+instruction_ref = "packs/vault/agents/plan/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "plan-shipped-4"
+suite = "phase_agents"
+phase = "plan"
+instruction_ref = "packs/vault/agents/plan/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "plan-generic-fail"
+suite = "phase_agents"
+phase = "plan"
+instruction_ref = "synthetic:vault-plan-generic-write-files"
+expected = "fail"
+
+[[cases]]
+id = "write-shipped"
+suite = "phase_agents"
+phase = "write"
+instruction_ref = "packs/vault/agents/write/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "write-shipped-2"
+suite = "phase_agents"
+phase = "write"
+instruction_ref = "packs/vault/agents/write/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "write-shipped-3"
+suite = "phase_agents"
+phase = "write"
+instruction_ref = "packs/vault/agents/write/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "write-shipped-4"
+suite = "phase_agents"
+phase = "write"
+instruction_ref = "packs/vault/agents/write/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "write-generic-fail"
+suite = "phase_agents"
+phase = "write"
+instruction_ref = "synthetic:vault-write-generic-write-files"
+expected = "fail"
+
+[[cases]]
+id = "judge-shipped"
+suite = "phase_agents"
+phase = "judge"
+instruction_ref = "packs/vault/agents/judge/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "judge-shipped-2"
+suite = "phase_agents"
+phase = "judge"
+instruction_ref = "packs/vault/agents/judge/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "judge-shipped-3"
+suite = "phase_agents"
+phase = "judge"
+instruction_ref = "packs/vault/agents/judge/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "judge-shipped-4"
+suite = "phase_agents"
+phase = "judge"
+instruction_ref = "packs/vault/agents/judge/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "judge-generic-fail"
+suite = "phase_agents"
+phase = "judge"
+instruction_ref = "synthetic:vault-judge-generic-write-files"
+expected = "fail"
+
+[[cases]]
+id = "propose-shipped"
+suite = "phase_agents"
+phase = "propose"
+instruction_ref = "packs/vault/agents/propose/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "propose-shipped-2"
+suite = "phase_agents"
+phase = "propose"
+instruction_ref = "packs/vault/agents/propose/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "propose-shipped-3"
+suite = "phase_agents"
+phase = "propose"
+instruction_ref = "packs/vault/agents/propose/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "propose-shipped-4"
+suite = "phase_agents"
+phase = "propose"
+instruction_ref = "packs/vault/agents/propose/AGENTS.md"
+expected = "pass"
+
+[[cases]]
+id = "propose-generic-fail"
+suite = "phase_agents"
+phase = "propose"
+instruction_ref = "synthetic:vault-propose-generic-write-files"
+expected = "fail"

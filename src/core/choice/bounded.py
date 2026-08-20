@@ -125,6 +125,7 @@ def resolve_step_tool(
     chooser: Chooser,
     bound: int = DEFAULT_RECHOICE_BOUND,
     already_chosen: Answer | None = None,
+    instruction: str = "",
 ) -> StepResolution:
     """Ask a model what to do at this step, and carry the answer into the governed entry.
 
@@ -171,6 +172,7 @@ def resolve_step_tool(
                         step_index=step_index,
                         attempt=attempt,
                         refused=tuple(refused),
+                        instruction=instruction,
                     )
                 )
             except MalformedAnswer as exc:
