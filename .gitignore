@@ -51,6 +51,13 @@ tmp-ui-mockups/
 .env.*
 !.env.example
 
+# GEPA run traces (049 eval-lane). Candidates themselves may be reviewed; logs are not.
+evals/prompt-tune/candidates/**/gepa-log/
+evals/prompt-tune/candidates/**/joint-gepa-log/
+evals/prompt-tune/candidates/run.log
+evals/prompt-tune/candidates/.dspy-cache/
+evals/prompt-tune/sc006-*.log
+
 # Editor
 *.swp
 *.swo

@@ -118,31 +118,31 @@ digest  = "b3815739e32a0b1578b04b863a890d91b5c925259a19ed8f283c2e91de5f9d81"
 phase   = "research"
 path    = "agents/research/AGENTS.md"
 version = "0.1.0"
-digest  = "f69beed41b92aa882ebf67b71746d62c62d606a90bb994576b26f47875c1d666"
+digest  = "f3f2401e0c5ab9c44d60256a9dfc4450dd7b1fa331c33d7cea06d540c0321b0d"
 
 [[agents]]
 phase   = "plan"
 path    = "agents/plan/AGENTS.md"
 version = "0.1.0"
-digest  = "9552e61157526f59a4780f14ee42d45ad76c33b4a0bfdf25257a299ce015ead8"
+digest  = "aa92f182a61a29429c72b5eecd91b96d7f864039e5f1d9385cebd89070c436b7"
 
 [[agents]]
 phase   = "write"
 path    = "agents/write/AGENTS.md"
 version = "0.1.0"
-digest  = "08cd8f45d3d42a165ff1a4693a9270f2bb0feb0c091952ae08273628c83c4698"
+digest  = "20308b71af99ce7ba6e5cccdf6ecc980fd8a6b5c2db29a479ead66ff65171233"
 
 [[agents]]
 phase   = "judge"
 path    = "agents/judge/AGENTS.md"
 version = "0.1.0"
-digest  = "a1f6e714e748bc31d3382444667f6eeeb70473c3febd5d84053c95ec7306a0a0"
+digest  = "1b98b4e4594484f8a9d742c93a9faaace53719c680ca0e26b3427a762ea18f45"
 
 [[agents]]
 phase   = "propose"
 path    = "agents/propose/AGENTS.md"
 version = "0.1.0"
-digest  = "a0597634b7540daa99b629a2ed9bf1eeeedfce1a9d89d8f6c93b1058bb7bdc6b"
+digest  = "0f6109c5cfa5e8f2136d461c0a2b5ebddc33b5d5fe695eed635402bf26fccaa6"
 
 # At least one PAVED workflow, so US5 has something a lowest-tier definition may actually
 # run. A tier bound with nothing beneath it would assert a refusal against an empty set.

@@ -63,7 +63,18 @@ Author complete files, not fragments: a file you emit REPLACES the one at that p
 Do not explain. Do not add commentary outside the blocks."""
 
 
-def _ask(prompt: str, *, api_key: str) -> str:
+def _system_prompt(instruction: str = "") -> str:
+    """Generic write steer, optionally followed by a pinned pack Write card."""
+    extra = instruction.strip()
+    if not extra:
+        return _SYSTEM
+    return (
+        _SYSTEM + "\n\nThe following is the product Write instruction for this Build. "
+        "Stay in Write. Do not fetch the public web.\n\n" + extra
+    )
+
+
+def _ask(prompt: str, *, api_key: str, instruction: str = "") -> str:
     """One model call, through the ADAPTER that owns the vendor binding.
 
     Not `import anthropic` here: `tests/unit/test_no_live_dependencies.py` forbids a test
@@ -79,7 +90,7 @@ def _ask(prompt: str, *, api_key: str) -> str:
         # before answering spends from the same budget, and a truncated answer returns empty
         # text that scores as a wrong answer rather than as a budget problem.
         max_tokens=4096,
-        system=_SYSTEM,
+        system=_system_prompt(instruction),
         messages=[{"role": "user", "content": prompt}],
     )
     return "".join(block.text for block in message.content if block.type == "text")
@@ -177,7 +188,7 @@ def _terraform_validates(contents: dict[str, str]) -> ToolingResult:
 
 
 def _author(
-    task: GoldenTask, *, api_key: str, workdir: Path
+    task: GoldenTask, *, api_key: str, workdir: Path, instruction: str = ""
 ) -> tuple[AuthoredArtifact, dict[str, str], dict[str, str]]:
     """Drive the model, then put its answer through the REAL `author_file` handler.
 
@@ -191,7 +202,7 @@ def _author(
     )
     prompt = f"TASK: {task.prompt}\n\nCURRENT REPOSITORY CONTENTS:\n{rendered}"
 
-    response = _ask(prompt, api_key=api_key)
+    response = _ask(prompt, api_key=api_key, instruction=instruction)
     authored = _parse(response)
 
     subject = workdir / task.name / "subject"
@@ -216,13 +227,39 @@ def _author(
 
 
 def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Live write qualification (two gates).")
+    parser.add_argument(
+        "--instruction-file",
+        default=os.environ.get("INSTRUCTION_FILE", ""),
+        help="Optional pack Write AGENTS.md to prepend after the generic steer",
+    )
+    parser.add_argument(
+        "--label",
+        default=os.environ.get("EVAL_LABEL", "generic"),
+        help="Label printed in the summary (generic vs write-card)",
+    )
+    args = parser.parse_args()
+    instruction = ""
+    if args.instruction_file:
+        path = Path(args.instruction_file)
+        instruction = path.read_text(encoding="utf-8")
+        if not instruction.strip():
+            print(f"empty instruction file: {path}", file=sys.stderr)
+            return 2
+
     key = os.environ.get("EVAL_PROVIDER_API_KEY", "").strip()
     if not key:
         print("no EVAL_PROVIDER_API_KEY; this lane cannot run", file=sys.stderr)
         return 2
 
     corpus = load_corpus(CORPUS)
-    print(f"== live `write` qualification — {LIVE_MODEL}")
+    print(f"== live `write` qualification — {LIVE_MODEL} — {args.label}")
+    if args.instruction_file:
+        print(f"   instruction: {args.instruction_file}")
+    else:
+        print("   instruction: generic steer (no pack AGENTS.md)")
     print(f"   corpus: {len(corpus.golden)} golden tasks, {len(corpus.deny)} deny cases\n")
 
     artefacts: dict[str, tuple[AuthoredArtifact, dict[str, str]]] = {}
@@ -230,7 +267,9 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         workdir = Path(raw)
         for task in corpus.golden:
-            artifact, contents, merged = _author(task, api_key=key, workdir=workdir)
+            artifact, contents, merged = _author(
+                task, api_key=key, workdir=workdir, instruction=instruction
+            )
             found = detect(contents)
             print(f"--- {task.name}")
             print(f"    files      : {sorted(contents) or '(none)'}")
@@ -252,6 +291,7 @@ def main() -> int:
         )
 
     print("\n== gates, two numbers and never one")
+    print(f"   label                : {args.label}")
     print(f"   product tooling      : {report.tooling_passed}/{report.tooling_total}")
     print(f"   reference comparison : {report.reference_passed}/{report.reference_total}")
     if report.valid_but_wrong:

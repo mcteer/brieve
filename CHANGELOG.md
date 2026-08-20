@@ -9,7 +9,11 @@ durable record.
 
 - Each Build phase is steered by a pinned pack file `packs/<pack>/agents/<phase>/AGENTS.md`
   (Terraform and Vault). Ask and the portal do not compose those files. Missing or empty
-  instructions fail the phase and do not open a pull request.
+  instructions fail the phase and do not open a pull request. Terraform and Vault cards
+  now encode HashiCorp style and security practice (layout, ``for_each``, version pins,
+  ephemeral Vault credentials, deny-by-default paths). On the live authoring lane
+  (n=5, Sonnet 5) the Write card and generic steer both scored 1/5 on the reference
+  gate — delta 0, so that eval remains open.
 - Write refuses dotenv templates (``.env``, ``.env.example``) instead of
   opening a pull request that only adds placeholder env files.
 - Write no longer treats “named nothing” as done while planned files are still

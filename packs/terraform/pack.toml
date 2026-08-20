@@ -77,31 +77,31 @@ digest  = "3dc8ffa10139e9772c5c102fee6377f66f5167bd043a7c43e6e5df682dc75f92"
 phase   = "research"
 path    = "agents/research/AGENTS.md"
 version = "0.1.0"
-digest  = "36d56e2fb8717adc89d7f23e4919241cd5654dee421749fd900d0e50b2881b84"
+digest  = "2b35fab3f8d1086541ba5115ea9dd4af3fb2dd9e0e5bf628ec21496d63c1d428"
 
 [[agents]]
 phase   = "plan"
 path    = "agents/plan/AGENTS.md"
 version = "0.1.0"
-digest  = "43a9bf574014054b6eaefa66619070b6744091636f10caaa6919b3ba716e7d60"
+digest  = "9d8b9e301702fe964e54d84fadb1a67c41246a77e021db381cc7c5895928e4ed"
 
 [[agents]]
 phase   = "write"
 path    = "agents/write/AGENTS.md"
 version = "0.1.0"
-digest  = "c85ba2f0894417b11d2d4b53512fda71c6cf4080dd8ff571a165fd5149f0d0eb"
+digest  = "54059d0591c30afadf9a1c1ae181753e0b47495d742fe02e513f8b03907e2ed2"
 
 [[agents]]
 phase   = "judge"
 path    = "agents/judge/AGENTS.md"
 version = "0.1.0"
-digest  = "eaacff7bc7b0df1583e700410b1209a8aad56a8a8565af1d1f30e099df4ae8fe"
+digest  = "38ce58eedbd17abf9fe765cb0ce18df351789cc6635750a1366ca37ae69328d5"
 
 [[agents]]
 phase   = "propose"
 path    = "agents/propose/AGENTS.md"
 version = "0.1.0"
-digest  = "1bfb3b6371ba4ab539f553b9b2156058dace9475f7575758a5e8c38b81a728ba"
+digest  = "4d1ddd022559c7dceed6bbafe44d72dfc36ea4e722109ade015a149b0ade487c"
 
 # Tier 1 is paved paths only, so a lowest-tier definition may run this and nothing else.
 [[workflows]]
