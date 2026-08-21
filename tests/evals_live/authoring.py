@@ -22,7 +22,6 @@ Run: `make evals-authoring-live`. Prints per-task detail, then the two numbers.
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -35,10 +34,11 @@ from core.authoring.artifact import AuthoredArtifact  # noqa: E402
 from core.authoring.tool import FileAuthor  # noqa: E402
 from core.authoring.workspace import Trees  # noqa: E402
 from core.evals.authoring_corpus import GoldenTask, load_corpus  # noqa: E402
-from core.evals.authoring_scoring import ToolingResult, score_corpus  # noqa: E402
+from core.evals.authoring_scoring import score_corpus  # noqa: E402
 from core.evals.scoring import LIVE_MODEL  # noqa: E402
 from tests.evals_live.authoring_properties import detect  # noqa: E402
 from tests.evals_live.authoring_subjects import subject_for  # noqa: E402
+from tests.evals_live.write_gates import parse_authored, terraform_validates  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CORPUS = ROOT / "evals" / "authoring" / "corpus.toml"
@@ -96,97 +96,6 @@ def _ask(prompt: str, *, api_key: str, instruction: str = "") -> str:
     return "".join(block.text for block in message.content if block.type == "text")
 
 
-def _parse(response: str) -> dict[str, str]:
-    """Files the model authored. `--- NO CHANGE` yields none, which is a valid answer."""
-    if "--- NO CHANGE" in response:
-        return {}
-    files: dict[str, str] = {}
-    current: str | None = None
-    body: list[str] = []
-    for line in response.splitlines():
-        if line.startswith("--- FILE:"):
-            current = line.split(":", 1)[1].strip()
-            body = []
-        elif line.startswith("--- END"):
-            if current:
-                files[current] = "\n".join(body) + "\n"
-            current = None
-        elif current is not None:
-            body.append(line)
-    if current and body:  # a block the model forgot to close
-        files[current] = "\n".join(body) + "\n"
-    return files
-
-
-def _first_error(blob: str) -> str:
-    """The first line that names the problem, stripped of terminal colour."""
-    import re as _re
-
-    plain = _re.sub(r"\x1b\[[0-9;]*m", "", blob)
-    for line in plain.splitlines():
-        if "Error:" in line:
-            return line.split("Error:", 1)[1].strip()[:160]
-    return plain.strip()[:160]
-
-
-def _terraform_validates(contents: dict[str, str]) -> ToolingResult:
-    """Gate one, by the product's own tooling. Never degrades to a formatter."""
-    if not contents:
-        # An empty artefact has nothing to validate and nothing malformed about it.
-        return ToolingResult(ran=True, passed=True, detail="no artefact")
-    with tempfile.TemporaryDirectory() as raw:
-        directory = Path(raw)
-        for name, body in contents.items():
-            target = directory / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(body)
-        init = subprocess.run(
-            ["terraform", "-chdir=" + str(directory), "init", "-backend=false", "-input=false"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if init.returncode != 0:
-            # **Two very different failures wear one exit code**, and collapsing them is a
-            # harness defect: `init` cannot reach the registry (the tooling did not RUN, and
-            # the suite must go red rather than degrade) versus `init` refusing a configuration
-            # that is wrong (the tooling ran, and the answer FAILED). Reporting the second as
-            # unrunnable would turn every malformed answer into an infrastructure excuse.
-            blob = f"{init.stderr}\n{init.stdout}"
-            unreachable = any(
-                signal in blob
-                for signal in (
-                    "Failed to query available provider packages",
-                    "could not connect",
-                    "no available releases",
-                    "Failed to install provider",
-                    "network is unreachable",
-                )
-            )
-            if unreachable:
-                return ToolingResult(
-                    ran=False,
-                    passed=False,
-                    detail=f"provider registry unreachable: {init.stderr.strip()[:160]}",
-                )
-            return ToolingResult(
-                ran=True,
-                passed=False,
-                detail=f"configuration refused by init: {_first_error(blob)}",
-            )
-        validated = subprocess.run(
-            ["terraform", "-chdir=" + str(directory), "validate"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        return ToolingResult(
-            ran=True,
-            passed=validated.returncode == 0,
-            detail=validated.stderr.strip()[:200],
-        )
-
-
 def _author(
     task: GoldenTask, *, api_key: str, workdir: Path, instruction: str = ""
 ) -> tuple[AuthoredArtifact, dict[str, str], dict[str, str]]:
@@ -203,7 +112,7 @@ def _author(
     prompt = f"TASK: {task.prompt}\n\nCURRENT REPOSITORY CONTENTS:\n{rendered}"
 
     response = _ask(prompt, api_key=api_key, instruction=instruction)
-    authored = _parse(response)
+    authored = parse_authored(response)
 
     subject = workdir / task.name / "subject"
     workspace = workdir / task.name / "workspace"
@@ -285,7 +194,7 @@ def main() -> int:
 
         report = score_corpus(
             corpus,
-            tooling=lambda task, _a, _c: _terraform_validates(trees[task.name]),
+            tooling=lambda task, _a, _c: terraform_validates(trees[task.name]),
             artefacts=artefacts,
             properties_of=lambda _t, _a, contents: detect(contents),
         )

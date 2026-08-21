@@ -13,7 +13,8 @@ durable record.
   now encode HashiCorp style and security practice (layout, ``for_each``, version pins,
   ephemeral Vault credentials, deny-by-default paths). On the live authoring lane
   (n=5, Sonnet 5) the Write card and generic steer both scored 1/5 on the reference
-  gate — delta 0, so that eval remains open.
+  gate — delta 0, so that eval remains open. The authoring pin detector now treats
+  HashiCorp ``~>`` as a pin (a ceiling exists); ``>=`` and ``*`` remain floating.
 - Write refuses dotenv templates (``.env``, ``.env.example``) instead of
   opening a pull request that only adds placeholder env files.
 - Write no longer treats “named nothing” as done while planned files are still

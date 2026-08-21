@@ -46,3 +46,11 @@ def test_a_losing_metric_copies_zero_files(tmp_path: Path) -> None:
         pack="alpha",
     )
     assert copied == 0
+
+
+def test_terraform_write_uses_authoring_gates() -> None:
+    common = _load("_common.py")
+    uses = common["uses_authoring_gates"]
+    assert uses("terraform", "write")  # type: ignore[operator]
+    assert not uses("terraform", "plan")  # type: ignore[operator]
+    assert not uses("vault", "write")  # type: ignore[operator]
