@@ -15,6 +15,12 @@ detector to fail it — that row is what makes the rest of this file trustworthy
 **Textual, deliberately.** A full HCL parse would be more precise and would also be a second
 implementation of what `terraform validate` already does in gate one. Gate one catches
 malformed; this gate catches *subtly wrong*, and subtly wrong is legible in the text.
+
+**Pin oracle.** `provider_version_is_pinned` / `no_floating_version_constraint` follow the
+pinned `terraform-style-guide` skill: HashiCorp `~>` is a pin (a ceiling exists);
+`>=`, `*`, and `latest` are not. An exact `version = "x.y.z"` remains a pin. The detector
+used to treat `~>` as floating, which scored HashiCorp practice as the failure the
+`pin_the_provider` task exists to catch.
 """
 
 from __future__ import annotations
@@ -52,11 +58,17 @@ _LEASED = re.compile(
     """
 )
 
-#: An exact version pin: `version = "1.2.3"`. No operator, no range.
-_EXACT_PIN = re.compile(r'(?i)\bversion\s*=\s*"\s*\d+\.\d+(\.\d+)?\s*"')
+#: An exact version pin: `version = "1.2.3"` or `version = "= 1.2.3"`.
+_EXACT_PIN = re.compile(r'(?i)\bversion\s*=\s*"\s*=?\s*\d+\.\d+(\.\d+)?\s*"')
 
-#: A constraint that can drift on a re-run.
-_FLOATING = re.compile(r'(?i)\bversion\s*=\s*"[^"]*(>=|<=|>|<|~>|\^|\*|latest)[^"]*"')
+#: HashiCorp pessimistic pin: `version = "~> 6.0"` or `version = "~> 4.4.0"`.
+#: The rightmost component may increment; a ceiling exists. This is the operator
+#: the pinned terraform-style-guide skill teaches. It is not "unpinned."
+_PESSIMISTIC_PIN = re.compile(r'(?i)\bversion\s*=\s*"\s*~>\s*\d+\.\d+(\.\d+)?\s*"')
+
+#: A constraint with no ceiling (or an unbounded wildcard). `~>` is not in this set:
+#: the `>` in `~>` is excluded by the lookbehind so HashiCorp pessimistic pins stay pins.
+_UNBOUNDED = re.compile(r'(?i)\bversion\s*=\s*"[^"]*(>=|<=|\^|\*|latest|(?<!~)[<>])[^"]*"')
 
 #: A capability list containing a wildcard, or a policy path ending in one.
 _WILDCARD = re.compile(
@@ -94,9 +106,10 @@ def detect(contents: dict[str, str]) -> frozenset[str]:
     if _LEASED.search(text):
         found.add("credential_has_a_lease")
 
-    if _EXACT_PIN.search(text) and not _FLOATING.search(text):
+    pinned = _EXACT_PIN.search(text) or _PESSIMISTIC_PIN.search(text)
+    if pinned and not _UNBOUNDED.search(text):
         found.add("provider_version_is_pinned")
-    if not _FLOATING.search(text):
+    if not _UNBOUNDED.search(text):
         found.add("no_floating_version_constraint")
 
     paths = _POLICY_PATH.findall(text)

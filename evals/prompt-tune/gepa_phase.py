@@ -19,6 +19,8 @@ from _common import (  # noqa: E402
     CANDIDATES,
     DEFAULT_FULL_EVALS,
     REPO_ROOT,
+    TASK_MAX_TOKENS,
+    WRITE_TASK_MAX_TOKENS,
     PhaseCompileOutcome,
     RefinementUnavailable,
     configure_dspy,
@@ -29,6 +31,7 @@ from _common import (  # noqa: E402
     phase_metric,
     phase_trainset,
     refinement_available,
+    uses_authoring_gates,
     write_result_json,
 )
 
@@ -81,6 +84,42 @@ def _phase_program(instruction: str) -> object:
     return PhasePredictor()
 
 
+def _write_program(instruction: str) -> object:
+    """Author `.tf` files. GEPA rewrites the card; FILE protocol lives on the task.
+
+    Must call ``self.steer`` so GEPA can build a reflective dataset. A raw ``lm()``
+    call scores artefacts but leaves no predictor traces, and every iteration then
+    dies with "No valid predictions found for any module."
+    """
+    import dspy
+    from dspy.utils.exceptions import AdapterParseError
+
+    signature = dspy.Signature("task -> artefact", instructions=instruction)
+
+    class WriteAuthor(dspy.Module):  # type: ignore[misc]
+        def __init__(self) -> None:
+            super().__init__()
+            self.steer = dspy.Predict(signature)
+
+        def forward(self, task: str) -> object:
+            card = str(self.steer.signature.instructions)
+            artefact = ""
+            try:
+                result = self.steer(task=task)
+                artefact = str(getattr(result, "artefact", "") or "")
+            except AdapterParseError as exc:
+                resp = exc.lm_response
+                if isinstance(resp, dict):
+                    artefact = str(resp.get("text") or "")
+                else:
+                    artefact = str(resp or "")
+            if artefact in {"None", "null"}:
+                artefact = ""
+            return dspy.Prediction(artefact=artefact, instruction=card)
+
+    return WriteAuthor()
+
+
 def compile_phase(
     instruction: str,
     metric_lost: bool,
@@ -130,12 +169,20 @@ def compile_phase_live(
     import dspy
 
     root = repo_root or REPO_ROOT
-    reflection_lm = configure_dspy()
+    authoring = uses_authoring_gates(pack, phase)
+    if authoring and shutil.which("terraform") is None:
+        raise RefinementUnavailable(
+            "live Write GEPA needs terraform on PATH; gate one is the product's own tooling"
+        )
+    reflection_lm = configure_dspy(
+        max_tokens=WRITE_TASK_MAX_TOKENS if authoring else TASK_MAX_TOKENS
+    )
     trainset = phase_trainset(pack, phase, repo_root=root)
-    valset = trainset[-1:] or trainset
+    # Score every example. Slicing to trainset[-1:] made the fail-case a perfect 1.0 seed.
+    valset = trainset
     score_set = valset
     metric = phase_metric(pack, phase)
-    seed = _phase_program(instruction)
+    seed = _write_program(instruction) if authoring else _phase_program(instruction)
     seed_score = mean_score(seed, score_set, metric)
     log_path = CANDIDATES / pack / phase / "gepa-log"
     if log_path.exists():
@@ -159,7 +206,7 @@ def compile_phase_live(
     )
     compiled = optimizer.compile(
         seed,
-        trainset=trainset[:1] or trainset,
+        trainset=trainset,
         valset=valset,
     )
     compiled_text = extract_instruction(compiled, "steer")

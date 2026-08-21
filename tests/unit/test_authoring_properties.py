@@ -88,9 +88,23 @@ def test_an_empty_artefact_exhibits_nothing() -> None:
 
 
 def test_a_floating_constraint_is_not_a_pin() -> None:
-    assert "provider_version_is_pinned" not in detect({"v.tf": 'version = "~> 4.0"'})
+    """`>=` / `*` have no ceiling. HashiCorp `~>` does — the style guide's own pin."""
+    assert "provider_version_is_pinned" not in detect({"v.tf": 'version = ">= 4.0"'})
     assert "no_floating_version_constraint" not in detect({"v.tf": 'version = ">= 4.0"'})
+    assert "provider_version_is_pinned" not in detect({"v.tf": 'version = "*"'})
     assert "provider_version_is_pinned" in detect({"v.tf": 'version = "4.2.1"'})
+    assert "no_floating_version_constraint" in detect({"v.tf": 'version = "4.2.1"'})
+
+
+def test_a_hashicorp_pessimistic_constraint_is_a_pin() -> None:
+    found = detect({"v.tf": 'version = "~> 4.0"'})
+    assert "provider_version_is_pinned" in found
+    assert "no_floating_version_constraint" in found
+    patch = detect({"v.tf": 'version = "~> 4.4.0"'})
+    assert "provider_version_is_pinned" in patch
+    mixed = detect({"v.tf": 'version = "~> 4.0"\nversion = ">= 1.0"'})
+    assert "provider_version_is_pinned" not in mixed
+    assert "no_floating_version_constraint" not in mixed
 
 
 def test_a_wildcard_capability_is_detected() -> None:

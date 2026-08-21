@@ -14,6 +14,8 @@ _ROOT = Path(__file__).resolve().parents[2]
 _SRC = _ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -31,6 +33,7 @@ PHASES = ("research", "plan", "write", "judge", "propose")
 DEFAULT_FULL_EVALS = 10
 MAX_TRAINSET = 3
 TASK_MAX_TOKENS = 1024
+WRITE_TASK_MAX_TOKENS = 8192
 REFLECTION_MAX_TOKENS = 4096
 _DOTENV_KEYS = frozenset({EVAL_PROVIDER_KEY, "ANTHROPIC_API_KEY", "ASK_MODEL", "RELEVANCE_MODEL"})
 
@@ -104,9 +107,7 @@ def configure_dspy(*, max_tokens: int = TASK_MAX_TOKENS) -> Any:
     model = dspy_model_id()
     # Sonnet 5 rejects any temperature other than 1.
     task_lm = dspy.LM(model, api_key=key, temperature=1.0, max_tokens=max_tokens)
-    reflection_lm = dspy.LM(
-        model, api_key=key, temperature=1.0, max_tokens=REFLECTION_MAX_TOKENS
-    )
+    reflection_lm = dspy.LM(model, api_key=key, temperature=1.0, max_tokens=REFLECTION_MAX_TOKENS)
     dspy.configure(lm=task_lm)
     return reflection_lm
 
@@ -286,6 +287,11 @@ def _phase_requirements(pack: str, phase: str) -> tuple[str, ...]:
     return shared + extra
 
 
+def uses_authoring_gates(pack: str, phase: str) -> bool:
+    """Terraform Write is scored by SC-006's gates, not keyword coverage."""
+    return pack.lower() == "terraform" and phase == "write"
+
+
 def _coverage(text: str, needles: tuple[str, ...]) -> tuple[float, tuple[str, ...]]:
     lowered = text.lower()
     missing = tuple(needle for needle in needles if needle.lower() not in lowered)
@@ -294,8 +300,11 @@ def _coverage(text: str, needles: tuple[str, ...]) -> tuple[float, tuple[str, ..
 
 
 def phase_metric(pack: str, phase: str) -> Any:
-    """GEPA feedback metric against `phase_agents` intent (not the mechanical path scorer)."""
+    """GEPA feedback metric. Terraform Write uses the authoring gates; other phases use needles."""
     import dspy
+
+    if uses_authoring_gates(pack, phase):
+        return _write_authoring_metric()
 
     needles = _phase_requirements(pack, phase)
     write_now = (
@@ -349,6 +358,34 @@ def phase_metric(pack: str, phase: str) -> Any:
                 "Do not instruct the agent to ignore governance."
             )
         return dspy.Prediction(score=float(score), feedback="; ".join(notes))
+
+    return metric
+
+
+def _write_authoring_metric() -> Any:
+    """SC-006 gates as a GEPA scalar. Feedback names which gate failed."""
+    import dspy
+    from tests.evals_live.write_gates import score_write_prediction
+
+    def metric(
+        gold: Any,
+        pred: Any,
+        trace: Any | None = None,
+        pred_name: str | None = None,
+        pred_trace: Any | None = None,
+    ) -> Any:
+        del trace, pred_name, pred_trace
+        artefact = str(getattr(pred, "artefact", "") or _guidance_text(pred))
+        task_name = str(getattr(gold, "task_name", "") or "")
+        result = score_write_prediction(task_name=task_name, artefact_text=artefact)
+        notes = [result.feedback] if result.feedback else []
+        notes.append(
+            "Stay in write for a terraform Build. Do not fetch the public web. "
+            "Author files when the subject does not already implement the request. "
+            "Respond with --- FILE blocks or --- NO CHANGE. "
+            "HashiCorp ~> is a pin; >= and * are not."
+        )
+        return dspy.Prediction(score=float(result.score), feedback="; ".join(notes))
 
     return metric
 
@@ -417,6 +454,21 @@ def build_metric(pack: str) -> Any:
 
 def phase_trainset(pack: str, phase: str, *, repo_root: Path = REPO_ROOT) -> list[Any]:
     import dspy
+
+    if uses_authoring_gates(pack, phase):
+        from tests.evals_live.write_gates import iter_write_train_items
+
+        write_examples: list[Any] = []
+        for item in iter_write_train_items(repo_root=repo_root):
+            write_examples.append(
+                dspy.Example(
+                    task=item.task_text,
+                    task_name=item.task_name,
+                    expected="pass",
+                    expects_no_artifact=item.expects_no_artifact,
+                ).with_inputs("task")
+            )
+        return write_examples
 
     pack_dir = repo_root / "packs" / pack
     cases = [c for c in load_phase_agents_cases(pack_dir) if c.phase.value == phase]
