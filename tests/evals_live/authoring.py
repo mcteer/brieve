@@ -34,7 +34,7 @@ from core.authoring.artifact import AuthoredArtifact  # noqa: E402
 from core.authoring.tool import FileAuthor  # noqa: E402
 from core.authoring.workspace import Trees  # noqa: E402
 from core.evals.authoring_corpus import GoldenTask, load_corpus  # noqa: E402
-from core.evals.authoring_scoring import score_corpus  # noqa: E402
+from core.evals.authoring_scoring import ToolingResult, score_corpus  # noqa: E402
 from core.evals.scoring import LIVE_MODEL  # noqa: E402
 from tests.evals_live.authoring_properties import detect  # noqa: E402
 from tests.evals_live.authoring_subjects import subject_for  # noqa: E402
@@ -74,7 +74,7 @@ def _system_prompt(instruction: str = "") -> str:
     )
 
 
-def _ask(prompt: str, *, api_key: str, instruction: str = "") -> str:
+def _ask(prompt: str, *, api_key: str, instruction: str = "") -> tuple[str, str]:
     """One model call, through the ADAPTER that owns the vendor binding.
 
     Not `import anthropic` here: `tests/unit/test_no_live_dependencies.py` forbids a test
@@ -86,19 +86,21 @@ def _ask(prompt: str, *, api_key: str, instruction: str = "") -> str:
     client, api_model = client_and_model(LIVE_MODEL, api_key=api_key)
     message = client.messages.create(  # type: ignore[attr-defined]
         model=api_model,
-        # 4096 rather than 2048, on the live lane's own recorded lesson: a model that reasons
-        # before answering spends from the same budget, and a truncated answer returns empty
-        # text that scores as a wrong answer rather than as a budget problem.
-        max_tokens=4096,
+        # 8192 matches Write GEPA (`WRITE_TASK_MAX_TOKENS`). 4096 truncated complete
+        # `variables.tf` mid-block; `terraform init` then refused the merged tree while
+        # the property detector still passed — the anonymous 4/5 tooling miss.
+        max_tokens=8192,
         system=_system_prompt(instruction),
         messages=[{"role": "user", "content": prompt}],
     )
-    return "".join(block.text for block in message.content if block.type == "text")
+    text = "".join(block.text for block in message.content if block.type == "text")
+    stop = str(getattr(message, "stop_reason", "") or "")
+    return text, stop
 
 
 def _author(
     task: GoldenTask, *, api_key: str, workdir: Path, instruction: str = ""
-) -> tuple[AuthoredArtifact, dict[str, str], dict[str, str]]:
+) -> tuple[AuthoredArtifact, dict[str, str], dict[str, str], str]:
     """Drive the model, then put its answer through the REAL `author_file` handler.
 
     Through the handler rather than into a dict: the qualification should score what the
@@ -111,7 +113,7 @@ def _author(
     )
     prompt = f"TASK: {task.prompt}\n\nCURRENT REPOSITORY CONTENTS:\n{rendered}"
 
-    response = _ask(prompt, api_key=api_key, instruction=instruction)
+    response, stop_reason = _ask(prompt, api_key=api_key, instruction=instruction)
     authored = parse_authored(response)
 
     subject = workdir / task.name / "subject"
@@ -132,7 +134,7 @@ def _author(
     # fails on every file that relies on a `required_providers` block it did not rewrite —
     # which is a defect in the harness, not in the answer.
     merged = {**subject_files, **author.contents}
-    return artifact, author.contents, merged
+    return artifact, author.contents, merged, stop_reason
 
 
 def main() -> int:
@@ -172,15 +174,19 @@ def main() -> int:
     print(f"   corpus: {len(corpus.golden)} golden tasks, {len(corpus.deny)} deny cases\n")
 
     artefacts: dict[str, tuple[AuthoredArtifact, dict[str, str]]] = {}
-    trees: dict[str, dict[str, str]] = {}
+    tooling_by_task: dict[str, ToolingResult] = {}
+    dump_root = ROOT / "evals" / "prompt-tune" / "sc006-dump" / args.label
+    dump_root.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as raw:
         workdir = Path(raw)
         for task in corpus.golden:
-            artifact, contents, merged = _author(
+            artifact, contents, merged, stop_reason = _author(
                 task, api_key=key, workdir=workdir, instruction=instruction
             )
             found = detect(contents)
+            tooling = terraform_validates(merged)
             print(f"--- {task.name}")
+            print(f"    stop       : {stop_reason or '(none)'}")
             print(f"    files      : {sorted(contents) or '(none)'}")
             print(f"    properties : {sorted(found) or '(none)'}")
             if task.reference is not None:
@@ -189,12 +195,20 @@ def main() -> int:
                 print(f"    missing    : {sorted(want - found) or '(none)'}")
             else:
                 print("    expected   : no artefact")
+            status = "pass" if tooling.passed else "FAIL"
+            print(f"    tooling    : {status}" + (f" — {tooling.detail}" if tooling.detail else ""))
             artefacts[task.name] = (artifact, contents)
-            trees[task.name] = merged
+            tooling_by_task[task.name] = tooling
+            task_dump = dump_root / task.name
+            task_dump.mkdir(parents=True, exist_ok=True)
+            for name, body in merged.items():
+                target = task_dump / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(body)
 
         report = score_corpus(
             corpus,
-            tooling=lambda task, _a, _c: terraform_validates(trees[task.name]),
+            tooling=lambda task, _a, _c: tooling_by_task[task.name],
             artefacts=artefacts,
             properties_of=lambda _t, _a, contents: detect(contents),
         )
@@ -203,8 +217,11 @@ def main() -> int:
     print(f"   label                : {args.label}")
     print(f"   product tooling      : {report.tooling_passed}/{report.tooling_total}")
     print(f"   reference comparison : {report.reference_passed}/{report.reference_total}")
+    if report.tooling_failed:
+        print(f"   TOOLING FAILED       : {list(report.tooling_failed)}")
     if report.valid_but_wrong:
         print(f"   VALID BUT WRONG      : {list(report.valid_but_wrong)}")
+    print(f"   dump                 : {dump_root}")
     print(f"\n   both gates passed    : {report.both_passed}")
     return 0 if report.both_passed else 1
 

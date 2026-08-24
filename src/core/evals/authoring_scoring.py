@@ -52,6 +52,9 @@ class GateReport:
     #: Names of tasks that passed tooling and failed the reference — the shape the second gate
     #: exists to catch, surfaced rather than buried in a ratio.
     valid_but_wrong: tuple[str, ...]
+    #: Names that failed gate one. Symmetric with valid_but_wrong so a 4/5 tooling
+    #: score is not an anonymous miss.
+    tooling_failed: tuple[str, ...] = ()
 
     @property
     def both_passed(self) -> bool:
@@ -89,6 +92,7 @@ def score_corpus(
     """
     tooling_passed = reference_passed = 0
     wrong: list[str] = []
+    failed_tooling: list[str] = []
 
     for task in corpus.golden:
         artefact, content = artefacts[task.name]
@@ -101,6 +105,8 @@ def score_corpus(
             )
         if result.passed:
             tooling_passed += 1
+        else:
+            failed_tooling.append(task.name)
         by_reference = score_reference(task, properties_of(task, artefact, content))
         if by_reference:
             reference_passed += 1
@@ -113,6 +119,7 @@ def score_corpus(
         reference_passed=reference_passed,
         reference_total=len(corpus.golden),
         valid_but_wrong=tuple(wrong),
+        tooling_failed=tuple(failed_tooling),
     )
 
 

@@ -16,11 +16,20 @@ Read for intent, not just resource type.
   (`database/creds/…`, `aws/creds/…`, `pki/issue/…`) already is "wired to dynamic
   secrets." Do not replace it with a guessed `ephemeral` type. If the task is
   already implemented, say so. Do not invent extra work.
+- If the subject is not yet wired, add the smallest secret-store read that
+  satisfies the task: `data "vault_generic_secret"` on the leased `/creds/` path
+  the app needs (and an output if a later phase will need the attribute). Do not
+  `vault_mount` a secrets engine, do not author `vault_database_secret_backend_*`,
+  and do not invent admin connection variables, unless the task asked to stand
+  that engine up.
 - Only author when what the task names is genuinely absent.
 - Do not author a second copy of an existing integration. If in doubt between
   improving a working pattern and leaving it, leave it and say so.
 - If the task is not yet done, saying it is already done is a wrong answer — you
   must author it.
+- Finish every file you emit. An unclosed `variable` or `resource` block fails
+  `terraform validate`. Prefer one complete `main.tf` over several half-written
+  files.
 
 ## Pins
 
@@ -42,7 +51,7 @@ on a leased `/creds/` path.
 
 An application role reads its own secrets path and nothing else. One `path`
 block, capabilities an explicit list (`read`, `list`) — never `"*"`, never
-`secret/*` for an app role.
+`secret/*`, never a trailing glob (`path "…/*"`). The path is one exact secret.
 
 ## Order of authorship
 
@@ -82,3 +91,5 @@ already uses those names.
   except a `vault_policy` the plan named.
 - Applying or initializing Terraform. You write files; a person applies after
   merge. Do not apply.
+- Never commit `terraform.tfstate`. Remote state with locking, one backend per
+  environment directory.

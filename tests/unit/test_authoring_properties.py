@@ -158,3 +158,30 @@ def test_every_property_the_corpus_names_is_detectable() -> None:
         f"the corpus names {missing}, which this detector can never produce — every task "
         f"requiring one is unpassable, and the failure would read as the model's fault"
     )
+
+
+def test_tooling_failed_names_the_task() -> None:
+    """A 4/5 tooling score must name the miss, not hide it in a ratio."""
+    from pathlib import Path
+
+    from core.evals.authoring_corpus import load_corpus
+    from core.evals.authoring_scoring import ToolingResult, score_corpus
+
+    corpus = load_corpus(
+        Path(__file__).resolve().parents[2] / "evals" / "authoring" / "corpus.toml"
+    )
+
+    def tooling(task: object, _a: object, _c: object) -> ToolingResult:
+        name = getattr(task, "name", "")
+        return ToolingResult(ran=True, passed=name != "pin_the_provider", detail="refused")
+
+    report = score_corpus(
+        corpus,
+        tooling=tooling,
+        artefacts={t.name: (None, {}) for t in corpus.golden},  # type: ignore[misc]
+        properties_of=lambda t, _a, _c: (
+            t.reference.properties if t.reference is not None else frozenset()
+        ),
+    )
+    assert report.tooling_failed == ("pin_the_provider",)
+    assert report.tooling_passed == report.tooling_total - 1

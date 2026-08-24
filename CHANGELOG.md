@@ -9,12 +9,14 @@ durable record.
 
 - Each Build phase is steered by a pinned pack file `packs/<pack>/agents/<phase>/AGENTS.md`
   (Terraform and Vault). Ask and the portal do not compose those files. Missing or empty
-  instructions fail the phase and do not open a pull request. Terraform and Vault cards
-  now encode HashiCorp style and security practice (layout, ``for_each``, version pins,
-  ephemeral Vault credentials, deny-by-default paths). On the live authoring lane
-  (n=5, Sonnet 5) the Write card and generic steer both scored 1/5 on the reference
-  gate — delta 0, so that eval remains open. The authoring pin detector now treats
-  HashiCorp ``~>`` as a pin (a ceiling exists); ``>=`` and ``*`` remain floating.
+  instructions fail the phase and do not open a pull request. Terraform cards are
+  **0.2.0**: production-shaped after individual GEPA (no eval-lane FILE protocol, no
+  grading overlay). On the live authoring lane (n=5, Sonnet 5, Terraform 1.15.8) the
+  promoted Write card scored **5/5** on both ``terraform validate`` and the property
+  detector; the generic steer scored 4/5 tooling and 1/5 reference (21 Aug, after the
+  pin oracle). Vault cards are unchanged; that half of SC-006 remains open. The
+  authoring pin detector treats HashiCorp ``~>`` as a pin (a ceiling exists);
+  ``>=`` and ``*`` remain floating.
 - Write refuses dotenv templates (``.env``, ``.env.example``) instead of
   opening a pull request that only adds placeholder env files.
 - Write no longer treats “named nothing” as done while planned files are still

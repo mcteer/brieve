@@ -87,12 +87,25 @@ def parse_authored(response: str) -> dict[str, str]:
 
 
 def first_error(blob: str) -> str:
-    """The first line that names the problem, stripped of terminal colour."""
+    """The first line that names the problem, stripped of terminal colour.
+
+    Terraform's first ``Error:`` is often the summary *encountered problems during
+    initialisation* — skip it so the named miss (truncated HCL, unknown type) is
+    what the live lane prints.
+    """
     plain = re.sub(r"\x1b\[[0-9;]*m", "", blob)
+    named = ""
     for line in plain.splitlines():
-        if "Error:" in line:
-            return line.split("Error:", 1)[1].strip()[:160]
-    return plain.strip()[:160]
+        if "Error:" not in line:
+            continue
+        message = line.split("Error:", 1)[1].strip()
+        if not message:
+            continue
+        if message.lower().startswith("terraform encountered problems"):
+            continue
+        named = message
+        break
+    return (named or plain.strip())[:160]
 
 
 def terraform_validates(contents: dict[str, str]) -> ToolingResult:

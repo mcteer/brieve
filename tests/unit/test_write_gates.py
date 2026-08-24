@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from tests.evals_live.write_gates import (
+    first_error,
     iter_write_train_items,
     parse_authored,
     score_write_prediction,
@@ -115,3 +116,11 @@ def test_parse_authored_reads_file_blocks() -> None:
     files = parse_authored("--- FILE: a.tf\nfoo\n--- END\n")
     assert files == {"a.tf": "foo\n"}
     assert parse_authored("I'll skip this.\n--- NO CHANGE\n") == {}
+
+
+def test_first_error_skips_terraform_init_summary() -> None:
+    blob = (
+        "Error: Terraform encountered problems during initialisation, including problems\n"
+        "Error: Invalid block definition\n"
+    )
+    assert first_error(blob) == "Invalid block definition"

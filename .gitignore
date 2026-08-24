@@ -57,6 +57,7 @@ evals/prompt-tune/candidates/**/joint-gepa-log/
 evals/prompt-tune/candidates/run.log
 evals/prompt-tune/candidates/.dspy-cache/
 evals/prompt-tune/sc006-*.log
+evals/prompt-tune/sc006-dump/
 
 # Editor
 *.swp

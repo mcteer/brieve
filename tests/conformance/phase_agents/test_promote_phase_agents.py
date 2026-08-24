@@ -69,3 +69,16 @@ def test_whole_set_promotes_when_both_suites_pass(tmp_path: Path) -> None:
     assert body.startswith(b"clean write")
     manifest = (tmp_path / "alpha" / "pack.toml").read_text(encoding="utf-8")
     assert recorded["write"] in manifest
+
+
+def test_aligned_path_field_still_rewrites_the_pin(tmp_path: Path) -> None:
+    """Shipped pack.toml aligns `path    =`; a literal `path =` miss leaves stale digests."""
+    write_authoring_pack(tmp_path, "alpha")
+    manifest = tmp_path / "alpha" / "pack.toml"
+    text = manifest.read_text(encoding="utf-8")
+    text = text.replace('path = "agents/write/AGENTS.md"', 'path    = "agents/write/AGENTS.md"')
+    manifest.write_text(text, encoding="utf-8")
+    recorded = _promote(tmp_path)
+    updated = manifest.read_text(encoding="utf-8")
+    assert recorded["write"] in updated
+    assert 'version = "0.2.0"' in updated
