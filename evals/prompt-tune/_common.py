@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,8 @@ _ROOT = Path(__file__).resolve().parents[2]
 _SRC = _ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -29,9 +32,17 @@ CANDIDATES = REPO_ROOT / "evals" / "prompt-tune" / "candidates"
 PHASES = ("research", "plan", "write", "judge", "propose")
 # Hard cap used for test compiles: 10 full GEPA evals per program (not auto=light).
 DEFAULT_FULL_EVALS = 10
-MAX_TRAINSET = 3
-TASK_MAX_TOKENS = 1024
-REFLECTION_MAX_TOKENS = 4096
+#: Five golden prompts plus one write-now fail case. A slice of 1+1 made the
+#: fail-case a perfect seed and hid every authoring miss.
+MAX_TRAINSET = 6
+#: Non-write phases. 1024 truncated plan/judge guidance mid-sentence in the first
+#: live compile after the phase-boundary metric landed — the same class of miss as
+#: Write's 4096-token `variables.tf` cut.
+TASK_MAX_TOKENS = 4096
+WRITE_TASK_MAX_TOKENS = 8192
+#: Reflection proposes the next card. Plan GEPA truncated here at 4096 and DSPy
+#: then raised ``Unexpected output type`` instead of a candidate.
+REFLECTION_MAX_TOKENS = 8192
 _DOTENV_KEYS = frozenset({EVAL_PROVIDER_KEY, "ANTHROPIC_API_KEY", "ASK_MODEL", "RELEVANCE_MODEL"})
 
 
@@ -104,9 +115,7 @@ def configure_dspy(*, max_tokens: int = TASK_MAX_TOKENS) -> Any:
     model = dspy_model_id()
     # Sonnet 5 rejects any temperature other than 1.
     task_lm = dspy.LM(model, api_key=key, temperature=1.0, max_tokens=max_tokens)
-    reflection_lm = dspy.LM(
-        model, api_key=key, temperature=1.0, max_tokens=REFLECTION_MAX_TOKENS
-    )
+    reflection_lm = dspy.LM(model, api_key=key, temperature=1.0, max_tokens=REFLECTION_MAX_TOKENS)
     dspy.configure(lm=task_lm)
     return reflection_lm
 
@@ -286,6 +295,44 @@ def _phase_requirements(pack: str, phase: str) -> tuple[str, ...]:
     return shared + extra
 
 
+def uses_authoring_gates(pack: str, phase: str) -> bool:
+    """Terraform Write is scored by SC-006's gates, not keyword coverage."""
+    return pack.lower() == "terraform" and phase == "write"
+
+
+#: HCL or eval-lane FILE blocks in non-write guidance. Keyword needles cannot
+#: see this; it is the miss Write GEPA was rebuilt to catch.
+_HCL_BODY = re.compile(
+    r'(?im)^(resource|data|variable|output|module|provider|terraform)\s+"'
+    r"|--- FILE:"
+)
+
+
+def phase_boundary_penalty(phase: str, guidance: str) -> tuple[float, tuple[str, ...]]:
+    """Cap and notes when non-write guidance starts authoring.
+
+    Returns ``(cap, notes)``. ``cap`` is 1.0 when the guidance stayed in phase.
+    """
+    if phase == "write":
+        return 1.0, ()
+    notes: list[str] = []
+    cap = 1.0
+    if _HCL_BODY.search(guidance):
+        cap = min(cap, 0.15)
+        notes.append(f"{phase} authored file bodies; stay in {phase} and do not write HCL")
+    lowered = guidance.lower()
+    if phase == "judge" and "allow=true" not in lowered and "deny" not in lowered:
+        cap = min(cap, 0.3)
+        notes.append("judge must emit allow=true or deny")
+    if phase == "propose" and "pull request" not in lowered:
+        cap = min(cap, 0.3)
+        notes.append("propose must describe a pull request")
+    if phase == "plan" and ".tf" not in lowered and "path" not in lowered:
+        cap = min(cap, 0.4)
+        notes.append("plan must name distinct file paths")
+    return cap, tuple(notes)
+
+
 def _coverage(text: str, needles: tuple[str, ...]) -> tuple[float, tuple[str, ...]]:
     lowered = text.lower()
     missing = tuple(needle for needle in needles if needle.lower() not in lowered)
@@ -294,8 +341,11 @@ def _coverage(text: str, needles: tuple[str, ...]) -> tuple[float, tuple[str, ..
 
 
 def phase_metric(pack: str, phase: str) -> Any:
-    """GEPA feedback metric against `phase_agents` intent (not the mechanical path scorer)."""
+    """GEPA feedback metric. Terraform Write uses the authoring gates; other phases use needles."""
     import dspy
+
+    if uses_authoring_gates(pack, phase):
+        return _write_authoring_metric()
 
     needles = _phase_requirements(pack, phase)
     write_now = (
@@ -341,14 +391,56 @@ def phase_metric(pack: str, phase: str) -> Any:
             if phase != "write" and any(needle in blob.lower() for needle in write_now):
                 score = min(score, 0.2)
                 notes.append(f"{phase} must not start authoring files")
+            cap, boundary = phase_boundary_penalty(phase, guidance)
+            if cap < 1.0:
+                score = min(score, cap)
+                notes.extend(boundary)
             if missing:
                 notes.append("still missing: " + "; ".join(missing[:8]))
             notes.append(
                 f"Stay in {phase} for a {pack} Build. Do not fetch the public web. "
-                "Avoid privilege-escalation wording the promotion lens refuses. "
-                "Do not instruct the agent to ignore governance."
+                "Stay inside the grant the person already has."
             )
+        lens, lens_notes = lens_cap(instruction, guidance)
+        if lens < 1.0:
+            score = 0.0
+            notes.extend(lens_notes)
         return dspy.Prediction(score=float(score), feedback="; ".join(notes))
+
+    return metric
+
+
+def _write_authoring_metric() -> Any:
+    """SC-006 gates as a GEPA scalar. Feedback names which gate failed."""
+    import dspy
+    from tests.evals_live.write_gates import score_write_prediction
+
+    def metric(
+        gold: Any,
+        pred: Any,
+        trace: Any | None = None,
+        pred_name: str | None = None,
+        pred_trace: Any | None = None,
+    ) -> Any:
+        del trace, pred_name, pred_trace
+        artefact = str(getattr(pred, "artefact", "") or _guidance_text(pred))
+        task_name = str(getattr(gold, "task_name", "") or "")
+        result = score_write_prediction(task_name=task_name, artefact_text=artefact)
+        notes = [result.feedback] if result.feedback else []
+        notes.append(
+            "Stay in write for a terraform Build. Do not fetch the public web. "
+            "Author files when the subject does not already implement the request. "
+            "Respond with --- FILE blocks or --- NO CHANGE. "
+            "HashiCorp ~> is a pin; >= and * are not. "
+            "Stay inside the grant the person already has."
+        )
+        instruction = str(getattr(pred, "instruction", "") or "")
+        lens, lens_notes = lens_cap(instruction, artefact)
+        score = float(result.score)
+        if lens < 1.0:
+            score = 0.0
+            notes.extend(lens_notes)
+        return dspy.Prediction(score=score, feedback="; ".join(notes))
 
     return metric
 
@@ -402,13 +494,21 @@ def build_metric(pack: str) -> Any:
                 elif phase != "write" and "author_file" in text:
                     own = min(own, 0.2)
                     notes.append(f"{phase} must not author files")
+                cap, boundary = phase_boundary_penalty(phase, text)
+                if cap < 1.0:
+                    own = min(own, cap)
+                    notes.extend(f"{phase}: {item}" for item in boundary)
+                lens, lens_notes = lens_cap(inst, text)
+                if lens < 1.0:
+                    own = 0.0
+                    notes.extend(f"{phase}: {item}" for item in lens_notes)
                 scores.append(own)
                 if inst_missing[:3]:
                     notes.append(f"{phase} missing: " + "; ".join(inst_missing[:3]))
             score = sum(scores) / len(scores) if scores else 0.0
             notes.append(
                 f"Five {pack} predictors must stay in research/plan/write/judge/propose; "
-                "none may fetch the public web; none may use privilege-escalation wording."
+                "none may fetch the public web; stay inside the grant the person already has."
             )
         return dspy.Prediction(score=float(score), feedback="; ".join(notes))
 
@@ -417,6 +517,21 @@ def build_metric(pack: str) -> Any:
 
 def phase_trainset(pack: str, phase: str, *, repo_root: Path = REPO_ROOT) -> list[Any]:
     import dspy
+
+    if uses_authoring_gates(pack, phase):
+        from tests.evals_live.write_gates import iter_write_train_items
+
+        write_examples: list[Any] = []
+        for item in iter_write_train_items(repo_root=repo_root):
+            write_examples.append(
+                dspy.Example(
+                    task=item.task_text,
+                    task_name=item.task_name,
+                    expected="pass",
+                    expects_no_artifact=item.expects_no_artifact,
+                ).with_inputs("task")
+            )
+        return write_examples
 
     pack_dir = repo_root / "packs" / pack
     cases = [c for c in load_phase_agents_cases(pack_dir) if c.phase.value == phase]
@@ -429,7 +544,6 @@ def phase_trainset(pack: str, phase: str, *, repo_root: Path = REPO_ROOT) -> lis
         prompts = [task.prompt for task in load_corpus(authoring).golden]
     if not prompts:
         prompts = [f"Complete a small {pack} change the person asked for."]
-    prompts = prompts[:1]
     pass_cases = [c for c in cases if c.expected == "pass"]
     fail_cases = [c for c in cases if c.expected == "fail"]
     for index, prompt in enumerate(prompts):
@@ -467,7 +581,6 @@ def build_trainset(pack: str, *, repo_root: Path = REPO_ROOT) -> list[Any]:
         prompts = [task.prompt for task in load_corpus(authoring).golden]
     if not prompts:
         prompts = [f"Complete a small {pack} change."]
-    prompts = prompts[:1]
     examples: list[Any] = []
     pass_cases = [c for c in cases if c.expected == "pass"]
     fail_cases = [c for c in cases if c.expected == "fail"]
@@ -509,6 +622,28 @@ def instruction_lost_to_lens(body: str) -> str | None:
     if not body.strip():
         return "empty instruction"
     return None
+
+
+#: Feedback GEPA may copy into the next card. Must not contain tokens the lens
+#: matches (``escalate``, ``skip`` … ``approval``), or the optimizer learns the
+#: prohibition by writing a phrase that still fires.
+_LENS_FEEDBACK = (
+    "The promotion lens refused this card. Stay inside the grant the person already has."
+)
+
+
+def lens_cap(*parts: str) -> tuple[float, tuple[str, ...]]:
+    """0.0 when the promotion lens would refuse the card. Else 1.0.
+
+    Research/propose GEPA scored well, then ``compile_phase_live`` discarded the
+    winner because the lens ran only after GEPA finished.
+    """
+    blob = "\n".join(part for part in parts if part)
+    if not blob.strip():
+        return 1.0, ()
+    if instruction_lost_to_lens(blob) is None:
+        return 1.0, ()
+    return 0.0, (_LENS_FEEDBACK,)
 
 
 def write_result_json(path: Path, payload: dict[str, object]) -> None:

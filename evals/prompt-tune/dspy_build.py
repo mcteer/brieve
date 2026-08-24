@@ -145,7 +145,7 @@ def compile_build_live(
     root = repo_root or REPO_ROOT
     reflection_lm = configure_dspy()
     trainset = build_trainset(pack, repo_root=root)
-    valset = trainset[-1:] or trainset
+    valset = trainset
     score_set = valset
     metric = build_metric(pack)
     seed = _build_program(instructions)
@@ -172,7 +172,7 @@ def compile_build_live(
     )
     compiled = optimizer.compile(
         seed,
-        trainset=trainset[:1] or trainset,
+        trainset=trainset,
         valset=valset,
     )
     compiled_texts = extract_instructions(compiled)

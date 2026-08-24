@@ -22,7 +22,6 @@ Run: `make evals-authoring-live`. Prints per-task detail, then the two numbers.
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -39,6 +38,7 @@ from core.evals.authoring_scoring import ToolingResult, score_corpus  # noqa: E4
 from core.evals.scoring import LIVE_MODEL  # noqa: E402
 from tests.evals_live.authoring_properties import detect  # noqa: E402
 from tests.evals_live.authoring_subjects import subject_for  # noqa: E402
+from tests.evals_live.write_gates import parse_authored, terraform_validates  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CORPUS = ROOT / "evals" / "authoring" / "corpus.toml"
@@ -74,7 +74,7 @@ def _system_prompt(instruction: str = "") -> str:
     )
 
 
-def _ask(prompt: str, *, api_key: str, instruction: str = "") -> str:
+def _ask(prompt: str, *, api_key: str, instruction: str = "") -> tuple[str, str]:
     """One model call, through the ADAPTER that owns the vendor binding.
 
     Not `import anthropic` here: `tests/unit/test_no_live_dependencies.py` forbids a test
@@ -86,110 +86,21 @@ def _ask(prompt: str, *, api_key: str, instruction: str = "") -> str:
     client, api_model = client_and_model(LIVE_MODEL, api_key=api_key)
     message = client.messages.create(  # type: ignore[attr-defined]
         model=api_model,
-        # 4096 rather than 2048, on the live lane's own recorded lesson: a model that reasons
-        # before answering spends from the same budget, and a truncated answer returns empty
-        # text that scores as a wrong answer rather than as a budget problem.
-        max_tokens=4096,
+        # 8192 matches Write GEPA (`WRITE_TASK_MAX_TOKENS`). 4096 truncated complete
+        # `variables.tf` mid-block; `terraform init` then refused the merged tree while
+        # the property detector still passed — the anonymous 4/5 tooling miss.
+        max_tokens=8192,
         system=_system_prompt(instruction),
         messages=[{"role": "user", "content": prompt}],
     )
-    return "".join(block.text for block in message.content if block.type == "text")
-
-
-def _parse(response: str) -> dict[str, str]:
-    """Files the model authored. `--- NO CHANGE` yields none, which is a valid answer."""
-    if "--- NO CHANGE" in response:
-        return {}
-    files: dict[str, str] = {}
-    current: str | None = None
-    body: list[str] = []
-    for line in response.splitlines():
-        if line.startswith("--- FILE:"):
-            current = line.split(":", 1)[1].strip()
-            body = []
-        elif line.startswith("--- END"):
-            if current:
-                files[current] = "\n".join(body) + "\n"
-            current = None
-        elif current is not None:
-            body.append(line)
-    if current and body:  # a block the model forgot to close
-        files[current] = "\n".join(body) + "\n"
-    return files
-
-
-def _first_error(blob: str) -> str:
-    """The first line that names the problem, stripped of terminal colour."""
-    import re as _re
-
-    plain = _re.sub(r"\x1b\[[0-9;]*m", "", blob)
-    for line in plain.splitlines():
-        if "Error:" in line:
-            return line.split("Error:", 1)[1].strip()[:160]
-    return plain.strip()[:160]
-
-
-def _terraform_validates(contents: dict[str, str]) -> ToolingResult:
-    """Gate one, by the product's own tooling. Never degrades to a formatter."""
-    if not contents:
-        # An empty artefact has nothing to validate and nothing malformed about it.
-        return ToolingResult(ran=True, passed=True, detail="no artefact")
-    with tempfile.TemporaryDirectory() as raw:
-        directory = Path(raw)
-        for name, body in contents.items():
-            target = directory / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(body)
-        init = subprocess.run(
-            ["terraform", "-chdir=" + str(directory), "init", "-backend=false", "-input=false"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if init.returncode != 0:
-            # **Two very different failures wear one exit code**, and collapsing them is a
-            # harness defect: `init` cannot reach the registry (the tooling did not RUN, and
-            # the suite must go red rather than degrade) versus `init` refusing a configuration
-            # that is wrong (the tooling ran, and the answer FAILED). Reporting the second as
-            # unrunnable would turn every malformed answer into an infrastructure excuse.
-            blob = f"{init.stderr}\n{init.stdout}"
-            unreachable = any(
-                signal in blob
-                for signal in (
-                    "Failed to query available provider packages",
-                    "could not connect",
-                    "no available releases",
-                    "Failed to install provider",
-                    "network is unreachable",
-                )
-            )
-            if unreachable:
-                return ToolingResult(
-                    ran=False,
-                    passed=False,
-                    detail=f"provider registry unreachable: {init.stderr.strip()[:160]}",
-                )
-            return ToolingResult(
-                ran=True,
-                passed=False,
-                detail=f"configuration refused by init: {_first_error(blob)}",
-            )
-        validated = subprocess.run(
-            ["terraform", "-chdir=" + str(directory), "validate"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        return ToolingResult(
-            ran=True,
-            passed=validated.returncode == 0,
-            detail=validated.stderr.strip()[:200],
-        )
+    text = "".join(block.text for block in message.content if block.type == "text")
+    stop = str(getattr(message, "stop_reason", "") or "")
+    return text, stop
 
 
 def _author(
     task: GoldenTask, *, api_key: str, workdir: Path, instruction: str = ""
-) -> tuple[AuthoredArtifact, dict[str, str], dict[str, str]]:
+) -> tuple[AuthoredArtifact, dict[str, str], dict[str, str], str]:
     """Drive the model, then put its answer through the REAL `author_file` handler.
 
     Through the handler rather than into a dict: the qualification should score what the
@@ -202,8 +113,8 @@ def _author(
     )
     prompt = f"TASK: {task.prompt}\n\nCURRENT REPOSITORY CONTENTS:\n{rendered}"
 
-    response = _ask(prompt, api_key=api_key, instruction=instruction)
-    authored = _parse(response)
+    response, stop_reason = _ask(prompt, api_key=api_key, instruction=instruction)
+    authored = parse_authored(response)
 
     subject = workdir / task.name / "subject"
     workspace = workdir / task.name / "workspace"
@@ -223,7 +134,7 @@ def _author(
     # fails on every file that relies on a `required_providers` block it did not rewrite —
     # which is a defect in the harness, not in the answer.
     merged = {**subject_files, **author.contents}
-    return artifact, author.contents, merged
+    return artifact, author.contents, merged, stop_reason
 
 
 def main() -> int:
@@ -263,15 +174,19 @@ def main() -> int:
     print(f"   corpus: {len(corpus.golden)} golden tasks, {len(corpus.deny)} deny cases\n")
 
     artefacts: dict[str, tuple[AuthoredArtifact, dict[str, str]]] = {}
-    trees: dict[str, dict[str, str]] = {}
+    tooling_by_task: dict[str, ToolingResult] = {}
+    dump_root = ROOT / "evals" / "prompt-tune" / "sc006-dump" / args.label
+    dump_root.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as raw:
         workdir = Path(raw)
         for task in corpus.golden:
-            artifact, contents, merged = _author(
+            artifact, contents, merged, stop_reason = _author(
                 task, api_key=key, workdir=workdir, instruction=instruction
             )
             found = detect(contents)
+            tooling = terraform_validates(merged)
             print(f"--- {task.name}")
+            print(f"    stop       : {stop_reason or '(none)'}")
             print(f"    files      : {sorted(contents) or '(none)'}")
             print(f"    properties : {sorted(found) or '(none)'}")
             if task.reference is not None:
@@ -280,12 +195,20 @@ def main() -> int:
                 print(f"    missing    : {sorted(want - found) or '(none)'}")
             else:
                 print("    expected   : no artefact")
+            status = "pass" if tooling.passed else "FAIL"
+            print(f"    tooling    : {status}" + (f" — {tooling.detail}" if tooling.detail else ""))
             artefacts[task.name] = (artifact, contents)
-            trees[task.name] = merged
+            tooling_by_task[task.name] = tooling
+            task_dump = dump_root / task.name
+            task_dump.mkdir(parents=True, exist_ok=True)
+            for name, body in merged.items():
+                target = task_dump / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(body)
 
         report = score_corpus(
             corpus,
-            tooling=lambda task, _a, _c: _terraform_validates(trees[task.name]),
+            tooling=lambda task, _a, _c: tooling_by_task[task.name],
             artefacts=artefacts,
             properties_of=lambda _t, _a, contents: detect(contents),
         )
@@ -294,8 +217,11 @@ def main() -> int:
     print(f"   label                : {args.label}")
     print(f"   product tooling      : {report.tooling_passed}/{report.tooling_total}")
     print(f"   reference comparison : {report.reference_passed}/{report.reference_total}")
+    if report.tooling_failed:
+        print(f"   TOOLING FAILED       : {list(report.tooling_failed)}")
     if report.valid_but_wrong:
         print(f"   VALID BUT WRONG      : {list(report.valid_but_wrong)}")
+    print(f"   dump                 : {dump_root}")
     print(f"\n   both gates passed    : {report.both_passed}")
     return 0 if report.both_passed else 1
 

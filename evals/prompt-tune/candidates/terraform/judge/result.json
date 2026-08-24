@@ -1,0 +1,13 @@
+{
+  "auto": null,
+  "compiled_score": 0.8529411764705882,
+  "live": true,
+  "lost": false,
+  "max_full_evals": 10,
+  "max_metric_calls": null,
+  "optimizer": "dspy.GEPA",
+  "pack": "terraform",
+  "phase": "judge",
+  "reason": "improved_or_tied",
+  "seed_score": 0.776470588235294
+}

@@ -19,6 +19,7 @@ without building the manual one would make the forbidden route the only one that
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -320,10 +321,13 @@ def promote_phase_agents(
 
 def _rewrite_agent_pin(text: str, *, phase: str, digest: str, version: str) -> str:
     """Update the [[agents]] digest/version for one phase. Whole-file, not a parser."""
-    marker = f'path = "agents/{phase}/AGENTS.md"'
-    start = text.find(marker)
-    if start < 0:
+    marker = re.search(
+        rf'path\s*=\s*"agents/{re.escape(phase)}/AGENTS\.md"',
+        text,
+    )
+    if marker is None:
         return text
+    start = marker.start()
     block_start = text.rfind("[[agents]]", 0, start)
     nxt = text.find("[[agents]]", start)
     block_end = nxt if nxt >= 0 else len(text)
