@@ -14,7 +14,10 @@ durable record.
   grading overlay). On the live authoring lane (n=5, Sonnet 5, Terraform 1.15.8) the
   promoted Write card scored **5/5** on both ``terraform validate`` and the property
   detector; the generic steer scored 4/5 tooling and 1/5 reference (21 Aug, after the
-  pin oracle). Vault cards are unchanged; that half of SC-006 remains open. The
+  pin oracle). Vault cards are **0.2.0** on the same production-shaped pattern (grant-scope,
+  exact-path least privilege, no GEPA grading overlay). The live authoring lane's subjects
+  are Terraform repositories, so SC-006's Vault half is the per-phase GEPA record plus
+  those pins — not a 5/5 on ``terraform validate``. The
   authoring pin detector treats HashiCorp ``~>`` as a pin (a ceiling exists);
   ``>=`` and ``*`` remain floating.
 - Write refuses dotenv templates (``.env``, ``.env.example``) instead of
