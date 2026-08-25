@@ -35,6 +35,11 @@ durable record.
 - A finished Build that opened a pull request now shows the link. Publish wrote
   the URL, then the proposer restored the analyzer snapshot and wiped it, so the
   page reported "Ended without a pull request" while GitHub had the PR.
+- Terraform-shaped Build runs a real `terraform plan` against the authored tree
+  before Judge. A failed plan (or a missing Terraform binary) does not open a
+  pull request. A successful plan’s bounded output is evidence on the PR.
+  The authoring image pins Terraform 1.15.8; the analyzer fails `tooling_missing`
+  at start if the binary is absent.
 
 ### Local stack
 

@@ -75,9 +75,11 @@ variable "image" {
   default     = "brieve/authoring-runtime:local"
   description = <<-DESC
     Task image for both analyzer and proposer. Must carry pinned `git` and `gh` (ADR-0066 /
-    041 R8) — the proposer fails `tooling_missing` at start if either is absent. Built from
-    `infra/images/authoring-runtime/Dockerfile`; `portal-up` / `enclave-up` build the local
-    tag before registering this job. Do not revert to a bare uv image: that cannot publish.
+    041 R8) and pinned `terraform` (047 / ADR-0047) — the proposer fails `tooling_missing`
+    at start if git or gh is absent; the analyzer fails the same way if terraform is
+    absent. Built from `infra/images/authoring-runtime/Dockerfile`; `portal-up` /
+    `enclave-up` build the local tag before registering this job. Do not revert to a bare
+    uv image: that cannot publish or plan.
   DESC
 }
 
@@ -217,8 +219,11 @@ job "authoring-tier" {
         # NO `--extra evals`: this task calls a model through the ordinary run path and needs
         # no scoring machinery, and 027 recorded what happens when an extra is wrong in a
         # deployed allocation — the failure arrives at the last step, in front of a user.
+        #
+        # TERRAFORM is the Plan oracle (047). Verified at start: a missing binary must not
+        # surface as a green fixture plan after the model has already written files.
         args = [
-          "set -e; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.dispatch.entrypoint"
+          "set -e; command -v terraform >/dev/null || { echo 'tooling_missing: terraform' >&2; exit 3; }; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.dispatch.entrypoint"
         ]
       }
 

@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
 from surfaces.dispatch.terraform_authoring import (
+    PlanGateRefused,
+    attach_plan_evidence,
     compose_plan_evidence,
+    gate_final_plan,
     judge_may_publish,
     quality_judge_may_publish,
 )
@@ -124,5 +128,78 @@ def test_compose_plan_evidence_bounds_output() -> None:
             "output": "plan ok",
         }
     )
-    assert "Terraform plan" in text
+    assert "terraform plan" in text
     assert "plan ok" in text
+
+
+def test_p6_harness_plan_fail_refuses_before_a_real_binary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HARNESS_TERRAFORM_PLAN_FAIL", "1")
+    (tmp_path / "main.tf").write_text('resource "null_resource" "x" {}\n', encoding="utf-8")
+    with pytest.raises(PlanGateRefused, match="plan failed"):
+        gate_final_plan(workspace=tmp_path, authored_paths=["main.tf"])
+
+
+def test_p6_missing_binary_is_a_red_gate_not_a_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("HARNESS_TERRAFORM_PLAN_FAIL", raising=False)
+    monkeypatch.setenv("HARNESS_TERRAFORM_BIN", str(tmp_path / "no-such-terraform"))
+    (tmp_path / "main.tf").write_text('resource "null_resource" "x" {}\n', encoding="utf-8")
+    with pytest.raises(PlanGateRefused, match="plan failed"):
+        gate_final_plan(workspace=tmp_path, authored_paths=["main.tf"])
+
+
+def test_p6_stub_plan_error_blocks_and_success_attaches_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("HARNESS_TERRAFORM_PLAN_FAIL", raising=False)
+    failing = tmp_path / "tf-fail"
+    failing.write_text(
+        "#!/usr/bin/env python3\nimport sys\nsys.exit(1 if sys.argv[1] == 'init' else 1)\n",
+        encoding="utf-8",
+    )
+    failing.chmod(0o755)
+    monkeypatch.setenv("HARNESS_TERRAFORM_BIN", str(failing))
+    (tmp_path / "main.tf").write_text('resource "null_resource" "x" {}\n', encoding="utf-8")
+    with pytest.raises(PlanGateRefused):
+        gate_final_plan(workspace=tmp_path, authored_paths=["main.tf"])
+
+    passing = tmp_path / "tf-ok"
+    passing.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if sys.argv[1] == 'init':\n"
+        "    sys.exit(0)\n"
+        "if sys.argv[1] == 'plan':\n"
+        "    print('Plan: 1 to add, 0 to change, 0 to destroy.')\n"
+        "    sys.exit(2)\n"
+        "sys.exit(1)\n",
+        encoding="utf-8",
+    )
+    passing.chmod(0o755)
+    monkeypatch.setenv("HARNESS_TERRAFORM_BIN", str(passing))
+    result = gate_final_plan(workspace=tmp_path, authored_paths=["main.tf"])
+    assert result["fixture"] is False
+    assert result["exit_code"] == 2
+    assert result["has_changes"] is True
+
+    class _Proposal:
+        evidence: list[str] = []
+
+    proposal = _Proposal()
+    proposal.evidence = []
+    attach_plan_evidence(proposal=proposal, plan_result=result)
+    assert any("terraform plan" in line for line in proposal.evidence)
+    assert any("1 to add" in line for line in proposal.evidence)
+
+
+def test_attach_plan_evidence_refuses_a_missing_oracle() -> None:
+    class _Proposal:
+        evidence: list[str] = []
+
+    proposal = _Proposal()
+    proposal.evidence = []
+    with pytest.raises(PlanGateRefused):
+        attach_plan_evidence(proposal=proposal, plan_result=None)
