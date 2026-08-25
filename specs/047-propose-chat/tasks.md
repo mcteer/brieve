@@ -29,25 +29,28 @@
 ## Phase 4 — User Story 2 (Live phases) — P1
 
 - [x] T013 [US2] Persist/expose `ProposeProgress` on run view for SSE consumers
-- [ ] T014 [US2] Entrypoint advances phases with user-visible updates — **partial**: publish writes
-  final result; analyzer loop still needs ordered `advance`/`fail` checkpoints per phase
+- [x] T014 [US2] Entrypoint advances phases with user-visible updates (ordered
+  `advance`/`fail` checkpoints: Research → Plan → Write → Judge → Propose)
 - [x] T015 [US2] Portal phase strip + SSE updates (`portal-propose.js` / templates)
-- [ ] T016 [US2] Hermetic P3/P4; walkthrough note for E3 — blocked on T014 completeness
+- [x] T016 [US2] Hermetic P3/P4; walkthrough note for E3 (named-runner live SSE)
 
 ## Phase 5 — User Story 3 (Fail closed) — P1
 
 - [x] T017 [US3] Ownership refusal before acquisition success path
-- [x] T018 [US3] Judge deny helper (P5) — wire into analyzer before compose (remaining)
-- [ ] T019 [US3] Publish failure → Propose phase failed; no success PR URL — partial (no pr_url)
+- [x] T018 [US3] Judge deny helper (P5) — wired into analyzer before compose
+- [x] T019 [US3] Publish failure → Propose phase failed; no success PR URL
 - [x] T020 [US3] Hermetic P5/P6 helpers; secret non-leakage on reasons
 
 ## Phase 6 — User Story 4 (Real plan) — P2
 
 - [x] T021 [US4] Real `terraform_plan` handler (refuses when binary missing; no always-green fixture)
 - [x] T022 [US4] `compose_plan_evidence` helper (+ reject fixture evidence)
-- [ ] T023 [US4] Authoring-tier / alloc has Terraform CLI
-- [ ] T024 [US4] Hermetic plan-fail blocks PR end-to-end; enclave E2 named-runner
-- [ ] T025 [US4] Successful PR includes bounded plan evidence in live path
+- [x] T023 [US4] Authoring-tier / alloc has Terraform CLI (pinned in
+  `authoring-runtime` image; analyzer verifies at start)
+- [x] T024 [US4] Hermetic plan-fail blocks PR end-to-end (`HARNESS_TERRAFORM_PLAN_FAIL` /
+  missing binary / stub exit 1); enclave E2 remains named-runner
+- [x] T025 [US4] Successful PR includes bounded plan evidence (handoff serialises
+  `evidence`; publish puts it on the PR body and result payload)
 
 ## Phase 7 — Gates & polish
 

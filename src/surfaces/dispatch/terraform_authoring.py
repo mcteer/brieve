@@ -8,26 +8,85 @@ Mirrors the product-specific half of ``policy_authoring.py`` without living insi
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 
-def compose_plan_evidence(*, plan_result: dict[str, Any]) -> str:
-    """Bounded, reviewer-facing plan evidence for a PR body. Never includes secrets."""
+class PlanGateRefused(RuntimeError):
+    """The final Terraform plan oracle failed. No compose, no PR (047 / ADR-0047)."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
+def plan_evidence_lines(plan_result: dict[str, Any]) -> list[str]:
+    """Bounded facts a reviewer can scan. Never includes secret values."""
     if plan_result.get("fixture"):
         raise RuntimeError("fixture plan output cannot become proposal evidence")
     exit_code = plan_result.get("exit_code")
     has_changes = bool(plan_result.get("has_changes"))
-    output = str(plan_result.get("output") or "")
-    # Bound again at compose time — handlers already truncate, but evidence is a second gate.
-    clipped = output[-4000:]
-    return (
-        "## Terraform plan\n\n"
-        f"- exit_code: {exit_code}\n"
-        f"- has_changes: {has_changes}\n\n"
-        "```\n"
-        f"{clipped}\n"
-        "```\n"
-    )
+    output = str(plan_result.get("output") or "")[-4000:]
+    lines: list[str] = [
+        f"Measured by `terraform plan` (exit_code={exit_code}, has_changes={has_changes}).",
+    ]
+    for raw in output.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        lines.append(stripped[:500])
+        if len(lines) >= 40:
+            lines.append("(plan output truncated)")
+            break
+    return lines
+
+
+def compose_plan_evidence(*, plan_result: dict[str, Any]) -> str:
+    """Bounded, reviewer-facing plan evidence for a PR body. Never includes secrets."""
+    return "\n".join(plan_evidence_lines(plan_result))
+
+
+def attach_plan_evidence(*, proposal: Any, plan_result: dict[str, Any] | None) -> Any:
+    """Mutate the composed proposal with measured plan facts (042's evidence seam).
+
+    Refuses when there is no plan: a PR that looks complete without the oracle is the
+    reassurance ADR-0047 forbids.
+    """
+    if plan_result is None:
+        raise PlanGateRefused("no Terraform plan is attached to this proposal")
+    proposal.evidence.extend(plan_evidence_lines(plan_result))
+    return proposal
+
+
+def _plan_workdir(workspace: Path, authored_paths: list[str]) -> Path:
+    tf_paths = [p for p in authored_paths if p.endswith((".tf", ".tf.json"))]
+    if not tf_paths:
+        raise PlanGateRefused("no Terraform files to plan")
+    parents = {str(Path(path).parent) for path in tf_paths}
+    if len(parents) == 1:
+        relative = next(iter(parents))
+        return workspace if relative in {".", ""} else workspace / relative
+    return workspace
+
+
+def gate_final_plan(*, workspace: Path, authored_paths: list[str]) -> dict[str, Any]:
+    """Run the real plan oracle against the authored tree, or refuse.
+
+    ``HARNESS_TERRAFORM_PLAN_FAIL=1`` forces a red gate for hermetic P6. A missing
+    binary still refuses (not a green fixture). Always-green is invalid.
+    """
+    if os.environ.get("HARNESS_TERRAFORM_PLAN_FAIL", "").strip() in {"1", "true", "yes"}:
+        raise PlanGateRefused("the Terraform plan failed")
+    workdir = _plan_workdir(workspace, authored_paths)
+    from surfaces.handlers import terraform_plan
+
+    try:
+        result = terraform_plan({"working_directory": str(workdir)})
+    except RuntimeError as exc:
+        raise PlanGateRefused("the Terraform plan failed") from exc
+    if not isinstance(result, dict) or result.get("fixture"):
+        raise PlanGateRefused("the Terraform plan failed")
+    return result
 
 
 def judge_may_publish(*, authored_paths: list[str], task: str) -> tuple[bool, str]:
@@ -138,8 +197,12 @@ def reviewer_copy(
 
 
 __all__ = [
+    "PlanGateRefused",
+    "attach_plan_evidence",
     "compose_plan_evidence",
+    "gate_final_plan",
     "judge_may_publish",
+    "plan_evidence_lines",
     "quality_judge_may_publish",
     "reviewer_copy",
     "usage_notes_for",

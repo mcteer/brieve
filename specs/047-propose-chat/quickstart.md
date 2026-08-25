@@ -23,10 +23,15 @@ open https://127.0.0.1:8082/propose
 ## Failure drills
 
 1. Paste a repo not in the allowlist → refuse; no PR.
-2. Force plan failure in fixture/enclave harness → Plan failed; no PR.
-3. Force judge deny → Judge failed; no PR.
+2. `HARNESS_TERRAFORM_PLAN_FAIL=1` (hermetic) or a tree that makes `terraform plan` exit 1
+   → Write failed with a plan reason; no PR. Live E2 is the named-runner enclave row.
+3. `HARNESS_JUDGE_DENY=1` → Judge failed; no PR.
 
 ## Live / enclave
 
 Named runner (Dan): E1–E3 in `contracts/conformance-propose-chat.md` against the enclave
 and the owned demo repository. Record outcomes on the implementation PR.
+
+**E3 walkthrough**: start Build on an owned demo repo; without a full page reload that
+clears the run, the phase strip must show at least one mid-run transition (for example
+Research → Plan, or Write → Judge) before the PR URL or a phase failure.

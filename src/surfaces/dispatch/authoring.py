@@ -176,6 +176,7 @@ def proposal_payload(proposal: Proposal) -> dict[str, Any]:
         "usage": proposal.usage,
         "disclosures": list(proposal.disclosures),
         "provenance": list(proposal.provenance),
+        "evidence": list(proposal.evidence),
         "state": str(proposal.state),
         "files": [{"path": f.path, "body": f.body, "is_diff": f.is_diff} for f in proposal.files],
     }
@@ -197,5 +198,6 @@ def proposal_from_payload(payload: Mapping[str, Any]) -> Proposal:
         usage=str(raw.get("usage", "")),
         disclosures=[str(d) for d in raw.get("disclosures", [])],
         provenance=[str(p) for p in raw.get("provenance", [])],
+        evidence=[str(e) for e in raw.get("evidence", [])],
         state=ProposalState(str(raw.get("state", ProposalState.COMPOSED))),
     )

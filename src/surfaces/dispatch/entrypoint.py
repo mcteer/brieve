@@ -87,7 +87,13 @@ from surfaces.dispatch.authoring import (
     trees_for,
 )
 from surfaces.dispatch.phase_agents import bind_phase_agents
-from surfaces.dispatch.terraform_authoring import quality_judge_may_publish, reviewer_copy
+from surfaces.dispatch.terraform_authoring import (
+    PlanGateRefused,
+    attach_plan_evidence,
+    gate_final_plan,
+    quality_judge_may_publish,
+    reviewer_copy,
+)
 from surfaces.toolset import (
     AUTHORING_VOCABULARY,
     build_registry,
@@ -888,6 +894,31 @@ def _finish_authoring_analyzer(
         )
         return 1
 
+    # Final plan oracle before Judge (047 / ADR-0047). Write stays the active phase so a
+    # red plan labels the work that failed rather than rewinding Research/Plan.
+    try:
+        plan_result = gate_final_plan(
+            workspace=trees.workspace,
+            authored_paths=sorted(author_contents),
+        )
+    except PlanGateRefused as exc:
+        reason = exc.reason
+        result_body["reason"] = reason
+        _fail_current_phase(run, reason)
+        durability.save(
+            CheckpointBlob(
+                blob_id=blob_id,
+                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+                correlation_id=correlation_id,
+                grant_id=grant.grant_id,
+                step_index=max(steps - 1, 0),
+                written_by="entrypoint",
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
+            )
+        )
+        print(f"run {correlation_id}: {reason}; no proposer handoff", flush=True)
+        return 0
+
     _complete_write(run)
     run.propose_progress = advance(_current_progress(run), into=PhaseName.JUDGE)
     durability.save(
@@ -912,10 +943,10 @@ def _finish_authoring_analyzer(
                 grant_id=grant.grant_id,
                 step_index=max(steps - 1, 0),
                 written_by="entrypoint",
-                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=bind_reason),
             )
         )
-        print(f"run {correlation_id}: {reason}; no proposer handoff", flush=True)
+        print(f"run {correlation_id}: {bind_reason}; no proposer handoff", flush=True)
         return 1
     allowed, judge_reason = quality_judge_may_publish(
         authored_paths=sorted(author_contents),
@@ -990,6 +1021,25 @@ def _finish_authoring_analyzer(
         consulted=consulted,
         base_commit=os.environ.get("RUN_BASE_COMMIT", "").strip(),
     )
+    try:
+        attach_plan_evidence(proposal=proposal, plan_result=plan_result)
+    except PlanGateRefused as exc:
+        reason = exc.reason
+        result_body["reason"] = reason
+        _fail_current_phase(run, reason)
+        durability.save(
+            CheckpointBlob(
+                blob_id=blob_id,
+                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
+                correlation_id=correlation_id,
+                grant_id=grant.grant_id,
+                step_index=max(steps - 1, 0),
+                written_by="entrypoint",
+                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
+            )
+        )
+        print(f"run {correlation_id}: {reason}; no proposer handoff", flush=True)
+        return 0
     payload = _payload_with_progress(
         {
             RESULT_KEY: result_body,
@@ -1402,6 +1452,17 @@ def continue_dispatched_run(
     return 0
 
 
+def _payload_without_success_pr(payload: dict[str, Any], run: Any, reason: str) -> dict[str, Any]:
+    """Propose failed: keep phase progress, never present a PR URL as success (FR-006)."""
+    out = _payload_with_progress(payload, run)
+    result = out.get(RESULT_KEY)
+    cleaned: dict[str, Any] = dict(result) if isinstance(result, dict) else {}
+    cleaned.pop("pr_url", None)
+    cleaned["reason"] = reason
+    out[RESULT_KEY] = cleaned
+    return out
+
+
 def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
     """Register `open_proposal` for this task and invoke it once, through the governed path.
 
@@ -1419,7 +1480,16 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
         )
         run.propose_progress = advance(_current_progress(run), into=PhaseName.PROPOSE)
         _fail_current_phase(run, "the analysing task did not hand over a proposal")
-        checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
+        checkpoint_run(
+            run,
+            payload=_payload_without_success_pr(
+                dict(checkpoint.payload), run, "the analysing task did not hand over a proposal"
+            ),
+            outcome=RunOutcome(
+                state=RunState.STOPPED.value,
+                stop_reason="the analysing task did not hand over a proposal",
+            ),
+        )
         return 1
 
     # The reader is supplied HERE, by the surface that knows which fabric this deployment
@@ -1439,7 +1509,16 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
         print(f"run {run.correlation_id}: no installation named for publishing", flush=True)
         run.propose_progress = advance(_current_progress(run), into=PhaseName.PROPOSE)
         _fail_current_phase(run, "no installation named for publishing")
-        checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
+        checkpoint_run(
+            run,
+            payload=_payload_without_success_pr(
+                dict(checkpoint.payload), run, "no installation named for publishing"
+            ),
+            outcome=RunOutcome(
+                state=RunState.STOPPED.value,
+                stop_reason="no installation named for publishing",
+            ),
+        )
         return 1
 
     workspace = Path(os.environ.get("NOMAD_ALLOC_DIR", "/alloc")) / "workspace"
@@ -1462,7 +1541,11 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
     run.propose_progress = advance(_current_progress(run), into=PhaseName.PROPOSE)
     checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
     if _bind_phase_or_fail(run, PhaseName.PROPOSE):
-        checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
+        checkpoint_run(
+            run,
+            payload=_payload_without_success_pr(dict(checkpoint.payload), run, "agents_missing"),
+            outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason="agents_missing"),
+        )
         return 1
 
     result = invoke_tool(run, OPEN_PROPOSAL, {})
@@ -1472,7 +1555,11 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
             detail = f"{detail}: {result.message}"
         print(f"run {run.correlation_id}: publishing refused ({detail})", flush=True)
         _fail_current_phase(run, detail)
-        checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
+        checkpoint_run(
+            run,
+            payload=_payload_without_success_pr(dict(checkpoint.payload), run, detail),
+            outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=detail),
+        )
         return 1
     print(f"run {run.correlation_id}: {result.tool_result}", flush=True)
     # 047 — success payload carries the PR URL for Propose UI / get_run_result.
@@ -1488,7 +1575,7 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
         payload[RESULT_KEY] = {
             "pr_url": pr_url,
             PROGRESS_KEY: payload.get(PROGRESS_KEY),
-            "plan_evidence": getattr(proposal, "evidence", None),
+            "plan_evidence": list(getattr(proposal, "evidence", ()) or ()),
         }
         # Terminal: get_run_result only discloses RESULT_KEY once an outcome exists
         # (or, after the 048 follow-up, when pr_url is already on the payload).
@@ -1501,7 +1588,15 @@ def _publish_the_proposal(run: Any, *, checkpoint: Any, registry: Any) -> int:
         )
         return 0
     _fail_current_phase(run, "publish produced no pull request")
-    checkpoint_run(run, payload=_payload_with_progress(dict(checkpoint.payload), run))
+    checkpoint_run(
+        run,
+        payload=_payload_without_success_pr(
+            dict(checkpoint.payload), run, "publish produced no pull request"
+        ),
+        outcome=RunOutcome(
+            state=RunState.STOPPED.value, stop_reason="publish produced no pull request"
+        ),
+    )
     return 0
 
 

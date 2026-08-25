@@ -444,13 +444,34 @@ def terraform_plan(arguments: Mapping[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"terraform plan: working directory {workdir} is not a directory")
 
     binary = os.environ.get("HARNESS_TERRAFORM_BIN", "terraform").strip() or "terraform"
+    timeout = float(os.environ.get("HARNESS_TERRAFORM_PLAN_TIMEOUT", "300"))
+    try:
+        initialised = subprocess.run(  # noqa: S603 — operator-configured binary, fixed args
+            [binary, "init", "-backend=false", "-input=false", "-no-color"],
+            cwd=str(workdir),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "terraform plan: binary not available; refuse rather than return a fixture"
+        ) from exc
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(f"terraform plan: {type(exc).__name__}") from exc
+    if initialised.returncode != 0:
+        raise RuntimeError(
+            "terraform init failed: "
+            + (initialised.stderr or initialised.stdout or "unknown error")[:2000]
+        )
     try:
         finished = subprocess.run(  # noqa: S603 — operator-configured binary, fixed args
             [binary, "plan", "-input=false", "-no-color", "-detailed-exitcode"],
             cwd=str(workdir),
             capture_output=True,
             text=True,
-            timeout=float(os.environ.get("HARNESS_TERRAFORM_PLAN_TIMEOUT", "300")),
+            timeout=timeout,
             check=False,
         )
     except FileNotFoundError as exc:

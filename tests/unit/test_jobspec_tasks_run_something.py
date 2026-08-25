@@ -150,6 +150,31 @@ def test_the_publishing_task_verifies_its_tooling_and_fails_by_name() -> None:
         )
 
 
+def test_the_analysing_task_verifies_terraform_and_fails_by_name() -> None:
+    """Terraform is the Plan oracle; a missing binary must not become a green fixture.
+
+    Checked at analyzer start rather than after Write, because a person waiting on a PR
+    should not learn the allocation never had Terraform.
+    """
+    text = (JOBS / "authoring-tier.nomad.hcl").read_text()
+    analyzer = dict(_tasks(text))["analyzer"]
+
+    assert "tooling_missing" in analyzer
+    assert "command -v terraform" in analyzer, (
+        "the analysing task must verify terraform at start; installing it at runtime "
+        "would be an unpinned fetch inside the hardened tier"
+    )
+
+
+def test_the_authoring_runtime_image_pins_terraform() -> None:
+    """T023 — the allocation's image carries Terraform, not a host PATH coincidence."""
+    dockerfile = JOBS.parent / "images" / "authoring-runtime" / "Dockerfile"
+    text = dockerfile.read_text()
+    assert "TERRAFORM_VERSION=1.15.8" in text
+    assert "releases.hashicorp.com/terraform/" in text
+    assert "terraform version" in text
+
+
 def test_the_walk_examined_something() -> None:
     """A parser that finds no tasks reports a clean tree — the 008 failure, one file over."""
     jobspecs = list(JOBS.glob("*.nomad.hcl"))
