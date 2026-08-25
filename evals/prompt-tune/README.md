@@ -74,10 +74,25 @@ INSTRUCTION_FILE=packs/terraform/agents/write/AGENTS.md EVAL_LABEL=write-card \
 | Production-shaped card (`AGENTS.production.md`, no FILE protocol, 21 Aug first shot) | tooling **4/5**, reference **5/5**. Least-privilege wildcard miss is gone. One authored tree failed `terraform validate` (task unnamed — the live lane did not print per-task tooling). |
 | Diagnostic (same card, per-task tooling + dump) | tooling **3/5**, reference **4/5**. `dynamic_database_secret` and `static_credential_lookalike` failed `terraform init`: both `variables.tf` files were truncated mid-block at `max_tokens=4096`. `least_privilege_role` used a trailing `path "…/*"` glob (VALID BUT WRONG). |
 | Production-shaped retry (`EVAL_LABEL=gepa-write-production-8192`) | **tooling 5/5, reference 5/5, both gates passed.** Live lane `max_tokens` is 8192 (same as Write GEPA). Card tells the cell to add the smallest leased `data "vault_generic_secret"` rather than standing up `vault_database_secret_backend_*`, and forbids path globs. All five `stop_reason=end_turn`. |
-| Delta vs generic | GEPA FILE card: reference **+3/5**. Production-shaped (this 5/5 shot): reference **+4/5** vs the 21 Aug generic (20% → 100%) and tooling **+1/5** vs that generic's 4/5. Same-n generic was not re-shot on this retry. |
-| Promoted? | **Yes, 24 Aug.** Terraform `[[agents]]` **0.2.0**. Production-shaped five-file set via `promote_phase_agents` (lens clean). Write is this 5/5 `AGENTS.production.md`, not the FILE GEPA card. Joint `dspy_build.py --live` was not run (joint metric is still needles). Vault: see below. |
+| Delta vs generic | Historical (21 Aug): GEPA FILE card reference **+3/5**. **Governing (25 Aug, same n):** see E3 close-out below. |
+| Promoted? | **Yes, 24 Aug.** Terraform `[[agents]]` **0.2.0**. Production-shaped five-file set via `promote_phase_agents` (lens clean). Write is `AGENTS.production.md`, not the FILE GEPA card. Joint `dspy_build.py --live` was not run (joint metric is still needles). Vault: see below. |
 
-A non-positive delta is a failed eval. Terraform Write vs the 21 Aug generic is reference **1/5 → 5/5** and tooling **4/5 → 5/5**. Same-n generic was not re-shot after this promotion. E1: connected, restricted, and air-gapped profiles execute the same pinned files (no public-web fetch at phase start).
+### E3 close-out (25 Aug, same n, after promotion)
+
+Same lane, same n, same model, same Terraform, same day. Generic first, then the **shipped** `packs/terraform/agents/write/AGENTS.md`.
+
+| Overlay | Tooling | Reference | Both gates | VALID BUT WRONG |
+| --- | --- | --- | --- | --- |
+| Generic steer (`EVAL_LABEL=e3-generic-049-close`) | **5/5** | **2/5** | false | `pin_the_provider`, `existing_integration_is_not_duplicated`, `least_privilege_role` |
+| Promoted Write 0.2.0 (`EVAL_LABEL=e3-write-049-close`) | **5/5** | **5/5** | **true** | — |
+
+Delta: reference **2/5 → 5/5** (+3/5). Tooling tied at 5/5. Both-gates-complete false → true. A non-positive delta would have been a failed eval.
+
+Joint `dspy_build.py --live` stays unrun: the joint metric is still needles and would pull Write off the authoring gates. That is a recorded decision, not a skipped gate.
+
+E1: connected, restricted, and air-gapped profiles execute the same pinned files (no public-web fetch at phase start).
+
+The 21 Aug generic (4/5 tooling, 1/5 reference) is **not** this comparison — pin oracle and `max_tokens=8192` were already in force then, but it was not the same-day shot against the promoted 0.2.0 card.
 
 The live lane now prints per-task `terraform validate` / `stop_reason`, names `TOOLING FAILED` beside `VALID BUT WRONG`, and dumps merged trees under gitignored `evals/prompt-tune/sc006-dump/<label>/`.
 
@@ -115,4 +130,6 @@ Vault Write stays on needles (the authoring-gate / `terraform validate` lane is 
 | judge | 0.137 | 0.948 | improved; raw GEPA was eval-homework, not shipped |
 | propose | 0.551 | 0.978 | improved; raw GEPA was eval-homework, not shipped |
 
-**Promoted 24 Aug (vault `[[agents]]` 0.2.0).** Production-shaped five-file set in `packs/vault/agents/` via `promote_phase_agents` (lens clean). Joint `dspy_build.py --live` was not run. The live authoring lane's subjects are Terraform repositories; overlaying Vault Write there is not a product measurement, so SC-006's Vault half is the GEPA record above plus the promoted cards, not a 5/5 on `terraform validate`.
+**Promoted 24 Aug (vault `[[agents]]` 0.2.0).** Production-shaped five-file set in `packs/vault/agents/` via `promote_phase_agents` (lens clean). Joint `dspy_build.py --live` was not run.
+
+**SC-006 Vault half.** The live authoring corpus subjects are Terraform repositories and gate one is `terraform validate`. Overlaying Vault Write on that lane is not a product measurement. E3 for Vault is this GEPA record plus the promoted 0.2.0 pins. A Vault authoring corpus (policy HCL subjects and a Vault-shaped gate one) is a later feature, not a 049 re-run.
