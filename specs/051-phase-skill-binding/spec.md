@@ -13,8 +13,17 @@
 | Field | Value |
 | --- | --- |
 | **Requirements (R1–R17)** | **R12 (eval / gate)** — a phase's behaviour under a skill must be expressible as rows that can lose. **R16 (sealed core, versioned seams)** — skill delivery is a pack seam, not core logic. **R4 / R13 (evidence)** — the run record must distinguish a skill that shaped a phase from one that was merely present in the pack |
-| **ADRs touched** | **ADR-0004** (adopt upstream skills as a pinned, governed supply chain — this feature is the consumption half it never got). **ADR-0030** (pinned vs consulted — a skill is *executed* content, so it is pinned and must actually be executed). **ADR-0025** (registry isolation — a skill is pack content and must not become core knowledge). **ADR-0049** (phase instructions are executed artifacts, versioned and digest-pinned; skills join them). **ADR-0047** (a passing stub is worse than a missing one — the current state is its content-supply-chain equivalent) |
+| **ADRs touched** | **ADR-0004** (adopt upstream skills as a pinned, governed supply chain — this feature is the consumption half it never got). **ADR-0030** (pinned vs consulted — a skill is *executed* content, so it is pinned and must actually be executed). **ADR-0025** (registry isolation — a skill is pack content and must not become core knowledge). **ADR-0038** (the agent authors and a person merges — what the platform cannot perform is handed to the reviewer, not silently skipped). **ADR-0049** (phase instructions are executed artifacts, versioned and digest-pinned; skills join them). **ADR-0047** (a passing stub is worse than a missing one — the current state is its content-supply-chain equivalent) |
 | **Evidence class** | attestation-relevant — `content_pins` at `RUN_START` currently names skills that did not reach the model |
+
+## Clarifications
+
+### Session 2026-08-26
+
+- Q: Which phases should actually receive the vendored Terraform skills? (FR-012) → A: Option C — `plan`, `write` and `judge`. Plan is bound because its output is what tells Write how to proceed: a plan made without the skills can direct Write toward something the skills would not sanction. `research` and `propose` are not bound, and their instruction prose is corrected instead.
+- Q: Must a phase be re-qualified before a newly bound skill takes effect, or do binding and re-qualification ship together? (FR-013) → A: Option B — they ship together in one change. Phase-agent promotion is already all-five-or-none and gates on both suites passing, so the eval run is unavoidable; the platform adds no runtime state for a binding that exists but is not yet in force.
+- Q: When adopted skill content instructs an action the platform does not offer (e.g. `terraform fmt`, `terraform validate` — no registry tool exists), what governs? → A: The skill is delivered byte-exact (ADR-0004 forbids editing it) and is NOT performed or claimed; the phase instruction states that precedence. What the platform cannot satisfy is surfaced in the pull request so the reviewer knows what is left to do.
+- Q: Who determines which skill recommendations the platform cannot satisfy — the pack, or the model at run time? → A: Option A — the pack declares them per skill in the manifest. A model's account of its own work is not evidence (Principle IX), and a declaration is pinned, reviewed, identical on every run, and checkable against the registry.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -98,19 +107,55 @@ observe the bound phase receive it.
 
 ---
 
+### User Story 4 - The pull request says what the platform could not do (Priority: P2)
+
+A reviewer opening a Build's pull request can see which recommendations from the vendored
+skills this platform is not able to carry out — `terraform fmt` and `terraform validate` have
+no registry tool — so the work left to a human is stated rather than left to be discovered.
+
+**Why this priority**: It is the same move that withdrew the plan gate: a check the platform
+cannot perform honestly belongs to the person who can. Without it, binding a skill that
+recommends unperformable steps makes the platform quietly non-compliant with its own adopted
+practice, and the reviewer has no way to know.
+
+**Independent Test**: Open a pull request from a Build bound to a skill with declared
+unsatisfiable recommendations. Assert each appears in the pull request body, and that the
+text is identical across two runs of different content.
+
+**Acceptance Scenarios**:
+
+1. **Given** a phase bound to a skill declaring recommendations this platform cannot satisfy,
+   **When** the Build opens a pull request, **Then** the body names each of them.
+2. **Given** two Builds bound to the same skills, **When** both open pull requests, **Then**
+   the unsatisfiable-recommendation text is identical in both — it derives from the manifest,
+   not from what either model said.
+3. **Given** a pack declaring an unsatisfiable recommendation that names a tool the registry
+   **does** offer, **When** the pack loads, **Then** loading refuses and names the stale
+   declaration.
+
+---
+
 ### Edge Cases
 
-- **A phase instruction claims a skill it is not bound to.** The Terraform `write`
-  instruction currently reads *"Practice is this file and the pinned skills
-  `terraform-style-guide` / `terraform-style-guide-security`"* while receiving neither. A
-  phase whose prose names a skill it will not be given is the defect this feature removes,
-  and it must not be reintroducible silently.
+- **A phase instruction claims a skill it is not bound to.** **All five** Terraform phase
+  instructions — research, plan, write, judge and propose — read *"Practice is this file and
+  the pinned skills `terraform-style-guide` / `terraform-style-guide-security`"*, and not one
+  of them receives either. The pack's authors have already declared where these skills apply;
+  the platform does not honour the declaration anywhere. A phase whose prose names a skill it
+  will not be given is the defect this feature removes, and it must not be reintroducible
+  silently.
 - **The combined instruction and skills exceed what the model will accept.** Silent
   truncation would deliver partial practice while the record claims the whole skill.
 - **A skill is bound to a phase whose model was qualified without it.** The qualified cell
   was scored against different instruction content than the one now being sent.
 - **A pack declares a skill that no phase binds.** Adopted, reviewed, pinned, and inert —
   legitimate during staged adoption, and it must be visible rather than look like delivery.
+- **A skill recommends a step the platform has no tool for.** The vendored style guide says
+  to run `terraform fmt -recursive` and `terraform validate`; neither exists in the registry.
+  Delivered with no precedence rule, the model either names tools that will be rejected or
+  reports a checklist item it did not perform.
+- **An upstream skill bump adds an unsatisfiable step nobody declared.** The declaration
+  would then be silently incomplete — the reverse of a stale one, and not visible at load.
 - **Two skills bound to one phase.** Order must be deterministic, or two runs of identical
   content produce different instructions.
 - **A skill file present on disk but absent from the manifest.** Unpinned content next to
@@ -142,16 +187,38 @@ observe the bound phase receive it.
 - **FR-010**: Phase instruction prose MUST NOT claim practice from a skill the phase is not
   bound to, and a check MUST make a divergence between the two visible.
 - **FR-011**: A phase bound to no skills MUST behave exactly as it does today.
-- **FR-012**: The Terraform pack MUST bind `terraform-style-guide` to every phase that
-  authors or reviews HCL. [NEEDS CLARIFICATION: which phases author or review HCL for this
-  purpose — `write` only, or also `plan` (which decides what will be written) and `judge`
-  (which reviews it)? And does `terraform-style-guide-security` bind to the same set or only
-  to `judge`?]
+- **FR-012**: The Terraform pack MUST bind both `terraform-style-guide` and
+  `terraform-style-guide-security` to the `plan`, `write` and `judge` phases. **Plan is
+  bound because its output is Write's instruction.** The paths and intent Plan names are
+  what Write then works from, so a plan formed without the skills can direct Write toward
+  something the skills would not sanction — and Write receiving the skills does not undo a
+  direction it was told to take. Binding Plan is not about what Plan emits; it is about
+  what Plan tells the next phase to do.
+- **FR-012a**: The `research` and `propose` phase instructions MUST stop claiming practice
+  from skills they are not bound to. Both currently read *"Practice is this file and the
+  pinned skills …"*; that sentence is false today for all five phases and remains false for
+  these two after FR-012.
 - **FR-013**: A phase whose model cell was eval-qualified against instruction content that
-  did not include a now-bound skill MUST [NEEDS CLARIFICATION: be re-qualified before the
-  binding takes effect, or take the binding immediately and be re-qualified after? Principle
-  VIII gates promotion on eval passes, and adding a skill changes the artifact those passes
-  described — but treating every binding as a promotion may make adoption unaffordable.]
+  did not include a now-bound skill MUST be re-qualified in the same change that introduces
+  the binding. The binding and its passing eval promote together, or neither promotes.
+- **FR-013a**: The platform MUST NOT carry runtime state for a binding that exists but is
+  not yet in force. A binding present in a loaded manifest is in force; there is no
+  "declared but unqualified" condition for a run to interpret, and no way to ship one.
+
+- **FR-014**: A skill step naming a capability the registry does not offer MUST NOT be
+  performed or reported as performed. The phase instruction MUST state this precedence: the
+  registry bounds what can be done, and adopted practice does not widen it.
+- **FR-015**: The pack manifest MUST declare, per skill, the recommendations this platform
+  cannot satisfy. Skill content itself is never edited or filtered — ADR-0004 requires the
+  adopted bytes stay identical to upstream.
+- **FR-016**: A pull request opened by a run whose phases were bound to skills carrying
+  declared unsatisfiable recommendations MUST state them, so the reviewer sees what adopted
+  practice remains for a person to carry out.
+- **FR-017**: The platform MUST refuse to load a manifest declaring an unsatisfiable
+  recommendation that names a capability the registry **does** offer. A declaration that has
+  gone stale would tell a reviewer to do work the platform already did.
+- **FR-018**: The text of an unsatisfiable recommendation in a pull request MUST derive from
+  the manifest alone, identical across runs, and never from what a model reported.
 
 ### Key Entities
 
@@ -161,6 +228,8 @@ observe the bound phase receive it.
   receive it. Declared, not inferred.
 - **Phase instruction**: what a phase's model is given today — the pack's `AGENTS.md` for
   that phase. Becomes that file plus the skills bound to the phase.
+- **Unsatisfiable recommendation**: a step an adopted skill recommends that this platform
+  has no capability to perform. Declared in the manifest beside the skill, not inferred.
 - **Content pin record**: the `RUN_START` evidence naming executed content by digest.
   Gains the ability to say *delivered to a phase that ran*.
 
@@ -183,6 +252,13 @@ observe the bound phase receive it.
   distinct recorded reason; none proceeds silently and none is reported as another.
 - **SC-006**: No phase instruction in any shipped pack names practice the phase is not bound
   to receive — enforced, not audited by hand.
+- **SC-008**: Every declared unsatisfiable recommendation for a bound skill appears in the
+  pull request body — 100% of runs that open one — and is byte-identical across runs.
+- **SC-009**: A declaration naming a capability the registry offers fails pack loading; none
+  ever reaches a pull request.
+- **SC-007**: No phase ships bound to a skill whose combined instruction content has not
+  passed both the phase-agents and build-agents suites — 100%, enforced by the existing
+  promotion gate rather than by review.
 
 ## Assumptions
 
@@ -200,5 +276,9 @@ observe the bound phase receive it.
   `hashicorp/agent-skills` is the existing ADR-0004 intake path and is out of scope here.
 - **The Vault pack is in scope for the mechanism, not for new bindings.** Whatever bindings
   it declares today (none) continue to work.
+- **Phase-agent promotion is all-five-or-none.** The existing gate requires all five phase
+  files and passes of both suites, so correcting `research` and `propose` prose (FR-012a)
+  forces a full promotion regardless of how many phases are bound. This is why binding and
+  re-qualification shipping together costs nothing extra.
 - **No change to how phase instructions themselves are pinned.** ADR-0049's `[[agents]]`
   pins keep their current shape.
