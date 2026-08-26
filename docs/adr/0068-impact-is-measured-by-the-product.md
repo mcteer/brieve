@@ -1,6 +1,7 @@
 # ADR-0068: Impact is measured by the product, in a namespace reserved for measurement
 
-- **Status**: Proposed
+- **Status**: Proposed — amended 2026-08-26: Terraform's instrument is no longer a
+  merge-blocking gate (see *Amendment* below). The Vault decision is unaffected.
 - **Date**: 2026-08-07
 - **Relates to**: [ADR-0047](0047-a-passing-stub-is-worse-than-a-missing-one.md), [ADR-0025](0025-registry-isolation.md), [ADR-0038](0038-the-agent-authors-and-a-person-merges.md), [ADR-0064](0064-authoring-tools-are-platform-tools.md), [ADR-0044](0044-federate-or-broker.md)
 - **Requirements**: R5, R7, R11, R2, R3
@@ -98,3 +99,39 @@ and here it is", not inherit an argument made about a different engine.
 build and would have been wrong in exactly the cases where a policy review matters — the
 unusual capability, the glob that does not mean what it looks like, the KV v2 path prefix.
 Those are the cases a reviewer most needs the product's own answer for.
+
+## Amendment — 2026-08-26: Terraform's plan is withdrawn as a gate
+
+**Nothing in the Decision above changes.** That decision is Vault's instrument —
+`vault_policy_impact`, its scratch namespace, its bounding token role and its three refusal
+layers — and it stands as written. What is withdrawn is a *different product's* application of
+the pattern: 047 made `terraform plan` a merge-blocking gate on Propose, and that gate is gone.
+
+**Why, in this record's own terms.** The thesis here is that impact is measured by asking the
+product rather than by deriving an answer or asking a model. Terraform's plan was named in the
+Context above as the clear case of a product that already answers *what would this actually
+do*. It does — **of the environment it is run against**. The gate ran it in the dispatch
+container with `-backend=false` and no state, against an estate that is not the one the change
+is for. That is the product's own engine answering a question about somewhere else.
+
+So the withdrawal is not a retreat from this ADR; it is this ADR applied more strictly. A
+fixture is green forever, which is the failure mode named above. A real instrument pointed at
+the wrong subject is worse in one specific way: it is *believable*. The same configuration can
+plan clean in that container and fail on apply where it is going, and a reviewer who saw a
+green plan has been reassured — the exact outcome the "ask the model" option was rejected for.
+The Vault design avoids this by construction, because it measures the policy in the Vault it
+would live in; the Terraform gate had no equivalent because the target estate is the
+requester's, not the platform's.
+
+**Where the measurement went.** To the person receiving the pull request, who plans it against
+their own state, credentials and backend — the only place the answer is true. That is a weaker
+guarantee for the platform and it is stated rather than absorbed: Propose no longer carries
+plan output as evidence, and soundness of the Terraform itself is now the reviewer's. Judge
+deny, ownership failure and publish error still block a PR.
+
+**The Consequences above anticipated this.** *"Every future product needs its own instrument,
+named"* — and *"this record does not generalise to Terraform or Nomad"*. Terraform's instrument
+was named in 047 and has now been withdrawn there; spec 047 carries the dated note and R7 no
+longer lists a failed plan among the conditions that stop a PR. If Terraform is ever to have a
+gate in this platform again, it needs an instrument that can reach the estate the change is
+for, and this record is the argument for why nothing less will do.

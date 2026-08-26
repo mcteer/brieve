@@ -69,7 +69,8 @@ durable record.
   whoever receives the pull request, against their own state and credentials. Judge deny,
   ownership failure and publish error still block. `terraform_plan` remains a tool the model
   may call for context; the PR no longer carries plan output as evidence.
-  Spec 047 carries a withdrawal note; ADR-0068 needs a supersession note to match.
+  Spec 047 and ADR-0068 both carry dated withdrawal notes; ADR-0068's Vault decision
+  is unaffected.
 
 ### Portal
 

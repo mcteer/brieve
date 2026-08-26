@@ -19,8 +19,8 @@
 > and publish error still hold R7 open. `terraform_plan` remains available as a TOOL the
 > model may call for context; only plan-as-gate is gone.
 >
-> ADR-0068 names Terraform's plan this product's impact oracle and needs a supersession note
-> to match.
+> ADR-0068 carries a dated amendment recording this (2026-08-26). Its Vault decision is
+> unaffected — what was withdrawn is Terraform's application of the same pattern.
 
 
 **Feature Branch**: `spec/047-propose-chat`
