@@ -17,9 +17,11 @@
   var button = form.querySelector("button[type=submit]");
   var field = form.querySelector("#question");
   var inflight = null;
-  var label = button ? button.textContent : "";
+  var label = button ? button.getAttribute("aria-label") || "" : "";
 
   form.addEventListener("submit", function (event) {
+    var target = form.getAttribute("action") || "";
+    if (target !== "/ask" && target.indexOf("/ask") !== 0) return;
     if (inflight) {
       event.preventDefault();
       inflight.abort();
@@ -29,8 +31,11 @@
     event.preventDefault();
 
     inflight = new AbortController();
+    // The NAME changes, not the contents: the control is a glyph either way, and setting
+    // text here put the word inside the circle. It also left the button named "Ask" while
+    // it stopped things — aria-label wins over content, so the old code renamed nothing.
     if (button) {
-      button.textContent = "Stop";
+      button.setAttribute("aria-label", "Stop");
       button.classList.add("go--stop");
     }
     form.setAttribute("aria-busy", "true");
@@ -72,7 +77,7 @@
         inflight = null;
         form.removeAttribute("aria-busy");
         if (!button) return;
-        button.textContent = label;
+        if (label) button.setAttribute("aria-label", label);
         button.classList.remove("go--stop");
       });
   });

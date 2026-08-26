@@ -34,6 +34,9 @@ from typing import Any
 #: supplied round trip, so it expires whether or not anyone comes back.
 PENDING_LIFETIME = timedelta(minutes=10)
 
+#: Signed-in empty home. Empty `/ask` 303s here; a `next` query still wins.
+DEFAULT_POST_LOGIN_PATH = "/"
+
 
 class LoginRefused(Exception):
     """The login could not be completed. Carries a reason code, never a token."""
@@ -59,7 +62,7 @@ class PendingLogin:
     #: Where to send the person after a successful login. Portal-relative only — an
     #: absolute URL here would make the portal an open redirector for anyone who can craft
     #: a login link.
-    next_path: str = "/"
+    next_path: str = DEFAULT_POST_LOGIN_PATH
 
 
 @dataclass
@@ -84,7 +87,7 @@ class OidcClient:
     exchange: Any | None = None
     _pending: dict[str, PendingLogin] = field(default_factory=dict)
 
-    def begin(self, *, next_path: str = "/") -> tuple[str, str]:
+    def begin(self, *, next_path: str = DEFAULT_POST_LOGIN_PATH) -> tuple[str, str]:
         """Return ``(state, authorization_url)`` and remember what we sent.
 
         ``state`` binds the callback to this request; the verifier binds the code to this
@@ -186,6 +189,7 @@ def _safe_next(path: str) -> str:
 
 
 __all__ = [
+    "DEFAULT_POST_LOGIN_PATH",
     "PENDING_LIFETIME",
     "LoginRefused",
     "OidcClient",

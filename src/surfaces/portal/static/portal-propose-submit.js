@@ -9,15 +9,19 @@
 (function () {
   "use strict";
 
-  var form = document.querySelector("form.dock:not(.ask)");
+  var form = document.querySelector("form.dock:not(.ask)")
+    || document.querySelector("form.ask[data-create-home]");
   var main = document.querySelector(".app-main");
   if (!form || !main || !window.fetch) return;
   var button = form.querySelector("button[type=submit]");
-  var field = form.querySelector("#message");
+  var note = document.getElementById("ask-status");
+  var field = form.querySelector("#message") || form.querySelector("#question");
   var inflight = null;
-  var label = button ? button.textContent : "";
+  var label = button ? button.getAttribute("aria-label") || "" : "";
 
   form.addEventListener("submit", function (event) {
+    var target = form.getAttribute("action") || "";
+    if (target !== "/" && target !== "/propose") return;
     if (inflight) {
       event.preventDefault();
       inflight.abort();
@@ -28,10 +32,13 @@
 
     inflight = new AbortController();
     if (button) {
-      button.textContent = "Stop";
+      button.setAttribute("aria-label", "Stop");
       button.classList.add("go--stop");
     }
     form.setAttribute("aria-busy", "true");
+    // Ask says what it is doing while it waits; Build said nothing, so the only sign it had
+    // been pressed was a spinner dot with no sentence beside it.
+    if (note) note.textContent = "Starting the build. The phases appear as it goes.";
 
     fetch(form.action, {
       method: "POST",
@@ -66,10 +73,11 @@
       })
       .then(function () {
         inflight = null;
+        if (note && document.body.contains(note)) note.textContent = "";
         if (!document.body.contains(form)) return;
         form.removeAttribute("aria-busy");
         if (!button) return;
-        button.textContent = label;
+        if (label) button.setAttribute("aria-label", label);
         button.classList.remove("go--stop");
       });
   });

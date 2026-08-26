@@ -1,27 +1,41 @@
-<form method="post"
-      action="{% if thread %}/threads/{{ thread.thread_id }}/turns{% else %}/threads{% endif %}"
-      class="run-composer">
-  <label for="agent">Agent</label>
-  {% if not definitions_reachable %}
-    <p class="notice">The list of agents could not be reached.</p>
-  {% endif %}
-  <select name="agent_definition_id" id="agent">
-    <option value="">None &mdash; just leave a note</option>
-    {% for d in definitions %}
-      <option value="{{ d.agent_definition_id }}" {% if not d.may_start %}disabled{% endif %}
-              title="{{ d.agent_definition_id }}">
-        {{ d.label }}{% if not d.may_start %} (you do not have access){% endif %}
-      </option>
-    {% endfor %}
-  </select>
-
-  <label for="message">Message</label>
-  <div class="field-with-control">
-    <textarea name="message" id="message" rows="2" required
-              placeholder="Describe what you want done&hellip;"
-              aria-describedby="recorded-note"></textarea>
-    <button type="submit" class="button field-control">Send</button>
+{# Create-home bubble: + placeholder, Ask/Build slider, send or Stop.
+   Default action is /ask. portal-composer.js may set action to / on empty home.
+   On an open Build this include is not the posting form — Stop is. #}
+{% set locked = composer_locked | default(false) %}
+{% set verb = composer_verb | default("ask") %}
+<form method="post" class="ask dock"
+      {% if not locked %}data-create-home{% endif %}
+      action="/ask{% if conversation_id %}?conversation_id={{ conversation_id }}{% endif %}">
+  <label class="visually-hidden" for="question">{% if conversation_id %}Ask a follow-up{% else %}Your question{% endif %}</label>
+  <div class="composer">
+    <textarea id="question" name="question" rows="1" required
+              placeholder="{% if conversation_id %}Write a message&hellip;{% else %}How can I help you today?{% endif %}"
+              aria-describedby="ask-expectation"></textarea>
+    <div class="composer-tools">
+      <button type="button" class="composer-plus" disabled
+              aria-label="Attach context" aria-describedby="attach-soon">+</button>
+      <p id="attach-soon" class="visually-hidden">Not available yet</p>
+      <div class="verb-slider" role="radiogroup" aria-label="Verb"
+           {% if locked %}aria-disabled="true"{% endif %}>
+        <label>
+          <input type="radio" name="verb" value="ask"
+                 {% if verb != "build" %}checked{% endif %}
+                 {% if locked %}disabled aria-disabled="true"{% endif %}>
+          Ask
+        </label>
+        <label>
+          <input type="radio" name="verb" value="build"
+                 {% if verb == "build" %}checked{% endif %}
+                 {% if locked %}disabled aria-disabled="true"{% endif %}>
+          Build
+        </label>
+      </div>
+      <button type="submit" class="go" aria-label="Ask"></button>
+    </div>
   </div>
-  <p id="recorded-note" class="note">This message is recorded as evidence before anything
-     acts on it.</p>
+  <p id="ask-expectation" class="visually-hidden">
+    Answers come from the platform&rsquo;s pinned documentation or from your own records
+    &mdash; whichever fits what you asked. An answer usually takes a minute or two.
+  </p>
 </form>
+<script src="/static/portal-composer.js" defer></script>

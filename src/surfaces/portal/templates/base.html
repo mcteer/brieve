@@ -4,41 +4,31 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Harness Portal{% endblock %}</title>
-  <link rel="stylesheet" href="/static/portal.css?v=20260819t">
+  <link rel="stylesheet" href="/static/portal.css?v=20260826v">
 </head>
-<body class="{% block body_class %}has-icons{% endblock %}">
+<body class="{% block body_class %}has-column{% endblock %}">
   <a class="skip" href="#main">Skip to main content</a>
   <div class="app-shell">
     {#
-      LABELLED BY THE VERB, because the difference between these two pages is whether
-      anything happens. "Conversations" and "Ask" both read as "talk to the thing" — the
-      first person to use this went looking for the ask on a thread page and found the
-      composer's agent picker instead.
+      ONE EMPTY HOME, LOCKED SLIDER (050).
 
-      028 chose separate pages so ADR-0039's never-acts rule would be *visible rather than
-      explained*, and labels that hid the distinction defeated the reason for the split.
-      047: Build (Propose under the hood) is the primary act (chat → PR). Ask answers. The
-      old agent-picker Run surface is at /run for operators — not the home path, and not a
-      third primary rail verb.
+      028 chose separate pages so ADR-0039's never-acts rule would be visible rather than
+      explained. 047 put Build at `/` and Ask at `/ask`. 050 collapses the empty rooms:
+      signed-in empty `/` is one create home; the Ask/Build slider is the verb; an open
+      item keeps its address and locks the slider. Never-acts stays visible as Ask's
+      status and as the slider word, not as two empty layouts (FR-001, FR-003).
 
-      Never-acts stays visible as Ask's status line ("Never acts") and as separate pages,
-      not only as words in the nav (FR-014).
+      The old icon rail is gone so it cannot sit beside this column.
     #}
-    {% block icons %}
-    <nav class="icons" aria-label="Main">
-      <span class="mark" aria-hidden="true"></span>
-      {# `aria-current` from the request path rather than from route context: it tells a
-         screen-reader user which page they are on, and the rail's highlight reads from the
-         same attribute so the visual and the announced state cannot drift. Template-only,
-         so no route had to learn about presentation. #}
-      <a href="/"{% if request.url.path == "/" or request.url.path.startswith("/propose") %} aria-current="page"{% endif %} aria-label="Build">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>
-        <span class="visually-hidden">Build</span>
-      </a>
-      <a href="/ask"{% if request.url.path.startswith("/ask") %} aria-current="page"{% endif %} aria-label="Ask">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-        <span class="visually-hidden">Ask</span>
-      </a>
+    {% block column %}
+    <aside class="create-column" aria-label="Workspace">
+      <nav class="create-nav" aria-label="Create">
+        <a class="create-new" href="/" aria-label="New">+ New</a>
+        <button type="button" class="create-projects" disabled
+                aria-label="Projects" aria-describedby="projects-soon">Projects</button>
+        <p id="projects-soon" class="visually-hidden">Not available yet</p>
+      </nav>
+      {% include "_history.html" %}
       {#
         SETTINGS, LINKED FOR EVERYONE, AND THE PLATFORM DECIDES (045).
 
@@ -53,17 +43,56 @@
         trust. The API refuses a non-admin, `/settings` renders that refusal as the platform
         working rather than as an error, and the a11y lane already walks that state — so the
         honest thin-client behaviour and the good one are the same behaviour.
+
+        050: Settings sits with profile and logout at the bottom of this column — not next
+        to New and Projects, and not by address only.
       #}
-      <a href="/settings"{% if request.url.path.startswith("/settings") %} aria-current="page"{% endif %} aria-label="Settings">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-        <span class="visually-hidden">Settings</span>
-      </a>
-    </nav>
+      {#
+        THE ACCOUNT ROW: who you are, and the two things you can do about it.
+
+        ICON-ONLY, AND THE NAME IS STILL THE NAME. A gear and a power symbol carry these for
+        a sighted reader, but the words stay in the document in a `visually-hidden` span
+        rather than moving to `aria-label` — the accessible name is then the same string it
+        has always been, computed from content the way every other control in this column
+        computes it, and `title` says it out loud on hover for anyone who does not read a
+        glyph. An `aria-label` here would have been a second place for that name to live and
+        a second place for it to go stale.
+
+        The MARKS ARE DRAWN HERE, not fetched and not vendored: two paths on a 24 grid in
+        `currentColor`, so they inherit this row's ink and its hover without a token of their
+        own, and the portal keeps serving every asset it needs (no CDN, works offline). The
+        cog outline is generated geometry — six teeth, straight flanks — chosen over a finer
+        one because at 16px anything busier silts up into a blob.
+      #}
+      <div class="column-end">
+        <p class="profile"><span class="visually-hidden">Signed in as</span> {{ subject_user_id }}</p>
+        <a class="column-settings icon-action" href="/settings" title="Settings"
+           {%- if request.url.path.startswith("/settings") %} aria-current="page"{% endif %}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M9.58 3.33 L14.42 3.33 L13.77 5.64 L16.62 7.28 L18.30 5.57 L20.72 9.76 L18.39 10.36 L18.39 13.64 L20.72 14.24 L18.30 18.43 L16.62 16.72 L13.77 18.36 L14.42 20.67 L9.58 20.67 L10.23 18.36 L7.38 16.72 L5.70 18.43 L3.28 14.24 L5.61 13.64 L5.61 10.36 L3.28 9.76 L5.70 5.57 L7.38 7.28 L10.23 5.64 Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span class="visually-hidden">Settings</span>
+        </a>
+        <form class="column-logout" method="post" action="/logout">
+          <button type="submit" class="icon-action" title="Sign out">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M7.05 7.05a7 7 0 1 0 9.9 0"/>
+              <path d="M12 3v8"/>
+            </svg>
+            <span class="visually-hidden">Sign out</span>
+          </button>
+        </form>
+      </div>
+    </aside>
     {% endblock %}
     <div class="app-stage">
       {% block masthead %}{% endblock %}
-      {# `main_class` lets a page opt out of the centred column. Ask is no longer the only full-width surface — Build uses the same shell — so both set `main--app`. Every
-         other signed-in page leaves this empty and still inherits the icon rail. #}
+      {# `main_class` lets a page opt out of the centred column. Ask and Build use
+         `main--app`. Every other signed-in page leaves this empty and still inherits
+         the left column. #}
       <main id="main" class="{% block main_class %}{% endblock %}">
         {% block content %}{% endblock %}
       </main>
@@ -73,14 +102,6 @@
            it does not remove the record.</p>
       </footer>
     </div>
-    {% block session_end %}
-    <form class="icons-end" method="post" action="/logout">
-      <button type="submit" aria-label="Sign out">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-        <span class="visually-hidden">Sign out</span>
-      </button>
-    </form>
-    {% endblock %}
   </div>
   {% block scripts %}{% endblock %}
   <script>

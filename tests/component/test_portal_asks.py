@@ -348,7 +348,7 @@ def test_the_ask_waits_longer_and_nothing_else_does() -> None:
     portal = _portal(surface, relay=relay)
 
     portal.post("/ask", data={"question": GUIDANCE_QUESTION})
-    portal.get("/ask")
+    portal.get("/")
     portal.get("/")
 
     patience = dict(relay.seen)
@@ -553,15 +553,34 @@ def test_the_two_surfaces_say_which_one_acts() -> None:
     """
     portal = _portal(_answering_surface())
 
-    ask = _visible(portal.get("/ask").text)
-    build = _visible(portal.get("/").text)
+    home = portal.get("/")
+    assert home.status_code == 200
+    visible = _visible(home.text)
+    assert "never acts" in visible, "create home does not say Ask never acts"
+    assert 'action="/ask"' in home.text
+    assert 'action="/propose"' not in home.text
+    assert "Let's Create" not in home.text
 
-    assert "never acts" in ask, "the ask page does not say that nothing happens"
-    assert "pull request" in build, "the Build page does not say that something does"
 
-    # And each points at the other, so landing on the wrong one is a click rather than a search.
-    assert 'href="/"' in portal.get("/ask").text
-    assert 'href="/ask"' in portal.get("/").text
+def test_ask_selected_on_empty_home_does_not_post_build() -> None:
+    """047 P8 / T007: default create-home form is Ask."""
+    portal = _portal(_answering_surface())
+    html = portal.get("/").text
+    assert 'action="/ask"' in html
+    assert not re.search(r'<form[^>]+action="/"', html)
+    assert 'action="/propose"' not in html
+
+
+def test_ask_stop_does_not_claim_the_answer_ended() -> None:
+    """T017 / research F5: aborting the wait is not an ended answer."""
+    from pathlib import Path
+
+    script = (
+        Path(__file__).resolve().parents[2] / "src/surfaces/portal/static/portal-ask.js"
+    ).read_text(encoding="utf-8")
+    assert "Stopped waiting. The question was already sent." in script
+    assert "answer ended" not in script.lower()
+    assert "the answer has ended" not in script.lower()
 
 
 def test_the_portal_shows_what_a_bounded_answer_rests_on() -> None:

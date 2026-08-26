@@ -1,5 +1,28 @@
 # Feature Specification: Propose chat — repo URL to phased work to pull request
 
+> **WITHDRAWN AFTER THE FACT — the final Terraform plan gate (2026-08-26).**
+>
+> This spec requires a real `terraform plan` against the authored tree as the last gate
+> before Propose, and lists a failed plan under R7 among the conditions that must not open a
+> pull request. That gate has been removed.
+>
+> The reason is not cost. **A plan is only true of the environment it ran against.** The gate
+> ran in the dispatch container with `-backend=false` and no state — not the estate the
+> change is for — so a green result was never evidence about the target: the same
+> configuration can plan clean there and fail on apply where it is actually going. A gate
+> that can pass and then be wrong is worse than none, because it is read as assurance. It
+> also refused correct work outright, since a configuration declaring a remote backend cannot
+> be planned without initialising that backend, which the gate deliberately would not do.
+>
+> The check moves to the person receiving the proposal, who plans it against their own state
+> and credentials — the only place the answer means anything. Judge deny, ownership failure
+> and publish error still hold R7 open. `terraform_plan` remains available as a TOOL the
+> model may call for context; only plan-as-gate is gone.
+>
+> ADR-0068 names Terraform's plan this product's impact oracle and needs a supersession note
+> to match.
+
+
 **Feature Branch**: `spec/047-propose-chat`
 
 **Created**: 2026-08-13

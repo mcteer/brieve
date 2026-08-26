@@ -1,16 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Build — Harness Portal{% endblock %}
+{% block title %}{{ title or "Build" }} — Harness Portal{% endblock %}
 {% block main_class %}main--app{% endblock %}
 {% block content %}
-<div class="app-layout">
-{% include "_build_rail.html" %}
+<div class="app-layout app-layout--create app-layout--item">
 <div class="app-main">
 {% include "_propose_run_main.html" %}
 </div>
 </div>
 {% endblock %}
 {% block scripts %}
-{# Cache-bust: portal copies static at alloc start; browsers also cache aggressively. #}
-<script src="/static/portal-propose-strip.js?v=20260819r" defer></script>
-<script src="/static/portal-propose.js?v=20260819r" defer></script>
+<script src="/static/portal-copy.js" defer></script>
+<script src="/static/portal-propose-strip.js?v=20260825h" defer></script>
+<script src="/static/portal-propose.js?v=20260825h" defer></script>
 {% endblock %}

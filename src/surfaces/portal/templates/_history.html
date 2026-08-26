@@ -1,0 +1,33 @@
+{# Combined Ask + Build history. The region stays when the list is empty so a first
+   visit has the same landmarks as a return. Search filters already-visible text. #}
+<nav class="create-history" aria-label="Your work">
+  {# A label over the list, because the search field and the rows under it were bolted
+     straight onto New/Projects with nothing saying where one group ended and the next
+     began. Not a heading: the nav already carries the accessible name. #}
+  <p class="rail-label" aria-hidden="true">Conversations and builds</p>
+  <label class="visually-hidden" for="history-search">Search conversations and builds</label>
+  <input type="search" id="history-search" data-history-search
+         placeholder="Search" autocomplete="off">
+  {% if ask_history_reachable is defined and not ask_history_reachable %}
+  <p class="notice" role="status">Ask history could not be read. This is not an empty list.</p>
+  {% endif %}
+  {% if build_history_reachable is defined and not build_history_reachable %}
+  <p class="notice" role="status">Build history could not be read. This is not an empty list.</p>
+  {% endif %}
+  <ul data-history-list>
+    {% for item in history_items|default([]) %}
+      <li>
+        <a href="{{ item.href }}" data-history-row title="{{ item.title }}"
+           {% if item.current %}aria-current="page"{% endif %}>
+          <span class="history-verb">{{ item.verb }}</span>
+          <span class="history-title">{{ item.title }}</span>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+  <p class="list-empty" data-history-empty hidden>No matches</p>
+  {% if not history_items|default([]) and ask_history_reachable|default(true) and build_history_reachable|default(true) %}
+  <p class="list-empty">No conversations or builds yet.</p>
+  {% endif %}
+</nav>
+<script src="/static/portal-history.js" defer></script>

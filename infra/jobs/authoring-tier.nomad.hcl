@@ -220,8 +220,13 @@ job "authoring-tier" {
         # no scoring machinery, and 027 recorded what happens when an extra is wrong in a
         # deployed allocation — the failure arrives at the last step, in front of a user.
         #
-        # TERRAFORM is the Plan oracle (047). Verified at start: a missing binary must not
-        # surface as a green fixture plan after the model has already written files.
+        # TERRAFORM is a pack TOOL the model may call while it works (`packs/terraform`), and
+        # the binary is verified at start so a missing one fails here rather than as a green
+        # fixture plan after files have been written.
+        #
+        # It is no longer the final plan ORACLE: 047's gate ran a plan against absent state in
+        # this container — not the estate the change is for — so it could pass and still be
+        # wrong, and it is withdrawn. Plan-as-context stays; plan-as-gate is gone.
         args = [
           "set -e; command -v terraform >/dev/null || { echo 'tooling_missing: terraform' >&2; exit 3; }; cd /repo; export PYTHONPYCACHEPREFIX=/tmp/pycache; uv run --extra adapters --extra surfaces python -m surfaces.dispatch.entrypoint"
         ]

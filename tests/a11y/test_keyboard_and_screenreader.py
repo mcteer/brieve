@@ -100,7 +100,7 @@ def test_focus_order_follows_visual_reading_order(page: Any, portal_server: Port
         for i in range(1, len(tops))
         # A tolerance, because elements on one visual row legitimately share a band.
         # A jump UP is a defect in the same column; starting the next column at its
-        # top (icon rail, then list, then stage) is how this shell is read.
+        # top (create column, then stage) is how this shell is read.
         if tops[i] < tops[i - 1] - 12 and sequence[i]["left"] <= sequence[i - 1]["left"] + 24
     ]
     assert out_of_order == [], "focus jumps upward against reading order: " + "; ".join(

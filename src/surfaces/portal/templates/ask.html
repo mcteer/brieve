@@ -1,64 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Ask — Harness Portal{% endblock %}
+{% block title %}{% if conversation_id %}{{ title or "Ask" }} — {% endif %}Harness Portal{% endblock %}
 {% block main_class %}main--app{% endblock %}
 {% block content %}
-{# The empty rail stays: omitting it when there is nothing to list turned Ask into a
-   document and Build into a different product. At 320px the list stacks rather than
-   remaining a second column — that is the collapse, not a missing landmark. #}
-<div class="app-layout">
-
-{#
-  THE RAIL — this person's own conversations, most recently used first.
-
-  A `nav`, so it is reachable as one and skippable as one. The column is present even
-  when the list is empty, so a first visit still has the same landmarks as a return.
-#}
-<nav class="app-rail" aria-label="Your conversations">
-  {# The whole ROW is the link, not the words inside it — a target you can hit anywhere is what
-     makes a sidebar feel like one, and it clears the 24px minimum without a fixed height. #}
-  <div class="rail-head">
-    <p class="rail-heading" id="rail-heading">Conversations</p>
-    <a class="rail-new" href="/ask">New</a>
-  </div>
-  {% if conversations %}
-  <ul aria-labelledby="rail-heading">
-    {% for conversation in conversations %}
-      <li>
-        <a href="/ask/{{ conversation.conversation_id }}" title="{{ conversation.title }}"
-           {% if conversation.conversation_id == conversation_id %}aria-current="page"{% endif %}>
-          {# Truncated to one line in CSS; `title` keeps the whole question a hover away, and
-             the accessible name is still the full text because it is the link's own content. #}
-          <span>{{ conversation.title }}</span>
-          {# A count is a fact about the conversation, in the role reserved for what a person
-             would quote — not decoration. #}
-          <span class="rail-count">{{ conversation.exchanges }} exchange{% if conversation.exchanges != 1 %}s{% endif %}</span>
-        </a>
-      </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="list-empty">No conversations yet.</p>
-  {% endif %}
-</nav>
+{# The empty list region stays: omitting it when there is nothing to list turned the
+   shell into a document. At 320px the column stacks rather than remaining a second
+   column — that is the collapse, not a missing landmark. #}
+<div class="app-layout app-layout--create{% if conversation_id %} app-layout--item{% endif %}">
 
 <div class="app-main">
+{% if conversation_id %}
 <header class="stage-top">
-  <p class="crumb">ask{% if conversation_id %} / <b>{{ conversation_id[:8] }}</b>{% endif %}</p>
+  <h1 class="item-title">{{ title }}</h1>
   <div class="meta">
     <span class="live idle"><i aria-hidden="true"></i>Never acts</span>
-    {% if conversation_id %}
-      <a class="quiet-action" href="/ask/{{ conversation_id }}/delete">Delete</a>
-    {% endif %}
+    <a class="quiet-action" href="/ask/{{ conversation_id }}/delete">Delete</a>
   </div>
 </header>
+{% else %}
+<h1 class="create-greeting">
+  <img src="/static/mark/hashicorp-logomark.svg" alt="HashiCorp">
+</h1>
+{% endif %}
 
 <div class="thread">
 <div class="inner">
-<h1{% if exchanges or response is defined %} class="visually-hidden"{% endif %}>Ask</h1>
-{% if not exchanges and not response is defined %}
-<p class="lede">Asking answers. It never acts.</p>
+{% if not conversation_id and not exchanges and response is not defined %}
+<p class="visually-hidden">Ask answers. It never acts. Move the slider to Build to start a change.</p>
 {% endif %}
 
+{% if error %}
+  <p class="notice" role="alert">{{ error }}</p>
+{% endif %}
 {% if missing %}
   <p class="notice">That conversation is not one of yours &mdash; nothing about your access has
      changed.</p>
@@ -89,58 +61,19 @@
   {% endif %}
 </div>
 
-{#
-  Two regions, deliberately, because they carry different kinds of thing. `ask-status` holds a
-  SHORT sentence about what is happening and is a live region, so a screen-reader user is told
-  the question went and later that it came back. The transcript is NOT live: announcing a page
-  of claims the instant it arrives talks over somebody who is still reading. Focus moves to the
-  new answer's heading instead, which is how a person gets there on purpose.
-#}
 <p id="ask-status" role="status" class="meta ask-status"></p>
 </div>
 </div>
 
 {#
   ONE FORM, ONE FIELD. No source selector and no model selector: which corpus is pinned and
-  which model may answer are not the asker's to choose, and a control for either would be a
-  request to widen scope. The platform decides what the question needs.
-
-  The conversation it belongs to travels in the action, not in a field — there is nothing here
-  for a person to set, and an id in a form control is an id somebody can edit.
+  which model may answer are not the asker's to choose. The conversation it belongs to
+  travels in the action. On empty home the slider may change the submit target via
+  portal-composer.js; without that script this form posts /ask.
 #}
-{#
-  ONE FIELD, and the control inside it — the composer every chat interface has.
-
-  The LABEL is visually hidden rather than deleted: the placeholder is not an accessible name,
-  it disappears the moment somebody types, and a control whose only name is placeholder text is
-  a control a screen-reader user meets unnamed. It still says which of the two things this is,
-  because "ask a follow-up" and "ask a question" are different acts.
-
-  The EXPECTATION text is hidden for the same reason and the opposite direction. It used to be
-  a paragraph under the box, which 028 wanted perceivable as plain content — but a sighted
-  person now learns the same fact at the moment it matters, from the status line that appears
-  while the platform is working. A screen-reader user has no such moment, so the description
-  stays on the control where `aria-describedby` will read it.
-#}
-<form method="post" class="ask dock"
-      action="/ask{% if conversation_id %}?conversation_id={{ conversation_id }}{% endif %}">
-  <label class="visually-hidden" for="question">{% if exchanges or conversation_id %}Ask a follow-up{% else %}Your question{% endif %}</label>
-  <div class="composer">
-    <textarea id="question" name="question" rows="1" required
-              {# ONE PLACEHOLDER, because the varying one is wrong half the time. It is chosen
-                 when the SERVER renders, and exchanges appended by script afterwards do not
-                 change it — so mid-conversation the box invited a first question. The label
-                 below still varies: it is read on load, which is when it is true. #}
-              placeholder="Ask&hellip;"
-              aria-describedby="ask-expectation"></textarea>
-    <div class="chips"><span class="chip">Never acts</span></div>
-    <button type="submit" class="go">Ask</button>
-  </div>
-  <p id="ask-expectation" class="visually-hidden">
-    Answers come from the platform&rsquo;s pinned documentation or from your own records
-    &mdash; whichever fits what you asked. An answer usually takes a minute or two.
-  </p>
-</form>
+{% set composer_locked = conversation_id | default('') | length > 0 %}
+{% set composer_verb = "ask" %}
+{% include "_thread_composer.html" %}
 
 {% if empty %}
   <p class="notice">Type a question first &mdash; nothing was sent.</p>
@@ -150,10 +83,24 @@
 </div>
 {% endblock %}
 {% block scripts %}
-{#
-  Loaded only where they have work to do. Ask posts without navigating; copy buttons put an
-  answer or code panel on the clipboard. Both are progressive enhancement.
-#}
 <script src="/static/portal-ask.js" defer></script>
 <script src="/static/portal-copy.js" defer></script>
+<script src="/static/portal-propose-submit.js" defer></script>
+{#
+  THE BUILD WATCHER BELONGS WHERE A BUILD CAN BE STARTED, and this is that page.
+
+  Starting a Build from the create home swaps the run column in without navigating, then asks
+  `BRIEVE_PROPOSE_WATCH` to follow it over SSE. Both of those live in the two files below, and
+  neither was ever loaded here — only `propose_run.html` pulled them — so the call was
+  guarded, found nothing, and did nothing. The panel appeared frozen at its first render: no
+  phase ever advanced, the dial never moved, the state never changed and no pull request ever
+  arrived, on a run that was in fact progressing perfectly well on the platform.
+
+  Inert on a page with no run in it: the strip file only defines `BRIEVE_PROPOSE`, and the
+  watcher looks for a `[data-propose-run]` element at load and finds none until a Build is
+  started. Order matters — the watcher checks for `BRIEVE_PROPOSE` before it connects — and
+  `defer` runs these in document order.
+#}
+<script src="/static/portal-propose-strip.js?v=20260826g" defer></script>
+<script src="/static/portal-propose.js?v=20260826g" defer></script>
 {% endblock %}

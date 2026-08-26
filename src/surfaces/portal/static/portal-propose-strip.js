@@ -5,9 +5,7 @@
 
   function setOutcome(htmlClass, text, href) {
     var box = document.querySelector("[data-propose-outcome]");
-    if (!box) {
-      return;
-    }
+    if (!box) return;
     var existing = box.querySelector("p");
     if (existing) {
       var sameClass = existing.className === htmlClass;
@@ -74,20 +72,26 @@
     if (!progress || !Array.isArray(progress.phases)) {
       return;
     }
-    progress.phases.forEach(function (phase) {
+    // Same rule as `_phase_position` in app.py: the phase the run is ON, not the count done.
+    var done = 0;
+    progress.phases.forEach(function (phase, at) {
+      if (phase.status === "completed") done += 1;
+      if (phase.status === "active" || phase.status === "failed") done = at + 1;
       var li = document.querySelector('#phase-strip [data-phase="' + phase.name + '"]');
-      if (!li) {
-        return;
-      }
+      if (!li) return;
       var nextClass = "node node--" + phase.status;
-      if (li.className !== nextClass) {
-        li.className = nextClass;
-      }
+      if (li.className !== nextClass) li.className = nextClass;
       var statusNode = li.querySelector(".phase-status");
-      if (statusNode && statusNode.textContent !== phase.status) {
-        statusNode.textContent = phase.status;
-      }
+      if (statusNode && statusNode.textContent !== phase.status) statusNode.textContent = phase.status;
     });
+    // The ring and the count inside it are drawn from these two numbers, so they are set
+    // together — a dial that disagrees with its own label is worse than no dial.
+    var dial = document.getElementById("phase-strip");
+    if (!dial) return;
+    dial.style.setProperty("--dial-done", done);
+    dial.style.setProperty("--dial-total", progress.phases.length);
+    var count = dial.querySelector(".dial-count");
+    if (count) count.textContent = done + " of " + progress.phases.length;
   }
 
   global.BRIEVE_PROPOSE = { applyRun: applyRun };

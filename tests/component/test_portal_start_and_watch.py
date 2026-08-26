@@ -216,8 +216,9 @@ def test_an_unreachable_api_says_so_rather_than_showing_an_empty_platform() -> N
 
     page = portal.get("/")
 
-    assert "could not be reached" in page.text
-    assert "have not been lost" in page.text
+    assert "Ask history could not be read" in page.text
+    assert "Build history could not be read" in page.text
+    assert "This is not an empty list" in page.text
     assert "not started any conversations" not in page.text, (
         "an unreachable platform was rendered as an empty one"
     )

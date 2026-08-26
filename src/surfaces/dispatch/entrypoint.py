@@ -24,7 +24,7 @@ import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from adapters.model_chooser import FIXTURE_PROVIDER, build_chooser
 from core.audit.postgres_sink import PostgresAuditSink
@@ -88,9 +88,6 @@ from surfaces.dispatch.authoring import (
 )
 from surfaces.dispatch.phase_agents import bind_phase_agents
 from surfaces.dispatch.terraform_authoring import (
-    PlanGateRefused,
-    attach_plan_evidence,
-    gate_final_plan,
     quality_judge_may_publish,
     reviewer_copy,
 )
@@ -368,18 +365,32 @@ def _write_locked_task(
     )
 
 
+#: How many times in a row the write model may name nothing before the loop stops asking.
+#:
+#: "NONE is not a Build end" is right — a model can decline once and author on the next step —
+#: but it was applied without a bound, so a model that had decided to write nothing was asked
+#: again for every remaining step. A real run spent seventeen consecutive attempts that way,
+#: burned its whole step budget, and then reported "nothing was authored": the RESULT of the
+#: failure standing in for its cause. Three keeps the second chance the rule exists for and
+#: ends the grind, and the ending carries the model's own outcome instead of the symptom.
+_EMPTY_RETRY_BUDGET: Final[int] = 3
+
+
 def _empty_after_plan(
     *,
     planned: bool,
     authored: int,
     outcome: Any,
     remaining: int = 0,
+    streak: int = 0,
 ) -> str:
     """What an empty/exhausted choice means once a write plan exists.
 
     ``done`` — files exist, remaining planned paths are empty, and the model named nothing.
-    ``retry`` — nothing authored yet, or planned paths are still missing (NONE is not a Build end).
-    ``stop`` — not an authoring write loop, or a real bound exhaustion after files exist.
+    ``retry`` — nothing authored yet, or planned paths are still missing (NONE is not a Build end),
+    and the model has not yet named nothing ``_EMPTY_RETRY_BUDGET`` times in a row.
+    ``stop`` — not an authoring write loop, a real bound exhaustion after files exist, or a
+    model that has declined often enough that asking again is not a plan.
     """
     if not planned:
         return "stop"
@@ -391,7 +402,7 @@ def _empty_after_plan(
             return "retry"
         return "done"
     if authored == 0 and (empty or exhausted):
-        return "retry"
+        return "retry" if streak < _EMPTY_RETRY_BUDGET else "stop"
     return "stop"
 
 
@@ -500,6 +511,9 @@ def _run_steps(
     planned = False
     post_plan_reads = 0
     write_locked = False
+    # Consecutive steps on which the model named nothing while nothing has been authored.
+    # Reset by a file landing, because a model that just wrote is not a model that has stopped.
+    empty_streak = 0
     if require_write_plan and author is not None:
         author.plan_ready = False
 
@@ -652,10 +666,12 @@ def _run_steps(
                             )
                         ),
                         outcome=resolution.outcome,
+                        streak=empty_streak,
                     )
                     if require_write_plan
                     else "stop"
                 )
+                empty_streak = empty_streak + 1 if empty_kind == "retry" else empty_streak
                 if empty_kind == "done":
                     print(
                         f"run {run.correlation_id}: write complete ({authored_n} file(s))",
@@ -676,6 +692,15 @@ def _run_steps(
                 # grant-expiry stop does. Exiting non-zero would make every bound look like a
                 # failure to whoever reads allocation states.
                 ended = _ended_reason_for_choice(resolution.outcome, resolution.attempts)
+                if planned and authored_n == 0 and empty_streak:
+                    # WHY, not what is missing afterwards. Reaching here with nothing authored
+                    # used to fall through to `_finish_authoring_analyzer`'s "nothing was
+                    # authored" — which is the state the run was left in, not the thing that
+                    # went wrong, and sends whoever reads it looking in the wrong place.
+                    ended = (
+                        f"the write model named no file to author on {empty_streak} "
+                        "consecutive attempts, so nothing was written"
+                    )
                 print(
                     f"run {run.correlation_id} ending at step {step}: "
                     f"{resolution.outcome} after {resolution.attempts} attempt(s)",
@@ -694,6 +719,7 @@ def _run_steps(
                 if planned:
                     post_plan_reads += 1
             if tool_name == AUTHOR_FILE and resolution.executed:
+                empty_streak = 0
                 _mark_write_active(run)
                 payload = getattr(resolution.result, "tool_result", None)
                 authored_path = str(payload.get("path") or "") if isinstance(payload, dict) else ""
@@ -894,31 +920,22 @@ def _finish_authoring_analyzer(
         )
         return 1
 
-    # Final plan oracle before Judge (047 / ADR-0047). Write stays the active phase so a
-    # red plan labels the work that failed rather than rewinding Research/Plan.
-    try:
-        plan_result = gate_final_plan(
-            workspace=trees.workspace,
-            authored_paths=sorted(author_contents),
-        )
-    except PlanGateRefused as exc:
-        reason = exc.reason
-        result_body["reason"] = reason
-        _fail_current_phase(run, reason)
-        durability.save(
-            CheckpointBlob(
-                blob_id=blob_id,
-                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
-                correlation_id=correlation_id,
-                grant_id=grant.grant_id,
-                step_index=max(steps - 1, 0),
-                written_by="entrypoint",
-                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
-            )
-        )
-        print(f"run {correlation_id}: {reason}; no proposer handoff", flush=True)
-        return 0
-
+    # NO FINAL PLAN GATE. 047 ran a real `terraform plan` here and refused to open a pull
+    # request unless it came back clean. That is withdrawn, and the reason is not that the
+    # check was expensive — it is that A PLAN IS ONLY TRUE OF THE ENVIRONMENT IT RAN AGAINST.
+    # This one ran with `-backend=false` against no state, in a container that is not the
+    # estate the change is for. A green result there says nothing about the target: the same
+    # configuration can plan clean here and fail on apply where it is actually going. A gate
+    # that can pass and then be wrong is worse than no gate, because it is read as assurance.
+    #
+    # The person receiving the pull request plans it against their own state, credentials and
+    # backend, which is the only place the answer means anything — so the check moves to
+    # where it can be true rather than being performed where it cannot.
+    #
+    # What this gives up is real and is not hidden: spec 047's R7 named a failed plan among
+    # the conditions that must not open a PR, and ADR-0068 made Terraform's plan this
+    # product's impact oracle. Judge still blocks, ownership still blocks, publish failure
+    # still blocks. Soundness of the Terraform itself now belongs to the reviewer.
     _complete_write(run)
     run.propose_progress = advance(_current_progress(run), into=PhaseName.JUDGE)
     durability.save(
@@ -1021,25 +1038,8 @@ def _finish_authoring_analyzer(
         consulted=consulted,
         base_commit=os.environ.get("RUN_BASE_COMMIT", "").strip(),
     )
-    try:
-        attach_plan_evidence(proposal=proposal, plan_result=plan_result)
-    except PlanGateRefused as exc:
-        reason = exc.reason
-        result_body["reason"] = reason
-        _fail_current_phase(run, reason)
-        durability.save(
-            CheckpointBlob(
-                blob_id=blob_id,
-                payload=_payload_with_progress({RESULT_KEY: result_body}, run),
-                correlation_id=correlation_id,
-                grant_id=grant.grant_id,
-                step_index=max(steps - 1, 0),
-                written_by="entrypoint",
-                outcome=RunOutcome(state=RunState.STOPPED.value, stop_reason=reason),
-            )
-        )
-        print(f"run {correlation_id}: {reason}; no proposer handoff", flush=True)
-        return 0
+    # The PR carried bounded plan facts as evidence; with no gate there is no plan to quote.
+    # The proposal still carries what it authored, why, and the run it came from.
     payload = _payload_with_progress(
         {
             RESULT_KEY: result_body,
