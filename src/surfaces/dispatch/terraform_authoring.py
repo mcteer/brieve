@@ -8,85 +8,31 @@ Mirrors the product-specific half of ``policy_authoring.py`` without living insi
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
 
-
-class PlanGateRefused(RuntimeError):
-    """The final Terraform plan oracle failed. No compose, no PR (047 / ADR-0047)."""
-
-    def __init__(self, reason: str) -> None:
-        self.reason = reason
-        super().__init__(reason)
-
-
-def plan_evidence_lines(plan_result: dict[str, Any]) -> list[str]:
-    """Bounded facts a reviewer can scan. Never includes secret values."""
-    if plan_result.get("fixture"):
-        raise RuntimeError("fixture plan output cannot become proposal evidence")
-    exit_code = plan_result.get("exit_code")
-    has_changes = bool(plan_result.get("has_changes"))
-    output = str(plan_result.get("output") or "")[-4000:]
-    lines: list[str] = [
-        f"Measured by `terraform plan` (exit_code={exit_code}, has_changes={has_changes}).",
-    ]
-    for raw in output.splitlines():
-        stripped = raw.strip()
-        if not stripped:
-            continue
-        lines.append(stripped[:500])
-        if len(lines) >= 40:
-            lines.append("(plan output truncated)")
-            break
-    return lines
-
-
-def compose_plan_evidence(*, plan_result: dict[str, Any]) -> str:
-    """Bounded, reviewer-facing plan evidence for a PR body. Never includes secrets."""
-    return "\n".join(plan_evidence_lines(plan_result))
-
-
-def attach_plan_evidence(*, proposal: Any, plan_result: dict[str, Any] | None) -> Any:
-    """Mutate the composed proposal with measured plan facts (042's evidence seam).
-
-    Refuses when there is no plan: a PR that looks complete without the oracle is the
-    reassurance ADR-0047 forbids.
-    """
-    if plan_result is None:
-        raise PlanGateRefused("no Terraform plan is attached to this proposal")
-    proposal.evidence.extend(plan_evidence_lines(plan_result))
-    return proposal
-
-
-def _plan_workdir(workspace: Path, authored_paths: list[str]) -> Path:
-    tf_paths = [p for p in authored_paths if p.endswith((".tf", ".tf.json"))]
-    if not tf_paths:
-        raise PlanGateRefused("no Terraform files to plan")
-    parents = {str(Path(path).parent) for path in tf_paths}
-    if len(parents) == 1:
-        relative = next(iter(parents))
-        return workspace if relative in {".", ""} else workspace / relative
-    return workspace
-
-
-def gate_final_plan(*, workspace: Path, authored_paths: list[str]) -> dict[str, Any]:
-    """Run the real plan oracle against the authored tree, or refuse.
-
-    ``HARNESS_TERRAFORM_PLAN_FAIL=1`` forces a red gate for hermetic P6. A missing
-    binary still refuses (not a green fixture). Always-green is invalid.
-    """
-    if os.environ.get("HARNESS_TERRAFORM_PLAN_FAIL", "").strip() in {"1", "true", "yes"}:
-        raise PlanGateRefused("the Terraform plan failed")
-    workdir = _plan_workdir(workspace, authored_paths)
-    from surfaces.handlers import terraform_plan
-
-    try:
-        result = terraform_plan({"working_directory": str(workdir)})
-    except RuntimeError as exc:
-        raise PlanGateRefused("the Terraform plan failed") from exc
-    if not isinstance(result, dict) or result.get("fixture"):
-        raise PlanGateRefused("the Terraform plan failed")
-    return result
+# ── THE FINAL PLAN GATE IS GONE ────────────────────────────────────────────────────────
+#
+# 047 ran a real `terraform plan` against the authored tree here and blocked the pull request
+# unless it came back clean, with bounded plan output attached to the PR as evidence.
+#
+# Withdrawn, because A PLAN IS ONLY TRUE OF THE ENVIRONMENT IT RAN AGAINST. This one ran in
+# the dispatch container with `-backend=false` and no state — not the estate the change is
+# for — so a green result was never evidence about the target. The same configuration can
+# plan clean here and fail on apply where it is actually going, and a gate that can pass and
+# then be wrong is worse than no gate: it is read as assurance and spends the reviewer's
+# attention it was supposed to earn.
+#
+# It also could not evaluate the ordinary case. A config declaring a remote backend cannot be
+# planned without initialising that backend, which the gate deliberately refused to do, so it
+# rejected correct work — `Backend initialization required` — on runs that were fine.
+#
+# The check now lives with the person who receives the proposal, against their own state and
+# credentials, which is the only place it can be true. `judge_may_publish` and the ownership
+# and publish checks are unchanged and still block.
+#
+# What this withdraws is recorded rather than quietly dropped: spec 047's R7 listed a failed
+# final plan among the conditions that must not open a PR, and ADR-0068 named Terraform's
+# plan this product's impact oracle. Both need a supersession note if this stands.
 
 
 def judge_may_publish(*, authored_paths: list[str], task: str) -> tuple[bool, str]:
@@ -197,12 +143,7 @@ def reviewer_copy(
 
 
 __all__ = [
-    "PlanGateRefused",
-    "attach_plan_evidence",
-    "compose_plan_evidence",
-    "gate_final_plan",
     "judge_may_publish",
-    "plan_evidence_lines",
     "quality_judge_may_publish",
     "reviewer_copy",
     "usage_notes_for",

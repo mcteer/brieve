@@ -46,6 +46,9 @@ NOT_NAVIGATION = {
     # 047: home is Build. `/propose` 303s there so old bookmarks still work — linking
     # both would put the same page in the nav twice.
     "/propose": "alias of `/`; not a distinct page",
+    # 050: empty Ask is gone. `GET /ask` 303s to create home — linking both would
+    # put the same page in the nav twice.
+    "/ask": "alias of `/`; empty Ask is not a distinct page",
     # Operator agent-picker. 047 moved the primary act to Build; `/run` stays for
     # people who still start a named agent, reached by URL rather than the main nav.
     "/run": "operator Run surface; not the primary product path",
@@ -53,31 +56,60 @@ NOT_NAVIGATION = {
 
 
 def _nav_targets() -> set[str]:
-    """The hrefs in the main navigation, read out of the rendered template.
+    """The hrefs in the portal's persistent navigation, read out of the rendered shell.
+
+    **Read from the SIGNED-IN column, and that is where it moved to.** This used to fetch `/`
+    with no session and read a `<nav aria-label="Main">` out of the signed-out page. That bar
+    is gone: from a signed-out page its two links — Home and Settings — were this page and
+    this page, navigation offering two ways back to where you already were. Nothing before
+    sign-in is a destination, so nothing before sign-in can be the thing this row audits.
+
+    The column beside every signed-in page is the navigation now, and it is the honest place
+    to ask "can a person get there from here". The rule the row enforces is unchanged.
 
     Rendered rather than regex-matched over the file, so a link inside a comment or behind a
     condition that is never true does not count as reachable.
     """
+    from fastapi.testclient import TestClient
+
+    from surfaces.portal.oidc import code_challenge_for
+    from surfaces.portal.session import COOKIE_NAME
+    from tests.harness.fake_oidc_provider import FakeOIDCProvider
+
+    idp = FakeOIDCProvider()
+    oidc = OidcClient(
+        issuer=idp.issuer,
+        client_id="portal",
+        redirect_uri="http://testserver/callback",
+        authorize_endpoint="http://idp.test/authorize",
+        token_endpoint="http://idp.test/token",
+        exchange=lambda code, code_verifier: idp.exchange(
+            code=code, code_verifier=code_verifier, redirect_uri="http://localhost/callback"
+        ),
+    )
     portal = create_portal(
         relay=ApiRelay(
             base_url="http://api.test",
-            transport=lambda **kwargs: ApiResponse(status=200, payload={}),
+            # Empty lists, so the only hrefs in the column are the PERSISTENT ones. A
+            # conversation row is reached from a list, not from the navigation.
+            transport=lambda **kwargs: ApiResponse(
+                status=200, payload={"conversations": [], "runs": []}
+            ),
         ),
-        oidc=OidcClient(
-            issuer="http://idp.test",
-            client_id="portal",
-            redirect_uri="http://localhost/callback",
-            authorize_endpoint="http://idp.test/authorize",
-            token_endpoint="http://idp.test/token",
-            exchange=lambda code, code_verifier: {},
-        ),
+        oidc=oidc,
     )
-    from fastapi.testclient import TestClient
+    client = TestClient(portal, base_url="http://testserver")
+    state, _ = oidc.begin()
+    code = idp.authorize(
+        code_challenge=code_challenge_for(oidc._pending[state].verifier), subject="alice"
+    )
+    signed = client.get(f"/callback?code={code}&state={state}", follow_redirects=False)
+    client.cookies.set(COOKIE_NAME, str(signed.cookies.get(COOKIE_NAME)))
 
-    body = TestClient(portal).get("/").text
-    nav = re.search(r"<nav[^>]*aria-label=\"Main\"[^>]*>(.*?)</nav>", body, re.S)
-    assert nav, "the portal renders no main navigation at all"
-    return set(re.findall(r'href="([^"#?]+)"', nav.group(1)))
+    body = client.get("/").text
+    column = re.search(r"<aside[^>]*class=\"create-column\"[^>]*>(.*?)</aside>", body, re.S)
+    assert column, "the portal renders no persistent navigation at all"
+    return set(re.findall(r'href="([^"#?]+)"', column.group(1)))
 
 
 def _page_routes() -> set[str]:

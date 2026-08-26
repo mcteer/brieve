@@ -6,6 +6,7 @@ from __future__ import annotations
 from adapters.model_chooser import _JUDGE_REASON_LIMIT, _authoring_hint
 from core.choice import ChoiceOutcome
 from surfaces.dispatch.entrypoint import (
+    _EMPTY_RETRY_BUDGET,
     _MAX_AUTHOR_FILES,
     _POST_PLAN_READ_BUDGET,
     _authored_excerpts,
@@ -131,3 +132,56 @@ def test_research_hint_still_asks_for_read_first() -> None:
 
 def test_author_file_budget_is_below_the_step_budget() -> None:
     assert 1 <= _MAX_AUTHOR_FILES < 20
+
+
+def test_an_empty_choice_is_retried_but_not_forever() -> None:
+    """ "NONE is not a Build end" earns a second chance, not the whole step budget.
+
+    Unbounded, a model that had decided to write nothing was asked again on every remaining
+    step: one real run spent seventeen consecutive attempts that way and then reported
+    "nothing was authored" — the state it was left in rather than the thing that went wrong.
+    """
+    for streak in range(_EMPTY_RETRY_BUDGET):
+        assert (
+            _empty_after_plan(planned=True, authored=0, outcome=ChoiceOutcome.EMPTY, streak=streak)
+            == "retry"
+        ), f"streak {streak} should still get another attempt"
+    assert (
+        _empty_after_plan(
+            planned=True, authored=0, outcome=ChoiceOutcome.EMPTY, streak=_EMPTY_RETRY_BUDGET
+        )
+        == "stop"
+    )
+    assert (
+        _empty_after_plan(
+            planned=True,
+            authored=0,
+            outcome=ChoiceOutcome.EXHAUSTED,
+            streak=_EMPTY_RETRY_BUDGET,
+        )
+        == "stop"
+    )
+
+
+def test_a_streak_does_not_end_a_run_that_is_still_writing() -> None:
+    """The cap is for a model that has stopped, not one working through a plan."""
+    assert (
+        _empty_after_plan(
+            planned=True,
+            authored=2,
+            remaining=3,
+            outcome=ChoiceOutcome.EMPTY,
+            streak=_EMPTY_RETRY_BUDGET + 5,
+        )
+        == "retry"
+    )
+    assert (
+        _empty_after_plan(
+            planned=True,
+            authored=2,
+            remaining=0,
+            outcome=ChoiceOutcome.EMPTY,
+            streak=_EMPTY_RETRY_BUDGET + 5,
+        )
+        == "done"
+    )

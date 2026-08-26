@@ -45,7 +45,10 @@ def test_p3_entrypoint_checkpoints_each_advance() -> None:
     propose = source.index("into=PhaseName.PROPOSE")
     assert research < plan < write < judge < propose
     finish = source.split("def _finish_authoring_analyzer(", 1)[1].split("def _run_task(", 1)[0]
-    assert "gate_final_plan(" in finish
+    # `gate_final_plan(` stood here beside the judge. The final Terraform plan gate is
+    # withdrawn — it planned against absent state in a container that is not the target
+    # estate, so it could pass and still be wrong — and the assertion goes with it rather
+    # than being weakened to something that no longer means anything. Judge still blocks.
     assert "quality_judge_may_publish(" in finish
     write_plan = source.split("def _run_write_plan(", 1)[1].split("_POST_PLAN_READ_BUDGET", 1)[0]
     assert "checkpoint_run(" in write_plan

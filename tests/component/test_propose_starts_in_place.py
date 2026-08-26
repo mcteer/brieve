@@ -175,10 +175,12 @@ def test_a_refused_start_refuses_in_the_fragment_envelope() -> None:
 
 def test_the_build_page_offers_somewhere_for_a_run_to_land() -> None:
     """A regression here is silent: the form keeps working, just with a full-page navigation."""
-    body = _portal().get("/").text
+    portal = _portal()
+    home = portal.get("/").text
+    assert "/static/portal-propose-submit.js" in home
+    assert "dock" in home
+    assert "data-create-home" in home
 
-    assert "/static/portal-propose-submit.js" in body
-    assert "/static/portal-propose.js" in body
-    assert "/static/portal-propose-strip.js" in body
-    assert 'class="dock"' in body
-    assert 'name="message"' in body
+    run = portal.get(f"/propose/runs/{_RUN_ID}").text
+    assert "/static/portal-propose.js" in run
+    assert "/static/portal-propose-strip.js" in run

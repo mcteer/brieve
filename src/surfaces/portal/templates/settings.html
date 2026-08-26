@@ -166,10 +166,10 @@
               #}
               {% if not source.withdrawn %}
                 <form method="post" action="/settings/endorsed/{{ name }}/review">
-                  <button type="submit">Review changes to {{ name }}</button>
+                  <button type="submit" class="quiet-action">Review<span class="visually-hidden"> changes to {{ name }}</span></button>
                 </form>
                 <form method="post" action="/settings/endorsed/{{ name }}/withdraw">
-                  <button type="submit">Withdraw {{ name }}</button>
+                  <button type="submit" class="quiet-action">Withdraw<span class="visually-hidden"> {{ name }}</span></button>
                 </form>
               {% else %}
                 <form method="post" action="/settings/endorsed">
@@ -177,7 +177,7 @@
                   {# No location: re-endorsing keeps the one already recorded, and keeps the
                      adopted version too, so restoring trust does not cost the ground every
                      run record names. #}
-                  <button type="submit">Re-endorse {{ name }}</button>
+                  <button type="submit" class="quiet-action">Re-endorse<span class="visually-hidden"> {{ name }}</span></button>
                 </form>
               {% endif %}
             </td>
@@ -224,7 +224,7 @@
         Where the documents live. A location, never a credential.
       </span>
     </p>
-    <button type="submit">Endorse this source</button>
+    <button type="submit" class="button">Endorse this source</button>
   </form>
 
 {% endif %}

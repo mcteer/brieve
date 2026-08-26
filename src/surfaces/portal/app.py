@@ -28,7 +28,7 @@ from markupsafe import Markup, escape
 
 from surfaces.portal.events import propose_event_stream, thread_event_stream
 from surfaces.portal.highlight import highlight_code
-from surfaces.portal.oidc import LoginRefused, OidcClient
+from surfaces.portal.oidc import DEFAULT_POST_LOGIN_PATH, LoginRefused, OidcClient
 from surfaces.portal.relay import ApiRelay, ApiResponse
 from surfaces.portal.session import COOKIE_NAME, SessionStore, cookie_attributes
 
@@ -225,7 +225,7 @@ def create_portal(
     # ------------------------------------------------------------------ auth
 
     @app.get("/login")
-    def login(request: Request, next: str = "/") -> RedirectResponse:
+    def login(request: Request, next: str = DEFAULT_POST_LOGIN_PATH) -> RedirectResponse:
         return _login_redirect(request, next)
 
     @app.get("/callback")
@@ -272,18 +272,17 @@ def create_portal(
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> Response:
-        """047 — home is Propose chat, not the agent-picker Run surface."""
+        """050 — signed-in empty home is create (Ask by default), not a second empty Build."""
         session = _session(request)
         if session is None:
             return templates.TemplateResponse(request=request, name="signed_out.html", context={})
-        listed = _builds(session)
-        if listed is None:
+        shell = _shell_context(session, request)
+        if shell is None:
             return _reauthenticate(request)
-        builds, reachable = listed
         return templates.TemplateResponse(
             request=request,
-            name="propose.html",
-            context={"builds": builds, "reachable": reachable},
+            name="ask.html",
+            context={**shell, "exchanges": [], "composer_verb": "ask"},
         )
 
     @app.get("/run", response_class=HTMLResponse)
@@ -295,10 +294,12 @@ def create_portal(
 
         threads, reachable, refused = _threads(session)
         definitions, definitions_reachable = _definitions(session)
+        shell = _shell_context(session, request) or {}
         return templates.TemplateResponse(
             request=request,
             name="threads.html",
             context={
+                **shell,
                 "thread": None,
                 "turns": [],
                 "threads": threads,
@@ -331,10 +332,14 @@ def create_portal(
         posture = app.state.relay.request(
             "GET", "/console/configuration", token=session.access_token
         )
+        shell = _shell_context(session, request)
+        if shell is None:
+            return _reauthenticate(request)
         return templates.TemplateResponse(
             request=request,
             name="settings.html",
             context={
+                **shell,
                 "posture": posture.payload if posture.ok else {},
                 "reachable": posture.reachable,
                 "refused": not posture.ok and posture.reachable,
@@ -361,10 +366,14 @@ def create_portal(
             f"/console/endorsed-sources/{source}/review",
             token=session.access_token,
         )
+        shell = _shell_context(session, request)
+        if shell is None:
+            return _reauthenticate(request)
         return templates.TemplateResponse(
             request=request,
             name="endorsed_review.html",
             context={
+                **shell,
                 "source": source,
                 "review": review.payload if review.ok else {},
                 "reachable": review.reachable,
@@ -447,10 +456,12 @@ def create_portal(
         posture = app.state.relay.request(
             "GET", "/console/configuration", token=session.access_token
         )
+        shell = _shell_context(session, request) or {}
         return templates.TemplateResponse(
             request=request,
             name="settings.html",
             context={
+                **shell,
                 "posture": posture.payload if posture.ok else {},
                 "reachable": posture.reachable,
                 "refused": not posture.ok and posture.reachable,
@@ -516,22 +527,82 @@ def create_portal(
                     "run_id": run_id,
                     "title": _build_rail_title(run_id),
                     "state": str(run.get("state") or "") or None,
+                    "created_at": str(run.get("created_at") or ""),
                 }
             )
         return builds, True
 
-    def _conversations(session: Any) -> list[dict[str, Any]]:
-        """This person's own conversations for the rail, or nothing to show.
+    def _conversations(session: Any) -> tuple[list[dict[str, Any]], bool]:
+        """This person's own conversations, and whether the list could be read.
 
-        A list the platform could not read is rendered as absent rather than as empty: the API
+        A list the platform could not read is omitted rather than shown as empty: the API
         answers 503 for an unreadable store precisely so nobody is told they have no
         conversations when the truth is that nobody could look.
         """
         listed = app.state.relay.request("GET", "/ask-conversations", token=session.access_token)
         if not listed.reachable or not listed.ok:
-            return []
+            return [], False
         conversations: list[dict[str, Any]] = (listed.payload or {}).get("conversations", [])
-        return conversations
+        return conversations, True
+
+    def history_items(session: Any, *, path: str) -> tuple[list[dict[str, Any]], bool, bool] | None:
+        """Portal-only merge of Ask conversations and Builds. ``None`` means re-auth."""
+        listed = _builds(session)
+        if listed is None:
+            return None
+        builds, build_ok = listed
+        conversations, ask_ok = _conversations(session)
+        items: list[dict[str, Any]] = []
+        if ask_ok:
+            for conversation in conversations:
+                if not isinstance(conversation, dict):
+                    continue
+                title = str(conversation.get("title") or "").strip()
+                conversation_id = str(conversation.get("conversation_id") or "")
+                if not title or not conversation_id:
+                    continue
+                href = f"/ask/{conversation_id}"
+                items.append(
+                    {
+                        "kind": "ask",
+                        "verb": "Ask",
+                        "title": title,
+                        "href": href,
+                        "sort_at": str(conversation.get("last_asked_at") or ""),
+                        "current": path == href or path.startswith(f"{href}/"),
+                    }
+                )
+        if build_ok:
+            for build in builds:
+                title = str(build.get("title") or "").strip()
+                run_id = str(build.get("run_id") or "")
+                if not title or not run_id:
+                    continue
+                href = f"/propose/runs/{run_id}"
+                items.append(
+                    {
+                        "kind": "build",
+                        "verb": "Build",
+                        "title": title,
+                        "href": href,
+                        "sort_at": str(build.get("created_at") or ""),
+                        "current": path == href,
+                    }
+                )
+        items.sort(key=lambda row: str(row.get("sort_at") or ""), reverse=True)
+        return items, ask_ok, build_ok
+
+    def _shell_context(session: Any, request: Request) -> dict[str, Any] | None:
+        merged = history_items(session, path=request.url.path)
+        if merged is None:
+            return None
+        items, ask_ok, build_ok = merged
+        return {
+            "history_items": items,
+            "ask_history_reachable": ask_ok,
+            "build_history_reachable": build_ok,
+            "subject_user_id": session.subject_user_id,
+        }
 
     def _threads(session: Any) -> tuple[list[dict[str, Any]], bool, bool]:
         """This person's agent threads for the rail, and whether the list could be read."""
@@ -588,6 +659,7 @@ def create_portal(
             "run_id": run_id,
             "state": run_state,
             "phases": progress,
+            "phase_position": _phase_position(progress),
             "pr_url": pr_url,
             "ended_reason": ended_reason,
             "intake_message": intake,
@@ -630,18 +702,18 @@ def create_portal(
                     context={"message": detail},
                     status_code=started.status or 503,
                 )
-            listed = _builds(session)
-            if listed is None:
+            shell = _shell_context(session, request)
+            if shell is None:
                 return _reauthenticate(request)
-            builds, reachable = listed
             return templates.TemplateResponse(
                 request=request,
-                name="propose.html",
+                name="ask.html",
                 context={
-                    "message": message,
+                    **shell,
+                    "exchanges": [],
+                    "composer_verb": "build",
                     "error": detail,
-                    "builds": builds,
-                    "reachable": reachable,
+                    "message": message,
                 },
                 status_code=started.status or 503,
             )
@@ -660,7 +732,7 @@ def create_portal(
             return templates.TemplateResponse(
                 request=request,
                 name="_propose_run_main.html",
-                context=fields,
+                context={**fields, "title": _build_rail_title(str(run_id))},
             )
         return RedirectResponse(f"/propose/runs/{run_id}", status_code=303)
 
@@ -672,14 +744,17 @@ def create_portal(
         fields = _propose_run_fields(session, run_id)
         if fields is None:
             return _reauthenticate(request)
-        listed = _builds(session)
-        if listed is None:
+        shell = _shell_context(session, request)
+        if shell is None:
             return _reauthenticate(request)
-        builds, reachable = listed
         return templates.TemplateResponse(
             request=request,
             name="propose_run.html",
-            context={**fields, "builds": builds, "reachable": reachable},
+            context={
+                **fields,
+                **shell,
+                "title": _build_rail_title(run_id),
+            },
         )
 
     @app.get("/propose/runs/{run_id}/events")
@@ -702,12 +777,8 @@ def create_portal(
         """
         session = _session(request)
         if session is None:
-            return _login_redirect(request, "/ask")
-        return templates.TemplateResponse(
-            request=request,
-            name="ask.html",
-            context={"conversations": _conversations(session), "exchanges": []},
-        )
+            return _login_redirect(request, DEFAULT_POST_LOGIN_PATH)
+        return RedirectResponse("/", status_code=303)
 
     @app.get("/ask/{conversation_id}", response_class=HTMLResponse)
     def ask_conversation(request: Request, conversation_id: str) -> Response:
@@ -726,25 +797,35 @@ def create_portal(
         if not found.reachable or not found.ok:
             # The API's verdict, carried. A conversation that is not this person's answers 404
             # there and the portal must not soften that into an empty page.
+            shell = _shell_context(session, request)
+            if shell is None:
+                return _reauthenticate(request)
             return templates.TemplateResponse(
                 request=request,
                 name="ask.html",
                 context={
-                    "conversations": _conversations(session),
+                    **shell,
                     "exchanges": [],
                     "missing": True,
+                    "composer_locked": True,
+                    "composer_verb": "ask",
                 },
                 status_code=found.status if found.reachable else 503,
             )
         payload = found.payload or {}
+        shell = _shell_context(session, request)
+        if shell is None:
+            return _reauthenticate(request)
         return templates.TemplateResponse(
             request=request,
             name="ask.html",
             context={
-                "conversations": _conversations(session),
+                **shell,
                 "conversation_id": conversation_id,
                 "title": payload.get("title", ""),
                 "exchanges": _rendered(payload.get("exchanges", [])),
+                "composer_locked": True,
+                "composer_verb": "ask",
             },
         )
 
@@ -758,17 +839,30 @@ def create_portal(
             "GET", f"/ask-conversations/{conversation_id}", token=session.access_token
         )
         if not found.reachable or not found.ok:
+            shell = _shell_context(session, request)
+            if shell is None:
+                return _reauthenticate(request)
             return templates.TemplateResponse(
                 request=request,
                 name="ask.html",
-                context={"conversations": [], "exchanges": [], "missing": True},
+                context={
+                    **shell,
+                    "exchanges": [],
+                    "missing": True,
+                    "composer_locked": True,
+                    "composer_verb": "ask",
+                },
                 status_code=found.status if found.reachable else 503,
             )
         payload = found.payload or {}
+        shell = _shell_context(session, request)
+        if shell is None:
+            return _reauthenticate(request)
         return templates.TemplateResponse(
             request=request,
             name="ask_delete_confirm.html",
             context={
+                **shell,
                 "conversation_id": conversation_id,
                 "title": payload.get("title", ""),
                 "exchanges": len(payload.get("exchanges", [])),
@@ -780,11 +874,11 @@ def create_portal(
         """Delete, then take the person somewhere that still exists."""
         session = _session(request)
         if session is None:
-            return _login_redirect(request, "/ask")
+            return _login_redirect(request, DEFAULT_POST_LOGIN_PATH)
         app.state.relay.request(
             "DELETE", f"/ask-conversations/{conversation_id}", token=session.access_token
         )
-        return RedirectResponse("/ask", status_code=303)
+        return RedirectResponse("/", status_code=303)
 
     @app.post("/ask")
     def ask(request: Request, question: str = Form("")) -> Response:
@@ -797,7 +891,7 @@ def create_portal(
         """
         session = _session(request)
         if session is None:
-            return _login_redirect(request, "/ask")
+            return _login_redirect(request, DEFAULT_POST_LOGIN_PATH)
 
         # WHOLE PAGE OR JUST THE OUTCOME — the same render either way.
         #
@@ -813,6 +907,13 @@ def create_portal(
 
         asked = question.strip()
         conversation_id = (request.query_params.get("conversation_id") or "").strip()
+        shell: dict[str, Any] = {}
+        if page == "ask.html":
+            packed = _shell_context(session, request)
+            if packed is None:
+                return _reauthenticate(request)
+            shell = packed
+
         if not asked:
             # THE CHEAPEST REFUSAL IN THE FEATURE, and it costs no API call and no model call.
             # An empty question relayed would spend a governed ask, a vendor call and a trail
@@ -821,19 +922,15 @@ def create_portal(
                 request=request,
                 name="_notice.html" if page == "_exchange.html" else page,
                 context={
+                    **shell,
                     "empty": True,
-                    "conversations": _conversations(session) if page == "ask.html" else [],
                     "exchanges": [],
                     "conversation_id": conversation_id,
+                    "composer_locked": bool(conversation_id),
+                    "composer_verb": "ask",
                 },
                 status_code=400,
             )
-
-        # Fetched before the ask and only for a whole page. The fragment envelope re-renders one
-        # exchange and never the rail, so a follow-up costs exactly one call — and doing it
-        # first keeps the ask itself the last thing this handler does, which is what the
-        # containment session reads.
-        rail = _conversations(session) if page == "ask.html" else []
 
         body: dict[str, Any] = {"question": asked}
         if conversation_id:
@@ -854,11 +951,14 @@ def create_portal(
             request=request,
             name=page,
             context={
+                **shell,
                 "question": asked,
                 "response": answered,
                 "conversation_id": landed,
-                "conversations": rail,
+                "title": (answered.payload or {}).get("title") or asked,
                 "exchanges": [],
+                "composer_locked": True,
+                "composer_verb": "ask",
             },
             # The API's own status, carried rather than reinterpreted. A refusal is an answer.
             status_code=answered.status if answered.reachable else 503,
@@ -918,10 +1018,12 @@ def create_portal(
         threads, reachable, refused = _threads(session)
         definitions, definitions_reachable = _definitions(session)
         turns = _with_run_state(app.state.relay, session.access_token, detail.payload["turns"])
+        shell = _shell_context(session, request) or {}
         return templates.TemplateResponse(
             request=request,
             name="threads.html",
             context={
+                **shell,
                 "thread": detail.payload["thread"],
                 "turns": turns,
                 "threads": threads,
@@ -972,8 +1074,13 @@ def create_portal(
         session = _session(request)
         if session is None:
             return _login_redirect(request, f"/threads/{thread_id}")
+        shell = _shell_context(session, request)
+        if shell is None:
+            return _reauthenticate(request)
         return templates.TemplateResponse(
-            request=request, name="delete_confirm.html", context={"thread_id": thread_id}
+            request=request,
+            name="delete_confirm.html",
+            context={**shell, "thread_id": thread_id},
         )
 
     @app.post("/threads/{thread_id}/delete")
@@ -1071,6 +1178,23 @@ def _propose_phases(result: ApiResponse) -> list[dict[str, str]]:
             }
         )
     return rendered or default
+
+
+def _phase_position(phases: list[dict[str, str]]) -> int:
+    """WHICH PHASE THE RUN IS ON, 1-based — not how many it has finished.
+
+    The dial counted completed phases, so a run actively researching read "0 of 5": true of
+    the finished count and wrong about the thing a person is looking at the dial to learn.
+    A phase that has started is a phase you are on, so the tick moves when work begins rather
+    than a beat later when it lands.
+
+    A failed phase counts the same way — it is where the run got to. With nothing started at
+    all this is 0, which is the one case where an empty dial is the honest picture.
+    """
+    for index, phase in enumerate(phases, start=1):
+        if str(phase.get("status", "")) in {"active", "failed"}:
+            return index
+    return sum(1 for phase in phases if str(phase.get("status", "")) == "completed")
 
 
 def _propose_outcome(

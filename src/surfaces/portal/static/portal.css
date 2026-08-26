@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
  *
  * The portal's visual identity: Nocturne (one designed dark theme). Ask and Build share a
- * shell. Faces stay Inter + IBM Plex Mono (048 FR-007 / FR-009) — self-hosted, no CDN.
+ * shell. Faces stay Roboto + IBM Plex Mono — self-hosted, no CDN.
  *
  * **Two rules govern this file.** Every colour and every typeface is a TOKEN, declared once
  * below and referenced everywhere — a component row fails on a colour literal outside the
@@ -25,15 +25,29 @@
   --bg-surface: #181c24;
   --bg-selected: #1d2230;
   --bg-bubble: #1d2230;
+  /* THE ONE SURFACE THAT IS NOT A SURFACE STEP. Every ground above is a step in the dark
+     ramp, and a selected toggle drawn from that ramp is invisible: the verb slider's chosen
+     half sat on `--bg-surface` INSIDE a `--bg-surface` composer — 1.00:1, no edge at all —
+     and the whole ramp tops out around 1.7:1 against its neighbours, so no darker value
+     could have fixed it. 1.4.11 asks 3:1 for what identifies a control's STATE, and this is
+     the lightest value on the palette's own blue-grey that clears it against the slider
+     track (3.05:1), with page ink still at 5.39:1 on top. Reach for it for a chosen toggle,
+     not as a fourth panel colour. */
+  --bg-toggle-on: #59606c;
 
   --border: #212630;
   --border-strong: #333a48;
   --border-bubble: #2a3040;
 
   --text-primary: #e9edf3;
-  --text-secondary: #9aa4b6;
-  /* Mockup faint fails 4.5 as text on page / sidebar / surface; raised until it clears. */
-  --text-muted: #848c9e;
+  /* SECONDARY AND MUTED CARRY MOST OF WHAT IS ON SCREEN — every row in the column, every
+     placeholder, every note under a field — and at the mockup's values the page read as
+     dim rather than as quiet. Both are a step brighter than they were: secondary now clears
+     10:1 on the page ground and muted 7.6:1, against the 4.5 the mockup only just met. The
+     three-step hierarchy is intact (primary > secondary > muted); what changed is the floor,
+     not the order. */
+  --text-secondary: #b6bece;
+  --text-muted: #9ba3b5;
   --text-bubble: #dfe3ec;
   /* White on `--accent` is 3.39:1. Page ink on the same fill clears 4.5. */
   --text-on-accent: #0c0e12;
@@ -41,6 +55,9 @@
   --accent: #8b7bf0;
   --accent-hover: #9d8ff5;
   --accent-bg: rgb(139 123 240 / 0.14);
+  /* The same wash carried further, for the hover state of the one accent-filled destination
+     on a finished Build. A second step rather than a second hue. */
+  --accent-bg-strong: rgb(139 123 240 / 0.24);
 
   --success: #22c98e;
   --success-bg: rgb(34 201 142 / 0.12);
@@ -48,6 +65,10 @@
   --warning-bg: rgb(237 169 74 / 0.12);
   --danger: #ef6461;
   --danger-bg: rgb(239 100 97 / 0.12);
+  /* Stop is a light red rather than the danger red: it ends something you started on
+     purpose, which is not the same event as a failure, and the two should not be the same
+     colour. Light enough that a near-black square sits on it at 7:1. */
+  --stop: #f5918e;
   --info: #5b9bf0;
   --info-bg: rgb(91 155 240 / 0.12);
 
@@ -84,8 +105,13 @@
   --shadow-panel: 0 1px 3px rgb(0 0 0 / 0.15), 0 12px 32px rgb(0 0 0 / 0.14);
   --radius: 10px;
   --radius-sm: 6px;
+  /* THE COMPOSER IS A SOFT RECTANGLE, NOT A STADIUM. `--radius-bubble` at 28px reads as a
+     pill on a one-line field and as a lozenge the moment the field grows — the shape drifts
+     with the content. A fixed 18px holds through every height. */
+  --radius-composer: 18px;
   --radius-md: 10px;
   --radius-lg: 14px;
+  --radius-bubble: 28px;
   --control-height: 2.5rem;
 
   --text-xs: 11px;
@@ -116,12 +142,23 @@
   --space-8: 32px;
 
   --measure: 34rem;
+  /* ONE COLUMN WIDTH FOR THE STAGE, AND IT FOLLOWS THE WINDOW. The transcript was 680px and
+     the composer 56rem, centred on the same axis — so the field a person types into was
+     216px wider than the answers above it and no two edges lined up. Both read this token
+     now; a change to the measure moves the composer with it or it moves nothing.
+
+     `100%` rather than a viewport unit, so the column measures itself against the STAGE it
+     sits in and not against the window the sidebar is also using — the same value is correct
+     with the column open, collapsed, or on a phone. The cap keeps a line of prose from
+     running past the point where the eye loses its place returning to the left margin; below
+     it the column is fluid all the way down. */
+  --stage-column: min(58rem, 100%);
 
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 700;
 
-  --font-ui: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ui: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --font-prose: var(--font-ui);
   --font-control: var(--font-ui);
@@ -146,9 +183,10 @@ html { color-scheme: dark; }
    See fonts/PROVENANCE.md for the pin, licences (OFL 1.1) and digests. `swap` so text is
    readable before the font arrives. */
 @font-face {
-  font-family: Inter;
-  src: url("fonts/inter-variable.woff2") format("woff2-variations");
+  font-family: Roboto;
+  src: url("fonts/roboto-variable.woff2") format("woff2-variations");
   font-weight: 100 900;
+  font-stretch: 75% 100%;
   font-style: normal;
   font-display: swap;
 }
@@ -198,20 +236,20 @@ p:last-child { margin-bottom: 0; }
   font-family: var(--font-control);
 }
 
-/* Icon rail + stage: signed-in Ask and Build share this shell. Signed-out pages keep
-   tokens and type without the three-column grid (research F6). Conversational pages
+/* Create column + stage: signed-in Ask and Build share this shell. Signed-out pages keep
+   tokens and type without the two-column grid (research F6). Conversational pages
    lock to the viewport so the list, header, and composer stay put and the thread
    is the pane that moves — the chrome the mockups signed off, not a document that
    happens to have a sidebar. Settings and other reading pages still scroll. */
 .app-shell { min-height: 100vh; }
-body.has-icons .app-shell {
+body.has-column .app-shell {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   grid-template-rows: 1fr auto;
   min-height: 100vh;
 }
-body.has-icons:has(main.main--app) { overflow: hidden; }
-body.has-icons:has(main.main--app) .app-shell {
+body.has-column:has(main.main--app) { overflow: hidden; }
+body.has-column:has(main.main--app) .app-shell {
   height: 100vh;
   overflow: hidden;
 }
@@ -220,57 +258,15 @@ body.plain .app-shell { display: block; }
   display: flex; flex-direction: column; min-width: 0; min-height: 0;
   grid-column: 2; grid-row: 1 / span 2;
 }
-body.has-icons:has(main.main--app) .app-stage { overflow: hidden; height: 100%; }
-.icons {
-  grid-column: 1; grid-row: 1;
-  border-right: 1px solid var(--border);
-  display: flex; flex-direction: column; align-items: center;
-  padding: 14px 0; gap: 4px;
-  background: var(--bg-rail);
-}
-.icons .mark {
-  width: 26px; height: 26px; margin-bottom: 18px;
-  background: var(--accent); border-radius: 7px;
-}
-.icons a,
-.icons button {
-  width: 34px; height: 34px; display: grid; place-items: center;
-  color: var(--text-secondary); text-decoration: none; border-radius: var(--radius-sm);
-  background: transparent; border: 0; cursor: pointer; padding: 0;
-  font: inherit;
-}
-.icons a[aria-current],
-.icons a[aria-current="page"] {
-  color: var(--accent);
-  background: var(--accent-bg);
-}
-.icons a:hover,
-.icons button:hover { background: var(--bg-selected); }
-.icons a:focus-visible,
-.icons button:focus-visible {
-  outline: 2px solid var(--accent); outline-offset: 2px;
-}
-.icons svg,
-.icons-end svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; }
-.icons-end {
-  grid-column: 1; grid-row: 2;
-  display: flex; justify-content: center;
-  padding: 0 0 14px;
-  border-right: 1px solid var(--border);
-  background: var(--bg-rail);
-  margin: 0;
-}
-.icons-end button {
-  width: 34px; height: 34px; display: grid; place-items: center;
-  color: var(--text-muted); border-radius: var(--radius-sm);
-  background: transparent; border: 0; cursor: pointer; padding: 0;
-  font: inherit;
-}
-.icons-end button:focus-visible {
-  outline: 3px solid var(--link-bright); outline-offset: 2px;
-}
+body.has-column:has(main.main--app) .app-stage { overflow: hidden; height: 100%; }
+/* A CENTRED TITLE IS A WINDOW CHROME, NOT AN APPLICATION HEADER. The three-column grid put
+   the conversation's name in the middle of a 1160px bar with the status pill floating at the
+   far right — the shape of a document viewer's title bar. The name of the thing you are
+   reading belongs at the start of the line; the actions on it belong at the end. */
 .stage-top {
-  height: 42px; display: flex; align-items: center; gap: 16px;
+  height: 48px; display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; gap: 16px;
   padding: 0 20px; border-bottom: 1px solid var(--border); flex: 0 0 auto;
 }
 .crumb {
@@ -284,8 +280,19 @@ body.has-icons:has(main.main--app) .app-stage { overflow: hidden; height: 100%; 
   min-width: 0;
 }
 .crumb b { color: var(--ink); font-weight: 500; }
+.stage-top .item-title {
+  grid-column: 1;
+  text-align: start;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .stage-top .meta {
-  margin-left: auto;
+  grid-column: 2;
+  justify-self: end;
+  margin-left: 0;
   margin-bottom: 0;
   max-width: none;
   display: flex;
@@ -332,33 +339,16 @@ body.has-icons:has(main.main--app) .app-stage { overflow: hidden; height: 100%; 
 }
 
 @media (max-width: 45rem) {
-  body.has-icons:has(main.main--app) { overflow: auto; }
-  body.has-icons:has(main.main--app) .app-shell {
+  body.has-column:has(main.main--app) { overflow: auto; }
+  body.has-column:has(main.main--app) .app-shell {
     height: auto;
     min-height: 100vh;
     overflow: visible;
-  }
-  body.has-icons:has(main.main--app) .app-stage { overflow: visible; height: auto; }
-  body.has-icons .app-shell {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
   }
-  .icons {
-    grid-column: 1; grid-row: 1;
-    flex-direction: row;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-    height: auto;
-    padding: 8px 12px;
-  }
-  .icons-end {
-    grid-column: 2; grid-row: 1;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-    padding: 8px 12px;
-  }
+  body.has-column:has(main.main--app) .app-stage { overflow: visible; height: auto; }
   .app-stage { grid-column: 1 / -1; grid-row: 2; }
-  .icons .mark { margin-bottom: 0; margin-right: 8px; }
   .thread { padding: 16px; overflow: visible; }
   .ask, .dock { padding: 12px 16px 16px; }
   .stage-top { padding: 0 16px; }
@@ -477,22 +467,28 @@ form.inline { display: inline; }
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
   position: relative;
-  width: 56%;
-  max-width: 56%;
+  width: 100%;
+  max-width: var(--stage-column);
   margin-inline: auto;
-  min-height: 60px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 9px 11px 36px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-composer);
+  padding: 16px 16px 12px;
 }
 .composer textarea {
-  flex: 1;
+  flex: 0 0 auto;
   min-width: 0;
-  height: 42px;
-  min-height: 42px;
+  height: auto;
+  /* THE FLOOR, NOT THE HEIGHT. `field-sizing: content` still grows the field as a person
+     types; this is how tall it is before they have. Raising it is what makes the composer
+     taller, because everything else in the box is a fixed row. */
+  min-height: 2.75rem;
+  font-family: var(--font-prose);
+  /* Above the 12.5px chrome, below the 17px it was: the field a person types into should be
+     the largest thing on the screen after the answers, not larger than both. */
+  font-size: 0.9375rem;
   max-height: 12rem;
   resize: none;
   border: 0;
@@ -521,37 +517,64 @@ html[data-input="keyboard"] .composer .go:focus-visible {
 }
 .composer .ask-send,
 .composer .go {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
+  position: static;
   flex: 0 0 auto;
-  margin: 0;
-  min-height: 24px;
-  height: 24px;
-  padding: 0 11px;
-  background: var(--cta);
-  color: var(--cta-ink);
+  margin: 0 0 0 auto;
+  min-height: 30px;
+  min-width: 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: var(--ink);
+  color: var(--bg-page);
   text-transform: none;
   letter-spacing: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
 }
-.composer .go:hover { background: var(--accent-hover); }
-.composer .go--stop,
+.composer .go:not(.go--stop)::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid var(--bg-page);
+}
+.composer .go:hover { background: var(--text-bubble); }
+/* STOP IS THE SEND BUTTON, RECOLOURED — same 30px circle in the same place, so the control
+   that starts the wait and the control that ends it do not move under the cursor. It was a
+   wide pill with the word in it, which changed size the moment it changed job and shoved the
+   verb slider sideways.
+
+   A SQUARE, not a word: it is the transport convention next to the send triangle, and it
+   survives greyscale, where a red-versus-white swap on its own would not (1.4.1). The word
+   "Stop" stays in the document for anything that reads rather than looks. */
+.composer .go.go--stop,
 .ask[aria-busy="true"] .go {
-  background: var(--danger);
-  color: var(--text-on-accent);
+  width: 30px;
+  padding: 0;
+  background: var(--stop);
+  color: var(--bg-page);
   cursor: pointer;
   opacity: 1;
 }
+.composer .go--stop::before,
+.ask[aria-busy="true"] .go::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--bg-page);
+}
 .composer .go--stop:hover,
-.ask[aria-busy="true"] .go:hover { background: var(--danger); opacity: 0.92; }
+.ask[aria-busy="true"] .go:hover { background: var(--stop); opacity: 0.88; }
 .chips {
   position: absolute;
   left: 14px;
@@ -579,102 +602,179 @@ html[data-input="keyboard"] .composer .go:focus-visible {
   box-shadow: var(--inset);
 }
 .run-composer select:hover, .run-composer textarea:hover, .run-composer input:hover { border-color: var(--muted); }
-.phase-strip { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 0; position: relative; }
-.phase-strip::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  top: 10px;
-  bottom: 10px;
-  width: 1px;
-  background: var(--border);
-}
-.node {
-  display: grid;
-  grid-template-columns: 17px 1fr;
-  gap: 12px;
+/* ── THE PHASE DIAL (Build) ──────────────────────────────────────────────────────────
+   A ring that fills as phases complete, with the count inside it and the phase now running
+   named beside it. What it replaced was a five-row spine with a dotted rule down the left,
+   which spent most of its height telling you four things were "pending" — the state that
+   carries the least information of any state a phase can be in. */
+.phase-dial {
+  display: flex;
   align-items: center;
-  font-family: var(--font-prose);
-  font-size: var(--text-md);
-  padding: 9px 0;
-  position: relative;
+  gap: var(--space-5);
+  margin: 26px 0 0;
 }
-.phase-strip .node {
-  grid-template-columns: 17px 76px minmax(0, 1fr);
-  column-gap: 12px;
-  row-gap: 0;
-  align-items: center;
-  padding: 9px 0;
-  border-top: 0;
-}
-.phase-strip .node:first-child { border-top: 0; }
-.node::before { content: none; }
-.phase-strip .node::before { content: none; }
-.dot {
-  width: 17px; height: 17px; border-radius: 50%;
-  border: 1.5px solid var(--border-strong);
-  background: var(--bg-page);
-  margin-top: 0;
+/* The ring scales as a whole: the mask hole is a PERCENTAGE of the circle, so the stroke
+   keeps its proportion at any diameter and only this one number has to change. */
+.dial {
   position: relative;
-  z-index: 1;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
   display: grid;
   place-items: center;
-  box-sizing: border-box;
 }
-.phase-strip .dot {
-  width: 17px; height: 17px;
-  margin-top: 0;
+/* A STROKED ARC, NOT A GRADIENT. The ring was a conic-gradient behind a radial mask, and
+   both edges aliased: a conic's hard colour stop steps down the diagonal in visible stairs,
+   and the mask's inner edge had one percent of the radius — half a pixel at this size — to
+   get from clear to opaque. It read as jagged because it was. An SVG stroke is antialiased
+   by the renderer at whatever size it is drawn, and it costs less than the mask it replaces.
+
+   The two circles are the same geometry: one full ring for the track, one dashed to the
+   fraction complete on top of it. */
+.dial-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Twelve o'clock, not three — the stroke starts where the eye expects a dial to. */
+  transform: rotate(-90deg);
 }
-.node--completed .dot { background: var(--bg-page); border-color: var(--success); color: var(--success); }
-.node--completed .dot::after {
+.dial-track,
+.dial-arc {
+  fill: none;
+  stroke-width: 9;
+}
+.dial-track { stroke: var(--border); }
+.dial-arc {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: calc(100 - 100 * var(--dial-done) / var(--dial-total));
+  /* The arc grows into its new length when a phase completes rather than jumping, which is
+     the difference between a dial and a number that changed. */
+  transition: stroke-dashoffset 450ms ease;
+}
+.phase-dial:has(.node--failed) .dial-arc { stroke: var(--danger); }
+/* A ROUND CAP ON A ZERO-LENGTH ARC IS STILL A DOT, and a mark at twelve o'clock on a run
+   that has not started reads as progress that has not happened. Nothing completed, nothing
+   running and nothing failed — only then is the arc genuinely zero and hidden. An ACTIVE
+   first phase is already one of five, so it draws. */
+.phase-dial:not(:has(.node--completed)):not(:has(.node--active)):not(:has(.node--failed))
+  .dial-arc {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dial-arc { transition: none; }
+}
+.dial-count {
+  position: relative;
+  font-family: var(--font-control);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.phase-list { list-style: none; margin: 0; padding: 0; min-width: 0; }
+/* ONE ROW SHOWS, and which one is decided by the classes the live updater already writes —
+   so the ring and the words beside it cannot disagree. A terminal run has no active phase:
+   a failed one names itself, and anything else falls back to the last phase reached. */
+.phase-list .node { display: none; }
+.phase-list .node--active { display: block; }
+.phase-list:not(:has(.node--active)) .node--failed { display: block; }
+.phase-list:not(:has(.node--active)):not(:has(.node--failed)) .node:last-child { display: block; }
+.phase-list .node::before { content: none; }
+/* IS IT DOING ANYTHING? A phase runs for minutes, and until it ends the dial has nothing to
+   say: same count, same arc, same words. A panel that moved once and then held still is
+   indistinguishable from one that has stopped, which is the question people kept asking of
+   a run that was working perfectly well.
+
+   The mark is the one the Ask composer already uses while it waits — one liveness vocabulary
+   across both surfaces rather than a second invented here — and it sits on the RUNNING phase
+   only. It says "still going", never how far along: the arc is what carries progress, and a
+   moving thing that means nothing would be worse than a still one. */
+.phase-list .node--active .phase-name::before,
+.phase-list .node--failed .phase-name::before {
   content: "";
-  width: 7px;
-  height: 4px;
-  border-left: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg) translate(0, -1px);
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: var(--space-2);
+  border-radius: 50%;
+  vertical-align: middle;
 }
-.node--active .dot {
-  background: var(--bg-page);
-  border-color: var(--warning);
-  box-shadow: 0 0 0 3px var(--warning-bg);
+/* GREEN AND MOVING MEANS RUNNING AND WELL. The mark answers "is this alright?", which is a
+   different question from "how far along is it?" — that one is the arc's, and the arc keeps
+   the accent. Two facts, two colours, so neither has to carry both. */
+.phase-list .node--active .phase-name::before {
+  background: var(--success);
+  animation: ask-pulse 1.1s ease-in-out infinite;
 }
-.node--pending .dot { background: var(--bg-page); border-color: var(--border-strong); }
-.node--failed .dot {
-  background: var(--bg-page);
-  border-color: var(--danger);
-  box-shadow: 0 0 0 3px var(--danger-bg);
+/* RED AND STILL. A failed run is not a run that is still doing something, so the mark stops
+   rather than pulsing on in a colour that says stop — the movement is the liveness half of
+   the signal and it has to end when the liveness does. */
+.phase-list .node--failed .phase-name::before {
+  background: var(--danger);
+  animation: none;
 }
+@media (prefers-reduced-motion: reduce) {
+  .phase-list .node--active .phase-name::before {
+    animation: none;
+    opacity: 1;
+  }
+}
+/* One row carries both tenses; the row's own status class picks which is shown, so a phase
+   completing in place reads correctly without the updater knowing any of this copy. */
+.phase-list .phase-summary[data-when="done"] { display: none; }
+.phase-list .node--completed .phase-summary[data-when="doing"] { display: none; }
+.phase-list .node--completed .phase-summary[data-when="done"] { display: block; }
+.phase-list .phase-summary {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+}
+
 .phase-name {
-  font-family: var(--font-ui);
-  font-size: var(--text-md);
+  display: block;
+  font-family: var(--font-control);
+  font-size: var(--text-xl);
   font-weight: var(--weight-medium);
+  line-height: 1.25;
   color: var(--text-primary);
   text-transform: capitalize;
-  white-space: nowrap;
 }
 .node--active .phase-name { color: var(--text-primary); }
-.node--active .phase-status { color: var(--warning); }
-.node--pending .phase-status { color: var(--text-muted); }
-.node--completed .phase-status { color: var(--success); }
-.node--failed .phase-status { color: var(--danger); }
+/* THE STATUS WORD IS FOR READERS, NOT FOR THE PAGE. "active" beside a phase name that is
+   plainly the one running says nothing a sighted person did not already get from the ring;
+   the word stays in the document because the live updater writes it and a screen reader
+   announces it through the live region. Failure is carried by the ring below, so the dial
+   never needs a second vocabulary for the same fact. */
 .phase-status {
-  display: block;
-  font-size: var(--text-sm);
-  font-family: var(--font-evidence);
-  color: var(--text-muted);
-  text-transform: capitalize;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
+/* A FIXED 315px IN A 680px COLUMN wrapped every question of any length onto three ragged
+   lines while half the column sat empty beside it. A share of the column tracks the measure
+   instead — the bubble stays clearly short of the full width (that inset is what marks it as
+   one voice of two) without pretending every question is the same length. */
 .you {
   margin: 0 0 16px auto;
-  max-width: 315px;
-  padding: 8px 11px;
+  max-width: min(65%, 25rem);
+  /* TALLER BY WAY OF THE PADDING AND THE LEADING, because a text box has no height of its
+     own to set — content decides that, and a fixed height would clip the third line of a
+     long question. Both halves move: padding alone grows a one-line bubble and barely
+     touches a four-line one, so the leading carries the rest and the increase holds however
+     much a person typed. */
+  padding: 16px 14px;
   background: var(--bg-bubble);
   border: 1px solid var(--border-bubble);
-  border-radius: var(--radius-md);
-  font-size: var(--text-base);
-  line-height: var(--line-body);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-md);
+  line-height: 1.6;
   color: var(--text-bubble);
   -webkit-tap-highlight-color: transparent;
 }
@@ -689,7 +789,7 @@ html[data-input="keyboard"] .composer .go:focus-visible {
   background: var(--bubble);
   color: var(--ink);
 }
-.thread .inner { max-width: 680px; width: 100%; margin-inline: auto; }
+.thread .inner { max-width: var(--stage-column); width: 100%; margin-inline: auto; }
 .run-composer select {
   appearance: none; min-height: var(--control-height); padding-right: var(--space-6);
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
@@ -748,6 +848,9 @@ html[data-input="keyboard"] .composer .go:focus-visible {
   min-width: 24px;
   padding: 3px 10px;
   margin: 0;
+  /* A chip that wraps is not a chip. In a table cell the row actions were breaking across
+     three lines each and dragging the row to 100px tall. */
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -802,11 +905,15 @@ dt, dd {
   border-bottom: 1px solid var(--line);
   font-size: var(--text-sm);
 }
+/* A COLUMN HEADING IS NOT AN IDENTIFIER. "Currently in force", "Endorsed by", "Answers rest
+   on" are sentences set in the face reserved for hashes and paths, which made a description
+   list read as a config dump. The mono face stays where it earns itself — `.stamp`,
+   `.citations`, `.references code`, `.crumb` — on things that resolve to a record. */
 dt {
-  font-family: var(--font-evidence);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--muted);
+  font-family: var(--font-control);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
 }
 dd { min-width: 0; word-break: break-word; }
 
@@ -831,10 +938,10 @@ th, td {
   font-weight: 400;
 }
 thead th {
-  font-family: var(--font-evidence);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--muted);
+  font-family: var(--font-control);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
 }
 tbody th { font-weight: 500; color: var(--ink); }
 
@@ -856,6 +963,55 @@ tbody th { font-weight: 500; color: var(--ink); }
   margin: 0;
   font-family: var(--font-prose);
   white-space: normal;
+}
+/* THE ONE THING THE BUILD WAS FOR. Everything above it is the platform explaining itself;
+   this is the artefact, and it was an underlined prose link sitting where the status text had
+   been — indistinguishable from the sentence it replaced, on the one screen where a person is
+   looking for somewhere to go next. It reads as a destination now.
+
+   The ornament is CSS rather than markup, and that is a constraint rather than a preference:
+   the live updater builds this element with `createElement` and may not insert markup, so
+   anything the server put inside the link would vanish the moment a run completed in place.
+   A chevron drawn from two borders in `currentColor` also keeps the theme's rule that every
+   colour is a token — there is no literal here to exempt. */
+.propose-outcome .result a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 12px var(--space-5);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--accent-bg);
+  color: var(--text-primary);
+  font-family: var(--font-control);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.propose-outcome .result a::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: rotate(45deg);
+  /* The stroke sits on the outside of a rotated square, so nudge it back onto the baseline. */
+  margin-inline-start: var(--space-1);
+  transition: transform 140ms ease;
+}
+.propose-outcome .result a:hover {
+  background: var(--accent-bg-strong);
+  border-color: var(--accent-hover);
+}
+.propose-outcome .result a:hover::after {
+  transform: rotate(45deg) translate(2px, -2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .propose-outcome .result a,
+  .propose-outcome .result a::after { transition: none; }
+  .propose-outcome .result a:hover::after { transform: rotate(45deg); }
 }
 /* The one-line statement of what a page does, under its heading (028 follow-up). It carries
    the never-acts distinction that the nav labels alone could not — a person who lands mid-flow
@@ -917,11 +1073,16 @@ tbody th { font-weight: 500; color: var(--ink); }
   align-items: center;
 }
 .disposition form.inline { display: inline-flex; margin: 0; }
+/* ONE STATUS SHAPE. `.live` in the stage header was already the rounded, hairline-bordered
+   pill the theme specifies, while this one — the same idea, on the operator surface — was a
+   square-cornered box of letterspaced mono caps. Two shapes for "what state is this in" is
+   one more than a person should have to learn. Semantic colour stays on the text, so the
+   verdict still survives greyscale (1.4.1) through the word rather than the hue. */
 .pill {
-  font-family: var(--font-evidence); font-size: 0.6875rem; letter-spacing: 0.08em;
-  text-transform: uppercase; padding: 0.15rem 0.45rem; border-radius: 3px;
-  border: 1px solid currentColor; display: inline-block;
-  min-height: 24px; line-height: 22px;
+  font-family: var(--font-prose); font-size: var(--text-xs);
+  text-transform: capitalize; padding: 3px var(--space-3); border-radius: 999px;
+  border: 1px solid var(--border); display: inline-flex; align-items: center;
+  min-height: 24px;
 }
 .pill--answered, .pill--completed { color: var(--allowed); }
 .pill--declined, .pill--refused, .pill--failed { color: var(--denied); }
@@ -946,15 +1107,18 @@ tbody th { font-weight: 500; color: var(--ink); }
   padding: 0;
   border-radius: 0;
 }
+/* THE OUTCOME LABEL IS A SENTENCE, SO IT TAKES THE PROSE FACE. "No answer for this one" set
+   in the evidence mono read as a code fence above the answer — the mono face is for things
+   that are literally identifiers (hashes, paths, durations), which this is not. */
 .answer > h2,
 .answer-toolbar > h2 {
   margin: 0 0 4px;
-  font-family: var(--font-evidence);
-  font-size: var(--text-xs);
+  font-family: var(--font-control);
+  font-size: var(--text-sm);
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 .answer > h2 { margin: 0 0 6px; }
 
@@ -962,11 +1126,15 @@ tbody th { font-weight: 500; color: var(--ink); }
   max-width: 100%; margin-bottom: 0;
   display: grid; gap: 10px;
 }
+/* THE ANSWER OUTRANKS THE CHROME AROUND IT. This was `--text-muted` at 11.5px — smaller and
+   dimmer than the question bubble above it, which inverted the hierarchy: the thing a person
+   came to read was the quietest text on the screen. It is the largest now, and the only
+   full-contrast prose in the transcript. */
 .primary-answer-prose {
   white-space: pre-wrap; margin: 0; font: inherit; max-width: 100%;
-  color: var(--muted);
-  font-size: var(--text-sm);
-  line-height: 1.55;
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  line-height: 1.6;
 }
 .primary-answer-prose strong { font-weight: 650; }
 .primary-answer-prose code {
@@ -1056,7 +1224,12 @@ tbody th { font-weight: 500; color: var(--ink); }
 }
 .claims { padding-left: 0; list-style: none; display: grid; gap: 14px; }
 .claims li { margin: 0; border-left: none; padding-left: 0; }
-.claims li > p, .claims li { max-width: 62ch; color: var(--muted); }
+.claims li > p, .claims li {
+  max-width: 62ch;
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+}
 /* EVIDENCE, not prose. Citations and record references are things a person carries
    elsewhere, so they take the evidence face — and a record hash stays `code` rather than `a`,
    because it resolves to nothing a browser can fetch and a dead link teaches readers the
@@ -1169,7 +1342,7 @@ main.main--app {
 
 /* Evidence footer stays in the DOM (ADR-0051) but must not sit under the dock as a
    document colophon — that was the tell the mockups were a different product. */
-body.has-icons:has(main.main--app) .app-stage > footer {
+body.has-column:has(main.main--app) .app-stage > footer {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1220,10 +1393,13 @@ body.has-icons:has(main.main--app) .app-stage > footer {
   padding: 0 2px 10px;
   gap: 8px;
 }
+/* Same treatment as `.rail-label` over the search field — one section-label voice. It keeps
+   its own alignment because it shares a row with the New chip rather than sitting over a
+   field it has to centre on. */
 .rail-heading {
   font-family: var(--font-control);
-  font-size: 10.5px;
-  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1372,7 +1548,7 @@ body.has-icons:has(main.main--app) .app-stage > footer {
 .exchange .you {
   align-self: end;
   margin: 0;
-  max-width: 315px;
+  max-width: min(65%, 25rem);
 }
 .exchange .node {
   display: block;
@@ -1427,21 +1603,21 @@ body.has-icons:has(main.main--app) .app-stage > footer {
    already answer). */
 .asked {
   align-self: end;
-  max-width: 315px;
+  max-width: min(65%, 25rem);
   margin: 0 0 0 auto;
   background: var(--bg-bubble);
   border: 1px solid var(--border-bubble);
-  border-radius: var(--radius-md);
-  padding: 8px 11px;
+  border-radius: var(--radius-lg);
+  padding: 16px 14px;
+  line-height: 1.6;
 }
 
+/* "You said" is a speaker label — a phrase, not a token. Caps are for a section heading. */
 .asked-label {
   display: block;
   font-family: var(--font-control);
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink);
+  color: var(--text-secondary);
   margin-block-end: var(--space-1);
 }
 
@@ -1634,12 +1810,12 @@ section.propose {
    Uppercase in CSS rather than in the markup, so the accessible name stays "Ask". A screen
    reader given the literal string "ASK" may spell it. */
 /* Shared by both composers — the run surface uses the same field with a different verb in it. */
+/* SENTENCE CASE, the same call the verb slider took. "SEND" in letterspaced caps was the
+   operator surface speaking in a different voice from the one next door. */
 .ask-send,
 .field-control {
   flex: 0 0 auto;
   margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 html { scroll-padding-block-end: 2rem; }
@@ -1650,4 +1826,516 @@ html { scroll-padding-block-end: 2rem; }
   margin-block-start: var(--space-6);
   padding-block-start: var(--space-4);
   border-top: 1px solid var(--rule);
+}
+
+/* ── SIGN IN ────────────────────────────────────────────────────────────────────────────
+   One mark, one control. The page used to open with a nav bar linking Home and Settings,
+   which from here are this page and this page — chrome that implied somewhere to go before
+   there was anywhere to go — above a heading, a paragraph and a link.
+
+   Centred on the viewport rather than sitting under a masthead, because with the bar gone
+   there is nothing to sit under. */
+.signin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: 72vh;
+  text-align: center;
+}
+.signin-mark {
+  width: 128px;
+  height: 128px;
+}
+.signin-go {
+  /* Wider than a form button: it is the only thing on the page, and a control that small
+     under a 128px mark reads as an afterthought beneath a hero. */
+  min-width: 12rem;
+  min-height: 44px;
+  font-size: var(--text-lg);
+}
+.signin-note {
+  margin: 0;
+  max-width: 28rem;
+  color: var(--text-muted);
+  font-size: var(--text-md);
+}
+
+/* ---------------------------------------------------------------- create home (050) */
+
+/* WHAT COUNTS AS "THE STAGE HAS SOMETHING IN IT" — and a Build is one of the somethings.
+
+   These rules asked only whether an `.exchange` existed. A Build started from home swaps in
+   a run section, which has no exchange in it, so the empty-home rules kept applying: the
+   `.thread` holding the request bubble, the phase dial and the outcome was collapsed to
+   height 0 with `overflow: hidden`, while the run's own header and dock — which sit outside
+   that box — rendered normally. The result was a page showing a title, a status pill and
+   "Build in flight." with a blank band between them, and the only way to see the run was to
+   reload onto `/propose/runs/{id}`, which renders with `app-layout--item` and never took
+   this branch.
+
+   `:has()` takes a selector list, so the condition is stated once per rule rather than
+   duplicated: an exchange OR a run column means this is a conversation stage. */
+
+
+.create-column {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  padding: var(--space-3);
+  gap: var(--space-3);
+}
+.create-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.create-new,
+.create-projects {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  min-width: 24px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-family: var(--font-control);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+}
+/* NEW IS THE ONE ROW THAT CARRIES A GROUND. It is the primary way into this column and it
+   was set identically to the disabled placeholder under it — two lines of plain text where
+   one is the main action and the other cannot be pressed at all. */
+.create-new { background: var(--bg-surface); }
+.create-new:hover { background: var(--bg-selected); }
+.create-projects:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+/* THE SEARCH FIELD STAYS, THE ROWS MOVE. With the scroll on the whole region, filtering a
+   long list scrolled the field you were typing into off the top of the column. */
+.create-history {
+  /* Space between the nav above and this section, on the SECTION rather than on its label —
+     the gap is between two groups, so it should survive the heading being reworded or
+     dropped instead of disappearing with it. */
+  margin-top: var(--space-3);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Notices and the empty line sit on the same rail as the rows they stand in for. */
+.create-history .notice,
+.create-history .list-empty {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+/* CENTRED OVER THE FIELD, so the margin is zero rather than the rows' twelve pixels: the
+   label's box and the search input's box are then the same box, and "centred" means centred
+   on the thing below it rather than on an inset the eye cannot see. */
+.rail-label {
+  margin: var(--space-1) 0 var(--space-2);
+  font-family: var(--font-control);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.create-history input[type="search"] {
+  width: 100%;
+  min-height: 32px;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-page);
+  color: var(--ink);
+  font-family: var(--font-control);
+  font-size: var(--text-base);
+}
+/* THE LIST SHRINKS TO THE COLUMN, IT DOES NOT GROW TO FILL IT. With `flex: 1` the rows
+   claimed every spare pixel, which pinned "No conversations or builds yet." to the very
+   bottom of the sidebar — an empty-state sentence floating five hundred pixels from the
+   list it describes. `0 1 auto` lets it take its own height and scroll once it outgrows
+   the column, so the leftover space falls after the list where it belongs. */
+.create-history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.create-history li > a {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 30px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text-secondary);
+}
+.create-history li > a:hover { background: var(--bg-selected); color: var(--ink); }
+/* NO BORDER ON THE CURRENT ROW. A 1px outline added two pixels of height to exactly one row,
+   so the selected conversation sat a hair lower than its neighbours and the list lost its
+   rhythm wherever you happened to be. Ground and ink carry the state instead. */
+.create-history li > a[aria-current="page"] {
+  background: var(--bg-selected);
+  color: var(--text-primary);
+}
+/* SAME SIZE AS THE TITLE BESIDE IT. At 11px against the title's 12.5px the verb sat visibly
+   small and slightly off the title's baseline, so each row read as two pieces of type rather
+   than as one line.
+
+   It is the BRIGHTER half of the row — full page ink against the title's secondary — so which
+   kind of thing a row is reads before what it is called. That difference is also the only
+   thing separating the two words now, which is why the verb is not simply set to the title's
+   own colour: matched, the pair would run together as one phrase. */
+.history-verb {
+  flex: 0 0 auto;
+  font-family: var(--font-control);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+/* ONE ROW, ONE LINE. Titles are a person's own sentences and run long; wrapped, every row was
+   two or three lines tall and the column stopped being scannable. The full title is on the
+   row's `title` attribute and the conversation itself is one click away. */
+.history-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+}
+/* ONE ROW: the name takes the space, the two actions take the end of it.
+   Three stacked full-width rows spent sixty vertical pixels of a column whose job is the
+   list above it, on a name that never changes and two controls used once a session. As one
+   row it costs thirty, and the name still reads first. */
+.column-end {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+/* Takes the slack, so the two icons are pushed to the end of the row and stay there —
+   `margin-left: auto` on the first icon would do it too and would break the moment a third
+   control arrived between them. */
+.profile {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  color: var(--text-secondary);
+  font-family: var(--font-control);
+  font-size: var(--text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* AN ICON CONTROL IS A BOX WITH A MARK IN IT, and the class carries BOTH halves.
+   The box and the glyph were split across two selectors for a moment — `.icon-action` sized
+   the mark while a neighbouring rule made the square — which reads as a class that styles a
+   control and is not one. The next person to put `icon-action` on something would have got a
+   16px glyph and no target, and 2.5.8 would have caught it two features later. */
+.icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 2.5.8: 30px square, so the hit area is the button and not the 16px mark inside it. */
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 0;
+  text-decoration: none;
+  cursor: pointer;
+}
+.icon-action svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  /* The mark is not the target — clicks land on the box whatever they hit. */
+  pointer-events: none;
+}
+/* The column's own ink on top of that shape. */
+.column-settings,
+.column-logout button {
+  font-family: var(--font-control);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+.column-settings:hover,
+.column-logout button:hover { color: var(--ink); background: var(--bg-selected); }
+/* Settings already carried `aria-current` on its own page and nothing rendered it — the row
+   said "you are here" to a screen reader and nothing at all to everyone else. */
+.column-settings[aria-current] {
+  color: var(--text-primary);
+  background: var(--bg-selected);
+}
+.column-logout { margin: 0; }
+.create-greeting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-7);
+  font-size: 0;
+}
+.create-greeting img { width: 96px; height: 96px; }
+.item-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+.app-layout--create {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.app-layout--create .app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+/* ABOVE TRUE CENTRE — WHILE THE HOME IS STILL A HOME. Dead-centring the mark and the
+   composer put them in the middle of a 900px stage with as much empty room above as below,
+   which reads as a widget floating in a window rather than the top of something you are
+   about to start. Padding the bottom of the band lifts the pair without moving them apart.
+
+   It stops applying THE MOMENT A REQUEST IS IN FLIGHT, and that last clause is the whole
+   point of this note. Without it the lift stayed on while the composer was already docking
+   itself to the bottom, so the dock came to rest 16vh — 144px on a 900px stage — short of
+   where it would sit once the answer or the run column arrived, and then jumped down to meet
+   it. Two resting positions for one control, a third of a second apart. The lift belongs to
+   the empty home only; from submit onward this is a conversation stage. */
+.app-layout--create:not(.app-layout--item):not(:has(.exchange, [data-propose-run])):not(
+    :has([aria-busy="true"])
+  ) .app-main {
+  padding-bottom: 16vh;
+}
+
+/* EMPTY HOME CENTRES; A HOME WITH AN ANSWER IN IT DOES NOT. The first answer arrives in
+   place (`portal-ask.js` swaps it in without navigating), so this layout is still the
+   "empty" one after the conversation has started — and it went on centring the composer
+   under a greeting mark with the transcript pushed above both. Once an exchange exists the
+   stage becomes the open-item stage: mark gone, transcript from the top, composer docked. */
+.app-layout--create:not(.app-layout--item):not(:has(.exchange, [data-propose-run])) .app-main {
+  justify-content: center;
+  align-items: stretch;
+}
+.app-layout--create:not(.app-layout--item):has(.exchange, [data-propose-run]) .create-greeting { display: none; }
+.app-layout--create:not(.app-layout--item):not(:has(.exchange, [data-propose-run])) .thread {
+  flex: none;
+  height: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ── NOTHING SEEMED TO BE HAPPENING, AND THAT WAS LITERALLY TRUE ──────────────────────
+   `#ask-status` — "Working on your question. This takes a minute or two" — lives inside
+   `.thread`, and on an empty home `.thread` is the collapsed box above: height 0, overflow
+   hidden. So the one piece of feedback a first question had was rendered into a box with no
+   height, and a person who asked something sat looking at an unchanged page until the answer
+   landed twenty seconds later. Every ask AFTER the first was fine, because by then an
+   exchange existed and the box was open — which is why it survived: it only fails on the
+   very first question anybody asks.
+
+   While a question is in flight the home stage becomes the conversation stage early: mark
+   away, thread open, composer docked. It is the same arrangement the answer arrives into, so
+   nothing jumps when it does. */
+.app-layout--create:not(.app-layout--item):not(:has(.exchange, [data-propose-run])):has([aria-busy="true"]) .thread {
+  flex: 1;
+  height: auto;
+  padding: 26px 30px 8px;
+  overflow: auto;
+}
+.app-layout--create:not(.app-layout--item):not(:has(.exchange, [data-propose-run])):has([aria-busy="true"]) .app-main {
+  justify-content: flex-start;
+}
+/* A REFUSED START LEFT NOTHING ON SCREEN. When a Build cannot be started the server sends
+   the reason back as a notice and the submit script puts it in the thread — but the thread
+   is only open WHILE the form is busy, and the script clears busy immediately afterwards.
+   The stage closed over the sentence in the same tick it arrived, so a person who asked for
+   something impossible got a page that had not visibly reacted at all. If the thread is
+   holding a notice, it stays open to show it. */
+.app-layout--create:not(.app-layout--item):not(:has(.exchange, [data-propose-run])) .thread:has(.notice) {
+  flex: 1;
+  height: auto;
+  padding: 26px 30px 8px;
+  overflow: auto;
+}
+.app-layout--create:not(.app-layout--item):has([aria-busy="true"]) .create-greeting {
+  display: none;
+}
+.app-layout--create:not(.app-layout--item):not(:has(.exchange, [data-propose-run])):has([aria-busy="true"]) .ask.dock {
+  margin-top: auto;
+  padding-bottom: 1.5rem;
+}
+
+/* A PULSE, NOT ONLY A SENTENCE. A line of text that appears once and then sits there reads
+   as a page that has stopped; a moving mark reads as a page that is still working. It is
+   drawn from the status paragraph the server already renders, so no script builds anything.
+   Reduced motion gets the mark without the movement — the state is still legible. */
+.app-layout:has([aria-busy="true"]) .ask-status::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-2);
+  border-radius: 50%;
+  background: var(--accent);
+  animation: ask-pulse 1.1s ease-in-out infinite;
+}
+@keyframes ask-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.75); }
+  50%      { opacity: 1;   transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-layout:has([aria-busy="true"]) .ask-status::before {
+    animation: none;
+    opacity: 1;
+  }
+}
+.app-layout--create:not(.app-layout--item) .create-greeting { margin: 0 auto; }
+.app-layout--create:not(.app-layout--item):not(:has(.exchange, [data-propose-run])) .ask.dock {
+  margin: 0 auto;
+  width: min(var(--stage-column), calc(100% - 4rem));
+  padding: 0;
+  background: transparent;
+}
+.app-layout--create:has(.exchange, [data-propose-run]) .ask.dock,
+.app-layout--item .ask.dock {
+  margin-top: auto;
+  margin-inline: auto;
+  width: min(var(--stage-column), calc(100% - 4rem));
+  padding: 0 0 1.5rem;
+  background: transparent;
+}
+.composer-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 30px;
+}
+.composer-tools [data-stop-form] {
+  margin: 0 0 0 auto;
+}
+.composer-plus {
+  min-width: 30px;
+  min-height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-control);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: not-allowed;
+}
+.verb-slider {
+  display: inline-flex;
+  align-items: stretch;
+  align-self: center;
+  gap: 0;
+  margin: 0;
+  padding: 2px;
+  min-inline-size: 0;
+  /* 2.5.8 SETS THIS HEIGHT, not taste. The labels stretch to the track and the radio fills
+     the label, so the track's height minus its border and padding IS the target a person has
+     to hit — take it below 30px and the two verbs drop under 24px. */
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-page);
+}
+.verb-slider input[type="radio"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.verb-slider label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 0 11px;
+  border-radius: 6px;
+  font-family: var(--font-control);
+  /* SENTENCE CASE. Set in letterspaced micro-caps, the two words in the one control a person
+     uses on every visit read as a second typographic voice, for a verb that is supposed to be
+     an ordinary choice between two words. Caps belong on a section LABEL (`.rail-label`),
+     where they mark a heading that is not meant to be read as a sentence — not on a control
+     whose whole job is to say plainly which of two things you are doing. */
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+.verb-slider label:hover { color: var(--ink); }
+.verb-slider label:has(:checked) {
+  background: var(--bg-toggle-on);
+  color: var(--text-primary);
+}
+.verb-slider[aria-disabled="true"] label { cursor: default; }
+/* AN IDLE BUILD STANDS IN FOR THE FIELD, so it has to occupy the field's box.
+   This is the line that replaces the textarea on a Build in flight — "Build in flight.",
+   "This build has ended." — and it was set as an ordinary small paragraph: 11.5px in a
+   19px line, against the composer's 15px in a 44px field. The dock came out 89px on Build
+   and 114px on Ask, so the box a person types into visibly changed size and weight when
+   they switched verb, on two surfaces whose whole point is that they are one shell.
+
+   The three values below are the textarea's own — floor, size, leading. They are duplicated
+   rather than shared because a `<p>` and a `<textarea>` cannot inherit one rule usefully;
+   if the field's metrics change, this changes with it. */
+.composer-idle {
+  margin: 0;
+  min-height: 2.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+@media (max-width: 45rem) {
+  .create-column {
+    grid-column: 1;
+    grid-row: 1;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 40vh;
+  }
+  body.has-column .app-stage { grid-column: 1; grid-row: 2; }
 }

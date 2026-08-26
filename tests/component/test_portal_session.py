@@ -258,6 +258,29 @@ def test_pending_logins_do_not_accumulate() -> None:
     assert state not in oidc._pending
 
 
+def test_sign_in_without_a_next_lands_on_home() -> None:
+    """050: login without `next` lands on create home (`/`)."""
+    idp = FakeOIDCProvider()
+    portal = _portal(idp)
+    state, _url = portal.oidc.begin()
+    pending = portal.oidc._pending[state]
+    code = idp.authorize(code_challenge=code_challenge_for(pending.verifier), subject="alice")
+    response = portal.client.get(f"/callback?code={code}&state={state}", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers.get("location") == "/"
+
+
+def test_sign_in_with_a_next_still_returns_there() -> None:
+    idp = FakeOIDCProvider()
+    portal = _portal(idp)
+    state, _url = portal.oidc.begin(next_path="/settings")
+    pending = portal.oidc._pending[state]
+    code = idp.authorize(code_challenge=code_challenge_for(pending.verifier), subject="alice")
+    response = portal.client.get(f"/callback?code={code}&state={state}", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers.get("location") == "/settings"
+
+
 def test_an_absolute_next_path_is_refused() -> None:
     """A login link must not be able to make the portal an open redirector."""
     oidc = OidcClient(

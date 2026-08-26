@@ -1,40 +1,108 @@
 <section class="propose" data-propose-run="{{ run_id }}">
-  <header class="stage-top">
-    <p class="crumb">build / <b>{{ run_id[:8] }}</b></p>
-    <div class="meta">
-      {% set ns = namespace(current="") %}
-      {% for phase in phases %}
-        {% if phase.status == "active" %}{% set ns.current = phase.name %}{% endif %}
-      {% endfor %}
-      {% if ns.current %}
-        <span class="live"><i aria-hidden="true"></i>{{ ns.current }}</span>
-      {% else %}
-        <span class="live idle"><i aria-hidden="true"></i>{{ state }}</span>
-      {% endif %}
-      {% set terminal = state in ("stopped", "completed", "failed") %}
-      <form method="post" action="/runs/{{ run_id }}/stop" data-stop-form
-            {% if terminal %}hidden{% endif %}>
-        <button type="submit" class="quiet-action">Stop</button>
-      </form>
-    </div>
-  </header>
+  {#
+    NO STATUS BAR. The run id and the state pill restated what the page below already says:
+    the dial names the phase and counts it, the line under the dial states the outcome, and a
+    failed run turns the arc red. The bar spent 48px at the top of every Build repeating that,
+    and the id it showed is also the row highlighted in the column beside it.
+
+    THE HEADING STAYS, OUT OF SIGHT. Deleting the bar outright would leave this page with no
+    `h1` at all — nothing for anyone navigating by heading to land on, and the run's identity
+    reduced to the browser tab. Hidden, the structure survives the bar.
+  #}
+  <h1 class="visually-hidden">{{ title }}</h1>
 
   <div class="thread">
     <div class="inner">
-      <h1>Build</h1>
+      {#
+        THE REQUEST, WITH A WAY TO TAKE IT WITH YOU.
+
+        A Build cannot be edited and re-run in place — it is a governed run, and starting
+        another is starting another. So the useful thing to offer is the words: copy what was
+        asked for, put it back in the composer, change what needs changing, send. Ask's
+        question bubble has carried this control since 035; this is the same include, the same
+        `asked` scope and the same script, so the two bubbles behave identically.
+
+        `.asked-text` is not decoration — `portal-copy.js` looks for exactly that class inside
+        the closest `.you`/`.asked` to find what to put on the clipboard.
+      #}
       {% if intake_message %}
-        <p class="you">{{ intake_message }}</p>
+        <div class="you has-copy">
+          {% with copy_scope="asked" %}{% include "_copy_control.html" %}{% endwith %}
+          <span class="visually-hidden">You requested</span>
+          <span class="asked-text">{{ intake_message }}</span>
+        </div>
       {% endif %}
 
-      <ol class="phase-strip" aria-live="polite" aria-atomic="true" id="phase-strip">
-        {% for phase in phases %}
-          <li class="node node--{{ phase.status }}" data-phase="{{ phase.name }}">
-            <span class="dot" aria-hidden="true"></span>
-            <span class="phase-name">{{ phase.name }}</span>
-            <span class="phase-status">{{ phase.status }}</span>
-          </li>
-        {% endfor %}
-      </ol>
+      {#
+        THE PHASE DIAL. A ring that fills as phases complete, the count inside it, and the
+        phase now running named beside it with a line about what that phase does. It replaced
+        a five-row spine that spent most of its height saying "pending" four times.
+
+        The per-phase list is still here, still carrying `data-phase`, its status class and
+        its status word: that is what the live updater maintains over SSE, and what a screen
+        reader reads. Only the running row is SHOWN — the rest stay in the document so the
+        ring, the count and the copy are all drawn from one source rather than three.
+      #}
+      {# `_phase_position` in app.py: the phase the run is ON, not the count it has finished. #}
+      {% set done = phase_position | default(0) %}
+      {#
+        What each phase does. `PhaseName` is a closed set of five (`core/authoring/progress.py`)
+        — the same five this portal already names as its default order — so this is display
+        copy over a fixed vocabulary, the way `agent_label` is. It describes the STEP, never
+        the run: nothing here reports what the platform found or decided, and a name this map
+        does not know simply gets no line rather than a portal-authored guess.
+      #}
+      {#
+        TWO TENSES, because one row outlives the thing it describes. "Opening the pull
+        request" is true while Propose runs and false the moment it lands — the run finishes,
+        the panel stays, and the last thing it says is a job still in progress.
+
+        BOTH strings are rendered and CSS shows the one that matches the row's status. The
+        live updater rewrites class names and the status word and never touches this text, so
+        a single server-chosen string would freeze in whichever tense it was born in when a
+        phase completed in place. Driving it from the class is the same trick that picks which
+        phase row shows at all, and it keeps the copy here rather than duplicated into the
+        client.
+      #}
+      {% set summaries = {
+        "research": "Reading the repository and the material this change has to rest on.",
+        "plan": "Recording which files the change will touch, before anything is written.",
+        "write": "Authoring the files the plan named.",
+        "judge": "A second model reviews the work — never the one that wrote it.",
+        "propose": "Opening the pull request for a person to review.",
+      } %}
+      {% set finished = {
+        "research": "Read the repository and the material this change rests on.",
+        "plan": "Recorded which files the change would touch.",
+        "write": "Authored the files the plan named.",
+        "judge": "A second model reviewed the work — never the one that wrote it.",
+        "propose": "Opened the pull request for a person to review.",
+      } %}
+      <div class="phase-dial" id="phase-strip" aria-live="polite" aria-atomic="true"
+           style="--dial-done: {{ done }}; --dial-total: {{ phases | length }}">
+        {#
+          `pathLength="100"` renormalises the circle's length to 100 user units, so the arc
+          is set with a plain percentage — `stroke-dashoffset` counts down from 100 — and no
+          rule anywhere has to know the radius or carry 2πr as a magic number.
+        #}
+        <div class="dial" aria-hidden="true">
+          <svg class="dial-ring" viewBox="0 0 100 100" focusable="false">
+            <circle class="dial-track" cx="50" cy="50" r="44" pathLength="100"/>
+            <circle class="dial-arc" cx="50" cy="50" r="44" pathLength="100"/>
+          </svg>
+          <span class="dial-count">{{ done }} of {{ phases | length }}</span>
+        </div>
+        <ol class="phase-list">
+          {% for phase in phases %}
+            <li class="node node--{{ phase.status }}" data-phase="{{ phase.name }}">
+              <span class="phase-name">{{ phase.name }}</span>
+              <span class="phase-status">{{ phase.status }}</span>
+              <span class="phase-summary" data-when="doing">{{ summaries.get(phase.name, "") }}</span>
+              <span class="phase-summary" data-when="done">{{ finished.get(phase.name, "") }}</span>
+            </li>
+          {% endfor %}
+        </ol>
+      </div>
 
       <p class="disposition" data-run-id="{{ run_id }}">
         <span class="visually-hidden">Run status:</span>
@@ -55,4 +123,30 @@
     </div>
   </div>
 
+  {% set terminal = state in ("stopped", "completed", "failed") %}
+  <div class="ask dock">
+    <div class="composer">
+      <p class="composer-idle">{% if terminal %}This build has ended.{% else %}Build in flight.{% endif %}</p>
+      <div class="composer-tools">
+        <button type="button" class="composer-plus" disabled
+                aria-label="Attach context" aria-describedby="attach-soon-build">+</button>
+        <p id="attach-soon-build" class="visually-hidden">Not available yet</p>
+        <div class="verb-slider" role="radiogroup" aria-label="Verb" aria-disabled="true">
+          <label>
+            <input type="radio" name="verb" value="ask" disabled aria-disabled="true">
+            Ask
+          </label>
+          <label>
+            <input type="radio" name="verb" value="build" checked disabled aria-disabled="true">
+            Build
+          </label>
+        </div>
+        {% if not terminal %}
+        <form method="post" action="/runs/{{ run_id }}/stop" data-stop-form>
+          <button type="submit" class="go go--stop"><span class="visually-hidden">Stop</span></button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 </section>

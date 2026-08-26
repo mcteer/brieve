@@ -147,10 +147,10 @@ def test_the_vendored_font_is_what_the_record_says() -> None:
 
     fonts_dir = STATIC / "fonts"
     for name in (
-        "inter-variable.woff2",
+        "roboto-variable.woff2",
         "ibm-plex-mono-regular.woff2",
         "ibm-plex-mono-medium.woff2",
-        "OFL-inter.txt",
+        "OFL-roboto.txt",
         "OFL-ibm-plex-mono.txt",
     ):
         recorded = next((d for key, d in digests.items() if name in key), None)
@@ -162,24 +162,26 @@ def test_the_vendored_font_is_what_the_record_says() -> None:
             f"drift this check exists to stop"
         )
 
-    leftover = fonts_dir / "roboto-variable.woff2"
-    leftover_licence = fonts_dir / "OFL.txt"
-    assert not leftover.exists(), "roboto-variable.woff2 must leave with the restyle (FR-016)"
-    assert not leftover_licence.exists(), "Roboto OFL.txt must leave with the restyle (FR-016)"
+    leftover = fonts_dir / "inter-variable.woff2"
+    leftover_licence = fonts_dir / "OFL-inter.txt"
+    leftover_034 = fonts_dir / "OFL.txt"
+    assert not leftover.exists(), "inter-variable.woff2 must leave with Roboto (unused faces leave)"
+    assert not leftover_licence.exists(), "OFL-inter.txt must leave with Inter"
+    assert not leftover_034.exists(), "unnamed OFL.txt is not the Roboto licence file"
 
 
 def test_the_licence_travels_with_the_font() -> None:
     """OFL 1.1's own requirement, and a supply-chain fact: adopted content carries its terms."""
-    inter = (STATIC / "fonts" / "OFL-inter.txt").read_text()
+    roboto = (STATIC / "fonts" / "OFL-roboto.txt").read_text()
     plex = (STATIC / "fonts" / "OFL-ibm-plex-mono.txt").read_text()
     record = PROVENANCE.read_text()
 
-    assert "SIL Open Font License" in inter
+    assert "SIL Open Font License" in roboto
     assert "SIL Open Font License" in plex
     assert "OFL" in record, "the provenance record does not name the licence"
     assert "Reserved Font Name" in record, "Plex RFN presence must be recorded"
     assert "Palatino" not in CSS.read_text()
-    assert "Roboto" not in CSS.read_text()
+    assert "Inter" not in CSS.read_text()
     assert "Iowan Old Style" not in CSS.read_text()
 
 
@@ -204,6 +206,15 @@ def test_no_template_fetches_from_a_third_party(path: Path) -> None:
     assert fetch_causing == [], f"{path.name} fetches from a third party: {fetch_causing}"
 
 
+def test_hashicorp_mark_matches_provenance() -> None:
+    record = (STATIC / "mark" / "PROVENANCE.md").read_text()
+    digest = re.search(r"`hashicorp-logomark.svg`\s*\|\s*`([0-9a-f]{64})`", record)
+    assert digest, "mark provenance has no digest"
+    actual = hashlib.sha256((STATIC / "mark" / "hashicorp-logomark.svg").read_bytes()).hexdigest()
+    assert actual == digest.group(1)
+    assert "orange" not in CSS.read_text().lower() or "--warning" in CSS.read_text()
+
+
 def test_the_stylesheet_fetches_nothing_external() -> None:
     """The same claim for CSS: `url()` and `@import` are fetches, and the only one here is the
     font we vendored ourselves."""
@@ -215,7 +226,7 @@ def test_the_stylesheet_fetches_nothing_external() -> None:
     )
     assert "@import" not in source, "@import is a runtime fetch the offline property forbids"
     assert set(urls) == {
-        "fonts/inter-variable.woff2",
+        "fonts/roboto-variable.woff2",
         "fonts/ibm-plex-mono-regular.woff2",
         "fonts/ibm-plex-mono-medium.woff2",
     }, f"unexpected asset references: {urls} — every one is a fetch a reader pays for"
@@ -340,27 +351,49 @@ def _css_block(source: str, selector: str) -> str:
     return source.split(needle, 1)[1].split("}", 1)[0]
 
 
-def test_composer_is_one_centred_row_wider_than_the_reading_column() -> None:
-    """US3 / SC-003. Composer is a 56% field with the action at the bottom right."""
+def test_composer_and_reading_column_share_one_measure() -> None:
+    """The composer is a rounded bubble on the SAME axis and the SAME width as the transcript.
+
+    050 pinned the composer at 56rem beside a 680px transcript, both centred on one axis —
+    which put the field a person types into 216px wider than the answers above it, so no two
+    edges in the conversation lined up. Widths that are meant to match are asserted here as
+    one token rather than as two literals that agreed once: two numbers that must be equal and
+    are written down twice are two numbers that will stop being equal.
+    """
     css = CSS.read_text()
     composer = _css_block(css, ".composer")
     reading = _css_block(css, ".thread .inner")
 
     assert "display: flex" in composer
     assert "flex-direction: column" in composer
-    assert "max-width: 56%" in composer
-    assert "min-height: 60px" in composer
+    assert "min-height: 7.5rem" not in composer
+    assert "var(--radius-composer)" in composer
 
-    assert "max-width: 680px" in reading
+    assert "max-width: var(--stage-column)" in composer
+    assert "max-width: var(--stage-column)" in reading
+    assert "margin-inline: auto" in composer
     assert "margin-inline: auto" in reading
 
+    # The docked composer takes the same measure, so an open item and empty home agree.
+    assert css.count("min(var(--stage-column), calc(100% - 4rem))") == 2
+    # No rule sets a width of its own beside the token. (The token's own comment names the
+    # 56rem it replaced, so this looks at declarations rather than at the whole file.)
+    assert "max-width: 56rem" not in css
+    assert "width: min(56rem" not in css
+
+    # The field's FLOOR, which is a 2.5.8 matter rather than a taste one: this textarea
+    # shipped at 22px and sat under the 24px target minimum until the a11y lane caught it.
+    # Asserted as "at least 24px" rather than as one exact value, so the composer can be
+    # made taller or shorter without anybody having to guess which number was load-bearing.
     textarea = _css_block(css, ".composer textarea")
-    assert "min-height: 42px" in textarea
-    assert "14rem" not in textarea, "a tall min-height stacks the composer into a second row"
+    floor = re.search(r"min-height:\s*([0-9.]+)rem", textarea)
+    assert floor is not None, "the composer field declares no minimum height"
+    assert float(floor.group(1)) * 16 >= 24, (
+        f"the composer field floor is {floor.group(1)}rem, under the 24px target minimum"
+    )
     go = _css_block(css, ".composer .ask-send,\n.composer .go")
-    assert "position: absolute" in go
-    assert "right: 6px" in go
-    assert "bottom: 6px" in go
+    assert "position: static" in go
+    assert "margin: 0 0 0 auto" in go
 
 
 def test_header_actions_are_themed_chips_not_native_buttons() -> None:
@@ -395,18 +428,30 @@ def test_propose_submit_script_turns_the_action_into_stop() -> None:
     assert "BRIEVE_PROPOSE_WATCH" in script
 
 
-def test_icon_rail_names_the_verbs() -> None:
-    """US1 / FR-001. Icons are not the accessible name."""
+def test_column_names_settings_and_sign_out() -> None:
+    """US4 / FR-011. The column names Settings and Sign out — as TEXT, not as a label.
+
+    Both are icon-only now (a gear and a power symbol), which is exactly the shape that
+    usually loses a name: the words move to `aria-label`, the visible string disappears, and
+    the name is then in a place no test that reads this file would notice going stale. So the
+    assertion is unchanged from when they were visible rows — the words are still in the
+    document, in a `visually-hidden` span — and the icons are asserted to carry no name of
+    their own, so the accessible name has one source and this row still guards it.
+    """
     base = (TEMPLATES / "base.html").read_text()
-    ask = (TEMPLATES / "ask.html").read_text()
-    builds = (TEMPLATES / "_build_rail.html").read_text()
+    assert ">Settings<" in base
+    assert 'href="/settings"' in base
+    assert ">Sign out<" in base
+    assert "subject_user_id" in base
+    assert 'aria-label="New"' in base
+    assert 'aria-label="Projects"' in base
 
-    for verb in ("Build", "Ask", "Settings", "Sign out"):
-        assert f'aria-label="{verb}"' in base or f">{verb}<" in base, f"rail missing {verb}"
-
-    assert ">Conversations<" in ask or "Conversations" in ask
-    assert ">Builds<" in builds
-    assert 'class="rail-new"' in builds
+    # The marks are decorative — the span beside them is the name.
+    account = base.split('class="column-end"', 1)[1]
+    assert account.count('aria-hidden="true"') == 2
+    assert "aria-label" not in account
+    assert account.count('class="visually-hidden">Settings<') == 1
+    assert account.count('class="visually-hidden">Sign out<') == 1
 
 
 def test_decision_comments_survive_on_base_and_ask() -> None:
@@ -414,12 +459,12 @@ def test_decision_comments_survive_on_base_and_ask() -> None:
     base = (TEMPLATES / "base.html").read_text()
     ask = (TEMPLATES / "ask.html").read_text()
 
-    assert "LABELLED BY THE VERB" in base
+    assert "ONE EMPTY HOME, LOCKED SLIDER" in base
     assert "028 chose separate pages" in base
     assert "SETTINGS, LINKED FOR EVERYONE" in base
     assert "aria-current" in base
-    assert "Ask is no longer the only full-width surface" in base
+    assert "left column" in base
     assert "the only one that wants the whole viewport" not in base
 
-    assert "empty rail stays" in ask or "omitted when there is nothing to list" in ask
+    assert "empty list region stays" in ask or "omitted when there is nothing to list" in ask
     assert "No `tabindex`" in ask or "No tabindex" in ask

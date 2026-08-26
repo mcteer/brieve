@@ -57,8 +57,33 @@ durable record.
   After `up` recreates the sign-in helper, Sign in again — a leftover session is
   unverifiable, not an outage, and the build list is not lost.
 
+### Build
+
+- The final Terraform plan gate is removed. It ran `terraform plan` against the authored
+  tree in the dispatch container, with `-backend=false` and no state, and refused to open a
+  pull request unless it came back clean. A plan is only true of the environment it ran
+  against: that one was not the target estate, so a green result was never evidence about
+  the target and the same configuration could plan clean there and fail on apply where it
+  was going. It also refused correct work, because a configuration declaring a remote
+  backend cannot be planned without initialising that backend. The check now belongs to
+  whoever receives the pull request, against their own state and credentials. Judge deny,
+  ownership failure and publish error still block. `terraform_plan` remains a tool the model
+  may call for context; the PR no longer carries plan output as evidence.
+  Spec 047 and ADR-0068 both carry dated withdrawal notes; ADR-0068's Vault decision
+  is unaffected.
+
 ### Portal
 
+- Signed-in empty home is one create stage: HashiCorp mark and
+  an Ask/Build slider (Ask by default). History combines conversations and
+  Builds. Stop for a running Ask or Build sits in the composer bubble.
+- The conversation stage lines up: transcript and composer share one measure
+  (`--stage-column`) instead of 680px beside 56rem, the item title reads from the
+  left of the topbar rather than its centre, and the answer is the largest, fullest
+  contrast prose in the transcript rather than the smallest and dimmest. Once an
+  answer arrives in place, home becomes the open-item stage — the create mark no
+  longer sits above a conversation. Column rows are one line and one left edge; the
+  verb slider is sentence case.
 - The Build phase table shows only the phase status. The failure write-up
   stays under the table, not in the Judge row.
 - Ask and Build share one dark conversational shell (icon rail, per-verb list, thread,
@@ -70,5 +95,5 @@ durable record.
   updates, matching Ask. Without JavaScript the form still 303s to the run page. Header
   Stop (and Ask Delete) use the same chip as New, not a native browser button. The
   Nocturne palette (violet accent, semantic stage colours) replaces the copper theme;
-  Inter and IBM Plex Mono stay (048). In-flight Build shows the stored opening message
+  UI type is Roboto, evidence stays IBM Plex Mono. In-flight Build shows the stored opening message
   when the platform already holds it (`intake_message` on `GET /runs/{run_id}/result`).
