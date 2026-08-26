@@ -60,7 +60,7 @@ Verified by a component row recomputing the digest. Filename:
 | Landmark | Empty home | Open Ask | Open Build |
 | --- | --- | --- | --- |
 | Left column | New, Projects, search, history, profile, Settings, logout | same | same |
-| Stage top | mark + Let's Create | summarized title | summarized title |
+| Stage top | mark + Let's Create | existing conversation `title` | existing build title |
 | Composer | bubble in the stage, slider operable, default Ask | same bubble, bottom centre, slider locked Ask | same bubble, bottom centre, slider locked Build; Stop = existing run-stop |
 | Greeting | present | absent | absent |
 

@@ -9,7 +9,7 @@
 | One empty home: `GET /` has mark, Let's Create, slider on Ask; `GET /ask` is 303 to `/` | `tests/component/test_portal_shell.py` | Nothing | **Blocking from this feature** |
 | Combined history: Ask + Build rows; each named Ask or Build; search filters visible text | `tests/component/test_portal_shell.py` | Nothing | **Blocking from this feature** |
 | Unreadable Ask or Build list is a notice, not an empty claim | `tests/component/test_portal_shell.py` | Nothing | **Blocking from this feature** |
-| Slider: empty home Ask posts `/ask` not `/`; locked on open item | `tests/component/test_portal_asks.py` / `test_portal_shell.py` | Nothing | **Blocking from this feature** |
+| Slider: empty home Ask posts `/ask` not `/`; `portal-composer.js` sets Build; locked on open item; no-JS still posts `/ask` | `tests/component/test_portal_asks.py` / `test_portal_shell.py` | Nothing | **Blocking from this feature** |
 | Open item: title present; greeting absent; composer has no `POST /` on `propose_run.html` | `tests/component/test_portal_shell.py` | Nothing | **Blocking from this feature** |
 | Build Stop in the bubble is `POST /runs/{id}/stop`; failed stop does not look ended | `tests/component/test_portal_shell.py` | Nothing | **Blocking from this feature** |
 | Ask Stop abort does not claim the answer ended | `tests/component/test_portal_asks.py` | Nothing | **Blocking from this feature** |
@@ -24,9 +24,11 @@
 
 ## What these rows assert
 
-- Empty Ask and empty Build are gone; the slider is the verb.
+- Empty Ask and empty Build are gone; the slider is the verb. Without
+  `portal-composer.js` the form posts `/ask`.
 - History is this person's existing Ask conversations and Builds, merged, searchable
-  without a new operation.
+  without a new operation. An unreadable kind is a notice, not an empty claim.
+  Operator `/run` threads are not in the list.
 - Stop is the stops that already exist.
 - The HashiCorp mark is a pinned file, not a runtime fetch and not a redrawing.
 - Settings remains reachable from the shell.

@@ -5,8 +5,8 @@
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/conformance.md
 
 **Tests**: included — empty-home 303, slider isolation, combined history, unreadable-list
-notices, bubble Stop, Nocturne token discipline, a11y lane, and 047 P8 are how the
-spec's success criteria can lose.
+notices, placeholder + / Projects, bubble Stop, Nocturne token discipline, a11y
+lane, and 047 P8 are how the spec's success criteria can lose.
 
 **Organization**: Setup vendors the mark. Foundational is routing + `history_items`
 (blocks every story). US1 is empty home + slider + Nocturne on the new chrome. US3
@@ -20,8 +20,8 @@ changelog, P8.
 
 | Gate type | This feature |
 | --- | --- |
-| **Fail-closed** | Unreadable Ask or Build list is a notice, not an empty claim (T014). Failed Build stop does not look ended (T019). Ask abort does not claim the answer ended (T018) |
-| **Conformance** | 047 P8 Ask isolation still green (T032) |
+| **Fail-closed** | Unreadable Ask or Build list is a notice, not an empty claim (T013). Failed Build stop does not look ended (T019). Ask abort does not claim the answer ended (T017) |
+| **Conformance** | 047 P8 Ask isolation still green (T031) |
 | **Correlation / evidence** | N/A — no new run path |
 | **Eval** | N/A — no pack, prompt, model, or policy |
 | **No-secret-leak** | N/A — no new credential or tool-result path |
@@ -47,9 +47,11 @@ changelog, P8.
 
 - [ ] T002 Implement `history_items` in `src/surfaces/portal/app.py` per
       `specs/050-create-home/data-model.md`: merge existing `_conversations` and
-      `_builds` into `kind`, `verb`, `title`, `href`, `sort_at` (Ask
-      `last_asked_at`, Build `created_at`), newest first. Omit a kind when that
-      list is unreadable. Do not add a catalogue field.
+      `_builds` into `kind`, `verb`, `title` (conversation `title` or
+      `_build_rail_title`), `href`, `sort_at` (Ask `last_asked_at`, Build
+      `created_at`), `current` (request path matches `href`), newest first.
+      Omit a kind when that list is unreadable. Omit operator `/run` threads.
+      Do not emit a blank title row. Do not add a catalogue field.
 
 - [ ] T003 Set `DEFAULT_POST_LOGIN_PATH` to `"/"` in
       `src/surfaces/portal/oidc.py` and the `/login` default in
@@ -80,8 +82,9 @@ slider on Ask. Submit Ask → ask, never a Build. `GET /ask` 303s home.
 
 - [ ] T006 [US1] In `tests/component/test_portal_shell.py`: signed-in `GET /`
       contains Let's Create, `/static/mark/hashicorp-logomark.svg`, slider on
-      Ask, composer `action="/ask"` (not `action="/"`). Must fail on today's
-      empty Build page.
+      Ask, composer `action="/ask"` (not `action="/"`). Home/Code, model picker,
+      and Share MUST be absent (FR-010, FR-015). Must fail on today's empty
+      Build page.
 
 - [ ] T007 [P] [US1] In `tests/component/test_portal_asks.py`: Ask selected on
       empty home has no `action="/"` or `action="/propose"` (047 P8). Must fail
@@ -100,8 +103,12 @@ slider on Ask. Submit Ask → ask, never a Build. `GET /ask` 303s home.
 
 - [ ] T010 [US1] Rounded composer + Ask/Build slider in
       `src/surfaces/portal/templates/_thread_composer.html`: default `action="/ask"`;
-      slider operable only on empty home; + is `disabled` / not-available-yet
-      (FR-006). Without JS the form posts `/ask`.
+      slider operable only on empty home; idle send control on the inner
+      bottom-right (named, 24×24); + is `disabled` / not-available-yet
+      (FR-006). Add `src/surfaces/portal/static/portal-composer.js` and
+      reference it from the composer include: it sets `form.action` to `/ask`
+      or `/` and the send label to Ask or Build. Do not put that switch in
+      `portal-ask.js`. Without that script the form posts `/ask`.
 
 - [ ] T011 [US1] In `src/surfaces/portal/static/portal.css` paint column,
       greeting, bubble, and slider with **Nocturne tokens only** (research F10).
@@ -124,13 +131,20 @@ matching row; New returns home on Ask; Projects does not navigate.
 
 - [ ] T012 [US3] In `tests/component/test_portal_shell.py`: a fixture with one
       conversation and one authoring run renders both rows with visible words
-      Ask and Build and the existing hrefs. Search script
+      Ask and Build and the existing hrefs. A fixture that also has an operator
+      `/run` thread does not render that row. Search script
       `src/surfaces/portal/static/portal-history.js` is referenced from the
       history include.
 
 - [ ] T013 [GATE:fail-closed] [US3] In `tests/component/test_portal_shell.py`:
       unreachable conversations omit Ask rows and show a notice (not “no
       conversations”). Unreachable builds do the same for Builds.
+
+- [ ] T033 [P] [US3] In `tests/component/test_portal_shell.py`: + is named,
+      `disabled`, and has no file input; Projects is named, `disabled` or
+      `aria-disabled="true"`, described as not available yet, and has no href
+      that navigates (SC-005, FR-006, FR-009). Must fail if either control
+      attaches, starts work, or changes the URL.
 
 ### Implementation
 
@@ -144,8 +158,11 @@ matching row; New returns home on Ask; Projects does not navigate.
       script leaves the full list.
 
 - [ ] T016 [US3] In `src/surfaces/portal/templates/base.html`: **+ New** is
-      `href="/"` with accessible name New. **Projects** is visible, named, and
-      does not navigate (FR-009).
+      `href="/"` with accessible name New. **Projects** is a real control with
+      an accessible name, `disabled` or `aria-disabled="true"` plus a description
+      that it is not available yet, and MUST NOT navigate, attach, or start
+      work (F8, FR-009). No `href="/projects"` and no `#` that looks like a
+      destination.
 
 **Checkpoint**: one searchable history; New is empty home.
 
@@ -168,11 +185,13 @@ the bubble is `POST /runs/{run_id}/stop`. Failed stop does not look ended.
 - [ ] T018 [US2] In `tests/component/test_portal_shell.py`:
       `src/surfaces/portal/templates/propose_run.html` has no
       `method="post" action="/"` (or `/propose`); the bubble contains
-      `action="/runs/` + stop.
+      `action="/runs/` + stop. Home/Code, model picker, and Share are absent
+      (FR-010, FR-015).
 
 - [ ] T019 [GATE:fail-closed] [US2] In `tests/component/test_portal_shell.py` /
       existing stop rows: a failed stop response does not present the run as
-      ended.
+      ended. A terminal run has no operable Stop, or Stop is inert and does
+      not claim a new stop succeeded.
 
 ### Implementation
 
@@ -184,11 +203,13 @@ the bubble is `POST /runs/{run_id}/stop`. Failed stop does not look ended.
       `src/surfaces/portal/templates/propose_run.html` and
       `src/surfaces/portal/templates/_propose_run_main.html`. Slider locked on
       Build (`disabled`). Title at top; greeting absent. Keep
-      `id="phase-strip"` and `[data-phase]`.
+      `id="phase-strip"` and `[data-phase]`. On a terminal run, Stop is absent
+      or inert and MUST NOT look like a new stop succeeded.
 
 - [ ] T022 [US2] On an open Ask in `src/surfaces/portal/templates/ask.html`,
       lock the slider on Ask; composer at bottom centre (CSS from T011);
-      follow-up still POSTs `/ask`.
+      follow-up still POSTs `/ask`. Home/Code, model picker, and Share MUST
+      NOT appear.
 
 **Checkpoint**: Stop is the existing stops, in the bubble.
 
@@ -225,7 +246,9 @@ page-local hex or leftover icon rail as the only Settings path.
 - [ ] T025 [US5] Extend `tests/component/test_portal_identity.py`: every colour
       on the new shell traces to the Nocturne `:root` block; no reference
       orange; mark digest matches `src/surfaces/portal/static/mark/PROVENANCE.md`;
-      no third-party `url(` in CSS/templates.
+      no third-party `url(` in CSS/templates. Decision-comments in
+      `src/surfaces/portal/templates/base.html` and
+      `src/surfaces/portal/templates/ask.html` are still present (FR-017).
 
 - [ ] T026 [US5] Update a11y fixtures/selectors in `tests/a11y` for the new
       column (New, Projects, search, slider, Stop, +, profile, Settings,
@@ -242,8 +265,10 @@ page-local hex or leftover icon rail as the only Settings path.
 ## Phase 8: Polish & Cross-Cutting
 
 - [ ] T028 Remove the icon rail from `src/surfaces/portal/templates/base.html`
-      so it cannot sit beside the new column. Signed-out / `login_failed.html` /
-      `refused.html` inherit tokens without the column.
+      so it cannot sit beside the new column. After T008, if empty-Build
+      `propose.html` or rail-only CSS is loaded by no remaining route, remove
+      that chrome (FR-018). Signed-out / `login_failed.html` / `refused.html`
+      inherit tokens without the column.
 
 - [ ] T029 Rewrite F9 decision-comments in `src/surfaces/portal/templates/base.html`
       and `src/surfaces/portal/templates/ask.html` for one empty home, locked
@@ -268,7 +293,7 @@ page-local hex or leftover icon rail as the only Settings path.
 Phase 1  T001
   → Phase 2  T005 → T002 → T003 → T004
   → Phase 3  T006 ∥ T007 → T008 → T009 → T010 → T011
-  → Phase 4  T012 ∥ T013 → T014 → T015 → T016
+  → Phase 4  T012 ∥ T013 ∥ T033 → T014 → T015 → T016
   → Phase 5  T017 ∥ T018 ∥ T019 → T020 → T021 → T022
   → Phase 6  T023 → T024
   → Phase 7  T025 → T026 → T027
@@ -281,7 +306,7 @@ composer CSS). T014 before T016 (column exists). T001 before T009 (img src).
 ### User Story mapping
 
 - **US1**: T006–T011
-- **US3**: T012–T016
+- **US3**: T012–T016, T033
 - **US2**: T017–T022
 - **US4**: T023–T024
 - **US5**: T025–T027
@@ -295,7 +320,7 @@ follow.
 ### Parallel examples
 
 After T005: T006 ∥ T007.
-After T011: T012 ∥ T013.
+After T011: T012 ∥ T013 ∥ T033.
 After T016: T017 ∥ T018 ∥ T019.
 
 ---
@@ -303,9 +328,9 @@ After T016: T017 ∥ T018 ∥ T019.
 ## Notes
 
 - Named contracts bind exactly: `history_items`; `DEFAULT_POST_LOGIN_PATH` = `/`;
-  files `hashicorp-logomark.svg`, `_history.html`, `portal-history.js`;
-  `GET /` renders `ask.html`; `GET /ask` 303 `/`; Ask Stop is the existing
-  abort; Build Stop is `POST /runs/{run_id}/stop`.
+  files `hashicorp-logomark.svg`, `_history.html`, `portal-history.js`,
+  `portal-composer.js`; `GET /` renders `ask.html`; `GET /ask` 303 `/`; Ask
+  Stop is the existing abort; Build Stop is `POST /runs/{run_id}/stop`.
 - No sealed core, no new ADR, no new catalogue operation, no CDN, no Claude
   orange.
 - What would fail honestly: leftover empty `/ask` page; slider default posting

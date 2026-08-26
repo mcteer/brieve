@@ -43,12 +43,12 @@ load one list
 
 **Constraints**: no third-party fetch (FR-012); no new operation (FR-014); Ask
 never acts (ADR-0039); stop fail-closed (FR-005); 320px reflow; placeholders must
-not succeed; official mark unmodified (F6)
+not succeed; official mark unmodified (F6); slider script is `portal-composer.js`
 
 **Scale/Scope**: `base.html` left column; `ask.html` as empty home and open Ask;
 `propose_run.html` open Build; `_history.html`; `portal-history.js`; slider on the
-shared composer; vendored mark; identity + a11y + session tests; icon rail removed
-from the conversational shell
+shared composer (`portal-composer.js`); vendored mark; identity + a11y + session
+tests; icon rail removed from the conversational shell
 
 ## Constitution Check
 
@@ -99,10 +99,12 @@ src/surfaces/portal/oidc.py                        # DEFAULT_POST_LOGIN_PATH = "
 src/surfaces/portal/templates/base.html            # left column; no icon rail
 src/surfaces/portal/templates/ask.html             # empty home + open Ask
 src/surfaces/portal/templates/propose_run.html     # open Build; bubble Stop
+src/surfaces/portal/templates/_propose_run_main.html  # run stage + bubble Stop (T021)
 src/surfaces/portal/templates/_history.html        # combined list + search
 src/surfaces/portal/templates/_thread_composer.html  # bubble; slider; + placeholder
 src/surfaces/portal/static/portal.css              # column + bubble geometry; Nocturne tokens are the schema
 src/surfaces/portal/static/portal-history.js       # search filter only
+src/surfaces/portal/static/portal-composer.js      # empty-home slider sets form.action
 src/surfaces/portal/static/portal-ask.js           # Stop abort unchanged; first land → /ask/{id}
 src/surfaces/portal/static/mark/hashicorp-logomark.svg
 src/surfaces/portal/static/mark/PROVENANCE.md
@@ -119,10 +121,11 @@ column. `portal.css` stays one file (034/048 audit property).
 
 ## Dependency order
 
-US5 (tokens, a11y, mark provenance) lands with US1’s empty home — the gate is how
-the shell is proven. US3 (combined history + search) is the left column US1 needs.
-US2 (Stop in the bubble) follows the shared composer markup. US4 (profile /
-Settings / logout) is the bottom of that column.
+Mark provenance (T001) and Nocturne tokens (T011) land with US1’s empty home.
+The a11y lane (US5) runs after Settings / logout exist in the column (US4).
+US3 (combined history + search) is the left column US1 needs. US2 (Stop in the
+bubble) follows the shared composer markup. US4 (profile / Settings / logout)
+is the bottom of that column.
 
 ## Complexity Tracking
 

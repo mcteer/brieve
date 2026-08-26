@@ -57,11 +57,12 @@ pretend to filter.
 ## F4 — Slider is presentation; submit targets existing posts
 
 **Decision**: on empty home the composer is one form. Default `action="/ask"`
-(Ask). Slider is a two-value control that sets `form.action` to `/ask` or `/`
+(Ask). **`portal-composer.js`** (one new progressive-enhancement file; not
+`portal-ask.js`) is the slider script: it sets `form.action` to `/ask` or `/`
 and the submit label to Ask or Build. Enter uses the existing base.html
-requestSubmit path. Without JS, the form posts `/ask` (Ask default). Build
-without JS is not required; the slider’s Build value is the progressive
-enhancement, same class as today’s Ask fetch enhancement.
+requestSubmit path. Without that script, the form posts `/ask` (Ask default).
+Build without the script is not required; the slider’s Build value is the
+progressive enhancement, same class as today’s Ask fetch enhancement.
 
 On an open Ask the form posts `/ask` (follow-up); slider locked on Ask
 (`disabled` + `aria-disabled`, still visible). On an open Build the bubble
@@ -115,8 +116,8 @@ committing the Claude screenshot.
 ## F7 — Open item: title at top, same bubble at bottom centre
 
 **Decision**: empty `/` shows mark + “Let's Create” and the composer in the
-stage. Open Ask or Build hides that greeting. The summarized title is the
-conversation `title` or the existing build title, at the top of the stage.
+stage. Open Ask or Build hides that greeting. The title at the top of the
+stage is the existing conversation `title` or the existing build title.
 Composer is the same bubble, `position`ed at the bottom centre (CSS). 048’s
 one-row 880/680 geometry is superseded; token and type-role rules are not.
 

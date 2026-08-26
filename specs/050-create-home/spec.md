@@ -49,7 +49,7 @@ together.
 ### Session 2026-08-25
 
 - Q: Now that the icon rail is gone, where does someone reach Settings? → A: **Settings sits with profile and logout at the bottom of the left column.** Not a third primary action next to New and Projects, and not address-only.
-- Q: When someone opens an Ask or a Build from history, what happens to the Ask/Build slider? → A: **The slider stays visible, set to that item’s verb, and is not operable.** New returns to the empty home, where the slider works again. On an open item the summarized title sits at the top of the stage; the same rounded composer moves to the bottom centre. The HashiCorp mark and “Let's Create” are empty-home only.
+- Q: When someone opens an Ask or a Build from history, what happens to the Ask/Build slider? → A: **The slider stays visible, set to that item’s verb, and is not operable.** New returns to the empty home, where the slider works again. On an open item the existing item title (conversation `title` or current build title) sits at the top of the stage; the same rounded composer moves to the bottom centre. The HashiCorp mark and “Let's Create” are empty-home only.
 - Q: On the empty create home, what should the old Ask and Build empty pages mean? → A: **They go away.** Empty home is one place. Ask versus Build is only the slider. A conversation or a run still has its own address so that item can be opened again; those are not a second empty home.
 - Q: When you hit + New, should the slider stay on whatever you last used, or go back to Ask? → A: **The slider always defaults to Ask.** Empty home, sign-in, and + New all start on Ask. Build is a deliberate move of the slider on empty home. An open Build still shows Build locked.
 - Q: Does the redesign keep the current colour schema? → A: **Yes. Nocturne is part of this redesign**, not leftover chrome. The new shell (column, greeting, bubble, slider, history) uses the shipped dark grounds, ink, muted text, violet accent, and semantic status colours. It MUST NOT adopt the reference screenshot’s orange, and MUST NOT bring back a second identity (048 copper as a competing palette).
@@ -115,10 +115,12 @@ who cannot read the address can still name the selected verb from the slider.
 
 ### User Story 2 - The bubble starts work and can stop it (Priority: P1)
 
-Enter starts the selected verb. While Ask is answering or a Build is running, the
-same place in the bubble becomes Stop. Using Stop actually stops that work using
-the platform's existing stop. A + control sits at the bottom left of the bubble
-as a named placeholder for attaching context later.
+Enter starts Ask when Ask is selected. Build starts from Enter only when the
+person has moved the slider to Build and the page can apply that choice; without
+that enhancement, Enter still starts Ask. While Ask is answering or a Build is
+running, the same place in the bubble becomes Stop. Using Stop actually stops
+that work using the platform's existing stop. A + control sits at the bottom
+left of the bubble as a named placeholder for attaching context later.
 
 **Why this priority**: A shell that cannot stop what it started is unsafe to
 leave running. A + that looks like attach but silently does nothing must not
@@ -131,8 +133,12 @@ no attachment and no new work.
 
 **Acceptance Scenarios**:
 
-1. **Given** the composer idle, **When** the person presses Enter (not
-   Shift+Enter), **Then** the selected verb starts.
+1. **Given** the composer idle on empty home with Ask selected, **When** the
+   person presses Enter (not Shift+Enter), **Then** Ask starts. **Given** they
+   have moved the slider to Build and the page applies that choice, **When** they
+   press Enter, **Then** a Build starts. **Given** the page cannot apply the
+   slider choice, **When** they press Enter, **Then** Ask starts and a Build
+   does not.
 2. **Given** Ask answering, **When** they use Stop in the bubble, **Then** that
    Ask stops through the existing Ask stop, and the page does not keep presenting
    it as in flight.
@@ -169,10 +175,11 @@ New returns to the empty home. Projects does not open a projects product.
 2. **Given** that list, **When** they type in search, **Then** only rows whose
    already-shown text matches remain; clearing search restores the list.
 3. **Given** a row, **When** they open it, **Then** they see that Ask or that
-   Build — not a merged thread. A summarized title for that item is at the top
-   of the stage; the composer is at the bottom centre and looks the same as on
-   empty home; the slider shows that item’s verb and cannot be changed. The
-   HashiCorp mark and “Let's Create” are not on this page.
+   Build — not a merged thread. The existing item title (conversation `title` or
+   current build title) is at the top of the stage; the composer is at the
+   bottom centre and looks the same as on empty home; the slider shows that
+   item’s verb and cannot be changed. The HashiCorp mark and “Let's Create” are
+   not on this page.
 4. **Given** + New, **When** they activate it, **Then** they return to the empty
    create home (US1) without deleting history, and the slider is on Ask.
 5. **Given** Projects, **When** they activate it, **Then** it does not navigate
@@ -237,13 +244,17 @@ over every page state it covers today, on the designed theme.
 ### Edge Cases
 
 - Opening an Ask item keeps the slider visible, locked on Ask; submitting is a
-  follow-up Ask, never a Build from that thread. The summarized conversation
-  title is at the top of the stage; the composer sits at the bottom centre and
+  follow-up Ask, never a Build from that thread. The existing conversation
+  `title` is at the top of the stage; the composer sits at the bottom centre and
   looks the same as on empty home.
-- Opening a Build item keeps the slider visible, locked on Build. The summarized
-  run title is at the top of the stage; the composer sits at the bottom centre.
+- Opening a Build item keeps the slider visible, locked on Build. The existing
+  build title is at the top of the stage; the composer sits at the bottom centre.
   The bubble does not start a second Build from that page (047/048: empty home
   remains the posting surface for a new Build; Stop is not a second propose).
+- If Ask history cannot be read, Ask rows are omitted and the page says so —
+  not that the person has no conversations. If Build history cannot be read,
+  Build rows are omitted and the page says so — not that they have no Builds.
+  The list region still renders. The page MUST NOT invent a row.
 - Empty home shows the HashiCorp mark and “Let's Create” with the composer in
   the stage. An open item MUST NOT repeat that greeting; the title replaces it.
 - An empty history still shows the list region and search; it does not collapse
@@ -280,8 +291,12 @@ over every page state it covers today, on the designed theme.
   that item’s verb, and MUST NOT be operable. Ask selected MUST keep Ask unable
   to act (ADR-0039). The selected or locked verb MUST be obvious without colour
   alone.
-- **FR-004**: Enter MUST start the selected verb. Shift+Enter MUST insert a line
-  without starting work.
+- **FR-004**: Shift+Enter MUST insert a line without starting work. Enter MUST
+  start Ask when Ask is selected. On empty home, when the person has moved the
+  slider to Build and the page can apply that choice, Enter MUST start a Build.
+  When the page cannot apply the slider choice, Enter MUST start Ask and MUST
+  NOT start a Build. Build as the selected verb is a progressive enhancement of
+  the empty-home slider, not a second no-JS form.
 - **FR-005**: While Ask is answering, the bubble's primary action MUST be Stop
   and MUST perform the existing Ask stop. While a Build is in flight, that
   action MUST be Stop and MUST perform the existing Build stop. Stop MUST
@@ -291,7 +306,13 @@ over every page state it covers today, on the designed theme.
   MUST NOT attach files or start work in this feature.
 - **FR-007**: The left column MUST list this person's Ask conversations and
   Builds in one newest-first list. Each row MUST remain identifiable as Ask or
-  Build. Opening a row MUST open that existing item.
+  Build. Opening a row MUST open that existing item. If the Ask list cannot be
+  read, Ask rows MUST be omitted and the page MUST say Ask history could not be
+  read — not that they have no conversations. If the Build list cannot be read,
+  Build rows MUST be omitted and the page MUST say Build history could not be
+  read — not that they have no Builds. The list region MUST still render. The
+  page MUST NOT invent a row. Operator `/run` threads MUST NOT appear in this
+  list.
 - **FR-008**: A search field above that list MUST filter rows by text already
   shown on the row. It MUST NOT add a new platform search or show work this
   person could not already list.
@@ -320,9 +341,9 @@ over every page state it covers today, on the designed theme.
   catalogued for Ask and for runs.
 - **FR-015**: Opening a conversation or a run MUST still land on that item (so a
   person can return to it). Those item addresses are not a second empty home.
-  An open item MUST show a summarized title for that Ask or Build at the top of
-  the stage. Share, model picker, and other reference-only header chrome MUST
-  NOT appear.
+  An open item MUST show that item’s existing title (conversation `title` or
+  current build title) at the top of the stage. Share, model picker, and other
+  reference-only header chrome MUST NOT appear.
 - **FR-016**: Every existing accessibility criterion MUST still pass on the
   designed theme (048 FR-012).
 - **FR-017**: Templates' decision comments MUST survive (048 FR-014). Where a
@@ -399,5 +420,9 @@ over every page state it covers today, on the designed theme.
   slider on Ask. There is no empty Ask destination and no empty Build destination.
   + New also returns there with the slider on Ask.
 - Operator run is unchanged in purpose and is not a primary verb here.
+- Enter on empty home starts Ask when Ask is selected, and starts Build only
+  when the slider enhancement can apply a Build choice. Without that
+  enhancement, Enter starts Ask. This is the same class of progressive
+  enhancement as today's Ask fetch — not a second no-JS Build form.
 - Iteration after this slice may add attach-context and Projects as real
   features under later specs; this slice forbids fake success for either.

@@ -37,3 +37,6 @@
   home. "Catalogue operation" in FR-014 is the project's existing term for "no
   new platform verb," not an API design. SC-010 names the existing Ask-never-acts
   regression the same way 048 did.
+- Analyze 2026-08-25: FR-004 records no-JS Enter as Ask; FR-007 names the
+  unreadable-list failure sibling; open-item title is the existing field, not a
+  new summarizer.

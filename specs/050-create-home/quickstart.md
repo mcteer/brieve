@@ -25,7 +25,8 @@ uv run --extra adapters --extra surfaces --extra portal pytest \
 
 Expected: `GET /` is create home (mark, Let's Create, slider on Ask);
 `GET /ask` is 303 `/`; history mixes Ask and Build; search filters visible text;
-Ask selected has no `action="/"`; `propose_run.html` has no `POST /`; login
+unreadable lists are notices; + and Projects do not navigate or attach; Ask
+selected has no `action="/"`; `propose_run.html` has no `POST /`; login
 without next is `/`; mark digest matches `mark/PROVENANCE.md`; no icon rail as
 the only Settings path.
 
