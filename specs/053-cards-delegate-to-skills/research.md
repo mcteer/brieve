@@ -71,24 +71,43 @@ reasoning about version pinning applied a second time.
 
 ---
 
-## R4 — Vault is the control, and its residue is small
+## R4 — Vault has no bound skill, and is the *unbound* case rather than a control
 
-**Decision**: `packs/vault` is corrected where it overlaps, and serves as the passing control.
+**Decision**: `packs/vault` is **not edited**, and its role is to prove that a pack with no
+bound skill is reported as **unbound**, never as clean.
 
-**Measured, provisionally**: 2 of an eight-rule **probe** subset restated by
-`vault/agents/write/AGENTS.md` — check-and-set
-on writes, and preferring a dynamic secret. Six are not: never asking for or reusing a token,
-reporting an auth failure rather than routing around it, passing a path rather than the value,
-use-and-discard, redacting before a durable write, and writing only to a scoped path. The
-skill is also 50 prose lines of 109 — a far healthier ratio than terraform's 64 of 314.
+**Measured**: `packs/vault/pack.toml` has **no `phases` key**. `vault-secret-access` is pinned
+and bound to nothing. `grep -n "^phases" packs/*/pack.toml` returns only the two terraform
+entries.
 
-**The eight is a probe, not a count.** The vault guide carries fifteen bullet-form prose
-statements; eight were selected to establish direction quickly. The derived inventory (T009)
-sets the real denominator, and "2 of 8" must not be treated as a target it should reproduce.
+**This was deliberate, and it is load-bearing.** 051's [R12](../051-phase-skill-binding/research.md)
+decided it explicitly: the skill *"stays adopted and inert, and is recorded `@unbound`"*, it is
+*"the live fixture"* for distinguishing a pack with a bound skill from one without, and it
+**"must not acquire a binding by tidiness."**
 
-**Rationale**: This is what makes the rule credible rather than aspirational. A gate whose
-only subject is the thing it was written to condemn proves nothing about whether it can be
-satisfied; vault passes at 2 of 8 today and at 0 after a small correction.
+**What this feature got wrong before analysis, and why it matters.** An earlier draft measured
+`vault/agents/write/AGENTS.md` against `vault-secret-access/SKILL.md`, found 2 of 8 rules
+restated, and proposed removing them as a "control". Three things are wrong with that:
+
+1. **There is no delegation relationship to enforce.** FR-001 governs a rule a skill *bound to
+   that phase* states. Vault has no bound phase, so FR-001 is vacuously satisfied and the
+   overlap is not a defect at all.
+2. **Removing those rules would delete guidance nothing delivers.** The card would lose
+   check-and-set and dynamic-secret-first, and no skill would supply them — the precise failure
+   the spec's own edge case warns about, committed deliberately.
+3. **It would break 051's fixture**, which R12 forbids in as many words.
+
+**The hazard this leaves behind is real and is now a row.** Run the comparison over vault today
+and it returns zero restated rules, which *reads as compliance*. It is not compliance; it is
+absence of a binding. A gate that cannot tell those apart would report the vault pack as clean
+for the same reason it would report a pack whose cards delegate perfectly.
+
+**The positive control is terraform itself**: A4 fails against the frozen pre-feature cards,
+A1 passes after the edits. That pairing does the work "vault passes" was wrongly asked to do.
+
+**Recorded, not fixed here**: vault pins a skill delivered to no model. Under ADR-0004 that is
+worth revisiting, but 051 chose it with reasons, and changing it is a binding decision with a
+re-qualification cost — not something this feature should do while passing through.
 
 ---
 

@@ -51,8 +51,8 @@ candidate.
 **Constraints**: `SKILL.md` is upstream and digest-pinned to commit `8c6573ab` and must not be
 edited. Phase-agent promotion is all-five-or-none and gates on both suites ([R8](research.md))
 
-**Scale/Scope**: Three terraform cards, one vault card, one skill rule inventory per skill, one
-new structural detector, one enforcement row
+**Scale/Scope**: Three terraform cards, one skill rule inventory, one new structural detector,
+one enforcement row set. No vault card is edited
 
 ## Constitution Check
 
@@ -103,7 +103,6 @@ specs/053-cards-delegate-to-skills/
 packs/terraform/agents/write/AGENTS.md     # delegate 16 rules; keep §Precedence, §Pins (override), minimality
 packs/terraform/agents/judge/AGENTS.md     # delegate style criteria; keep its own checklist (R3)
 packs/terraform/agents/plan/AGENTS.md      # delegate 6 restated rules
-packs/vault/agents/write/AGENTS.md         # remove the 2-of-8 residue
 
 tests/conformance/packs/
 ├── rule_inventory.py                      # rules derived per skill, digest-bound (R7)
@@ -124,7 +123,7 @@ evals/authoring/corpus.toml                # a task that exercises it
 | Why a curated rule inventory rather than automatic overlap detection? | Reviewability. A maintainer must see *which rule* is duplicated and where. A similarity score is a number to argue with; an inventory entry is a fact to act on ([R7](research.md)) |
 | Why does Judge keep a checklist when Write delegates its rules? | Two of the skill checklist's ten items are the capabilities this pack declares unsatisfiable. Delegating them would make an unperformable step operative instruction ([R3](research.md)) |
 | Why a new detector rather than reusing one of nine? | All nine either were measured flat or belong to rules the card keeps. `variable_has_validation` fails the spec's own bar — Sonnet 5 emits it unprompted at 5/5 in both arms ([R5](research.md)) |
-| Why is vault in scope at all? | As the control. A gate whose only subject is the thing it condemns proves nothing about whether it can be satisfied ([R4](research.md)) |
+| Why is vault in scope but not edited? | Its skill is bound to no phase, so its cards have nothing to delegate to and an overlap there is not a defect. It contributes the *unbound* hazard instead: zero restated rules must not read as compliance when the truth is that nothing is bound ([R4](research.md)) |
 
 ## Post-design Constitution re-check
 

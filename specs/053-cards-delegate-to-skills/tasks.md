@@ -11,8 +11,7 @@ row must be shown to catch the real defect and to be satisfiable.
 
 **Organization**: By user story. **US3's comparison mechanism is Foundational**, ahead of US1's
 edits — see Ordering note. Named contracts bind exactly: `rule_inventory`, `stated_rules`,
-`declared_overrides`, `compare_card`, `TERRAFORM_STYLE_RULES`, `VAULT_ACCESS_RULES`,
-`standard_file_organisation`. Do not substitute a near-equivalent name.
+`declared_overrides`, `compare_card`, `TERRAFORM_STYLE_RULES`, `standard_file_organisation`. Do not substitute a near-equivalent name.
 
 ## Ordering note — why the mechanism precedes the edits
 
@@ -26,6 +25,23 @@ and its fixtures come before the content change they measure — and it is what 
 standing row rather than a one-time observation.
 
 US1 remains the MVP: it is the story that makes ADR-0004's pin load-bearing.
+
+## Withdrawn during analysis — IDs kept, not renumbered
+
+Pass 2 compared the artifacts against `src/` and found `packs/vault/pack.toml` has **no
+`phases` key**: `vault-secret-access` is pinned and bound to nothing. Four tasks rested on
+vault being a delegation subject and are withdrawn rather than renumbered, so every ID cited
+elsewhere still means what it meant.
+
+| Withdrawn | Why |
+| --- | --- |
+| T009, T009a | A vault rule inventory serves a delegation relationship that does not exist |
+| T017 | Removing those two rules would **delete guidance nothing delivers**, and would break the live fixture 051's R12 says "must not acquire a binding by tidiness" |
+| T022 | No vault card is edited, so no vault phase needs re-qualification |
+
+What the mistake exposed is kept as row A5 (T035): a pack with no bound skill must be reported
+**unbound**, never clean. Zero restated rules for want of a binding and zero because a card
+delegates are opposite conditions.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -47,8 +63,8 @@ Single project: `src/`, `tests/`, `packs/`, `evals/`, `docs/` at repository root
 ## Phase 1: Setup
 
 - [ ] T001 Verify delegation's premise before shortening any card: confirm `skill_missing`, `skill_empty` and `digest_mismatch` are each reached by `raise ManifestError` in `src/core/packs/loader.py`. If any is a warning, STOP — the feature's safety argument is gone
-- [ ] T002 Freeze the pre-feature card text as fixtures in `tests/conformance/packs/card_fixtures.py`: the current `packs/terraform/agents/{write,judge,plan}/AGENTS.md` **and `packs/vault/agents/write/AGENTS.md`** bodies, verbatim, with the date and commit they were taken from. Row A4 asserts against these forever, and without the vault copy the residue this feature removes could never be shown to have been caught
-- [ ] T003 Record the **provisional** probe counts (write 16/16 against the full stated surface; judge 7 and plan 6 against a twelve-rule probe; vault 2 against an eight-rule probe) in `tests/conformance/packs/card_fixtures.py` as *direction*, explicitly not as targets. **The denominators differ and only Write's is derived** — see [R1](research.md). T008/T009 set the real inventories and T009b re-records the baselines against them
+- [ ] T002 Freeze the pre-feature card text as fixtures in `tests/conformance/packs/card_fixtures.py`: the current `packs/terraform/agents/{write,judge,plan}/AGENTS.md` bodies, verbatim, with the date and commit they were taken from. Row A4 asserts against these forever. **No vault fixture** — vault is not edited, per [R4](research.md)
+- [ ] T003 Record the **provisional** probe counts (write 16/16 against the full stated surface; judge 7 and plan 6 against a twelve-rule probe) in `tests/conformance/packs/card_fixtures.py` as *direction*, explicitly not as targets. **The denominators differ and only Write's is derived** — see [R1](research.md). T008/T009 set the real inventories and T009b re-records the baselines against them
 - [ ] T003a Confirm before proceeding that no later task treats a probe count as a target. T032 reproduces the baselines recorded by T009b, never the numbers in T003
 
 ---
@@ -62,9 +78,7 @@ Single project: `src/`, `tests/`, `packs/`, `evals/`, `docs/` at repository root
 - [ ] T006 Implement `declared_overrides(card_text)` in `tests/conformance/packs/rule_inventory.py` — recognises an override **from the card's own text**, requiring both the overridden rule and a stated reason (FR-002)
 - [ ] T007 Implement `compare_card(card_text, rules)` in `tests/conformance/packs/rule_inventory.py` — returns each restated rule with its id, so a failure names the rule and both documents rather than scoring a similarity (FR-006, [R7](research.md))
 - [ ] T008 **Derive** `TERRAFORM_STYLE_RULES` in `tests/conformance/packs/rule_inventory.py` from `terraform-style-guide/SKILL.md` — every prose-stated rule, each with the guide's own words and line number, bound to digest `fea8a0ea…`. The count is whatever the guide yields; sixteen is what a probe found, not a quota to fill
-- [ ] T009 **Derive** `VAULT_ACCESS_RULES` in `tests/conformance/packs/rule_inventory.py` from `vault-secret-access/SKILL.md`, same shape, bound to its pinned digest. The guide carries fifteen bullet-form statements and the probe used eight — the inventory records what is there, not the probe's subset
-- [ ] T009a Reconcile the checklist against the rules it restates: `vault-secret-access/SKILL.md` ends with a six-item checklist that repeats rules stated above it. Count each rule once, or the vault denominator is inflated and its ratio is meaningless
-- [ ] T009b Re-record the real per-card baselines in `tests/conformance/packs/card_fixtures.py`, all three terraform cards and vault measured against the **derived** inventories, so every figure shares a denominator. These are what T032 reproduces
+- [ ] T009b Re-record the real per-card baselines in `tests/conformance/packs/card_fixtures.py`, all three terraform cards measured against the **derived** inventory, so every figure shares a denominator. These are what T032 reproduces
 - [ ] T010 [P] Row A3 in `tests/conformance/packs/test_cards_delegate_to_skills.py` — content inside a fenced block is never a stated rule. Asserted against the real guide: `default_tags`, `validation` and the aliased-provider example must all be absent from `TERRAFORM_STYLE_RULES`
 - [ ] T011 [P] Row A6 in `tests/conformance/packs/test_cards_delegate_to_skills.py` — each inventory's digest matches the manifest's pinned digest, so a re-pin cannot leave the inventory describing bytes that are gone
 
@@ -87,7 +101,6 @@ declared overrides.
 - [ ] T014 [US1] Delegate the seven restated rules from `packs/terraform/agents/judge/AGENTS.md` §Check, keeping the checklist's own structure — the skill's Code Review Checklist is **not** adoptable, because two of its ten items are the `terraform fmt` / `terraform validate` steps this pack declares unsatisfiable ([R3](research.md))
 - [ ] T015 [US1] Keep `validation` and `default_tags` in the Judge card, and say in the card why: they appear in the guide **only inside code examples**, so they are not delegated practice but Judge's own criteria. Without the note a later reader assumes they were missed by T014
 - [ ] T016 [US1] Delegate the six restated rules from `packs/terraform/agents/plan/AGENTS.md`
-- [ ] T017 [US1] Remove the two-of-eight residue from `packs/vault/agents/write/AGENTS.md` — check-and-set on writes, and preferring a dynamic secret ([R4](research.md))
 - [ ] T018 [US1] Confirm no card was left nearly empty by delegation. If a phase's instruction was never more than a copy, say so in the card rather than padding it
 - [ ] T019 [US1] Re-read each edited card end to end for coherence — delegation removes sentences from the middle of prose, and a card that no longer reads as instruction is a defect this feature introduced
 
@@ -95,8 +108,7 @@ declared overrides.
 
 - [ ] T020 [US1] Run the `phase_agents` suite over **assembled** content for every edited terraform phase
 - [ ] T021 [US1] Run the `build_agents` suite over assembled content for the same phases
-- [ ] T022 [US1] Run both suites for the edited vault phase
-- [ ] T023 [US1] Promote all five phase agents together, all-five-or-none, only after T020–T022 pass ([R8](research.md)). A card edit may not ship on the eval that qualified the previous text
+- [ ] T023 [US1] Promote all five phase agents together, all-five-or-none, only after T020–T021 pass ([R8](research.md)). A card edit may not ship on the eval that qualified the previous text
 
 **Checkpoint**: US1 is independently verifiable — the cards no longer restate, and the phases
 are qualified on the bytes they now carry.
@@ -136,7 +148,8 @@ both locations. Remove it and it passes.
 - [ ] T032 [US3] Rows A0 and A1 in `tests/conformance/packs/test_cards_delegate_to_skills.py` — no card states a rule its bound skill states, except a declared override (A1); and the baselines compared against are the **derived** ones sharing a denominator across all four cards, never T003's probe counts (A0)
 - [ ] T033 [US3] Row A2 — an override passes, and a §Pins that keeps its rule but stops saying what it overrides fails
 - [ ] T034 [US3] Row A4 — the comparison **fails** against the frozen pre-feature fixtures from T002. This is what makes A1 evidence rather than a detector that finds nothing
-- [ ] T035 [US3] Row A5 — the comparison **passes** against `packs/vault` after T017, the control that the rule is satisfiable ([R4](research.md))
+- [ ] T035 [US3] Row A5 — `packs/vault` is reported **unbound**, not clean. Its skill is bound to no phase, so zero restated rules there means *no binding*, and a gate returning the same verdict as it does for a card that delegates asserts nothing ([R4](research.md))
+- [ ] T035a [US3] Row A5a — the comparison **passes** against the terraform cards after T012–T016. Terraform is both halves of the control: A4 failing before, A5a passing after
 - [ ] T036 [US3] Row A7 — every phase bound to a skill is compared, derived from the manifest rather than a hard-coded three, so a fourth binding is not silently unchecked
 - [ ] T037 [US3] Row A9 — the pack-level total is reported, not only per-card, so practice distributed across cards cannot read as cleanliness ([R2](research.md))
 - [ ] T038 [US3] Row asserting SC-006: this feature's file list touches no path under `src/`
@@ -149,6 +162,7 @@ both locations. Remove it and it passes.
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [ ] T040 Amend `specs/051-phase-skill-binding/contracts/conformance-phase-skill-binding.md`: record the **withdrawal** of the minimality hypothesis and the **selection error** (both measured rules drawn from fenced example code), with the 2026-08-27 measurement (FR-008)
+- [ ] T040a Record in `research.md` R4, and raise separately, that `vault-secret-access` is pinned and delivered to no model. Worth revisiting under ADR-0004; **not** changed here — 051 R12 chose it with reasons and says it must not acquire a binding by tidiness
 - [ ] T041 Confirm FR-011 by inspection — this feature changes what the card says, never what the record reports. No `content_pins` or payload shape is touched
 - [ ] T042 Add the 053 row to `ROADMAP.md`'s shipped table, naming ADR-0004 as the record made load-bearing
 - [ ] T043 Run `make check` — the hermetic suite including every A row
@@ -162,13 +176,13 @@ both locations. Remove it and it passes.
 ```
 Setup (T001–T003a)
   │  T001 gates everything: if refusals are not fail-closed, STOP
-  │  T002 must precede T012–T017 — the fixtures cannot be captured after the edit
+  │  T002 must precede T012–T016 — the fixtures cannot be captured after the edit
   ▼
 Foundational (T004–T011)   the mechanism and the DERIVED inventories, blocking all stories
   │  T009b sets the only baselines T032 may reproduce; T003's probe counts are not targets
   ▼
 US1 (T012–T023)  ──────────► US3 (T032–T039)  rows need the edited cards to be green
-  │                                A4 needs only T002's fixtures
+  │                                A4 needs only T002's fixtures; A5 needs no edit at all
   ▼
 US2 (T024–T031)  needs US1: unbound arms are only different once the card delegates
   ▼
@@ -176,7 +190,7 @@ Polish (T040–T045)
 ```
 
 **Parallel opportunities**: T010/T011 (different rows, same file — sequential within the file
-but independent in reasoning). T012, T014, T016, T017 touch four different cards and are
+but independent in reasoning). T012, T014 and T016 touch three different cards and are
 genuinely parallel. T032–T039 are one file and are sequential.
 
 ## Implementation strategy

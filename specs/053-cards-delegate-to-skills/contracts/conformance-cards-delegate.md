@@ -14,15 +14,23 @@ that is missing, so every row below names the state in which it fails.
 | A2 | An override is recognised from the card's own text, with its reason | §Pins keeps its rule but stops saying what it overrides | FR-002 |
 | A3 | Content inside a fenced code block is never counted as a stated rule | the inventory admits `default_tags`, `validation` or aliased providers as taught practice | FR-003 |
 | A4 | The row fails against the terraform pack's **pre-feature** card text | the detection is too weak to have caught what this feature was written for | FR-007, SC-003 |
-| A5 | The row passes against `packs/vault` | the rule is not satisfiable, or vault silently regressed | FR-007, SC-003 |
+| A5 | `packs/vault` is reported **unbound**, not clean — its skill is bound to no phase | zero-restated-for-want-of-a-binding becomes indistinguishable from zero-restated-because-the-card-delegates | **FR-007a**, SC-003 |
+| A5a | The terraform pack passes **after** the edits | the positive half of A4; without it A4 alone shows only that something is wrong | FR-007, SC-003 |
 | A6 | The inventory's digest matches the manifest's pinned digest | `SKILL.md` is re-pinned and the inventory is left describing bytes that are gone | **FR-012** |
 | A7 | Every phase bound to a skill is compared, not a hard-coded three | a fourth phase is bound later and is never checked | FR-005 |
 | A8 | Delegation is safe: absent delivery refuses | `skill_missing`, `skill_empty` or `digest_mismatch` stops raising, so a delegating card could run without what it delegated | FR-001 |
 | A9 | The pack-level total is reported, not only per-card | the practice is distributed across cards and each card reads clean ([R2](../research.md)) | FR-005 |
 
-**A4 and A5 are the pair that makes A1 evidence.** A1 alone would pass against a detector that
-finds nothing. A4 pins that it caught the real defect; A5 pins that it is satisfiable. Neither
-is optional and neither can substitute for the other.
+**A4 and A5a are the pair that makes A1 evidence.** A1 alone would pass against a detector that
+finds nothing. A4 pins that it caught the real defect; A5a pins that the rule is satisfiable.
+Terraform is both halves of that control — failing before the edits, passing after.
+
+**A5 is a different guard, and analysis is what found it.** An earlier draft made "the row
+passes against `packs/vault`" the control. It would have passed by asserting nothing:
+`packs/vault/pack.toml` has no `phases` key, so its cards have no bound skill, FR-001 is
+vacuous there, and zero restated rules means *no binding* rather than *good delegation*. A5
+now asserts the gate can tell those apart — which is the hazard the mistake exposed, kept as a
+row instead of quietly dropped.
 
 **A8 is the load-bearing row.** Delegation removes rules from a card on the strength of them
 arriving from elsewhere. If that ever stops being enforced, this feature converts a duplicated

@@ -115,8 +115,8 @@ helpful edit at a time. Fixing the text without fixing the ratchet buys one rele
 the precedent for this exact shape in SC-006 — "enforced, not audited by hand".
 
 **Independent Test**: Add a rule to a phase card that its bound skill already states, and the
-check fails naming both locations. Remove it and the check passes. `packs/vault` passes
-throughout, unmodified, as the control that the rule is satisfiable rather than aspirational.
+check fails naming both locations. Remove it and the check passes. The positive control is
+terraform itself — failing before the edits, passing after.
 
 **Acceptance Scenarios**:
 
@@ -124,8 +124,9 @@ throughout, unmodified, as the control that the rule is satisfiable rather than 
    **Then** it fails, naming the rule and both documents.
 2. **Given** a card that overrides a rule and says so, **When** the check runs, **Then** it
    passes — an override is the sanctioned case, not an exemption from being noticed.
-3. **Given** `packs/vault` unchanged, **When** the check runs, **Then** it passes, and it would
-   have failed against the terraform pack before this feature.
+3. **Given** `packs/vault`, whose skill is bound to no phase, **When** the check runs, **Then**
+   it reports the pack as *unbound* rather than clean — and the terraform pack's pre-feature
+   text still fails.
 
 ### Edge Cases
 
@@ -163,9 +164,11 @@ throughout, unmodified, as the control that the rule is satisfiable rather than 
   shipped pack, not to the terraform Write card alone.
 - **FR-006**: A check MUST fail when a card restates a bound skill's stated rule, naming the
   rule and both documents. It MUST pass for a recorded override.
-- **FR-007**: The check MUST pass against `packs/vault` unmodified, and MUST have failed
-  against the terraform pack in its pre-feature state. A check that cannot demonstrate both is
-  not evidence.
+- **FR-007**: The check MUST have failed against the terraform pack in its pre-feature state
+  and MUST pass after the edits. A check that cannot demonstrate both is not evidence.
+- **FR-007a**: A pack whose skill is bound to no phase MUST be reported as **unbound**, never as
+  clean. Zero restated rules for want of a binding and zero for a card that delegates are
+  opposite conditions, and a gate that returns the same verdict for both asserts nothing.
 - **FR-008**: 051's SC-002 contract MUST be amended to record the withdrawal of the minimality
   hypothesis and the measured reason the original arms were invalid.
 - **FR-009**: A level SC-002 result MUST remain recordable as a finding. Nothing in this
@@ -199,8 +202,9 @@ throughout, unmodified, as the control that the rule is satisfiable rather than 
   is addressed by SC-004)*: Removing a skill binding changes the instruction the phase receives
   in a way a reader can point to — for at least one rule per bound skill, or a recorded finding that the
   skill has no stated rule the platform relies on.
-- **SC-003**: The check fails against the terraform pack's pre-feature text and passes against
-  `packs/vault` unmodified.
+- **SC-003**: The check fails against the terraform pack's pre-feature text and passes after
+  the edits; and it distinguishes `packs/vault`'s unbound skill from a delegating card rather
+  than reporting both as clean.
 - **SC-004**: **051's** SC-002 is either met on a rule selected from stated instruction, or amended
   to record that this skill has no teachable surface for the qualified model — with the
   measurement that establishes it. No third outcome is left open.
@@ -218,8 +222,12 @@ throughout, unmodified, as the control that the rule is satisfiable rather than 
 - **Delegation is safe because 051 made absence fail-closed.** `skill_missing`, `skill_empty`
   and `digest_mismatch` each refuse the load, so a card that delegates cannot silently run
   without what it delegated. This assumption is load-bearing and is asserted, not trusted.
-- **Vault is the control, not a second subject.** At 2 of 8 it is close enough to correct that
-  it demonstrates the rule is satisfiable. Any residue found is in scope; a rewrite is not.
+- **Vault is the unbound case, and is not edited.** `packs/vault/pack.toml` has no `phases`
+  key: its skill is pinned and bound to nothing, which 051's R12 chose deliberately and called
+  a live fixture that "must not acquire a binding by tidiness". Its cards therefore have no
+  bound skill to delegate to, an earlier draft's "2 of 8" measured an overlap with no
+  delegation relationship behind it, and removing those rules would delete guidance nothing
+  supplies. What vault contributes is the hazard in FR-007a.
 - **Judge and Plan are in scope with Write.** All three are bound to these skills, and FR-005
   applies to bindings rather than to one phase.
 - **"Genuinely the platform's own" covers instruction about this platform** — precedence,
@@ -232,5 +240,8 @@ throughout, unmodified, as the control that the rule is satisfiable rather than 
   the whole remedy is on this side of the seam.
 - Changing 051's delivery mechanism, its precedence rule, or its refusal codes. This feature
   consumes them.
-- Adopting new skills, or widening what any phase is bound to.
+- Adopting new skills, or widening what any phase is bound to — including binding
+  `vault-secret-access`, which 051 left unbound on purpose. That it is pinned and delivered to
+  no model is worth revisiting under ADR-0004, and is not this feature's to change in passing.
+- Editing any `packs/vault` card.
 - Re-running the withdrawn minimality experiment.
