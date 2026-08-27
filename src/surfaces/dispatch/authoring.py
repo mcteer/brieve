@@ -29,6 +29,7 @@ from typing import Any
 
 from core.authoring.artifact import AuthoredArtifact
 from core.authoring.proposal import Proposal, ProposalState, ProposedFile
+from core.authoring.retention import SCRUBBED_MARKER
 from core.authoring.tool import (
     AUTHOR_FILE,
     OPEN_PROPOSAL,
@@ -182,9 +183,32 @@ def proposal_payload(proposal: Proposal) -> dict[str, Any]:
     }
 
 
+class ScrubbedProposal(ValueError):
+    """The handoff was read after its content had been cleared (052).
+
+    Raised rather than returning a proposal with empty bodies, which is what this function did
+    before the marker existed: `str(f["body"])` succeeds on `""`, so a scrubbed payload rebuilt
+    into a publishable proposal and a publish would have opened an **empty pull request**.
+
+    Reaching this means the ordering broke. The scrub runs after `_publish_the_proposal`
+    returns, so nothing should read a scrubbed payload — and a loud failure is a far better
+    outcome than a silent empty pull request against somebody's repository.
+    """
+
+
 def proposal_from_payload(payload: Mapping[str, Any]) -> Proposal:
-    """Rebuild what the analyzer composed. Raises KeyError when the handoff is absent."""
+    """Rebuild what the analyzer composed. Raises KeyError when the handoff is absent.
+
+    Refuses a payload the retention scrub has already cleared (052, FR-002).
+    """
     raw = payload[PROPOSAL_PAYLOAD_KEY]
+    if raw.get(SCRUBBED_MARKER):
+        raise ScrubbedProposal(
+            "this proposal's content was cleared by the terminal retention scrub, so there is "
+            "nothing to publish. The scrub runs after the publish returns; reaching it here "
+            "means the ordering broke, and opening a pull request with empty files would be "
+            "worse than stopping."
+        )
     return Proposal(
         target_repository=str(raw["target_repository"]),
         branch=str(raw["branch"]),

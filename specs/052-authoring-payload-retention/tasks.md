@@ -48,13 +48,13 @@ Single project: `src/`, `tests/`, `scripts/`, `specs/` at repository root.
 
 **Purpose**: One realistic fixture every later phase asserts against. No production code.
 
-- [ ] T001 [P] Add a proposal-payload fixture to `tests/fixtures/authoring_payloads.py`: a
+- [X] T001 [P] Add a proposal-payload fixture to `tests/fixtures/authoring_payloads.py`: a
       payload shaped exactly as `proposal_payload` writes one — two files with bodies, a
       `rationale`, a `provenance` list carrying a path-and-digest line per file, plus `title`,
       `usage`, `task`, `target_repository`, `branch`, `disclosures`, `evidence`, `state`.
       Bodies use the harness marker from `tests/harness/secrets.py`, never credential-shaped
       literals — gitleaks caught exactly that on 051's first commit attempt
-- [ ] T002 [P] Add a scrubbed-payload fixture to the same module: the expected result of
+- [X] T002 [P] Add a scrubbed-payload fixture to the same module: the expected result of
       scrubbing T001's, so the two can be diffed field by field rather than asserted key by key
 
 ---
@@ -66,45 +66,45 @@ Single project: `src/`, `tests/`, `scripts/`, `specs/` at repository root.
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T003 Add `scrub_proposal_payload(payload) -> tuple[dict[str, Any], int]` to
+- [X] T003 Add `scrub_proposal_payload(payload) -> tuple[dict[str, Any], int]` to
       `src/core/authoring/retention.py`, beside `CONTENT_BEARING_TOOLS` — the same knowledge,
       one record over. Clears `authoring_proposal.files[].body` and
       `authoring_proposal.rationale`; returns the rewritten payload and the count of bodies
       cleared
-- [ ] T004 Make it **total**: a payload with no `authoring_proposal` returns unchanged with
+- [X] T004 Make it **total**: a payload with no `authoring_proposal` returns unchanged with
       count 0. A run that authored nothing and one that published must not take different
       cleanup paths (FR-006, FR-008)
-- [ ] T005 Make it **idempotent**: re-scrubbing returns the payload unchanged with count 0.
+- [X] T005 Make it **idempotent**: re-scrubbing returns the payload unchanged with count 0.
       Terminal state can be reached more than once
-- [ ] T006 Empty cleared keys to `""` rather than removing them. A reader distinguishing
+- [X] T006 Empty cleared keys to `""` rather than removing them. A reader distinguishing
       *absent* from *emptied* would treat a scrubbed run as malformed
-- [ ] T007 Export it in `__all__` and record in the module docstring **why the durability
+- [X] T007 Export it in `__all__` and record in the module docstring **why the durability
       provider gains no method**: `save` already upserts by `blob_id`, so 041's
       `scrub_closed_arguments` — a bulk `UPDATE` across a join — has no analogue here, and
       adding one would widen a sealed-core seam to do what it does (research R4)
-- [ ] T008 Set `authoring_proposal.scrubbed = True` on the rewritten payload. **A marker, not an
+- [X] T008 Set `authoring_proposal.scrubbed = True` on the rewritten payload. **A marker, not an
       emptiness test**: `proposal_from_payload` does `str(f["body"])`, which succeeds on `""`, so
       with emptied keys it returns a proposal with no content — the empty-pull-request outcome
       the refusal exists to prevent. Refusing on emptiness was rejected because nothing forbids
       a legitimately empty authored file (data model §1a)
-- [ ] T009 Make `proposal_from_payload` in `src/surfaces/dispatch/authoring.py` **refuse a
+- [X] T009 Make `proposal_from_payload` in `src/surfaces/dispatch/authoring.py` **refuse a
       payload carrying `scrubbed: true`**, with a message naming the ordering that must have
       broken. Fail-closed beside the ordering guarantee rather than instead of it
-- [ ] T010 [P] [GATE:conformance] Assert bodies and `rationale` are cleared and the count
+- [X] T010 [P] [GATE:conformance] Assert bodies and `rationale` are cleared and the count
       matches what changed, in `tests/unit/test_proposal_payload_scrub.py` (row A1)
-- [ ] T011 [P] [GATE:conformance] Assert `files[].path`, `files[].is_diff`, `title`, `usage`,
+- [X] T011 [P] [GATE:conformance] Assert `files[].path`, `files[].is_diff`, `title`, `usage`,
       `task`, `target_repository`, `branch`, `disclosures`, `evidence` and `state` all survive
       untouched, in the same file (row A2)
-- [ ] T012 [GATE:conformance] **Assert `provenance` survives by name**, and that its
+- [X] T012 [GATE:conformance] **Assert `provenance` survives by name**, and that its
       path-and-digest lines still match the surviving `files[].path` values (row A3, FR-009,
       SC-007). Asserted
       explicitly rather than inferred from the cleared list: this single field is why US1 and
       US2 do not trade against each other, and a change that took it would satisfy retention,
       destroy attestation, and look tidier doing it
-- [ ] T013 [P] [GATE:conformance] Assert cleared keys are `""` and still present (row A6)
-- [ ] T014 [P] [GATE:conformance] Assert a payload with no proposal returns unchanged, count 0
+- [X] T013 [P] [GATE:conformance] Assert cleared keys are `""` and still present (row A6)
+- [X] T014 [P] [GATE:conformance] Assert a payload with no proposal returns unchanged, count 0
       (row A7)
-- [ ] T015 [P] [GATE:conformance] Assert scrubbing twice returns unchanged, count 0 (row A8)
+- [X] T015 [P] [GATE:conformance] Assert scrubbing twice returns unchanged, count 0 (row A8)
 
 **Checkpoint**: the function is correct and provably so, with nothing yet calling it.
 
