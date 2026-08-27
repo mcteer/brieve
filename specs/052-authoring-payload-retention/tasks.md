@@ -276,12 +276,12 @@ scrub.
 - [X] T044 [P] Add `proposal payload scrub` to `docs/glossary.md`, stating what is cleared, what
       survives, and that the pull request is the durable artifact (ADR-0038) — which is what
       makes clearing the platform's copy defensible at all
-- [ ] T045 Add the ROADMAP Shipped row for 052 **on the day it merges**. The file has been three
+- [X] T045 Add the ROADMAP Shipped row for 052 **on the day it merges**. The file has been three
       features behind four times, warns about exactly that in its own text, and is what a
       planner reads first
-- [ ] T046 Run every scenario in [quickstart.md](quickstart.md)
-- [ ] T047 Run `make check`, then `make conformance`, then `make test-full`
-- [ ] T048 Request **security-maintainer review** on the implementation PR.
+- [X] T046 Run every scenario in [quickstart.md](quickstart.md)
+- [X] T047 Run `make check`, then `make conformance`, then `make test-full`
+- [X] T048 Request **security-maintainer review** on the implementation PR.
       `src/core/authoring/retention.py` is sealed core, and this change deletes content a run
       record currently contains — constitution Principle V and `AGENTS.md` rule 4
 
