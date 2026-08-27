@@ -88,8 +88,8 @@ Single project: `src/`, `tests/`, `packs/`, `evals/`, `docs/` at repository root
 
 ## Phase 3: User Story 1 — The pin becomes load-bearing (Priority: P1) 🎯 MVP
 
-**Goal**: The three bound terraform cards and the vault card stop restating what the skill
-states, so removing a binding would change what the phase is told.
+**Goal**: The three bound terraform cards stop restating what the skill states, so removing a
+binding would change what the phase is told. No vault card is edited ([R4](research.md)).
 
 **Independent test**: Run `compare_card` over each edited card — zero restated rules, except
 declared overrides.

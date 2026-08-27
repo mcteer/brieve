@@ -31,7 +31,7 @@ structural rather than statistical:
 | Its prose-stated rules also stated by `agents/write/AGENTS.md` | **16 of 16** |
 | Skill content the card does not carry | exactly four: aliased providers, `default_tags`, `validation` blocks, `tflint` |
 | Of those four, how many are stated as instructions | **zero** — three appear only inside fenced code examples, the fourth is process tooling that cannot appear in authored HCL |
-| The same comparison on `packs/vault` | **2 of 8** restated — the control case |
+| The same comparison on `packs/vault` | **not applicable** — its skill is bound to no phase, so there is no delegation relationship to measure ([R4](research.md)) |
 
 **This retires the second sub-question rather than answering it.** SC-002 was measured on
 `variable_has_validation` and `tags_are_shared_not_ad_hoc`; both were selected from example

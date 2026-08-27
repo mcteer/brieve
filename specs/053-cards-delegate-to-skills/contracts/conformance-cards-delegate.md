@@ -40,7 +40,7 @@ rule into a missing one, silently, and nothing else here would notice.
 
 | Row | Asserts | Named runner |
 | --- | --- | --- |
-| E1 | The three edited terraform phases and the edited vault phase re-qualify before promotion, all-five-or-none | Dan — eval lane, FR-010, SC-005 |
+| E1 | The three edited terraform phases re-qualify before promotion, all-five-or-none | Dan — eval lane, FR-010, SC-005 |
 | E2 | **051's SC-002, re-measured** on a rule selected from *stated* instruction, bound vs unbound, n>=5 per arm | Dan — `evals/prompt-tune/sc002_skill_effect.py` |
 | E3 | No regression on the existing corpus: `no_floating_version_constraint` does not fall, since §Pins is retained as an override | Dan — eval lane |
 

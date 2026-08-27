@@ -15,7 +15,7 @@ force, and no measurement could show anything. The duplication is pack-wide
 
 This feature makes the pin load-bearing. The three bound cards delegate the practice the skill
 states, keep what is genuinely this platform's own, and keep §Pins as a **declared override**
-that says what it contradicts and why. A hermetic row then holds the line, with `packs/vault`
+that says what it contradicts and why. A hermetic row then holds the line, with terraform as
 as the passing control at 2 of 8 ([R4](research.md)).
 
 **Everything is pack content and gate rows. No platform source changes** — the seam 051 built
@@ -107,7 +107,7 @@ packs/terraform/agents/plan/AGENTS.md      # delegate 6 restated rules
 tests/conformance/packs/
 ├── rule_inventory.py                      # rules derived per skill, digest-bound (R7)
 ├── card_fixtures.py                       # frozen pre-feature card text; the baselines
-└── test_cards_delegate_to_skills.py       # the enforcement row + the vault control
+└── test_cards_delegate_to_skills.py       # rows A0–A9; terraform is the control
 
 tests/evals_live/authoring_properties.py   # one new structural detector (R5)
 evals/authoring/corpus.toml                # a task that exercises it

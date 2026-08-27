@@ -40,9 +40,22 @@ grep -n '^```' packs/terraform/skills/terraform-style-guide/SKILL.md
 Compare the line numbers. Every `tag` line falls inside a fence pair. There is no prose
 instruction to tag anywhere in the guide.
 
-**The 16-of-16 overlap**, and the vault control at 2-of-8: run the enforcement row (§3) — it is
+**The 16-of-16 overlap**: run the enforcement row (§3) — it is
 the same comparison, which is the point. A measurement that only a throwaway script can make is
 a measurement nobody will make again.
+
+## 1a. Confirm which packs actually bind a skill
+
+The whole scope rests on this, and an earlier draft of the spec got it wrong:
+
+```bash
+grep -n "^phases" packs/*/pack.toml
+```
+
+Only the two `packs/terraform` entries appear. `packs/vault`'s skill is pinned and bound to
+**nothing** — deliberately, per 051's R12 — so its cards have no bound skill to delegate to and
+are not edited by this feature. Row A5 exists because zero restated rules there means *no
+binding*, not compliance.
 
 ## 2. Confirm the assumption delegation rests on
 
@@ -63,7 +76,8 @@ uv run pytest tests/conformance/packs/test_cards_delegate_to_skills.py -v
 ```
 
 Expected: A1–A9 pass. In particular A4 must demonstrate that the row **fails** against the
-pre-feature card text, and A5 that it **passes** against `packs/vault` unmodified. A run where
+pre-feature card text, A5a that it **passes** after the edits, and A5 that `packs/vault` is
+reported *unbound* rather than clean. A run where
 A1 passes but A4 does not is a detector that finds nothing.
 
 Whole hermetic suite:
@@ -100,7 +114,7 @@ A card edit may not ship on the strength of the eval that qualified the previous
 ## What "done" looks like
 
 - `make check` green, with A4 and A5 demonstrating the row can both catch and be satisfied
-- Three terraform cards and one vault card shorter, each delegated rule gone
+- Three terraform cards shorter, each delegated rule gone; **no vault card edited**
 - §Pins retained and **saying what it overrides and why**
 - 051's SC-002 contract amended with the withdrawal and the selection error
 - SC-002 either met on a stated rule, or recorded as unmeetable with the measurement
