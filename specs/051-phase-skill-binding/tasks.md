@@ -319,7 +319,7 @@ runs of different content.
 
 ### Implementation
 
-- [ ] T043 [US4] Declare the two unsatisfiable recommendations on
+- [X] T043 [US4] Declare the two unsatisfiable recommendations on
       **`terraform-style-guide` only** in `packs/terraform/pack.toml` — `terraform_fmt` and
       `terraform_validate`, with the exact recommendation strings from
       [data-model.md](data-model.md) §2. **`terraform-style-guide-security` declares nothing**:
@@ -329,12 +329,12 @@ runs of different content.
       digest (FR-019). **Wording is deliberately narrow**: no registry tool runs them, so the branch was not formatted or validated by
       the platform — not "the platform cannot run `terraform validate`", which the eval lane
       disproves (research R6)
-- [ ] T044 [US4] Add `unsatisfiable_recommendations: tuple[str, ...] = ()` to `Proposal` in
+- [X] T044 [US4] Add `unsatisfiable_recommendations: tuple[str, ...] = ()` to `Proposal` in
       `src/core/authoring/proposal.py` and render `## Adopted practice not carried out`
       between `## Provenance` and `## Limits`, one `- ` bullet per recommendation, verbatim.
       **Not folded into `limits`** — `limits` is `DERIVATIVE_LIMIT + disclosures` and
       disclosures are run-derived, while this text must be run-independent (FR-018)
-- [ ] T045 [US4] Populate it in `compose` in `src/core/authoring/proposal.py` and pass it from
+- [X] T045 [US4] Populate it in `compose` in `src/core/authoring/proposal.py` and pass it from
       the `compose(...)` call in `src/surfaces/dispatch/entrypoint.py`: the recommendations of
       every skill bound to **any** phase of the bound pack, in `[[skills]]` order then
       declaration order within a skill (FR-016). Read the manifest, never the progress record — a run
@@ -343,15 +343,15 @@ runs of different content.
 
 ### Tests
 
-- [ ] T046 [P] [US4] [GATE:conformance] Assert the section appears with both recommendations
+- [X] T046 [P] [US4] [GATE:conformance] Assert the section appears with both recommendations
       verbatim in the right position, and that two runs over different content produce
       byte-identical section bytes, in
       `tests/component/test_proposal_unsatisfiable_recommendations.py` (row A16, FR-016, SC-008,
       US4 acceptances 1–2)
-- [ ] T047 [P] [US4] [GATE:conformance] Assert a pack with no bound skills — or none
+- [X] T047 [P] [US4] [GATE:conformance] Assert a pack with no bound skills — or none
       declaring unsatisfiable recommendations — renders today's body exactly, with no empty
       heading, in the same file (row A17)
-- [ ] T048 [US4] Assert the stale-declaration guard end to end: declaring
+- [X] T048 [US4] Assert the stale-declaration guard end to end: declaring
       `terraform_fmt` as a `[[tools]]` entry with a resolvable handler refuses the load rather
       than telling a reviewer to do work the platform now does (row A15 tie-in, US4
       acceptance 3)
@@ -372,12 +372,12 @@ the bound phase receive it.
 **Note**: US3 acceptance 2 (binding to an unknown phase refuses and names it) is delivered by
 T006 and asserted by T009. This phase adds the property that keeps the boundary from eroding.
 
-- [ ] T049 [US3] [GATE:conformance] Assert **no file under `src/` names a skill, a
+- [X] T049 [US3] [GATE:conformance] Assert **no file under `src/` names a skill, a
       skill-to-phase binding, or a recommendation string** — scanning for the shipped skill
       names, `phases`-adjacent literals, and the recommendation text — in
       `tests/conformance/packs/test_no_source_names_a_skill.py` (row A11, SC-004). Extends the
       existing `test_core_is_product_blind.py` property to skills
-- [ ] T050 [US3] Assert the positive case: adding a `phases` entry to an in-memory fixture
+- [X] T050 [US3] Assert the positive case: adding a `phases` entry to an in-memory fixture
       manifest, with zero source change, causes the bound phase to receive the skill —
       in `tests/conformance/phase_agents/test_binding_is_declaration.py` (US3 acceptance 1)
 

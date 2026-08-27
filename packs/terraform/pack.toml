@@ -78,6 +78,26 @@ unsatisfiable_reviewed_at = "fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d417621
 # Research and Propose are not bound, and their prose no longer claims otherwise.
 phases = ["plan", "write", "judge"]
 
+# WHAT THIS SKILL RECOMMENDS THAT NO REGISTRY TOOL CAN DO (051, FR-015).
+#
+# SKILL.md's "Validation Tools" section says to run these before committing. Neither is a
+# registry tool, so the authoring agent cannot run them on the branch it is proposing, and
+# the pull request says so — adopted practice this platform cannot carry out is handed to
+# the reviewer rather than silently skipped (ADR-0038).
+#
+# THE WORDING IS DELIBERATELY NARROW. `tests/evals_live/write_gates.py` really does shell out
+# to `terraform validate` as gate one of Write scoring, so "this platform cannot run
+# terraform validate" would be false and this repository would disprove it. What is true is
+# that no REGISTRY tool exists, so this branch's files were never formatted or validated by
+# the platform.
+[[skills.unsatisfiable]]
+capability     = "terraform_fmt"
+recommendation = "No registry tool runs `terraform fmt -recursive`; the authored files in this branch were not formatted by the platform."
+
+[[skills.unsatisfiable]]
+capability     = "terraform_validate"
+recommendation = "No registry tool runs `terraform validate`; this branch's configuration was not validated by the platform."
+
 [[skills]]
 name    = "terraform-style-guide-security"
 path    = "skills/terraform-style-guide/SECURITY.md"

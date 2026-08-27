@@ -451,6 +451,32 @@ def _fail_current_phase(run: Any, reason: str) -> None:
     run.propose_progress = fail(progress, phase=phase_to_fail(progress), reason=reason)
 
 
+def _unperformable_practice(run: Any) -> tuple[str, ...]:
+    """What the bound pack's skills recommend that no registry tool can do (051, FR-016).
+
+    Read from the manifest, never from the progress record and never from a model — which is
+    what makes the text identical across runs (FR-018).
+
+    Returns empty rather than raising. The pack loaded at phase-bind time or the run would
+    not have reached a pull request; if it somehow cannot be read here, a proposal that omits
+    the section is a smaller wrong than a run that dies after the work is done. The absence
+    is visible: the section is missing, not silently short.
+    """
+    from core.packs.agents import unsatisfiable_recommendations
+    from core.packs.loader import FilesystemPackLoader
+    from surfaces.dispatch.phase_agents import _pack_names
+    from surfaces.toolset import PACKS_ROOT
+
+    names = _pack_names(run)
+    if len(names) != 1:
+        return ()
+    root = Path(getattr(run, "packs_root", PACKS_ROOT))
+    try:
+        return unsatisfiable_recommendations(FilesystemPackLoader(root).load(names[0]))
+    except Exception:  # noqa: BLE001 — see the docstring; the section is omitted, not faked
+        return ()
+
+
 def _bind_phase_or_fail(run: Any, phase: PhaseName) -> str | None:
     """Bind the phase instruction or fail closed. Returns a reason code on failure."""
     from core.packs.manifest import ManifestError
@@ -1061,6 +1087,7 @@ def _finish_authoring_analyzer(
         correlation_id=correlation_id,
         consulted=consulted,
         base_commit=os.environ.get("RUN_BASE_COMMIT", "").strip(),
+        unsatisfiable_recommendations=_unperformable_practice(run),
     )
     # The PR carried bounded plan facts as evidence; with no gate there is no plan to quote.
     # The proposal still carries what it authored, why, and the run it came from.

@@ -73,6 +73,31 @@ class PhaseAgents:
     skills: tuple[DeliveredSkill, ...] = ()
 
 
+def unsatisfiable_recommendations(manifest: PackManifest) -> tuple[str, ...]:
+    """What this pack's bound skills recommend that no registry tool can carry out.
+
+    **From the manifest, and from nothing else** (FR-018). Not the progress record, not a
+    model's account of its own work — a declaration is pinned, reviewed, and identical on
+    every run, which is what makes the sentence a reviewer reads the same in two pull
+    requests over entirely different content.
+
+    **Every skill bound to any phase**, rather than to the phases that happened to run. The
+    two sets are the same at the only moment this is asked: a run that opens a pull request
+    has necessarily executed all five phases, because `open_proposal` follows the Propose
+    bind, which follows Judge permitting publication, which follows Write, Plan and Research.
+    Reading the manifest rather than the progress record is what makes run-independence
+    structural instead of carefully maintained.
+
+    Order is `[[skills]]` declaration order, then declaration order within a skill.
+    """
+    out: list[str] = []
+    for skill in manifest.skills:
+        if not skill.phases:
+            continue
+        out.extend(item.recommendation for item in skill.unsatisfiable)
+    return tuple(out)
+
+
 def assemble_instruction(
     agents_body: str,
     skills: tuple[DeliveredSkill, ...],
@@ -273,4 +298,11 @@ def load_phase_agents(
     )
 
 
-__all__ = ["PhaseAgents", "load_phase_agents"]
+__all__ = [
+    "INSTRUCTION_BUDGET_BYTES",
+    "DeliveredSkill",
+    "PhaseAgents",
+    "assemble_instruction",
+    "load_phase_agents",
+    "unsatisfiable_recommendations",
+]
