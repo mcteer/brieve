@@ -191,10 +191,67 @@ class PolicyAuthoringRequest:
 #: Vault's ACL is the layer underneath.
 _POLICY_ARGUMENTS = ("policy_name", "target_policy", "name")
 
+#: Arguments through which a call claims WHICH RUN it is. Checked on every tool rather than
+#: only the policy-writing ones, because this is an identity claim rather than a policy name:
+#: no tool has a legitimate reason to act as a run other than the one making the call.
+#:
+#: **042 refused a `scratch_name` argument as "a caller choosing what to overwrite"
+#: (`handlers.py`) and then derived that name from `run_id`, which is an argument.** The
+#: refusal was right and the route around it was open — a call naming another run's id reaches
+#: that run's measurement workspace, and the wildcard grant in `scratch.tf` permits acting on
+#: it. Demonstrated against the live enclave, issue #226.
+_IDENTITY_ARGUMENTS = ("run_id",)
+
 #: Which tools this hook inspects. Supplied as a constant rather than checked against every
 #: tool, because a hook that examined `read_subject`'s file contents for policy names would
 #: refuse a run for analysing a repository that mentions `agent-ceiling` in a comment.
 POLICY_WRITING_TOOLS = frozenset({"author_file", "vault_policy_impact"})
+
+
+def _refuse_a_foreign_run(ctx: HookContext) -> HookDecision | None:
+    """Deny a call claiming a run id that is not the caller's. `None` when there is nothing to
+    refuse (issue #226).
+
+    **Fail-closed when identity cannot be established.** A governance hook always receives its
+    run, so an absent one is a misconfiguration — and allowing on absence would make this guard
+    removable by arranging for the run to be missing rather than by deleting the check.
+
+    **Compared against the run's own id and nothing else.** There is no list to be on: the only
+    run a call may act as is the one making it.
+    """
+    claimed = ""
+    for argument in _IDENTITY_ARGUMENTS:
+        claimed = str(ctx.arguments.get(argument, "") or "").strip()
+        if claimed:
+            break
+    if not claimed:
+        return None
+
+    run = ctx.run
+    actual = str(getattr(run, "run_id", "") or "").strip() if run is not None else ""
+    if not actual:
+        actual = str(ctx.correlation_id or "").strip()
+
+    if not actual:
+        return HookDecision(
+            outcome="deny",
+            reason_code="run_identity_unavailable",
+            message=(
+                "a call claims a run id but the pipeline could not establish which run is "
+                "making it, so the claim cannot be checked. Refused rather than trusted."
+            ),
+        )
+    if claimed == actual:
+        return None
+    return HookDecision(
+        outcome="deny",
+        reason_code="run_id_forged",
+        message=(
+            f"this call claims to be run {claimed!r} while it is run {actual!r}. A run id is "
+            f"not a caller's to choose: the measurement namespace is derived from it, so "
+            f"naming another run reaches that run's workspace."
+        ),
+    )
 
 
 def protected_policy_hook(protected: ProtectedSet) -> HookRegistration:
@@ -223,6 +280,10 @@ def protected_policy_hook(protected: ProtectedSet) -> HookRegistration:
     """
 
     def handler(ctx: HookContext) -> HookDecision:
+        forged = _refuse_a_foreign_run(ctx)
+        if forged is not None:
+            return forged
+
         if ctx.tool_name not in POLICY_WRITING_TOOLS:
             return HookDecision(outcome="allow")
 

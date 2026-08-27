@@ -1,6 +1,7 @@
 # ADR-0057: Read-scope narrowing is the wrong control for context-hungry expert agents
 
-- **Status**: Accepted
+- **Status**: Accepted — **trigger 1 fired 2026-08-07, recorded 2026-08-27** (see *Amendment*).
+  The Decision stands; what changed is that a condition it named for re-opening has occurred.
 - **Date**: 2026-07-31
 - **Qualifies**: [ADR-0056](0056-task-scope-needs-an-authorization-server-vault-is-not-one.md) — its mechanism stands; its *applicability* to reads does not
 - **Relates to**: [ADR-0026](0026-delegation-grants-and-per-step-tokens.md), [ADR-0044](0044-authz-doctrine-and-credential-translation.md), [ADR-0048](0048-nomad-is-the-agent-execution-substrate.md)
@@ -112,6 +113,45 @@ than its ceiling; write or act capability enters an agent ceiling; or an estate'
 posture requires per-task read scoping regardless of the cost to output quality. The first two
 are ordinary; the third is a real possibility in a regulated deployment, and the mechanism
 being proven means it is a configuration decision rather than a project.
+
+## Amendment — 2026-08-27: trigger 1 has fired
+
+**The Decision below is unchanged and was right.** Read-scope narrowing starves context-hungry
+agents, and nothing here reverses that. What follows is the record catching up with a condition
+this ADR itself named.
+
+**Trigger 1 — "a pack ships a tool inherently narrower than its ceiling" — occurred on
+2026-08-07** with 042, and nobody noticed at the time. `packs/vault/pack.toml` ships
+`vault_policy_impact`, whose declared `paths` are `sys/policies/acl/scratch-agent-*` with
+`create`, `update`, `delete` and `read`. The tool needs exactly two of those paths per call,
+both derived from the run id; it holds a wildcard over every run's.
+
+**The premise this ADR rested on also stopped being true, and the tree says so in its own
+words.** The Decision reads *"Every ceiling in the estate is read-only today, so writes are
+already refused one layer up."* `infra/modules/trust-fabric/auth.tf` now records the opposite
+at the grant it added: *"This is the first WRITE capability a dispatched run has ever carried —
+every grant above is read-only."*
+
+**Which is what this record predicted.** The Decision's third bullet says *"Where narrowing is
+worth having is WRITE and ACT, and that is a different mechanism."* 042 needed exactly that and
+built the cheapest available version — a static Vault ACL over a fixed prefix, because
+Terraform cannot know a run id at apply time. Per-run manufacture from an attested identity is
+the thing that can, and it is the substrate parked at `archive/016-task-scoped-authority`.
+
+**What the trigger firing does and does not mean.** It does not re-open read narrowing; the
+reasoning against that is untouched and the workload has not changed. It re-opens the
+*write* case, narrowly: a grant scoped to the run that uses it, for a namespace whose names
+are already per-run.
+
+**Evidence.** Demonstrated against the live dev enclave on 2026-08-27 with a token carrying
+exactly the policies the `agent-run` role grants: one run read (200), overwrote (200) and
+deleted (204) another run's measurement policy. Recorded as issue #226 with the reachability
+analysis, including two paths checked and found sound — concurrent runs do not collide by
+accident, and the sweep does not race a live run.
+
+**Partly closed already.** The reachable route — a model-driven tool call naming a foreign
+`run_id` — is refused in the governance hook as of #226. The grant underneath is still
+estate-wide, which is the half this trigger is about.
 
 ## Notes
 
