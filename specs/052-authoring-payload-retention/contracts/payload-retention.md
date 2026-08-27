@@ -74,6 +74,31 @@ defect the call site's own comment records somebody hitting.
 **Persistence**: `DurabilityProvider.save` with the same `blob_id`. No new provider method
 (ADR-0024, Principle V — the seam is used).
 
+### 2.1 The re-save carries every field
+
+`save()` **overwrites the whole row**, and the store's own comment calls the default *"the
+trap"*. Two columns are guarded and the rest are not:
+
+| Column | Bare re-save | Guard |
+| --- | --- | --- |
+| `payload` | replaced — intended | none |
+| `run_state`, `stop_reason` | safe | `COALESCE` — terminal-once |
+| `resume_count` | safe | `GREATEST` — monotonic |
+| **`correlation_id`** | **blanked** | **none** |
+| `grant_id`, `step_index`, `written_by` | blanked / reset | none |
+
+**The scrub MUST construct its blob from the one it rewrites, replacing `payload` and nothing
+else.**
+
+Blanking `correlation_id` is a governance defect, not untidiness: it is the ID joining prompt →
+hook decision → tool call → product run → audit entry, `AGENTS.md` requires it propagated
+through every new code path, and Principle IX's attestation is walked along it. US2 exists to
+keep a run attestable, so a literal reading of "save the scrubbed payload" would destroy what
+US2 protects in the commit that protects it.
+
+Row A17 asserts every column survives. The two SQL guards protect the two columns somebody
+already lost; they are not a reason to trust the next unguarded one.
+
 ---
 
 ## 3. Refusals
@@ -117,6 +142,15 @@ back.
 **Six checkpoints, ~81 KB, all `completed`** at the time of writing. #219's row sweeps the whole
 table rather than runs created after the change, so without the backfill the feature does not
 close the issue it was written for.
+
+---
+
+## 5.1 Scope
+
+The scrub reaches authoring runs only (FR-012). The call sits inside the `PROPOSER` branch, so
+the scoping is structural — and row A18 asserts it anyway, because a structural property is
+exactly what somebody undoes by hoisting a call one line out of a branch, and every other row
+would still pass.
 
 ---
 

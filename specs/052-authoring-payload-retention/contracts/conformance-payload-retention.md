@@ -23,8 +23,11 @@ executes names the party who runs it before merge (constitution v1.6.0, Quality 
 | A14 | The compiled report does not claim to carry content the run no longer holds | An attestation asserts more than the record supports |
 | A15 | The backfill clears terminal checkpoints only and leaves non-terminal ones intact | A resumable run is scrubbed by a maintenance script |
 | A16 | The backfill is idempotent and reports each blob it changed | A silent backfill is indistinguishable from one that did nothing |
+| A17 | **The re-save carries every column.** After the scrub, `correlation_id`, `grant_id`, `step_index`, `written_by`, `run_state`, `stop_reason` and `resume_count` are unchanged from before it | A bare `CheckpointBlob(blob_id=…, payload=…)` blanks the correlation ID on the terminal checkpoint — and the run this feature just made retention-safe stops being walkable |
+| A18 | A non-authoring run's payload is untouched (FR-012) | The call is hoisted out of the `PROPOSER` branch and every other row still passes |
 
-**Runner**: CI (`make check`) for A1–A3, A6–A8, A10–A11; `make conformance` for the rest.
+**Runner**: CI (`make check`) for A1–A3, A6–A8, A10–A11; `make conformance` for the rest,
+including A17 and A18.
 
 ## Enclave / named runner
 
@@ -57,8 +60,21 @@ A11 asserts the property that is actually true and can actually fail: the refusa
 `authoring_proposal`. If that ever changes — if a refused run starts carrying a proposal — this
 row goes red and FR-007 stops being vacuous, which is exactly when somebody needs to know.
 
-**This is carried to `/speckit-analyze`**: FR-007 as written asks for something unobservable,
-and should be restated.
+**Resolved 2026-08-27**: FR-007 was restated to say this, so the requirement and the row now
+agree about what is being asserted.
+
+### Why A17 exists at all
+
+The obvious reading of "persist the scrubbed payload" is
+`save(CheckpointBlob(blob_id=…, payload=scrubbed))`. It is wrong, and wrong silently: `save()`
+overwrites the whole row, and only `run_state`, `stop_reason` and `resume_count` carry guards —
+each added after somebody lost that column.
+
+`correlation_id` has no guard. Blanking it on the terminal checkpoint breaks the join
+attestation is walked along, in a feature whose second user story exists to keep runs
+attestable. No other row in this contract would notice: every one of them reads the payload.
+
+A17 reads the columns.
 
 ### Why A3 is singled out
 

@@ -106,6 +106,46 @@ down is the way this feature ships broken (US3).
 payload itself. The scrub rewrites what it just wrote, through `save` — which upserts by
 `blob_id`, so no new provider capability is needed.
 
+### 4a. The re-save must carry every field, not only the payload
+
+**`save()` overwrites the whole row.** The store's own comment calls the default *"the trap"*,
+and the columns split three ways:
+
+| Column | On a bare re-save | Guard |
+| --- | --- | --- |
+| `payload` | replaced | none — this is the intent |
+| `run_state`, `stop_reason` | **safe** | `COALESCE(checkpoints.…, EXCLUDED.…)` — terminal-once |
+| `resume_count` | **safe** | `GREATEST(…)` — monotonic |
+| `correlation_id` | **BLANKED** | none |
+| `grant_id`, `step_index`, `written_by` | **blanked / reset** | none |
+
+**Blanking `correlation_id` would be a governance defect, not untidiness.** It is the ID that
+joins prompt → hook decision → tool call → product run → audit entry; `AGENTS.md` requires it
+propagated through every new code path, and Principle IX's attestation is walked along it.
+This feature's US2 exists to keep a run attestable — so a literal reading of "save the scrubbed
+payload" would destroy the thing US2 protects, in the same commit that protects it.
+
+**The rule**: the scrub constructs its blob from the one it is rewriting, replacing `payload`
+and nothing else. Every other field is threaded through, exactly as the entrypoint's existing
+terminal writes already do:
+
+```
+CheckpointBlob(
+    blob_id=blob.blob_id,
+    payload=scrubbed,                 # the only change
+    correlation_id=blob.correlation_id,
+    grant_id=blob.grant_id,
+    step_index=blob.step_index,
+    written_by=blob.written_by,
+    outcome=blob.outcome,
+    resume_count=blob.resume_count,
+)
+```
+
+The two SQL guards are real and are **not** the answer. They protect the two columns somebody
+already lost, and a row must assert the rest rather than trusting that the next unguarded
+column is also harmless.
+
 ---
 
 ## 5. What does not change
@@ -117,6 +157,7 @@ payload itself. The scrub rewrites what it just wrote, through `save` — which 
 | The checkpoint schema | No migration |
 | `proposal_from_payload` | Unchanged, and it must stay strict: it reads `body` and will raise on a scrubbed payload. That is correct — it is only called before publishing, so a scrubbed payload reaching it means the ordering broke, and it should fail loudly rather than reconstruct an empty proposal |
 | The audit trail | Not a subject here. FR-013 already refused the trail a copy nobody can delete |
+| Non-authoring runs | Untouched, and asserted rather than assumed. The call sits inside the `PROPOSER` branch, so the scoping is structural — but a row is what stops somebody hoisting it one line out and passing every other check (FR-012) |
 
 ---
 

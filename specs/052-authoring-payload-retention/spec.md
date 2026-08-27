@@ -44,6 +44,18 @@ The other half was never closed: the composed proposal is also written to
   none of the content. The cost is accepted deliberately: a path list is a partial fingerprint
   of the customer's tree, and it is the smallest thing that keeps the run self-describing.
 
+### Session 2026-08-27 — `/speckit-analyze` remediation
+
+- **FR-007** asked for something unobservable. A run refused at Judge returns before Propose and
+  never composes a proposal, so a row asserting the scrub cleared it would pass without
+  exercising anything. Restated as the property that can actually fail.
+- **FR-014** described work that had already merged in #220. Restated as the non-regression
+  obligation that remains.
+- **FR-015** added. The backfill was designed in the plan and required by nothing: SC-001 admits
+  no exception for content that predates the fix, and the acceptance row sweeps the whole store.
+- **FR-011** sharpened. Its obligation — that the never-terminal gap is recorded — was
+  dischargeable only by this document, which nobody reads while reading the code.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A completed Build leaves no copy of what it wrote (Priority: P1)
@@ -164,8 +176,13 @@ request opens carrying the same files, and that the scrub did not run before the
   detect afterwards.
 - **FR-006**: The scrub MUST be safe to run more than once, and MUST clear nothing when a run
   authored nothing — a successful run and an empty one may not take different cleanup paths.
-- **FR-007**: A run that ends by refusal MUST be scrubbed on the same terms as one that ends by
-  publishing.
+- **FR-007**: A run that ends by refusal MUST leave no authored content either. **Measured, this
+  holds by construction rather than by scrubbing**: a run refused at Judge returns before Propose
+  and never composes a proposal, so its payload has no authored content to clear. The
+  requirement is therefore stated as the property that is actually checkable — the refusal path
+  writes no proposal — because a row asserting "the scrub cleared it" would pass without
+  exercising anything. If the refusal path ever starts carrying a proposal, that row fails, and
+  this requirement stops being satisfied for free.
 - **FR-008**: The scrub MUST clear the authored file bodies and the model-authored rationale,
   and MUST NOT clear the title or usage text. Both cleared fields derive from the customer's
   repository; FR-032 already treats the rationale that way, and the two remaining fields are
@@ -178,17 +195,30 @@ request opens carrying the same files, and that the scrub did not run before the
   proposal is published or the run has failed terminally. A run that can still resume MUST NOT
   have been scrubbed.
 - **FR-011**: A run that never reaches terminal state is not scrubbed by FR-010, and the
-  platform MUST record that this case exists rather than let it read as covered. Closing it
-  needs a sweeper and a staleness threshold, which is a separate decision.
+  platform MUST record that this case exists rather than let it read as covered. **Recorded
+  where a reader of the platform will find it** — beside the scrub itself, and in the project's
+  deferral list — not only in this specification, which nobody consults while reading the code.
+  Closing it needs a sweeper and a staleness threshold, which is a separate decision.
 - **FR-012**: The scrub MUST be scoped to authoring runs. 041 decided this deliberately for
   intents — a run whose arguments are a Vault path or a workspace name is not the case this
   exists for — and widening it here would re-decide that in a different feature.
 - **FR-013**: A conformance row MUST observe the state store holding no authored content after
   a completed run, and MUST be able to fail — asserted against a store that held the content
   before the scrub ran.
-- **FR-014**: The platform MUST NOT rely on prose matching to decide whether content is
-  present. The row that surfaced this defect was red for three weeks because it matched the
-  English word *"secret"* in a Judge model's sentence.
+- **FR-014**: The acceptance row MUST NOT regress to prose matching. **This is a
+  non-regression obligation, not new work**: the matcher that decides whether content is present
+  was corrected in [#220](https://github.com/mcteer/brieve/pull/220) — the row had been red for
+  three weeks because it matched the English word *"secret"* in a Judge model's sentence, which
+  masked the finding this feature exists to close. What remains is that this feature does not
+  undo it, and that the row still asserts credential *shapes* rather than words when it goes
+  green.
+
+- **FR-015**: Authoring runs that reached terminal state **before** this feature existed MUST
+  also be cleared. Six such checkpoints hold authored bodies today, and SC-001 admits no
+  exception for content that predates the fix. The acceptance signal sweeps the whole store
+  rather than runs created after the change, so a forward-only scrub leaves the finding open.
+  This is a one-time, idempotent operation over terminal checkpoints — not a scheduled sweeper,
+  which FR-011 deliberately leaves undone.
 
 ### Key Entities
 

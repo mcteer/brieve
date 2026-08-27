@@ -76,19 +76,33 @@ v1.6.0 (Last Amended 2026-08-05) — checked against that version.*
 
 **Gate result**: **PASS — proceed to Phase 0.**
 
-### Carried findings that need a spec sentence
+### Carried findings — resolved by the `/speckit-analyze` remediation
 
-Both must reach `/speckit-analyze` and from there `/speckit-clarify`. Neither blocks this plan.
+Both are now spec sentences, and analysis found three more. Recorded because the plan was
+written before them.
 
-1. **FR-007's case does not exist** ([R6](research.md)). A run refused at Judge returns before
-   Propose and never composes a proposal, so there is nothing in its payload to scrub. A row
-   asserting FR-007 as written would pass without exercising anything. The requirement should
-   be restated as what is actually true and checkable: a refused run's payload contains no
-   authored content in the first place.
-2. **The backfill has no requirement** ([R7](research.md)). Six checkpoints already hold
-   authored bodies, all terminal. SC-001 says 100% and the acceptance row sweeps the whole
-   table, so a forward-only scrub leaves #219 red. The plan builds the backfill; the spec does
-   not ask for it.
+1. **FR-007** asked for something unobservable — a refused run never composes a proposal.
+   Restated as the property that can fail.
+2. **FR-015** added for the backfill, which this plan designed and no requirement asked for.
+3. **FR-014** described work already merged in #220; restated as the non-regression obligation.
+4. **FR-011** sharpened — its obligation was dischargeable only by the specification, which
+   nobody reads while reading the code.
+5. **FR-012 gained a row.** Structural scoping is what somebody undoes by hoisting a call out
+   of a branch.
+
+### The correction analysis forced
+
+**The re-save would have blanked the correlation ID.** `save()` overwrites the whole row.
+`run_state`, `stop_reason` and `resume_count` carry guards — each added after somebody lost
+that column — and `correlation_id`, `grant_id`, `step_index` and `written_by` do not.
+
+So the obvious implementation of "persist the scrubbed payload" destroys the ID joining
+prompt → hook decision → tool call → product run → audit entry, which `AGENTS.md` requires
+propagated through every new code path and Principle IX's attestation is walked along. In the
+feature whose US2 exists to keep runs attestable, and silently: every other row in this feature
+reads the payload, so none of them would have noticed.
+
+Data model §4a and contract §2.1 now state the rule; row A17 reads the columns.
 
 ## Project Structure
 
