@@ -165,8 +165,8 @@ both locations. Remove it and it passes.
 - [X] T040a Record in `research.md` R4, and raise separately, that `vault-secret-access` is pinned and delivered to no model. Worth revisiting under ADR-0004; **not** changed here — 051 R12 chose it with reasons and says it must not acquire a binding by tidiness
 - [X] T041 Confirm FR-011 by inspection — this feature changes what the card says, never what the record reports. No `content_pins` or payload shape is touched
 - [X] T042 Add the 053 row to `ROADMAP.md`'s shipped table, naming ADR-0004 as the record made load-bearing
-- [X] T043 Run `make check` — the hermetic suite including every A row
-- [X] T044 Run `make conformance` — the enclave rows, exit 0
+- [X] T043 Run `make check` — **1643 passed, mypy clean over 747 files**. Note: `testpaths` is unit + component, so the A rows gate in `make conformance`'s hermetic step (951 passed), not here
+- [X] T044 Run `make conformance` — the enclave rows, **exit 0, 2026-08-27**
 - [X] T045 Fill `contracts/conformance-cards-delegate.md` §5 with the E1–E3 named-runner record
 
 ---
