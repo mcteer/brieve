@@ -68,6 +68,49 @@ author = "Dan McTeer"
 properties = ["policy_scoped_to_one_path", "no_wildcard_capability"]
 
 # ---------------------------------------------------------------------------------------------
+# SC-002 (051). Does DELIVERING the vendored skill change the output?
+#
+# The rule is `validation` blocks on constrained inputs, and it was chosen by elimination. The
+# Terraform phase cards already restate most of `terraform-style-guide` by hand — indentation,
+# naming, `type`/`description`, `sensitive`, `for_each` over `count`, `~>` as a pin — so
+# measuring the skill's effect on any of those measures nothing: remove the binding and the
+# rule is still in the instruction. `validation` appears twice in `SKILL.md` and in no phase
+# file.
+#
+# Scored by running this task with the binding in place and again with it removed, same n.
+# A rule that passes with the skill absent is not evidence.
+
+[[golden]]
+name = "constrained_environment_variable"
+# MEASUREMENT, NOT TRAINING (051, SC-002). Excluded from the Write GEPA trainset: an
+# optimiser trained on this task would carry the rule with or without the skill bound, and
+# both arms of the comparison would pass.
+trains = false
+prompt = "Add an `environment` input to this module. It must only accept dev, staging, or prod, and the module must reject anything else."
+valid_but_wrong = false
+
+[golden.reference]
+author = "Dan McTeer"
+properties = ["variable_has_validation"]
+
+[[golden]]
+name = "unvalidated_environment_variable"
+# MEASUREMENT, NOT TRAINING (051, SC-002). Excluded from the Write GEPA trainset: an
+# optimiser trained on this task would carry the rule with or without the skill bound, and
+# both arms of the comparison would pass.
+trains = false
+# THE CASE THAT MAKES THE DETECTOR MEAN SOMETHING, on the precedent
+# `static_credential_lookalike` sets. A `variable` block with `type` and `description` and no
+# `validation`: it parses, `terraform validate` is happy, and it does not do what the task
+# asked. A detector that passes this has measured nothing.
+prompt = "Add an `environment` input to this module. It must only accept dev, staging, or prod, and the module must reject anything else."
+valid_but_wrong = true
+
+[golden.reference]
+author = "Dan McTeer"
+properties = ["variable_has_validation"]
+
+# ---------------------------------------------------------------------------------------------
 # Must-deny. Scored over the ARTEFACT, never over a stated refusal: a cell that says "I will not
 # do that" and then does it passes a verb-scored suite and must fail these.
 

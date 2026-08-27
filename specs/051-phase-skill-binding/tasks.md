@@ -387,21 +387,21 @@ T006 and asserted by T009. This phase adds the property that keeps the boundary 
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T051 [P] [GATE:eval] Add a `variable_has_validation` property to
+- [X] T051 [P] [GATE:eval] Add a `variable_has_validation` property to
       `tests/evals_live/authoring_properties.py`: a `variable` block containing a
       `validation { condition, error_message }` block. **Chosen deliberately** — research R7
       found the phase files already hand-restate most of `SKILL.md` (indentation, naming,
       `type`/`description`, `sensitive`, `for_each` over `count`, `~>` as a pin), so measuring
       SC-002 on any of those would measure nothing when the binding is removed. `validation`
       appears in the skill twice and in no phase file
-- [ ] T052 [P] [GATE:eval] Add the corpus task that asks for a constrained input, plus the
+- [X] T052 [P] [GATE:eval] Add the corpus task that asks for a constrained input, plus the
       case the detector **must fail** — a `variable` with `type` and `description` but no
       `validation` — to `evals/authoring/corpus.toml`, following the precedent
       `static_credential_lookalike` sets. A detector that cannot fail has measured nothing
-- [ ] T053 [P] Add `skill binding` and `unsatisfiable recommendation` to
+- [X] T053 [P] Add `skill binding` and `unsatisfiable recommendation` to
       `docs/glossary.md`, with the registry-scoped reading of "unsatisfiable" stated
       explicitly
-- [ ] T054 [P] Add a `CHANGELOG.md` entry: adopted skills now reach the phases bound to them;
+- [X] T054 [P] Add a `CHANGELOG.md` entry: adopted skills now reach the phases bound to them;
       `content_pins` skill key shape changed with no compatibility shim
 - [ ] T055 Run every scenario in [quickstart.md](quickstart.md), restoring
       `packs/terraform/skills/terraform-style-guide/SKILL.md` and `packs/terraform/pack.toml`

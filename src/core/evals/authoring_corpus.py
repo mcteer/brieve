@@ -79,6 +79,14 @@ class GoldenTask:
     #: Syntactically valid and substantively wrong. The case that makes the second gate mean
     #: something, because the first gate passes it.
     valid_but_wrong: bool
+    #: Whether this task may join the Write GEPA trainset (051). Default true.
+    #:
+    #: **A measurement task must not train the thing it measures.** SC-002 asks whether
+    #: delivering a vendored skill changes the output, answered by running the same task with
+    #: the binding present and then removed. An optimiser that had already been trained on
+    #: that task would produce a card carrying the rule regardless, and both arms would pass —
+    #: measuring the trainset rather than the skill.
+    trains: bool = True
 
 
 @dataclass(frozen=True)
@@ -154,6 +162,7 @@ def _golden(entry: dict[str, object]) -> GoldenTask:
         reference=reference,
         expects_no_artifact=expects_no_artifact,
         valid_but_wrong=bool(entry.get("valid_but_wrong", False)),
+        trains=bool(entry.get("trains", True)),
     )
 
 

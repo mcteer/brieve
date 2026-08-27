@@ -264,7 +264,25 @@ only per-call: the sub-agent runs under its own registered ceiling, scoped at or
 parent, on the same correlation ID (ADR-0054). Proposed; upstream is experimental.
 
 **Skill** — pinned, provenance-checked instruction content the agent *executes by*;
-adopted from upstream skill repositories with overlays authored here (ADR-0004).
+adopted from upstream skill repositories with overlays authored here (ADR-0004). Delivered
+into a phase's instruction by its **skill binding**, and digest-verified again at that
+moment — a skill nothing binds is governed but never executed.
+
+**Skill binding** — the declaration, in a pack manifest, of *which phases receive a skill*
+(`phases` on `[[skills]]`, 051). A skill with no binding is adopted, pinned and delivered
+nowhere — a legitimate staged-adoption state that the run record keeps distinguishable from
+delivery. No platform source names a skill or a binding: adding one is a `pack.toml` edit
+and nothing else (ADR-0003). Where a bound skill and the phase instruction differ on a
+concrete rule, the instruction governs, and the phase file says so.
+
+**Unsatisfiable recommendation** — a step adopted content recommends that **no registry tool
+can perform**, declared per skill in the manifest and stated in the pull request so the work
+left to a person is named rather than discovered (051, ADR-0038). Scoped to the *registry*,
+not the repository: the eval lane runs `terraform validate`, but no tool lets an authoring
+agent run it on the branch it is proposing. A declaration naming a capability the registry
+*does* offer fails pack loading, and a declaration whose skill has been bumped without it
+being re-examined fails too — the pull request derives from the declaration and never from
+the skill's bytes, so one that lags the content understates what remains to be done.
 
 **Pack phase AGENTS.md** — the executed Build instruction for one pack × one phase
 (`packs/<pack>/agents/<phase>/AGENTS.md`, pinned by `[[agents]]` in `pack.toml`). Distinct

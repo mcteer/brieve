@@ -33,7 +33,7 @@ def _terraform() -> tuple[str, ...]:
 
 def _render(content: str, recommendations: tuple[str, ...] = ()) -> str:
     digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
-    artifact = AuthoredArtifact(files=(AuthoredFile(path="main.tf", digest=digest, edited=False),))
+    artifact = AuthoredArtifact(files=[AuthoredFile(path="main.tf", digest=digest, edited=False)])
     return compose(
         artifact=artifact,
         target_repository="acme/infra",

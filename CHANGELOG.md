@@ -7,6 +7,24 @@ durable record.
 
 ### Build
 
+- **Adopted skills now reach the phases bound to them.** A pack declares `phases` on each
+  `[[skills]]` entry, and that phase's model receives the skill's bytes alongside its
+  instruction, digest-verified again at delivery. The Terraform pack binds
+  `terraform-style-guide` and `terraform-style-guide-security` to `plan`, `write` and
+  `judge`; both were pinned and delivered to nobody before. `research` and `propose` stop
+  claiming practice they do not receive, and so do all five Vault phase files. A phase bound
+  to no skill is byte-identical to what it was. Missing, empty, drifted, or over-budget
+  content stops the phase with its own reason code; nothing is ever truncated. Terraform and
+  Vault instruction cards are **0.3.0**.
+- **A pull request says what the platform could not carry out.** The vendored style guide
+  recommends `terraform fmt -recursive` and `terraform validate`, and no registry tool offers
+  either, so an `## Adopted practice not carried out` section names them for the reviewer.
+  The text comes from the manifest, never from a model, and is identical across runs.
+- **`content_pins` skill keys now name the binding** — `<pack>/skills/<name>@plan+write+judge`
+  or `@unbound`, replacing `<pack>/<name>` with no compatibility shim. What each phase
+  actually received is recorded separately as phases bind, so a run that stopped before Write
+  is not readable as one whose Write model saw the skill.
+
 - Each Build phase is steered by a pinned pack file `packs/<pack>/agents/<phase>/AGENTS.md`
   (Terraform and Vault). Ask and the portal do not compose those files. Missing or empty
   instructions fail the phase and do not open a pull request. Terraform cards are
