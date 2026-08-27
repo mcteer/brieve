@@ -123,7 +123,22 @@ def declared_overrides(card_text: str) -> dict[str, str]:
     A reason is required. An override without one is indistinguishable from a card that simply
     kept the rule, which is the thing being forbidden.
     """
-    return {m.group("rule"): m.group("reason").strip() for m in OVERRIDE_MARKER.finditer(card_text)}
+    found: dict[str, str] = {}
+    lines = card_text.splitlines()
+    for index, line in enumerate(lines):
+        opener = OVERRIDE_MARKER.match(line)
+        if opener is None:
+            continue
+        # A reason runs to the end of its blockquote, not to the end of its first line. Taking
+        # only the first line would reject a properly-explained override for being terse.
+        reason = [opener.group("reason").strip()]
+        for follow in lines[index + 1 :]:
+            stripped = follow.strip()
+            if not stripped.startswith(">"):
+                break
+            reason.append(stripped.lstrip("> ").strip())
+        found[opener.group("rule")] = " ".join(part for part in reason if part).strip()
+    return found
 
 
 def compare_card(card_text: str, inventory: Inventory) -> list[str]:
