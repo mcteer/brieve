@@ -121,3 +121,23 @@ def test_the_two_sweeps_share_one_definition() -> None:
     assert "credential_material_in" in sweep
     restated = '"secret", "password"'
     assert restated not in sweep, "the sweep restates the list instead of importing it"
+
+
+def test_the_acceptance_row_still_matches_shapes_not_words() -> None:
+    """FR-014 (052). Confirming the sweep PASSES says nothing about how it decides.
+
+    #219 stayed hidden for three weeks because the row matched the English word "secret" in a
+    Judge model's prose. A revert to substring matching would go green against a scrubbed store
+    and re-open exactly that blindness, with nothing else noticing.
+    """
+    from pathlib import Path
+
+    sweep = (
+        Path(__file__).resolve().parents[1]
+        / "conformance"
+        / "durability"
+        / "test_dispatched_no_secret_sweep.py"
+    ).read_text(encoding="utf-8")
+    assert "credential_material_in" in sweep
+    for word in ('"secret"', '"password"', '"token"'):
+        assert f"needle {word}" not in sweep and f"[{word}]" not in sweep

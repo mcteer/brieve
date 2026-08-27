@@ -1548,7 +1548,9 @@ def _scrub_the_proposal(durability: Any, *, blob_id: str, correlation_id: str) -
         # never wrote a payload for this to clear.
         return
     payload, cleared = scrub_proposal_payload(blob.payload)
-    if not cleared:
+    # Compared, not counted. `cleared` counts file bodies; a payload whose only remaining
+    # content is a prose field would report zero and never be written.
+    if payload == blob.payload:
         return
     durability.save(
         CheckpointBlob(
@@ -1566,7 +1568,7 @@ def _scrub_the_proposal(durability: Any, *, blob_id: str, correlation_id: str) -
     # finish over content still in the store — the one failure mode nothing can detect
     # afterwards, because every later reader sees a completed run and no reason to look.
     written = durability.load(blob_id)
-    if written is None or scrub_proposal_payload(written.payload)[1]:
+    if written is None or scrub_proposal_payload(written.payload)[0] != written.payload:
         raise ScrubFailed(
             f"the proposal's content is still in the store for {blob_id}. The run finished, so "
             f"nothing else will clear it; reporting success here would record a retention "

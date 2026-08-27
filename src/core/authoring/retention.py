@@ -13,6 +13,12 @@ clearing it on an OPEN one would make that revival re-invoke with nothing — fi
 only."* It also recorded that the request was left **removable rather than load-bearing** so a
 successor could consume it. This is that successor.
 
+**A RUN THAT NEVER REACHES TERMINAL STATE IS NEVER SCRUBBED** (052, FR-011). Killed, abandoned,
+or parked on a dependency that never recovers — its content stays, and that is the case holding
+it longest. Closing it needs a sweeper and a staleness threshold, which is a separate decision
+and is deliberately not made here. Recorded beside the scrub because a gap written down only in
+a specification reads as covered to anybody reading the code.
+
 **Scoped to authoring runs, not global.** 040's retention decision for ordinary runs stands —
 a run whose arguments are a Vault path or a workspace name is not the case this exists for, and
 widening the scrub to every run would be re-deciding 040's requirement in a different feature.
@@ -53,9 +59,21 @@ SCRUBBED_MARKER = "scrubbed"
 #: narrow answer 041 took for intents would have contradicted a decision this platform has
 #: already made.
 #:
-#: `title` and `usage` are NOT here. They are prose *about* the change rather than extracts
-#: *from* it, and a reviewer reading a scrubbed run needs them to know what was proposed.
-CONTENT_BEARING_PROPOSAL_FIELDS = frozenset({"rationale"})
+#: `usage` JOINED IT AT IMPLEMENTATION, and the reason is worth keeping. The spec kept it on the
+#: grounds that it is prose *about* the change rather than an extract *from* it — a distinction
+#: that did not survive contact with a real payload. The first acceptance sweep after the
+#: backfill found a `usage` field carrying a shell transcript, complete with an `export` line
+#: assigning a credential-named variable. A placeholder rather than a credential, but the shape
+#: is exactly what a credential takes, and the store sweep is deliberately built to match shape
+#: rather than prose.
+#:
+#: More to the point: `usage` and `rationale` are the same kind of thing — model-authored prose
+#: that quotes the subject and travels in the pull request body. The pull request is the durable
+#: artifact (ADR-0038), so a reviewer loses nothing by this; they read it there.
+#:
+#: `title` and `task` are NOT here. A title is a one-line summary the platform composed, and
+#: `task` is the person's own words, already in the trail. Neither quotes the repository.
+CONTENT_BEARING_PROPOSAL_FIELDS = frozenset({"rationale", "usage"})
 
 #: The tools whose arguments are somebody else's content rather than a reference to it.
 #:
@@ -104,13 +122,18 @@ def scrub_proposal_payload(payload: Mapping[str, Any]) -> tuple[dict[str, Any], 
     none of the content. Retention and attestation do not trade here only because that manifest
     already existed.
 
-    **Total and idempotent.** A payload with no proposal, and one already scrubbed, both return
-    unchanged with count 0: a run that authored nothing and one that published must not take
-    different cleanup paths.
+    **Total, and idempotent by CONTENT rather than by flag.** A payload with no proposal, and one
+    already scrubbed, both return unchanged with count 0 — because there is nothing non-empty
+    left to clear, not because the marker short-circuits the work.
+
+    That distinction earned itself immediately. The marker did short-circuit at first, and when
+    `usage` joined the cleared set, a re-run over already-marked rows found "nothing to do" and
+    left the new field in place. Clearing what is actually there means a widened definition heals
+    existing rows on the next pass instead of needing a flag to force it.
     """
     out = deepcopy(dict(payload))
     proposal = out.get(PROPOSAL_KEY)
-    if not isinstance(proposal, dict) or proposal.get(SCRUBBED_MARKER):
+    if not isinstance(proposal, dict):
         return out, 0
 
     cleared = 0

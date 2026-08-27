@@ -68,7 +68,14 @@ def authored_payload(*, include_result: bool = True) -> dict[str, Any]:
             "task": "Wire the application to dynamic credentials",
             "title": "Wire the application to the secret store",
             "rationale": RATIONALE,
-            "usage": "Copy `.env.example` to `.env` and set VAULT_ADDR before running.",
+            # A shell transcript, because that is what a real one carried — and what made
+            # keeping this field untenable. The value is a placeholder; the SHAPE is a
+            # credential assignment, which is what the store sweep matches.
+            "usage": (
+                "Copy `.env.example` to `.env`, then:\n\n"
+                "    vault server -dev\n"
+                "    export VAULT_TOKEN='<root token printed by dev server>'\n"
+            ),
             "disclosures": [],
             "provenance": list(PROVENANCE),
             "evidence": [],
@@ -99,6 +106,7 @@ def scrubbed_payload(*, include_result: bool = True) -> dict[str, Any]:
     for entry in proposal["files"]:
         entry["body"] = ""
     proposal["rationale"] = ""
+    proposal["usage"] = ""
     proposal["scrubbed"] = True
     return payload
 

@@ -7,6 +7,14 @@ durable record.
 
 ### Build
 
+- **A finished authoring run no longer leaves its proposal in the control plane.** 041 cleared
+  the model's stated arguments at terminal state and left the composed proposal — the same file
+  bodies — in the checkpoint payload, where six completed runs were still holding ~81 KB of
+  customer content. It is now cleared after the pull request opens, along with the
+  model-authored rationale and usage text; paths and the path-and-digest manifest survive, so a
+  reviewer can still prove a merged pull request is what the run proposed. Existing checkpoints
+  were backfilled. A run that never reaches terminal state is still not scrubbed — recorded, not
+  closed.
 - **Adopted skills now reach the phases bound to them.** A pack declares `phases` on each
   `[[skills]]` entry, and that phase's model receives the skill's bytes alongside its
   instruction, digest-verified again at delivery. The Terraform pack binds

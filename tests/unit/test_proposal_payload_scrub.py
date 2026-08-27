@@ -33,7 +33,7 @@ from core.authoring.retention import (
 )
 
 #: Keys that are prose *about* the change rather than extracts *from* it. All must survive.
-KEPT_SCALARS = ("title", "usage", "task", "target_repository", "branch", "state")
+KEPT_SCALARS = ("title", "task", "target_repository", "branch", "state")
 
 
 def _scrub(payload: dict[str, Any] | None = None) -> tuple[dict[str, Any], int]:
@@ -57,11 +57,25 @@ def test_every_body_is_cleared_and_the_count_says_how_many() -> None:
     assert all(f["body"] == "" for f in out["authoring_proposal"]["files"])
 
 
-def test_the_rationale_is_cleared() -> None:
-    """Row A1. FR-032 already classes it as content reaching the customer's repository."""
+def test_the_model_authored_prose_is_cleared() -> None:
+    """Row A1. Both fields quote the subject and both travel in the pull request body.
+
+    `usage` joined `rationale` at implementation: the first acceptance sweep after the backfill
+    found one carrying a shell transcript with a credential-shaped assignment. The spec's
+    "prose about the change, not an extract from it" distinction did not survive a real payload.
+    """
     out, _ = _scrub()
-    assert out["authoring_proposal"]["rationale"] == ""
-    assert CONTENT_BEARING_PROPOSAL_FIELDS == {"rationale"}
+    proposal = out["authoring_proposal"]
+    assert proposal["rationale"] == ""
+    assert proposal["usage"] == ""
+    assert CONTENT_BEARING_PROPOSAL_FIELDS == {"rationale", "usage"}
+
+
+def test_a_credential_shaped_line_in_usage_does_not_survive() -> None:
+    """The specific finding, named so the regression is recognisable if it returns."""
+    assert "VAULT_TOKEN" in str(authored_payload())
+    out, _ = _scrub()
+    assert "VAULT_TOKEN" not in str(out)
 
 
 def test_the_subject_marker_is_gone_from_the_whole_payload() -> None:
@@ -151,6 +165,7 @@ def test_the_input_is_not_mutated() -> None:
     _scrub(payload)
     assert payload["authoring_proposal"]["files"][0]["body"] != ""
     assert payload["authoring_proposal"]["rationale"] != ""
+    assert payload["authoring_proposal"]["usage"] != ""
 
 
 def test_a_payload_with_no_proposal_key_is_returned_unchanged() -> None:

@@ -212,17 +212,17 @@ which files it touched, and that the proposal is the one the pull request carrie
 what was proposed, and says the same things about paths and outcome as one compiled before the
 scrub.
 
-- [ ] T029 [US2] Verify no consumer breaks: `PROPOSAL_PAYLOAD_KEY` has exactly two readers —
+- [X] T029 [US2] Verify no consumer breaks: `PROPOSAL_PAYLOAD_KEY` has exactly two readers —
       `proposal_from_payload` and the entrypoint that writes it — and no portal template,
       report compiler or API operation reads it (research R8). Assert that with a source scan,
       so a future reader is caught rather than discovered
-- [ ] T030 [P] [US2] [GATE:correlation] Assert a RunReport compiled from a scrubbed run
+- [X] T030 [P] [US2] [GATE:correlation] Assert a RunReport compiled from a scrubbed run
       validates and names every authored path (row A12, FR-003, SC-002)
-- [ ] T031 [P] [US2] [GATE:correlation] Assert the pull request stays identifiable from a
+- [X] T031 [P] [US2] [GATE:correlation] Assert the pull request stays identifiable from a
       scrubbed run's record (row A13, FR-004)
-- [ ] T032 [P] [US2] [GATE:evidence] Assert the compiled report does not claim to carry content
+- [X] T032 [P] [US2] [GATE:evidence] Assert the compiled report does not claim to carry content
       the run no longer holds (row A14)
-- [ ] T033 [US2] Assert a report compiled before and after the scrub agrees on paths and
+- [X] T033 [US2] Assert a report compiled before and after the scrub agrees on paths and
       outcome (SC-002, SC-007) — the property that says the scrub cost no attestation, rather
       than that the report merely still compiles
 
@@ -234,46 +234,46 @@ scrub.
 
 **Purpose**: The six rows already in the store, the acceptance signal, and the record.
 
-- [ ] T034 Write `infra/bin/backfill_proposal_payloads.py`: one-time, idempotent, operator-invoked.
+- [X] T034 Write `infra/bin/backfill_proposal_payloads.py`: one-time, idempotent, operator-invoked.
       Applies **the same `scrub_proposal_payload`** to terminal checkpoints (FR-015) — a second
       implementation could disagree with the first — and names each blob it changed, because a
       silent backfill is indistinguishable from one that did nothing
-- [ ] T035 Scope the backfill to **terminal checkpoints only**. A non-terminal one may still be
+- [X] T035 Scope the backfill to **terminal checkpoints only**. A non-terminal one may still be
       resumed, and scrubbing it is the same defect T025 guards against, arriving by a different
       route
-- [ ] T036 [P] [GATE:conformance] Assert the backfill leaves non-terminal checkpoints intact
+- [X] T036 [P] [GATE:conformance] Assert the backfill leaves non-terminal checkpoints intact
       (row A15)
-- [ ] T037 [P] [GATE:conformance] Assert the backfill is idempotent and reports what it changed
+- [X] T037 [P] [GATE:conformance] Assert the backfill is idempotent and reports what it changed
       (row A16)
-- [ ] T038 Run the backfill against the live store and record the before/after count. **Six
+- [X] T038 Run the backfill against the live store and record the before/after count. **Six
       checkpoints hold a proposal today, ~81 KB, every one `completed`** — a forward-only scrub
       leaves all of them, and the acceptance row sweeps the whole table rather than runs created
       after the change (FR-015, SC-001)
-- [ ] T039 [GATE:no-secret-leak] Confirm
+- [X] T039 [GATE:no-secret-leak] Confirm
       `tests/conformance/durability/test_dispatched_no_secret_sweep.py::test_row_checkpoints_still_hold_no_credential_material`
       **passes** (SC-006), and remove the KNOWN RED note its docstring carries. **Assert the row
       still calls `credential_material_in`** (FR-014) — confirming it passes says nothing about
       *how*, and a revert to substring matching would go green here while re-opening the defect
       that hid #219 for three weeks. That row is this
       feature's acceptance signal and closes issue #219
-- [ ] T040 [GATE:conformance] Named-runner rows on the implementation PR — **Dan McTeer**:
+- [X] T040 [GATE:conformance] Named-runner rows on the implementation PR — **Dan McTeer**:
       **E1** the stored-JSON round trip (bodies absent from the stored text, not merely from the
       object — 041's in-memory argument does not transfer, because this feature writes no SQL);
       **E2** the acceptance sweep over the live store after the backfill, recording the
       pre-backfill count; **E3** a killed publish resumes and opens a pull request carrying the
       same files
-- [ ] T041 [P] Correct `proposal_payload`'s docstring in `src/surfaces/dispatch/authoring.py`.
+- [X] T041 [P] Correct `proposal_payload`'s docstring in `src/surfaces/dispatch/authoring.py`.
       It already says *"the run's terminal scrub (FR-033) removes it"* — false until this
       feature lands, and the natural place somebody would have noticed. Make the sentence true
       rather than delete it (research R3)
-- [ ] T042 Record the never-terminal gap where a reader of the platform will find it (FR-011):
+- [X] T042 Record the never-terminal gap where a reader of the platform will find it (FR-011):
       in `src/core/authoring/retention.py`'s module docstring beside the scrub, and in the
       ROADMAP's deferral list. The specification is not a discharge — nobody consults it while
       reading the code, and a gap recorded only there reads as covered
-- [ ] T043 [P] Add a `CHANGELOG.md` entry: a finished authoring run no longer leaves its
+- [X] T043 [P] Add a `CHANGELOG.md` entry: a finished authoring run no longer leaves its
       proposal in the control plane; the path-and-digest manifest survives so a reviewer can
       still match a merged pull request against what was proposed
-- [ ] T044 [P] Add `proposal payload scrub` to `docs/glossary.md`, stating what is cleared, what
+- [X] T044 [P] Add `proposal payload scrub` to `docs/glossary.md`, stating what is cleared, what
       survives, and that the pull request is the durable artifact (ADR-0038) — which is what
       makes clearing the platform's copy defensible at all
 - [ ] T045 Add the ROADMAP Shipped row for 052 **on the day it merges**. The file has been three
