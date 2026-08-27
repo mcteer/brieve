@@ -121,7 +121,7 @@ the scrub ran, so the row can lose.
 
 ### Implementation
 
-- [ ] T016 [US1] Call `scrub_proposal_payload` in `src/surfaces/dispatch/entrypoint.py` at the
+- [X] T016 [US1] Call `scrub_proposal_payload` in `src/surfaces/dispatch/entrypoint.py` at the
       existing scrub site, **inside the `authoring_role(...) == PROPOSER` branch and after
       `_publish_the_proposal` returns 0** — that function writes the terminal payload itself, so
       the scrub rewrites what it just wrote (FR-001, FR-010, FR-012).
@@ -136,33 +136,33 @@ the scrub ran, so the row can lose.
       `CheckpointBlob(blob_id=…, payload=scrubbed)` blanks the correlation ID on the terminal
       checkpoint — the join attestation is walked along, in the feature whose US2 exists to keep
       runs attestable (contract §2.1)
-- [ ] T017 [US1] [GATE:fail-closed] Stop the run with the reason recorded when the save fails
+- [X] T017 [US1] [GATE:fail-closed] Stop the run with the reason recorded when the save fails
       (FR-005). **Never report a clean run over content still in the store** — that is the
       failure nothing can detect afterwards
 
 ### Tests
 
-- [ ] T018 [US1] [GATE:conformance] Assert the stored payload holds no authored body after a
+- [X] T018 [US1] [GATE:conformance] Assert the stored payload holds no authored body after a
       completed authoring run, reading the row back rather than trusting the return value
       (row A9, FR-013, SC-005). Assert it held them before the scrub, so the row can lose
-- [ ] T019 [P] [US1] [GATE:fail-closed] Assert a save failure stops the run with a recorded
+- [X] T019 [P] [US1] [GATE:fail-closed] Assert a save failure stops the run with a recorded
       reason and does not report success (row A9, SC-004)
-- [ ] T020 [US1] [GATE:correlation] **Assert the re-save carries every column** (row A17):
+- [X] T020 [US1] [GATE:correlation] **Assert the re-save carries every column** (row A17):
       `correlation_id`, `grant_id`, `step_index`, `written_by`, `run_state`, `stop_reason` and
       `resume_count` are all unchanged across the scrub. Read the columns, not the payload —
       every other row in this feature reads the payload, so none of them would notice a blanked
       correlation ID
-- [ ] T021 [P] [US1] [GATE:conformance] Assert a **non-authoring** run's payload is untouched
+- [X] T021 [P] [US1] [GATE:conformance] Assert a **non-authoring** run's payload is untouched
       (row A18, FR-012). The scoping is structural — the call sits inside the `PROPOSER` branch
       — and a structural property is exactly what somebody undoes by hoisting a call one line
       out of a branch, with every other row still passing
-- [ ] T022 [US1] [GATE:conformance] **Assert `pr_url` survives the scrub** (row A19) — the
+- [X] T022 [US1] [GATE:conformance] **Assert `pr_url` survives the scrub** (row A19) — the
       field the recorded defect actually lost, and the one that proves the terminal blob was
       re-read rather than the pre-publish snapshot reused
-- [ ] T023 [P] [US1] [GATE:conformance] Assert the scrubbed payload carries `scrubbed: true` and
+- [X] T023 [P] [US1] [GATE:conformance] Assert the scrubbed payload carries `scrubbed: true` and
       a run that authored nothing does not (row A20). Without the marker, A10's refusal has
       nothing to key on
-- [ ] T024 [P] [US1] [GATE:conformance] **Assert a refused run's payload contains no authored
+- [X] T024 [P] [US1] [GATE:conformance] **Assert a refused run's payload contains no authored
       content in the first place** (row A11). A run refused at Judge returns before Propose and
       never composes a proposal, so FR-007 is satisfied vacuously — a row asserting "the scrub
       cleared it" would pass without exercising anything. This asserts the property that is
@@ -184,19 +184,19 @@ request opens carrying the same files, and that the scrub did not run before the
 **⚠️ This phase is why US1 is not shippable alone.** The three rows below are the difference
 between a retention fix and a durability defect.
 
-- [ ] T025 [US3] [GATE:conformance] **Assert the analyzer branch does not scrub the payload**
+- [X] T025 [US3] [GATE:conformance] **Assert the analyzer branch does not scrub the payload**
       (row A4, FR-002). The adjacent intents scrub is gated `authoring_role(...) is not None`, which is
       **true in the analyzer too** — safe for intents, whose SQL clears closed brackets only,
       and a defect here because the analyzer's checkpoint *is* the handoff the proposer reads.
       Copying that gate one line down makes every publish resume with nothing to publish
-- [ ] T026 [US3] [GATE:conformance] Assert a **failed** publish leaves the payload intact, so
+- [X] T026 [US3] [GATE:conformance] Assert a **failed** publish leaves the payload intact, so
       the resumption has what it needs (row A5, FR-002)
-- [ ] T027 [P] [US3] [GATE:conformance] Assert `proposal_from_payload` **refuses a payload
+- [X] T027 [P] [US3] [GATE:conformance] Assert `proposal_from_payload` **refuses a payload
       carrying `scrubbed: true`** (row A10), and — the half that keeps it honest — **accepts a
       payload with a legitimately empty body and no marker**. It is only called before
       publishing, so a scrubbed payload reaching it means the ordering broke, and an empty pull
       request is a worse outcome than a loud failure
-- [ ] T028 [US3] Assert a run killed between Judge and publish resumes and opens a pull request
+- [X] T028 [US3] Assert a run killed between Judge and publish resumes and opens a pull request
       carrying the same files, in `tests/conformance/durability/` (SC-003)
 
 **Checkpoint**: the scrub happens where it must and nowhere it must not.

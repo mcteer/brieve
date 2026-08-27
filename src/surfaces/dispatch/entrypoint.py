@@ -44,7 +44,7 @@ from core.authoring.progress import (
 )
 from core.authoring.proposal import branch_for, compose, files_from_write_plan
 from core.authoring.publish import ProposalObserver, ProposalPublisher
-from core.authoring.retention import scrub_authoring_requests
+from core.authoring.retention import scrub_authoring_requests, scrub_proposal_payload
 from core.authoring.tool import AUTHOR_FILE, OPEN_PROPOSAL, READ_SUBJECT, WRITE_ROLE
 from core.authoring.workspace import Trees
 from core.authority.clock import Clock, SystemClock
@@ -1500,7 +1500,79 @@ def continue_dispatched_run(
         scrubbed = scrub_authoring_requests(durability, run_id=blob_id)
         if scrubbed:
             print(f"run {correlation_id}: scrubbed {scrubbed} authoring request(s)", flush=True)
+
+    # 052: THE OTHER HALF OF FR-033. The intents scrub above clears the model's stated
+    # arguments; the composed proposal — the same file bodies — also rests in the checkpoint
+    # payload, and until now nothing cleared it.
+    #
+    # PROPOSER BRANCH ONLY, unlike the scrub above. `authoring_role(...) is not None` is true in
+    # the ANALYSING task too, which is safe for intents and would be a defect here: the
+    # analyzer's checkpoint IS the handoff this task reads, so scrubbing it there would make
+    # every interrupted publish resume with nothing to publish.
+    if authoring_role(dict(os.environ)) == PROPOSER:
+        _scrub_the_proposal(durability, blob_id=blob_id, correlation_id=correlation_id)
     return 0
+
+
+class ScrubFailed(RuntimeError):
+    """The retention scrub did not take effect, verified by reading the store back (052, FR-005).
+
+    Raised rather than logged. The alternative — a warning and a clean exit — is the shape this
+    feature exists to remove: a record saying the content is gone while the store still holds
+    it, with nothing downstream having a reason to look again.
+    """
+
+
+def _scrub_the_proposal(durability: Any, *, blob_id: str, correlation_id: str) -> None:
+    """Clear the published proposal's content from the terminal checkpoint (052, FR-001).
+
+    **Re-reads the terminal blob rather than reusing what is in scope**, and that is the whole
+    care in this function. `_publish_the_proposal` returns an int, not the blob it wrote, so the
+    only blob the caller holds is `checkpoint` — loaded BEFORE the publish. Saving from it is
+    the defect this file already records: it "restored the analyzer snapshot, wiped `pr_url`,
+    and left Nomad 'complete' looking like 'Ended without a pull request.'"
+
+    **Every column is threaded through**, not only the payload. `save()` overwrites the whole
+    row. `run_state`, `stop_reason` and `resume_count` carry guards — each added after somebody
+    lost that column — and `correlation_id`, `grant_id`, `step_index` and `written_by` do not.
+    A bare `CheckpointBlob(blob_id=…, payload=…)` would blank the correlation ID on the terminal
+    checkpoint, breaking the join that prompt → hook → tool → product → audit is walked along,
+    in the feature whose whole second half is keeping a finished run attestable.
+
+    Fails the run rather than reporting a clean one (FR-005). A scrub that returned quietly
+    while leaving content in the store is the failure nothing can detect afterwards.
+    """
+    blob = durability.load(blob_id)
+    if blob is None:
+        # Nothing to scrub, and nothing to hide: a run whose terminal checkpoint cannot be read
+        # never wrote a payload for this to clear.
+        return
+    payload, cleared = scrub_proposal_payload(blob.payload)
+    if not cleared:
+        return
+    durability.save(
+        CheckpointBlob(
+            blob_id=blob.blob_id,
+            payload=payload,
+            correlation_id=blob.correlation_id,
+            grant_id=blob.grant_id,
+            step_index=blob.step_index,
+            written_by=blob.written_by,
+            outcome=blob.outcome,
+            resume_count=blob.resume_count,
+        )
+    )
+    # FAIL CLOSED (FR-005). A save that silently failed would leave the run reporting a clean
+    # finish over content still in the store — the one failure mode nothing can detect
+    # afterwards, because every later reader sees a completed run and no reason to look.
+    written = durability.load(blob_id)
+    if written is None or scrub_proposal_payload(written.payload)[1]:
+        raise ScrubFailed(
+            f"the proposal's content is still in the store for {blob_id}. The run finished, so "
+            f"nothing else will clear it; reporting success here would record a retention "
+            f"guarantee the store does not hold."
+        )
+    print(f"run {correlation_id}: scrubbed {cleared} authored file(s) from the payload", flush=True)
 
 
 def _payload_without_success_pr(payload: dict[str, Any], run: Any, reason: str) -> dict[str, Any]:
