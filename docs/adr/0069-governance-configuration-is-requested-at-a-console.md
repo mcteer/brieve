@@ -3,7 +3,7 @@
 - **Status**: Proposed
 - **Date**: 2026-08-07
 - **Amends**: [ADR-0026](0026-per-source-model-bindings.md) (moves where a governance change may *originate*; what *decides* one is unchanged)
-- **Relates to**: [ADR-0016](0016-quorum-on-authority-changes.md), [ADR-0025](0025-registry-isolation.md), [ADR-0039](0039-per-role-model-bindings.md), [ADR-0047](0047-a-passing-stub-is-worse-than-a-missing-one.md), [ADR-0067](0067-a-model-does-not-judge-its-own-output.md)
+- **Relates to**: [ADR-0016](0016-control-groups-gate-authority-changes.md), [ADR-0025](0025-enclave-is-the-default-topology.md), [ADR-0039](0039-per-role-model-bindings.md), [ADR-0047](0047-conformance-gate-rows-attach-as-features-land.md), [ADR-0067](0067-a-model-does-not-judge-its-own-output.md)
 - **Requirements**: R2, R3, R4, R5, R7, R11, R13
 
 ## Context

@@ -706,11 +706,33 @@ ADR — never a passing stub.**
 
 ## Open records
 
-One ADR remains **Proposed** and is expected to resolve rather than linger. It does not block the
-sequence above, but a Proposed record that quietly becomes permanent is a failure of the process
-([`docs/adr/README.md`](docs/adr/README.md)).
+**Six ADRs are Proposed**, and five of them govern features that have already shipped. A Proposed
+record that quietly becomes permanent is a failure of the process
+([`docs/adr/README.md`](docs/adr/README.md)) — and a shipped feature governed by an unaccepted
+record is the same failure with a product attached. **This section claimed "one" until 2026-08-27**,
+which is the staleness its own closing paragraph warns about, in the file a planner reads first.
 
-- **ADR-0054** — model-written orchestration, per-call and per-delegation parity. Left Proposed
+Only ADR-0054 is Proposed for a reason that still holds. The other five are Proposed because
+nothing carried them to acceptance when their feature landed; **accepting them is a maintainer
+decision, not an editorial one** (Principle X), so they are recorded here rather than resolved.
+
+| Record | Governs | Why still Proposed |
+|---|---|---|
+| **ADR-0054** | 036 | **Legitimately open.** Its delegation half has no substrate to govern — see below. |
+| **ADR-0065** | 036 | Code mode decided against. **ADR-0041's status already reads "Superseded by ADR-0065"** — a shipped supersession resting on an unaccepted record. |
+| **ADR-0067** | 043 | A model does not judge its own output. Shipped; never accepted. |
+| **ADR-0068** | 042 | Impact is measured by the product. Amended 2026-08-26 (Terraform's instrument is no longer merge-blocking) while still Proposed. |
+| **ADR-0069** | 044 | Governance configuration is requested at a console. Shipped; never accepted. Also carries an unsourced quotation — see below. |
+| **ADR-0070** | 045 | Endorsed-content sync is an egress class. Shipped; never accepted. |
+
+**ADR-0069 attributes a direct quotation to ADR-0026 that ADR-0026 does not contain.** The line
+*"where a model is reachable from is assembly while which model is permitted is governance"*
+appears in no ADR but 0069 itself, and 0026 is *Long-running execution — delegation grants,
+per-step tokens*, which is not about model reachability at all. The `Amends:` target is therefore
+unverified. Left as found, because guessing the intended record would launder the defect rather
+than fix it.
+
+- **ADR-0054**, in full — model-written orchestration, per-call and per-delegation parity. Left Proposed
   by [036](specs/036-deferred-disclosure-code-mode/spec.md) **on purpose**: its per-call half was
   realized and its delegation half has no substrate to govern, because the orchestration package
   still carries an `experimental` import segment and its durable-workflows extension has not

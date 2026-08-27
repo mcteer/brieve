@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-08-19
-- **Relates to**: [ADR-0001](0001-framework-agnostic-core.md), [ADR-0004](0004-adopt-skills-as-governed-supply-chain.md), [ADR-0030](0030-executed-artifacts-are-pinned-consulted-ones-are-fresh.md), [ADR-0058](0058-model-credential-brokering.md)
+- **Relates to**: [ADR-0001](0001-framework-agnostic-core.md), [ADR-0004](0004-adopt-skills-as-governed-supply-chain.md), [ADR-0030](0030-pinned-versus-consulted-artifacts.md), [ADR-0058](0058-model-credential-brokering.md)
 - **Requirements**: R12
 
 ## Context

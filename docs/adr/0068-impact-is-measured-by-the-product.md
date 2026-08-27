@@ -3,7 +3,7 @@
 - **Status**: Proposed — amended 2026-08-26: Terraform's instrument is no longer a
   merge-blocking gate (see *Amendment* below). The Vault decision is unaffected.
 - **Date**: 2026-08-07
-- **Relates to**: [ADR-0047](0047-a-passing-stub-is-worse-than-a-missing-one.md), [ADR-0025](0025-registry-isolation.md), [ADR-0038](0038-the-agent-authors-and-a-person-merges.md), [ADR-0064](0064-authoring-tools-are-platform-tools.md), [ADR-0044](0044-federate-or-broker.md)
+- **Relates to**: [ADR-0047](0047-conformance-gate-rows-attach-as-features-land.md), [ADR-0025](0025-enclave-is-the-default-topology.md), [ADR-0038](0038-integration-uplift-workflows.md), [ADR-0064](0064-version-control-is-a-platform-capability.md), [ADR-0044](0044-authz-doctrine-and-credential-translation.md)
 - **Requirements**: R5, R7, R11, R2, R3
 
 ## Context
@@ -22,7 +22,7 @@ Three ways to close that gap were available.
 
 **Derive the answer.** Parse the HCL, reason about capability semantics, and report the
 difference. This is the tempting one — no writes, no cleanup, no new grant — and it is
-[ADR-0047](0047-a-passing-stub-is-worse-than-a-missing-one.md)'s exact shape wearing better
+[ADR-0047](0047-conformance-gate-rows-attach-as-features-land.md)'s exact shape wearing better
 clothes. A derived answer agrees with Vault until Vault's semantics differ from the derivation
 in some case nobody thought of, and the gate is green either way. This platform already
 declined to make Terraform the first product for the same reason: its `terraform_plan` handler
