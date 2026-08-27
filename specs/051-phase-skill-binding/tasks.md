@@ -208,11 +208,11 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
 
 ### Fail-closed
 
-- [ ] T024 [US1] [GATE:fail-closed] Raise `ManifestError` with `skill_missing` (absent,
+- [X] T024 [US1] [GATE:fail-closed] Raise `ManifestError` with `skill_missing` (absent,
       unreadable, or path escaping the pack), `skill_empty` (bytes empty after strip), and
       `digest_mismatch` (bytes ≠ pin) in `src/core/packs/agents.py`. No fallback exists:
       neither delivering unverified content nor proceeding without the skill (FR-004)
-- [ ] T025 [US1] [GATE:fail-closed] Check the budget after assembly and **before return** in
+- [X] T025 [US1] [GATE:fail-closed] Check the budget after assembly and **before return** in
       `src/core/packs/agents.py`: `len(body.encode("utf-8")) > INSTRUCTION_BUDGET_BYTES`
       raises `instruction_too_large`. Never truncate — a truncated instruction delivers
       partial practice while the record claims the whole skill (FR-009)
@@ -249,7 +249,7 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
       `load_phase_agents` refuses `digest_mismatch`, so the suites cannot pass, so promotion
       cannot run). Scoring the file alone would green the gate without looking at the bytes
       the model receives (ADR-0047)
-- [ ] T031 [US1] [GATE:eval] Add a `phase_agents` case whose bound skill is missing and which
+- [X] T031 [US1] [GATE:eval] Add a `phase_agents` case whose bound skill is missing and which
       must score `fail`, to `packs/terraform/evals/phase_agents.toml`. Without it T030's
       change is unfalsifiable
 - [X] T032 [US1] [GATE:eval] Re-run `phase_agents` and `build_agents` over the assembled
@@ -260,41 +260,41 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
 
 ### Tests
 
-- [ ] T033 [P] [US1] [GATE:conformance] Assert the write model receives both skills in full,
+- [X] T033 [P] [US1] [GATE:conformance] Assert the write model receives both skills in full,
       between the fixed delimiters, in
       `tests/conformance/phase_agents/test_skill_assembly.py` (row A1, FR-001, SC-001,
       US1 acceptance 1)
-- [ ] T034 [P] [US1] [GATE:conformance] Assert delivery order is `[[skills]]` declaration
+- [X] T034 [P] [US1] [GATE:conformance] Assert delivery order is `[[skills]]` declaration
       order and that two loads of identical manifest content produce byte-identical `body`,
       in `tests/conformance/phase_agents/test_skill_order_deterministic.py` (row A2, FR-006)
-- [ ] T035 [P] [US1] [GATE:conformance] Assert a phase bound to no skills produces `body`
+- [X] T035 [P] [US1] [GATE:conformance] Assert a phase bound to no skills produces `body`
       byte-identical to its `AGENTS.md` — no delimiter, no trailing-byte change — for
       Terraform `research`/`propose` and all five Vault phases, in
       `tests/conformance/phase_agents/test_unbound_phase_unchanged.py` (row A3, FR-011,
       US1 acceptance 3)
-- [ ] T036 [P] [US1] [GATE:fail-closed] Assert a drifted skill fails the phase
+- [X] T036 [P] [US1] [GATE:fail-closed] Assert a drifted skill fails the phase
       `digest_mismatch` and that `run.phase_instruction` never holds the mismatched content,
       in `tests/conformance/phase_agents/test_skill_digest_mismatch.py` (row A4,
       US1 acceptance 2)
-- [ ] T037 [P] [US1] [GATE:fail-closed] Assert `skill_missing` and `skill_empty` are distinct
+- [X] T037 [P] [US1] [GATE:fail-closed] Assert `skill_missing` and `skill_empty` are distinct
       and neither collapses into the other or into `digest_mismatch`, in
       `tests/conformance/phase_agents/test_skill_fail_closed.py` (row A5, SC-005)
-- [ ] T038 [P] [US1] [GATE:fail-closed] Assert an over-budget assembly raises
+- [X] T038 [P] [US1] [GATE:fail-closed] Assert an over-budget assembly raises
       `instruction_too_large` and that no truncated body is ever returned, in
       `tests/conformance/phase_agents/test_instruction_budget.py` (row A6)
-- [ ] T039 [P] [US1] [GATE:conformance] Assert `packs/terraform/skills/LICENSE` and
+- [X] T039 [P] [US1] [GATE:conformance] Assert `packs/terraform/skills/LICENSE` and
       `PROVENANCE.md` — on disk, absent from `[[skills]]` — never appear in any phase's
       `body`, in `tests/conformance/phase_agents/test_undeclared_skill_files.py` (row A8,
       FR-008)
-- [ ] T040 [US1] [GATE:conformance] Assert **no shipped `AGENTS.md` in any pack names a skill
+- [X] T040 [US1] [GATE:conformance] Assert **no shipped `AGENTS.md` in any pack names a skill
       it is not bound to**, deriving both sides from the manifests rather than a hard-coded
       list, in `tests/conformance/phase_agents/test_prose_matches_binding.py` (row A9,
       FR-010, SC-006). This is the check that makes the divergence visible rather than
       audited by hand
-- [ ] T041 [P] [US1] [GATE:conformance] Assert every phase bound to a skill states both
+- [X] T041 [P] [US1] [GATE:conformance] Assert every phase bound to a skill states both
       precedence sentences, in
       `tests/conformance/phase_agents/test_precedence_stated.py` (row A10)
-- [ ] T042 [P] [US1] [GATE:eval] Assert the scorers read assembled content and that a case
+- [X] T042 [P] [US1] [GATE:eval] Assert the scorers read assembled content and that a case
       with a missing bound skill scores `fail`, in
       `tests/conformance/phase_agents/test_scorers_score_assembled.py` (rows A18, A21, SC-007).
       A21 is the one that would have caught the deadlock: assert a candidate with **no

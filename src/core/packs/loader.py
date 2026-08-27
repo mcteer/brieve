@@ -474,12 +474,22 @@ class FilesystemPackLoader:
         """
         for skill in manifest.skills:
             path = pack_dir / skill.path
+            # DISTINCT CODES, on the same terms as delivery (051, SC-005). A file that is not
+            # there did not fail a hash comparison, and reporting it as `digest_mismatch`
+            # sends whoever reads the refusal looking for drifted content that does not exist.
             if not path.is_file():
                 raise ManifestError(
                     f"skill {skill.name!r} declares {skill.path} which is not present",
-                    reason_code="digest_mismatch",
+                    reason_code="skill_missing",
                 )
-            actual = content_digest(path.read_bytes())
+            raw = path.read_bytes()
+            if not raw.decode("utf-8", errors="replace").strip():
+                raise ManifestError(
+                    f"skill {skill.name!r} at {skill.path} is empty; an empty skill delivers "
+                    f"no practice while the pin claims governed content",
+                    reason_code="skill_empty",
+                )
+            actual = content_digest(raw)
             if actual != skill.digest:
                 raise ManifestError(
                     f"skill {skill.name!r} at {skill.path}: manifest records {skill.digest}, "
