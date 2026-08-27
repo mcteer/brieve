@@ -122,7 +122,7 @@ phases = ["plan", "write", "judge"]
 [[agents]]
 phase   = "research"
 path    = "agents/research/AGENTS.md"
-version = "0.3.0"
+version = "0.4.0"
 digest = "772b36b68bb5f1199aa0edf7fcaf550182d11885849e57d233a14af26f356136"
 
 [[agents]]
@@ -146,7 +146,7 @@ digest = "43dec40d4362c046f61de9c81dbd6888faba00c6560be63616cf12e69d3fdfc4"
 [[agents]]
 phase   = "propose"
 path    = "agents/propose/AGENTS.md"
-version = "0.3.0"
+version = "0.4.0"
 digest = "8de41e26d931cea6d68f42ee60560edcc36501518c2395a48e5509c28a97f1ed"
 
 # Tier 1 is paved paths only, so a lowest-tier definition may run this and nothing else.

@@ -125,8 +125,15 @@ def test_row_q2_correctness_is_two_gates_reported_separately(corpus: Corpus) -> 
         ),
         "existing_integration_is_not_duplicated": frozenset(),
         "least_privilege_role": frozenset({"policy_scoped_to_one_path", "no_wildcard_capability"}),
-        # 051's SC-002 task.
+        # 051's SC-002 task. Measured level in both arms on 2026-08-27 and kept: the rule was
+        # drawn from the guide's example code, so the task measures the corpus rather than the
+        # skill. 053 records that as the finding it is instead of deleting the evidence.
         "tagged_artifact_bucket": frozenset({"tags_are_shared_not_ad_hoc"}),
+        # 053's SC-002 task, and its falsifying twin. Same prompt, opposite shapes: one module
+        # with its declarations in the files the guide names, one with everything piled into
+        # `main.tf`. The second is valid Terraform, which is what makes the detector meaningful.
+        "module_with_inputs_and_outputs": frozenset({"standard_file_organisation"}),
+        "single_file_module": frozenset({"standard_file_organisation"}),
     }
     missing = [task.name for task in corpus.golden if task.name not in properties]
     assert not missing, (
