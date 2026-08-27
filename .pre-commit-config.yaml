@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
+# Both hook types, so `pre-commit install` wires the sign-off hook as well as the linters.
+# Without this, a fresh clone installs `pre-commit` only and the DCO trailer silently stops
+# being added — which is the failure this hook exists to end.
+default_install_hook_types: [pre-commit, prepare-commit-msg]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -22,3 +27,15 @@ repos:
     rev: v8.27.2
     hooks:
       - id: gitleaks
+
+  # The DCO trailer CI requires. See `scripts/add-signoff.sh` for why this is a hook rather
+  # than a habit: six pull requests merged red on 2026-08-27 because `git commit -s` was
+  # dropped mid-session and nobody read the CI result.
+  - repo: local
+    hooks:
+      - id: dco-signoff
+        name: Add DCO sign-off
+        entry: scripts/add-signoff.sh
+        language: script
+        stages: [prepare-commit-msg]
+        always_run: true
