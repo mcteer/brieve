@@ -162,9 +162,12 @@ product = "{name}"
         (pack / "AGENTS.md").write_text("# stand-in root agents\n", encoding="utf-8")
         (root / "AGENTS.md").write_text("# repository-root stand-in\n", encoding="utf-8")
     if plant_skill:
-        skills = pack / "skills" / "guide"
-        skills.mkdir(parents=True, exist_ok=True)
-        (skills / "SKILL.md").write_text("# skill is not a phase instruction\n", encoding="utf-8")
+        # An UNDECLARED skill file: on disk, named by no `[[skills]]` entry, and therefore
+        # never opened by delivery. `planted` rather than `skills` — the parameter owns that
+        # name now, and the two mean different things.
+        planted = pack / "skills" / "guide"
+        planted.mkdir(parents=True, exist_ok=True)
+        (planted / "SKILL.md").write_text("# skill is not a phase instruction\n", encoding="utf-8")
     if plant_candidate:
         cand = root / "evals" / "prompt-tune" / "candidates" / name / "write"
         cand.mkdir(parents=True, exist_ok=True)

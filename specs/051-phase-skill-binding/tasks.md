@@ -219,29 +219,29 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
 
 ### Pack content
 
-- [ ] T026 [US1] Add `phases = ["plan", "write", "judge"]` to both `[[skills]]` entries in
+- [X] T026 [US1] Add `phases = ["plan", "write", "judge"]` to both `[[skills]]` entries in
       `packs/terraform/pack.toml`. Plan is bound because its output is Write's instruction: a
       plan formed without the skills can direct Write toward something the skills would not
       sanction, and Write receiving them does not undo a direction it was told to take
       (FR-012)
-- [ ] T027 [P] [US1] Remove the *"Practice is this file and the pinned skills
+- [X] T027 [P] [US1] Remove the *"Practice is this file and the pinned skills
       `terraform-style-guide` / `terraform-style-guide-security`"* sentence from
       `packs/terraform/agents/research/AGENTS.md` and
       `packs/terraform/agents/propose/AGENTS.md` (FR-012a). It is false today for all five
       phases and stays false for these two after T026
-- [ ] T028 [US1] Add both precedence sentences to
+- [X] T028 [US1] Add both precedence sentences to
       `packs/terraform/agents/{plan,write,judge}/AGENTS.md` (contract §7.2): **capability** —
       the registry bounds what can be done and adopted practice does not widen it, so a step
       naming a capability the registry does not offer is neither performed nor reported as
       performed (FR-014); **content** — where this file and a delivered skill differ on a
       concrete rule, this file governs, and the difference is not a licence to do neither
-- [ ] T029 [US1] Update `PROVENANCE.md` for all five Terraform phases in
+- [X] T029 [US1] Update `PROVENANCE.md` for all five Terraform phases in
       `packs/terraform/agents/*/PROVENANCE.md` — what changed, why, and that the set
       re-promotes as a unit
 
 ### Re-qualification (FR-013, SC-007)
 
-- [ ] T030 [US1] Score the **assembled** instruction in `score_phase_agents_case` and
+- [X] T030 [US1] Score the **assembled** instruction in `score_phase_agents_case` and
       `score_build_agents_case` in `src/core/evals/phase_agents_corpus.py`: read the case's
       referenced bytes as today, resolve the pack's skills bound to that phase from the
       manifest, and call `assemble_instruction`. **Do not route through `load_phase_agents`** —
@@ -252,7 +252,7 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
 - [ ] T031 [US1] [GATE:eval] Add a `phase_agents` case whose bound skill is missing and which
       must score `fail`, to `packs/terraform/evals/phase_agents.toml`. Without it T030's
       change is unfalsifiable
-- [ ] T032 [US1] [GATE:eval] Re-run `phase_agents` and `build_agents` over the assembled
+- [X] T032 [US1] [GATE:eval] Re-run `phase_agents` and `build_agents` over the assembled
       content and re-promote all five Terraform phase files through `promote_phase_agents`,
       updating `[[agents]]` digests and bumping `version` in `packs/terraform/pack.toml`.
       All five or none; both suites or neither (FR-013, FR-013a — no runtime state exists for
