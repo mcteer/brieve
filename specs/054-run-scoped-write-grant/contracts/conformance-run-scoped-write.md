@@ -19,6 +19,9 @@ itself proves nothing about Vault's answer.
 | **E5** | Removing the narrowing makes E1–E3 pass again | the refusal comes from something other than this feature | FR-004, SC-003 |
 | **E6** | A read a run could make before is still permitted | reads narrowed by accident | FR-006, SC-005 |
 | **E7** | The sweeper still lists the namespace | the run's narrowing narrowed the service role too | FR-008 |
+| **E8** | The refusal comes from **Vault's own answer**, with the pipeline guard disabled | the bound is really the hook, and would not survive a platform bug — 042's stated reason for the ACL layer | **FR-002** |
+| **E9** | A Build outlasting one credential lifetime completes its measurement, and a grant whose run has ended stops renewing | expiry turns a slow Build into a failed one, or a credential outlives its work | **SC-008** |
+| **E10** | A resumed run reaches its own earlier workspace with a fresh credential | resumption either loses access to its own scratch policies or reuses a credential across the interruption | **FR-016** |
 
 **E1–E3 replay the exact actions that returned 200, 200 and 204 on 2026-08-27.** Same shape as
 018's registry-isolation rows: a real attempt under a real run's authority, against the live
@@ -52,20 +55,25 @@ other row here and grant exactly what the feature exists to stop.
 is deliberate: a contract naming a JWT would have to be rewritten if the cheap path wins, and
 would quietly argue for the expensive one.
 
+**SC-006 is discharged by [research.md](../research.md) R1–R3**, not by a row: it requires the
+cheapest sufficient mechanism with rejected alternatives recorded and the evidence that ruled
+each out. R1 rejects templating on measurement, R3 records ADR-0058 closing the hand-it-down
+fallback. A row cannot assert "this was the cheapest"; the record is the artifact.
+
 Two rows are owed **only if R2 fails** and 016's substrate is built:
 
 | Row | Asserts |
 | --- | --- |
-| E8 | A run presents its own attested identity; no credential is handed to the allocation (ADR-0058) |
-| E9 | The mint path is bounded — a run cannot mint authority naming another run's workspace |
+| E11 | A run presents its own attested identity; no credential is handed to the allocation (ADR-0058) |
+| E12 | The mint path is bounded — a run cannot mint authority naming another run's workspace |
 
 ## 4. Named runner
 
-Dan McTeer (maintainer). E1–E7 fail loudly when the enclave is absent; they do not skip green.
+Dan McTeer (maintainer). E1–E10 fail loudly when the enclave is absent; they do not skip green.
 
 | Row | Named runner | Status |
 | --- | --- | --- |
-| E1–E7 | — | pending |
+| E1–E10 | — | pending |
 
 ## 5. Stability commitments
 
