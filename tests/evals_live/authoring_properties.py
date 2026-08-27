@@ -124,12 +124,50 @@ _WILDCARD = re.compile(
     """
 )
 
+#: Where each kind of declaration belongs, per the guide's File Organization table. Keys are
+#: the block keyword; values are the filenames that may hold it.
+#:
+#: 053's SC-002 candidate, and it is STRUCTURAL on purpose. The two rules 051 measured —
+#: `variable_has_validation` and `tags_are_shared_not_ad_hoc` — were drawn from the guide's
+#: example code rather than its stated rules, which is why both arms came back level. This one
+#: the guide states twice, in prose, and it is legible from filenames alone: no HCL parsing, no
+#: judgement, and two readers cannot score it differently.
+_CANONICAL_HOME = {
+    "variable": ("variables.tf",),
+    "output": ("outputs.tf",),
+    "locals": ("locals.tf", "main.tf"),
+    "provider": ("providers.tf", "main.tf"),
+}
+
+#: Declares a block of the given kind at the top level of a file.
+_BLOCK = r'(?im)^\s*{kind}\s+("[^"]+"\s*)?\{{'
+
+
 #: A Vault policy path block. Counted, because "scoped to one path" is a count.
 _POLICY_PATH = re.compile(r'(?im)^\s*path\s+"[^"]+"\s*\{')
 
 
 def _joined(contents: dict[str, str]) -> str:
     return "\n".join(contents.values())
+
+
+def _files_are_organised(contents: dict[str, str]) -> bool:
+    """Whether declarations sit in the files the guide says hold them.
+
+    True when every kind of declaration the artefact makes lives in its canonical file. An
+    artefact that declares nothing placeable is NOT organised — the property must be absent
+    rather than vacuously true, or a one-line change would score it and measure nothing.
+    """
+    placeable = False
+    for kind, homes in _CANONICAL_HOME.items():
+        pattern = _BLOCK.format(kind=kind)
+        for path, body in contents.items():
+            if not re.search(pattern, body):
+                continue
+            placeable = True
+            if not any(path.endswith(home) for home in homes):
+                return False
+    return placeable
 
 
 def detect(contents: dict[str, str]) -> frozenset[str]:
@@ -163,6 +201,9 @@ def detect(contents: dict[str, str]) -> frozenset[str]:
 
     if _SHARED_TAGS.search(text):
         found.add("tags_are_shared_not_ad_hoc")
+
+    if _files_are_organised(contents):
+        found.add("standard_file_organisation")
 
     paths = _POLICY_PATH.findall(text)
     if len(paths) == 1:

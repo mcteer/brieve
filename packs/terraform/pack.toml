@@ -122,31 +122,31 @@ phases = ["plan", "write", "judge"]
 [[agents]]
 phase   = "research"
 path    = "agents/research/AGENTS.md"
-version = "0.3.0"
+version = "0.4.0"
 digest = "772b36b68bb5f1199aa0edf7fcaf550182d11885849e57d233a14af26f356136"
 
 [[agents]]
 phase   = "plan"
 path    = "agents/plan/AGENTS.md"
-version = "0.3.0"
-digest = "2f8f0f3aa886724cc77a8020d10637f6b76c4a1f27f0b8f1a554825c1edb8e33"
+version = "0.4.0"
+digest = "fe407621c5657982ebcad6a3770b93e585f83acfc065b93d7fb5c9d5bd2dd3b5"
 
 [[agents]]
 phase   = "write"
 path    = "agents/write/AGENTS.md"
-version = "0.3.0"
-digest = "a828b828d41348edfa483138442b6196bdcb053e70a188f72c19b9b1999721d6"
+version = "0.4.0"
+digest = "d1fa0da5a96145f148f322f8e48fc1ebd3c052e445b1d41f0b48fbdb074d496c"
 
 [[agents]]
 phase   = "judge"
 path    = "agents/judge/AGENTS.md"
-version = "0.3.0"
-digest = "4290a0bdca1d4434bce0bc5e4fc8a9f1a797a73f9d38659f62b6ba7dc745d7b4"
+version = "0.4.0"
+digest = "43dec40d4362c046f61de9c81dbd6888faba00c6560be63616cf12e69d3fdfc4"
 
 [[agents]]
 phase   = "propose"
 path    = "agents/propose/AGENTS.md"
-version = "0.3.0"
+version = "0.4.0"
 digest = "8de41e26d931cea6d68f42ee60560edcc36501518c2395a48e5509c28a97f1ed"
 
 # Tier 1 is paved paths only, so a lowest-tier definition may run this and nothing else.

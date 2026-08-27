@@ -105,9 +105,14 @@ for the same reason it would report a pack whose cards delegate perfectly.
 **The positive control is terraform itself**: A4 fails against the frozen pre-feature cards,
 A1 passes after the edits. That pairing does the work "vault passes" was wrongly asked to do.
 
-**Recorded, not fixed here**: vault pins a skill delivered to no model. Under ADR-0004 that is
-worth revisiting, but 051 chose it with reasons, and changing it is a binding decision with a
-re-qualification cost — not something this feature should do while passing through.
+**Recorded, not fixed here** (T040a): `vault-secret-access` is pinned, digest-verified,
+re-reviewed on every bump — and delivered to no model. Under ADR-0004 that is a supply chain
+with no consumer, which is the defect 051 was written to fix, surviving one pack over. It is
+not fixed here for two reasons: 051's R12 chose it deliberately and calls it a live fixture
+that "must not acquire a binding by tidiness", and binding it would cost a re-qualification of
+all five vault phases. **Row A5 fails informatively if it ever acquires a binding**, so the
+decision cannot be taken silently. Worth a look on its own terms; not this feature's to take
+while passing through.
 
 ---
 

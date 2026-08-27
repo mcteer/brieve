@@ -119,6 +119,37 @@ _UNTAGGED_MODULE = {
 }
 
 
+#: 053's SC-002 subject. A live stack root and nothing else — no `modules/` directory, so the
+#: new module is greenfield and the model must decide its layout rather than copy one.
+#:
+#: **It deliberately takes no position, and that is harder here than it looks.** A subject
+#: already split into `terraform.tf` / `variables.tf` / `outputs.tf` would be copied, and both
+#: arms would pass for the same reason 051's first attempt failed — the prompt, or the fixture,
+#: teaching the rule instead of the skill. A root stack in one `main.tf` is ordinary, correct
+#: Terraform (a root is not a module), so it neither demonstrates the rule nor contradicts it.
+_LIVE_STACK_NO_MODULES = {
+    "terraform.tf": """terraform {
+  required_version = "~> 1.14"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+""",
+    "main.tf": """provider "aws" {
+  region = "us-west-2"
+}
+
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+""",
+}
+
+
 _BY_TASK = {
     "dynamic_database_secret": _PLAIN_APP,
     "static_credential_lookalike": _PLAIN_APP,
@@ -128,6 +159,10 @@ _BY_TASK = {
     # 051's SC-002 task. The subject takes no position on tagging, so the model is asked to
     # know the rule rather than to copy it.
     "tagged_artifact_bucket": _UNTAGGED_MODULE,
+    # 053's SC-002 task and its falsifying twin. Same subject: the shapes differ in what the
+    # model produces, not in what it is shown.
+    "module_with_inputs_and_outputs": _LIVE_STACK_NO_MODULES,
+    "single_file_module": _LIVE_STACK_NO_MODULES,
 }
 
 
