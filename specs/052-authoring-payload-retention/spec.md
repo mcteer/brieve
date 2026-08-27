@@ -56,6 +56,12 @@ The other half was never closed: the composed proposal is also written to
 - **FR-011** sharpened. Its obligation — that the never-terminal gap is recorded — was
   dischargeable only by this document, which nobody reads while reading the code.
 
+### Session 2026-08-27 — found at implementation
+
+- **FR-008** widened to clear `usage`. Not a preference: the first acceptance sweep after the
+  backfill failed on a `usage` field carrying a shell transcript with a credential-shaped
+  assignment. Two analyze passes did not find this, because neither ran the sweep.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A completed Build leaves no copy of what it wrote (Priority: P1)
@@ -183,10 +189,15 @@ request opens carrying the same files, and that the scrub did not run before the
   writes no proposal — because a row asserting "the scrub cleared it" would pass without
   exercising anything. If the refusal path ever starts carrying a proposal, that row fails, and
   this requirement stops being satisfied for free.
-- **FR-008**: The scrub MUST clear the authored file bodies and the model-authored rationale,
-  and MUST NOT clear the title or usage text. Both cleared fields derive from the customer's
-  repository; FR-032 already treats the rationale that way, and the two remaining fields are
-  prose about the change rather than extracts from it.
+- **FR-008**: The scrub MUST clear the authored file bodies and the model-authored **rationale
+  and usage** text, and MUST NOT clear the title or the requester's task. All three cleared
+  fields derive from the customer's repository; FR-032 already treats the rationale that way.
+  **`usage` was added at implementation, on evidence**: the first acceptance sweep after the
+  backfill found one carrying a shell transcript with a credential-shaped assignment, so the
+  "prose about the change rather than an extract from it" line did not survive a real payload.
+  `usage` and `rationale` are the same kind of thing — model-authored prose quoting the subject,
+  travelling in the pull request body — and the pull request is the durable artifact, so a
+  reviewer loses nothing.
 - **FR-009**: Each authored file's **path and content digest MUST survive** the scrub. The
   digest is already recorded in the proposal's provenance, so this preserves rather than adds:
   a reviewer can establish that a merged pull request is the proposal the run made, with the

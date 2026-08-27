@@ -153,6 +153,12 @@ def test_core_authoring_is_untouched_by_this_feature() -> None:
         "src/core/authoring/publish.py",
         "src/core/authoring/repository_id.py",
         "src/core/authoring/tool.py",
+        # 052 extends the retention scrub with a second subject: the composed proposal in the
+        # checkpoint payload, which 041's FR-033 left behind when it cleared the same content's
+        # other copy. `retention.py` is 041's OWN file and was never listed because nothing had
+        # needed to touch it since. Adding to the shared tier is the opposite of forking it, and
+        # `test_core_is_product_blind` still asserts no product names reach this module.
+        "src/core/authoring/retention.py",
     }
     extra = [path for path in changed if path not in permitted]
     assert not extra, (

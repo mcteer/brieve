@@ -268,6 +268,16 @@ adopted from upstream skill repositories with overlays authored here (ADR-0004).
 into a phase's instruction by its **skill binding**, and digest-verified again at that
 moment — a skill nothing binds is governed but never executed.
 
+**Proposal payload scrub** — clearing a finished authoring run's authored content from the
+control plane (052). At terminal state, after the pull request opens, the checkpoint's file
+bodies and the model-authored `rationale` and `usage` are emptied; the paths and the
+path-and-digest manifest in `provenance` survive, so a reviewer can still hash the merged pull
+request and prove it is the proposal the run made. **The pull request is the durable artifact**
+(ADR-0038) — that is what makes clearing the platform's copy defensible rather than destructive.
+Completes 041's FR-033, which closed the same content's other copy in `intents.arguments` and
+left this one. A run that never reaches terminal state is not scrubbed, and that gap is recorded
+rather than closed.
+
 **Skill binding** — the declaration, in a pack manifest, of *which phases receive a skill*
 (`phases` on `[[skills]]`, 051). A skill with no binding is adopted, pinned and delivered
 nowhere — a legitimate staged-adoption state that the run record keeps distinguishable from

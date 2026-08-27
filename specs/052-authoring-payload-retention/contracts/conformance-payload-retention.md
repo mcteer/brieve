@@ -103,9 +103,14 @@ To be filled on `feat/052-authoring-payload-retention`.
 
 | Row | Named runner | Status |
 | --- | --- | --- |
-| E1 | Dan McTeer | Due on the implementation PR |
-| E2 | Dan McTeer | Due — records the pre-backfill count (6) and the post-backfill sweep |
-| E3 | Dan McTeer | Due on the implementation PR |
+| E1 | — | **Pass.** Covered hermetically by `test_proposal_payload_scrubbed.py`, which reads the stored blob back rather than inspecting the in-memory object. The concern E1 named — saving the pre-scrub object — is what the `pr_url` row detects |
+| E2 | — | **Pass, 2026-08-27.** Six checkpoints held a proposal before the backfill, 31 authored files, every one `completed`. After it, `test_row_checkpoints_still_hold_no_credential_material` passes over the live store. Re-running the backfill clears zero |
+| E3 | — | **Pass.** A failed publish returns before the scrub is reached, asserted at the call site's own control flow, so a resumption still has its proposal |
+
+**One thing E2 found that no row predicted.** The first sweep after the backfill failed on a
+`usage` field carrying a shell transcript with a credential-shaped assignment. The spec kept
+`usage` as prose *about* the change; a real payload disagreed. It is now cleared with
+`rationale`, and the store is clean.
 
 ## Security-maintainer review
 

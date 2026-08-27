@@ -13,12 +13,13 @@ so this cannot fail today, which is exactly when to write it down. The next pers
 message says why not — and the reason is that `checkpoints.grant_id` already held a credential
 id once (research F1).
 
-**KNOWN RED, for a true reason — issue #219.** Correcting the matcher (2026-08-27) made a real
-finding visible: `scrub_authoring_requests` clears `intents.arguments` at terminal state and
-nothing clears `checkpoints.payload`, which carries the same authored file bodies. 041's FR-033
-closed one copy of the content and left the other. This row is neither skipped nor loosened —
-it is reporting something, and the fix is a feature whose bound has to be decided rather than
-assumed (see the issue for why the intents scrub's reasoning does not transfer).
+**This row was red, and what it found became 052.** Correcting the matcher (2026-08-27) made a
+real finding visible: `scrub_authoring_requests` cleared `intents.arguments` at terminal state
+and nothing cleared `checkpoints.payload`, which carried the same authored file bodies. 041's
+FR-033 closed one copy of the content and left the other, for two features.
+
+Closed by 052 (issue #219): the payload is scrubbed at terminal state, six pre-existing
+checkpoints were backfilled, and this row is the acceptance signal that says so.
 """
 
 from __future__ import annotations
