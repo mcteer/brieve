@@ -16,6 +16,14 @@
 | **ADRs touched** | **ADR-0057** (amended 2026-08-27: its trigger 1 fired, and its Decision predicted this exact split — *"where narrowing is worth having is WRITE and ACT"*). **ADR-0056** (the mechanism it established — Vault is the resource server and cannot perform the exchange). **ADR-0044** (federate-or-broker: where a write bound belongs). **ADR-0025** (structural exclusion — a run may not reach what bounds another run). **ADR-0047** (a bound that cannot be shown to refuse is a passing stub) |
 | **Evidence class** | attestation-relevant — the grant a run receives is what the trust fabric will answer with when asked what a run could have done |
 
+## Clarifications
+
+### Session 2026-08-27
+
+- Q: Should every dispatched run get a scoped write grant, or only the runs that actually need to write? → A: Only runs that need it — manufactured when the run's requested tools declare a write path, so most runs carry no write authority at all.
+- Q: What happens when a run's write grant expires while the Build is still going? → A: Renew while the run is alive, and stop the moment it is not. A slow Build must not become a failed measurement.
+- Q: On resume, does a run get a fresh write grant or carry the original? → A: A fresh credential, but its scope MUST be identical — re-deriving scope at resume could widen it, which would be as bad as not narrowing at all. Sameness is asserted, not assumed.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### The measurement that produced this feature
@@ -111,19 +119,30 @@ no measurement is attempted; no wider authority is substituted.
 
 ### Edge Cases
 
-- **The grant expires mid-measurement.** A scoped credential has a lifetime; a Build can be
-  slower. The measurement must fail cleanly rather than half-write.
-- **A run resumes.** Resumption re-observes rather than replaying; the resumed run needs
-  authority for the same workspace, and whether that is the same grant or a fresh one is a
-  design point, not an assumption.
+- **The grant expires mid-measurement.** A scoped credential has a lifetime and a Build can be
+  slower, so the grant is renewed while the run is alive (FR-014). The case that must still be
+  handled is renewal *failing* — that stops the run under FR-005 like any other manufacture
+  failure, and must not leave a half-written measurement.
+- **Renewal outlives the run.** Renewal keyed to something other than the run's own liveness
+  would keep a write credential alive after the work ended, which is the shape this feature
+  exists to remove. It stops when the run stops.
+- **A run resumes.** Resumption mints a fresh credential naming the **same** workspace
+  (FR-016). The hazard is not the new credential, it is re-derivation: anything that computes
+  scope again at resume can compute it differently, and a resumed run holding a wider grant
+  than the original would defeat the feature while looking like it worked. Sameness is
+  asserted (FR-017), not assumed.
+- **Scope drifts between mints without anyone noticing.** The same hazard as resume, arriving
+  through renewal or a retry rather than through an interruption. Any re-mint is covered.
 - **The sweep still needs breadth.** `sweep_scratch_policies` finds orphans by listing the
   namespace, which is exactly what a run must not do. The service role holds that grant, and
   narrowing the run's must not narrow the sweeper's.
 - **Two runs, one agent definition.** Entity-scoped mechanisms bind per definition, not per
   run. Two concurrent runs of the same definition are the case that breaks a naive
   identity-templated policy.
-- **A run with no write need at all.** Most runs never call the impact check. Whether they
-  receive a scoped grant they never use, or none, is a real choice.
+- **A run with no write need at all.** Most runs never call the impact check and now receive
+  no write authority whatsoever (FR-012) — stricter than today, where every dispatched run
+  carries the estate-wide grant. The decision is made from the run's requested tools, before
+  the model has chosen anything, which is what makes it decidable at all.
 
 ## Requirements *(mandatory)*
 
@@ -152,6 +171,24 @@ no measurement is attempted; no wider authority is substituted.
   the narrowing derives from, or the spec MUST record why it cannot be.
 - **FR-011**: What a run's authority actually granted MUST remain answerable after the run, so
   an auditor can say what it could have done.
+- **FR-012**: A scoped write grant MUST be manufactured only for a run whose requested tools
+  declare a write path. A run with no such tool MUST receive no write authority at all — not a
+  scoped grant it never uses, and not the estate-wide one.
+- **FR-013**: The decision in FR-012 MUST be made from the run's requested tools rather than
+  from what the model later chooses to call, so a run's write authority does not depend on a
+  model's behaviour partway through it.
+- **FR-014**: A scoped write grant MUST be renewable while its run is alive, and MUST stop
+  being renewed when the run is not. A Build slower than one credential lifetime is a normal
+  Build, not a failed measurement.
+- **FR-015**: A failed renewal MUST be handled as FR-005 handles a failed manufacture — the
+  run stops with a distinct recorded reason, with no wider authority substituted and no
+  half-written measurement left behind.
+- **FR-016**: A resumed run MUST receive a fresh credential naming the **same** workspace as
+  the original, so no credential has to survive an interruption.
+- **FR-017**: Every re-mint of a run's write grant — on resume, on renewal, on retry — MUST
+  produce **identical scope** to the first. A widened re-mint MUST be refused rather than
+  used, and a row MUST be able to detect one. A grant that drifts wider between mints defeats
+  this feature while appearing to work, which is the failure this requirement exists for.
 
 ### Key Entities
 
@@ -176,6 +213,15 @@ no measurement is attempted; no wider authority is substituted.
 - **SC-004**: Every failure to manufacture stops the run with a distinct reason; none proceeds
   unmeasured and none is reported as another failure.
 - **SC-005**: Read scope is unchanged — no path a run could read before is refused after.
+- **SC-007**: A run whose requested tools declare no write path holds no write authority —
+  measured live, and contrasted against today, where every dispatched run holds the
+  estate-wide grant regardless of what it will do.
+- **SC-008**: A Build lasting longer than one credential lifetime completes its measurement
+  successfully, and a grant whose run has ended is no longer renewed — both measured rather
+  than reasoned about.
+- **SC-009**: Every re-minted grant is scope-identical to the run's first — across resume,
+  renewal and retry, 100% of re-mints, with a widened one refused and detected rather than
+  used.
 - **SC-006**: The mechanism chosen is the cheapest that satisfies SC-001, with the rejected
   alternatives recorded and the evidence that ruled each out.
 
@@ -194,6 +240,14 @@ no measurement is attempted; no wider authority is substituted.
   cannot express.
 - **Only the scratch namespace is in scope.** It is the only write capability a dispatched run
   carries today.
+- **Scope is derived once and thereafter reproduced, not recomputed.** The cheapest way to
+  satisfy FR-017 is to derive a run's workspace once and re-present it, rather than re-running
+  the derivation and hoping two runs of it agree. If planning finds that impractical, FR-017's
+  assertion becomes the load-bearing control and needs a row that can actually catch drift.
+- **The write-path decision is derivable at run start.** `start_governed_run` already receives
+  the requested tools and pack manifests already declare each tool's `paths`, so FR-013 needs
+  no new authoring and no new artifact. If that turns out not to hold, FR-012's timing is the
+  thing to revisit — not its substance.
 
 ## Out of Scope
 

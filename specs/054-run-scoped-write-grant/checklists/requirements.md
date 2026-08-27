@@ -46,12 +46,21 @@ are the case that breaks them. If that can be worked around, the expensive path 
 that the `b7c2a2f` pipeline guard holds. This feature is the layer beneath it and does not
 re-close the route above.
 
-**Three questions are genuinely the maintainer's** and are left for `/speckit-clarify` rather
-than guessed, because each changes what gets built:
+**Three questions were resolved in the 2026-08-27 clarification session**, adding FR-012
+through FR-017 and SC-007 through SC-009:
 
-1. Does a run that never writes receive a scoped grant it never uses, or none at all?
-2. On resume, does the run present the same grant or a fresh one?
-3. What happens when a grant's lifetime is shorter than the Build that holds it?
+1. Only runs whose requested tools declare a write path get a grant at all — stricter than
+   today, where every dispatched run carries the estate-wide one.
+2. Grants renew while the run is alive and stop when it is not, so a slow Build is a normal
+   Build rather than a failed measurement.
+3. A resumed run gets a fresh credential naming the same workspace.
+
+**The third answer was corrected by the maintainer and is better for it.** The option offered
+was "fresh grant, same workspace"; the answer added the constraint that makes it safe —
+*re-deriving* scope at resume can widen it, and a resumed run holding a wider grant would
+defeat the feature while appearing to work. FR-017 now covers every re-mint, not just resume,
+and requires a widened one to be refused **and detectable**. That hazard was not in the spec
+before the question was asked.
 
 **Numbers in this spec are measurements, not estimates.** The 200/200/204 was observed against
 the live dev enclave on 2026-08-27 and is cheap to reproduce; the ~36,000-line divergence of
