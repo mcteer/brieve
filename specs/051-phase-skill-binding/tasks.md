@@ -403,7 +403,7 @@ T006 and asserted by T009. This phase adds the property that keeps the boundary 
       explicitly
 - [X] T054 [P] Add a `CHANGELOG.md` entry: adopted skills now reach the phases bound to them;
       `content_pins` skill key shape changed with no compatibility shim
-- [ ] T055 Run every scenario in [quickstart.md](quickstart.md), restoring
+- [X] T055 Run every scenario in [quickstart.md](quickstart.md), restoring
       `packs/terraform/skills/terraform-style-guide/SKILL.md` and `packs/terraform/pack.toml`
       after the tamper and unbind scenarios — a left-behind edit fails everything downstream
 - [ ] T056 Run `make check`, then `make conformance`, then `make test-full`. Rows A1–A19 are
