@@ -268,3 +268,145 @@ def test_row_v2_a_hook_that_raises_denies_rather_than_allowing() -> None:
         "protected set becoming unreadable mid-run silently unprotects the platform"
     )
     assert not calls
+
+
+# --------------------------------------------------------- #226: a run id is not a claim
+
+#: The run every row below actually is. `_run` builds it with this correlation id, and
+#: `GovernedRun.run_id` defaults to the correlation id.
+OWN_RUN = "corr-042-hook"
+
+#: Another run's id. Nothing about it is special — that is the point.
+FOREIGN_RUN = "corr-some-other-build"
+
+
+def test_a_call_claiming_another_runs_id_is_refused() -> None:
+    """ISSUE #226 — the route around 042's own refusal.
+
+    `handlers.py` deliberately refuses a `scratch_name` argument as "a caller choosing what to
+    overwrite", and then derives that name from `run_id` — which IS an argument. Naming another
+    run's id reaches that run's measurement workspace, and the wildcard grant in `scratch.tf`
+    permits acting on it. Demonstrated against the live enclave before this guard existed:
+    read 200, overwrite 200, delete 204.
+    """
+    registry, calls = _registry()
+    audit = InMemoryAuditSink()
+
+    result = invoke_tool(
+        _run(registry, audit, hooked=True), TOOL, {"run_id": FOREIGN_RUN, "path": "main.tf"}
+    )
+
+    assert not result.allowed
+    assert result.reason_code == "run_id_forged"
+    assert not calls, "refused BEFORE the handler ran; a later refusal has already written"
+
+
+def test_a_call_using_its_own_run_id_is_allowed() -> None:
+    """THE CONTROL, and the row that stops the guard being a blanket refusal.
+
+    Without this, denying every `run_id` would satisfy the row above and break the feature
+    the argument exists for.
+    """
+    registry, calls = _registry()
+    audit = InMemoryAuditSink()
+
+    result = invoke_tool(
+        _run(registry, audit, hooked=True), TOOL, {"run_id": OWN_RUN, "path": "main.tf"}
+    )
+
+    assert result.allowed, result.reason_code
+    assert calls, "the handler must still run for a call acting as itself"
+
+
+def test_a_call_carrying_no_run_id_is_untouched() -> None:
+    """The guard binds on a claim, not on its absence. Most calls carry no run id at all."""
+    registry, calls = _registry()
+    audit = InMemoryAuditSink()
+
+    result = invoke_tool(_run(registry, audit, hooked=True), TOOL, {"path": "main.tf"})
+
+    assert result.allowed, result.reason_code
+    assert calls
+
+
+def test_the_identity_guard_can_lose() -> None:
+    """V3's shape for #226. Identical run, identical call, hook not registered.
+
+    If this ever stops passing, the refusal above is coming from somewhere this fix does not
+    control — and removing the hook would silently stop protecting anything.
+    """
+    registry, calls = _registry()
+    audit = InMemoryAuditSink()
+
+    result = invoke_tool(
+        _run(registry, audit, hooked=False), TOOL, {"run_id": FOREIGN_RUN, "path": "main.tf"}
+    )
+
+    assert result.allowed, (
+        "with the hook unregistered this call MUST succeed — that is what makes the refusal "
+        "above attributable to the hook rather than to something else in the pipeline"
+    )
+    assert calls
+
+
+def test_the_guard_covers_a_tool_outside_the_policy_writing_set() -> None:
+    """A run id is an IDENTITY claim, not a policy name, so the check runs on every tool.
+
+    `_POLICY_ARGUMENTS` is deliberately scoped to `POLICY_WRITING_TOOLS`, because a hook
+    reading `read_subject`'s file contents for policy names would refuse a run for analysing a
+    repository that mentions `agent-ceiling` in a comment. That reasoning does not transfer:
+    no tool has a legitimate reason to act as a run other than the one calling it, and a
+    future tool deriving anything from `run_id` inherits this guard rather than needing to be
+    added to a set somebody must remember.
+    """
+    calls: list[dict[str, Any]] = []
+    registry = ToolRegistry()
+
+    def _record(arguments: Mapping[str, Any]) -> dict[str, Any]:
+        calls.append(dict(arguments))
+        return {"ok": True}
+
+    registry.register(name="unrelated_tool", handler=_record, repeatable=True)
+    tools = {"unrelated_tool"}
+    run = start_governed_run(
+        agent_definition_id=DEFINITION,
+        correlation_id=OWN_RUN,
+        subject_user_id="user-1",
+        requested_scope=AuthorityScope(tool_names=frozenset(tools), product_actions=frozenset()),
+        identity_fabric=fake_identity_fabric(
+            tool_names=tools, product_actions=set(), ceiling_tools=tools, ceiling_actions=set()
+        ),
+        clock=frozen_clock(),
+        registry=registry,
+        audit_sink=InMemoryAuditSink(),
+        hooks=[protected_policy_hook(PROTECTED)],
+    )
+
+    result = invoke_tool(run, "unrelated_tool", {"run_id": FOREIGN_RUN})
+
+    assert not result.allowed
+    assert result.reason_code == "run_id_forged"
+    assert not calls
+
+
+def test_an_unestablishable_identity_refuses_rather_than_allows() -> None:
+    """FAIL-CLOSED. A guard that allowed on absence would be removable by arranging for the
+    run to be missing, rather than by deleting the check — which is the failure mode
+    Principle III exists to refuse.
+    """
+    from core.hooks.types import HookContext
+    from core.hooks.types import HookPhase as _Phase
+    from surfaces.dispatch.policy_authoring import _refuse_a_foreign_run
+
+    decision = _refuse_a_foreign_run(
+        HookContext(
+            correlation_id="",
+            tool_name=TOOL,
+            arguments={"run_id": FOREIGN_RUN},
+            phase=_Phase.PRE,
+            run=None,
+        )
+    )
+    assert decision is not None
+    assert decision.outcome == "deny"
+    assert decision.reason_code == "run_identity_unavailable"
