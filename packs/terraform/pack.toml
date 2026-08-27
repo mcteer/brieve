@@ -64,12 +64,20 @@ name    = "terraform-style-guide"
 path    = "skills/terraform-style-guide/SKILL.md"
 version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
 digest  = "fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d41762120059c49540c2"
+# Reviewed against these exact bytes (051, FR-019). A bump changes `digest`; leaving
+# this behind refuses the load, so nobody can bump the content without re-reading what
+# it now recommends that this platform has no registry tool for.
+unsatisfiable_reviewed_at = "fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d41762120059c49540c2"
 
 [[skills]]
 name    = "terraform-style-guide-security"
 path    = "skills/terraform-style-guide/SECURITY.md"
 version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
 digest  = "3dc8ffa10139e9772c5c102fee6377f66f5167bd043a7c43e6e5df682dc75f92"
+# Reviewed against these exact bytes (051, FR-019). A bump changes `digest`; leaving
+# this behind refuses the load, so nobody can bump the content without re-reading what
+# it now recommends that this platform has no registry tool for.
+unsatisfiable_reviewed_at = "3dc8ffa10139e9772c5c102fee6377f66f5167bd043a7c43e6e5df682dc75f92"
 
 # 049 executed phase instructions. Digests are SHA-256 of AGENTS.md.
 # 0.2.0: production-shaped set after individual GEPA (Write SC-006 5/5).

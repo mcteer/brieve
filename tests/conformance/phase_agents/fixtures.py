@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -15,6 +16,30 @@ PHASES: tuple[str, ...] = tuple(p.value for p in PHASE_ORDER)
 
 def digest_of(body: bytes) -> str:
     return hashlib.sha256(body).hexdigest()
+
+
+@dataclass(frozen=True)
+class SkillSpec:
+    """One ``[[skills]]`` entry to write, and the single way it may be broken.
+
+    ``phases=None`` omits the key entirely, which is the shape every pack shipped before
+    051 and the one FR-011 requires to keep behaving exactly as it did.
+    """
+
+    name: str
+    body: str = "# fixture skill\nPractice the fixture pack pins.\n"
+    path: str = ""
+    phases: tuple[str, ...] | None = None
+    unsatisfiable: tuple[tuple[str, str], ...] = ()
+    #: ``None`` records the file's own digest — the reviewed-and-current case.
+    reviewed_at: str | None = None
+    drift: bool = False
+    empty: bool = False
+    absent: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.path:
+            object.__setattr__(self, "path", f"skills/{self.name}/SKILL.md")
 
 
 def write_authoring_pack(
@@ -29,8 +54,14 @@ def write_authoring_pack(
     plant_skill: bool = False,
     plant_candidate: bool = False,
     extra_workflow: bool = True,
+    skills: tuple[SkillSpec, ...] = (),
 ) -> Path:
-    """Write a complete (or deliberately broken) authoring pack under ``root / name``."""
+    """Write a complete (or deliberately broken) authoring pack under ``root / name``.
+
+    ``skills`` writes a ``[[skills]]`` entry per spec, with the file on disk. Each spec can
+    be broken one way at a time — drifted bytes, empty bytes, an absent file, a declaration
+    reviewed against a stale digest — so a row asserts one refusal rather than several at once.
+    """
     pack = root / name
     pack.mkdir(parents=True, exist_ok=True)
     agent_blocks: list[str] = []
@@ -63,6 +94,41 @@ def write_authoring_pack(
                 ]
             )
         )
+    skill_blocks: list[str] = []
+    for spec in skills:
+        body = spec.body.encode()
+        recorded = digest_of(body)
+        if spec.drift:
+            (pack / spec.path).parent.mkdir(parents=True, exist_ok=True)
+            (pack / spec.path).write_bytes(body + b"\ndrifted after the pin was taken\n")
+        elif spec.empty:
+            (pack / spec.path).parent.mkdir(parents=True, exist_ok=True)
+            (pack / spec.path).write_bytes(b"   \n")
+        elif not spec.absent:
+            (pack / spec.path).parent.mkdir(parents=True, exist_ok=True)
+            (pack / spec.path).write_bytes(body)
+        reviewed = spec.reviewed_at if spec.reviewed_at is not None else recorded
+        lines = [
+            "[[skills]]",
+            f'name = "{spec.name}"',
+            f'path = "{spec.path}"',
+            'version = "0.1.0"',
+            f'digest = "{recorded}"',
+            f'unsatisfiable_reviewed_at = "{reviewed}"',
+        ]
+        if spec.phases is not None:
+            rendered = ", ".join(f'"{ph}"' for ph in spec.phases)
+            lines.append(f"phases = [{rendered}]")
+        lines.append("")
+        for capability, recommendation in spec.unsatisfiable:
+            lines += [
+                "[[skills.unsatisfiable]]",
+                f'capability = "{capability}"',
+                f'recommendation = "{recommendation}"',
+                "",
+            ]
+        skill_blocks.append("\n".join(lines))
+
     workflow = ""
     if extra_workflow:
         workflow = """
@@ -87,6 +153,7 @@ transport = "native"
 handler = "h"
 product = "{name}"
 {workflow}
+{"".join(skill_blocks)}
 {"".join(agent_blocks)}
 """,
         encoding="utf-8",

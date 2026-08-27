@@ -253,6 +253,9 @@ name = "read"
 path = "skills/read.md"
 version = "1"
 digest = "{wrong}"
+# Matches `digest`, so the declaration is self-consistent and the ONLY defect here is the
+# one this row is about: the pin disagrees with the bytes on disk (051, FR-019).
+unsatisfiable_reviewed_at = "{wrong}"
 """
     )
     with pytest.raises(ManifestError) as caught:
@@ -280,6 +283,7 @@ name = "read"
 path = "skills/read.md"
 version = "1"
 digest = "{hashlib.sha256(body).hexdigest()}"
+unsatisfiable_reviewed_at = "{hashlib.sha256(body).hexdigest()}"
 """
     )
     assert FilesystemPackLoader(tmp_path).load("vault").skills[0].name == "read"

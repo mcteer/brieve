@@ -12,6 +12,24 @@ from core.packs.manifest import ManifestError
 
 _CANDIDATES_MARKER = "prompt-tune/candidates"
 
+#: Ceiling on the assembled instruction — instruction plus every skill bound to the phase.
+#:
+#: **Refuse, never truncate.** A truncated instruction delivers partial practice while the
+#: record claims the whole skill, which is worse than delivering none: the run looks governed
+#: and is not. FR-009 also requires the stop to be deterministic and recorded, and the only
+#: other candidate signal — the model provider rejecting an over-long prompt — is none of
+#: those things. It arrives after the call is paid for, it differs per provider and per
+#: model (so two qualified cells would disagree about whether the same pack loads), and the
+#: eval lane never sees it, so no row could assert it. A byte count over digest-pinned content
+#: is the same number on every run, in every profile, on every model.
+#:
+#: 256 KiB against a largest current assembly of 16,603 bytes (Write plus both HashiCorp
+#: skills) — roughly 15× headroom, so no legitimate adoption trips it, and far below any
+#: qualified cell's context window, so a refusal means somebody bound something structurally
+#: wrong: a vendored directory, a corpus. Fixed with its reasoning for the same purpose as
+#: `READ_BUDGET_BYTES` — an unfixed threshold is one that gets raised until the corpus passes.
+INSTRUCTION_BUDGET_BYTES = 256 * 1024
+
 
 @dataclass(frozen=True)
 class PhaseAgents:

@@ -111,6 +111,10 @@ name    = "vault-secret-access"
 path    = "skills/vault-secret-access/SKILL.md"
 version = "0.1.0"
 digest  = "b3815739e32a0b1578b04b863a890d91b5c925259a19ed8f283c2e91de5f9d81"
+# Reviewed against these exact bytes (051, FR-019). A bump changes `digest`; leaving
+# this behind refuses the load, so nobody can bump the content without re-reading what
+# it now recommends that this platform has no registry tool for.
+unsatisfiable_reviewed_at = "b3815739e32a0b1578b04b863a890d91b5c925259a19ed8f283c2e91de5f9d81"
 
 # 049 executed phase instructions. Digests are SHA-256 of AGENTS.md.
 # 0.2.0: production-shaped set after individual GEPA (no grading overlay).

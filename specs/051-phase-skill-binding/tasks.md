@@ -46,12 +46,12 @@ Single project: `src/`, `tests/`, `packs/`, `evals/`, `docs/` at repository root
 
 **Purpose**: Fixtures the later phases assert against. No production code.
 
-- [ ] T001 [P] Add bound / unbound / mismatched-skill fixture packs to
+- [X] T001 [P] Add bound / unbound / mismatched-skill fixture packs to
       `tests/conformance/phase_agents/fixtures.py`: a pack whose skill binds to `write`, a
       pack whose skill binds to nothing, a pack whose skill file has drifted from its digest,
       and a pack whose skill file is empty. Fixture packs use invented pack and skill names —
       `src/core` must stay product-blind
-- [ ] T002 [P] Add manifest fixtures for each load-stage refusal to
+- [X] T002 [P] Add manifest fixtures for each load-stage refusal to
       `tests/conformance/packs/`: `phases = ["deploy"]`, `phases` naming a phase with no
       `[[agents]]` pin, two `[[skills]]` sharing a `name`, and an `unsatisfiable.capability`
       naming a tool the registry offers
@@ -65,49 +65,49 @@ Sealed core — `src/core/packs/manifest.py` is a registry schema.
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T003 Add frozen `UnsatisfiableRecommendation(capability, recommendation)` to
+- [X] T003 Add frozen `UnsatisfiableRecommendation(capability, recommendation)` to
       `src/core/packs/manifest.py`, exported in `__all__`, with a docstring stating the
       scope: unsatisfiable means **no registry tool**, not "the repository never runs it"
       (research R6 — `tests/evals_live/write_gates.py` does run `terraform validate`)
-- [ ] T004 Add `phases: tuple[str, ...] = ()`,
+- [X] T004 Add `phases: tuple[str, ...] = ()`,
       `unsatisfiable: tuple[UnsatisfiableRecommendation, ...] = ()` and
       `unsatisfiable_reviewed_at: str = ""` to `SkillPin` in
       `src/core/packs/manifest.py`. `phases` and `unsatisfiable` default empty so an unbound
       skill stays valid unchanged (FR-011); `unsatisfiable_reviewed_at` is **required on
       every skill** and its empty default is what the T006 refusal catches (FR-019)
-- [ ] T005 Parse both fields in `_parse_skill` in `src/core/packs/loader.py`, preserving
+- [X] T005 Parse both fields in `_parse_skill` in `src/core/packs/loader.py`, preserving
       `[[skills]]` declaration order and `[[skills.unsatisfiable]]` order within a skill.
       Missing `capability` or `recommendation`, or an empty string in either, refuses
       `malformed_manifest`
-- [ ] T006 Add the binding refusals to `validate_manifest` in `src/core/packs/loader.py`: a
+- [X] T006 Add the binding refusals to `validate_manifest` in `src/core/packs/loader.py`: a
       `phases` entry that is not a `PhaseName` value → `unknown_phase`; a `phases` entry
       naming a phase with no `[[agents]]` pin → `skill_binding_unbacked`; two `[[skills]]`
       sharing a `name` → `duplicate_skill`; `unsatisfiable_reviewed_at` absent or not equal to
       that entry's `digest` → `unsatisfiable_declaration_unreviewed` (FR-019). Collapse
       duplicates within one `phases` array
-- [ ] T007 Add `INSTRUCTION_BUDGET_BYTES = 256 * 1024` to `src/core/packs/agents.py` with the
+- [X] T007 Add `INSTRUCTION_BUDGET_BYTES = 256 * 1024` to `src/core/packs/agents.py` with the
       reasoning inline (research R4): largest current assembly is Write at 16,603 bytes;
       fixed with its reasoning because an unfixed threshold is one that gets raised until the
       corpus passes, per `READ_BUDGET_BYTES`
-- [ ] T008 Add the FR-017 stale-declaration check to `load_packs` in
+- [X] T008 Add the FR-017 stale-declaration check to `load_packs` in
       `src/core/packs/registration.py`, **after every pack in the set has registered**: a
       declared `capability` present in `registry.tool_names()` or in `bindings.handlers`
       refuses `unsatisfiable_declaration_stale` for the whole set. Not in `register_pack` —
       that is order-dependent, and load order changes without anybody deciding it did
-- [ ] T009 [GATE:fail-closed] Assert each load-stage refusal is distinct and none stands in
+- [X] T009 [GATE:fail-closed] Assert each load-stage refusal is distinct and none stands in
       for another, in `tests/conformance/packs/test_skill_binding_refusals.py` (rows A7, SC-005):
       `unknown_phase`, `skill_binding_unbacked`, `duplicate_skill`. Each fixture must load
       cleanly once the single defect is removed, so the row can lose
-- [ ] T010 [GATE:fail-closed] Assert a skill whose `digest` changed without
+- [X] T010 [GATE:fail-closed] Assert a skill whose `digest` changed without
       `unsatisfiable_reviewed_at` changing refuses `unsatisfiable_declaration_unreviewed`, and
       that the rule applies to a skill declaring **nothing** as well as one declaring
       something, in `tests/conformance/packs/test_declaration_keeps_pace.py` (row A20, FR-019,
       SC-010). A bump that loads with an unexamined declaration makes the pull request
       understate what a person still has to do
-- [ ] T011 [GATE:fail-closed] Assert `unsatisfiable_declaration_stale` refuses the whole load
+- [X] T011 [GATE:fail-closed] Assert `unsatisfiable_declaration_stale` refuses the whole load
       set and is **order-independent** — same verdict whichever pack registers first — in
       `tests/conformance/packs/test_unsatisfiable_declaration_stale.py` (row A15, SC-009)
-- [ ] T012 [GATE:conformance] Assert `terraform_fmt` and `terraform_validate` are not in
+- [X] T012 [GATE:conformance] Assert `terraform_fmt` and `terraform_validate` are not in
       `known_tools(registry)`, in `tests/conformance/packs/test_unsatisfiable_capabilities.py`
       (row A19). This is the premise both Terraform declarations rest on; if it ever becomes
       false, this row fails alongside A15
