@@ -10,14 +10,20 @@ All measurements here are hermetic and cheap to reproduce. Nothing below rests o
 
 **Decision**: All three bound terraform phases are in scope, not the Write card alone.
 
-**Measured**: `terraform-style-guide/SKILL.md` is 314 lines, 64 of them prose. Against a
-twelve-rule common subset:
+**Measured**: `terraform-style-guide/SKILL.md` is 314 lines, 64 of them prose.
 
-| Card | Restates | Notes |
-| --- | --- | --- |
-| `write/AGENTS.md` | **16 of 16** stated rules | the full prose surface of the skill |
-| `judge/AGENTS.md` | 7 of 12 | plus two rules Write does not carry — see R2 |
-| `plan/AGENTS.md` | 6 of 12 | naming, `for_each`, meta-arguments, alphabetical, `tfstate` |
+| Card | Restates | Against | Notes |
+| --- | --- | --- | --- |
+| `write/AGENTS.md` | **16 of 16** | the full stated-rule surface | every prose rule the guide gives |
+| `judge/AGENTS.md` | 7 | a twelve-rule **probe** subset | plus two rules Write does not carry — see R2 |
+| `plan/AGENTS.md` | 6 | the same probe subset | naming, `for_each`, meta-arguments, alphabetical, `tfstate` |
+
+**The denominators are not comparable, and the Judge and Plan figures are provisional.** Write
+was compared against the guide's whole stated surface; Judge and Plan against a twelve-rule
+hand-built probe used to establish *that* they duplicate, not *how much*. Only the derived
+inventory (T008) can give all three a common denominator, and the baselines are re-recorded
+there. Any use of "7 of 12" or "6 of 12" as a target for the real mechanism is a mistake —
+they were never measured against it.
 
 **Rationale**: The spec's FR-005 already binds the rule to every phase bound to a skill. This
 measurement is what makes the scope concrete: three cards, one pack.
@@ -69,11 +75,16 @@ reasoning about version pinning applied a second time.
 
 **Decision**: `packs/vault` is corrected where it overlaps, and serves as the passing control.
 
-**Measured**: 2 of 8 stated rules restated by `vault/agents/write/AGENTS.md` — check-and-set
+**Measured, provisionally**: 2 of an eight-rule **probe** subset restated by
+`vault/agents/write/AGENTS.md` — check-and-set
 on writes, and preferring a dynamic secret. Six are not: never asking for or reusing a token,
 reporting an auth failure rather than routing around it, passing a path rather than the value,
 use-and-discard, redacting before a durable write, and writing only to a scoped path. The
 skill is also 50 prose lines of 109 — a far healthier ratio than terraform's 64 of 314.
+
+**The eight is a probe, not a count.** The vault guide carries fifteen bullet-form prose
+statements; eight were selected to establish direction quickly. The derived inventory (T009)
+sets the real denominator, and "2 of 8" must not be treated as a target it should reproduce.
 
 **Rationale**: This is what makes the rule credible rather than aspirational. A gate whose
 only subject is the thing it was written to condemn proves nothing about whether it can be

@@ -83,7 +83,8 @@ A maintainer runs the standing SC-002 harness and gets a result that means somet
 either a demonstrated effect, or a recorded finding that this skill has no teachable surface
 for this model. Today it can only return the artefact of the duplication.
 
-**Why this priority**: 051's SC-002 is unmet and its row cannot currently fail, which is
+**Why this priority**: 051's SC-002 (not 053's, below — a different claim) is unmet and its
+row cannot currently fail, which is
 ADR-0047's failure in the content plane. It depends on US1 and is worthless before it.
 
 **Independent Test**: Run `evals/prompt-tune/sc002_skill_effect.py` on a rule that the skill
@@ -174,6 +175,9 @@ throughout, unmodified, as the control that the rule is satisfiable rather than 
   previous text.
 - **FR-011**: Run records MUST continue to name which skills shaped which phase. This feature
   changes what the card says, never what the record reports.
+- **FR-012**: A rule inventory MUST be bound to the skill digest it was derived from, and a
+  digest that has moved MUST invalidate it. An inventory is only true of the bytes it was read
+  from, and after this feature the cards depend on content they no longer hold.
 
 ### Key Entities
 
@@ -191,12 +195,13 @@ throughout, unmodified, as the control that the rule is satisfiable rather than 
 
 - **SC-001**: Zero rules are stated in both a phase card and a skill bound to that phase across
   every shipped pack, except overrides carrying a recorded reason. Measured, not reviewed.
-- **SC-002**: Removing a skill binding changes the instruction the phase receives in a way a
-  reader can point to — for at least one rule per bound skill, or a recorded finding that the
+- **SC-002** *(053's — a claim about the instruction; 051's SC-002 is about authored output and
+  is addressed by SC-004)*: Removing a skill binding changes the instruction the phase receives
+  in a way a reader can point to — for at least one rule per bound skill, or a recorded finding that the
   skill has no stated rule the platform relies on.
 - **SC-003**: The check fails against the terraform pack's pre-feature text and passes against
   `packs/vault` unmodified.
-- **SC-004**: 051's SC-002 is either met on a rule selected from stated instruction, or amended
+- **SC-004**: **051's** SC-002 is either met on a rule selected from stated instruction, or amended
   to record that this skill has no teachable surface for the qualified model — with the
   measurement that establishes it. No third outcome is left open.
 - **SC-005**: Every affected phase is re-qualified before promotion, and no phase ships on a

@@ -106,7 +106,8 @@ packs/terraform/agents/plan/AGENTS.md      # delegate 6 restated rules
 packs/vault/agents/write/AGENTS.md         # remove the 2-of-8 residue
 
 tests/conformance/packs/
-├── rule_inventory.py                      # curated stated rules per skill (R7)
+├── rule_inventory.py                      # rules derived per skill, digest-bound (R7)
+├── card_fixtures.py                       # frozen pre-feature card text; the baselines
 └── test_cards_delegate_to_skills.py       # the enforcement row + the vault control
 
 tests/evals_live/authoring_properties.py   # one new structural detector (R5)

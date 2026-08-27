@@ -33,7 +33,7 @@ US1 remains the MVP: it is the story that makes ADR-0004's pin load-bearing.
 
 | Gate type | Where |
 | --- | --- |
-| **Conformance** | T032–T038 (rows A1, A2, A4, A5, A7, A9 and the SC-006 source check); T010–T011 (rows A3, A6 on the mechanism itself) |
+| **Conformance** | T003a, T032–T038 (rows A1, A2, A4, A5, A7, A9 and the SC-006 source check); T010–T011 (rows A3, A6 on the mechanism itself) |
 | **Fail-closed** | T001, T039 — the refusal delegation depends on. T001 verifies it before any card is shortened; T039 (row A8) asserts it permanently |
 | **Eval** | T024–T028 (the structural detector, its must-fail corpus case, and the SC-002 arms), T020–T023 (re-qualification, all-five-or-none) |
 | **Evidence** | T029–T031, T040 — the SC-002 outcome and the two amendments owed to 051, recorded with the measurement rather than as a restated conclusion |
@@ -47,8 +47,9 @@ Single project: `src/`, `tests/`, `packs/`, `evals/`, `docs/` at repository root
 ## Phase 1: Setup
 
 - [ ] T001 Verify delegation's premise before shortening any card: confirm `skill_missing`, `skill_empty` and `digest_mismatch` are each reached by `raise ManifestError` in `src/core/packs/loader.py`. If any is a warning, STOP — the feature's safety argument is gone
-- [ ] T002 Freeze the pre-feature card text as fixtures in `tests/conformance/packs/card_fixtures.py`: the current `packs/terraform/agents/{write,judge,plan}/AGENTS.md` bodies, verbatim, with the date and commit they were taken from. Row A4 asserts against these forever
-- [ ] T003 Record the baseline overlap counts (write 16/16, judge 7/12, plan 6/12, vault 2/8) in `tests/conformance/packs/card_fixtures.py` as the numbers T032 must reproduce from the real mechanism
+- [ ] T002 Freeze the pre-feature card text as fixtures in `tests/conformance/packs/card_fixtures.py`: the current `packs/terraform/agents/{write,judge,plan}/AGENTS.md` **and `packs/vault/agents/write/AGENTS.md`** bodies, verbatim, with the date and commit they were taken from. Row A4 asserts against these forever, and without the vault copy the residue this feature removes could never be shown to have been caught
+- [ ] T003 Record the **provisional** probe counts (write 16/16 against the full stated surface; judge 7 and plan 6 against a twelve-rule probe; vault 2 against an eight-rule probe) in `tests/conformance/packs/card_fixtures.py` as *direction*, explicitly not as targets. **The denominators differ and only Write's is derived** — see [R1](research.md). T008/T009 set the real inventories and T009b re-records the baselines against them
+- [ ] T003a Confirm before proceeding that no later task treats a probe count as a target. T032 reproduces the baselines recorded by T009b, never the numbers in T003
 
 ---
 
@@ -60,8 +61,10 @@ Single project: `src/`, `tests/`, `packs/`, `evals/`, `docs/` at repository root
 - [ ] T005 Implement `stated_rules(text)` in `tests/conformance/packs/rule_inventory.py` — returns prose-stated rules only, excluding every line inside a fenced code block (FR-003)
 - [ ] T006 Implement `declared_overrides(card_text)` in `tests/conformance/packs/rule_inventory.py` — recognises an override **from the card's own text**, requiring both the overridden rule and a stated reason (FR-002)
 - [ ] T007 Implement `compare_card(card_text, rules)` in `tests/conformance/packs/rule_inventory.py` — returns each restated rule with its id, so a failure names the rule and both documents rather than scoring a similarity (FR-006, [R7](research.md))
-- [ ] T008 Author `TERRAFORM_STYLE_RULES` in `tests/conformance/packs/rule_inventory.py`: the sixteen stated rules of `terraform-style-guide/SKILL.md`, each with the guide's own words and line number, bound to digest `fea8a0ea…`
-- [ ] T009 Author `VAULT_ACCESS_RULES` in `tests/conformance/packs/rule_inventory.py`: the eight stated rules of `vault-secret-access/SKILL.md`, same shape, bound to its pinned digest
+- [ ] T008 **Derive** `TERRAFORM_STYLE_RULES` in `tests/conformance/packs/rule_inventory.py` from `terraform-style-guide/SKILL.md` — every prose-stated rule, each with the guide's own words and line number, bound to digest `fea8a0ea…`. The count is whatever the guide yields; sixteen is what a probe found, not a quota to fill
+- [ ] T009 **Derive** `VAULT_ACCESS_RULES` in `tests/conformance/packs/rule_inventory.py` from `vault-secret-access/SKILL.md`, same shape, bound to its pinned digest. The guide carries fifteen bullet-form statements and the probe used eight — the inventory records what is there, not the probe's subset
+- [ ] T009a Reconcile the checklist against the rules it restates: `vault-secret-access/SKILL.md` ends with a six-item checklist that repeats rules stated above it. Count each rule once, or the vault denominator is inflated and its ratio is meaningless
+- [ ] T009b Re-record the real per-card baselines in `tests/conformance/packs/card_fixtures.py`, all three terraform cards and vault measured against the **derived** inventories, so every figure shares a denominator. These are what T032 reproduces
 - [ ] T010 [P] Row A3 in `tests/conformance/packs/test_cards_delegate_to_skills.py` — content inside a fenced block is never a stated rule. Asserted against the real guide: `default_tags`, `validation` and the aliased-provider example must all be absent from `TERRAFORM_STYLE_RULES`
 - [ ] T011 [P] Row A6 in `tests/conformance/packs/test_cards_delegate_to_skills.py` — each inventory's digest matches the manifest's pinned digest, so a re-pin cannot leave the inventory describing bytes that are gone
 
@@ -79,10 +82,10 @@ declared overrides.
 
 ### Pack content
 
-- [ ] T012 [US1] Delegate the sixteen restated rules from `packs/terraform/agents/write/AGENTS.md` §"Required HashiCorp practice". Keep §Precedence, §Decide whether any change is needed, §Order of authorship, §Least privilege, §Do not invent provider syntax and §Anti-patterns — platform-own per [R6](research.md)
+- [ ] T012 [US1] Delegate the sixteen restated rules from `packs/terraform/agents/write/AGENTS.md` §"Required HashiCorp practice" (**FR-004**). Keep §Precedence, §Decide whether any change is needed, §Order of authorship, §Least privilege, §Do not invent provider syntax and §Anti-patterns — platform-own per [R6](research.md)
 - [ ] T013 [US1] Rewrite `packs/terraform/agents/write/AGENTS.md` §Pins as a **declared override**: keep the rule that `>=` is not a pin, and state that it overrides the guide's `required_version = ">= 1.14"` (lines 38, 232) and why (FR-002)
 - [ ] T014 [US1] Delegate the seven restated rules from `packs/terraform/agents/judge/AGENTS.md` §Check, keeping the checklist's own structure — the skill's Code Review Checklist is **not** adoptable, because two of its ten items are the `terraform fmt` / `terraform validate` steps this pack declares unsatisfiable ([R3](research.md))
-- [ ] T015 [US1] Keep `validation` and `default_tags` in the Judge card only if the inventory shows them as *stated* rules; per T010 they are example-only, so they are Judge's own criteria and stay — with a note saying so, since a later reader will otherwise assume they were missed
+- [ ] T015 [US1] Keep `validation` and `default_tags` in the Judge card, and say in the card why: they appear in the guide **only inside code examples**, so they are not delegated practice but Judge's own criteria. Without the note a later reader assumes they were missed by T014
 - [ ] T016 [US1] Delegate the six restated rules from `packs/terraform/agents/plan/AGENTS.md`
 - [ ] T017 [US1] Remove the two-of-eight residue from `packs/vault/agents/write/AGENTS.md` — check-and-set on writes, and preferring a dynamic secret ([R4](research.md))
 - [ ] T018 [US1] Confirm no card was left nearly empty by delegation. If a phase's instruction was never more than a copy, say so in the card rather than padding it
@@ -103,7 +106,8 @@ are qualified on the bytes they now carry.
 ## Phase 4: User Story 2 — SC-002 can return a real answer (Priority: P2)
 
 **Goal**: Measure whether a delivered skill changes authored output, on a rule that can carry
-the question.
+the question. Throughout this phase **SC-002 means 051's** — 053's own SC-002 is a different
+claim, about the instruction rather than the output.
 
 **Independent test**: Bound and unbound arms now differ in instruction; a delta is possible
 where it was previously excluded by construction.
@@ -113,7 +117,7 @@ where it was previously excluded by construction.
 - [ ] T026 [US2] Add a must-fail case: an artefact in a single `main.tf` that the detector scores `fail`, following the `static_credential_lookalike` precedent. A detector that cannot fail is not evidence
 - [ ] T027 [US2] Point `evals/prompt-tune/sc002_skill_effect.py` at the new property and task, leaving its null-result instruction text intact
 - [ ] T028 [US2] Run E2: `uv run python evals/prompt-tune/sc002_skill_effect.py -n 5`, both arms, on the qualified model
-- [ ] T029 [US2] Record the E2 result in `contracts/conformance-cards-delegate.md` §5 — the numbers, the model, the date, whichever way it went
+- [ ] T029 [US2] Record the E2 result in `contracts/conformance-cards-delegate.md` §5 — the numbers, the model, the date, whichever way it went (**FR-009**: a level result stays recordable as a finding)
 - [ ] T030 [US2] If E2 is level, record it as the finding (SC-004) and amend 051's SC-002 to say this skill has no teachable surface for the qualified model. **Do not** move the threshold or search for a fourth rule
 - [ ] T031 [US2] If E2 demonstrates an effect, record 051's SC-002 as met, naming the rule and the measurement that met it
 
@@ -129,7 +133,7 @@ helpful edit at a time.
 **Independent test**: Add a rule to a card that its bound skill states — the check fails naming
 both locations. Remove it and it passes.
 
-- [ ] T032 [US3] Row A1 in `tests/conformance/packs/test_cards_delegate_to_skills.py` — no card states a rule its bound skill states, except a declared override. Reproduces the T003 baselines from the real mechanism
+- [ ] T032 [US3] Rows A0 and A1 in `tests/conformance/packs/test_cards_delegate_to_skills.py` — no card states a rule its bound skill states, except a declared override (A1); and the baselines compared against are the **derived** ones sharing a denominator across all four cards, never T003's probe counts (A0)
 - [ ] T033 [US3] Row A2 — an override passes, and a §Pins that keeps its rule but stops saying what it overrides fails
 - [ ] T034 [US3] Row A4 — the comparison **fails** against the frozen pre-feature fixtures from T002. This is what makes A1 evidence rather than a detector that finds nothing
 - [ ] T035 [US3] Row A5 — the comparison **passes** against `packs/vault` after T017, the control that the rule is satisfiable ([R4](research.md))
@@ -156,11 +160,12 @@ both locations. Remove it and it passes.
 ## Dependencies
 
 ```
-Setup (T001–T003)
+Setup (T001–T003a)
   │  T001 gates everything: if refusals are not fail-closed, STOP
   │  T002 must precede T012–T017 — the fixtures cannot be captured after the edit
   ▼
-Foundational (T004–T011)   the mechanism, blocking all stories
+Foundational (T004–T011)   the mechanism and the DERIVED inventories, blocking all stories
+  │  T009b sets the only baselines T032 may reproduce; T003's probe counts are not targets
   ▼
 US1 (T012–T023)  ──────────► US3 (T032–T039)  rows need the edited cards to be green
   │                                A4 needs only T002's fixtures

@@ -9,12 +9,13 @@ that is missing, so every row below names the state in which it fails.
 
 | Row | Asserts | Fails when | FR / SC |
 | --- | --- | --- | --- |
+| A0 | The per-card baselines are the **derived** ones, sharing a denominator across all four cards | a probe count is used as a target — the defect analyze caught in T003 | FR-003 |
 | A1 | No card states a rule its bound skill states, except a declared override | any of the 16 terraform rules returns to `write`, or the 7 to `judge`, or the 6 to `plan` | FR-001, SC-001 |
 | A2 | An override is recognised from the card's own text, with its reason | §Pins keeps its rule but stops saying what it overrides | FR-002 |
 | A3 | Content inside a fenced code block is never counted as a stated rule | the inventory admits `default_tags`, `validation` or aliased providers as taught practice | FR-003 |
 | A4 | The row fails against the terraform pack's **pre-feature** card text | the detection is too weak to have caught what this feature was written for | FR-007, SC-003 |
 | A5 | The row passes against `packs/vault` | the rule is not satisfiable, or vault silently regressed | FR-007, SC-003 |
-| A6 | The inventory's digest matches the manifest's pinned digest | `SKILL.md` is re-pinned and the inventory is left describing bytes that are gone | FR-003 |
+| A6 | The inventory's digest matches the manifest's pinned digest | `SKILL.md` is re-pinned and the inventory is left describing bytes that are gone | **FR-012** |
 | A7 | Every phase bound to a skill is compared, not a hard-coded three | a fourth phase is bound later and is never checked | FR-005 |
 | A8 | Delegation is safe: absent delivery refuses | `skill_missing`, `skill_empty` or `digest_mismatch` stops raising, so a delegating card could run without what it delegated | FR-001 |
 | A9 | The pack-level total is reported, not only per-card | the practice is distributed across cards and each card reads clean ([R2](../research.md)) | FR-005 |
@@ -32,13 +33,16 @@ rule into a missing one, silently, and nothing else here would notice.
 | Row | Asserts | Named runner |
 | --- | --- | --- |
 | E1 | The three edited terraform phases and the edited vault phase re-qualify before promotion, all-five-or-none | Dan — eval lane, FR-010, SC-005 |
-| E2 | **SC-002, re-measured** on a rule selected from *stated* instruction, bound vs unbound, n>=5 per arm | Dan — `evals/prompt-tune/sc002_skill_effect.py` |
+| E2 | **051's SC-002, re-measured** on a rule selected from *stated* instruction, bound vs unbound, n>=5 per arm | Dan — `evals/prompt-tune/sc002_skill_effect.py` |
 | E3 | No regression on the existing corpus: `no_floating_version_constraint` does not fall, since §Pins is retained as an override | Dan — eval lane |
 
 **Named runner**: Dan McTeer (maintainer). Rows fail loudly when the enclave or eval broker is
 absent — do not skip green.
 
 ### What E2 may return, and what may not be done about it
+
+*Throughout this section **SC-002 means 051's** — 053 has its own SC-002, which is a claim
+about the instruction rather than the authored output.*
 
 E2 has **two** acceptable outcomes and the feature is complete on either:
 
