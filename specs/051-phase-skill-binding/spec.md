@@ -13,7 +13,7 @@
 | Field | Value |
 | --- | --- |
 | **Requirements (R1–R17)** | **R12 (eval / gate)** — a phase's behaviour under a skill must be expressible as rows that can lose. **R16 (sealed core, versioned seams)** — skill delivery is a pack seam, not core logic. **R4 / R13 (evidence)** — the run record must distinguish a skill that shaped a phase from one that was merely present in the pack |
-| **ADRs touched** | **ADR-0004** (adopt upstream skills as a pinned, governed supply chain — this feature is the consumption half it never got). **ADR-0030** (pinned vs consulted — a skill is *executed* content, so it is pinned and must actually be executed). **ADR-0025** (registry isolation — a skill is pack content and must not become core knowledge). **ADR-0038** (the agent authors and a person merges — what the platform cannot perform is handed to the reviewer, not silently skipped). **ADR-0049** (phase instructions are executed artifacts, versioned and digest-pinned; skills join them). **ADR-0047** (a passing stub is worse than a missing one — the current state is its content-supply-chain equivalent) |
+| **ADRs touched** | **ADR-0004** (adopt upstream skills as a pinned, governed supply chain — this feature is the consumption half it never got). **ADR-0030** (pinned vs consulted — a skill is *executed* content, so it is pinned and must actually be executed). **ADR-0003** (a vertical ships as a content profile with zero core code — a skill is pack content and must not become core knowledge). **ADR-0038** (the agent authors the integration and opens a pull request back — what the platform cannot perform is handed to the reviewer, not silently skipped). **ADR-0047** (a passing stub is worse than a missing one — the current state is its content-supply-chain equivalent) |
 | **Evidence class** | attestation-relevant — `content_pins` at `RUN_START` currently names skills that did not reach the model |
 
 ## Clarifications
@@ -24,6 +24,24 @@
 - Q: Must a phase be re-qualified before a newly bound skill takes effect, or do binding and re-qualification ship together? (FR-013) → A: Option B — they ship together in one change. Phase-agent promotion is already all-five-or-none and gates on both suites passing, so the eval run is unavoidable; the platform adds no runtime state for a binding that exists but is not yet in force.
 - Q: When adopted skill content instructs an action the platform does not offer (e.g. `terraform fmt`, `terraform validate` — no registry tool exists), what governs? → A: The skill is delivered byte-exact (ADR-0004 forbids editing it) and is NOT performed or claimed; the phase instruction states that precedence. What the platform cannot satisfy is surfaced in the pull request so the reviewer knows what is left to do.
 - Q: Who determines which skill recommendations the platform cannot satisfy — the pack, or the model at run time? → A: Option A — the pack declares them per skill in the manifest. A model's account of its own work is not evidence (Principle IX), and a declaration is pinned, reviewed, identical on every run, and checkable against the registry.
+
+### Session 2026-08-26 — `/speckit-analyze` remediation
+
+Three defects found by cross-artifact analysis, resolved as spec changes rather than worked
+around downstream.
+
+- **FR-007** named a refusal that cannot exist under FR-002's shape — "binding a name no
+  `[[skills]]` entry declares" presupposes bindings live somewhere other than `[[skills]]`,
+  which FR-002 forbids. Replaced with the three refusals that are reachable.
+- **FR-014a** added. FR-014 gave precedence for *capabilities* only, but the vendored guide
+  and the Write instruction contradict each other on `required_version` (`>= 1.14` against
+  "`>=` is not a pin"), and this feature is what first puts them in one context. Without a
+  content-precedence rule the likeliest observable outcome of the feature is a regression.
+- **FR-019 / SC-010** added. The "upstream bump adds an undeclared unsatisfiable step" edge
+  case was named with nothing behind it. Because the pull request derives from the
+  declaration and never from the skill's bytes (Q4 above), a declaration that lags the
+  content silently understates what a person still has to do — which is the same
+  overstatement Principle IX forbids, pointed the other way.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -89,7 +107,7 @@ Whoever adopts the next skill binds it to the phases it applies to by editing th
 manifest, the same place its pin, version and digest already live. No platform code names a
 skill or a phase.
 
-**Why this priority**: ADR-0025 keeps product knowledge in packs. A binding expressed in
+**Why this priority**: ADR-0003 keeps product knowledge in packs and out of core. A binding expressed in
 code would put "Terraform's style guide belongs to the write phase" inside the core, which
 is the boundary that principle exists to hold. It is P3 because a hard-coded first binding
 would deliver P1 and could be moved later — but it would be moved by someone who has to
@@ -156,6 +174,9 @@ text is identical across two runs of different content.
   reports a checklist item it did not perform.
 - **An upstream skill bump adds an unsatisfiable step nobody declared.** The declaration
   would then be silently incomplete — the reverse of a stale one, and not visible at load.
+  The pull request would tell a reviewer that two things are left for a person when three
+  are, because the pull request derives from the declaration and never from the bytes.
+  Closed by FR-019.
 - **Two skills bound to one phase.** Order must be deterministic, or two runs of identical
   content produce different instructions.
 - **A skill file present on disk but absent from the manifest.** Unpinned content next to
@@ -178,8 +199,9 @@ text is identical across two runs of different content.
   skill present in the bound pack but not delivered.
 - **FR-006**: Delivery order for multiple skills bound to one phase MUST be deterministic
   and derived from the manifest, so identical content produces an identical instruction.
-- **FR-007**: The platform MUST refuse to load a manifest binding a skill to an unknown
-  phase, or binding a name no `[[skills]]` entry declares.
+- **FR-007**: The platform MUST refuse to load a manifest whose skill bindings cannot be
+  honoured: a binding naming a phase that does not exist, a binding naming a phase the pack
+  ships no instruction for, and two skill entries sharing one name. Each refuses distinctly.
 - **FR-008**: A skill file present in a pack but absent from the manifest MUST never be
   delivered.
 - **FR-009**: When the assembled instruction cannot be delivered whole, the run MUST stop
@@ -208,6 +230,10 @@ text is identical across two runs of different content.
 - **FR-014**: A skill step naming a capability the registry does not offer MUST NOT be
   performed or reported as performed. The phase instruction MUST state this precedence: the
   registry bounds what can be done, and adopted practice does not widen it.
+- **FR-014a**: Where a phase instruction and a skill delivered to that phase differ on a
+  concrete rule, the phase instruction MUST govern, and the phase instruction MUST state that
+  precedence. The difference is never a licence to satisfy neither. Adopted content is never
+  edited to remove the difference (ADR-0004); which document wins is stated instead.
 - **FR-015**: The pack manifest MUST declare, per skill, the recommendations this platform
   cannot satisfy. Skill content itself is never edited or filtered — ADR-0004 requires the
   adopted bytes stay identical to upstream.
@@ -219,6 +245,12 @@ text is identical across two runs of different content.
   gone stale would tell a reviewer to do work the platform already did.
 - **FR-018**: The text of an unsatisfiable recommendation in a pull request MUST derive from
   the manifest alone, identical across runs, and never from what a model reported.
+- **FR-019**: A pack MUST record, per skill, the skill digest against which that skill's
+  unsatisfiable declaration was last examined, and the platform MUST refuse to load a manifest
+  where the recorded digest and the skill's own pin disagree. A skill bump therefore cannot
+  land while its declaration goes unexamined. **"Nothing here is unsatisfiable" is itself a
+  claim that goes stale on a bump**, so the record is required of every skill, not only of
+  those declaring something.
 
 ### Key Entities
 
@@ -252,13 +284,16 @@ text is identical across two runs of different content.
   distinct recorded reason; none proceeds silently and none is reported as another.
 - **SC-006**: No phase instruction in any shipped pack names practice the phase is not bound
   to receive — enforced, not audited by hand.
+- **SC-007**: No phase ships bound to a skill whose combined instruction content has not
+  passed both the phase-agents and build-agents suites — 100%, enforced by the existing
+  promotion gate rather than by review.
 - **SC-008**: Every declared unsatisfiable recommendation for a bound skill appears in the
   pull request body — 100% of runs that open one — and is byte-identical across runs.
 - **SC-009**: A declaration naming a capability the registry offers fails pack loading; none
   ever reaches a pull request.
-- **SC-007**: No phase ships bound to a skill whose combined instruction content has not
-  passed both the phase-agents and build-agents suites — 100%, enforced by the existing
-  promotion gate rather than by review.
+- **SC-010**: No skill bump reaches a run carrying an unsatisfiable declaration nobody
+  re-examined — 100%, refused at load rather than discovered by a reviewer who was told less
+  work remained than actually does.
 
 ## Assumptions
 
@@ -280,5 +315,5 @@ text is identical across two runs of different content.
   files and passes of both suites, so correcting `research` and `propose` prose (FR-012a)
   forces a full promotion regardless of how many phases are bound. This is why binding and
   re-qualification shipping together costs nothing extra.
-- **No change to how phase instructions themselves are pinned.** ADR-0049's `[[agents]]`
-  pins keep their current shape.
+- **No change to how phase instructions themselves are pinned.** The `[[agents]]` pins that feature 049
+  introduced under ADR-0030 keep their current shape.
