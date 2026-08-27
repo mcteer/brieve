@@ -246,7 +246,17 @@ meant to buy is already held: authority is manufactured per allocation from an a
 identity and expires in an hour.
 
 [ADR-0057](docs/adr/0057-context-hungry-agents-want-breadth-not-narrower-reads.md) records the
-decision and the three triggers for re-opening it. The research — Vault is the resource server
+decision and the three triggers for re-opening it.
+
+**Trigger 1 fired on 2026-08-07 and was noticed on 2026-08-27.** 042 shipped
+`vault_policy_impact`, a tool needing two policy paths derived from its run id and holding a
+wildcard over every run's — *"a pack ships a tool inherently narrower than its ceiling"*. The
+premise ADR-0057 rested on went with it: it said every ceiling was read-only, and
+`infra/modules/trust-fabric/auth.tf` now calls that same grant *"the first WRITE capability a
+dispatched run has ever carried"*. One run reading, overwriting and deleting another's
+measurement policy was demonstrated against the live enclave (issue #226); the model-driven
+route is closed, the grant is not. **Only the WRITE case re-opens** — the argument against
+narrowing reads is untouched, and this record's own Decision predicted exactly this split. The research — Vault is the resource server
 and cannot perform the exchange, the entity-alias binding, the `jti` trap — is kept in
 `specs/016-task-scoped-authority/research.md`, alongside the spec and a README that says what
 was pruned. The rest of that feature's planning artifacts were removed on 2026-08-03: a
