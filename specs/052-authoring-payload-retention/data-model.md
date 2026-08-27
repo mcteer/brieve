@@ -24,9 +24,27 @@ record holds after a run finishes.
 | `task` | kept | What the person asked for. Their words, already in the trail |
 | `target_repository`, `branch` | kept | Where the proposal went. Needed to find the pull request |
 | `disclosures`, `evidence`, `state` | kept | Platform-authored statements about the run |
+| `scrubbed` | **added, `true`** | **New field.** Says *why* the bodies are empty, so a reader can tell a scrubbed run from one that authored nothing — and so `proposal_from_payload` can refuse unambiguously. See §1a |
 
 **`is_diff` stays with a cleared body, deliberately.** A diff's body is a diff of customer
 content and goes; whether the path was created or edited is a fact about what the run *did*.
+
+### 1a. Why a marker, and not "refuse an empty body"
+
+**Emptied keys and a refusing reader cannot both work without one.** The scrub empties
+`files[].body` to `""` rather than removing it (§3), so `proposal_from_payload` — which does
+`str(f["body"])` — succeeds and returns a proposal whose files have no content. That is exactly
+the "publish opens an empty pull request" outcome the refusal exists to prevent, and it was
+verified against the code rather than assumed.
+
+Refusing on **emptiness** was rejected: nothing in `compose` or containment forbids a
+legitimately empty authored file, so an empty-body rule would conflate "this was scrubbed" with
+"the agent wrote an empty file" and refuse a proposal that was never scrubbed.
+
+`scrubbed: true` is unambiguous, and it earns its place twice. `proposal_from_payload` refuses
+on it — a fail-closed guard beside the ordering guarantee rather than instead of it — and an
+auditor reading the payload learns *why* the bodies are empty, which the record could not
+otherwise say.
 
 ---
 
@@ -125,22 +143,39 @@ propagated through every new code path, and Principle IX's attestation is walked
 This feature's US2 exists to keep a run attestable — so a literal reading of "save the scrubbed
 payload" would destroy the thing US2 protects, in the same commit that protects it.
 
-**The rule**: the scrub constructs its blob from the one it is rewriting, replacing `payload`
-and nothing else. Every other field is threaded through, exactly as the entrypoint's existing
-terminal writes already do:
+**The rule**: the scrub constructs its blob from the **terminal** one, replacing `payload` and
+nothing else.
+
+**And the terminal blob is not in scope — this is the trap inside the trap.**
+`_publish_the_proposal` returns `int`, not the blob it wrote. The only blob the caller holds is
+`checkpoint`, loaded before publish: the **analyzer snapshot**. Threading from it is the defect
+the call site's own comment already records somebody hitting —
+
+> Re-saving `checkpoint.payload` here restored the analyzer snapshot, wiped `pr_url`, and left
+> Nomad "complete" looking like "Ended without a pull request."
+
+So the terminal blob is **re-read** first:
 
 ```
-CheckpointBlob(
-    blob_id=blob.blob_id,
-    payload=scrubbed,                 # the only change
-    correlation_id=blob.correlation_id,
-    grant_id=blob.grant_id,
-    step_index=blob.step_index,
-    written_by=blob.written_by,
-    outcome=blob.outcome,
-    resume_count=blob.resume_count,
-)
+blob = durability.load(blob_id)        # the TERMINAL blob, not `checkpoint`
+scrubbed, count = scrub_proposal_payload(blob.payload)
+if count:
+    durability.save(
+        CheckpointBlob(
+            blob_id=blob.blob_id,
+            payload=scrubbed,          # the only change
+            correlation_id=blob.correlation_id,
+            grant_id=blob.grant_id,
+            step_index=blob.step_index,
+            written_by=blob.written_by,
+            outcome=blob.outcome,
+            resume_count=blob.resume_count,
+        )
+    )
 ```
+
+`pr_url` lives in that payload, so a row asserts it survives — the same field the recorded
+defect lost.
 
 The two SQL guards are real and are **not** the answer. They protect the two columns somebody
 already lost, and a row must assert the rest rather than trusting that the next unguarded
@@ -163,7 +198,9 @@ column is also harmless.
 
 ## 6. The backfill
 
-`scripts/backfill-proposal-payloads.py` — one-time, idempotent, operator-invoked.
+`infra/bin/backfill_proposal_payloads.py`, with a `backfill-proposal-payloads` wrapper —
+one-time, idempotent, operator-invoked. Placed beside the other operator tooling and following
+the `corpus_sync.py` / `corpus-sync` pairing; `scripts/` holds only the two `.sh` CI gates.
 
 Six checkpoints hold a proposal today, ~81 KB, **all `completed`**. A forward-only scrub leaves
 every one of them, and #219's acceptance row sweeps the whole table rather than runs created

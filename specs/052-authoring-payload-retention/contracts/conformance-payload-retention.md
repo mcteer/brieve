@@ -16,7 +16,7 @@ executes names the party who runs it before merge (constitution v1.6.0, Quality 
 | A7 | A payload with no `authoring_proposal` returns unchanged, count 0, no save | A run that authored nothing takes a different cleanup path from one that published |
 | A8 | Scrubbing twice returns unchanged, count 0 | Terminal state reached twice produces a different result the second time |
 | A9 | A save failure stops the run with the reason recorded | A clean run is reported over content still in the store — the failure nothing can detect afterwards |
-| A10 | `proposal_from_payload` raises on a scrubbed payload rather than reconstructing an empty proposal | It silently returns a proposal with empty bodies, and a publish opens an empty pull request |
+| A10 | `proposal_from_payload` **refuses a payload carrying `scrubbed: true`**, rather than reconstructing a proposal with empty bodies | It refuses on emptiness instead and rejects a legitimately empty authored file; or it does not refuse at all, and a publish opens an empty pull request |
 | A11 | **A refused run's payload contains no authored content in the first place** — control returns before Propose, so `authoring_proposal` is never written | The refusal path starts composing a proposal, and FR-007's case stops being vacuous without anybody noticing |
 | A12 | A RunReport compiled from a scrubbed run validates, names every authored path, and states the outcome | The report fails to compile, or loses the paths with the bodies |
 | A13 | A scrubbed run's pull request is still identifiable from the record | `pr_url` lost with the content it described |
@@ -25,9 +25,11 @@ executes names the party who runs it before merge (constitution v1.6.0, Quality 
 | A16 | The backfill is idempotent and reports each blob it changed | A silent backfill is indistinguishable from one that did nothing |
 | A17 | **The re-save carries every column.** After the scrub, `correlation_id`, `grant_id`, `step_index`, `written_by`, `run_state`, `stop_reason` and `resume_count` are unchanged from before it | A bare `CheckpointBlob(blob_id=…, payload=…)` blanks the correlation ID on the terminal checkpoint — and the run this feature just made retention-safe stops being walkable |
 | A18 | A non-authoring run's payload is untouched (FR-012) | The call is hoisted out of the `PROPOSER` branch and every other row still passes |
+| A19 | **`pr_url` survives the scrub.** The scrub re-reads the terminal blob rather than reusing the pre-publish `checkpoint` in scope | The analyzer snapshot is restored over the terminal payload — the defect the call site's comment already records, arriving a second time |
+| A20 | The scrubbed payload carries `scrubbed: true`, and a run that authored nothing does not | A scrubbed run and an empty one are indistinguishable, and A10's refusal has nothing to key on |
 
 **Runner**: CI (`make check`) for A1–A3, A6–A8, A10–A11; `make conformance` for the rest,
-including A17 and A18.
+including A17–A20.
 
 ## Enclave / named runner
 
@@ -62,6 +64,15 @@ row goes red and FR-007 stops being vacuous, which is exactly when somebody need
 
 **Resolved 2026-08-27**: FR-007 was restated to say this, so the requirement and the row now
 agree about what is being asserted.
+
+### Why A19 exists
+
+Pass 1 of `/speckit-analyze` fixed the columns and left the **object** wrong: "construct the
+blob from the one being rewritten" names a blob the caller does not have.
+`_publish_the_proposal` returns `int`, so the only blob in scope is the pre-publish snapshot —
+the exact object the call site's comment warns about.
+
+A17 reads the columns; A19 reads `pr_url`, which is the field the recorded defect actually lost.
 
 ### Why A17 exists at all
 

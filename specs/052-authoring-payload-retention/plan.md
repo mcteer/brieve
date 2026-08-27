@@ -90,7 +90,21 @@ written before them.
 5. **FR-012 gained a row.** Structural scoping is what somebody undoes by hoisting a call out
    of a branch.
 
-### The correction analysis forced
+### The corrections analysis forced
+
+**Pass 2 compared the artifacts against the code, and two of its findings were pass 1's.**
+
+- **A6 and A10 contradicted each other.** Emptied keys mean `proposal_from_payload` succeeds
+  and returns a proposal with no content — the empty-pull-request outcome A10 exists to
+  prevent. Refusing on *emptiness* was rejected: nothing forbids a legitimately empty authored
+  file. A `scrubbed: true` marker resolves it and lets the record say why the bodies are empty.
+- **The blob to thread from is not in scope.** `_publish_the_proposal` returns `int`, so the
+  only blob the caller holds is the pre-publish snapshot — the object the call site's comment
+  already warns about. The scrub re-reads with `durability.load(blob_id)`; a row asserts
+  `pr_url` survives.
+- The backfill moved to `infra/bin/`, beside the other operator tooling.
+
+### The correction pass 1 forced
 
 **The re-save would have blanked the correlation ID.** `save()` overwrites the whole row.
 `run_state`, `stop_reason` and `resume_count` carry guards — each added after somebody lost
@@ -132,8 +146,8 @@ src/core/authoring/
 src/surfaces/dispatch/
 └── entrypoint.py     # the call, in the PROPOSER branch only, after publish returns 0
 
-scripts/
-└── backfill-proposal-payloads.py   # one-time, idempotent, over terminal checkpoints
+(infra/bin/)
+└── backfill_proposal_payloads.py  # one-time, idempotent, over terminal checkpoints
 
 tests/
 ├── unit/                        # field selection, idempotence, the manifest survives

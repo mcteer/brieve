@@ -73,9 +73,14 @@ not take different cleanup paths, and terminal state can be reached twice.
 uv run pytest tests/conformance/authoring/ -k "scrubbed_payload" -q
 ```
 
-**Expect**: `proposal_from_payload` **raises**. It is only called before publishing, so a
-scrubbed payload reaching it means the ordering broke — and it must fail loudly rather than
-reconstruct a proposal with empty bodies and open an empty pull request.
+**Expect**: `proposal_from_payload` **refuses a payload carrying `scrubbed: true`** — and
+**accepts** one with a legitimately empty body and no marker. It is only called before
+publishing, so a scrubbed payload reaching it means the ordering broke, and it must fail loudly
+rather than open an empty pull request.
+
+> A marker rather than an emptiness test, because `str(f["body"])` succeeds on `""` and nothing
+> forbids a legitimately empty authored file. Refusing on emptiness would reject proposals
+> nobody scrubbed.
 
 ---
 
@@ -129,7 +134,7 @@ c.close()"
 **Expect before**: 6, every one `completed`. Then:
 
 ```bash
-uv run python scripts/backfill-proposal-payloads.py
+uv run python infra/bin/backfill_proposal_payloads.py
 make conformance
 ```
 

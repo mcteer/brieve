@@ -24,6 +24,18 @@ Returns the rewritten payload and the number of file bodies cleared.
 | `authoring_proposal.files[].body` | `""` | The customer's file content |
 | `authoring_proposal.rationale` | `""` | Model-authored, derived from the subject. FR-032 already treats it as content reaching the customer's repository |
 
+### 1.1a Added
+
+| Path | Value | Why |
+| --- | --- | --- |
+| `authoring_proposal.scrubbed` | `true` | Says **why** the bodies are empty. Without it, a scrubbed payload and a run that authored nothing are indistinguishable, and `proposal_from_payload` cannot refuse one without refusing the other |
+
+**A marker, not an emptiness test.** `proposal_from_payload` does `str(f["body"])`, which
+succeeds on `""` — verified, not assumed — so with emptied keys (§1.3) it returns a proposal
+with no content, which is the empty-pull-request outcome the refusal exists to prevent.
+Refusing on *emptiness* was rejected: nothing forbids a legitimately empty authored file, so
+that rule would refuse proposals nobody scrubbed.
+
 ### 1.2 Kept, and asserted as kept
 
 `files[].path`, `files[].is_diff`, `provenance`, `title`, `usage`, `task`,
@@ -87,8 +99,13 @@ trap"*. Two columns are guarded and the rest are not:
 | **`correlation_id`** | **blanked** | **none** |
 | `grant_id`, `step_index`, `written_by` | blanked / reset | none |
 
-**The scrub MUST construct its blob from the one it rewrites, replacing `payload` and nothing
-else.**
+**The scrub MUST construct its blob from the TERMINAL one, replacing `payload` and nothing
+else — and MUST re-read it rather than reusing what is in scope.**
+
+`_publish_the_proposal` returns `int`, not the blob it wrote. The only blob the caller holds is
+`checkpoint`, loaded **before** publish, and threading from it is the defect the call site's own
+comment records: *"restored the analyzer snapshot, wiped `pr_url`, and left Nomad 'complete'
+looking like 'Ended without a pull request.'"* So: `durability.load(blob_id)` first.
 
 Blanking `correlation_id` is a governance defect, not untidiness: it is the ID joining prompt →
 hook decision → tool call → product run → audit entry, `AGENTS.md` requires it propagated
@@ -108,7 +125,8 @@ already lost; they are not a reason to trust the next unguarded one.
 | The save fails | The run stops with the reason recorded (FR-005). **Never a clean report over content still in the store** — that is the failure nothing can detect afterwards |
 | The provider predates `save` | Not possible; `save` is the protocol's oldest method. 041's older-provider allowance does not transfer and is deliberately not reproduced |
 | The payload has no proposal | Returns unchanged, count `0`, no save, no error (FR-006) |
-| Already scrubbed | Same. Terminal state can be reached twice |
+| Already scrubbed | Same — detected by the `scrubbed` marker, not by empty bodies. Terminal state can be reached twice |
+| `proposal_from_payload` on a scrubbed payload | **Refuses**, on the marker. A fail-closed guard beside the ordering guarantee rather than instead of it |
 
 **Asserted against the store, not the return value.** A scrub that returned a count while
 leaving the row intact is exactly the shape FR-005 is about, so the row reads the stored JSON
@@ -129,7 +147,9 @@ back.
 
 ## 5. The backfill
 
-`scripts/backfill-proposal-payloads.py` — one-time, idempotent, operator-invoked.
+`infra/bin/backfill_proposal_payloads.py` with a `backfill-proposal-payloads` wrapper —
+one-time, idempotent, operator-invoked. Beside the other operator tooling, following the
+`corpus_sync.py` / `corpus-sync` pairing.
 
 - **Scope**: terminal checkpoints only. A non-terminal one may still resume.
 - **Function**: the same `scrub_proposal_payload`. A second implementation could disagree with
