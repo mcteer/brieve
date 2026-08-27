@@ -12,6 +12,13 @@ so this cannot fail today, which is exactly when to write it down. The next pers
 "just the credential id, for correlation" on that record has to delete an assertion whose
 message says why not — and the reason is that `checkpoints.grant_id` already held a credential
 id once (research F1).
+
+**KNOWN RED, for a true reason — issue #219.** Correcting the matcher (2026-08-27) made a real
+finding visible: `scrub_authoring_requests` clears `intents.arguments` at terminal state and
+nothing clears `checkpoints.payload`, which carries the same authored file bodies. 041's FR-033
+closed one copy of the content and left the other. This row is neither skipped nor loosened —
+it is reporting something, and the fix is a feature whose bound has to be decided rather than
+assumed (see the issue for why the intents scrub's reasoning does not transfer).
 """
 
 from __future__ import annotations
@@ -21,12 +28,16 @@ from typing import Any
 import pytest
 
 from tests.conformance.durability import dispatch_harness as h
+from tests.conformance.durability.rows import credential_material_in
 
 pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
-#: Matched against every stored value. The same list 005's blob-level sweep uses, so the two
+#: THE SAME MATCHER 005's blob-level sweep uses, imported rather than restated — so the two
 #: cannot drift into disagreeing about what a secret looks like.
-FORBIDDEN = ("credential", "token", "secret", "password", "run_salt", "hvs.", "private_key")
+#:
+#: They already had. This module carried a seven-entry tuple and `rows.py` a five-entry one;
+#: `hvs.` and `private_key` were in this copy alone, and the comment claiming they could not
+#: drift sat directly above the drift. One definition now, in `rows.py`.
 
 
 @pytest.fixture
@@ -43,12 +54,12 @@ def _sweep(conn: Any, table: str, columns: str) -> None:
         f"no-secret sweep over no rows is the vacuous pass this suite exists to avoid."
     )
     for row in rows:
-        rendered = " ".join(str(value).lower() for value in row)
-        for needle in FORBIDDEN:
-            assert needle not in rendered, (
-                f"{table} contains {needle!r}: {row!r}. The state store holds state, never "
-                f"authority (Principle IV, FR-012)"
-            )
+        rendered = " ".join(str(value) for value in row)
+        found = credential_material_in(rendered)
+        assert found is None, (
+            f"{table} contains credential material {found!r}: {row!r}. The state store holds "
+            f"state, never authority (Principle IV, FR-012)"
+        )
 
 
 def test_row_the_grants_table_holds_consent_metadata_and_nothing_else(conn: Any) -> None:
