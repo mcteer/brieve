@@ -84,6 +84,26 @@ _VARIABLE_VALIDATION = re.compile(
     """
 )
 
+#: Tagging as the style guide teaches it: a shared set defined once and applied everywhere,
+#: rather than a literal map retyped onto each resource.
+#:
+#: Either shape counts — `default_tags` on the provider, or a `locals` tag set merged into a
+#: resource's `tags`. The guide shows both; picking one and calling the other a miss would
+#: score a house style rather than the guide's.
+#:
+#: THE SECOND SC-002 CANDIDATE. The first, `variable_has_validation`, measured nothing: the
+#: model emitted validation blocks 5/5 in both arms, with a prompt that named the rule and
+#: again with one that did not. Tagging is the strongest remaining rule that the vendored
+#: guide teaches and the Write card does not mention at all — the card contains the word
+#: "tag" zero times.
+_SHARED_TAGS = re.compile(
+    r"""(?ix)
+    \bdefault_tags\s*\{               # provider "aws" { default_tags { ... } }
+    | \bmerge\s*\(\s*local\.[a-z_]*tag  # tags = merge(local.common_tags, { ... })
+    | \btags\s*=\s*local\.[a-z_]*tag     # tags = local.common_tags
+    """
+)
+
 #: An exact version pin: `version = "1.2.3"` or `version = "= 1.2.3"`.
 _EXACT_PIN = re.compile(r'(?i)\bversion\s*=\s*"\s*=?\s*\d+\.\d+(\.\d+)?\s*"')
 
@@ -140,6 +160,9 @@ def detect(contents: dict[str, str]) -> frozenset[str]:
 
     if _VARIABLE_VALIDATION.search(text):
         found.add("variable_has_validation")
+
+    if _SHARED_TAGS.search(text):
+        found.add("tags_are_shared_not_ad_hoc")
 
     paths = _POLICY_PATH.findall(text)
     if len(paths) == 1:

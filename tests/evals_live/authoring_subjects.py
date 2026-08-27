@@ -87,12 +87,47 @@ EOT
 """,
 }
 
+#: A module with a provider, one input and NO tagging discipline — the starting point for
+#: SC-002's rule (051). It shows the shape being extended and takes no position on tags: no
+#: `default_tags`, no `locals`, no tagged resource. A subject that already tagged something
+#: would ask the model to copy rather than to know.
+_UNTAGGED_MODULE = {
+    "terraform.tf": """terraform {
+  required_version = "~> 1.14"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+""",
+    "providers.tf": """provider "aws" {
+  region = "us-west-2"
+}
+""",
+    "variables.tf": """variable "project_name" {
+  description = "Name of the project this stack belongs to"
+  type        = string
+}
+""",
+    "main.tf": """resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+""",
+}
+
+
 _BY_TASK = {
     "dynamic_database_secret": _PLAIN_APP,
     "static_credential_lookalike": _PLAIN_APP,
     "pin_the_provider": _UNPINNED,
     "existing_integration_is_not_duplicated": _ALREADY_INTEGRATED,
     "least_privilege_role": _BROAD_POLICY,
+    # 051's SC-002 task. The subject takes no position on tagging, so the model is asked to
+    # know the rule rather than to copy it.
+    "tagged_artifact_bucket": _UNTAGGED_MODULE,
 }
 
 

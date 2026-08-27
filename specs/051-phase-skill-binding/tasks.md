@@ -406,9 +406,9 @@ T006 and asserted by T009. This phase adds the property that keeps the boundary 
 - [X] T055 Run every scenario in [quickstart.md](quickstart.md), restoring
       `packs/terraform/skills/terraform-style-guide/SKILL.md` and `packs/terraform/pack.toml`
       after the tamper and unbind scenarios — a left-behind edit fails everything downstream
-- [ ] T056 Run `make check`, then `make conformance`, then `make test-full`. Rows A1–A19 are
+- [X] T056 Run `make check`, then `make conformance`, then `make test-full`. Rows A1–A19 are
       hermetic and must pass in CI
-- [ ] T057 [GATE:conformance] Named-runner rows on the implementation PR — **Dan McTeer**:
+- [X] T057 [GATE:conformance] Named-runner rows on the implementation PR — **Dan McTeer**:
       **E1** identical assembled instruction in connected, restricted and air-gapped profiles;
       **E2** SC-002 — `variable_has_validation` present in ≥ 4 of 5 runs bound and
       demonstrably less often unbound, same n, recording n, both rates and the delta;

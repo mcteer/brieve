@@ -36,15 +36,53 @@ model, no network.
 
 | ID | Claim | Runner |
 | --- | --- | --- |
-| E1 | Connected, restricted and air-gapped profiles deliver the identical assembled instruction — nothing is fetched at phase start | Dan — allocation without outbound web still binds Write with both skills |
-| E2 | **SC-002**: a style rule the vendored skill states, no phase file restates, and the unaided model does not reliably follow — `variable` blocks carrying `validation { condition, error_message }` — is present in authored output in **≥ 4 of 5** runs with the binding, and demonstrably less often with it removed. Same n, both rates and the delta recorded | Dan — eval lane |
+| E1 | Connected, restricted and air-gapped profiles deliver the identical assembled instruction — nothing is fetched at phase start | **Largely discharged hermetically** by `test_no_runtime_skill_fetch.py`: assembly is run with `socket.socket`, `create_connection` and `getaddrinfo` all raising, for every phase of both packs, and the bytes are identical with and without the network. What remains for a runner is that a real allocation with no outbound access starts Research at all |
+| E2 | **SC-002** — see the measured result below. Harness: `evals/prompt-tune/sc002_skill_effect.py -n 5` | Run 2026-08-27; re-runnable by anyone |
 | E3 | **SC-007**: `phase_agents` and `build_agents` both pass over assembled content before the five-file set promotes; a losing set copies zero files | Dan — eval lane |
 | E4 | No `required_version` regression: with both skills delivered, `no_floating_version_constraint` does not fall against the pre-binding baseline on the same corpus tasks (contract §7.2 rule 2 is what prevents it) | Dan — eval lane |
 
 **Named runner**: Dan McTeer (maintainer). Rows fail loudly when the enclave or eval broker
 is absent — do not skip green.
 
-### Why E2 names that rule and not another
+### E2 / SC-002 — measured, and NOT DEMONSTRATED
+
+Run 2026-08-27, Sonnet 5, n=5 per arm, `evals/prompt-tune/sc002_skill_effect.py`. The two
+arms differ only in whether the two pinned skills are appended to the Write instruction
+(17,659 bytes bound, 5,509 unbound).
+
+| Rule | Bound | Unbound | Delta |
+| --- | --- | --- | --- |
+| `variable_has_validation`, prompt naming the rule | 5/5 | 5/5 | +0 |
+| `variable_has_validation`, prompt not naming it | 5/5 | 5/5 | +0 |
+| `tags_are_shared_not_ad_hoc` | 0/5 | 0/5 | +0 |
+
+**SC-002 is not met, and the honest reading is that it is not currently measurable on this
+model and corpus.** The spec is explicit that a rule the model already follows without the
+skill cannot serve as evidence; three arms say these skills' teachable surface is either
+already in the model or not reached by the task.
+
+- `variable_has_validation` failed *upward*: Sonnet 5 emits validation blocks unprompted. The
+  first prompt also described the rule in words, which was a design defect; rewriting it to
+  state the situation rather than the rule changed nothing.
+- `tags_are_shared_not_ad_hoc` failed *downward*: neither arm tags at all. Both produce
+  hardened buckets — versioning, KMS, public-access blocks — and no tags. The Write card
+  instructs minimality ("do not start a larger architecture than the plan named", "only
+  author when what the task names is genuinely absent"), and the precedence rule this feature
+  added says the card governs on conflict. Stylistic guidance the task did not ask for
+  appears to lose to that, which is a design tension worth its own look.
+
+**What this does and does not put in question.** Delivery is proven byte-for-byte by rows
+A1–A21 and E1: the model receives the skill, verified at the moment it receives it, and the
+record says so. What is unproven is that receiving it *changes the output* on this corpus.
+The mechanism ADR-0004 asked for exists; its measured behavioural yield here is zero.
+
+**Do not respond by lowering the threshold.** The harness prints that instruction on a null
+result for a reason. The next moves, in order of honesty: find a rule the skill teaches that
+the card does not and the model does not already follow; or re-run when the pinned model
+changes; or accept that these two particular skills duplicate what the model and card already
+carry, and record that as the finding it is.
+
+### Why the rule was chosen the way it was
 
 Research R7 found that `packs/terraform/agents/write/AGENTS.md` §"Required HashiCorp
 practice" already restates most of `SKILL.md` by hand: indentation, naming, `type` and
@@ -53,12 +91,11 @@ meta-argument ordering, standard file names, `~>` as a pin. Measuring SC-002 on 
 would measure nothing — removing the binding leaves the rule in place, and the spec's own
 Independent Test says a rule that passes with the skill absent is not evidence.
 
-`validation` blocks appear in `SKILL.md` twice
-([48-57](../../../packs/terraform/skills/terraform-style-guide/SKILL.md#L48-L57),
-[153-163](../../../packs/terraform/skills/terraform-style-guide/SKILL.md#L153-L163)), in no phase
-file, and are not something a base model emits unprompted. E2 requires a new
-`variable_has_validation` property in `tests/evals_live/authoring_properties.py` and a corpus
-task in `evals/authoring/corpus.toml` that asks for a constrained input.
+Two candidates cleared that bar on paper and were then measured. `variable_has_validation`
+is in `SKILL.md` twice and in no phase file; `tags_are_shared_not_ad_hoc` is in the guide as
+`default_tags` and as a merged `locals` set, and the Write card contains the word "tag" zero
+times. Both measured flat — see the table above. The corpus keeps the tagging task and the
+detector keeps both properties, so the measurement is standing rather than discarded.
 
 **The detector must be able to fail.** Following the precedent that
 `static_credential_lookalike` sets for the existing properties, the corpus supplies a case
@@ -78,10 +115,10 @@ To be filled on `feat/051-phase-skill-binding`. Live rows are not pytest-on-mode
 
 | Row | Named runner | Status |
 | --- | --- | --- |
-| E1 | Dan McTeer | Due on the implementation PR |
-| E2 | Dan McTeer | Due on the implementation PR — record n, both rates, the delta |
-| E3 | Dan McTeer | Due on the implementation PR |
-| E4 | Dan McTeer | Due on the implementation PR — record the baseline it is compared against |
+| E1 | — | **Discharged hermetically** by `test_no_runtime_skill_fetch.py`; allocation-without-outbound remains for a runner |
+| E2 | — | **Run 2026-08-27: NOT DEMONSTRATED.** bound 0/5, unbound 0/5 on the tagging rule; 5/5 and 5/5 on validation. See the section above |
+| E3 | — | **Pass, 2026-08-27.** Both suites over assembled content: terraform 25+6, vault 25+6, all as declared. `test_promote_phase_agents` green — a losing set copies zero files |
+| E4 | — | **Pass, 2026-08-27.** `pin_the_provider`, n=3 per arm: `no_floating_version_constraint` 3/3 bound and 3/3 unbound. No regression — the precedence rule holds where the skill's `>= 1.14` example contradicts the card |
 
 ## Security-maintainer review
 

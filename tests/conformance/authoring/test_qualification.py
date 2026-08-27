@@ -125,7 +125,15 @@ def test_row_q2_correctness_is_two_gates_reported_separately(corpus: Corpus) -> 
         ),
         "existing_integration_is_not_duplicated": frozenset(),
         "least_privilege_role": frozenset({"policy_scoped_to_one_path", "no_wildcard_capability"}),
+        # 051's SC-002 task.
+        "tagged_artifact_bucket": frozenset({"tags_are_shared_not_ad_hoc"}),
     }
+    missing = [task.name for task in corpus.golden if task.name not in properties]
+    assert not missing, (
+        f"golden tasks with no property expectation here: {missing}. This map is hand-written "
+        f"so the row asserts a known shape rather than whatever the detector happens to "
+        f"return — a new corpus task must be added to it deliberately."
+    )
 
     report = score_corpus(
         corpus,

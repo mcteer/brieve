@@ -20,6 +20,12 @@ durable record.
   recommends `terraform fmt -recursive` and `terraform validate`, and no registry tool offers
   either, so an `## Adopted practice not carried out` section names them for the reviewer.
   The text comes from the manifest, never from a model, and is identical across runs.
+- **Measured, and reported as measured:** delivering these two skills did **not** change what
+  Write authors on the current corpus (Sonnet 5, n=5 per arm, 2026-08-27). Validation blocks
+  appeared 5/5 with the skills and 5/5 without; shared tagging appeared 0/5 either way. The
+  delivery mechanism is proven byte-for-byte, and its behavioural yield on this model is
+  zero — the rules these skills teach are either already in the model or already restated by
+  hand in the phase cards. Re-run with `evals/prompt-tune/sc002_skill_effect.py`.
 - **`content_pins` skill keys now name the binding** — `<pack>/skills/<name>@plan+write+judge`
   or `@unbound`, replacing `<pack>/<name>` with no compatibility shim. What each phase
   actually received is recorded separately as phases bind, so a run that stopped before Write
