@@ -32,8 +32,11 @@ ADR_DIR = ROOT / "docs" / "adr"
 #: A markdown link to a sibling ADR file, e.g. `](0025-enclave-is-the-default-topology.md)`.
 _LINK = re.compile(r"\]\((\d{4}-[a-z0-9-]+\.md)\)")
 
-#: A row of the ROADMAP `Open records` table, whose first cell names the record.
-_TABLE_ROW = re.compile(r"^\|\s*\*\*ADR-(\d{4})\*\*\s*\|", re.MULTILINE)
+#: A bullet in ROADMAP's `Open records` naming a record that is still open. Matched at line
+#: start so that prose *mentioning* an accepted record elsewhere in the section is not read as
+#: a claim that it is open — the section explains what was accepted and why, and must stay free
+#: to do so.
+_OPEN_BULLET = re.compile(r"^- \*\*ADR-(\d{4})\*\*", re.MULTILINE)
 
 #: The one link that could NOT be repaired by inspection, kept explicit rather than deleted.
 #:
@@ -104,41 +107,82 @@ def test_the_roadmap_names_exactly_the_open_records() -> None:
     roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
     start = roadmap.index("## Open records")
     section = roadmap[start : roadmap.index("\n## ", start + 1)]
-    listed = set(_TABLE_ROW.findall(section))
+    listed = set(_OPEN_BULLET.findall(section))
 
     assert listed == proposed, (
         "`ROADMAP.md`'s Open records table disagrees with the ADRs' own Status lines.\n"
         f"  Proposed but unlisted: {sorted(proposed - listed) or 'none'}\n"
         f"  Listed but not Proposed: {sorted(listed - proposed) or 'none'}\n"
-        "A record accepted since this was written should be dropped from the table; one that "
-        "went Proposed should be added, with the feature it governs."
+        "A record accepted since this was written should lose its `- **ADR-NNNN**` bullet; one "
+        "that went Proposed should gain one, saying which feature it governs and why it is open."
     )
 
 
-def test_a_superseding_record_has_itself_been_accepted() -> None:
-    """A shipped supersession resting on a record nobody accepted.
+def test_no_supersession_rests_on_an_unaccepted_record() -> None:
+    """A record cannot be retired by one nobody accepted.
 
-    ADR-0041 reads "Superseded by ADR-0065" while ADR-0065 is Proposed. That is recorded in
-    `Open records` rather than repaired, because accepting 0065 is a maintainer decision under
-    Principle X. This row keeps the pairing visible: it fails if a *new* one appears.
+    ADR-0041 read "Superseded by ADR-0065" while ADR-0065 was Proposed — for three weeks, with
+    `docs/adr/README.md` listing 0041 as Accepted the whole time. Both were settled on
+    2026-08-27 when 0065 was accepted, so this asserts the empty set rather than carrying an
+    exception: the pairing is fixed, and a new one should fail here rather than be grandfathered.
     """
-    known = {"0041": "0065"}
-    status = {
-        p.name[:4]: re.search(r"^- \*\*Status\*\*: (.+)$", p.read_text(encoding="utf-8"), re.M)
-        for p in _adr_files()
-    }
-    resting: dict[str, str] = {}
-    for num, match in status.items():
-        if match is None:
-            continue
-        cited = re.search(r"Superseded by \[?ADR-(\d{4})", match.group(1))
+    status = {}
+    for p in _adr_files():
+        match = re.search(r"^- \*\*Status\*\*: (.+)$", p.read_text(encoding="utf-8"), re.M)
+        if match is not None:
+            status[p.name[:4]] = match.group(1)
+
+    resting = {}
+    for num, line in status.items():
+        cited = re.search(r"Superseded by \[?ADR-(\d{4})", line)
         if cited is None:
             continue
-        target = status.get(cited.group(1))
-        if target is not None and target.group(1).startswith("Proposed"):
+        target = status.get(cited.group(1), "")
+        if target.startswith("Proposed"):
             resting[num] = cited.group(1)
 
-    assert resting == known, (
-        f"a supersession now rests on an unaccepted record: {resting}. Either the superseding "
-        "ADR should be accepted, or `ROADMAP.md`'s Open records section should say why not."
+    assert resting == {}, (
+        f"a supersession rests on an unaccepted record: {resting}. Either accept the superseding "
+        "ADR, or say in `ROADMAP.md`'s Open records why it is right to leave it Proposed."
+    )
+
+
+def test_the_index_agrees_with_each_record() -> None:
+    """The fourth place a status lives, and the one that was wrong for three weeks.
+
+    A status is written in the ADR itself, in `ROADMAP.md`'s Open records, in the feature table,
+    and in `docs/adr/README.md`'s index — which is the table a reader scans to find out what was
+    already decided. It listed ADR-0041 as **Accepted** while ADR-0041 itself read "Superseded by
+    ADR-0065", so the index was recommending a record that had been retired.
+
+    Only the leading verdict is compared. The index legitimately carries more than the file does
+    (*"Accepted (one clause superseded by 0008)"*) and a checker demanding equality would force
+    the two to say exactly the same thing, which is not what an index is for.
+    """
+    index = {}
+    for line in (ADR_DIR / "README.md").read_text(encoding="utf-8").splitlines():
+        row = re.match(r"^\| \[(\d{4})\]\([^)]+\) \| .+? \| (.+?) \|$", line)
+        if row is not None:
+            index[row.group(1)] = row.group(2)
+
+    assert len(index) == len(_adr_files()), (
+        f"the index lists {len(index)} records and {len(_adr_files())} files exist; a record "
+        "missing from the index is invisible to anyone reading it to find prior decisions"
+    )
+
+    def verdict(text: str) -> str:
+        return re.sub(r"[*_]", "", text).split()[0].rstrip(",;:—-").capitalize()
+
+    disagree = {}
+    for path in _adr_files():
+        stated = re.search(r"^- \*\*Status\*\*: (.+)$", path.read_text(encoding="utf-8"), re.M)
+        if stated is None:
+            continue
+        listed = index.get(path.name[:4])
+        if listed is not None and verdict(listed) != verdict(stated.group(1)):
+            disagree[path.name[:4]] = (verdict(stated.group(1)), verdict(listed))
+
+    assert disagree == {}, (
+        "`docs/adr/README.md`'s index disagrees with the records themselves, as "
+        f"{{num: (record says, index says)}}: {disagree}"
     )
