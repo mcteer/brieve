@@ -21,12 +21,16 @@ from typing import Any
 import pytest
 
 from tests.conformance.durability import dispatch_harness as h
+from tests.conformance.durability.rows import credential_material_in
 
 pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
-#: Matched against every stored value. The same list 005's blob-level sweep uses, so the two
+#: THE SAME MATCHER 005's blob-level sweep uses, imported rather than restated — so the two
 #: cannot drift into disagreeing about what a secret looks like.
-FORBIDDEN = ("credential", "token", "secret", "password", "run_salt", "hvs.", "private_key")
+#:
+#: They already had. This module carried a seven-entry tuple and `rows.py` a five-entry one;
+#: `hvs.` and `private_key` were in this copy alone, and the comment claiming they could not
+#: drift sat directly above the drift. One definition now, in `rows.py`.
 
 
 @pytest.fixture
@@ -43,12 +47,12 @@ def _sweep(conn: Any, table: str, columns: str) -> None:
         f"no-secret sweep over no rows is the vacuous pass this suite exists to avoid."
     )
     for row in rows:
-        rendered = " ".join(str(value).lower() for value in row)
-        for needle in FORBIDDEN:
-            assert needle not in rendered, (
-                f"{table} contains {needle!r}: {row!r}. The state store holds state, never "
-                f"authority (Principle IV, FR-012)"
-            )
+        rendered = " ".join(str(value) for value in row)
+        found = credential_material_in(rendered)
+        assert found is None, (
+            f"{table} contains credential material {found!r}: {row!r}. The state store holds "
+            f"state, never authority (Principle IV, FR-012)"
+        )
 
 
 def test_row_the_grants_table_holds_consent_metadata_and_nothing_else(conn: Any) -> None:

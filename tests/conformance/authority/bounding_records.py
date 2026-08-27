@@ -79,6 +79,21 @@ NAMED_BOUNDS: dict[str, str] = {
     "identity/group": "attaches grants to a group of identities",
     "sys/auth/probe-018": "creates an auth method — a new way for identities to be issued",
     "sys/mounts/probe-018": "creates a mount — changes what a path resolves to",
+    # The version-control App key (ADR-0062, Principle IV's third named exception). Read by
+    # the PUBLISHING task alone, through `authoring-publisher` bound to `nomad_task =
+    # "proposer"`; `harness-authority-read` never names it, so no derivation from a run's read
+    # grants can reach it. Write it and a run substitutes the credential every proposal is
+    # opened with — authorship the forge attributes to this platform, under a key the run
+    # chose.
+    #
+    # PROBE-SUFFIXED, unlike the real paths above. A write to `authoring/vcs-app` that
+    # unexpectedly SUCCEEDED would clobber the operator-seeded key, and the failure would
+    # present as an authentication outage — the shape `infra/modules/trust-fabric/authoring.tf`
+    # already guards with `ignore_changes`. Same jurisdiction, name nothing owns.
+    "harness-authority/data/authoring/probe-018": (
+        "the version-control App key's jurisdiction — write here and a run supplies the "
+        "credential its own pull requests are opened with"
+    ),
 }
 
 #: The four kinds the control plane genuinely enumerates.
@@ -226,6 +241,34 @@ def bounding_paths() -> list[str]:
         }
     )
     return [p for p in paths if not any(p.startswith(x) for x in EXCLUDED_PREFIXES)]
+
+
+def covered_prefixes() -> set[str]:
+    """Every prefix something in this module accounts for — granted, or named.
+
+    **Derived from the GRANTS, not from the probes**, and the difference is a defect this
+    function exists to remove. `probe_targets()` deliberately skips a grant written as an
+    exact path, because probing one would attempt to overwrite a real record. Coverage asking
+    the same function was therefore asking *what do we write to* when the question is *what is
+    accounted for* — so a record whose grant carries no glob read as uncovered.
+
+    `protected-policies` is exactly that case, and the policy's own comment says why it has no
+    glob: it is one record with no subpath, and a Vault glob does not match the empty
+    remainder. `ask-bindings` and `model-matrix` escaped only because each also carries a glob
+    sibling. `product-connections` and `endorsed-sources` are exact-only too, and would have
+    joined the failure the moment anybody wrote one.
+
+    Named bounds count as covering. A path the derivation cannot reach is not uncovered when
+    this module names it and attempts a write against it.
+    """
+    covered: set[str] = set()
+    for path in bounding_paths():
+        # `harness-authority/data/harness-ceilings/*` accounts for that folder; the exact
+        # `harness-authority/data/protected-policies` accounts for itself.
+        covered.add(path[:-2] if path.endswith("/*") else path.rstrip("*").rstrip("/"))
+    for path in NAMED_BOUNDS:
+        covered.add(path.rsplit("/", 1)[0])
+    return covered
 
 
 #: What a probe writes into a bounding path. Never a real name — the write is expected to be
@@ -393,6 +436,7 @@ def undo(path: str, token: str) -> str:
 
 __all__ = [
     "AUTHORITY_POLICY",
+    "covered_prefixes",
     "ENUMERABLE_KINDS",
     "EXCLUDED_PREFIXES",
     "NAMED_BOUNDS",

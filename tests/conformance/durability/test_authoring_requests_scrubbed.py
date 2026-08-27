@@ -15,6 +15,7 @@ wearing a security fix's clothes.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 
@@ -27,10 +28,14 @@ SECRET_BODY = 'resource "aws_iam_user" "x" { name = "customer-private-content" }
 
 
 def _intent(
-    key: str, *, tool: str = "author_file", arguments: dict[str, object] | None = None
+    key: str,
+    *,
+    tool: str = "author_file",
+    arguments: dict[str, object] | None = None,
+    run_id: str = RUN,
 ) -> IntentRecord:
     return IntentRecord(
-        run_id=RUN,
+        run_id=run_id,
         idempotency_key=key,
         step_index=1,
         tool_name=tool,
@@ -41,9 +46,9 @@ def _intent(
     )
 
 
-def _result(key: str) -> ResultRecord:
+def _result(key: str, *, run_id: str = RUN) -> ResultRecord:
     return ResultRecord(
-        run_id=RUN, idempotency_key=key, step_index=1, recorded_at=datetime.now(UTC)
+        run_id=run_id, idempotency_key=key, step_index=1, recorded_at=datetime.now(UTC)
     )
 
 
@@ -132,16 +137,47 @@ def test_a_provider_without_the_method_does_not_fail_a_finished_run() -> None:
 
 @pytest.mark.enclave
 def test_row_a22_the_postgres_leg(postgres_durability) -> None:  # type: ignore[no-untyped-def]
-    """The leg that counts. In-memory clears a field for free; this proves the SQL exists."""
-    provider = postgres_durability
-    provider.record_intent(_intent("pg-closed"))
-    provider.record_result(_result("pg-closed"))
-    provider.record_intent(_intent("pg-open"))
+    """The leg that counts. In-memory clears a field for free; this proves the SQL exists.
 
-    scrubbed = scrub_authoring_requests(provider, run_id=RUN)
+    **A RUN ID OF ITS OWN, PER EXECUTION** (2026-08-27). This row used the module's fixed
+    `RUN`, and the Postgres store is persistent: the first execution scrubbed `pg-closed`, and
+    every execution after it found that record already scrubbed, counted zero, and failed on
+    `scrubbed == 1`.
+
+    So the row passed exactly once — on a fresh database, the day it was written — and was red
+    from then on. It stayed red across two features, reported inside the allocation lane where
+    a single failure sits under a summary line saying the rest of the suite passed.
+
+    The in-memory rows above keep the fixed `RUN` deliberately: their provider is constructed
+    per test, so a shared constant is what proves the scrub is scoped by run id rather than
+    global.
+    """
+    provider = postgres_durability
+    run = f"{RUN}-{uuid4().hex[:12]}"
+    provider.record_intent(_intent("pg-closed", run_id=run))
+    provider.record_result(_result("pg-closed", run_id=run))
+    provider.record_intent(_intent("pg-open", run_id=run))
+
+    scrubbed = scrub_authoring_requests(provider, run_id=run)
 
     assert scrubbed == 1
-    closed = [i for i in provider.closed_intents(RUN) if i.idempotency_key == "pg-closed"]
+    closed = [i for i in provider.closed_intents(run) if i.idempotency_key == "pg-closed"]
     assert closed and closed[0].arguments is None
-    still_open = [i for i in provider.open_intents(RUN) if i.idempotency_key == "pg-open"]
+    still_open = [i for i in provider.open_intents(run) if i.idempotency_key == "pg-open"]
     assert still_open and still_open[0].arguments is not None
+
+
+@pytest.mark.enclave
+def test_row_a22_the_postgres_leg_is_repeatable(postgres_durability) -> None:  # type: ignore[no-untyped-def]
+    """REGRESSION. The row above must give the same answer twice in a row.
+
+    Running it against a store that already holds its records is exactly what happened the
+    second time anybody ran the durability lane, and the failure was indistinguishable from
+    the SQL being wrong.
+    """
+    provider = postgres_durability
+    for _ in range(2):
+        run = f"{RUN}-repeat-{uuid4().hex[:12]}"
+        provider.record_intent(_intent("pg-closed", run_id=run))
+        provider.record_result(_result("pg-closed", run_id=run))
+        assert scrub_authoring_requests(provider, run_id=run) == 1

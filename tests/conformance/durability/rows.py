@@ -8,11 +8,68 @@ knows works (FR-014).
 
 from __future__ import annotations
 
+import re
+
 from core.durability.types import CheckpointBlob, DurabilityProvider
 from core.observation.types import ObservationOutcome
 from core.run import RunState
 
-FORBIDDEN_IN_CHECKPOINTS = ("credential", "token", "secret", "password", "run_salt")
+#: Substrings that only ever appear in credential MATERIAL. Matched raw, because none of
+#: them is an English word somebody could write about.
+CREDENTIAL_MARKERS = ("hvs.", "hvb.", "-----begin", "run_salt")
+
+#: Field names whose VALUE would be credential material. Matched as a key-with-value pair,
+#: never as a bare word.
+#:
+#: THE BARE WORD WAS THE BUG (2026-08-27). This swept `str(row).lower()` for `"secret"`, and a
+#: Judge model's own prose — *"the slice is on-topic and secret-free"* — matched it. A gate
+#: proving the store holds no authority went red because a model said the word while reporting
+#: the absence of the thing. It is the same shape this repository has caught four times before:
+#: a check matching prose instead of structure.
+#:
+#: A credential in a checkpoint is a VALUE UNDER A KEY. `"vault_token": "hvs.abc"` is the
+#: leak; `secret-free` in a sentence is not, and cannot be made into one.
+CREDENTIAL_FIELDS = ("credential", "token", "secret", "password", "private_key", "api_key")
+
+#: `"token": "value"` and `'token': 'value'` — JSON and Python-repr, because a row renders
+#: through `str()` and a payload through `model_dump()`. A non-empty value is required: an
+#: empty or null field carries nothing.
+#: The key may be quoted (`"token":`) or bare (`client_secret =`). The bare form was missed on
+#: the first attempt and `test_credential_material_matcher` caught it — a config-file or
+#: environment assignment is as much a leak as a JSON field, and requiring quotes would have
+#: shipped a matcher blind to `.env`-shaped material.
+_FIELD_WITH_VALUE = re.compile(
+    r"""(?ix)
+    ["']?                                  # optional opening quote of the key
+    \b[a-z0-9_.\-]*                        # any prefix: vault_token, app_secret
+    (?:"""
+    + "|".join(CREDENTIAL_FIELDS)
+    + r""")
+    [a-z0-9_.\-]*\b                        # any suffix: token_id, secret_ref
+    ["']?                                  # optional closing quote
+    \s*[:=]\s*                             # : in a mapping, = in an assignment
+    ["'][^"']+["']                         # a NON-EMPTY string value
+    """
+)
+
+
+def credential_material_in(rendered: str) -> str | None:
+    """The first sign of credential material in ``rendered``, or None.
+
+    One definition, used by the blob-level sweep and the live-table one, so the two cannot
+    drift into disagreeing about what a secret looks like — which they already had, silently:
+    two tuples, one carrying `hvs.` and `private_key` and the other not.
+    """
+    lowered = rendered.lower()
+    for marker in CREDENTIAL_MARKERS:
+        if marker in lowered:
+            return marker
+    found = _FIELD_WITH_VALUE.search(rendered)
+    return found.group(0) if found else None
+
+
+#: Kept for callers that still want the raw field names.
+FORBIDDEN_IN_CHECKPOINTS = CREDENTIAL_FIELDS
 
 
 def assert_resumes_from_checkpoint(blob: CheckpointBlob | None, *, expected_step: int) -> None:
@@ -26,9 +83,8 @@ def assert_executed_exactly_once(counts: dict[str, int], step: str) -> None:
 
 
 def assert_no_credential_in_checkpoint(blob: CheckpointBlob) -> None:
-    dumped = str(blob.model_dump()).lower()
-    for token in FORBIDDEN_IN_CHECKPOINTS:
-        assert token not in dumped, f"checkpoint contains {token!r}"
+    found = credential_material_in(str(blob.model_dump()))
+    assert found is None, f"checkpoint contains credential material: {found!r}"
 
 
 def assert_fresh_authority(before_id: str, after_id: str | None) -> None:

@@ -147,22 +147,59 @@ def test_no_refusal_is_asserted_with_administrator_authority() -> None:
 
 def test_every_existing_record_is_covered() -> None:
     """FR-011: the derivation is blind outside a run's read grants, and this is the only
-    direction that blindness can be seen from."""
-    derived_prefixes = {p.rsplit("/", 1)[0] for p in b.probe_targets()}
+    direction that blindness can be seen from.
+
+    Measured against `covered_prefixes()` — what is GRANTED or NAMED — rather than against
+    `probe_targets()`, what is written to. Those are different questions, and asking the
+    second made every exact-path grant read as uncovered: `probe_targets` skips them on
+    purpose, because probing one would overwrite a real record.
+    """
+    covered = b.covered_prefixes()
     unplaced: dict[str, str] = {}
 
     for mount, prefixes in b.existing_prefixes().items():
         for prefix in prefixes:
-            for shape in (f"{mount}/data/{prefix}", f"{mount}/{prefix}"):
-                if shape in derived_prefixes:
-                    break
-            else:
-                if prefix not in b.EXCLUDED_PREFIXES:
-                    unplaced[f"{mount}/{prefix}"] = "exists but is not derived or excluded"
+            shapes = (f"{mount}/data/{prefix}", f"{mount}/{prefix}")
+            if any(shape in covered for shape in shapes):
+                continue
+            if prefix not in b.EXCLUDED_PREFIXES:
+                unplaced[f"{mount}/{prefix}"] = "exists but is not derived, named, or excluded"
 
     assert not unplaced, "records exist that no bounding path covers:\n" + "\n".join(
         f"  {k}: {v}" for k, v in unplaced.items()
     )
+
+
+def test_an_exact_path_grant_counts_as_coverage() -> None:
+    """REGRESSION (2026-08-27). The row above read exact-path grants as uncovered.
+
+    `harness-authority/data/protected-policies` is granted with no glob — deliberately, and
+    the policy says why: it is one record with no subpath, and a Vault glob does not match the
+    empty remainder. Coverage derived from `probe_targets()` could not see it, so the row went
+    red on a grant that was correct all along.
+
+    Two features landed on top of that red row before anybody looked.
+    """
+    covered = b.covered_prefixes()
+    exact = "harness-authority/data/protected-policies"
+    assert exact in b.bounding_paths(), "the grant this row is about is gone; re-derive it"
+    assert exact not in {p.rsplit("/", 1)[0] for p in b.probe_targets()}, (
+        "probe_targets now covers exact paths; this regression row no longer asserts anything"
+    )
+    assert exact in covered
+
+
+def test_a_named_bound_counts_as_coverage() -> None:
+    """A path the derivation cannot reach is covered when this module names it.
+
+    `harness-authority/authoring/vcs-app` is the version-control App key (ADR-0062): readable
+    only by the publishing task, so no derivation from a run's read grants reaches it, and
+    writable by nobody — a run that could write it would supply the credential its own pull
+    requests are opened with.
+    """
+    covered = b.covered_prefixes()
+    assert "harness-authority/data/authoring" in covered
+    assert any(path.startswith("harness-authority/data/authoring/") for path in b.NAMED_BOUNDS)
 
 
 def test_every_enumerable_surface_is_named_or_excluded() -> None:
