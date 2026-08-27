@@ -40,7 +40,18 @@ def bind_phase_agents(
     key = f"{loaded.pack}/agents/{loaded.phase.value}@{loaded.version}"
     pins = dict(getattr(run, "agent_content_pins", {}) or {})
     pins[key] = loaded.digest
+    # WHAT THIS PHASE WAS ACTUALLY GIVEN, keyed off the instruction it came with (051,
+    # FR-005). Recorded here rather than at RUN_START because only a phase that ran can be
+    # said to have received anything: a run that stops before Write must not read as one
+    # whose Write model saw the skill.
+    #
+    # Digests are the values re-verified at delivery, not copied from the manifest.
+    for skill in loaded.skills:
+        pins[f"{key}+{skill.name}"] = skill.digest
     run.agent_content_pins = pins
+    # Assembly happens in core, on purpose. This surface resolves a pack name and records;
+    # composing instruction content here would put it in the thin layer, and would give the
+    # eval lane a second assembly path that could pass on bytes production never sends.
     run.phase_instruction = loaded.body
     return loaded
 

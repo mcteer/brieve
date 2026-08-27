@@ -62,8 +62,16 @@ def test_the_run_record_names_each_loaded_pack_and_digest() -> None:
     recorded = payload.get("content_pins")
     assert isinstance(recorded, dict), "RUN_START carries no content_pins"
     assert "vault@0.1.0" in recorded
-    assert "vault/vault-secret-access" in recorded
-    assert recorded["vault/vault-secret-access"] == loaded["vault"].manifest.skills[0].digest
+    # The key names the binding (051, FR-005). Vault adopts its skill and binds it to no
+    # phase, which is a legitimate staged-adoption state and must stay visible as one rather
+    # than read like delivery.
+    key = "vault/skills/vault-secret-access@unbound"
+    assert key in recorded
+    assert recorded[key] == loaded["vault"].manifest.skills[0].digest
+    assert "vault/vault-secret-access" not in recorded, (
+        "the pre-051 key shape is still emitted; old and new keys must differ so a trail "
+        "written before this change is visibly not one written after it"
+    )
 
 
 def test_changed_content_is_distinguishable_from_unchanged() -> None:

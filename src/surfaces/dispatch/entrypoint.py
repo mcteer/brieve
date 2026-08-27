@@ -177,9 +177,33 @@ def _phase_status(progress: ProposeProgress, name: PhaseName) -> PhaseStatus:
     return PhaseStatus.PENDING
 
 
+#: Checkpoint key for what each phase's model was actually given, by name and digest.
+#: Identity only — never an instruction or skill body (051, FR-005; row A14).
+AGENT_PINS_KEY = "agent_content_pins"
+
+
 def _payload_with_progress(payload: dict[str, Any], run: Any) -> dict[str, Any]:
-    """Keep Build phases on every blob write — finish-path saves replace the payload."""
+    """Keep Build phases and delivered content on every blob write.
+
+    Finish-path saves replace the payload, so anything that must survive a checkpoint is
+    re-attached here rather than written once.
+
+    **`agent_content_pins` is what a phase ACTUALLY received** (051, FR-005). `RUN_START`'s
+    `content_pins` is written before any phase runs, so it can say what a pack binds and
+    never what a run was steered by; this map accumulates at each bind, so a run that stopped
+    before Write carries no Write key and cannot be read as one whose Write model saw the
+    skill.
+
+    049 set this map on the run object and no checkpoint, audit event, or result body ever
+    carried it — per-phase pins existed in memory and nowhere else. Writing them is what
+    makes the delivered-versus-merely-bound distinction observable at all.
+    """
     out = dict(payload)
+    pins = getattr(run, "agent_content_pins", None)
+    if pins:
+        # Sorted for the same reason `RUN_START` sorts: two runs over identical content
+        # produce identical bytes, so a diff between trails is a real difference.
+        out[AGENT_PINS_KEY] = dict(sorted(pins.items()))
     live = getattr(run, "propose_progress", None)
     if live is None:
         return out

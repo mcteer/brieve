@@ -132,35 +132,35 @@ yet contains skill keys.
 
 ### Implementation
 
-- [ ] T013 [US2] Change the skill key grammar in `content_pins` in `src/surfaces/toolset.py`
+- [X] T013 [US2] Change the skill key grammar in `content_pins` in `src/surfaces/toolset.py`
       from `<pack>/<skill-name>` to `<pack>/skills/<skill-name>@<binding>`, where `<binding>`
       is the bound phase names joined by `+` **in `PHASE_ORDER` order** (not manifest order,
       so rewriting a `phases` array does not change the key), or the literal `unbound`. Pack
       and `[[agents]]` keys unchanged
-- [ ] T014 [US2] **Close the 049 gap** (FR-005, SC-003): write `run.agent_content_pins` into
+- [X] T014 [US2] **Close the 049 gap** (FR-005, SC-003): write `run.agent_content_pins` into
       the checkpoint payload under the `agent_content_pins` key, in `_payload_with_progress` in
       `src/surfaces/dispatch/entrypoint.py`. The map is set by `bind_phase_agents` and is
       currently carried by no checkpoint, audit event, or result body — US2 is unobservable
       until it is written at all
-- [ ] T015 [US2] Update the two existing consumers of the old key shape:
+- [X] T015 [US2] Update the two existing consumers of the old key shape:
       `tests/component/test_run_record_names_its_packs.py` and
       `tests/component/test_phase_agents_pins.py`. **No compatibility shim** — a run started
       before this change and resumed after it must not silently match (contract §5)
 
 ### Tests
 
-- [ ] T016 [P] [US2] [GATE:conformance] Assert the `RUN_START` key shape in
+- [X] T016 [P] [US2] [GATE:conformance] Assert the `RUN_START` key shape in
       `tests/component/test_content_pins_name_bindings.py` (row A12): Terraform's two skills
       record `@plan+write+judge`, Vault's records `@unbound`, and a bound skill is
       distinguishable from an unbound one by the key alone (US2 acceptance 1)
-- [ ] T017 [P] [US2] [GATE:correlation] Assert per-phase pins reach the checkpoint payload
+- [X] T017 [P] [US2] [GATE:correlation] Assert per-phase pins reach the checkpoint payload
       and join on the correlation ID, in
       `tests/component/test_phase_delivery_record.py` (row A13, SC-003)
-- [ ] T018 [US2] [GATE:correlation] Assert the **negative**: a Build stopped before Write
+- [X] T018 [US2] [GATE:correlation] Assert the **negative**: a Build stopped before Write
       carries no `…/agents/write@…+<skill>` key (US2 acceptance 2, row A13). This is the half
       that makes the record honest; without it a run that never reached Write reads as one
       whose Write model saw the skill
-- [ ] T019 [P] [US2] [GATE:no-secret-leak] Extend
+- [X] T019 [P] [US2] [GATE:no-secret-leak] Extend
       `tests/conformance/phase_agents/test_pins_are_identity_only.py` to the skill keys (row
       A14): names and digests only, never an instruction or skill body, in the map, the
       payload, or a phase failure reason
@@ -182,12 +182,12 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
 
 ### Assembly and delivery
 
-- [ ] T020 [US1] Add frozen `DeliveredSkill(name, digest)` and
+- [X] T020 [US1] Add frozen `DeliveredSkill(name, digest)` and
       `skills: tuple[DeliveredSkill, ...] = ()` to `PhaseAgents` in
       `src/core/packs/agents.py`. `PhaseAgents.digest` stays the `AGENTS.md` digest — a pin
       identity, not a hash of the assembly (spec Assumptions: `[[agents]]` pins keep their
       shape)
-- [ ] T021 [US1] Add the pure function `assemble_instruction(agents_body, skills, bodies)` to
+- [X] T021 [US1] Add the pure function `assemble_instruction(agents_body, skills, bodies)` to
       `src/core/packs/agents.py` and have `load_phase_agents` call it (FR-001, SC-001).
       It takes the instruction bytes as a **parameter** and never re-derives them from a pin,
       so the eval scorers can assemble a candidate that has no `[[agents]]` pin (contract
@@ -197,11 +197,11 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
       `phases`. Skill bytes verbatim — never edited, filtered, reordered internally, or
       truncated (ADR-0004, FR-015). Assembly exists **only here**; production and the eval
       lane both reach it through this function (contract §2.5)
-- [ ] T022 [US1] Verify each bound skill at delivery in `src/core/packs/agents.py`, on the
+- [X] T022 [US1] Verify each bound skill at delivery in `src/core/packs/agents.py`, on the
       same terms as the existing `AGENTS.md` check: resolve the path inside the pack
       directory, re-read the bytes, re-hash, compare to `SkillPin.digest`. `DeliveredSkill.digest`
       is the value re-verified here, never copied from the manifest (FR-003)
-- [ ] T023 [US1] Record delivered skills per phase in `bind_phase_agents` in
+- [X] T023 [US1] Record delivered skills per phase in `bind_phase_agents` in
       `src/surfaces/dispatch/phase_agents.py`: add
       `<pack>/agents/<phase>@<version>+<skill-name>` → digest for each `DeliveredSkill`.
       **No assembly here** — the surface resolves the pack name and records, nothing more
