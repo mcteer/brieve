@@ -68,8 +68,10 @@ Single project: `src/`, `tests/`, `infra/`, `packs/`, `specs/` at repository roo
 - [ ] T009 Add the per-run token to the manifest's `paths` declaration in `src/core/packs/manifest.py` and `packs/vault/pack.toml`, so `vault_policy_impact` declares `scratch-agent-{run_id}-*` rather than the estate-wide wildcard ([R4](research.md))
 - [ ] T010 Create `RecordedScope` in `src/core/authority/workspace.py` — `run_id`, `paths`, `derived_from` — and persist it where FR-011 can answer from it after the run
 - [ ] T011 Implement `remint_grant` so a re-mint **reproduces** the recorded scope and never re-derives it ([R5](research.md), FR-017)
+- [ ] T011a Build the row harness that obtains authority through the **real login path** a dispatched run uses, in `tests/conformance/authority/run_authority.py`. **Not `auth/token/create`**: a token minted from policy names has `entity_id: ""`, and under Branch A a templated policy then refuses everything including the run's own workspace — E1–E3 would pass while asserting nothing. Analysis caught this; measured 2026-08-27
 - [ ] T012 [P] Row A10 in `tests/unit/test_run_workspace.py` — no derived workspace contains a wildcard. **The row to keep if any are cut**: one surviving `*` passes every other row and grants exactly what this feature removes
 - [ ] T013 [P] Row A9 in `tests/unit/test_run_workspace.py` — the workspace derives from the manifest declaration, so a second place to say what a tool touches cannot appear
+- [ ] T013a [P] Row A8 in `tests/unit/test_write_grant_gating.py` — the `run_id_forged` guard still refuses (FR-007). **In Foundational, not Polish**: it brackets with T006, so a break anywhere in Phases 3–5 fails immediately rather than at the end
 - [ ] T014 [P] Rows A3 and A4 in `tests/unit/test_remint_stability.py` (**SC-009**) — a re-mint reproduces the recorded scope, and a **widened** re-mint is refused and detectable. A4 is the maintainer's hazard: a fresh grant derived differently would defeat this feature while appearing to work
 
 **Checkpoint**: a run's workspace can be derived, recorded, and re-presented without drift.
@@ -80,7 +82,10 @@ Single project: `src/`, `tests/`, `infra/`, `packs/`, `specs/` at repository roo
 
 **Goal**: A run's write authority names only its own workspace, via a per-allocation identity.
 
-**Independent test**: the three actions from T001, refused; the run's own workspace, reachable.
+**Independent test**, without Phase 4: the workspace derives with no wildcard (A10), a re-mint
+reproduces it (A3/A4), renewal follows the run's life (T022a), and a run with no declared write
+path gets no grant (A1). The live refusal is US2's — a story whose only test lives in another
+story cannot ship on its own.
 
 - [ ] T015a [US1] Point `user_claim` at the per-allocation claim for the `agent_run` role in `infra/modules/trust-fabric/auth.tf`, keeping the `bound_claims` glob intact
 - [ ] T016a [US1] Map the per-allocation claim into alias metadata via `claim_mappings` in the same role, so a templated policy can reach it
@@ -102,10 +107,11 @@ Single project: `src/`, `tests/`, `infra/`, `packs/`, `specs/` at repository roo
 - [ ] T020 [P] [US1] Row A1 in `tests/unit/test_write_grant_gating.py` (**SC-007**) — a run declaring no write path is manufactured no write grant at all
 - [ ] T021 [P] [US1] Row A2 in `tests/unit/test_write_grant_gating.py` — the decision reads requested tools, so authority never depends on model behaviour mid-run
 - [ ] T022 [US1] Implement renewal while the run is alive, stopping when it is not (FR-014)
+- [ ] T022a [P] [US1] Hermetic renewal row in `tests/unit/test_grant_renewal.py` — a grant renews while its run is alive and stops when it is not (FR-014). US1 must be verifiable inside its own phase; E9 confirms the same property live in Phase 4
 - [ ] T023 [US1] Confirm the sweeper's grant is untouched (FR-008) — `scratch_sweep` lists the namespace by design and `scratch_policy_check` carries no `list`
 - [ ] T024 [US1] Confirm no read path a run could reach before is refused after (FR-006). ADR-0057's argument is untouched and must not be narrowed by accident
 
-**Checkpoint**: US1 is independently verifiable — the grant names one run's workspace.
+**Checkpoint**: US1 is independently verifiable by its own hermetic rows. US2 then shows the estate agrees.
 
 ---
 
@@ -144,7 +150,6 @@ the attempt succeeds, and it fails if the attempt cannot be made.
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [ ] T038 Confirm FR-011 end to end — an auditor can say what a finished run's authority actually granted, from the recorded scope
-- [ ] T039 Row A8 in `tests/unit/test_write_grant_gating.py` — the `run_id_forged` guard still refuses. This feature adds a layer and does not replace one (FR-007)
 - [ ] T040 Update issue #226: close the structural half, or say precisely what remains. It was reopened once already because a PR closed it while the grant was unchanged
 - [ ] T041 Add the 054 row to `ROADMAP.md`'s shipped table, naming ADR-0057's fired trigger and which branch T003 chose
 - [ ] T042 Fill `contracts/conformance-run-scoped-write.md` §4 with the E1–E10 named-runner record

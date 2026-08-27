@@ -59,9 +59,10 @@ and can reach no other run's, because the authority it holds does not name them.
 failure. Principle IV describes authority manufactured per task; for the one write capability
 a run carries, it currently is not.
 
-**Independent Test**: Take a real run's authority and attempt the three actions above against
-a foreign path. Before: 200, 200, 204. After: refused, and the refusal observed rather than
-inferred.
+**Independent Test**, checkable inside this story: a derived workspace contains no wildcard, a
+re-mint reproduces it, and a run declaring no write path is manufactured no grant. The live
+refusal itself belongs to US2 — that separation is deliberate, because a story whose only test
+is another story's rows cannot ship on its own.
 
 **Acceptance Scenarios**:
 

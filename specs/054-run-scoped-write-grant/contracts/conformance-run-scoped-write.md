@@ -15,7 +15,7 @@ itself proves nothing about Vault's answer.
 | **E1** | A run-shaped authority attempting **read** on another run's workspace is refused, live | the estate-wide grant is still in force | FR-001, SC-001 |
 | **E2** | The same for **write** | as above | FR-001, SC-001 |
 | **E3** | The same for **delete** | as above | FR-001, SC-001 |
-| **E4** | The same authority **succeeds** on its own workspace | the narrowing went too far and the measurement is broken | FR-001, SC-002 |
+| **E4** | The same authority **succeeds** on its own workspace | the narrowing went too far, OR the row minted an authority with no identity and every refusal above is meaningless | FR-001, SC-002 |
 | **E5** | Removing the narrowing makes E1–E3 pass again | the refusal comes from something other than this feature | FR-004, SC-003 |
 | **E6** | A read a run could make before is still permitted | reads narrowed by accident | FR-006, SC-005 |
 | **E7** | The sweeper still lists the namespace | the run's narrowing narrowed the service role too | FR-008 |
@@ -23,9 +23,28 @@ itself proves nothing about Vault's answer.
 | **E9** | A Build outlasting one credential lifetime completes its measurement, and a grant whose run has ended stops renewing | expiry turns a slow Build into a failed one, or a credential outlives its work | **SC-008** |
 | **E10** | A resumed run reaches its own earlier workspace with a fresh credential | resumption either loses access to its own scratch policies or reuses a credential across the interruption | **FR-016** |
 
+**E9 and E10 test lifecycle rather than demonstrability**, and sit here because both need the
+live control plane and a real run authority — the same apparatus as E1–E8. Grouping them with
+the hermetic rows would mean building that apparatus twice.
+
 **E1–E3 replay the exact actions that returned 200, 200 and 204 on 2026-08-27.** Same shape as
 018's registry-isolation rows: a real attempt under a real run's authority, against the live
 control plane, with every refusal observed.
+
+**HOW the authority is obtained is part of the contract, and analysis caught this.** The
+defect was demonstrated with a token minted through `auth/token/create` carrying the run's
+policy names. **That method cannot verify Branch A.** Measured 2026-08-27: such a token has
+`entity_id: ""`, and a templated policy resolves against nothing and returns **403 on every
+path**. E1–E3 would pass because the token has no identity — not because the grant is narrow —
+and **E4 would fail**, since the same token cannot reach its own workspace either.
+
+So every row in this section MUST obtain authority through the **real login path** a dispatched
+run uses, not by minting a token from policy names. A row that mints its own authority is
+testing the row's construction, not the estate's.
+
+**E4 is what catches a violation of this**, which is why it is not optional: an authority that
+resolves to nothing refuses everything, and E1–E3 alone cannot tell that apart from a working
+bound.
 
 **E4 and E6 are not optional.** A grant that reaches nothing refuses everything, and would
 satisfy E1–E3 while breaking the product. E5 is the safety case being able to lose.

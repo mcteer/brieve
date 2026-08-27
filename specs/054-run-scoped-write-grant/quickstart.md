@@ -28,7 +28,14 @@ Then read, write and delete `sys/policies/acl/scratch-agent-<some-other-run>-cur
 **Clean up anything you seed** — the namespace is swept, but a leftover policy is noise in a
 store other rows read.
 
-After the fix, the same three attempts must be refused. That is rows E1–E3.
+**This method proves the defect and CANNOT prove the fix.** A token minted this way has
+`entity_id: ""`. If T003 chooses Branch A, the narrowing is a templated policy that resolves
+against an identity entity — so this token would be refused everything, including its own
+workspace, and a green E1–E3 would mean nothing. Rows obtain authority through the **real login
+path** instead; see the contract's §1.
+
+After the fix, the same three attempts must be refused **and** the run's own workspace must
+still be reachable. That is rows E1–E4 together.
 
 ## 2. Confirm R1 for yourself — why templating was rejected
 
