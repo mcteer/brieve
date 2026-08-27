@@ -97,7 +97,7 @@ same change.
 | [0038](0038-integration-uplift-workflows.md) | Integration and uplift work is a first-class workflow family | Accepted (pack-tool-target clause amended by [0064](0064-version-control-is-a-platform-capability.md)) |
 | [0039](0039-per-role-model-bindings.md) | Definitions pin per-role model bindings, not a single model | Accepted |
 | [0040](0040-deferred-tool-disclosure.md) | Tool and capability disclosure is deferred by default | Accepted (audit clause amended by [0061](0061-discovery-is-recorded-never-refused.md)) |
-| [0041](0041-code-mode-requires-hook-parity.md) | Code mode ships only with verified per-call hook parity | Accepted |
+| [0041](0041-code-mode-requires-hook-parity.md) | Code mode ships only with verified per-call hook parity | **Superseded** by [0065](0065-code-mode-is-decided-against.md) |
 | [0042](0042-duplicate-detection-and-precedent-cache.md) | Duplicate detection and precedent reuse — two mechanisms, neither skipping governance | Accepted |
 | [0043](0043-judge-screened-precedent-reuse.md) | Judge-screened precedent reuse, fail-closed on uncertainty | Accepted |
 | [0044](0044-authz-doctrine-and-credential-translation.md) | Authorization doctrine — two domains, entitlement mirroring, federate before broker | Accepted |
@@ -121,12 +121,12 @@ same change.
 | [0062](0062-authoring-credentials-are-vended-per-task.md) | The authoring credential is vended per task, and is Principle IV's third exception | Accepted |
 | [0063](0063-a-mechanical-scorer-may-qualify-a-cell.md) | A mechanical scorer over a human-authored reference may qualify a cell | Accepted |
 | [0064](0064-version-control-is-a-platform-capability.md) | Version control is a platform capability, not a pack tool target | Accepted |
-| [0065](0065-code-mode-is-decided-against.md) | Code mode is decided against, superseding [0041](0041-code-mode-requires-hook-parity.md) | Proposed |
+| [0065](0065-code-mode-is-decided-against.md) | Code mode is decided against, superseding [0041](0041-code-mode-requires-hook-parity.md) | Accepted |
 | [0066](0066-version-control-is-reached-through-adopted-clis.md) | Version control is reached through adopted CLIs, not an MCP server | Accepted |
-| [0067](0067-a-model-does-not-judge-its-own-output.md) | A model does not judge its own output | Proposed |
-| [0068](0068-impact-is-measured-by-the-product.md) | Impact is measured by the product, in a namespace reserved for measurement | Proposed |
-| [0069](0069-governance-configuration-is-requested-at-a-console.md) | Governance configuration is requested at a console and decided by the trust fabric | Proposed |
-| [0070](0070-endorsed-content-sync-is-an-egress-class.md) | Endorsed-content sync is an enumerated egress class, and customer content is pinned rather than fetched | Proposed |
+| [0067](0067-a-model-does-not-judge-its-own-output.md) | A model does not judge its own output | Accepted |
+| [0068](0068-impact-is-measured-by-the-product.md) | Impact is measured by the product, in a namespace reserved for measurement | Accepted |
+| [0069](0069-governance-configuration-is-requested-at-a-console.md) | Governance configuration is requested at a console and decided by the trust fabric | Accepted |
+| [0070](0070-endorsed-content-sync-is-an-egress-class.md) | Endorsed-content sync is an enumerated egress class, and customer content is pinned rather than fetched | Accepted |
 | [0071](0071-prompt-optimization-is-eval-lane-only.md) | Prompt-optimization libraries are eval-lane only | Accepted |
 
 ## Reviews

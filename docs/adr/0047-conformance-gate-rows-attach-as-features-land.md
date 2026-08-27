@@ -90,7 +90,7 @@ after it.
 **The Decision above assumes every row not yet in force traces to a deferring ADR.** It says
 a row whose feature has not landed is "absent from the suite, or present as a single explicit
 skip carrying the ADR reference that defers it." One row never fit that: registry isolation.
-It derives from Principle IV and [ADR-0025](0025-structural-exclusion-over-runtime-checks.md)'s
+It derives from Principle IV and [ADR-0025](0025-enclave-is-the-default-topology.md)'s
 structural-exclusion rule, and neither of those defers it. Nothing chose to postpone it; no
 feature had yet existed that could carry it.
 
@@ -121,7 +121,7 @@ already rejects — cite something adjacent, or stub the row green.
 original Decision did not distinguish. Every row in force stays in force; the obligation that
 adding a feature adds its rows in the same change is untouched; a passing stub is still
 forbidden in both states. The Decision is left intact above — this record is append-only, the
-shape [ADR-0048](0048-conformance-gates-bind-to-the-deployed-artifact.md) set earlier the same
+shape [ADR-0048](0048-nomad-is-the-agent-execution-substrate.md) set earlier the same
 day.
 
 **Registry isolation was the second state and is now in force**, carried by 018 against the

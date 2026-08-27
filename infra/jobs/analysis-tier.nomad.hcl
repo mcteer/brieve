@@ -25,6 +25,18 @@ variable "cni_bridge" {
 }
 
 job "analysis-tier" {
+  # 017's deployment lane. Every job definition must be a declared subject or an
+  # explicitly excluded one — coverage a process opts into is fail-open, and the
+  # process nobody remembered to enrol is exactly the one nobody remembered to cover.
+  #
+  # 037's hardened untrusted-content isolation tier. Dispatched per analysis, so the
+  # deployment lane does not stand it up; the intake rows drive it.
+  meta {
+    harness_surface     = "true"
+    harness_shape       = "dispatched"
+    harness_covered_by  = "tests/conformance/intake/"
+    harness_lane_starts = "false"
+  }
   type        = "batch"
   datacenters = ["dc1"]
 

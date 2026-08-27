@@ -2,7 +2,7 @@
 
 - **Status**: Accepted (2026-07-29, decided by `specs/013-capability-packs`)
 - **Date**: 2026-07-29
-- **Relates to**: [ADR-0022](0022-models-ship-as-a-qualified-model-matrix.md), [ADR-0039](0039-per-role-model-bindings.md), [ADR-0004](0004-skills-are-an-adopted-pinned-supply-chain.md)
+- **Relates to**: [ADR-0022](0022-qualified-model-matrix.md), [ADR-0039](0039-per-role-model-bindings.md), [ADR-0004](0004-adopt-skills-as-governed-supply-chain.md)
 - **Requirements**: R6 (eval-gated promotion), R4 (evidence over claims)
 
 ## Context

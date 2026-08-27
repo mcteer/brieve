@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-08-07
-- **Relates to**: [ADR-0064](0064-version-control-is-a-platform-capability.md) (what the capability *is*; this records how it is *reached*), [ADR-0038](0038-integration-uplift-workflows.md), [ADR-0062](0062-authoring-credentials-are-vended-per-task.md), [ADR-0001](0001-build-glue-only.md)
+- **Relates to**: [ADR-0064](0064-version-control-is-a-platform-capability.md) (what the capability *is*; this records how it is *reached*), [ADR-0038](0038-integration-uplift-workflows.md), [ADR-0062](0062-authoring-credentials-are-vended-per-task.md), [ADR-0001](0001-framework-agnostic-core.md)
 - **Requirements**: R5, R11, R12
 
 ## Context

@@ -1,6 +1,6 @@
 # ADR-0070: Endorsed-content sync is an enumerated egress class, and customer content is pinned rather than fetched
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-08-27, decided by `specs/045-customer-endorsed-context`)
 - **Date**: 2026-08-07
 - **Amends**: [ADR-0030](0030-pinned-versus-consulted-artifacts.md) (names the one class of consulted material that is *not* fetched fresh, and why)
 - **Relates to**: [ADR-0004](0004-adopt-skills-as-governed-supply-chain.md), [ADR-0021](0021-connectivity-tiers.md), [ADR-0046](0046-multi-tenancy.md), [ADR-0066](0066-version-control-is-reached-through-adopted-clis.md), [ADR-0069](0069-governance-configuration-is-requested-at-a-console.md)

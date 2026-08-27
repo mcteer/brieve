@@ -706,15 +706,33 @@ ADR — never a passing stub.**
 
 ## Open records
 
-One ADR remains **Proposed** and is expected to resolve rather than linger. It does not block the
-sequence above, but a Proposed record that quietly becomes permanent is a failure of the process
-([`docs/adr/README.md`](docs/adr/README.md)).
+**One ADR remains Proposed**, and it is the only one open for a reason that still holds.
 
-- **ADR-0054** — model-written orchestration, per-call and per-delegation parity. Left Proposed
-  by [036](specs/036-deferred-disclosure-code-mode/spec.md) **on purpose**: its per-call half was
-  realized and its delegation half has no substrate to govern, because the orchestration package
-  still carries an `experimental` import segment and its durable-workflows extension has not
-  landed. Governing an object that cannot yet be invoked would be a rule nothing exercises.
+**The other five were accepted on 2026-08-27** — ADR-0065 (036), ADR-0067 (043), ADR-0068 (042),
+ADR-0069 (044) and ADR-0070 (045). Each had governed a shipped feature while still Proposed,
+because nothing carried it to acceptance when its feature landed. **ADR-0065's acceptance is the
+one that closes a real gap**: ADR-0041 has read "Superseded by ADR-0065" since it was written, so
+a shipped supersession had been resting on an unaccepted record. The index in
+[`docs/adr/README.md`](docs/adr/README.md) had it as Accepted throughout, in the fourth place a
+status lives.
+
+**This section claimed "one" while six were open**, which is the staleness its own closing
+paragraph warns about — the third recurrence. It is now asserted rather than written:
+`tests/unit/test_the_decision_record_resolves.py` fails if the set named here stops matching the
+set whose Status reads Proposed, in either direction and in either document.
+
+- **ADR-0054**, in full — model-written orchestration, per-call and per-delegation parity. Left
+  Proposed by [036](specs/036-deferred-disclosure-code-mode/spec.md) **on purpose**: its per-call
+  half was realized and its delegation half has no substrate to govern, because the orchestration
+  package still carries an `experimental` import segment and its durable-workflows extension has
+  not landed. Governing an object that cannot yet be invoked would be a rule nothing exercises.
+
+**ADR-0069 carries an unsourced citation.** Its `Amends:` names ADR-0026 and quotes it directly —
+*"where a model is reachable from is assembly while which model is permitted is governance."* That
+sentence appears in no ADR but 0069 itself, and ADR-0026 is *Long-running execution — delegation
+grants, per-step tokens*, which is not about model reachability. Accepting the record does not
+resolve this; the link is left broken and named in the row above, so repairing it requires
+establishing what was meant rather than guessing.
 
 **ADR-0011 resolved on 2026-08-05** (Accepted, on basis (2) — the dependency was withdrawn after
 examination rather than inherited). It had been the entry here since 2026-08-01, and this section

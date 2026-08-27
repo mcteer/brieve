@@ -1,6 +1,6 @@
 # ADR-0067: A model does not judge its own output
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-08-27, decided by `specs/043-grounded-means-relevant`)
 - **Date**: 2026-08-07
 - **Amends**: [ADR-0052](0052-the-first-judge-is-qualified-by-a-human-labeled-seed-set.md) (adds a constraint on *which* model may judge; the seed-rooted regress is unchanged)
 - **Relates to**: [ADR-0022](0022-qualified-model-matrix.md), [ADR-0039](0039-per-role-model-bindings.md), [ADR-0063](0063-a-mechanical-scorer-may-qualify-a-cell.md)

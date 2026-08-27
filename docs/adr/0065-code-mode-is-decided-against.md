@@ -1,9 +1,9 @@
 # ADR-0065: Code mode is decided against
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-08-27, decided by `specs/036-deferred-disclosure-code-mode`)
 - **Date**: 2026-08-06
 - **Supersedes**: ADR-0041
-- **Relates to**: [ADR-0040](0040-deferred-tool-disclosure.md), [ADR-0038](0038-integration-uplift.md), [ADR-0064](0064-version-control-is-a-platform-capability.md)
+- **Relates to**: [ADR-0040](0040-deferred-tool-disclosure.md), [ADR-0038](0038-integration-uplift-workflows.md), [ADR-0064](0064-version-control-is-a-platform-capability.md)
 - **Requirements**: R5, R11, R12
 
 ## Context

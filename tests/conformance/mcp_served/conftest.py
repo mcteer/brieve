@@ -23,14 +23,23 @@ import pytest
 
 from tests.conformance.mcp_served import surfaces
 
+#: The allocation the first row in this session saw. Kept only so a REPLACEMENT can be named.
+_FIRST_SEEN: list[str] = []
 
-@pytest.fixture(scope="session")
+
+@pytest.fixture
 def running_surface() -> str:
     """The allocation, or a failure that says the surface is absent rather than refusing.
 
     'Nothing replied' and 'the surface refused' are different findings and the second is the
     only interesting one. A fixture that let an absent surface read as a denial would make
     every refusal row in this directory satisfiable by the platform being down.
+
+    **Resolved per row, not per session.** It was session-scoped, and the allocation id is not
+    stable for a session's lifetime: anything that restarts `mcp-surface` mid-run — another
+    lane, an operator, Nomad rescheduling — replaces it, and every row still holding the old id
+    fails at once. That presented as seven unrelated failures in a full-suite run and none in a
+    repeat, which reads as flake and is not: the surface really had moved.
     """
     alloc = surfaces.allocation()
     if alloc is None:
@@ -40,10 +49,21 @@ def running_surface() -> str:
             "`make mcp-surface-up`, or run the whole lane with "
             "`bash infra/bin/mcp-surface-conformance`."
         )
+    # A replacement is REPORTED rather than absorbed. Re-resolving keeps the rows correct; a
+    # silent re-resolve would also hide a surface that is restart-looping, which is a finding.
+    if not _FIRST_SEEN:
+        _FIRST_SEEN.append(alloc)
+    elif alloc != _FIRST_SEEN[0]:
+        print(
+            f"\nmcp-surface was replaced mid-run: {_FIRST_SEEN[0]} -> {alloc}. Rows continue "
+            f"against the live allocation; if this repeats, the surface is restart-looping.",
+            flush=True,
+        )
+        _FIRST_SEEN[0] = alloc
     return alloc
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def caller(running_surface: str) -> str:
     """A real bearer token for an ordinary caller, from the provider the surface trusts."""
     # `permissions: platform:operator` is what the deployed claim mapping grants. A token
@@ -54,7 +74,7 @@ def caller(running_surface: str) -> str:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def other_caller(running_surface: str) -> str:
     """A second, different person — so FR-011 can assert they are DISTINGUISHABLE.
 

@@ -17,6 +17,18 @@
 # form: stage 5 needs a place to execute a presumed-hostile candidate where it can do nothing,
 # and a place is not a library.
 job "detonation-range" {
+  # 017's deployment lane. Every job definition must be a declared subject or an
+  # explicitly excluded one — coverage a process opts into is fail-open, and the
+  # process nobody remembered to enrol is exactly the one nobody remembered to cover.
+  #
+  # 037's detonation range. Dispatched per candidate — the lane does not stand it up,
+  # and `test_detonation.py` is what drives and asserts it.
+  meta {
+    harness_surface     = "true"
+    harness_shape       = "dispatched"
+    harness_covered_by  = "tests/conformance/intake/test_detonation.py"
+    harness_lane_starts = "false"
+  }
   type        = "batch"
   datacenters = ["dc1"]
 
