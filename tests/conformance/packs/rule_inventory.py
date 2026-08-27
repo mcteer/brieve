@@ -35,9 +35,10 @@ ROOT = Path(__file__).resolve().parents[3]
 #:
 #: Machine-readable so the gate can tell an override from a restatement, and readable so the
 #: disagreement is visible on the page rather than resolved silently by 051's precedence rule
-#: at runtime.
+#: at runtime. Leading whitespace is allowed: a blockquote nested inside a list item is
+#: legitimate markdown, and the Plan card needs one there.
 OVERRIDE_MARKER = re.compile(
-    r"^>\s*\*\*Overrides `(?P<rule>[a-z0-9_]+)`\*\*:\s*(?P<reason>\S.*)$", re.MULTILINE
+    r"^[ \t]*>\s*\*\*Overrides `(?P<rule>[a-z0-9_]+)`\*\*:\s*(?P<reason>\S.*)$", re.MULTILINE
 )
 
 
@@ -86,6 +87,25 @@ def prose_lines(text: str) -> list[tuple[int, str]]:
     return out
 
 
+def unfenced(text: str) -> list[str]:
+    """Every line outside a fenced code block, headings included.
+
+    The invariant a stated rule must satisfy: said, not merely shown. `prose_lines` is
+    narrower and exists for the 64-of-314 measurement; this is what membership is judged on,
+    because the guide states "Prefer for_each over count" as a heading and that is an
+    instruction whatever its markdown level.
+    """
+    out: list[str] = []
+    fenced = False
+    for line in text.splitlines():
+        if line.startswith("```"):
+            fenced = not fenced
+            continue
+        if not fenced and line.strip():
+            out.append(line.strip())
+    return out
+
+
 def verify_inventory(inventory: Inventory, skill_text: str) -> list[str]:
     """Rule ids whose `quote` is NOT in the skill's prose. Empty means the inventory is honest.
 
@@ -93,8 +113,8 @@ def verify_inventory(inventory: Inventory, skill_text: str) -> list[str]:
     the guide only shows in an example, or does not say at all, would widen what counts as
     delegated practice — and a card could then delete a rule nothing supplies.
     """
-    prose = "\n".join(text for _, text in prose_lines(skill_text))
-    return [rule.id for rule in inventory.rules if rule.quote not in prose]
+    stated = "\n".join(unfenced(skill_text))
+    return [rule.id for rule in inventory.rules if rule.quote not in stated]
 
 
 def declared_overrides(card_text: str) -> dict[str, str]:
@@ -116,6 +136,9 @@ def compare_card(card_text: str, inventory: Inventory) -> list[str]:
     """
     overrides = declared_overrides(card_text)
     body = OVERRIDE_MARKER.sub("", card_text)
+    # Collapsed to one line: a rule wrapped across a line break is the same rule, and a card
+    # must not be able to evade the gate by reflowing a paragraph.
+    body = re.sub(r"\s+", " ", body)
     restated: list[str] = []
     for rule in inventory.rules:
         if rule.id in overrides:
@@ -181,10 +204,13 @@ TERRAFORM_STYLE = Inventory(
             (r"dependency order",),
             18,
         ),
+        # `r"output if a later phase"` was here and had to go: it matched a parenthetical
+        # inside the card's Vault-wiring guidance, which applies the idea rather than stating
+        # the rule. The general form lived in §Order of authorship and is now delegated.
         StatedRule(
             "outputs_for_key_attributes",
             "Add outputs for key resource attributes",
-            (r"outputs? for key", r"output if a later phase"),
+            (r"outputs? for key", r"^\s*\d\.\s*outputs? for"),
             19,
         ),
         StatedRule(
@@ -197,8 +223,11 @@ TERRAFORM_STYLE = Inventory(
             "standard_file_set",
             "| `locals.tf` | Local value declarations |",
             (
-                r"`variables\.tf`.*`outputs\.tf`",
-                r"usual files:",
+                # The canonical FILE SET, not any mention of two of its members. Naming
+                # `variables.tf` and `outputs.tf` while deciding which files a slice needs
+                # is a planning decision; enumerating the set is the restatement.
+                r"(?:`(?:terraform|versions|providers|main|variables|outputs|locals)\.tf`"
+                r"(?: |,|/|or)*){3,}",
             ),
             31,
         ),
@@ -225,6 +254,12 @@ TERRAFORM_STYLE = Inventory(
             "- Align equals signs for consecutive arguments",
             (r"align.{0,12}equals",),
             89,
+        ),
+        StatedRule(
+            "for_each_over_count",
+            "### Prefer for_each over count",
+            (r"`for_each`.{0,40}over `count`", r"`for_each` for a named set", r"prefer `for_each`"),
+            191,
         ),
         StatedRule(
             "arguments_before_blocks",
@@ -296,7 +331,7 @@ TERRAFORM_STYLE = Inventory(
         StatedRule(
             "never_commit_state",
             "- `terraform.tfstate`, `terraform.tfstate.backup`",
-            (r"no `terraform\.tfstate`", r"never commit.{0,40}tfstate"),
+            (r"no `terraform\.tfstate`", r"never.{0,24}commit.{0,40}tfstate"),
             277,
         ),
         StatedRule(

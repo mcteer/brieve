@@ -302,28 +302,32 @@ PROBE_COUNTS = {"write": 16, "judge": 7, "plan": 6}
 
 
 #: T009b — the DERIVED baselines: every card measured against the same inventory, so the three
-#: figures finally share a denominator. These are the pre-feature numbers, computed from the
-#: frozen text above, and they are what rows A0/A4 reproduce.
+#: figures finally share a denominator. Computed from the frozen text above; rows A0/A4
+#: reproduce them.
 #:
-#: `PROBE_COUNTS` above said 16 / 7 / 6. Those came from a hand-built subset with two different
-#: denominators and are kept only to show what the spec was corrected away from.
+#: `PROBE_COUNTS` said 16 / 7 / 6, from a hand-built subset with two different denominators.
+#: Kept only to show what the spec was corrected away from — and the derived figures are
+#: HIGHER, because reading the edited cards for coherence found two rules the first patterns
+#: missed: the guide states "Prefer for_each over count" as a heading, and Plan evaded the
+#: state-file rule by writing "never plan to commit" rather than "never commit".
 DERIVED_BASELINES = {
-    "write": 17,
+    "write": 18,
     "judge": 13,
-    "plan": 6,
+    "plan": 8,
 }
 
-#: Which rules each card restated before 053, by id — so a failure names the rule rather than
-#: a count, and so a partial delegation is visible as the specific rules left behind.
+#: Which rules each card restated before 053, by id — so a failure names the rule rather
+#: than a count, and a partial delegation shows as the specific rules left behind.
 PRE_053_RESTATED = {
     "write": (
+        "generation_starts_with_versions",
         "data_sources_before_dependents",
         "resources_in_dependency_order",
-        "outputs_for_key_attributes",
         "standard_file_set",
         "variables_alphabetical",
         "two_space_indent",
         "align_equals",
+        "for_each_over_count",
         "lowercase_with_underscores",
         "resource_names_singular",
         "main_when_redundant",
@@ -351,11 +355,13 @@ PRE_053_RESTATED = {
         "no_hardcoded_credentials",
     ),
     "plan": (
-        "standard_file_set",
+        "generation_starts_with_versions",
         "two_space_indent",
+        "for_each_over_count",
         "arguments_before_blocks",
         "lowercase_with_underscores",
         "resource_names_singular",
+        "never_commit_state",
         "always_commit_lock_file",
     ),
 }

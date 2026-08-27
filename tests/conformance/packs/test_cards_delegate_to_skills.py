@@ -27,6 +27,7 @@ import pytest
 from tests.conformance.packs.rule_inventory import (
     INVENTORIES,
     TERRAFORM_STYLE,
+    Inventory,
     prose_lines,
     verify_inventory,
 )
@@ -42,8 +43,8 @@ def _card(pack: str, phase: str) -> str:
     return (ROOT / "packs" / pack / "agents" / phase / "AGENTS.md").read_text(encoding="utf-8")
 
 
-def _skill(inventory: object) -> str:
-    return (ROOT / inventory.path).read_text(encoding="utf-8")  # type: ignore[attr-defined]
+def _skill(inventory: Inventory) -> str:
+    return (ROOT / inventory.path).read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------- A3: what counts as a rule
