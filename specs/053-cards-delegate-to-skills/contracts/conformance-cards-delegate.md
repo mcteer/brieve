@@ -93,9 +93,46 @@ To be filled on `feat/053-cards-delegate-to-skills`.
 
 | Row | Named runner | Status |
 | --- | --- | --- |
-| E1 | — | pending |
-| E2 | — | pending |
-| E3 | — | pending |
+| E1 | — | **Pass, 2026-08-27.** Both suites over assembled content; all five terraform phases promoted together at v0.4.0. `promote_terraform_053.py` |
+| E2 | — | **Run 2026-08-27: NOT DEMONSTRATED, and this time the arms were valid.** See below |
+| E3 | — | **Pass, 2026-08-27.** Hermetic conformance 951 passed; `no_floating_version_constraint` unaffected — §Pins is retained in all three cards as a declared override |
+
+### E2 — the measurement this feature existed to make possible
+
+Run 2026-08-27, n=5 per arm, `standard_file_organisation` on
+`module_with_inputs_and_outputs`. Bound instruction 17,740 bytes, unbound 5,590.
+
+| Arm | Result |
+| --- | --- |
+| Bound (card + both skills) | **5/5** |
+| Unbound (card only) | **5/5** |
+| Delta | **+0** |
+
+**What is different from 051's null result.** That one was invalid: both rules were drawn from
+the guide's example code, so the guide never taught them and no delta was possible. This one is
+valid — the rule is stated in the guide's prose, twice; the card no longer states it; and the
+two arms are genuinely different instructions for the first time. The measurement worked. The
+answer is that **the qualified model already organises files correctly without being told.**
+
+Under the spec's own bar — *"a rule the model already follows without the skill cannot serve as
+evidence"* — this rule cannot carry SC-002 either. The finding is recorded rather than chased,
+per §2: no fourth rule was sought and no threshold moved.
+
+**A confound, named because it limits what the result means.** The unbound arm is not free of
+the topic. A delegating card must say what it delegates, so the Write card reads *"Follow the
+delivered guide's Code Generation Strategy and File Organization"* — which names the subject
+without giving the rule. In the unbound arm that is a pointer to absent content, a state
+production never reaches because delivery is fail-closed. The model may have been cued by the
+pointer even though the rule itself was absent.
+
+**And that generalises, which is the more useful finding.** *Any* delegated rule has this
+property: delegation is only legible if the card names what it delegates, so a card-only arm
+always carries the topic. **SC-002 as written may be unmeasurable by construction for delegated
+rules** — not because delivery does not work, but because the experiment's control cannot be
+made clean without testing a card that does not ship.
+
+That is a question about the success criterion, not about this feature, and it is recorded for
+051's amendment rather than resolved here.
 
 ## 6. Security-maintainer review
 

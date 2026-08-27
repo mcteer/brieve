@@ -70,6 +70,9 @@ already in the model or not reached by the task.
   author when what the task names is genuinely absent"), and the precedence rule this feature
   added says the card governs on conflict. Stylistic guidance the task did not ask for
   appears to lose to that, which is a design tension worth its own look.
+  **WITHDRAWN 2026-08-27 by 053** — see the Amendment above. The premise was false: the guide
+  states no tagging instruction anywhere, so nothing stylistic was delivered for the card's
+  minimality to lose to.
 
 **What this does and does not put in question.** Delivery is proven byte-for-byte by rows
 A1–A21 and E1: the model receives the skill, verified at the moment it receives it, and the
@@ -81,6 +84,46 @@ result for a reason. The next moves, in order of honesty: find a rule the skill 
 the card does not and the model does not already follow; or re-run when the pinned model
 changes; or accept that these two particular skills duplicate what the model and card already
 carry, and record that as the finding it is.
+
+### Amendment — 2026-08-27, by 053
+
+**Both measured rules were invalid, and the reason is structural.** `variable_has_validation`
+and `tags_are_shared_not_ad_hoc` were selected from the guide's **example code**, not from its
+stated instruction. Measured hermetically: every occurrence of "tag" in
+`terraform-style-guide/SKILL.md` sits inside a fenced code block, and so does every
+`validation`. The guide never instructs either, so delivering it could not teach either, and no
+delta was possible in either arm. The null result was an artefact of the selection.
+
+**The minimality hypothesis is WITHDRAWN.** The paragraph below reasoned that the Write card's
+minimality clause suppressed delivered stylistic guidance on tagging, and called it a design
+tension worth its own look. It rested on a false premise: no tagging instruction was ever
+delivered, so there was nothing for minimality to suppress. Nothing about the card's
+minimality is implicated by that arm, and no further investigation of it is owed.
+
+**The duplication finding below was worse than R7 recorded.** R7 said the phase files "already
+restate most of `SKILL.md` by hand". Measured against a derived inventory: the Write card
+restated **eighteen** of the guide's stated rules, Judge thirteen, Plan eight. Removing the
+binding entirely would have left every one of them in force, so SC-002 was unmeasurable by
+construction whatever the model did.
+
+**053 fixed that and re-measured.** All three cards now delegate, with three declared
+overrides. On `standard_file_organisation` — stated twice in the guide's prose, and no longer
+in any card — the arms were finally different instructions: 17,740 bytes bound against 5,590.
+The result was **5/5 and 5/5, delta +0**. This time the measurement was valid and the answer is
+that the qualified model already follows the rule unaided, which the criterion's own bar
+excludes as evidence.
+
+**SC-002 may be unmeasurable by construction for a delegated rule**, and that is the open
+question this leaves. A delegating card has to name what it delegates or the delegation is
+illegible, so a card-only arm always carries the rule's *subject* even when it lacks the rule.
+The control cannot be made clean without testing a card that does not ship. Whether SC-002
+should be restated to compare *outputs under absent delivery* — which is fail-closed, so the
+run refuses rather than authoring — or retired in favour of the delivery guarantee rows A1–A21
+already provide, is a question for whoever revisits it, and is deliberately left open rather
+than answered by the feature that found it.
+
+**Status of SC-002: NOT MET, and now known to be unmet for a reason no further rule search can
+resolve.** Two measurements, three arms, one corrected selection. Do not choose a fourth rule.
 
 ### Why the rule was chosen the way it was
 

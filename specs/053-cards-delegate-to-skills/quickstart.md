@@ -118,4 +118,7 @@ A card edit may not ship on the strength of the eval that qualified the previous
 - §Pins retained and **saying what it overrides and why**
 - 051's SC-002 contract amended with the withdrawal and the selection error
 - SC-002 either met on a stated rule, or recorded as unmeetable with the measurement
-- `git diff --stat src/` empty
+- `git diff --stat src/` empty — confirmed: 053 touched `packs/`, `tests/`, `evals/` and
+  `specs/` only
+- Run records unchanged (FR-011): no `content_pins` key, payload shape or audit field is
+  touched. This feature changed what a card says, never what the record reports
