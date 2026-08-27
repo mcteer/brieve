@@ -276,3 +276,83 @@ def test_the_write_card_does_not_teach_tagging() -> None:
         "the Write card now mentions tagging, so removing the binding would no longer change "
         "the output and SC-002 measures nothing. Pick a different rule."
     )
+
+
+# --------------------------------------------------------- 053: the SC-002 candidate
+
+#: One `main.tf` holding the resource, its variables and its outputs. Valid Terraform that
+#: `terraform validate` accepts, and exactly what a model produces when nothing tells it where
+#: declarations belong. `single_file_module` in the corpus is this shape.
+PILED_INTO_MAIN = {
+    "main.tf": """
+variable "bucket_name" {
+  type        = string
+  description = "Name of the artifact bucket"
+}
+
+variable "environment" {
+  type        = string
+  description = "Deployment environment"
+}
+
+resource "aws_s3_bucket" "main" {
+  bucket = var.bucket_name
+}
+
+output "bucket_arn" {
+  description = "ARN of the bucket"
+  value       = aws_s3_bucket.main.arn
+}
+"""
+}
+
+#: The same module, organised as the guide's File Organization table says.
+ORGANISED = {
+    "variables.tf": 'variable "bucket_name" {\n  type = string\n}\n',
+    "main.tf": 'resource "aws_s3_bucket" "main" {\n  bucket = var.bucket_name\n}\n',
+    "outputs.tf": 'output "bucket_arn" {\n  value = aws_s3_bucket.main.arn\n}\n',
+}
+
+
+def test_the_organisation_detector_fails_the_single_file_module() -> None:
+    """THE ROW THAT MAKES 053's SC-002 CANDIDATE WORTH MEASURING.
+
+    Following `static_credential_lookalike`: a detector that cannot fail has measured nothing,
+    and the corpus supplies the falsifying case rather than a fixture invented here.
+
+    This matters more than usual. 051's SC-002 came back level twice because both rules were
+    drawn from the guide's example code — content it shows but never instructs. File
+    organisation is stated in prose, twice, and 053 delegated it out of all three cards, so it
+    now reaches a phase only by delivery. If the detector could not tell the two shapes apart,
+    the replacement measurement would be as empty as the one it replaces.
+    """
+    assert "standard_file_organisation" not in detect(PILED_INTO_MAIN)
+    assert "standard_file_organisation" in detect(ORGANISED)
+
+
+def test_the_corpus_case_scores_the_way_the_detector_does() -> None:
+    """End to end through the real scorer, as `static_credential_lookalike` does."""
+    from pathlib import Path
+
+    from core.evals.authoring_corpus import load_corpus
+    from core.evals.authoring_scoring import score_reference
+
+    corpus = load_corpus(
+        Path(__file__).resolve().parents[2] / "evals" / "authoring" / "corpus.toml"
+    )
+    task = next(t for t in corpus.golden if t.name == "single_file_module")
+
+    assert not score_reference(task, detect(PILED_INTO_MAIN))
+    assert score_reference(task, detect(ORGANISED))
+
+
+def test_an_artefact_that_declares_nothing_placeable_is_not_organised() -> None:
+    """The property must not be vacuously true.
+
+    A one-line resource change places no variable, output, local or provider. Scoring it
+    `organised` would let a task that never exercises the rule report that the rule was
+    followed — and SC-002 would measure the corpus rather than the skill.
+    """
+    assert "standard_file_organisation" not in detect(
+        {"main.tf": 'resource "aws_s3_bucket" "main" {\n  bucket = "x"\n}\n'}
+    )

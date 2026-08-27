@@ -9,6 +9,11 @@ same subject, same model, same everything but the bytes under test.
 invocation, so a 5-and-5 comparison costs seventy model calls to learn something ten answer.
 This is the measurement, isolated, so it is cheap enough to re-run when somebody doubts it.
 
+**A level result is still a real answer, and 053 narrowed what may be done about it.** Two
+outcomes are acceptable: demonstrated, or recorded as a finding that this skill has no
+teachable surface for the qualified model. What may not happen is a further search for a rule
+that scores better — that search is what produced the invalid arms in the first place.
+
 **What a null result means.** SC-002 says the rule must be followed with the binding and
 *demonstrably less often* without it — a rule the model already follows is not evidence the
 skill did anything. A run that comes back level is a real answer about the rule, not a
@@ -44,8 +49,18 @@ CORPUS = ROOT / "evals" / "authoring" / "corpus.toml"
 PACKS = ROOT / "packs"
 
 #: The rule under test, and the task that asks for the situation it applies to.
-PROPERTY = "tags_are_shared_not_ad_hoc"
-TASK = "tagged_artifact_bucket"
+#:
+#: **Changed by 053, and the reason is the whole point of that feature.** The two rules measured
+#: on 2026-08-27 — `variable_has_validation` and `tags_are_shared_not_ad_hoc` — were both drawn
+#: from the guide's EXAMPLE CODE. Every occurrence of "tag" in `terraform-style-guide/SKILL.md`
+#: sits inside a fenced block, and so does every `validation`. The guide never instructs either,
+#: so delivering it could not teach either, and both arms came back level.
+#:
+#: File organisation is stated in prose, twice, and 053 delegated it out of all three phase
+#: cards — so it now reaches a phase only by delivery. That is what makes the two arms genuinely
+#: different instructions for the first time.
+PROPERTY = "standard_file_organisation"
+TASK = "module_with_inputs_and_outputs"
 
 
 def _arms() -> dict[str, str]:

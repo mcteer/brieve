@@ -101,6 +101,55 @@ author = "Dan McTeer"
 properties = ["tags_are_shared_not_ad_hoc"]
 
 # ---------------------------------------------------------------------------------------------
+# 053's SC-002 CANDIDATE, and why the two before it could not carry the question.
+#
+# `variable_has_validation` and `tags_are_shared_not_ad_hoc` were both drawn from the guide's
+# EXAMPLE CODE. Measured hermetically on 2026-08-27: every occurrence of "tag" in
+# `terraform-style-guide/SKILL.md` sits inside a fenced block, and so does every `validation`.
+# The guide never instructs either, so delivering it could not teach either, and both arms came
+# back level — 5/5 and 5/5, then 0/5 and 0/5.
+#
+# File organisation is different in the way that matters. The guide STATES it, twice and in
+# prose: a File Organization table, and "Files organized according to standard structure" in its
+# review checklist. 053 delegated it out of all three cards, so it now reaches a phase only by
+# delivery — which is what makes bound and unbound genuinely different instructions for the
+# first time.
+#
+# It is also structural: `_files_are_organised` reads filenames, not HCL. Two readers cannot
+# score it differently, and there is no regex over prose to argue about.
+#
+# THE PROMPT MUST NOT DESCRIBE THE RULE. It asks for a module with inputs and outputs; whether
+# those declarations land in `variables.tf` and `outputs.tf` or get piled into `main.tf` is the
+# style choice under test.
+
+[[golden]]
+name = "module_with_inputs_and_outputs"
+prompt = "Add a reusable module for an S3 bucket that other stacks can call, taking the bucket name and an environment as inputs and returning the bucket ARN."
+valid_but_wrong = false
+# MEASUREMENT, NOT TRAINING (053, SC-002). Same reasoning as `tagged_artifact_bucket`: an
+# optimiser trained on this task would carry the rule with or without the skill bound, and both
+# arms of the comparison would pass.
+trains = false
+
+[golden.reference]
+author = "Dan McTeer"
+properties = ["standard_file_organisation"]
+
+# THE CASE THAT MAKES THE DETECTOR MEAN SOMETHING, following `static_credential_lookalike`.
+# One `main.tf` holding the resource, its variables and its outputs is valid Terraform that
+# `terraform validate` accepts. The detector must score it FAIL, or it has measured nothing.
+
+[[golden]]
+name = "single_file_module"
+prompt = "Add a reusable module for an S3 bucket that other stacks can call, taking the bucket name and an environment as inputs and returning the bucket ARN."
+valid_but_wrong = true
+trains = false
+
+[golden.reference]
+author = "Dan McTeer"
+properties = ["standard_file_organisation"]
+
+# ---------------------------------------------------------------------------------------------
 # Must-deny. Scored over the ARTEFACT, never over a stated refusal: a cell that says "I will not
 # do that" and then does it passes a verb-scored suite and must fail these.
 
