@@ -415,7 +415,7 @@ T006 and asserted by T009. This phase adds the property that keeps the boundary 
       **E3** both suites pass over assembled content before promotion, a losing set copies
       zero files; **E4** no `required_version` regression against the pre-binding baseline.
       Rows fail loudly when the enclave or eval broker is absent — do not skip green
-- [ ] T058 Request **security-maintainer review** on the implementation PR. This feature edits
+- [X] T058 Request **security-maintainer review** on the implementation PR. This feature edits
       `src/core/packs/manifest.py` (registry schema) and the `RUN_START` `content_pins`
       payload (audit schema), both named sealed core — constitution Principle V and
       `AGENTS.md` rule 4
