@@ -64,44 +64,90 @@ name    = "terraform-style-guide"
 path    = "skills/terraform-style-guide/SKILL.md"
 version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
 digest  = "fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d41762120059c49540c2"
+# Reviewed against these exact bytes (051, FR-019). A bump changes `digest`; leaving
+# this behind refuses the load, so nobody can bump the content without re-reading what
+# it now recommends that this platform has no registry tool for.
+unsatisfiable_reviewed_at = "fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d41762120059c49540c2"
+# BOUND TO PLAN, WRITE AND JUDGE (051, FR-012).
+#
+# Plan is bound because its output is Write's instruction. The paths and intent Plan names
+# are what Write then works from, so a plan formed without the skills can direct Write toward
+# something the skills would not sanction — and Write receiving them does not undo a
+# direction it was told to take. This is not about what Plan emits; Plan emits no HCL.
+#
+# Research and Propose are not bound, and their prose no longer claims otherwise.
+phases = ["plan", "write", "judge"]
+
+# WHAT THIS SKILL RECOMMENDS THAT NO REGISTRY TOOL CAN DO (051, FR-015).
+#
+# SKILL.md's "Validation Tools" section says to run these before committing. Neither is a
+# registry tool, so the authoring agent cannot run them on the branch it is proposing, and
+# the pull request says so — adopted practice this platform cannot carry out is handed to
+# the reviewer rather than silently skipped (ADR-0038).
+#
+# THE WORDING IS DELIBERATELY NARROW. `tests/evals_live/write_gates.py` really does shell out
+# to `terraform validate` as gate one of Write scoring, so "this platform cannot run
+# terraform validate" would be false and this repository would disprove it. What is true is
+# that no REGISTRY tool exists, so this branch's files were never formatted or validated by
+# the platform.
+[[skills.unsatisfiable]]
+capability     = "terraform_fmt"
+recommendation = "No registry tool runs `terraform fmt -recursive`; the authored files in this branch were not formatted by the platform."
+
+[[skills.unsatisfiable]]
+capability     = "terraform_validate"
+recommendation = "No registry tool runs `terraform validate`; this branch's configuration was not validated by the platform."
 
 [[skills]]
 name    = "terraform-style-guide-security"
 path    = "skills/terraform-style-guide/SECURITY.md"
 version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
 digest  = "3dc8ffa10139e9772c5c102fee6377f66f5167bd043a7c43e6e5df682dc75f92"
+# Reviewed against these exact bytes (051, FR-019). A bump changes `digest`; leaving
+# this behind refuses the load, so nobody can bump the content without re-reading what
+# it now recommends that this platform has no registry tool for.
+unsatisfiable_reviewed_at = "3dc8ffa10139e9772c5c102fee6377f66f5167bd043a7c43e6e5df682dc75f92"
+# BOUND TO PLAN, WRITE AND JUDGE (051, FR-012).
+#
+# Plan is bound because its output is Write's instruction. The paths and intent Plan names
+# are what Write then works from, so a plan formed without the skills can direct Write toward
+# something the skills would not sanction — and Write receiving them does not undo a
+# direction it was told to take. This is not about what Plan emits; Plan emits no HCL.
+#
+# Research and Propose are not bound, and their prose no longer claims otherwise.
+phases = ["plan", "write", "judge"]
 
 # 049 executed phase instructions. Digests are SHA-256 of AGENTS.md.
 # 0.2.0: production-shaped set after individual GEPA (Write SC-006 5/5).
 [[agents]]
 phase   = "research"
 path    = "agents/research/AGENTS.md"
-version = "0.2.0"
-digest = "412ef781e1cb2760bc8f7a4e21c0cbbf6c8e59b41e9640f5fb9b2365d076e38e"
+version = "0.3.0"
+digest = "772b36b68bb5f1199aa0edf7fcaf550182d11885849e57d233a14af26f356136"
 
 [[agents]]
 phase   = "plan"
 path    = "agents/plan/AGENTS.md"
-version = "0.2.0"
-digest = "6220e802ba7b3f2ab8e19fb2575c84c04ae322ec758fbbe7fdfe644e0855d42c"
+version = "0.3.0"
+digest = "2f8f0f3aa886724cc77a8020d10637f6b76c4a1f27f0b8f1a554825c1edb8e33"
 
 [[agents]]
 phase   = "write"
 path    = "agents/write/AGENTS.md"
-version = "0.2.0"
-digest = "55398bf03f17ef26a2f7865d64fd2d9b958f1114cf5cdb45807ad511e02f3216"
+version = "0.3.0"
+digest = "a828b828d41348edfa483138442b6196bdcb053e70a188f72c19b9b1999721d6"
 
 [[agents]]
 phase   = "judge"
 path    = "agents/judge/AGENTS.md"
-version = "0.2.0"
-digest = "07cb5cbe3572e18578e935e7a3c0252a5cbae80b501dd18ddbb3333aa1c7a8d2"
+version = "0.3.0"
+digest = "4290a0bdca1d4434bce0bc5e4fc8a9f1a797a73f9d38659f62b6ba7dc745d7b4"
 
 [[agents]]
 phase   = "propose"
 path    = "agents/propose/AGENTS.md"
-version = "0.2.0"
-digest = "4269c964cea7cf0abe12d343a093802f52d52f2e8e02afd0738900ccfb29bea4"
+version = "0.3.0"
+digest = "8de41e26d931cea6d68f42ee60560edcc36501518c2395a48e5509c28a97f1ed"
 
 # Tier 1 is paved paths only, so a lowest-tier definition may run this and nothing else.
 [[workflows]]

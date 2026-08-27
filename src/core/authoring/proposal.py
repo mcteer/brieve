@@ -221,6 +221,17 @@ class Proposal:
     #: How a reviewer applies the change after merge. Platform section; model or fallback.
     usage: str = ""
     disclosures: list[str] = field(default_factory=list)
+    #: ADOPTED PRACTICE THIS PLATFORM COULD NOT CARRY OUT (051, FR-016).
+    #:
+    #: Derived from the bound pack's manifest and from nothing else — never from the progress
+    #: record, never from what a model said it did. That is what makes the text identical
+    #: across two runs of different content (FR-018), and it is the same reason the plan gate
+    #: was withdrawn: a check the platform cannot perform honestly belongs to the person who
+    #: can, stated rather than left to be discovered.
+    #:
+    #: Deliberately NOT folded into `limits`, which is `DERIVATIVE_LIMIT` plus run-derived
+    #: disclosures. Run-derived and run-independent text must not share a field.
+    unsatisfiable_recommendations: tuple[str, ...] = ()
     state: ProposalState = ProposalState.COMPOSED
     #: Platform-authored, never model-authored (041, FR-031). Correlation id, what was
     #: consulted, and the per-file digests, so a reviewer can trace the proposal back to the
@@ -287,6 +298,13 @@ class Proposal:
             # then where it came from, then what it does not cover.
             lines += ["", "## Provenance", ""]
             lines += [f"- {entry}" for entry in self.provenance]
+        if self.unsatisfiable_recommendations:
+            # Between provenance and limits: where the work came from, then what the adopted
+            # practice asked for and this platform could not do, then what is not covered.
+            # Empty renders nothing — a heading with no bullets tells a reviewer less than no
+            # heading at all.
+            lines += ["", "## Adopted practice not carried out", ""]
+            lines += [f"- {entry}" for entry in self.unsatisfiable_recommendations]
         lines += ["", "## Limits"]
         lines += [f"- {limit}" for limit in self.limits]
         return "\n".join(lines)
@@ -307,6 +325,7 @@ def compose(
     correlation_id: str = "",
     consulted: tuple[str, ...] = (),
     base_commit: str = "",
+    unsatisfiable_recommendations: tuple[str, ...] = (),
 ) -> Proposal:
     """Build the proposal from the **workspace**, never from the subject.
 
@@ -380,6 +399,7 @@ def compose(
         rationale=rationale,
         usage=usage,
         disclosures=disclosures,
+        unsatisfiable_recommendations=unsatisfiable_recommendations,
         provenance=provenance,
     )
 

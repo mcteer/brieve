@@ -143,7 +143,48 @@ def load_packs(
     loaded: dict[str, LoadedPack] = {}
     for name in names:
         loaded[name] = register_pack(loader.load(name), registry=registry, bindings=bindings)
+    _refuse_stale_declarations(loaded, registry=registry, bindings=bindings)
     return loaded
+
+
+def _refuse_stale_declarations(
+    loaded: dict[str, LoadedPack],
+    *,
+    registry: ToolRegistry,
+    bindings: PlatformBindings,
+) -> None:
+    """A pack may not declare unsatisfiable something the registry offers (051, FR-017).
+
+    **After the whole set registers, not during it.** `register_pack` sees one manifest at a
+    time, so a check placed there would refuse pack B's declaration only if pack A's tool
+    happened to register first — and load order changes without anybody deciding it did. That
+    is the same defect `isolation` refuses to ship for ambiguous tool names. Here the registry
+    is complete, so the verdict does not depend on iteration order.
+
+    **What counts as offered** is a registered tool name, or a name in `bindings.handlers`.
+    The handler table is included because a capability with a platform handler is one somebody
+    has built; the declaration is stale from that moment, not from whenever a pack gets round
+    to declaring a tool for it.
+
+    **What does not count** is anything reachable only outside the registry — a subprocess in
+    `tests/`, a Makefile target, a CI step. The eval lane really does run `terraform validate`,
+    and that is not the registry offering it to an authoring agent.
+
+    Refuses the whole set, matching `load_packs`'s existing all-or-nothing contract: a stale
+    declaration tells a reviewer to go and do work the platform already did, and there is no
+    partial state in which that is acceptable for some packs and not others.
+    """
+    offered = set(registry.tool_names()) | set(bindings.handlers)
+    for pack in loaded.values():
+        for skill in pack.manifest.skills:
+            for item in skill.unsatisfiable:
+                if item.capability in offered:
+                    raise ManifestError(
+                        f"pack {pack.name!r} skill {skill.name!r} declares {item.capability!r} "
+                        f"unsatisfiable, but the registry offers it. A pull request carrying "
+                        f"this would tell a reviewer to do work the platform already did",
+                        reason_code="unsatisfiable_declaration_stale",
+                    )
 
 
 __all__ = ["LoadedPack", "PlatformBindings", "load_packs", "register_pack"]

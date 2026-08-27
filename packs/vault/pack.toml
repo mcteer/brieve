@@ -111,38 +111,42 @@ name    = "vault-secret-access"
 path    = "skills/vault-secret-access/SKILL.md"
 version = "0.1.0"
 digest  = "b3815739e32a0b1578b04b863a890d91b5c925259a19ed8f283c2e91de5f9d81"
+# Reviewed against these exact bytes (051, FR-019). A bump changes `digest`; leaving
+# this behind refuses the load, so nobody can bump the content without re-reading what
+# it now recommends that this platform has no registry tool for.
+unsatisfiable_reviewed_at = "b3815739e32a0b1578b04b863a890d91b5c925259a19ed8f283c2e91de5f9d81"
 
 # 049 executed phase instructions. Digests are SHA-256 of AGENTS.md.
 # 0.2.0: production-shaped set after individual GEPA (no grading overlay).
 [[agents]]
 phase   = "research"
 path    = "agents/research/AGENTS.md"
-version = "0.2.0"
-digest = "5031d22d3c79f8fa9d8141383384ee489cd8ff52aab062e4eabacc701268b0b0"
+version = "0.3.0"
+digest = "b71496842a911db72b5d076f051f1bc3b95a09a377323fcf6013988902143e66"
 
 [[agents]]
 phase   = "plan"
 path    = "agents/plan/AGENTS.md"
-version = "0.2.0"
-digest = "3a4975f0520ded7483f92ce89680f7bcb5e5270e261b4e4165809292cccd7ef4"
+version = "0.3.0"
+digest = "3ab7fbf55118380101231eafe043e4a583690819ce056809d5aa7574d5f706ae"
 
 [[agents]]
 phase   = "write"
 path    = "agents/write/AGENTS.md"
-version = "0.2.0"
-digest = "67aa9d1263586b84087a63275aa5c7818b0e134adfb6c9a348ab8722be8b257c"
+version = "0.3.0"
+digest = "5c3312009d5ab5bc22a96daa63fee96199636c241d5a18f9a3631ab36aca141b"
 
 [[agents]]
 phase   = "judge"
 path    = "agents/judge/AGENTS.md"
-version = "0.2.0"
-digest = "6cc5b013591709fc6db5e6b7e88d5e75cc112cf137e32243b5a12fd6e9ed9d78"
+version = "0.3.0"
+digest = "65e2772615982c9aad3db0330d3aa4f860912071472fb869c6dff44d3052612c"
 
 [[agents]]
 phase   = "propose"
 path    = "agents/propose/AGENTS.md"
-version = "0.2.0"
-digest = "2a30184034c3a9fde60f2ef1e4b2cb4d809226cfaaf88eb03e3bb1ab36bcf0ca"
+version = "0.3.0"
+digest = "bb3f4f21023dcc46e5a266001da983617e322ed7757a078c898fed04d7d2e35b"
 
 # At least one PAVED workflow, so US5 has something a lowest-tier definition may actually
 # run. A tier bound with nothing beneath it would assert a refusal against an empty set.

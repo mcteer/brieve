@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import pathlib
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -132,14 +133,71 @@ def load_build_agents_cases(pack_dir: Path) -> tuple[BuildAgentsCase, ...]:
     return tuple(cases)
 
 
+def _pack_of(ref: str) -> str:
+    """The pack a case's instruction path belongs to, or "" when it names none.
+
+    `packs/terraform/agents/write/AGENTS.md` → `terraform`. A candidate under
+    `evals/prompt-tune/candidates/<pack>/…` resolves to its pack too, which is what lets an
+    unpromoted set be scored — a candidate has no `[[agents]]` pin by definition.
+    """
+    parts = pathlib.PurePosixPath(ref.replace("\\", "/")).parts
+    if len(parts) >= 2 and parts[0] == "packs":
+        return parts[1]
+    if len(parts) >= 4 and parts[:3] == ("evals", "prompt-tune", "candidates"):
+        return parts[3].split("-")[0]
+    return ""
+
+
+def _assembled(ref: str, phase: PhaseName, *, repo_root: Path) -> str:
+    """The bytes a phase's model would receive for this case, or "" if unscoreable.
+
+    **Assembled, not the instruction file alone** (051, FR-013, SC-007). Scoring the file by
+    itself green-lights a gate that never looked at what the model receives — a passing stub,
+    which ADR-0047 rates worse than a missing one. A phase bound to a skill is qualified
+    against instruction *plus* skill or it is not qualified.
+
+    Reached through `assemble_instruction`, which takes bytes as a parameter, rather than
+    through `load_phase_agents`, which would re-derive them from a pin. The difference is what
+    keeps re-qualification from deadlocking: an edited phase file has a stale `[[agents]]`
+    digest, `load_phase_agents` refuses `digest_mismatch`, and the suite that must pass before
+    promotion could never run.
+    """
+    from core.packs.agents import DeliveredSkill, assemble_instruction
+    from core.packs.loader import FilesystemPackLoader
+
+    path = repo_root / ref
+    if not path.is_file():
+        return ""
+    body = path.read_text(encoding="utf-8")
+    if not body.strip():
+        return ""
+    pack = _pack_of(ref)
+    if not pack:
+        return body
+    try:
+        manifest = FilesystemPackLoader(repo_root / "packs").load(pack)
+    except Exception:
+        # A pack that will not load cannot qualify anything. Scored `fail` by the caller
+        # rather than raised: a suite that crashes says nothing either way.
+        return ""
+    delivered: list[DeliveredSkill] = []
+    bodies: dict[str, str] = {}
+    for pin in manifest.skills:
+        if phase.value not in pin.phases:
+            continue
+        skill_path = repo_root / "packs" / pack / pin.path
+        if not skill_path.is_file():
+            return ""
+        bodies[pin.name] = skill_path.read_text(encoding="utf-8")
+        delivered.append(DeliveredSkill(name=pin.name, digest=pin.digest))
+    return assemble_instruction(body, tuple(delivered), bodies)
+
+
 def score_phase_agents_case(case: PhaseAgentsCase, *, repo_root: Path) -> str:
-    """Mechanical score: shipped paths exist and are non-empty; synthetics fail."""
+    """Mechanical score over the **assembled** instruction; synthetics fail."""
     if case.instruction_ref.startswith(_SYNTHETIC_PREFIX):
         return "fail"
-    path = repo_root / case.instruction_ref
-    if path.is_file() and path.read_text(encoding="utf-8").strip():
-        return "pass"
-    return "fail"
+    return "pass" if _assembled(case.instruction_ref, case.phase, repo_root=repo_root) else "fail"
 
 
 def score_build_agents_case(case: BuildAgentsCase, *, repo_root: Path) -> str:
@@ -149,12 +207,12 @@ def score_build_agents_case(case: BuildAgentsCase, *, repo_root: Path) -> str:
     parts = [part.strip() for part in case.set_ref.split(",") if part.strip()]
     if len(parts) != 5:
         return "fail"
-    if all(
-        (repo_root / part).is_file() and (repo_root / part).read_text(encoding="utf-8").strip()
-        for part in parts
-    ):
-        return "pass"
-    return "fail"
+    # Each file scored as the phase it steers, so a set qualifies against the same bytes the
+    # five phases actually receive — bindings included.
+    for part, phase in zip(parts, PHASE_ORDER, strict=True):
+        if not _assembled(part, phase, repo_root=repo_root):
+            return "fail"
+    return "pass"
 
 
 __all__ = [

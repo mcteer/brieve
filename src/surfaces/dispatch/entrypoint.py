@@ -177,9 +177,33 @@ def _phase_status(progress: ProposeProgress, name: PhaseName) -> PhaseStatus:
     return PhaseStatus.PENDING
 
 
+#: Checkpoint key for what each phase's model was actually given, by name and digest.
+#: Identity only — never an instruction or skill body (051, FR-005; row A14).
+AGENT_PINS_KEY = "agent_content_pins"
+
+
 def _payload_with_progress(payload: dict[str, Any], run: Any) -> dict[str, Any]:
-    """Keep Build phases on every blob write — finish-path saves replace the payload."""
+    """Keep Build phases and delivered content on every blob write.
+
+    Finish-path saves replace the payload, so anything that must survive a checkpoint is
+    re-attached here rather than written once.
+
+    **`agent_content_pins` is what a phase ACTUALLY received** (051, FR-005). `RUN_START`'s
+    `content_pins` is written before any phase runs, so it can say what a pack binds and
+    never what a run was steered by; this map accumulates at each bind, so a run that stopped
+    before Write carries no Write key and cannot be read as one whose Write model saw the
+    skill.
+
+    049 set this map on the run object and no checkpoint, audit event, or result body ever
+    carried it — per-phase pins existed in memory and nowhere else. Writing them is what
+    makes the delivered-versus-merely-bound distinction observable at all.
+    """
     out = dict(payload)
+    pins = getattr(run, "agent_content_pins", None)
+    if pins:
+        # Sorted for the same reason `RUN_START` sorts: two runs over identical content
+        # produce identical bytes, so a diff between trails is a real difference.
+        out[AGENT_PINS_KEY] = dict(sorted(pins.items()))
     live = getattr(run, "propose_progress", None)
     if live is None:
         return out
@@ -425,6 +449,32 @@ def _complete_write(run: Any) -> None:
 def _fail_current_phase(run: Any, reason: str) -> None:
     progress = _current_progress(run)
     run.propose_progress = fail(progress, phase=phase_to_fail(progress), reason=reason)
+
+
+def _unperformable_practice(run: Any) -> tuple[str, ...]:
+    """What the bound pack's skills recommend that no registry tool can do (051, FR-016).
+
+    Read from the manifest, never from the progress record and never from a model — which is
+    what makes the text identical across runs (FR-018).
+
+    Returns empty rather than raising. The pack loaded at phase-bind time or the run would
+    not have reached a pull request; if it somehow cannot be read here, a proposal that omits
+    the section is a smaller wrong than a run that dies after the work is done. The absence
+    is visible: the section is missing, not silently short.
+    """
+    from core.packs.agents import unsatisfiable_recommendations
+    from core.packs.loader import FilesystemPackLoader
+    from surfaces.dispatch.phase_agents import _pack_names
+    from surfaces.toolset import PACKS_ROOT
+
+    names = _pack_names(run)
+    if len(names) != 1:
+        return ()
+    root = Path(getattr(run, "packs_root", PACKS_ROOT))
+    try:
+        return unsatisfiable_recommendations(FilesystemPackLoader(root).load(names[0]))
+    except Exception:  # noqa: BLE001 — see the docstring; the section is omitted, not faked
+        return ()
 
 
 def _bind_phase_or_fail(run: Any, phase: PhaseName) -> str | None:
@@ -1037,6 +1087,7 @@ def _finish_authoring_analyzer(
         correlation_id=correlation_id,
         consulted=consulted,
         base_commit=os.environ.get("RUN_BASE_COMMIT", "").strip(),
+        unsatisfiable_recommendations=_unperformable_practice(run),
     )
     # The PR carried bounded plan facts as evidence; with no gate there is no plan to quote.
     # The proposal still carries what it authored, why, and the run it came from.

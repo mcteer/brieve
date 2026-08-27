@@ -46,12 +46,12 @@ Single project: `src/`, `tests/`, `packs/`, `evals/`, `docs/` at repository root
 
 **Purpose**: Fixtures the later phases assert against. No production code.
 
-- [ ] T001 [P] Add bound / unbound / mismatched-skill fixture packs to
+- [X] T001 [P] Add bound / unbound / mismatched-skill fixture packs to
       `tests/conformance/phase_agents/fixtures.py`: a pack whose skill binds to `write`, a
       pack whose skill binds to nothing, a pack whose skill file has drifted from its digest,
       and a pack whose skill file is empty. Fixture packs use invented pack and skill names —
       `src/core` must stay product-blind
-- [ ] T002 [P] Add manifest fixtures for each load-stage refusal to
+- [X] T002 [P] Add manifest fixtures for each load-stage refusal to
       `tests/conformance/packs/`: `phases = ["deploy"]`, `phases` naming a phase with no
       `[[agents]]` pin, two `[[skills]]` sharing a `name`, and an `unsatisfiable.capability`
       naming a tool the registry offers
@@ -65,49 +65,49 @@ Sealed core — `src/core/packs/manifest.py` is a registry schema.
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T003 Add frozen `UnsatisfiableRecommendation(capability, recommendation)` to
+- [X] T003 Add frozen `UnsatisfiableRecommendation(capability, recommendation)` to
       `src/core/packs/manifest.py`, exported in `__all__`, with a docstring stating the
       scope: unsatisfiable means **no registry tool**, not "the repository never runs it"
       (research R6 — `tests/evals_live/write_gates.py` does run `terraform validate`)
-- [ ] T004 Add `phases: tuple[str, ...] = ()`,
+- [X] T004 Add `phases: tuple[str, ...] = ()`,
       `unsatisfiable: tuple[UnsatisfiableRecommendation, ...] = ()` and
       `unsatisfiable_reviewed_at: str = ""` to `SkillPin` in
       `src/core/packs/manifest.py`. `phases` and `unsatisfiable` default empty so an unbound
       skill stays valid unchanged (FR-011); `unsatisfiable_reviewed_at` is **required on
       every skill** and its empty default is what the T006 refusal catches (FR-019)
-- [ ] T005 Parse both fields in `_parse_skill` in `src/core/packs/loader.py`, preserving
+- [X] T005 Parse both fields in `_parse_skill` in `src/core/packs/loader.py`, preserving
       `[[skills]]` declaration order and `[[skills.unsatisfiable]]` order within a skill.
       Missing `capability` or `recommendation`, or an empty string in either, refuses
       `malformed_manifest`
-- [ ] T006 Add the binding refusals to `validate_manifest` in `src/core/packs/loader.py`: a
+- [X] T006 Add the binding refusals to `validate_manifest` in `src/core/packs/loader.py`: a
       `phases` entry that is not a `PhaseName` value → `unknown_phase`; a `phases` entry
       naming a phase with no `[[agents]]` pin → `skill_binding_unbacked`; two `[[skills]]`
       sharing a `name` → `duplicate_skill`; `unsatisfiable_reviewed_at` absent or not equal to
       that entry's `digest` → `unsatisfiable_declaration_unreviewed` (FR-019). Collapse
       duplicates within one `phases` array
-- [ ] T007 Add `INSTRUCTION_BUDGET_BYTES = 256 * 1024` to `src/core/packs/agents.py` with the
+- [X] T007 Add `INSTRUCTION_BUDGET_BYTES = 256 * 1024` to `src/core/packs/agents.py` with the
       reasoning inline (research R4): largest current assembly is Write at 16,603 bytes;
       fixed with its reasoning because an unfixed threshold is one that gets raised until the
       corpus passes, per `READ_BUDGET_BYTES`
-- [ ] T008 Add the FR-017 stale-declaration check to `load_packs` in
+- [X] T008 Add the FR-017 stale-declaration check to `load_packs` in
       `src/core/packs/registration.py`, **after every pack in the set has registered**: a
       declared `capability` present in `registry.tool_names()` or in `bindings.handlers`
       refuses `unsatisfiable_declaration_stale` for the whole set. Not in `register_pack` —
       that is order-dependent, and load order changes without anybody deciding it did
-- [ ] T009 [GATE:fail-closed] Assert each load-stage refusal is distinct and none stands in
+- [X] T009 [GATE:fail-closed] Assert each load-stage refusal is distinct and none stands in
       for another, in `tests/conformance/packs/test_skill_binding_refusals.py` (rows A7, SC-005):
       `unknown_phase`, `skill_binding_unbacked`, `duplicate_skill`. Each fixture must load
       cleanly once the single defect is removed, so the row can lose
-- [ ] T010 [GATE:fail-closed] Assert a skill whose `digest` changed without
+- [X] T010 [GATE:fail-closed] Assert a skill whose `digest` changed without
       `unsatisfiable_reviewed_at` changing refuses `unsatisfiable_declaration_unreviewed`, and
       that the rule applies to a skill declaring **nothing** as well as one declaring
       something, in `tests/conformance/packs/test_declaration_keeps_pace.py` (row A20, FR-019,
       SC-010). A bump that loads with an unexamined declaration makes the pull request
       understate what a person still has to do
-- [ ] T011 [GATE:fail-closed] Assert `unsatisfiable_declaration_stale` refuses the whole load
+- [X] T011 [GATE:fail-closed] Assert `unsatisfiable_declaration_stale` refuses the whole load
       set and is **order-independent** — same verdict whichever pack registers first — in
       `tests/conformance/packs/test_unsatisfiable_declaration_stale.py` (row A15, SC-009)
-- [ ] T012 [GATE:conformance] Assert `terraform_fmt` and `terraform_validate` are not in
+- [X] T012 [GATE:conformance] Assert `terraform_fmt` and `terraform_validate` are not in
       `known_tools(registry)`, in `tests/conformance/packs/test_unsatisfiable_capabilities.py`
       (row A19). This is the premise both Terraform declarations rest on; if it ever becomes
       false, this row fails alongside A15
@@ -132,35 +132,35 @@ yet contains skill keys.
 
 ### Implementation
 
-- [ ] T013 [US2] Change the skill key grammar in `content_pins` in `src/surfaces/toolset.py`
+- [X] T013 [US2] Change the skill key grammar in `content_pins` in `src/surfaces/toolset.py`
       from `<pack>/<skill-name>` to `<pack>/skills/<skill-name>@<binding>`, where `<binding>`
       is the bound phase names joined by `+` **in `PHASE_ORDER` order** (not manifest order,
       so rewriting a `phases` array does not change the key), or the literal `unbound`. Pack
       and `[[agents]]` keys unchanged
-- [ ] T014 [US2] **Close the 049 gap** (FR-005, SC-003): write `run.agent_content_pins` into
+- [X] T014 [US2] **Close the 049 gap** (FR-005, SC-003): write `run.agent_content_pins` into
       the checkpoint payload under the `agent_content_pins` key, in `_payload_with_progress` in
       `src/surfaces/dispatch/entrypoint.py`. The map is set by `bind_phase_agents` and is
       currently carried by no checkpoint, audit event, or result body — US2 is unobservable
       until it is written at all
-- [ ] T015 [US2] Update the two existing consumers of the old key shape:
+- [X] T015 [US2] Update the two existing consumers of the old key shape:
       `tests/component/test_run_record_names_its_packs.py` and
       `tests/component/test_phase_agents_pins.py`. **No compatibility shim** — a run started
       before this change and resumed after it must not silently match (contract §5)
 
 ### Tests
 
-- [ ] T016 [P] [US2] [GATE:conformance] Assert the `RUN_START` key shape in
+- [X] T016 [P] [US2] [GATE:conformance] Assert the `RUN_START` key shape in
       `tests/component/test_content_pins_name_bindings.py` (row A12): Terraform's two skills
       record `@plan+write+judge`, Vault's records `@unbound`, and a bound skill is
       distinguishable from an unbound one by the key alone (US2 acceptance 1)
-- [ ] T017 [P] [US2] [GATE:correlation] Assert per-phase pins reach the checkpoint payload
+- [X] T017 [P] [US2] [GATE:correlation] Assert per-phase pins reach the checkpoint payload
       and join on the correlation ID, in
       `tests/component/test_phase_delivery_record.py` (row A13, SC-003)
-- [ ] T018 [US2] [GATE:correlation] Assert the **negative**: a Build stopped before Write
+- [X] T018 [US2] [GATE:correlation] Assert the **negative**: a Build stopped before Write
       carries no `…/agents/write@…+<skill>` key (US2 acceptance 2, row A13). This is the half
       that makes the record honest; without it a run that never reached Write reads as one
       whose Write model saw the skill
-- [ ] T019 [P] [US2] [GATE:no-secret-leak] Extend
+- [X] T019 [P] [US2] [GATE:no-secret-leak] Extend
       `tests/conformance/phase_agents/test_pins_are_identity_only.py` to the skill keys (row
       A14): names and digests only, never an instruction or skill body, in the map, the
       payload, or a phase failure reason
@@ -182,12 +182,12 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
 
 ### Assembly and delivery
 
-- [ ] T020 [US1] Add frozen `DeliveredSkill(name, digest)` and
+- [X] T020 [US1] Add frozen `DeliveredSkill(name, digest)` and
       `skills: tuple[DeliveredSkill, ...] = ()` to `PhaseAgents` in
       `src/core/packs/agents.py`. `PhaseAgents.digest` stays the `AGENTS.md` digest — a pin
       identity, not a hash of the assembly (spec Assumptions: `[[agents]]` pins keep their
       shape)
-- [ ] T021 [US1] Add the pure function `assemble_instruction(agents_body, skills, bodies)` to
+- [X] T021 [US1] Add the pure function `assemble_instruction(agents_body, skills, bodies)` to
       `src/core/packs/agents.py` and have `load_phase_agents` call it (FR-001, SC-001).
       It takes the instruction bytes as a **parameter** and never re-derives them from a pin,
       so the eval scorers can assemble a candidate that has no `[[agents]]` pin (contract
@@ -197,51 +197,51 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
       `phases`. Skill bytes verbatim — never edited, filtered, reordered internally, or
       truncated (ADR-0004, FR-015). Assembly exists **only here**; production and the eval
       lane both reach it through this function (contract §2.5)
-- [ ] T022 [US1] Verify each bound skill at delivery in `src/core/packs/agents.py`, on the
+- [X] T022 [US1] Verify each bound skill at delivery in `src/core/packs/agents.py`, on the
       same terms as the existing `AGENTS.md` check: resolve the path inside the pack
       directory, re-read the bytes, re-hash, compare to `SkillPin.digest`. `DeliveredSkill.digest`
       is the value re-verified here, never copied from the manifest (FR-003)
-- [ ] T023 [US1] Record delivered skills per phase in `bind_phase_agents` in
+- [X] T023 [US1] Record delivered skills per phase in `bind_phase_agents` in
       `src/surfaces/dispatch/phase_agents.py`: add
       `<pack>/agents/<phase>@<version>+<skill-name>` → digest for each `DeliveredSkill`.
       **No assembly here** — the surface resolves the pack name and records, nothing more
 
 ### Fail-closed
 
-- [ ] T024 [US1] [GATE:fail-closed] Raise `ManifestError` with `skill_missing` (absent,
+- [X] T024 [US1] [GATE:fail-closed] Raise `ManifestError` with `skill_missing` (absent,
       unreadable, or path escaping the pack), `skill_empty` (bytes empty after strip), and
       `digest_mismatch` (bytes ≠ pin) in `src/core/packs/agents.py`. No fallback exists:
       neither delivering unverified content nor proceeding without the skill (FR-004)
-- [ ] T025 [US1] [GATE:fail-closed] Check the budget after assembly and **before return** in
+- [X] T025 [US1] [GATE:fail-closed] Check the budget after assembly and **before return** in
       `src/core/packs/agents.py`: `len(body.encode("utf-8")) > INSTRUCTION_BUDGET_BYTES`
       raises `instruction_too_large`. Never truncate — a truncated instruction delivers
       partial practice while the record claims the whole skill (FR-009)
 
 ### Pack content
 
-- [ ] T026 [US1] Add `phases = ["plan", "write", "judge"]` to both `[[skills]]` entries in
+- [X] T026 [US1] Add `phases = ["plan", "write", "judge"]` to both `[[skills]]` entries in
       `packs/terraform/pack.toml`. Plan is bound because its output is Write's instruction: a
       plan formed without the skills can direct Write toward something the skills would not
       sanction, and Write receiving them does not undo a direction it was told to take
       (FR-012)
-- [ ] T027 [P] [US1] Remove the *"Practice is this file and the pinned skills
+- [X] T027 [P] [US1] Remove the *"Practice is this file and the pinned skills
       `terraform-style-guide` / `terraform-style-guide-security`"* sentence from
       `packs/terraform/agents/research/AGENTS.md` and
       `packs/terraform/agents/propose/AGENTS.md` (FR-012a). It is false today for all five
       phases and stays false for these two after T026
-- [ ] T028 [US1] Add both precedence sentences to
+- [X] T028 [US1] Add both precedence sentences to
       `packs/terraform/agents/{plan,write,judge}/AGENTS.md` (contract §7.2): **capability** —
       the registry bounds what can be done and adopted practice does not widen it, so a step
       naming a capability the registry does not offer is neither performed nor reported as
       performed (FR-014); **content** — where this file and a delivered skill differ on a
       concrete rule, this file governs, and the difference is not a licence to do neither
-- [ ] T029 [US1] Update `PROVENANCE.md` for all five Terraform phases in
+- [X] T029 [US1] Update `PROVENANCE.md` for all five Terraform phases in
       `packs/terraform/agents/*/PROVENANCE.md` — what changed, why, and that the set
       re-promotes as a unit
 
 ### Re-qualification (FR-013, SC-007)
 
-- [ ] T030 [US1] Score the **assembled** instruction in `score_phase_agents_case` and
+- [X] T030 [US1] Score the **assembled** instruction in `score_phase_agents_case` and
       `score_build_agents_case` in `src/core/evals/phase_agents_corpus.py`: read the case's
       referenced bytes as today, resolve the pack's skills bound to that phase from the
       manifest, and call `assemble_instruction`. **Do not route through `load_phase_agents`** —
@@ -249,10 +249,10 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
       `load_phase_agents` refuses `digest_mismatch`, so the suites cannot pass, so promotion
       cannot run). Scoring the file alone would green the gate without looking at the bytes
       the model receives (ADR-0047)
-- [ ] T031 [US1] [GATE:eval] Add a `phase_agents` case whose bound skill is missing and which
+- [X] T031 [US1] [GATE:eval] Add a `phase_agents` case whose bound skill is missing and which
       must score `fail`, to `packs/terraform/evals/phase_agents.toml`. Without it T030's
       change is unfalsifiable
-- [ ] T032 [US1] [GATE:eval] Re-run `phase_agents` and `build_agents` over the assembled
+- [X] T032 [US1] [GATE:eval] Re-run `phase_agents` and `build_agents` over the assembled
       content and re-promote all five Terraform phase files through `promote_phase_agents`,
       updating `[[agents]]` digests and bumping `version` in `packs/terraform/pack.toml`.
       All five or none; both suites or neither (FR-013, FR-013a — no runtime state exists for
@@ -260,41 +260,41 @@ rule. Remove the binding and assert the same case is no longer reliably correct.
 
 ### Tests
 
-- [ ] T033 [P] [US1] [GATE:conformance] Assert the write model receives both skills in full,
+- [X] T033 [P] [US1] [GATE:conformance] Assert the write model receives both skills in full,
       between the fixed delimiters, in
       `tests/conformance/phase_agents/test_skill_assembly.py` (row A1, FR-001, SC-001,
       US1 acceptance 1)
-- [ ] T034 [P] [US1] [GATE:conformance] Assert delivery order is `[[skills]]` declaration
+- [X] T034 [P] [US1] [GATE:conformance] Assert delivery order is `[[skills]]` declaration
       order and that two loads of identical manifest content produce byte-identical `body`,
       in `tests/conformance/phase_agents/test_skill_order_deterministic.py` (row A2, FR-006)
-- [ ] T035 [P] [US1] [GATE:conformance] Assert a phase bound to no skills produces `body`
+- [X] T035 [P] [US1] [GATE:conformance] Assert a phase bound to no skills produces `body`
       byte-identical to its `AGENTS.md` — no delimiter, no trailing-byte change — for
       Terraform `research`/`propose` and all five Vault phases, in
       `tests/conformance/phase_agents/test_unbound_phase_unchanged.py` (row A3, FR-011,
       US1 acceptance 3)
-- [ ] T036 [P] [US1] [GATE:fail-closed] Assert a drifted skill fails the phase
+- [X] T036 [P] [US1] [GATE:fail-closed] Assert a drifted skill fails the phase
       `digest_mismatch` and that `run.phase_instruction` never holds the mismatched content,
       in `tests/conformance/phase_agents/test_skill_digest_mismatch.py` (row A4,
       US1 acceptance 2)
-- [ ] T037 [P] [US1] [GATE:fail-closed] Assert `skill_missing` and `skill_empty` are distinct
+- [X] T037 [P] [US1] [GATE:fail-closed] Assert `skill_missing` and `skill_empty` are distinct
       and neither collapses into the other or into `digest_mismatch`, in
       `tests/conformance/phase_agents/test_skill_fail_closed.py` (row A5, SC-005)
-- [ ] T038 [P] [US1] [GATE:fail-closed] Assert an over-budget assembly raises
+- [X] T038 [P] [US1] [GATE:fail-closed] Assert an over-budget assembly raises
       `instruction_too_large` and that no truncated body is ever returned, in
       `tests/conformance/phase_agents/test_instruction_budget.py` (row A6)
-- [ ] T039 [P] [US1] [GATE:conformance] Assert `packs/terraform/skills/LICENSE` and
+- [X] T039 [P] [US1] [GATE:conformance] Assert `packs/terraform/skills/LICENSE` and
       `PROVENANCE.md` — on disk, absent from `[[skills]]` — never appear in any phase's
       `body`, in `tests/conformance/phase_agents/test_undeclared_skill_files.py` (row A8,
       FR-008)
-- [ ] T040 [US1] [GATE:conformance] Assert **no shipped `AGENTS.md` in any pack names a skill
+- [X] T040 [US1] [GATE:conformance] Assert **no shipped `AGENTS.md` in any pack names a skill
       it is not bound to**, deriving both sides from the manifests rather than a hard-coded
       list, in `tests/conformance/phase_agents/test_prose_matches_binding.py` (row A9,
       FR-010, SC-006). This is the check that makes the divergence visible rather than
       audited by hand
-- [ ] T041 [P] [US1] [GATE:conformance] Assert every phase bound to a skill states both
+- [X] T041 [P] [US1] [GATE:conformance] Assert every phase bound to a skill states both
       precedence sentences, in
       `tests/conformance/phase_agents/test_precedence_stated.py` (row A10)
-- [ ] T042 [P] [US1] [GATE:eval] Assert the scorers read assembled content and that a case
+- [X] T042 [P] [US1] [GATE:eval] Assert the scorers read assembled content and that a case
       with a missing bound skill scores `fail`, in
       `tests/conformance/phase_agents/test_scorers_score_assembled.py` (rows A18, A21, SC-007).
       A21 is the one that would have caught the deadlock: assert a candidate with **no
@@ -319,7 +319,7 @@ runs of different content.
 
 ### Implementation
 
-- [ ] T043 [US4] Declare the two unsatisfiable recommendations on
+- [X] T043 [US4] Declare the two unsatisfiable recommendations on
       **`terraform-style-guide` only** in `packs/terraform/pack.toml` — `terraform_fmt` and
       `terraform_validate`, with the exact recommendation strings from
       [data-model.md](data-model.md) §2. **`terraform-style-guide-security` declares nothing**:
@@ -329,12 +329,12 @@ runs of different content.
       digest (FR-019). **Wording is deliberately narrow**: no registry tool runs them, so the branch was not formatted or validated by
       the platform — not "the platform cannot run `terraform validate`", which the eval lane
       disproves (research R6)
-- [ ] T044 [US4] Add `unsatisfiable_recommendations: tuple[str, ...] = ()` to `Proposal` in
+- [X] T044 [US4] Add `unsatisfiable_recommendations: tuple[str, ...] = ()` to `Proposal` in
       `src/core/authoring/proposal.py` and render `## Adopted practice not carried out`
       between `## Provenance` and `## Limits`, one `- ` bullet per recommendation, verbatim.
       **Not folded into `limits`** — `limits` is `DERIVATIVE_LIMIT + disclosures` and
       disclosures are run-derived, while this text must be run-independent (FR-018)
-- [ ] T045 [US4] Populate it in `compose` in `src/core/authoring/proposal.py` and pass it from
+- [X] T045 [US4] Populate it in `compose` in `src/core/authoring/proposal.py` and pass it from
       the `compose(...)` call in `src/surfaces/dispatch/entrypoint.py`: the recommendations of
       every skill bound to **any** phase of the bound pack, in `[[skills]]` order then
       declaration order within a skill (FR-016). Read the manifest, never the progress record — a run
@@ -343,15 +343,15 @@ runs of different content.
 
 ### Tests
 
-- [ ] T046 [P] [US4] [GATE:conformance] Assert the section appears with both recommendations
+- [X] T046 [P] [US4] [GATE:conformance] Assert the section appears with both recommendations
       verbatim in the right position, and that two runs over different content produce
       byte-identical section bytes, in
       `tests/component/test_proposal_unsatisfiable_recommendations.py` (row A16, FR-016, SC-008,
       US4 acceptances 1–2)
-- [ ] T047 [P] [US4] [GATE:conformance] Assert a pack with no bound skills — or none
+- [X] T047 [P] [US4] [GATE:conformance] Assert a pack with no bound skills — or none
       declaring unsatisfiable recommendations — renders today's body exactly, with no empty
       heading, in the same file (row A17)
-- [ ] T048 [US4] Assert the stale-declaration guard end to end: declaring
+- [X] T048 [US4] Assert the stale-declaration guard end to end: declaring
       `terraform_fmt` as a `[[tools]]` entry with a resolvable handler refuses the load rather
       than telling a reviewer to do work the platform now does (row A15 tie-in, US4
       acceptance 3)
@@ -372,12 +372,12 @@ the bound phase receive it.
 **Note**: US3 acceptance 2 (binding to an unknown phase refuses and names it) is delivered by
 T006 and asserted by T009. This phase adds the property that keeps the boundary from eroding.
 
-- [ ] T049 [US3] [GATE:conformance] Assert **no file under `src/` names a skill, a
+- [X] T049 [US3] [GATE:conformance] Assert **no file under `src/` names a skill, a
       skill-to-phase binding, or a recommendation string** — scanning for the shipped skill
       names, `phases`-adjacent literals, and the recommendation text — in
       `tests/conformance/packs/test_no_source_names_a_skill.py` (row A11, SC-004). Extends the
       existing `test_core_is_product_blind.py` property to skills
-- [ ] T050 [US3] Assert the positive case: adding a `phases` entry to an in-memory fixture
+- [X] T050 [US3] Assert the positive case: adding a `phases` entry to an in-memory fixture
       manifest, with zero source change, causes the bound phase to receive the skill —
       in `tests/conformance/phase_agents/test_binding_is_declaration.py` (US3 acceptance 1)
 
@@ -387,35 +387,35 @@ T006 and asserted by T009. This phase adds the property that keeps the boundary 
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T051 [P] [GATE:eval] Add a `variable_has_validation` property to
+- [X] T051 [P] [GATE:eval] Add a `variable_has_validation` property to
       `tests/evals_live/authoring_properties.py`: a `variable` block containing a
       `validation { condition, error_message }` block. **Chosen deliberately** — research R7
       found the phase files already hand-restate most of `SKILL.md` (indentation, naming,
       `type`/`description`, `sensitive`, `for_each` over `count`, `~>` as a pin), so measuring
       SC-002 on any of those would measure nothing when the binding is removed. `validation`
       appears in the skill twice and in no phase file
-- [ ] T052 [P] [GATE:eval] Add the corpus task that asks for a constrained input, plus the
+- [X] T052 [P] [GATE:eval] Add the corpus task that asks for a constrained input, plus the
       case the detector **must fail** — a `variable` with `type` and `description` but no
       `validation` — to `evals/authoring/corpus.toml`, following the precedent
       `static_credential_lookalike` sets. A detector that cannot fail has measured nothing
-- [ ] T053 [P] Add `skill binding` and `unsatisfiable recommendation` to
+- [X] T053 [P] Add `skill binding` and `unsatisfiable recommendation` to
       `docs/glossary.md`, with the registry-scoped reading of "unsatisfiable" stated
       explicitly
-- [ ] T054 [P] Add a `CHANGELOG.md` entry: adopted skills now reach the phases bound to them;
+- [X] T054 [P] Add a `CHANGELOG.md` entry: adopted skills now reach the phases bound to them;
       `content_pins` skill key shape changed with no compatibility shim
-- [ ] T055 Run every scenario in [quickstart.md](quickstart.md), restoring
+- [X] T055 Run every scenario in [quickstart.md](quickstart.md), restoring
       `packs/terraform/skills/terraform-style-guide/SKILL.md` and `packs/terraform/pack.toml`
       after the tamper and unbind scenarios — a left-behind edit fails everything downstream
-- [ ] T056 Run `make check`, then `make conformance`, then `make test-full`. Rows A1–A19 are
+- [X] T056 Run `make check`, then `make conformance`, then `make test-full`. Rows A1–A19 are
       hermetic and must pass in CI
-- [ ] T057 [GATE:conformance] Named-runner rows on the implementation PR — **Dan McTeer**:
+- [X] T057 [GATE:conformance] Named-runner rows on the implementation PR — **Dan McTeer**:
       **E1** identical assembled instruction in connected, restricted and air-gapped profiles;
       **E2** SC-002 — `variable_has_validation` present in ≥ 4 of 5 runs bound and
       demonstrably less often unbound, same n, recording n, both rates and the delta;
       **E3** both suites pass over assembled content before promotion, a losing set copies
       zero files; **E4** no `required_version` regression against the pre-binding baseline.
       Rows fail loudly when the enclave or eval broker is absent — do not skip green
-- [ ] T058 Request **security-maintainer review** on the implementation PR. This feature edits
+- [X] T058 Request **security-maintainer review** on the implementation PR. This feature edits
       `src/core/packs/manifest.py` (registry schema) and the `RUN_START` `content_pins`
       payload (audit schema), both named sealed core — constitution Principle V and
       `AGENTS.md` rule 4

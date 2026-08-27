@@ -185,3 +185,94 @@ def test_tooling_failed_names_the_task() -> None:
     )
     assert report.tooling_failed == ("pin_the_provider",)
     assert report.tooling_passed == report.tooling_total - 1
+
+
+# --- 051, SC-002: tags_are_shared_not_ad_hoc ---------------------------------------------
+#
+# No valid-but-wrong corpus twin, and none is possible: the wrong answer to "add a bucket" is
+# an ad-hoc tag map, which is a different artefact for the same prompt rather than a
+# different task. The falsification lives here, where it can be stated exactly.
+
+_DEFAULT_TAGS = """provider "aws" {
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      ManagedBy = "Terraform"
+      Project   = var.project_name
+    }
+  }
+}
+"""
+
+_MERGED_LOCALS = """locals {
+  common_tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_s3_bucket" "artifacts" {
+  bucket = "${var.project_name}-artifacts"
+
+  tags = merge(local.common_tags, {
+    Name = "artifacts"
+  })
+}
+"""
+
+_AD_HOC = """resource "aws_s3_bucket" "artifacts" {
+  bucket = "${var.project_name}-artifacts"
+
+  tags = {
+    Name        = "artifacts"
+    Environment = "production"
+  }
+}
+"""
+
+
+def test_default_tags_on_the_provider_counts() -> None:
+    assert "tags_are_shared_not_ad_hoc" in detect({"providers.tf": _DEFAULT_TAGS})
+
+
+def test_a_locals_set_merged_into_a_resource_counts() -> None:
+    """Both shapes are in the guide. Scoring only one would score a house style, not the guide."""
+    assert "tags_are_shared_not_ad_hoc" in detect({"main.tf": _MERGED_LOCALS})
+
+
+def test_an_ad_hoc_tag_map_does_not_count() -> None:
+    """THE ROW THAT MAKES THE REST TRUSTWORTHY.
+
+    This is tagged, it parses, `terraform validate` is happy, and it retypes the shared set
+    onto one resource — which is what the guide teaches against. A detector that passes it
+    would report the skill working whether or not it was delivered.
+    """
+    assert "tags_are_shared_not_ad_hoc" not in detect({"main.tf": _AD_HOC})
+
+
+def test_an_untagged_resource_does_not_count() -> None:
+    bare = 'resource "aws_s3_bucket" "artifacts" {\n  bucket = "x"\n}\n'
+    assert "tags_are_shared_not_ad_hoc" not in detect({"main.tf": bare})
+
+
+def test_the_write_card_does_not_teach_tagging() -> None:
+    """SC-002's premise: the arms must differ on this rule.
+
+    The card restates most of the style guide by hand. If tagging is ever added to it,
+    removing the binding stops changing the output and this measurement means nothing.
+    """
+    from pathlib import Path
+
+    card = (
+        Path(__file__).resolve().parents[2]
+        / "packs"
+        / "terraform"
+        / "agents"
+        / "write"
+        / "AGENTS.md"
+    ).read_text(encoding="utf-8")
+    assert "tag" not in card.lower(), (
+        "the Write card now mentions tagging, so removing the binding would no longer change "
+        "the output and SC-002 measures nothing. Pick a different rule."
+    )

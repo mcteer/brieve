@@ -33,6 +33,7 @@ from core.packs.manifest import (
     SkillPin,
     ToolDeclaration,
     ToolPathGrant,
+    UnsatisfiableRecommendation,
     UpstreamPin,
     WorkflowDeclaration,
 )
@@ -200,13 +201,50 @@ def _parse_tool_paths(entry: dict[str, Any]) -> tuple[ToolPathGrant, ...]:
     return tuple(grants)
 
 
-def _parse_skill(entry: dict[str, Any]) -> SkillPin:
+def _parse_unsatisfiable(entry: dict[str, Any], *, skill: str) -> UnsatisfiableRecommendation:
+    """One declared step no registry tool can carry out.
+
+    Both fields are required and neither may be blank. An empty `recommendation` would render
+    an empty bullet into a pull request — a reviewer seeing a heading with nothing under it
+    learns less than one seeing no heading at all.
+    """
     try:
+        capability = str(entry["capability"]).strip()
+        recommendation = str(entry["recommendation"]).strip()
+    except KeyError as exc:
+        raise ManifestError(
+            f"skill {skill!r} unsatisfiable entry missing required field: {exc}",
+            reason_code="malformed_manifest",
+        ) from exc
+    _require(
+        bool(capability) and bool(recommendation),
+        f"skill {skill!r} declares an unsatisfiable recommendation with an empty "
+        f"capability or recommendation; an empty one renders a bullet a reviewer "
+        f"cannot act on",
+        reason_code="malformed_manifest",
+    )
+    return UnsatisfiableRecommendation(capability=capability, recommendation=recommendation)
+
+
+def _parse_skill(entry: dict[str, Any]) -> SkillPin:
+    """Parse one `[[skills]]` entry, preserving declared order in every sequence.
+
+    `tomllib` keeps array-of-table order, and both sequences stay tuples, so delivery order
+    and pull-request bullet order are the manifest's own order rather than whatever a dict
+    or set iteration produced that day (FR-006, FR-018).
+    """
+    try:
+        name = str(entry["name"])
         return SkillPin(
-            name=str(entry["name"]),
+            name=name,
             path=str(entry["path"]),
             version=str(entry["version"]),
             digest=str(entry["digest"]),
+            phases=tuple(str(phase) for phase in entry.get("phases", [])),
+            unsatisfiable=tuple(
+                _parse_unsatisfiable(item, skill=name) for item in entry.get("unsatisfiable", [])
+            ),
+            unsatisfiable_reviewed_at=str(entry.get("unsatisfiable_reviewed_at", "")).strip(),
         )
     except KeyError as exc:
         raise ManifestError(
@@ -325,6 +363,8 @@ def validate_manifest(manifest: PackManifest) -> None:
             reason_code="insufficient_eval_coverage",
         )
 
+    _validate_skill_bindings(manifest)
+
     seen_phases: set[str] = set()
     for pin in manifest.agents:
         _require(
@@ -341,6 +381,60 @@ def validate_manifest(manifest: PackManifest) -> None:
             f"pack {manifest.name!r} declares an authoring workflow but [[agents]] does not "
             f"cover every phase",
             reason_code="agents_incomplete",
+        )
+
+
+def _validate_skill_bindings(manifest: PackManifest) -> None:
+    """Every refusal a skill binding can earn (051, FR-007, FR-019).
+
+    Each is separate because SC-005 requires a distinct reason per failure and none reported
+    as another. A binding that refuses for the wrong reason sends whoever reads the refusal to
+    the wrong line of the manifest.
+    """
+    known_phases = {phase.value for phase in PHASE_ORDER}
+    backed = {pin.phase for pin in manifest.agents}
+    seen: set[str] = set()
+
+    for skill in manifest.skills:
+        _require(
+            skill.name not in seen,
+            f"pack {manifest.name!r} declares two skills named {skill.name!r}; a binding, a "
+            f"pin and a delivered digest would each be ambiguous",
+            reason_code="duplicate_skill",
+        )
+        seen.add(skill.name)
+
+        for phase in skill.phases:
+            _require(
+                phase in known_phases,
+                f"pack {manifest.name!r} binds skill {skill.name!r} to {phase!r}, which is not "
+                f"a Build phase. The phases are {sorted(known_phases)}",
+                reason_code="unknown_phase",
+            )
+            # A binding to a phase the pack ships no instruction for could never be
+            # delivered: `load_phase_agents` refuses `agents_missing` before assembly, so the
+            # binding would sit in the manifest reading like configuration while doing
+            # nothing. Refused here, where the manifest is in front of somebody.
+            _require(
+                phase in backed,
+                f"pack {manifest.name!r} binds skill {skill.name!r} to phase {phase!r}, for "
+                f"which it declares no [[agents]] instruction; the binding could never be "
+                f"delivered",
+                reason_code="skill_binding_unbacked",
+            )
+
+        # THE DECLARATION MUST KEEP PACE WITH THE BYTES (FR-019). A bump changes `digest`;
+        # if nobody re-read the content, this field still records the old one and the
+        # mismatch says so. Required even of a skill declaring nothing: "nothing here is
+        # unsatisfiable" goes stale exactly like a non-empty claim, and the pull request
+        # would then tell a reviewer that less work remains than actually does.
+        _require(
+            skill.unsatisfiable_reviewed_at == skill.digest,
+            f"pack {manifest.name!r} skill {skill.name!r}: unsatisfiable_reviewed_at is "
+            f"{skill.unsatisfiable_reviewed_at or '(unset)'!r} but the skill pins "
+            f"{skill.digest!r}. The declaration was examined against different bytes than the "
+            f"ones this pack ships, so what the platform cannot do may be understated",
+            reason_code="unsatisfiable_declaration_unreviewed",
         )
 
 
@@ -380,12 +474,22 @@ class FilesystemPackLoader:
         """
         for skill in manifest.skills:
             path = pack_dir / skill.path
+            # DISTINCT CODES, on the same terms as delivery (051, SC-005). A file that is not
+            # there did not fail a hash comparison, and reporting it as `digest_mismatch`
+            # sends whoever reads the refusal looking for drifted content that does not exist.
             if not path.is_file():
                 raise ManifestError(
                     f"skill {skill.name!r} declares {skill.path} which is not present",
-                    reason_code="digest_mismatch",
+                    reason_code="skill_missing",
                 )
-            actual = content_digest(path.read_bytes())
+            raw = path.read_bytes()
+            if not raw.decode("utf-8", errors="replace").strip():
+                raise ManifestError(
+                    f"skill {skill.name!r} at {skill.path} is empty; an empty skill delivers "
+                    f"no practice while the pin claims governed content",
+                    reason_code="skill_empty",
+                )
+            actual = content_digest(raw)
             if actual != skill.digest:
                 raise ManifestError(
                     f"skill {skill.name!r} at {skill.path}: manifest records {skill.digest}, "

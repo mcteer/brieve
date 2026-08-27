@@ -31,6 +31,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from core.authoring.progress import PHASE_ORDER
 from core.packs.loader import FilesystemPackLoader
 from core.packs.registration import LoadedPack, PlatformBindings, load_packs
 from core.registry.memory import ToolRegistry
@@ -130,19 +131,42 @@ def known_actions(registry: ToolRegistry) -> frozenset[str]:
 def content_pins(loaded: Mapping[str, LoadedPack]) -> dict[str, str]:
     """name → digest of every executed content artifact, for `RUN_START`.
 
-    Keyed `pack@version` and `pack/skill` so the record reads without a schema. The core
-    records these without interpreting them — it never learns what a pack is — and the
-    payload is what lets a resumed run's content be compared to what the original run
-    actually loaded, rather than to the manifest sitting beside whatever is on disk now.
+    Keyed so the record reads without a schema. The core records these without interpreting
+    them — it never learns what a pack is.
+
+    **A skill key names its binding** (051, FR-005). Until then every pinned skill was
+    recorded identically, which reads as "this governed the run" and was true of none of
+    them: nothing delivered a skill to any model. `@plan+write+judge` and `@unbound` are what
+    let an auditor tell an adopted-and-inert skill from one that actually reaches a phase.
+
+    **This record can say *bound*; it can never say *delivered*.** It is written at
+    `RUN_START`, before any phase executes, so "which skills shaped this run" is a question
+    it is not in a position to answer — a run that stops before Write must not read as one
+    whose Write model saw the skill. That half lives in `run.agent_content_pins`, which
+    accumulates as phases actually bind.
     """
     pins: dict[str, str] = {}
     for pack in loaded.values():
         pins[f"{pack.name}@{pack.manifest.version}"] = pack.manifest.version
         for skill in pack.manifest.skills:
-            pins[f"{pack.name}/{skill.name}"] = skill.digest
+            pins[f"{pack.name}/skills/{skill.name}@{_binding(skill.phases)}"] = skill.digest
         for agent in pack.manifest.agents:
             pins[f"{pack.name}/agents/{agent.phase}@{agent.version}"] = agent.digest
     return pins
+
+
+def _binding(phases: tuple[str, ...]) -> str:
+    """Bound phases joined by `+`, or `unbound`.
+
+    **`PHASE_ORDER`, not manifest order.** A key that changed when somebody rewrote a
+    `phases` array in a different order would make two identical bindings look like two
+    different ones in the trail, which is the sort of difference an auditor has to chase and
+    then discard.
+    """
+    if not phases:
+        return "unbound"
+    named = set(phases)
+    return "+".join(phase.value for phase in PHASE_ORDER if phase.value in named)
 
 
 #: Tool name → product, for tools the **platform** owns rather than a pack (041, FR-029).

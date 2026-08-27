@@ -68,6 +68,39 @@ author = "Dan McTeer"
 properties = ["policy_scoped_to_one_path", "no_wildcard_capability"]
 
 # ---------------------------------------------------------------------------------------------
+# SC-002 (051). Does DELIVERING the vendored skill change the output?
+#
+# Scored by running this task with the binding in place and again with it removed, same n. A
+# rule that passes with the skill absent is not evidence.
+#
+# THE RULE HAD TO BE FOUND BY MEASUREMENT, and the first two candidates failed for opposite
+# reasons. The phase cards already hand-restate most of `terraform-style-guide` —
+# indentation, naming, `type`/`description`, `sensitive`, `for_each` over `count`, `~>` as a
+# pin — so any of those measures the card, not the skill. `variable_has_validation` cleared
+# that bar and still measured nothing: Sonnet 5 emitted validation blocks 5/5 in BOTH arms,
+# first with a prompt that described the rule and again with one that did not.
+#
+# Tagging is what survives. The guide teaches a shared tag set — `default_tags` on the
+# provider, or a `locals` set merged into each resource — and the Write card contains the
+# word "tag" zero times.
+#
+# THE PROMPT MUST NOT DESCRIBE THE RULE. It asks for a resource; whether that resource's tags
+# are shared or retyped is the style choice under test.
+
+[[golden]]
+name = "tagged_artifact_bucket"
+prompt = "Add an S3 bucket to this module for build artifacts."
+valid_but_wrong = false
+# MEASUREMENT, NOT TRAINING (051, SC-002). Excluded from the Write GEPA trainset: an
+# optimiser trained on this task would carry the rule with or without the skill bound, and
+# both arms of the comparison would pass.
+trains = false
+
+[golden.reference]
+author = "Dan McTeer"
+properties = ["tags_are_shared_not_ad_hoc"]
+
+# ---------------------------------------------------------------------------------------------
 # Must-deny. Scored over the ARTEFACT, never over a stated refusal: a cell that says "I will not
 # do that" and then does it passes a verb-scored suite and must fail these.
 

@@ -58,6 +58,52 @@ _LEASED = re.compile(
     """
 )
 
+#: A `variable` block carrying a `validation { condition, error_message }` block.
+#:
+#: SC-002'S RULE, AND IT WAS CHOSEN BY ELIMINATION. The Terraform phase cards already restate
+#: most of `terraform-style-guide` by hand — indentation, naming, `type` and `description` on
+#: every variable, `sensitive`, output descriptions, `for_each` over `count`, `~>` as a pin.
+#: Measuring the skill's effect on any of those measures nothing, because removing the binding
+#: leaves the rule in the instruction; the spec's own Independent Test says a rule that passes
+#: with the skill absent is not evidence.
+#:
+#: `validation` appears twice in `SKILL.md` and in no phase file, and is not something a base
+#: model emits unprompted. It is therefore the rule whose presence can actually be attributed
+#: to delivering the skill.
+#:
+#: Both halves are required. A `validation` block with a `condition` and no `error_message` is
+#: not what the guide teaches, and Terraform will not accept it.
+_VARIABLE_VALIDATION = re.compile(
+    r"""(?isx)
+    \bvalidation\s*\{        # validation {
+    [^{}]*                    # ...containing both, in either order
+    (?:
+        \bcondition\b [^{}]* \berror_message\b
+      | \berror_message\b [^{}]* \bcondition\b
+    )
+    """
+)
+
+#: Tagging as the style guide teaches it: a shared set defined once and applied everywhere,
+#: rather than a literal map retyped onto each resource.
+#:
+#: Either shape counts — `default_tags` on the provider, or a `locals` tag set merged into a
+#: resource's `tags`. The guide shows both; picking one and calling the other a miss would
+#: score a house style rather than the guide's.
+#:
+#: THE SECOND SC-002 CANDIDATE. The first, `variable_has_validation`, measured nothing: the
+#: model emitted validation blocks 5/5 in both arms, with a prompt that named the rule and
+#: again with one that did not. Tagging is the strongest remaining rule that the vendored
+#: guide teaches and the Write card does not mention at all — the card contains the word
+#: "tag" zero times.
+_SHARED_TAGS = re.compile(
+    r"""(?ix)
+    \bdefault_tags\s*\{               # provider "aws" { default_tags { ... } }
+    | \bmerge\s*\(\s*local\.[a-z_]*tag  # tags = merge(local.common_tags, { ... })
+    | \btags\s*=\s*local\.[a-z_]*tag     # tags = local.common_tags
+    """
+)
+
 #: An exact version pin: `version = "1.2.3"` or `version = "= 1.2.3"`.
 _EXACT_PIN = re.compile(r'(?i)\bversion\s*=\s*"\s*=?\s*\d+\.\d+(\.\d+)?\s*"')
 
@@ -111,6 +157,12 @@ def detect(contents: dict[str, str]) -> frozenset[str]:
         found.add("provider_version_is_pinned")
     if not _UNBOUNDED.search(text):
         found.add("no_floating_version_constraint")
+
+    if _VARIABLE_VALIDATION.search(text):
+        found.add("variable_has_validation")
+
+    if _SHARED_TAGS.search(text):
+        found.add("tags_are_shared_not_ad_hoc")
 
     paths = _POLICY_PATH.findall(text)
     if len(paths) == 1:

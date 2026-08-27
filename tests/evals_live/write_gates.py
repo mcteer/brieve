@@ -167,10 +167,18 @@ def render_subject(files: dict[str, str]) -> str:
 
 
 def iter_write_train_items(*, repo_root: Path = ROOT) -> tuple[WriteTrainItem, ...]:
-    """All five golden tasks, each with its subject. No `prompts[:1]` slice."""
+    """Every golden task that trains, each with its subject. No `prompts[:1]` slice.
+
+    **Measurement tasks are excluded** (051). A task marked `trains = false` exists to answer
+    whether delivering a skill changed the output; training the optimiser on it would produce
+    a card that carries the rule either way, so both arms of the comparison would pass and the
+    measurement would be of the trainset rather than of the skill.
+    """
     corpus = load_corpus(repo_root / "evals" / "authoring" / "corpus.toml")
     items: list[WriteTrainItem] = []
     for task in corpus.golden:
+        if not task.trains:
+            continue
         subject = subject_for(task.name)
         prompt = (
             f"{FILE_PROTOCOL}\n\nTASK: {task.prompt}\n\n"
