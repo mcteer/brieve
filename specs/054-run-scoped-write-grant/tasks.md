@@ -37,8 +37,8 @@ mechanism-independent, so only Phase 3 branches.
 | --- | --- |
 | **Fail-closed** | T033–T037 — manufacture failure, renewal failure, and the absence of any fallback. Three distinct reasons, none proceeding and none reported as another |
 | **Conformance** | T025–T032 (rows E1–E10, live), T012–T014 and T019–T021 (rows A1–A10, hermetic) |
-| **Correlation / evidence** | T015, T038 — the recorded scope is what FR-011 answers from, joinable on the run |
-| **No-secret-leak** | T017a / T017b — a grant names paths and capabilities; no credential material reaches the record |
+| **Correlation / evidence** | T010, T038 — the recorded scope is what FR-011 answers from, joinable on the run |
+| **No-secret-leak** | T017a / T018b — a grant names paths and capabilities; no credential material reaches the record |
 
 ## Path Conventions
 
