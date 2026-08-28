@@ -85,6 +85,18 @@ resource "vault_jwt_auth_backend_role" "harness" {
   # ceiling to know what it may call. Read-only on the second — a run that could write its
   # own ceiling would be the escalation Principle IV exists to make structurally
   # unavailable.
+  # 054 REMOVED `scratch_policy_check` FROM THIS LIST, and this note is what it left behind.
+  #
+  # 042 granted it, and its own comment called it "the first WRITE capability a dispatched run
+  # has ever carried". Every grant below is read-only again. The measurement that needed it
+  # runs on the surface now, which already held the namespace for the sweep — so a run asks for
+  # a measurement rather than performing one, and holds no policy-write authority at all.
+  #
+  # This is 054's FR-012 met in full rather than in part. Bounding the grant per run was
+  # possible and cost one permanent identity entity per Build; removing it costs nothing.
+  #
+  # Written ABOVE the list rather than inside it: a row asserting what this role grants reads
+  # the brackets, and a comment naming the policy inside them reads as the grant itself.
   token_policies = [
     vault_policy.harness_database.name,
     vault_policy.harness_authority_read.name,
@@ -140,21 +152,18 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
   not_before_leeway = local.jwt_clock_leeway
   clock_skew_leeway = local.jwt_clock_leeway
 
-  # 054: THE ALLOCATION, NOT THE JOB. `user_claim` names the identity alias, and the alias is
-  # what `scratch.tf`'s templated policy resolves against — so this one line is what makes a
-  # run's write grant name its own workspace rather than every run's.
+  # 054, REVERTED AFTER MEASUREMENT. This pointed at `/nomad_allocation_id` for one day.
   #
-  # `nomad_job_id` presents the PARENT here (see the glob below), so every dispatched run
-  # shared ONE alias and ONE entity. Two concurrent runs would have received identical grants
-  # naming each other's workspace. `nomad_allocation_id` is the only per-run value Nomad's
-  # workload identity carries — the claim set is `aud, exp, iat, jti, nbf,
-  # nomad_allocation_id, nomad_job_id, nomad_namespace, nomad_task, sub`, and `sub` is
-  # job-shaped.
+  # It worked: a run could reach only its own measurement workspace, demonstrated live. It
+  # also created one Vault identity entity per Build, permanently, against a documented hard
+  # ceiling of ~480,000 on integrated storage — reached in about 2.4 months at 10,000 users,
+  # after which entity writes fail and entity writes happen on every login. Proposed ADR-0072
+  # records the rule: identity is per definition, never per invocation.
   #
-  # **The cost, recorded rather than discovered** (054 R2a): this creates one Vault identity
-  # entity per run, and Vault never garbage-collects them while Nomad does collect its
-  # allocations. Invisible on a laptop, monotonic in an estate running Builds continuously.
-  user_claim              = "/nomad_allocation_id"
+  # The isolation was kept and made stronger by moving the measurement off the run entirely
+  # (054 T046c/T046d), so this can go back to naming the job — where every run shares one
+  # identity that already exists and nothing accumulates.
+  user_claim              = "/nomad_job_id"
   user_claim_json_pointer = true
 
   bound_claims_type = "glob"
@@ -177,16 +186,6 @@ resource "vault_jwt_auth_backend_role" "agent_run" {
     # allocation must read it under its own attested identity — a key handed to an allocation
     # is a key in the allocation's environment, which is what ADR-0058 exists to avoid.
     vault_policy.model_credential_read.name,
-    # 042: the measurement namespace, and nothing outside it. This is the first WRITE
-    # capability a dispatched run has ever carried — every grant above is read-only, and
-    # `agent_pack_secrets` deliberately carries none, with its own comment explaining why
-    # the obvious reason to add one turned out not to need it.
-    #
-    # It is granted here because Principle IV's "structurally excluded from managing their
-    # own platform" is enforced by the NAMESPACE rather than by withholding the verb: a run
-    # can create and destroy `scratch-agent-*` and Vault refuses everything else, including
-    # the policy that grants this. See `scratch.tf` for the full argument.
-    vault_policy.scratch_policy_check.name,
   ]
   token_ttl  = 3600
   token_type = "service"

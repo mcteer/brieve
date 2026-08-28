@@ -175,6 +175,11 @@ def test_the_sweep_grant_is_not_held_by_a_dispatched_run() -> None:
 
     Finding an orphan means finding a name nobody told you about, so the sweep genuinely
     needs enumeration — which is exactly why a dispatched run must not have it.
+
+    **054 widened this row rather than narrowing it.** It used to assert the run held the
+    measurement grant and not the sweep's. It now asserts the run holds NEITHER: the
+    measurement moved to the surface, so a dispatched run has no policy-write authority at
+    all, and both halves of this assertion are about the same absence.
     """
     auth = (MODULE / "auth.tf").read_text()
     # Located by regex rather than by an exact-width slice. `terraform fmt` aligns `=` within
@@ -183,14 +188,24 @@ def test_the_sweep_grant_is_not_held_by_a_dispatched_run() -> None:
     # asserts was untouched. The property is worth keeping; the brittleness was not.
     anchor = re.search(r'^\s*role_name\s*=\s*"agent-run"', auth, re.MULTILINE)
     assert anchor is not None, "the agent-run JWT role is gone from auth.tf"
-    agent_role = auth[anchor.start() :]
-    agent_role = agent_role[: agent_role.index("\n}")]
+    block = auth[anchor.start() :]
+    block = block[: block.index("\n}")]
+
+    # THE GRANT LIST, NOT THE PROSE AROUND IT. Reading the whole block made this row fail on a
+    # comment that NAMED the policy it was explaining the removal of — the second time in this
+    # feature that a row keyed on incidental text rather than on the thing it asserts. What is
+    # being claimed is what the role grants, so that is what is read.
+    granted = re.search(r"token_policies\s*=\s*\[(.*?)\]", block, re.DOTALL)
+    assert granted is not None, "the agent-run role grants nothing at all, which is not a pass"
+    agent_role = granted.group(1)
 
     assert "scratch_sweep" not in agent_role, (
         "the sweep grant enumerates every policy in the estate; on a dispatched run that is "
         "reconnaissance, and the run has no use for it — it knows its own scratch names"
     )
-    assert "scratch_policy_check" in agent_role, (
-        "the run must carry the measurement grant, or the impact check refuses for want of "
-        "authority and the feature has no instrument"
+    assert "scratch_policy_check" not in agent_role, (
+        "a dispatched run carries policy-write authority again. 054 moved the measurement to "
+        "the surface precisely so it would not: bounding this grant per run was possible and "
+        "cost one permanent Vault identity entity per Build, against a ceiling that logins "
+        "fail at (ADR-0072). A run asks for a measurement now; it does not perform one."
     )

@@ -14,9 +14,13 @@ needed a probe job rather than a minted token; the short version is that a minte
 identity entity, so it would be refused everything and this file would pass while asserting
 nothing.
 
-**E4 is not optional and is the reason the others mean anything.** An authority that resolves
-to nothing refuses everything. Without a row requiring the run to reach its OWN workspace, a
-completely broken grant satisfies every refusal here.
+**The claim got STRICTER on 2026-08-28, and E4 went with it.** The first fix bounded a run to
+its own workspace, which worked and cost one permanent Vault identity entity per Build against
+a ceiling that logins fail at (ADR-0072). The measurement moved to the long-lived surface
+instead, so a run now holds no policy-write authority at all and has no own workspace to
+reach. E4 required exactly that and is withdrawn with its reason; what replaces it is
+`test_the_measurement_still_works`, because "refuses everything" must not be allowed to mean
+"the product is broken".
 """
 
 from __future__ import annotations
@@ -79,6 +83,57 @@ def _admin_json(path: str) -> dict[str, Any]:
         return dict(_json.loads(response.read()))
 
 
+def _admin_json_post(path: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Administrator POST. Setup only — never an assertion, because a refusal to an
+    administrator proves nothing."""
+    import json as _json
+
+    addr = os.environ.get("VAULT_ADDR", "https://127.0.0.1:8200")
+    ctx = ssl.create_default_context(cafile=os.environ.get("VAULT_CACERT") or None)
+    request = urllib.request.Request(  # noqa: S310
+        f"{addr}/v1/{path}",
+        method="POST",
+        data=_json.dumps(body).encode(),
+        headers={"X-Vault-Token": os.environ.get("VAULT_TOKEN", "")},
+    )
+    with urllib.request.urlopen(request, timeout=20, context=ctx) as response:  # noqa: S310
+        return dict(_json.loads(response.read()))
+
+
+def _as(token: str, path: str, *, method: str = "GET", body: dict[str, str] | None = None) -> int:
+    """One request as a specific token. The verdict, not the payload."""
+    import json as _json
+
+    addr = os.environ.get("VAULT_ADDR", "https://127.0.0.1:8200")
+    ctx = ssl.create_default_context(cafile=os.environ.get("VAULT_CACERT") or None)
+    request = urllib.request.Request(  # noqa: S310
+        f"{addr}/v1/{path}",
+        method=method,
+        data=_json.dumps(body).encode() if body else None,
+        headers={"X-Vault-Token": token},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20, context=ctx) as response:  # noqa: S310
+            return int(response.status)
+    except urllib.error.HTTPError as error:
+        return int(error.code)
+
+
+def _admin_list(path: str) -> list[str]:
+    """LIST as administrator. Enumeration for a measurement, never for an assertion of denial."""
+    import json as _json
+
+    addr = os.environ.get("VAULT_ADDR", "https://127.0.0.1:8200")
+    ctx = ssl.create_default_context(cafile=os.environ.get("VAULT_CACERT") or None)
+    request = urllib.request.Request(  # noqa: S310
+        f"{addr}/v1/{path}",
+        method="LIST",
+        headers={"X-Vault-Token": os.environ.get("VAULT_TOKEN", "")},
+    )
+    with urllib.request.urlopen(request, timeout=20, context=ctx) as response:  # noqa: S310
+        return list(_json.loads(response.read())["data"]["keys"])
+
+
 def _admin_body(path: str) -> str:
     """The deployed policy text, so a row that widens it can put it back exactly."""
     return str(_admin_json(path)["data"]["policy"])
@@ -101,71 +156,78 @@ def verdicts(another_runs_workspace: str) -> dict[tuple[str, str], int]:
     }
 
 
-def test_row_e4_a_run_reaches_its_own_workspace(verdicts: dict[tuple[str, str], int]) -> None:
-    """ROW E4 — and the row that makes E1-E3 evidence rather than noise.
+def test_the_measurement_still_works(another_runs_workspace: str) -> None:
+    """WHAT REPLACED E4, and the row without which every refusal below is worthless.
 
-    A grant that resolves to nothing refuses everything and would satisfy every refusal row
-    here while breaking the impact check entirely. Asserted FIRST for that reason.
+    A run that can reach nothing is trivially safe and useless. E4 used to catch that by
+    requiring the run to reach its OWN workspace; there is no own workspace now, so the same
+    duty falls here: the surface must still be able to write, measure and destroy in the
+    namespace, or 042's impact check has no instrument and 054 broke the product to secure it.
+
+    Asserted against the deployed grant rather than by driving a measurement, because the
+    surface's own rows drive that path and this one is about who holds the authority.
     """
-    assert verdicts[("own", "write")] in (200, 204), (
-        "a run cannot write its own measurement policy, so `vault_policy_impact` has no "
-        "instrument and every refusal below proves only that the grant is broken"
+    sweep = _admin_json("sys/policies/acl/scratch-sweep")["data"]["policy"]
+    assert '"create"' in sweep and '"update"' in sweep, (
+        "the surface cannot write in the measurement namespace, so nothing can — the run's "
+        "grant was removed on the understanding that this one exists"
     )
-    assert verdicts[("own", "read")] == 200
 
 
 @pytest.mark.parametrize("action", ["read", "write", "delete"])
-def test_rows_e1_e3_a_run_cannot_touch_another_runs_workspace(
-    verdicts: dict[tuple[str, str], int], action: str
+@pytest.mark.parametrize("target", ["mine", "existing"])
+def test_rows_e1_e3_a_run_reaches_no_scratch_policy(
+    verdicts: dict[tuple[str, str], int], target: str, action: str
 ) -> None:
-    """ROWS E1-E3 — the defect, attempted again under the fix.
+    """ROWS E1-E3, widened. A run reaches NO measurement policy — not another's, not one named
+    after itself.
 
-    These three actions returned 200, 200 and 204 on 2026-08-27 against the estate-wide grant.
+    The three actions against another run's workspace returned 200, 200 and 204 on 2026-08-27
+    against the estate-wide grant. They are all 403 now, and so is every attempt on a name the
+    run might think is its own, because a dispatched run holds no policy-write authority at all.
     """
-    assert verdicts[("foreign", action)] == 403, (
-        f"a run {action}s another run's measurement policy. The grant in `scratch.tf` is "
-        f"estate-wide again, or `user_claim` no longer names the allocation — the two must "
-        f"change together, and E4 above is what catches the other direction."
+    if (target, action) not in verdicts:
+        pytest.skip(f"{target}/{action} is not one of the attempted pairs")
+    assert verdicts[(target, action)] == 403, (
+        f"a run can {action} a scratch policy ({target}). 054 removed `scratch-policy-check` "
+        "from the agent-run role; if this passes, the grant is back, and with it one permanent "
+        "Vault identity entity per Build unless the per-run mechanism came back too."
     )
 
 
 def test_row_e5_the_safety_case_can_lose(another_runs_workspace: str) -> None:
-    """ROW E5 — **the row that makes every other row here mean something** (FR-004, SC-003).
+    """ROW E5 — **the row the rest depend on**, rebuilt for the new mechanism (FR-004, SC-003).
 
-    Widen the grant back to what it was, confirm the break-in succeeds again, and restore.
-    Without this, E1-E3 could be passing for any reason at all — a broken login, an unrelated
-    denial, a probe that never reached Vault — and nobody would know.
+    It used to widen the deployed grant and confirm the break-in worked again. That proves
+    nothing now: the run holds no scratch grant at all, so widening a policy it does not carry
+    would change nothing and the row would pass while asserting nothing — the exact failure it
+    exists to prevent.
 
-    Restores in a `finally`, because a row that widened the estate and died would leave the
-    defect in place while reporting a failure that looks like the feature's.
+    So the attribution moves to where the property now lives. A token carrying
+    `scratch-policy-check` — the grant that was removed from the run — CAN write in the
+    namespace. Therefore the run's refusal is caused by not holding that policy, and not by a
+    broken template, an unreachable Vault, or a probe that never got a token.
+
+    **Mints rather than mutates.** An earlier version of this row rewrote the deployed policy
+    and restored it in a `finally`; touching a role or a policy in a shared estate to prove a
+    point is a risk this version does not need to take.
     """
-    widened = (
-        'path "sys/policies/acl/scratch-agent-*" '
-        '{ capabilities = ["create", "update", "delete", "read"] }\n'
-        'path "auth/token/create/scratch-check" { capabilities = ["update"] }'
+    document = {"policy": 'path "secret/data/e5" { capabilities = ["read"] }'}
+    minted = _admin_json_post(
+        "auth/token/create",
+        {"policies": ["scratch-policy-check"], "ttl": "2m", "no_parent": True},
     )
-    original = _admin_body("sys/policies/acl/scratch-policy-check")
-    assert original, "the deployed grant could not be read, so it cannot be safely restored"
+    token = minted["auth"]["client_token"]
+
+    name = "scratch-agent-e5-attribution-current"
     try:
-        assert _admin(
-            "sys/policies/acl/scratch-policy-check", method="PUT", body={"policy": widened}
-        ) in (200, 204)
-        verdicts = {
-            (a.path, a.action): a.status
-            for a in attempt_under_run_authority(another_runs_workspace)
-        }
-        assert verdicts[("foreign", "write")] in (200, 204), (
-            "the estate-wide grant is back and a run STILL cannot reach another run's "
-            "workspace, so the refusal in E1-E3 is coming from something other than this "
-            "feature — find out what before trusting any row in this file"
+        assert _as(token, f"sys/policies/acl/{name}", method="PUT", body=document) in (200, 204), (
+            "the grant removed from the run does not itself permit writing, so the refusals "
+            "above are caused by something other than its absence. Find out what before "
+            "trusting any row in this file."
         )
     finally:
-        _admin("sys/policies/acl/scratch-policy-check", method="PUT", body={"policy": original})
-
-    restored = {
-        (a.path, a.action): a.status for a in attempt_under_run_authority(another_runs_workspace)
-    }
-    assert restored[("foreign", "write")] == 403, "the narrowing was not restored"
+        _admin(f"sys/policies/acl/{name}", method="DELETE")
 
 
 def test_row_e6_no_read_a_run_could_make_before_is_refused_now(
@@ -183,12 +245,16 @@ def test_row_e6_no_read_a_run_could_make_before_is_refused_now(
         "harness-authority-read",
         "harness-database",
         "model-credential-read",
-        "scratch-policy-check",
     }
     role = _admin_json("auth/nomad/role/agent-run")
     assert set(role["data"]["token_policies"]) == expected, (
         "a run's policy set changed. If a READ grant was removed, ADR-0057's reasoning is "
-        "being reversed by accident, which is the thing 054 was scoped to avoid."
+        "being reversed by accident, which is the thing 054 was scoped to avoid. If "
+        "`scratch-policy-check` is back, so is one permanent identity entity per Build."
+    )
+    assert "scratch-policy-check" not in role["data"]["token_policies"], (
+        "the run holds policy-write authority again — the grant 054 removed, and the reason "
+        "the per-run identity that cost an entity per Build is no longer needed"
     )
 
 
@@ -233,31 +299,24 @@ def test_row_e8_the_refusal_is_vaults_and_not_the_pipelines(
         "the probe now goes through platform code, so these rows would pass on a pipeline "
         "guard rather than on the estate's own answer — which is the claim E8 exists to make."
     )
-    assert verdicts[("foreign", "write")] == 403
+    assert verdicts[("existing", "write")] == 403
 
 
-def test_row_e10_a_restarted_run_gets_its_own_workspace(another_runs_workspace: str) -> None:
-    """ROW E10 — FR-016, as REVERSED on 2026-08-27.
+def test_row_e10_a_restarted_run_inherits_nothing(verdicts: dict[tuple[str, str], int]) -> None:
+    """ROW E10, and FR-016 is now satisfied by there being nothing to inherit.
 
     The original requirement said a restarted run must reach the workspace it had before. The
-    maintainer reversed it, and the reasoning is the point: a dependency outage restarting a
-    job repeatedly would have every attempt contending for ONE workspace — this feature's own
-    defect, self-inflicted.
+    maintainer reversed it: a dependency outage restarting a job repeatedly would have every
+    attempt contending for one workspace, which is this feature's own defect self-inflicted.
 
-    So each attempt gets its own, and cannot reach the one before it. That is asserted here by
-    treating a *previous* attempt's workspace exactly as a foreign one, because to a restarted
-    run that is precisely what it is.
-
-    What a dead attempt leaves behind is the sweep's job (E7), which is what that sweep exists
-    for.
+    After the measurement moved off the run, the requirement is met the strongest way available
+    — a run has no workspace at all, so an attempt cannot inherit one. The previous attempt's
+    is refused for the same reason every other name is.
     """
-    verdicts = {
-        (a.path, a.action): a.status for a in attempt_under_run_authority(another_runs_workspace)
-    }
-    assert verdicts[("own", "write")] in (200, 204)
-    assert verdicts[("foreign", "read")] == 403, (
-        "a run reaches a workspace that is not its own. A restarted run must not inherit the "
-        "previous attempt's, or an outage turns repeated restarts into repeated contention."
+    assert verdicts[("existing", "read")] == 403
+    assert verdicts[("mine", "write")] == 403, (
+        "a run can write a policy named after its own allocation. That was the previous "
+        "design and it cost one permanent identity entity per Build."
     )
 
 
@@ -281,4 +340,61 @@ def test_row_e9_the_grant_expires_and_is_not_standing() -> None:
     assert role.get("token_type") == "service", (
         "a batch token cannot be renewed, so a Build slower than one lifetime would fail its "
         "measurement rather than continue — the outcome FR-014 exists to avoid"
+    )
+
+
+def test_a_build_creates_no_identity_entity() -> None:
+    """**FR-018, and the row whose absence let a correct feature ship an unbounded cost.**
+
+    054's first mechanism bounded a run to its own workspace and created one permanent Vault
+    identity entity per Build to do it. Every gate the feature had asked whether the bound
+    *held*; none asked what it *cost to maintain*. Entities have no TTL, the documented ceiling
+    on integrated storage is a hard 256 MiB across 256 shards, and entity writes happen on every
+    login — so the failure mode was that logins stop and every Build fails, in about 2.4 months
+    at 10,000 users (ADR-0072).
+
+    This row is what that requirement bought. It reads the identity store either side of a real
+    dispatch, which is how the defect was found in the first place.
+    """
+    import subprocess
+    import time
+
+    def entity_count() -> int:
+        listed = _admin_list("identity/entity/id")
+        return len(listed)
+
+    before = entity_count()
+    correlation = f"corr-fr018-{int(time.time())}"
+    dispatched = subprocess.run(  # noqa: S603
+        [  # noqa: S607
+            "nomad",
+            "job",
+            "dispatch",
+            "-detach",
+            "-meta",
+            f"correlation_id={correlation}",
+            "-meta",
+            "subject_user_id=alice",
+            "-meta",
+            "tenant_id=default",
+            "-meta",
+            "agent_definition_id=vault-agent",
+            "-meta",
+            f"run_id={correlation}",
+            "-meta",
+            "step_index=0",
+            "agent-run",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert dispatched.returncode == 0, f"could not dispatch: {dispatched.stderr[:200]}"
+    time.sleep(20)
+
+    after = entity_count()
+    assert after == before, (
+        f"a Build created {after - before} identity entity(ies). They never expire, the "
+        "ceiling is hard, and entity writes happen on every login — so this grows until "
+        "logins fail. `user_claim` is naming something per-run again (ADR-0072)."
     )

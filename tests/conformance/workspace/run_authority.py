@@ -114,18 +114,19 @@ with urllib.request.urlopen(req, timeout=15, context=ctx) as r:
     token = json.loads(r.read())["auth"]["client_token"]
 
 alloc = os.environ["NOMAD_ALLOC_ID"]
-own = "sys/policies/acl/scratch-agent-" + alloc + "-current"
-foreign = "sys/policies/acl/" + sys.argv[1]
+mine = "sys/policies/acl/scratch-agent-" + alloc + "-current"
+existing = "sys/policies/acl/" + sys.argv[1]
 doc = {"policy": 'path "secret/data/x" { capabilities = ["read"] }'}
 
+# 054, after the measurement moved: a run has NO workspace of its own, so "mine" is only a
+# name it might try. Every one of these must be refused — that is the stricter claim.
 out = [
-    {"action": "write", "path": "own", "status": call(own, token, "PUT", doc)},
-    {"action": "read", "path": "own", "status": call(own, token)},
-    {"action": "read", "path": "foreign", "status": call(foreign, token)},
-    {"action": "write", "path": "foreign", "status": call(foreign, token, "PUT", doc)},
-    {"action": "delete", "path": "foreign", "status": call(foreign, token, "DELETE")},
+    {"action": "write", "path": "mine", "status": call(mine, token, "PUT", doc)},
+    {"action": "read", "path": "mine", "status": call(mine, token)},
+    {"action": "read", "path": "existing", "status": call(existing, token)},
+    {"action": "write", "path": "existing", "status": call(existing, token, "PUT", doc)},
+    {"action": "delete", "path": "existing", "status": call(existing, token, "DELETE")},
 ]
-call(own, token, "DELETE")
 print(json.dumps(out))
 """
 

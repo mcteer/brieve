@@ -159,17 +159,17 @@ records the rule; these tasks apply it.
 moving alone leaves the growth. Ordered so the tree is never in a state that has neither.
 
 - [X] T046 Configure Nomad's `oidc_issuer` in the substrate so workload tokens carry `iss` and discovery answers. **Measured prerequisite, not an optimisation** ([R10](research.md)): the JWT carries no issuer today and the surface's verifier keys on one
-- [ ] T046a Add a second `identity` block to the agent-run task in `infra/jobs/agent-run.nomad.hcl`, with an audience naming the surface. A token minted for Vault must not be replayable at the surface
-- [ ] T046b Configure `OIDC_WORKLOAD_ISSUER` and `OIDC_WORKLOAD_JWKS_URI` on the MCP job. The verifier already exists in `served.py` and the API job already sets both — the MCP job sets neither
-- [ ] T046c Build the run's client for the impact call in `src/surfaces/dispatch/`, presenting the surface-audience identity
-- [ ] T046d Execute `vault_policy_impact` on the surface under the surface's own identity; `toolset` already loads the handler there
-- [ ] T046e Grant the surface `create` and `update` on the scratch namespace in `infra/modules/trust-fabric/scratch.tf`, beside the `list`/`read`/`delete` the sweep already holds
-- [ ] T047 Remove `scratch-policy-check` from the `agent-run` role in `infra/modules/trust-fabric/auth.tf`. **This is FR-012 met in full** — a run then holds no policy-write authority at all, rather than a self-scoped grant it may not need
-- [ ] T048 Revert `user_claim` to `/nomad_job_id` in the same role, so runs share one identity that already exists and nothing accumulates (**FR-018**)
-- [ ] T049 Restore the estate-wide form in `scratch.tf`'s grant — it is the SURFACE's grant now, and one long-lived identity holding it is the shape the sweep already has
-- [ ] T050 Rework rows E1-E4: the claim becomes **a run cannot reach ANY scratch policy**, which is stricter than what they assert today. The probe harness survives unchanged; only the expectation moves
-- [ ] T051 [P] Row: the `agent-run` role's policy set contains no policy granting `create` or `update` on `sys/policies/acl` — asserted against the deployed role, so a future widening fails here
-- [ ] T052 [P] Row (**FR-018**): a dispatched Build creates **no new identity entity**. Measured by counting entities either side of a real dispatch, which is how the defect was found
+- [X] T046a Add a second `identity` block to the agent-run task in `infra/jobs/agent-run.nomad.hcl`, with an audience naming the surface. A token minted for Vault must not be replayable at the surface
+- [X] T046b Configure `OIDC_WORKLOAD_ISSUER` and `OIDC_WORKLOAD_JWKS_URI` on the MCP job. The verifier already exists in `served.py` and the API job already sets both — the MCP job sets neither
+- [X] T046c Build the run's client for the impact call in `src/surfaces/dispatch/`, presenting the surface-audience identity
+- [X] T046d Execute `vault_policy_impact` on the surface under the surface's own identity; `toolset` already loads the handler there
+- [X] T046e Grant the surface `create` and `update` on the scratch namespace in `infra/modules/trust-fabric/scratch.tf`, beside the `list`/`read`/`delete` the sweep already holds
+- [X] T047 Remove `scratch-policy-check` from the `agent-run` role in `infra/modules/trust-fabric/auth.tf`. **This is FR-012 met in full** — a run then holds no policy-write authority at all, rather than a self-scoped grant it may not need
+- [X] T048 Revert `user_claim` to `/nomad_job_id` in the same role, so runs share one identity that already exists and nothing accumulates (**FR-018**)
+- [X] T049 Restore the estate-wide form in `scratch.tf`'s grant — it is the SURFACE's grant now, and one long-lived identity holding it is the shape the sweep already has
+- [X] T050 Rework rows E1-E4: the claim becomes **a run cannot reach ANY scratch policy**, which is stricter than what they assert today. The probe harness survives unchanged; only the expectation moves
+- [X] T051 [P] Row: the `agent-run` role's policy set contains no policy granting `create` or `update` on `sys/policies/acl` — asserted against the deployed role, so a future widening fails here
+- [X] T052 [P] Row (**FR-018**): a dispatched Build creates **no new identity entity**. Measured by counting entities either side of a real dispatch, which is how the defect was found
 - [ ] T053 Delete `infra/jobs/run-probe.nomad.hcl` and its dev-only `agent_run_job_id_patterns` entry **only if** T050 leaves the harness unused. If the rows still borrow run authority, both stay — the probe exists because a minted token cannot carry an identity
 - [ ] T054 Enable telemetry in the enclave and alert on `vault.identity.upsert_entity_txn` — the metric HashiCorp names for this degradation. `sys/metrics` currently answers 400, so nothing would have reported the problem this amendment exists to prevent
 - [ ] T055 Reclaim the entities this session created: 11 → 69 in one afternoon. They do not expire, and the estate should not carry the evidence of a withdrawn design
