@@ -69,3 +69,21 @@ plugin "docker" {
     }
   }
 }
+
+# THE WORKLOAD IDENTITY ISSUER (054, T046).
+#
+# **Without this, a workload identity token carries no `iss` claim at all** — measured on a
+# live allocation, and `/.well-known/openid-configuration` answers 404 while
+# `/.well-known/jwks.json` answers 200. Vault does not mind: its JWT auth method is configured
+# with the JWKS directly and matches on `bound_audiences` and `bound_claims`.
+#
+# The MCP surface does mind. Its verifier is issuer-keyed
+# (`verifier_for(SubjectKind.WORKLOAD, iss=…, jwks=…)` in `src/surfaces/mcp/served.py`), and an
+# issuer-keyed verifier cannot accept a token that names no issuer. 054 needs a dispatched run
+# to authenticate to that surface, so this is a prerequisite rather than a tidy-up.
+#
+# Loopback, because the surface runs with `network_mode = "host"` and reaches the scheduler the
+# same way every other host process does. An estate with a real hostname sets its own.
+server {
+  oidc_issuer = "http://127.0.0.1:4646"
+}

@@ -158,7 +158,7 @@ records the rule; these tasks apply it.
 **The two halves are independent and both are required.** Reverting alone loses the isolation;
 moving alone leaves the growth. Ordered so the tree is never in a state that has neither.
 
-- [ ] T046 Configure Nomad's `oidc_issuer` in the substrate so workload tokens carry `iss` and discovery answers. **Measured prerequisite, not an optimisation** ([R10](research.md)): the JWT carries no issuer today and the surface's verifier keys on one
+- [X] T046 Configure Nomad's `oidc_issuer` in the substrate so workload tokens carry `iss` and discovery answers. **Measured prerequisite, not an optimisation** ([R10](research.md)): the JWT carries no issuer today and the surface's verifier keys on one
 - [ ] T046a Add a second `identity` block to the agent-run task in `infra/jobs/agent-run.nomad.hcl`, with an audience naming the surface. A token minted for Vault must not be replayable at the surface
 - [ ] T046b Configure `OIDC_WORKLOAD_ISSUER` and `OIDC_WORKLOAD_JWKS_URI` on the MCP job. The verifier already exists in `served.py` and the API job already sets both — the MCP job sets neither
 - [ ] T046c Build the run's client for the impact call in `src/surfaces/dispatch/`, presenting the surface-audience identity
