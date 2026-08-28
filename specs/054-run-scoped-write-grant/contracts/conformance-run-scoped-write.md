@@ -92,7 +92,23 @@ Dan McTeer (maintainer). E1–E10 fail loudly when the enclave is absent; they d
 
 | Row | Named runner | Status |
 | --- | --- | --- |
-| E1–E10 | — | pending |
+| E1–E3 | — | **Pass, 2026-08-27.** Read 403, write 403, delete 403 under real run authority, against a 200/200/204 baseline recorded before the change |
+| E4 | — | **Pass.** The same authority writes (204) and reads (200) its own workspace, so the refusals above are not an authority that reaches nothing |
+| E5 | — | **Pass.** Restoring the estate-wide grant makes the break-in succeed again; restored in a `finally` |
+| E6 | — | **Pass.** A run's five policies unchanged — no read narrowed |
+| E7 | — | **Pass.** The sweeper keeps `list`; the run still lacks it |
+| E8 | — | **Pass.** The probe never enters the dispatch pipeline, so the refusal is the trust fabric's |
+| E9 | — | **Pass.** Token TTL 3600s, `service` type — short by construction and renewable |
+| E10 | — | **Pass.** A previous attempt's workspace is foreign to a restarted run |
+
+**How they run.** `tests/conformance/workspace/`, marked `enclave` **and** `host_enclave`
+following 018, and the directory is named in the Makefile's host lane. That last part is not a
+detail: the directory was initially unnamed by any lane, so ten green rows ran nowhere — the
+trap 010, 014 and 018 each paid for. Full host lane, 2026-08-27: **92 passed**.
+
+**Authority is borrowed, never minted** — `run_authority.py`, via a probe job admitted to the
+`agent-run` role in dev and conformance only. A minted token has no identity entity and would
+be refused everything, which E4 exists to catch.
 
 ## 5. Stability commitments
 

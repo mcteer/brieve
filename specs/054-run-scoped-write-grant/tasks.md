@@ -67,10 +67,10 @@ Single project: `src/`, `tests/`, `infra/`, `packs/`, `specs/` at repository roo
 - [ ] ~~T010~~ **WITHDRAWN — see [research.md](research.md) R8.** Branch A answers FR-011 from the fixed policy and the allocation id, both already recorded; a `RecordedScope` would restate what the estate already says. Create `RecordedScope` in `src/core/authority/workspace.py` — `run_id`, `paths`, `derived_from` — for **FR-011 only**. It is a record an auditor reads, never a control the runtime consults ([R5](research.md))
 - [X] T011 **Assert the absence of a mechanism** (FR-017): no code path derives, stores or re-presents write scope. Vault evaluates it from the caller's identity per request, so `remint_grant` is not built — [R5](research.md) is superseded by [R2](research.md)
 - [X] T011a Build the row harness that obtains authority through the **real login path** a dispatched run uses, in `tests/conformance/authority/run_authority.py`. **Not `auth/token/create`**: a token minted from policy names has `entity_id: ""`, and under Branch A a templated policy then refuses everything including the run's own workspace — E1–E3 would pass while asserting nothing. Analysis caught this; measured 2026-08-27
-- [ ] T012 [P] Row A10 in `tests/unit/test_run_workspace.py` — no derived workspace contains a wildcard. **The row to keep if any are cut**: one surviving `*` passes every other row and grants exactly what this feature removes
-- [ ] T013 [P] Row A9 in `tests/unit/test_run_workspace.py` — the workspace derives from the manifest declaration, so a second place to say what a tool touches cannot appear
-- [ ] T013a [P] Row A8 in `tests/unit/test_write_grant_gating.py` — the `run_id_forged` guard still refuses (FR-007). **In Foundational, not Polish**: it brackets with T006, so a break anywhere in Phases 3–5 fails immediately rather than at the end
-- [ ] T014 [P] Rows A3 and A4 in `tests/unit/test_remint_stability.py` (**SC-009**) — asserted as an absence: no module derives or stores write scope, so a widened re-mint is unrepresentable rather than refused. The maintainer's hazard is closed by construction
+- [X] T012 [P] Row A10 in `tests/unit/test_run_workspace.py` — no derived workspace contains a wildcard. **The row to keep if any are cut**: one surviving `*` passes every other row and grants exactly what this feature removes
+- [X] T013 [P] Row A9 in `tests/unit/test_run_workspace.py` — the workspace derives from the manifest declaration, so a second place to say what a tool touches cannot appear
+- [X] T013a [P] Row A8 in `tests/unit/test_write_grant_gating.py` — the `run_id_forged` guard still refuses (FR-007). **In Foundational, not Polish**: it brackets with T006, so a break anywhere in Phases 3–5 fails immediately rather than at the end
+- [X] T014 [P] Rows A3 and A4 in `tests/unit/test_remint_stability.py` (**SC-009**) — asserted as an absence: no module derives or stores write scope, so a widened re-mint is unrepresentable rather than refused. The maintainer's hazard is closed by construction
 
 **Checkpoint**: a run's workspace can be derived, recorded, and re-presented without drift.
 
@@ -150,13 +150,13 @@ the attempt succeeds, and it fails if the attempt cannot be made.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T038 Confirm FR-011 end to end — an auditor can say what a finished run's authority actually granted, from the recorded scope
+- [X] T038 Confirm FR-011 end to end — an auditor can say what a finished run's authority actually granted, from the recorded scope
 - [ ] T040 Update issue #226: close the structural half, or say precisely what remains. It was reopened once already because a PR closed it while the grant was unchanged
-- [ ] T041 Add the 054 row to `ROADMAP.md`'s shipped table, naming ADR-0057's fired trigger and which branch T003 chose
-- [ ] T042 Fill `contracts/conformance-run-scoped-write.md` §4 with the E1–E10 named-runner record
+- [X] T041 Add the 054 row to `ROADMAP.md`'s shipped table, naming ADR-0057's fired trigger and which branch T003 chose
+- [X] T042 Fill `contracts/conformance-run-scoped-write.md` §4 with the E1–E10 named-runner record
 - [ ] T043 **Request security-maintainer review**, asking specifically whether the derived workspace can be induced to widen — that failure leaves every row in this feature green
-- [ ] T044 Run `make check` — hermetic rows A1–A10
-- [ ] T045 Run `make conformance` — the live rows E1–E10, exit 0
+- [X] T044 Run `make check` — hermetic rows A1–A10
+- [X] T045 Run `make conformance` — the live rows E1–E10, exit 0
 
 ---
 
