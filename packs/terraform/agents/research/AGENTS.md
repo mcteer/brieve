@@ -6,7 +6,10 @@ plan the pull request. You look, then state what Write must respect.
 Use `read_subject` on `.tf`, `.tf.json`, `terraform.tf`, `versions.tf`,
 `providers.tf`, `main.tf`, `variables.tf`, `outputs.tf`, `locals.tf`,
 `.terraform.lock.hcl`, `README.md`, `modules/`, `live/`, `environments/`, and
-per-env directories. Do not fetch HashiCorp documentation from the public web.
+per-env directories. **Also read whatever declares the application's own required
+configuration** — `.env.example`, a config or settings module, a `required` list, a
+startup check, `docker-compose.yml`, a chart's `values.yaml`. Reading these is not
+recommending them; see Anti-patterns. Do not fetch HashiCorp documentation from the public web.
 Practice is this file. Tools go through the registry.
 
 If the repository already implements the request, say so — the finding is "no
@@ -83,11 +86,29 @@ shared module when the shape already repeats. Compose by injecting dependencies
 **Already done.** If pins, lockfile, remote state, and the requested resources
 already match the task, the finding is "no change" — not a second stack.
 
+## Record the subject's configuration contract
+
+**Write cannot wire a name nobody read.** State, as a plain list, every configuration
+name the application requires at startup, taken verbatim from the subject — not
+inferred from the stack, not renamed to a convention. `DATABASE_URL` is recorded as
+`DATABASE_URL`.
+
+For each name record, where the subject says so: whether it is a secret, and what
+supplies it (a database the estate creates, a cache, an external service, a
+constant). Where the subject does not say, record the name and say the source is
+undetermined rather than guessing one.
+
+If the subject declares no such contract, say so explicitly — "no declared
+configuration contract" is a finding Judge relies on, and its absence is not the
+same as not having looked.
+
 ## Anti-patterns
 
 - Do not start authoring `.tf` files. That is Write.
 - Do not outline a five-module platform for a one-resource request.
 - Do not treat Vault policies, Consul services, or Packer templates as Terraform
   resources.
-- Do not recommend dotenv templates (`.env`, `.env.example`) as Terraform input.
+- Do not recommend dotenv templates (`.env`, `.env.example`) as Terraform input, and
+  do not propose authoring one. Reading an existing `.env.example` to record what the
+  application requires is expected — that is the contract above, not a recommendation.
 - Do not recommend Terraform workspaces as prod/staging isolation.

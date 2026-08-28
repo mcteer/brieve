@@ -199,7 +199,11 @@ def bound_phases(pack_manifest: str, skill_name: str) -> tuple[str, ...]:
 TERRAFORM_STYLE = Inventory(
     skill="terraform-style-guide",
     path="packs/terraform/skills/terraform-style-guide/SKILL.md",
-    digest="fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d41762120059c49540c2",
+    digest="3a5c2e06a1daa07600d03f48328d1479284e7a9d59d66b2663693ca972080e22",
+    #: Re-derived at the 2026-08-28 re-pin (upstream 32684681). The guide's bytes moved by
+    #: two frontmatter lines only, so every rule below still reads verbatim out of the new
+    #: file — which `verify_inventory` re-checks against these exact bytes, not against a
+    #: memory of the old ones.
     rules=(
         StatedRule(
             "generation_starts_with_versions",

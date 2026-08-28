@@ -88,6 +88,32 @@ Two things it does not cover:
 - **Match the subject's layout** when it already uses those file names. The guide
   describes a greenfield layout; you are usually editing an existing estate.
 
+## What the subject requires of you
+
+**Infrastructure that does not satisfy the application's own configuration contract is not a
+smaller change — it is a change that cannot run.** Measured over fifty authored artefacts for
+one repository: without this section, between one and three in ten set every name the subject
+needs at startup. The rest deploy and fail at boot.
+
+- **The contract is in the code, not in your assumptions.** `.env.example`, a config module, a
+  `required` list, a startup check that throws — read whichever the subject has and treat its
+  names as exact. `DATABASE_URL` is not `PGPASSWORD`.
+- **Every required name must arrive at the workload.** Secrets through the platform's secret
+  injection; non-secrets as plain configuration. A name the application needs and the
+  configuration never sets is a deployment that fails on its first request.
+- **Do not author `.env` files** — that rule is in Anti-patterns and stands. It is about where
+  secrets live, not about whether the contract exists. Read the example; satisfy it properly.
+
+## Depth must not cost a working deployment
+
+The delivered guides are thorough about encryption, and following them is right. Measured on
+the same corpus, they also **displace**: artefacts authored with them applied customer-managed
+keys four times as often as without, and set the subject's required configuration *less* often.
+
+Both, or neither is finished. If a change encrypts everything and the application cannot start,
+it is not a careful change — it is an unusable one with good properties. Get the subject
+running first, then apply the guides' depth to what you have built.
+
 ## Estate shape (not in the style guide)
 
 Formatting, naming, variables, outputs and `for_each` come from the delivered
