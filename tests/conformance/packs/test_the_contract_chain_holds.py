@@ -82,6 +82,13 @@ def test_research_may_read_what_it_must_not_recommend() -> None:
 def test_write_is_told_to_satisfy_the_contract() -> None:
     text = card("write")
     assert "## What the subject requires of you" in text
+    assert "then apply the delivered guides' depth" in text, (
+        "Write must be told to get the subject running BEFORE applying the guides' depth. "
+        "Measured 2026-08-28: stating this as its own section instead of one line made the "
+        "card longer and the artefact truncate 5 runs in 10 against the filler control's 1. "
+        "A cut-off artefact is worse than a terse complete one, so this stays one line here "
+        "and the scoring of it stays in Judge, where it costs Write no output budget."
+    )
     assert "Anti-patterns" in text, "the dotenv prohibition must remain in force"
     assert "do not author" in text.lower(), (
         "Write must still be barred from authoring dotenv files. Satisfying the contract "
@@ -111,10 +118,7 @@ def contract_prose(phase: str) -> str:
     raw = (CARDS / phase / "AGENTS.md").read_text(encoding="utf-8")
     headings = {
         "research": ["## Record the subject's configuration contract"],
-        "write": [
-            "## What the subject requires of you",
-            "## Depth must not cost a working deployment",
-        ],
+        "write": ["## What the subject requires of you"],
         "judge": None,
     }[phase]
     if headings is None:

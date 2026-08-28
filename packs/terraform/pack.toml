@@ -142,7 +142,7 @@ digest = "fe407621c5657982ebcad6a3770b93e585f83acfc065b93d7fb5c9d5bd2dd3b5"
 phase   = "write"
 path    = "agents/write/AGENTS.md"
 version = "0.5.0"
-digest = "82740cb37660ef213d3e233d5ef282bcc152e72e96099156d2722abed8ff9eb6"
+digest = "4538f3cea905e97dac3ea65e46b851c9f136dab5ac233ea81d1b42d1c31add6e"
 
 [[agents]]
 phase   = "judge"
