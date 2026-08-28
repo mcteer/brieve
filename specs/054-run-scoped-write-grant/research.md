@@ -183,3 +183,39 @@ and `scratch_policy_check` carries no `list`. Narrowing a run's grant must not t
 **The pipeline guard stays.** `b7c2a2f` refuses a call claiming a foreign `run_id`. This
 feature is the layer beneath it; FR-007 keeps both, and 042's own comment is the argument —
 the ACL is *"the only one that survives a platform bug."*
+
+
+---
+
+## R7 — Obtaining run authority for a row is harder than 018's, and this is what closes it
+
+**Measured 2026-08-27, three routes tried and closed:**
+
+1. **`auth/token/create` with the run's policy names** — 018's `run_authority()`. Closed by the
+   contract itself: such a token has `entity_id: ""`, and the templated grant resolves against
+   nothing, so every attempt returns 403 and E4 fails. It would produce a green refusal suite
+   asserting nothing.
+2. **Read the allocation's JWT and log in with it.** Closed by Nomad: `nomad alloc fs` on the
+   secrets directory returns *"Reading secret file prohibited"*. Correct behaviour, and worth
+   recording as a thing the platform gets right.
+3. **A long-lived probe job matching the `agent-run` role.** Closed by configuration:
+   `agent_run_job_id_patterns` is `["agent-run", "agent-run/dispatch-*"]`, listed explicitly
+   rather than globbed *"to `agent-run*`, which would also admit a job named `agent-runner`"*.
+
+**What remains, and it is a decision rather than a discovery.** A row needs authority that is
+both entity-bearing and agent-run-shaped, and only a real dispatched allocation has it. Two
+shapes are available:
+
+- **A declared probe job**, admitted by adding a pattern to `agent_run_job_id_patterns` **in the
+  dev and conformance environments only**. It obtains authority through the real login path, so
+  the contract holds as written. The cost is that a test-only job id is admissible where the
+  enclave is a test enclave — bounded, declared, and absent from production.
+- **Assert the composition instead of the token**: that `user_claim` names the allocation, that
+  the grant templates on the alias, and separately that Vault's templating denies a foreign name
+  — the last already demonstrated (403 on read, write and delete against a 200/200/204
+  baseline, same templating shape on a mount that can be minted against). Cheaper, and weaker:
+  it proves each link rather than the chain.
+
+**What is already proven end to end**, so neither option starts from nothing: a real dispatched
+run took the alias `ab997f55-5a60-d77b-9674-b706e8cb3978` — exactly its allocation id — where
+every run previously shared the single alias `agent-run`.
