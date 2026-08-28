@@ -94,6 +94,17 @@ ENCLAVE_PATHS = frozenset(
         # authority appears is enumeration — never an assertion of denial, because a refusal
         # to an administrator proves nothing.
         "conformance/authority/bounding_records.py",
+        # 054's run-scoped write rows. They seed a policy belonging to a DIFFERENT run under
+        # administrator authority, then have a real run attempt to reach it — the same posture
+        # as the entry above, and for the same reason: administrator authority appears only in
+        # the setup, never in the assertion, because a refusal to an administrator proves
+        # nothing.
+        #
+        # The RUN's own attempt does not appear here at all. It runs inside the allocation
+        # through `run_authority.py`, so a run's credential never enters the test process —
+        # which is what ADR-0058 refuses one layer up, and why that module needs no HTTP
+        # client of its own.
+        "conformance/authority/test_run_scoped_write.py",
         # 019's served-surface rows. They reach the MCP surface over a real socket and walk
         # the development provider's authorization-code flow to obtain a caller credential —
         # neither of which a client that does not speak HTTP can do.
