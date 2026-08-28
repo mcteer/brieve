@@ -21,6 +21,7 @@ without saying so is how a pack comes to read as proven.
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Mapping
 from typing import Any
@@ -351,9 +352,23 @@ def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
     write and the `finally` leaves scratch policies behind; the sweep (FR-023) is what makes
     "always destroyed" checkable rather than merely claimed.
     """
-    run_id = str(arguments.get("run_id", "")).strip()
-    if not run_id:
-        raise ValueError("vault_policy_impact requires a 'run_id' argument to derive its names")
+    # 054: THE ALLOCATION NAMES THE WORKSPACE, AND NOTHING ELSE MAY.
+    #
+    # This used to be `arguments["run_id"]` — a value the CALLER supplied. `scratch.tf` now
+    # grants only `scratch-agent-<this allocation>-*`, evaluated by Vault against the caller's
+    # own attested identity, so a name derived from anything else is simply refused. That is
+    # the point: the model cannot reach another run's workspace because it cannot name one,
+    # and could not be authorised for it if it did.
+    #
+    # `b7c2a2f`'s `run_id_forged` guard stays (FR-007) and becomes belt-and-braces rather than
+    # the only thing standing between a model and another run's measurement.
+    workspace_id = os.environ.get("NOMAD_ALLOC_ID", "").strip()
+    if not workspace_id:
+        raise ValueError(
+            "vault_policy_impact has no allocation identity to derive its workspace from. "
+            "The measurement namespace is bounded per allocation (054), so a caller outside "
+            "one has no workspace and must not be given the estate's."
+        )
     proposed_document = str(arguments.get("proposed_document", ""))
     current_document = str(arguments.get("current_document", ""))
     if not proposed_document.strip():
@@ -361,8 +376,8 @@ def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
 
     # DERIVED, never supplied. A `scratch_name` argument would be a caller choosing what to
     # overwrite, and the governance hook refuses a call that carries one.
-    current_name = f"{SCRATCH_PREFIX}{run_id}-current"
-    proposed_name = f"{SCRATCH_PREFIX}{run_id}-proposed"
+    current_name = f"{SCRATCH_PREFIX}{workspace_id}-current"
+    proposed_name = f"{SCRATCH_PREFIX}{workspace_id}-proposed"
 
     paths, truncated = _queried_paths(current_document, proposed_document)
     if not paths:
