@@ -24,6 +24,10 @@
 - Q: What happens when a run's write grant expires while the Build is still going? → A: Renew while the run is alive, and stop the moment it is not. A slow Build must not become a failed measurement.
 - Q: On resume, does a run get a fresh write grant or carry the original? → A: A fresh credential, but its scope MUST be identical — re-deriving scope at resume could widen it, which would be as bad as not narrowing at all. Sameness is asserted, not assumed.
 
+### Session 2026-08-27 (after T003)
+
+- Q: A restarted run gets a new allocation and therefore a new workspace. Must it still reach the workspace it had before? → A: **No, and returning to it would be actively harmful.** A dependency outage that restarts a job repeatedly would have every attempt contending for one workspace — the original defect, reintroduced and self-inflicted. Each attempt gets its own; the existing sweep clears what a dead one left. FR-016 is rewritten accordingly.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### The measurement that produced this feature
@@ -184,12 +188,20 @@ no measurement is attempted; no wider authority is substituted.
 - **FR-015**: A failed renewal MUST be handled as FR-005 handles a failed manufacture — the
   run stops with a distinct recorded reason, with no wider authority substituted and no
   half-written measurement left behind.
-- **FR-016**: A resumed run MUST receive a fresh credential naming the **same** workspace as
-  the original, so no credential has to survive an interruption.
-- **FR-017**: Every re-mint of a run's write grant — on resume, on renewal, on retry — MUST
-  produce **identical scope** to the first. A widened re-mint MUST be refused rather than
-  used, and a row MUST be able to detect one. A grant that drifts wider between mints defeats
-  this feature while appearing to work, which is the failure this requirement exists for.
+- **FR-016**: A restarted run MUST receive a workspace **only it can reach**. It MUST NOT be
+  required to reach the workspace of the attempt that preceded it.
+
+  *This reverses the original FR-016, on the maintainer's reasoning: a dependency outage that
+  restarts a job repeatedly would have every attempt contending for one workspace — the defect
+  this feature removes, reintroduced and self-inflicted. Anything a dead attempt left behind is
+  the existing sweep's job, which is what that sweep is for.*
+- **FR-017**: A run's write scope MUST NOT be derivable, storable or re-presentable by the
+  platform. It MUST be evaluated from the caller's own attested identity at the moment of the
+  request, so a widened scope is **unrepresentable** rather than merely refused.
+
+  *This strengthens the original FR-017. The concern behind it — that re-deriving scope could
+  silently widen it — is met by having no second derivation to disagree with a first, rather
+  than by asserting the two agree.*
 
 ### Key Entities
 
@@ -220,9 +232,9 @@ no measurement is attempted; no wider authority is substituted.
 - **SC-008**: A Build lasting longer than one credential lifetime completes its measurement
   successfully, and a grant whose run has ended is no longer renewed — both measured rather
   than reasoned about.
-- **SC-009**: Every re-minted grant is scope-identical to the run's first — across resume,
-  renewal and retry, 100% of re-mints, with a widened one refused and detected rather than
-  used.
+- **SC-009**: No code path derives, stores or re-presents a run's write scope — verified by
+  inspection, because the guarantee is the absence of a mechanism rather than the behaviour of
+  one.
 - **SC-006**: The mechanism chosen is the cheapest that satisfies SC-001, with the rejected
   alternatives recorded and the evidence that ruled each out.
 
@@ -241,10 +253,13 @@ no measurement is attempted; no wider authority is substituted.
   cannot express.
 - **Only the scratch namespace is in scope.** It is the only write capability a dispatched run
   carries today.
-- **Scope is derived once and thereafter reproduced, not recomputed.** The cheapest way to
-  satisfy FR-017 is to derive a run's workspace once and re-present it, rather than re-running
-  the derivation and hoping two runs of it agree. If planning finds that impractical, FR-017's
-  assertion becomes the load-bearing control and needs a row that can actually catch drift.
+- **Scope is never computed by this platform at all** (settled by T003). Vault evaluates it
+  from the caller's own attested identity. An earlier draft planned to derive once and
+  re-present; that is now unnecessary, and the assumption is recorded because the hazard it
+  guarded against was real and is now closed by construction rather than by care.
+- **Entity growth is accepted and owed a follow-up.** Branch A leaves one permanent Vault
+  identity entity per run, and nothing prunes them ([R2a](research.md)). Invisible at laptop
+  scale, monotonic in an estate running Builds continuously.
 - **The write-path decision is derivable at run start.** `start_governed_run` already receives
   the requested tools and pack manifests already declare each tool's `paths`, so FR-013 needs
   no new authoring and no new artifact. If that turns out not to hold, FR-012's timing is the
