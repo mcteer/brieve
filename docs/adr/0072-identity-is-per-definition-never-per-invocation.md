@@ -1,6 +1,6 @@
 # ADR-0072: Identity is per definition, never per invocation
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-08-28, decided by `specs/054-run-scoped-write-grant`)
 - **Date**: 2026-08-27
 - **Relates to**: [ADR-0056](0056-task-scope-needs-an-authorization-server-vault-is-not-one.md) (the distinction this applies), [ADR-0057](0057-context-hungry-agents-want-breadth-not-narrower-reads.md) (whose trigger 1 produced the feature that found this), [ADR-0015](0015-control-plane-vault-as-trust-fabric.md), [ADR-0025](0025-enclave-is-the-default-topology.md)
 - **Requirements**: R2, R3, R12

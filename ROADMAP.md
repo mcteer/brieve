@@ -718,15 +718,15 @@ ADR — never a passing stub.**
 
 ## Open records
 
-**Two ADRs are Proposed.**
+**One ADR remains Proposed**, and it is the only one open for a reason that still holds.
 
-- **ADR-0072** — identity is per definition, never per invocation. Raised 2026-08-27 by 054,
-  which shipped a correct bound with an unbounded cost: one permanent Vault identity entity per
-  Build, against a documented hard ceiling of ~480,000 on integrated storage, reached in about
-  2.4 months at 10,000 users. Entity writes happen on every login, so the failure mode is that
-  logins stop. Accepting it is a maintainer decision; it is recorded rather than assumed
-  because it withdraws an implementation that had already passed every gate it had.
-- **ADR-0054**, below — the only one open for a reason that still holds.
+**ADR-0072 was accepted on 2026-08-28** — identity is per definition, never per invocation.
+Raised by 054, which shipped a correct bound with an unbounded cost: one permanent Vault
+identity entity per Build, against a documented hard ceiling of ~480,000 on integrated storage,
+reached in about 2.4 months at 10,000 users. Entity writes happen on every login, so the
+failure mode was that logins stop. The feature was rebuilt under the rule and a Build now
+creates zero entities.
+
 
 **The other five were accepted on 2026-08-27** — ADR-0065 (036), ADR-0067 (043), ADR-0068 (042),
 ADR-0069 (044) and ADR-0070 (045). Each had governed a shipped feature while still Proposed,
