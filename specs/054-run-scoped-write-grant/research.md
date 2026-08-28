@@ -219,3 +219,44 @@ shapes are available:
 **What is already proven end to end**, so neither option starts from nothing: a real dispatched
 run took the alias `ab997f55-5a60-d77b-9674-b706e8cb3978` — exactly its allocation id — where
 every run previously shared the single alias `agent-run`.
+
+
+---
+
+## R8 — What Branch A satisfies by construction, and the one thing it cannot
+
+Written after implementation, because several requirements stopped needing machinery and one
+stopped being reachable. Recording which is which is the point: a requirement quietly dropped
+looks identical to one quietly met.
+
+### Met by construction — no code was written, and none should be
+
+| Requirement | Why it needs nothing |
+| --- | --- |
+| **FR-017** (scope cannot widen between mints) | Nothing derives, stores or re-presents scope. Vault evaluates the template against the caller's own identity per request; there is no second derivation to disagree with a first. `remint_grant` is not built |
+| **FR-011** (what a run's authority granted stays answerable) | The grant is one fixed policy and the alias is the allocation id — both already recorded. A `RecordedScope` record would restate what the estate already answers |
+| **FR-002** (enforced where it survives a platform bug) | The refusal is Vault's, reached without entering the dispatch pipeline. Row E8 asserts the probe never touches platform code |
+| **FR-016** (a restarted run gets a workspace only it can reach) | A restart is a new allocation, so it is a new workspace by the same mechanism. Row E10 |
+
+### The one that is NOT met, and cannot be under Branch A
+
+**FR-012** — *"A scoped write grant MUST be manufactured only for a run whose requested tools
+declare a write path. A run with no such tool MUST receive no write authority at all."*
+
+**Measured**: `token_policies` on a JWT auth role is **static**. Vault attaches the same set to
+every login; there is no per-dispatch condition available. Every dispatched run therefore
+carries `scratch-policy-check`, whether or not it will ever write.
+
+**What that does and does not mean.** The grant it carries is now bounded to a workspace nothing
+else can reach, and which is empty unless the run uses it. The harm FR-012 was written against —
+a run that never writes holding *estate-wide* write authority — is closed. What survives is that
+a run holding no write need still holds a self-scoped grant, and could create junk in its own
+corner of the measurement namespace, which the sweep already clears.
+
+**So the intent is met and the letter is not**, and the letter was only reachable on Branch B:
+manufacturing per run is what lets you decline to manufacture. That is the cost of the cheap
+path, and it belongs beside R2a's entity sprawl rather than buried.
+
+**This is a maintainer decision, not an editorial one.** Either FR-012 is amended to what Branch
+A can hold, or it stands and the feature is knowingly short of it. It is left standing and
+unmet, recorded here, rather than rewritten by the implementation that could not satisfy it.
