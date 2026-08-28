@@ -71,7 +71,7 @@ conformance:
 	C=$$(grep '^VAULT_CACERT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	T=$$(grep '^VAULT_ROOT_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '"') ; \
 	VAULT_ADDR=$$A VAULT_CACERT=$$C VAULT_TOKEN=$$T \
-	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability tests/conformance/evidence tests/conformance/authority tests/conformance/endorsed -m host_enclave -q
+	  $(UV_RUN) pytest tests/conformance/api tests/conformance/identity tests/conformance/packs tests/conformance/durability tests/conformance/evidence tests/conformance/authority tests/conformance/workspace tests/conformance/endorsed -m host_enclave -q
 	#
 	# 018 adds `tests/conformance/authority`, and it very nearly repeated 010's mistake in
 	# the feature built to end exactly this class of gap. Its rows passed by hand and its

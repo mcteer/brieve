@@ -104,7 +104,7 @@ ENCLAVE_PATHS = frozenset(
         # through `run_authority.py`, so a run's credential never enters the test process —
         # which is what ADR-0058 refuses one layer up, and why that module needs no HTTP
         # client of its own.
-        "conformance/authority/test_run_scoped_write.py",
+        "conformance/workspace/test_run_scoped_write.py",
         # 019's served-surface rows. They reach the MCP surface over a real socket and walk
         # the development provider's authorization-code flow to obtain a caller credential —
         # neither of which a client that does not speak HTTP can do.

@@ -30,9 +30,14 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
-from tests.conformance.authority.run_authority import attempt_under_run_authority
 
-pytestmark = pytest.mark.enclave
+from tests.conformance.workspace.run_authority import attempt_under_run_authority
+
+#: BOTH markers, following 018. `enclave` keeps these out of the hermetic lane, which runs
+#: `-m "not enclave"` and would otherwise collect them and fail for want of an estate.
+#: `host_enclave` is what selects them in the lane that names this directory — and is also
+#: true: a row that drives the scheduler cannot run inside something the scheduler placed.
+pytestmark = [pytest.mark.enclave, pytest.mark.host_enclave]
 
 #: A policy in the measurement namespace that belongs to somebody else. Seeded and removed with
 #: administrator authority, because the whole question is whether a RUN can touch it.
@@ -220,7 +225,7 @@ def test_row_e8_the_refusal_is_vaults_and_not_the_pipelines(
     directly and never enters the dispatch pipeline, so no hook, no handler and no guard is
     between it and the refusal. What denies it is the trust fabric.
     """
-    from tests.conformance.authority import run_authority
+    from tests.conformance.workspace import run_authority
 
     source = run_authority._ATTEMPT
     assert "auth/nomad/login" in source and "sys/policies/acl" in source
