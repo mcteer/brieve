@@ -142,6 +142,26 @@ job "agent-run" {
         change_mode = "restart"
       }
 
+      # A SECOND IDENTITY, FOR THE SURFACE, AND THE AUDIENCE IS THE WHOLE POINT (054, T046a).
+      #
+      # 054 moves the policy-impact measurement off the run and onto the long-lived surface,
+      # so a run must be able to authenticate to that surface. It must NOT do so with the
+      # token above: `aud` is what stops a credential minted for one audience being replayed
+      # at another, and a run presenting its Vault token to the surface would make the two
+      # interchangeable — a hole opened by the fix for a different one.
+      #
+      # Shorter than the Vault identity because it is used for one call at one moment, not
+      # held for the length of the run. `change_mode = "noop"`: a re-issue must not restart a
+      # Build mid-flight, and the client reads the file per call rather than caching it.
+      identity {
+        name        = "mcp"
+        aud         = ["brieve.mcp"]
+        env         = false
+        file        = true
+        ttl         = "10m"
+        change_mode = "noop"
+      }
+
       config {
         labels = {
           "com.docker.compose.project" = "brieve-local"
@@ -202,6 +222,15 @@ job "agent-run" {
       }
 
       env {
+
+        # 054: where this run asks the surface to measure a proposed policy. The run holds no
+
+        # policy-write authority of its own any more; absent this, the impact check refuses
+
+        # rather than reporting an unmeasured change as a safe one.
+
+        HARNESS_POLICY_IMPACT_URL = var.policy_impact_url
+
         VAULT_ADDR   = var.vault_addr
         VAULT_CACERT = var.vault_cacert
 
@@ -249,4 +278,16 @@ job "agent-run" {
       }
     }
   }
+}
+
+variable "policy_impact_url" {
+  type        = string
+  default     = "http://host.docker.internal:8090/internal/policy-impact"
+  description = <<-DESC
+    The surface's side door for policy-impact measurement (054).
+
+    `host.docker.internal` rather than loopback: a dispatched run is a container, and on the
+    dev substrate its loopback is the Docker VM's. This is the same distinction `nomad_addr`
+    draws for the sweeper's dispatcher, which 014 paid for once.
+  DESC
 }

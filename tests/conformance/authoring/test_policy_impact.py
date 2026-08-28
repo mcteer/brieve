@@ -25,6 +25,13 @@ from surfaces import handlers
 from surfaces.handlers import ImpactUnavailable, PolicyInvalid
 
 RUN = "corr-042"
+
+#: 054, second move: the workspace is named by the SURFACE, per call.
+#:
+#: The measurement now runs on the long-lived surface and a dispatched run holds no
+#: policy-write authority at all, so the name no longer has to be attacker-proof — nobody but
+#: that process can write in the namespace. It is generated per call anyway, so two concurrent
+#: measurements cannot collide.
 CURRENT = 'path "secret/data/payments/*" {\n  capabilities = ["read"]\n}\n'
 WIDER = 'path "secret/data/payments/*" {\n  capabilities = ["read", "create", "update"]\n}\n'
 
@@ -66,22 +73,28 @@ class _Vault:
 
 def _impact(monkeypatch: pytest.MonkeyPatch, vault: _Vault, **arguments: Any) -> Mapping[str, Any]:
     monkeypatch.setattr(handlers, "_fabric", lambda: vault)
-    result: Mapping[str, Any] = handlers.vault_policy_impact({"run_id": RUN, **arguments})
+    result: Mapping[str, Any] = handlers.measure_policy_impact({"run_id": RUN, **arguments})
     return result
 
 
-def test_row_v11_the_scratch_names_are_derived_from_the_run(
+def test_row_v11_the_scratch_names_are_derived_from_the_allocation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """V11 — FR-020. A model can request a measurement; it cannot request a policy name."""
+    """V11 — FR-020, and 054 moved what they derive FROM.
+
+    A model can request a measurement; it cannot request a policy name. Until 054 the name came
+    from a caller-supplied `run_id`, which the hook had to police. It now comes from the
+    allocation the code is running in, which no caller can influence at all.
+    """
     vault = _Vault()
 
     _impact(monkeypatch, vault, current_document=CURRENT, proposed_document=WIDER)
 
-    assert sorted(vault.written) == [
-        f"scratch-agent-{RUN}-current",
-        f"scratch-agent-{RUN}-proposed",
-    ]
+    written = sorted(vault.written)
+    assert len(written) == 2
+    stems = {name.removeprefix("scratch-agent-").rsplit("-", 1)[0] for name in written}
+    assert len(stems) == 1, f"the two sides must share one workspace stem: {written}"
+    assert written[0].endswith("-current") and written[1].endswith("-proposed")
     assert all(name.startswith("scratch-agent-") for name in vault.written)
 
 
@@ -196,10 +209,7 @@ def test_the_scratch_policies_are_destroyed_on_the_way_out(
 
     _impact(monkeypatch, vault, current_document=CURRENT, proposed_document=WIDER)
 
-    assert sorted(vault.deleted) == [
-        f"scratch-agent-{RUN}-current",
-        f"scratch-agent-{RUN}-proposed",
-    ]
+    assert sorted(vault.deleted) == sorted(vault.written)
 
 
 def test_the_scratch_policies_are_destroyed_even_when_the_measurement_fails(
@@ -217,10 +227,13 @@ def test_the_scratch_policies_are_destroyed_even_when_the_measurement_fails(
     with pytest.raises(ImpactUnavailable):
         _impact(monkeypatch, vault, current_document=CURRENT, proposed_document=WIDER)
 
-    assert sorted(vault.deleted) == [
-        f"scratch-agent-{RUN}-current",
-        f"scratch-agent-{RUN}-proposed",
-    ]
+    # BOTH sides, though the failure came before the second was written. That is the claim:
+    # the `finally` destroys the workspace it named, not merely the parts it reached.
+    deleted = sorted(vault.deleted)
+    assert len(deleted) == 2, f"both sides must be destroyed, got {deleted}"
+    stems = {name.removeprefix("scratch-agent-").rsplit("-", 1)[0] for name in deleted}
+    assert len(stems) == 1
+    assert [n.rsplit("-", 1)[1] for n in deleted] == ["current", "proposed"]
 
 
 def test_the_scratch_token_carries_only_the_policy_under_measurement(
@@ -235,10 +248,7 @@ def test_the_scratch_token_carries_only_the_policy_under_measurement(
 
     _impact(monkeypatch, vault, current_document=CURRENT, proposed_document=WIDER)
 
-    assert [m["policies"] for m in vault.minted] == [
-        [f"scratch-agent-{RUN}-current"],
-        [f"scratch-agent-{RUN}-proposed"],
-    ]
+    assert [m["policies"] for m in vault.minted] == [[n] for n in sorted(vault.written)]
     assert {m["role"] for m in vault.minted} == {"scratch-check"}
     assert {m["ttl"] for m in vault.minted} == {"60s"}
 
@@ -317,3 +327,40 @@ def test_vaults_deny_marker_is_not_treated_as_a_capability(
     assert entry["granted"] == ["list"]
     assert entry["revoked"] == [], "`deny` is not a capability and must not read as one"
     assert entry["current"] == []
+
+
+# ------------------------------------------------------------------ 054
+
+
+def test_no_argument_can_move_the_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """054's security property, which got simpler when the measurement moved.
+
+    It was: the workspace is named by the allocation, so an argument cannot move it. It is now
+    named by this process, per call, and a dispatched run cannot write in the namespace at all.
+
+    Two calls claiming wildly different run ids write different workspaces — not the SAME one,
+    which is what an earlier draft asserted. Uniqueness is the property now: a caller cannot
+    steer the name anywhere, including onto somebody else's.
+    """
+    first = _Vault()
+    _impact(monkeypatch, first, current_document=CURRENT, proposed_document=WIDER)
+
+    second = _Vault()
+    monkeypatch.setattr(handlers, "_fabric", lambda: second)
+    handlers.measure_policy_impact(
+        {
+            "run_id": "some-other-runs-correlation-id",
+            "current_document": CURRENT,
+            "proposed_document": WIDER,
+        }
+    )
+
+    assert sorted(second.written) != sorted(first.written), (
+        "two measurements shared a workspace name. Concurrent measurements would then "
+        "overwrite each other's scratch policies and report the wrong impact."
+    )
+    assert all("some-other-runs" not in name for name in second.written), (
+        "an argument reached the workspace name. It is generated here for exactly this reason."
+    )

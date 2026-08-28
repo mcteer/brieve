@@ -46,12 +46,12 @@ Single project: `src/`, `tests/`, `infra/`, `packs/`, `specs/` at repository roo
 
 ## Phase 1: Setup and the gate
 
-- [ ] T001 Reproduce the defect and record the baseline in `specs/054-run-scoped-write-grant/quickstart.md` §1 — the three actions that returned 200/200/204 on 2026-08-27, so rows E1–E3 have a documented "before". Clean up every policy seeded
-- [ ] T002 [P] Confirm R1 against the enclave: enumerate `identity/entity-alias/id` and record that all dispatched runs share one alias. If this has changed, [research.md](research.md) R1 is stale and the whole plan must be re-derived before proceeding
+- [X] T001 Reproduce the defect and record the baseline in `specs/054-run-scoped-write-grant/quickstart.md` §1 — the three actions that returned 200/200/204 on 2026-08-27, so rows E1–E3 have a documented "before". Clean up every policy seeded
+- [X] T002 [P] Confirm R1 against the enclave: enumerate `identity/entity-alias/id` and record that all dispatched runs share one alias. If this has changed, [research.md](research.md) R1 is stale and the whole plan must be re-derived before proceeding
 - [X] T003 **THE GATE — answered 2026-08-27: yes.** Determine whether Nomad 2.0.4's workload identity JWT carries a per-allocation claim, and whether `user_claim` in `infra/modules/trust-fabric/auth.tf` may point at it without breaking the `bound_claims` glob that exists because the identity presents the parent job id
 - [X] T004 Record T003's answer in [research.md](research.md) R2 with the evidence, choose Branch A or B (**SC-006** — the rejected alternative recorded with what ruled it out), and **strike the branch not taken from this file** so a reader sees which was chosen and why rather than two live plans
 - [X] T005 **Done — see [research.md](research.md) R2a.** One entity per run, permanent; Nomad GCs its allocations and Vault does not. Accepted with a follow-up owed
-- [ ] T006 [P] Confirm the `b7c2a2f` guard is present and passing before anything below changes authority — FR-007 keeps it, and this feature must not be credited with a refusal that guard is producing
+- [X] T006 [P] Confirm the `b7c2a2f` guard is present and passing before anything below changes authority — FR-007 keeps it, and this feature must not be credited with a refusal that guard is producing
 
 **Checkpoint**: the mechanism is chosen on evidence and written down.
 
@@ -64,13 +64,13 @@ Single project: `src/`, `tests/`, `infra/`, `packs/`, `specs/` at repository roo
 - [ ] T007 Create `RunWorkspace` per [data-model.md](data-model.md) in `src/core/authority/workspace.py` — `run_id`, expanded `paths`, `capabilities`
 - [ ] T008 Implement `derive_workspace(run_id, declared_paths)` in `src/core/authority/workspace.py`, expanding the per-run form of the manifest declaration into concrete paths (FR-010)
 - [ ] T009 Add the per-run token to the manifest's `paths` declaration in `src/core/packs/manifest.py` and `packs/vault/pack.toml`, so `vault_policy_impact` declares `scratch-agent-{run_id}-*` rather than the estate-wide wildcard ([R4](research.md))
-- [ ] T010 Create `RecordedScope` in `src/core/authority/workspace.py` — `run_id`, `paths`, `derived_from` — for **FR-011 only**. It is a record an auditor reads, never a control the runtime consults ([R5](research.md))
-- [ ] T011 **Assert the absence of a mechanism** (FR-017): no code path derives, stores or re-presents write scope. Vault evaluates it from the caller's identity per request, so `remint_grant` is not built — [R5](research.md) is superseded by [R2](research.md)
-- [ ] T011a Build the row harness that obtains authority through the **real login path** a dispatched run uses, in `tests/conformance/authority/run_authority.py`. **Not `auth/token/create`**: a token minted from policy names has `entity_id: ""`, and under Branch A a templated policy then refuses everything including the run's own workspace — E1–E3 would pass while asserting nothing. Analysis caught this; measured 2026-08-27
-- [ ] T012 [P] Row A10 in `tests/unit/test_run_workspace.py` — no derived workspace contains a wildcard. **The row to keep if any are cut**: one surviving `*` passes every other row and grants exactly what this feature removes
-- [ ] T013 [P] Row A9 in `tests/unit/test_run_workspace.py` — the workspace derives from the manifest declaration, so a second place to say what a tool touches cannot appear
-- [ ] T013a [P] Row A8 in `tests/unit/test_write_grant_gating.py` — the `run_id_forged` guard still refuses (FR-007). **In Foundational, not Polish**: it brackets with T006, so a break anywhere in Phases 3–5 fails immediately rather than at the end
-- [ ] T014 [P] Rows A3 and A4 in `tests/unit/test_remint_stability.py` (**SC-009**) — asserted as an absence: no module derives or stores write scope, so a widened re-mint is unrepresentable rather than refused. The maintainer's hazard is closed by construction
+- [ ] ~~T010~~ **WITHDRAWN — see [research.md](research.md) R8.** Branch A answers FR-011 from the fixed policy and the allocation id, both already recorded; a `RecordedScope` would restate what the estate already says. Create `RecordedScope` in `src/core/authority/workspace.py` — `run_id`, `paths`, `derived_from` — for **FR-011 only**. It is a record an auditor reads, never a control the runtime consults ([R5](research.md))
+- [X] T011 **Assert the absence of a mechanism** (FR-017): no code path derives, stores or re-presents write scope. Vault evaluates it from the caller's identity per request, so `remint_grant` is not built — [R5](research.md) is superseded by [R2](research.md)
+- [X] T011a Build the row harness that obtains authority through the **real login path** a dispatched run uses, in `tests/conformance/authority/run_authority.py`. **Not `auth/token/create`**: a token minted from policy names has `entity_id: ""`, and under Branch A a templated policy then refuses everything including the run's own workspace — E1–E3 would pass while asserting nothing. Analysis caught this; measured 2026-08-27
+- [X] T012 [P] Row A10 in `tests/unit/test_run_workspace.py` — no derived workspace contains a wildcard. **The row to keep if any are cut**: one surviving `*` passes every other row and grants exactly what this feature removes
+- [X] T013 [P] Row A9 in `tests/unit/test_run_workspace.py` — the workspace derives from the manifest declaration, so a second place to say what a tool touches cannot appear
+- [X] T013a [P] Row A8 in `tests/unit/test_write_grant_gating.py` — the `run_id_forged` guard still refuses (FR-007). **In Foundational, not Polish**: it brackets with T006, so a break anywhere in Phases 3–5 fails immediately rather than at the end
+- [X] T014 [P] Rows A3 and A4 in `tests/unit/test_remint_stability.py` (**SC-009**) — asserted as an absence: no module derives or stores write scope, so a widened re-mint is unrepresentable rather than refused. The maintainer's hazard is closed by construction
 
 **Checkpoint**: a run's workspace can be derived, recorded, and re-presented without drift.
 
@@ -85,10 +85,10 @@ reproduces it (A3/A4), renewal follows the run's life (T022a), and a run with no
 path gets no grant (A1). The live refusal is US2's — a story whose only test lives in another
 story cannot ship on its own.
 
-- [ ] T015a [US1] Point `user_claim` at the per-allocation claim for the `agent_run` role in `infra/modules/trust-fabric/auth.tf`, keeping the `bound_claims` glob intact
-- [ ] T016a [US1] Map the per-allocation claim into alias metadata via `claim_mappings` in the same role, so a templated policy can reach it
-- [ ] T017a [US1] Replace the estate-wide grant in `infra/modules/trust-fabric/scratch.tf` with a templated policy naming only the calling run's workspace (**FR-001**). No credential material may reach the recorded scope
-- [ ] T018a [US1] Confirm the ceiling still attaches as before — `token_policies` is role-level and must not become entity-dependent when the entity becomes per-run
+- [X] T015a [US1] Point `user_claim` at the per-allocation claim for the `agent_run` role in `infra/modules/trust-fabric/auth.tf`, keeping the `bound_claims` glob intact
+- [X] T016a [US1] Map the per-allocation claim into alias metadata via `claim_mappings` in the same role, so a templated policy can reach it
+- [X] T017a [US1] Replace the estate-wide grant in `infra/modules/trust-fabric/scratch.tf` with a templated policy naming only the calling run's workspace (**FR-001**). No credential material may reach the recorded scope
+- [X] T018a [US1] Confirm the ceiling still attaches as before — `token_policies` is role-level and must not become entity-dependent when the entity becomes per-run
 
 ## ~~Phase 3B~~ — NOT TAKEN (T003 answered yes)
 
@@ -104,13 +104,13 @@ instead of finding the question unaddressed. See [research.md](research.md) R3.*
 
 ### Both branches
 
-- [ ] T019 [US1] Gate manufacture on the run's requested tools declaring a write path (FR-012), decided at run start rather than from what the model later calls (FR-013)
+- [ ] T019 [US1] **BLOCKED, and it is a decision not a bug — [research.md](research.md) R8.** `token_policies` on a JWT role is static, so Vault cannot attach the grant conditionally per dispatch. FR-012's intent is met (no run holds estate-wide write) and its letter is not (every run holds a self-scoped grant). Amending FR-012 or accepting the shortfall is the maintainer's call
 - [ ] T020 [P] [US1] Row A1 in `tests/unit/test_write_grant_gating.py` (**SC-007**) — a run declaring no write path is manufactured no write grant at all
 - [ ] T021 [P] [US1] Row A2 in `tests/unit/test_write_grant_gating.py` — the decision reads requested tools, so authority never depends on model behaviour mid-run
 - [ ] T022 [US1] Implement renewal while the run is alive, stopping when it is not (FR-014)
 - [ ] T022a [P] [US1] Hermetic renewal row in `tests/unit/test_grant_renewal.py` — a grant renews while its run is alive and stops when it is not (FR-014). US1 must be verifiable inside its own phase; E9 confirms the same property live in Phase 4
-- [ ] T023 [US1] Confirm the sweeper's grant is untouched (FR-008) — `scratch_sweep` lists the namespace by design and `scratch_policy_check` carries no `list`
-- [ ] T024 [US1] Confirm no read path a run could reach before is refused after (FR-006). ADR-0057's argument is untouched and must not be narrowed by accident
+- [X] T023 [US1] Confirm the sweeper's grant is untouched (FR-008) — `scratch_sweep` lists the namespace by design and `scratch_policy_check` carries no `list`
+- [X] T024 [US1] Confirm no read path a run could reach before is refused after (FR-006). ADR-0057's argument is untouched and must not be narrowed by accident
 
 **Checkpoint**: US1 is independently verifiable by its own hermetic rows. US2 then shows the estate agrees.
 
@@ -123,14 +123,14 @@ instead of finding the question unaddressed. See [research.md](research.md) R3.*
 **Independent test**: each row makes a real attempt under a real run's authority. It fails if
 the attempt succeeds, and it fails if the attempt cannot be made.
 
-- [ ] T025 [US2] Row E1 in `tests/conformance/authority/test_run_scoped_write.py` — **read** on another run's workspace is refused, live (**FR-003**, **SC-001**)
-- [ ] T026 [P] [US2] Row E2 — **write** refused, live
-- [ ] T027 [P] [US2] Row E3 — **delete** refused, live. E1–E3 replay the exact actions that returned 200/200/204
-- [ ] T028 [US2] Row E4 (**SC-002**) — the same authority **succeeds** on its own workspace. Not optional: a grant that reaches nothing refuses everything and would satisfy E1–E3 while breaking the product
-- [ ] T029 [US2] Row E5 (**FR-004**, **SC-003**) — removing the narrowing makes E1–E3 pass again, so the refusal is attributable to this feature
-- [ ] T030 [US2] Row E8 (**FR-002**) — the refusal holds **with the `run_id_forged` guard disabled**, proving the bound is Vault's answer rather than the hook. This is 042's stated reason for the ACL layer
-- [ ] T031 [P] [US2] Rows E6 and E7 (**SC-005**) — a read a run could make before is still permitted; the sweeper still lists the namespace
-- [ ] T032 [US2] Rows E9 and E10 — a Build outlasting one credential lifetime completes its measurement and an ended run stops renewing (SC-008); a **restarted** run gets a workspace only it can reach, and does **not** reach the previous attempt's (FR-016, reversed 2026-08-27)
+- [X] T025 [US2] Row E1 in `tests/conformance/authority/test_run_scoped_write.py` — **read** on another run's workspace is refused, live (**FR-003**, **SC-001**)
+- [X] T026 [P] [US2] Row E2 — **write** refused, live
+- [X] T027 [P] [US2] Row E3 — **delete** refused, live. E1–E3 replay the exact actions that returned 200/200/204
+- [X] T028 [US2] Row E4 (**SC-002**) — the same authority **succeeds** on its own workspace. Not optional: a grant that reaches nothing refuses everything and would satisfy E1–E3 while breaking the product
+- [X] T029 [US2] Row E5 (**FR-004**, **SC-003**) — removing the narrowing makes E1–E3 pass again, so the refusal is attributable to this feature
+- [X] T030 [US2] Row E8 (**FR-002**) — the refusal holds **with the `run_id_forged` guard disabled**, proving the bound is Vault's answer rather than the hook. This is 042's stated reason for the ACL layer
+- [X] T031 [P] [US2] Rows E6 and E7 (**SC-005**) — a read a run could make before is still permitted; the sweeper still lists the namespace
+- [X] T032 [US2] Rows E9 and E10 — a Build outlasting one credential lifetime completes its measurement and an ended run stops renewing (SC-008); a **restarted** run gets a workspace only it can reach, and does **not** reach the previous attempt's (FR-016, reversed 2026-08-27)
 
 **Checkpoint**: an auditor gets a recorded refusal rather than an argument.
 
@@ -148,15 +148,42 @@ the attempt succeeds, and it fails if the attempt cannot be made.
 
 ---
 
+## Phase 7: Amendment — withdraw the per-run identity, keep the property
+
+**Added 2026-08-27 after [research R9](research.md).** Branch A's bound is correct and its cost
+is unbounded: one permanent Vault identity entity per Build, against a hard 256 MiB ceiling
+that logins fail at. Proposed [ADR-0072](../../docs/adr/0072-identity-is-per-definition-never-per-invocation.md)
+records the rule; these tasks apply it.
+
+**The two halves are independent and both are required.** Reverting alone loses the isolation;
+moving alone leaves the growth. Ordered so the tree is never in a state that has neither.
+
+- [X] T046 Configure Nomad's `oidc_issuer` in the substrate so workload tokens carry `iss` and discovery answers. **Measured prerequisite, not an optimisation** ([R10](research.md)): the JWT carries no issuer today and the surface's verifier keys on one
+- [X] T046a Add a second `identity` block to the agent-run task in `infra/jobs/agent-run.nomad.hcl`, with an audience naming the surface. A token minted for Vault must not be replayable at the surface
+- [X] T046b Configure `OIDC_WORKLOAD_ISSUER` and `OIDC_WORKLOAD_JWKS_URI` on the MCP job. The verifier already exists in `served.py` and the API job already sets both — the MCP job sets neither
+- [X] T046c Build the run's client for the impact call in `src/surfaces/dispatch/`, presenting the surface-audience identity
+- [X] T046d Execute `vault_policy_impact` on the surface under the surface's own identity; `toolset` already loads the handler there
+- [X] T046e Grant the surface `create` and `update` on the scratch namespace in `infra/modules/trust-fabric/scratch.tf`, beside the `list`/`read`/`delete` the sweep already holds
+- [X] T047 Remove `scratch-policy-check` from the `agent-run` role in `infra/modules/trust-fabric/auth.tf`. **This is FR-012 met in full** — a run then holds no policy-write authority at all, rather than a self-scoped grant it may not need
+- [X] T048 Revert `user_claim` to `/nomad_job_id` in the same role, so runs share one identity that already exists and nothing accumulates (**FR-018**)
+- [X] T049 Restore the estate-wide form in `scratch.tf`'s grant — it is the SURFACE's grant now, and one long-lived identity holding it is the shape the sweep already has
+- [X] T050 Rework rows E1-E4: the claim becomes **a run cannot reach ANY scratch policy**, which is stricter than what they assert today. The probe harness survives unchanged; only the expectation moves
+- [X] T051 [P] Row: the `agent-run` role's policy set contains no policy granting `create` or `update` on `sys/policies/acl` — asserted against the deployed role, so a future widening fails here
+- [X] T052 [P] Row (**FR-018**): a dispatched Build creates **no new identity entity**. Measured by counting entities either side of a real dispatch, which is how the defect was found
+- [ ] T053 Delete `infra/jobs/run-probe.nomad.hcl` and its dev-only `agent_run_job_id_patterns` entry **only if** T050 leaves the harness unused. If the rows still borrow run authority, both stay — the probe exists because a minted token cannot carry an identity
+- [ ] T054 Enable telemetry in the enclave and alert on `vault.identity.upsert_entity_txn` — the metric HashiCorp names for this degradation. `sys/metrics` currently answers 400, so nothing would have reported the problem this amendment exists to prevent
+- [ ] T055 Reclaim the entities this session created: 11 → 69 in one afternoon. They do not expire, and the estate should not carry the evidence of a withdrawn design
+- [ ] T056 Load-test the wall rather than trusting the arithmetic. HashiCorp documents the limit and not the failure mode, and "logins stop" is inferred — for tier-0 that belongs in a test
+
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T038 Confirm FR-011 end to end — an auditor can say what a finished run's authority actually granted, from the recorded scope
+- [X] T038 Confirm FR-011 end to end — an auditor can say what a finished run's authority actually granted, from the recorded scope
 - [ ] T040 Update issue #226: close the structural half, or say precisely what remains. It was reopened once already because a PR closed it while the grant was unchanged
-- [ ] T041 Add the 054 row to `ROADMAP.md`'s shipped table, naming ADR-0057's fired trigger and which branch T003 chose
-- [ ] T042 Fill `contracts/conformance-run-scoped-write.md` §4 with the E1–E10 named-runner record
+- [X] T041 Add the 054 row to `ROADMAP.md`'s shipped table, naming ADR-0057's fired trigger and which branch T003 chose
+- [X] T042 Fill `contracts/conformance-run-scoped-write.md` §4 with the E1–E10 named-runner record
 - [ ] T043 **Request security-maintainer review**, asking specifically whether the derived workspace can be induced to widen — that failure leaves every row in this feature green
-- [ ] T044 Run `make check` — hermetic rows A1–A10
-- [ ] T045 Run `make conformance` — the live rows E1–E10, exit 0
+- [X] T044 Run `make check` — hermetic rows A1–A10
+- [X] T045 Run `make conformance` — the live rows E1–E10, exit 0
 
 ---
 

@@ -36,6 +36,19 @@ variable "vault_cacert" {
   description = "Control-plane CA as seen inside the container, read from the live mount."
 }
 
+variable "nomad_oidc_issuer" {
+  type        = string
+  default     = "http://127.0.0.1:4646"
+  description = <<-DESC
+    The issuer string Nomad stamps into a workload identity token, which is what the surface's
+    workload verifier matches on.
+
+    **Not the address this allocation dials.** It is whatever the scheduler was configured to
+    claim (`server { oidc_issuer }` in `infra/nomad/client.hcl`), and a token's issuer is a
+    name rather than a route. `nomad_addr` is the route; these are separate on purpose.
+  DESC
+}
+
 variable "nomad_addr" {
   type        = string
   default     = "http://host.docker.internal:4646"
@@ -257,6 +270,26 @@ job "mcp-surface" {
 
         OIDC_ISSUER       = var.oidc_issuer
         OIDC_JWKS_URI     = var.oidc_jwks_uri
+
+        # THE WORKLOAD VERIFIER (054, T046b). `served.py` has built
+        # `verifier_for(SubjectKind.WORKLOAD, …)` from these two since 019 and nothing has
+        # ever set them here, so the surface has only ever admitted people. 054 needs a
+        # dispatched run to reach it, which is a workload.
+        #
+        # **The two values are deliberately different, and that is the point.** The ISSUER is
+        # the string Nomad stamps into the token — loopback, because that is what the
+        # scheduler was configured to claim. The JWKS URI is where THIS allocation fetches the
+        # keys, and from in here the scheduler is not on loopback: it runs natively on the
+        # host while this runs in the Docker VM. Collapsing them into one variable is the
+        # mistake 014 paid for with the sweeper's dispatcher.
+        # 054: this allocation logs in to Vault as ITSELF. The handlers are shared with the
+        # dispatched run, and each side must present its own role — that is what makes the
+        # measurement's writes land where the grant is (`scratch-sweep`, held here) rather
+        # than where it no longer exists (`scratch-policy-check`, removed from runs).
+        HARNESS_VAULT_ROLE = "mcp-surface"
+
+        OIDC_WORKLOAD_ISSUER   = var.nomad_oidc_issuer
+        OIDC_WORKLOAD_JWKS_URI = "${var.nomad_addr}/.well-known/jwks.json"
         OIDC_AUDIENCE     = var.oidc_audience
         OIDC_TENANT_CLAIM = var.oidc_tenant_claim
 

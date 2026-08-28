@@ -39,6 +39,16 @@ resource "vault_policy" "scratch_policy_check" {
     #
     # `delete` is what makes the `finally` block work. `read` is what lets a row assert the
     # policy is gone rather than assuming it.
+    # 054, SECOND MOVE: this grant is the SURFACE's, and the namespace bound is the whole of it.
+    #
+    # It was `scratch-agent-*` estate-wide on every dispatched run, which let one run reach
+    # another's measurement — demonstrated 2026-08-27 at 200/200/204. It was then templated per
+    # allocation, which fixed that and cost one permanent identity entity per Build (ADR-0072).
+    #
+    # Neither is needed now. `scratch_policy_check` is gone from `agent-run` entirely, so the
+    # only holder of this policy is the long-lived surface, and a template scoping one
+    # long-lived identity to itself would bound nothing. What bounds it is the namespace, and
+    # that a dispatched run cannot write here at all.
     path "sys/policies/acl/scratch-agent-*" {
       capabilities = ["create", "update", "delete", "read"]
     }
@@ -99,6 +109,16 @@ resource "vault_token_auth_backend_role" "scratch_check" {
 #
 # Delete is bounded to the measurement namespace even here. A sweeper able to delete
 # arbitrary policies would be a bigger standing capability than the thing it cleans up.
+#
+# **054 added `create` and `update`, and moved the measurement here with them (T046e).** The
+# run used to hold those, one allocation at a time — which worked and cost one permanent Vault
+# identity entity per Build against a hard ceiling that logins fail at. This service is a
+# single long-lived identity: the same authority, held once instead of once per run.
+#
+# It is the same argument the `list` grant above already makes. Finding an orphan needs
+# enumeration a run must never have, so it lives on the service; performing a measurement needs
+# write authority a run should never have, so it lives here too. The namespace bound is
+# unchanged — everything here is still `scratch-agent-*` and nothing else.
 resource "vault_policy" "scratch_sweep" {
   name   = "scratch-sweep"
   policy = <<-HCL
@@ -106,7 +126,7 @@ resource "vault_policy" "scratch_sweep" {
       capabilities = ["list"]
     }
     path "sys/policies/acl/scratch-agent-*" {
-      capabilities = ["read", "delete"]
+      capabilities = ["create", "update", "read", "delete"]
     }
   HCL
 }

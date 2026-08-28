@@ -450,6 +450,60 @@ class HarnessTokenVerifier:
         return self._subjects.get(token)
 
 
+def _attach_policy_impact(server: Any, verifier: HarnessTokenVerifier) -> None:
+    """The side door a dispatched run measures through (054, T046c/T046d).
+
+    **Deliberately NOT an operation.** It was one for an hour, and
+    `test_row_both_transports_expose_the_same_operations` refused it in the words its own
+    docstring uses: *"someone adds 'just this one helper' where it is easiest, and the surfaces
+    diverge from the side nobody is watching."* Parity was not the real objection though —
+    every operation in that catalogue is a PLATFORM operation, and this is a PRODUCT utility.
+    Putting it there would make the northbound API a Vault proxy and hand the capability to
+    every authenticated person.
+
+    **Workloads only, and that is the access control.** A person authenticating to this surface
+    reaches the operations; only an attested workload reaches this. The token it must present
+    carries `aud: brieve.mcp` — a second identity, so a credential minted for Vault is not
+    replayable here.
+
+    **Why the surface performs it at all**: a dispatched run held policy-write authority to do
+    this itself, and bounding that per run cost one permanent Vault identity entity per Build
+    against a ceiling that logins fail at (ADR-0072). This service is one long-lived identity
+    that already holds the namespace for the sweep.
+    """
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+
+    from surfaces import handlers
+
+    @server.custom_route("/internal/policy-impact", methods=["POST"])  # type: ignore[untyped-decorator]
+    async def policy_impact(request: Request) -> JSONResponse:
+        header = request.headers.get("authorization", "")
+        token = header.removeprefix("Bearer ").strip() if header.startswith("Bearer ") else ""
+        subject = verifier.subject_for(token) if token else None
+        if subject is None:
+            return JSONResponse({"reason": "unauthenticated"}, status_code=401)
+        if subject.subject_kind is not SubjectKind.WORKLOAD:
+            # A person reaching this would be a capability nobody granted them. The refusal is
+            # the point of the door being separate from the operations.
+            return JSONResponse({"reason": "workload callers only"}, status_code=403)
+
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            return JSONResponse({"reason": "malformed body"}, status_code=400)
+
+        try:
+            measured = handlers.measure_policy_impact(dict(body))
+        except (ValueError, KeyError) as malformed:
+            return JSONResponse({"reason": str(malformed)}, status_code=400)
+        except Exception as unavailable:  # noqa: BLE001
+            # A measurement that cannot run refuses. Reporting a policy as harmless because
+            # Vault was unreachable is the failure 042 exists to avoid.
+            return JSONResponse({"reason": str(unavailable)}, status_code=503)
+        return JSONResponse(dict(measured))
+
+
 def build_server(
     transport: McpTransport, verifier: HarnessTokenVerifier, sessions: SessionSubjects
 ) -> Any:
@@ -642,6 +696,7 @@ def main() -> int:  # pragma: no cover - process entrypoint
         return 2
 
     server = build_server(transport, verifier, sessions)
+    _attach_policy_impact(server, verifier)
     print(
         f"mcp surface ready — role={VAULT_ROLE} operations={len(operations())} db={_db_host()}",
         flush=True,

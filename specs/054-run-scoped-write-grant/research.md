@@ -183,3 +183,242 @@ and `scratch_policy_check` carries no `list`. Narrowing a run's grant must not t
 **The pipeline guard stays.** `b7c2a2f` refuses a call claiming a foreign `run_id`. This
 feature is the layer beneath it; FR-007 keeps both, and 042's own comment is the argument —
 the ACL is *"the only one that survives a platform bug."*
+
+
+---
+
+## R7 — Obtaining run authority for a row is harder than 018's, and this is what closes it
+
+**Measured 2026-08-27, three routes tried and closed:**
+
+1. **`auth/token/create` with the run's policy names** — 018's `run_authority()`. Closed by the
+   contract itself: such a token has `entity_id: ""`, and the templated grant resolves against
+   nothing, so every attempt returns 403 and E4 fails. It would produce a green refusal suite
+   asserting nothing.
+2. **Read the allocation's JWT and log in with it.** Closed by Nomad: `nomad alloc fs` on the
+   secrets directory returns *"Reading secret file prohibited"*. Correct behaviour, and worth
+   recording as a thing the platform gets right.
+3. **A long-lived probe job matching the `agent-run` role.** Closed by configuration:
+   `agent_run_job_id_patterns` is `["agent-run", "agent-run/dispatch-*"]`, listed explicitly
+   rather than globbed *"to `agent-run*`, which would also admit a job named `agent-runner`"*.
+
+**What remains, and it is a decision rather than a discovery.** A row needs authority that is
+both entity-bearing and agent-run-shaped, and only a real dispatched allocation has it. Two
+shapes are available:
+
+- **A declared probe job**, admitted by adding a pattern to `agent_run_job_id_patterns` **in the
+  dev and conformance environments only**. It obtains authority through the real login path, so
+  the contract holds as written. The cost is that a test-only job id is admissible where the
+  enclave is a test enclave — bounded, declared, and absent from production.
+- **Assert the composition instead of the token**: that `user_claim` names the allocation, that
+  the grant templates on the alias, and separately that Vault's templating denies a foreign name
+  — the last already demonstrated (403 on read, write and delete against a 200/200/204
+  baseline, same templating shape on a mount that can be minted against). Cheaper, and weaker:
+  it proves each link rather than the chain.
+
+**What is already proven end to end**, so neither option starts from nothing: a real dispatched
+run took the alias `ab997f55-5a60-d77b-9674-b706e8cb3978` — exactly its allocation id — where
+every run previously shared the single alias `agent-run`.
+
+
+---
+
+## R8 — What Branch A satisfies by construction, and the one thing it cannot
+
+Written after implementation, because several requirements stopped needing machinery and one
+stopped being reachable. Recording which is which is the point: a requirement quietly dropped
+looks identical to one quietly met.
+
+### Met by construction — no code was written, and none should be
+
+| Requirement | Why it needs nothing |
+| --- | --- |
+| **FR-017** (scope cannot widen between mints) | Nothing derives, stores or re-presents scope. Vault evaluates the template against the caller's own identity per request; there is no second derivation to disagree with a first. `remint_grant` is not built |
+| **FR-011** (what a run's authority granted stays answerable) | The grant is one fixed policy and the alias is the allocation id — both already recorded. A `RecordedScope` record would restate what the estate already answers |
+| **FR-002** (enforced where it survives a platform bug) | The refusal is Vault's, reached without entering the dispatch pipeline. Row E8 asserts the probe never touches platform code |
+| **FR-016** (a restarted run gets a workspace only it can reach) | A restart is a new allocation, so it is a new workspace by the same mechanism. Row E10 |
+
+### The one that is NOT met, and cannot be under Branch A
+
+**FR-012** — *"A scoped write grant MUST be manufactured only for a run whose requested tools
+declare a write path. A run with no such tool MUST receive no write authority at all."*
+
+**Measured**: `token_policies` on a JWT auth role is **static**. Vault attaches the same set to
+every login; there is no per-dispatch condition available. Every dispatched run therefore
+carries `scratch-policy-check`, whether or not it will ever write.
+
+**What that does and does not mean.** The grant it carries is now bounded to a workspace nothing
+else can reach, and which is empty unless the run uses it. The harm FR-012 was written against —
+a run that never writes holding *estate-wide* write authority — is closed. What survives is that
+a run holding no write need still holds a self-scoped grant, and could create junk in its own
+corner of the measurement namespace, which the sweep already clears.
+
+**So the intent is met and the letter is not**, and the letter was only reachable on Branch B:
+manufacturing per run is what lets you decline to manufacture. That is the cost of the cheap
+path, and it belongs beside R2a's entity sprawl rather than buried.
+
+**This is a maintainer decision, not an editorial one.** Either FR-012 is amended to what Branch
+A can hold, or it stands and the feature is knowingly short of it. It is left standing and
+unmet, recorded here, rather than rewritten by the implementation that could not satisfy it.
+
+---
+
+## R9 — The implementation does not scale, and the reason is a hard ceiling
+
+**Decision**: **Branch A as built is withdrawn.** `user_claim` reverts to the job, and the
+measurement moves to the long-lived surface. The isolation 054 exists for is kept — and
+improved — without a per-run identity.
+
+**Measured on the running enclave 2026-08-27**, not inferred:
+
+| | |
+| --- | --- |
+| One dispatched Build | **73 raft writes, +1 permanent entity** |
+| A repeat login by an existing identity | 14 raft writes, **no** new entity |
+| This session alone | entities 11 → 69, aliases 6 → 63 |
+| `auth/nomad/` entity clients | ~6 → 62 |
+
+**Documented** ([Vault limits](https://developer.hashicorp.com/vault/docs/internals/limits)):
+entities shard across 256 storage entries, a **hard 256 MiB cap** on integrated storage —
+~480,000 entities conservative, ~1,250,000 best case. This estate is Vault 2.0.3+ent on raft,
+so the figures apply directly. **Entities carry no TTL and no expiry field**; the identity
+record has `creation_time` and `last_update_time` and nothing else.
+
+### Why this is a tier-0 problem and not a bill
+
+**1. Logins are what hit the wall.** Entity writes happen on every login. When the shard space
+fills, logins fail — so every Build fails and the platform is down. The documented recovery
+("reconfigure to a larger maximum storage entry") does not apply: on integrated storage 256 MiB
+*is* the cap. At 10,000 users × 20 Builds/month the conservative ceiling arrives in **2.4
+months**, and because nothing expires, the system arrives and stays.
+
+**2. It degrades long before it breaks.** *"The cost of entity and group updates grows as the
+number of objects in each shard increases."* Every login pays it, so Build-start latency rises
+with the **cumulative count of Builds ever run**. No steady state, no recovery, and it looks
+correct in every test — the worst shape a performance defect can take.
+
+**3. It extends recovery.** Raft snapshots carry the identity store, so a quarter-gigabyte of
+entities lengthens snapshot and restore. For a service that may not go down, restore time *is*
+the availability number.
+
+**4. Write amplification through one leader.** 73 raft writes per Build, serialised through the
+raft leader. Build-start throughput is bounded by raft write throughput.
+
+**Measured versus reasoned, stated plainly**: the writes-per-Build, the entity growth and the
+ceiling arithmetic are measured. **What exactly happens at the wall is inferred** — HashiCorp
+documents the limit and not the failure mode. For tier-0 that belongs in a load test rather
+than in a paragraph.
+
+### The category error, named
+
+Entities express *who you are*. A run's workspace boundary is *what this task may do*. Branch A
+carried a task scope in the identity system, which is the distinction ADR-0056 drew when it
+established Vault as the resource server rather than the authorization server.
+
+**An agent's identity is per definition — or per definition and tenant. Never per invocation.**
+`registry.tf` already builds exactly that with `vault_identity_entity.agent`.
+
+### The replacement, in two independent halves
+
+| Half | Fixes | Keeps |
+| --- | --- | --- |
+| **Revert `user_claim` to `/nomad_job_id`** | the growth, completely — runs share one identity, which already exists, so nothing accumulates | nothing on its own; isolation is lost again |
+| **Move the measurement to the MCP surface** | the isolation, and improves it — runs hold **no** policy-write authority at all, so FR-012 is met in full rather than in part | — |
+
+Either alone is a regression on the other. Together they are better than Branch A **and**
+better than what preceded it.
+
+**The surface is the right home and the precedent is already there.** It is long-lived, one
+alias, one entity, and it already holds `scratch-sweep` with `list`, `read` and `delete` over
+the whole namespace — because the sweeper solves a structurally identical problem: *"something
+a dead run left that only a living process can clear."* A measurement needing authority a run
+should not hold has the same shape.
+
+### Owed regardless of which way this lands
+
+`vault.identity.upsert_entity_txn` is the metric HashiCorp names for this degradation, and
+**telemetry is disabled in this enclave** — `sys/metrics` returns 400. Nothing would have told
+us. For a tier-0 service that is its own defect.
+
+
+---
+
+## R10 — Scoping option C: what moving the measurement actually costs
+
+**Decision**: build it. Recorded here because the estimate was wrong twice and the third one
+should be checkable.
+
+**What was wrong before.** "Small, three files" assumed `transport = "mcp"` would route the
+call to the surface. **It does not: `transport` is purely declarative.** Nothing in `src/`
+reads it at invoke time — it is in the same state `risk_class` was before 013 and `paths` is
+now. A dispatched run has no channel to the MCP surface at all.
+
+**What already exists, and is more than expected.** Both served surfaces already verify a
+**WORKLOAD** subject kind — `served.py` builds `verifier_for(SubjectKind.WORKLOAD, iss=…,
+jwks=…)` from `OIDC_WORKLOAD_ISSUER` / `OIDC_WORKLOAD_JWKS_URI`, and `api/service.py` does the
+same. The API job configures both; **the MCP job configures neither.** So the mechanism for a
+workload to authenticate to a surface is built and unused, not missing.
+
+**The gap that makes it a substrate change.** Measured on a live allocation: the Nomad workload
+identity JWT carries **no `iss` claim** (`aud` is `vault.io`, set by the jobspec's `identity`
+block), and Nomad's `/.well-known/openid-configuration` returns 404 while `/.well-known/jwks.json`
+answers 200. Nomad emits an issuer only when the server is configured with `oidc_issuer`. An
+issuer-keyed verifier cannot accept a token that has no issuer, so configuring Nomad is a
+prerequisite rather than an optimisation.
+
+**The eight steps, each independently checkable:**
+
+1. Configure Nomad `oidc_issuer` so workload tokens carry `iss` and discovery answers.
+2. Add a second `identity` block to the agent-run task with an audience naming the surface —
+   a token minted for Vault must not be replayable at the surface.
+3. Configure the MCP job with `OIDC_WORKLOAD_ISSUER` and `OIDC_WORKLOAD_JWKS_URI`.
+4. Build the run's client for the impact call.
+5. Execute `vault_policy_impact` on the surface, under the surface's identity.
+6. Grant the surface `create`/`update` on the scratch namespace, beside the `list`/`read`/
+   `delete` it already holds for the sweep.
+7. Remove `scratch-policy-check` from the run, and revert `user_claim` to the job (**FR-018**).
+8. Rework the rows to the stricter claim: a run reaches **no** scratch policy.
+
+**Why this is worth it over reaping** (the option it was chosen against): reaping keeps the
+per-run entity and makes availability depend on a cleanup job keeping pace. This removes the
+authority instead of bounding its blast radius, so there is nothing to keep pace with.
+
+
+---
+
+## R11 — The run→surface call is not a northbound operation, and a gate said so
+
+**Decision**: T046c/T046d are **blocked on a design choice**, recorded rather than guessed.
+The measurement's *execution* has moved (R10 steps 1-3, 5-6 are done); the *call path* from a
+run to the surface has not.
+
+**What was tried and reverted.** Adding `measure_policy_impact` to `operations()` and
+`McpTransport.call`. Two rows refused it, and the second is the interesting one:
+`test_row_both_transports_expose_the_same_operations`, whose docstring names the exact failure
+committed — *"someone adds 'just this one helper' where it is easiest, and the surfaces diverge
+from the side nobody is watching."*
+
+**Parity is not the real objection, though.** It could be satisfied by adding the operation to
+the API too and amending 008's frozen snapshot. The objection is what that would mean: every
+operation in that catalogue is a **platform** operation — `start_run`, `read_evidence`, `ask`,
+`propose`, `list_agent_definitions`. `measure_policy_impact` is a **product** utility. Putting
+it there makes the northbound API a Vault proxy, and every authenticated person gains a
+capability that exists for the Build pipeline.
+
+**So the northbound catalogue is the wrong door.** What remains is a choice, and each option
+has a real cost:
+
+| Option | Shape | Cost |
+| --- | --- | --- |
+| **Internal endpoint on the surface** | workload-authenticated, outside `operations()` | `served.py` builds a FastMCP server, not a general HTTP app — there is no obvious place to hang one, and it is a second entry point to reason about |
+| **Northbound operation after all** | on both transports, 008's snapshot amended | a product utility in a platform catalogue, reachable by every authenticated person |
+| **The sweeper polls** | the run records a request; the surface measures and writes back | no new entry point and no new auth, but turns a synchronous measurement into an asynchronous one, which changes what a Build waits for |
+
+**Not chosen here.** The estimate for this feature has already been wrong twice, and each of
+these is a different platform, not a different afternoon.
+
+**What is done and standing**: Nomad publishes an issuer; runs carry a second identity for the
+surface with a distinct audience; the surface can verify a workload; the surface holds
+`create`/`update` on the namespace; and the measurement names its own workspace so nothing a
+caller says can steer it. All of that is prerequisite to every option above and none of it is
+wasted.

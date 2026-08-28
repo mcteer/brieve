@@ -70,4 +70,16 @@ module "trust_fabric" {
   # writes the record out of band, so an apply can never overwrite a real credential with a dud.
   seed_model_credential_placeholder = true
   seed_dev_claim_mapping            = true
+
+  # 054, T011a. Admits the run-shaped identity probe (`infra/jobs/run-probe.nomad.hcl`) to the
+  # `agent-run` role, so a conformance row can attempt a real break-in under real run
+  # authority. Three cheaper routes are closed — see 054 research R7 — and a row that minted
+  # its own authority would go green while asserting nothing.
+  #
+  # **SET HERE AND NOT IN THE MODULE**, deliberately. The module default stays
+  # `["agent-run", "agent-run/dispatch-*"]`, listed explicitly rather than globbed because
+  # `agent-run*` would also admit a job named `agent-runner`. Production inherits that default
+  # and never admits the probe: a test-only job id is admissible only where the enclave is
+  # itself a test enclave.
+  agent_run_job_id_patterns = ["agent-run", "agent-run/dispatch-*", "harness-run-probe"]
 }

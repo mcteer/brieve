@@ -21,9 +21,15 @@ without saying so is how a pack comes to read as proven.
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import urllib.error
+import urllib.request
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.observation.types import Observation, ObservationOutcome
@@ -36,8 +42,16 @@ AGENT_SECRET_MOUNT = "secret"
 
 
 def _fabric() -> VaultDatabaseCredentials:
-    """Vault, as this allocation. No credential is accepted from a caller."""
-    return VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role="agent-run")
+    """Vault, as this allocation. No credential is accepted from a caller.
+
+    **The role is the allocation's, and 054 made that matter.** These handlers are loaded in
+    both a dispatched run and the served surface; each logs in as whatever role its own job is
+    admitted to, so the same code carries different authority in the two places. That is the
+    property `measure_policy_impact` relies on: the measurement's writes happen only where the
+    grant exists, and the run no longer has it.
+    """
+    role = os.environ.get("HARNESS_VAULT_ROLE", "").strip() or "agent-run"
+    return VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role=role)
 
 
 def vault_read(arguments: Mapping[str, Any]) -> dict[str, Any]:
@@ -331,7 +345,7 @@ def _capabilities_under(
     return answered
 
 
-def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
+def measure_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
     """What the proposed policy would ALTER, measured by Vault (042, FR-007/009/019-022).
 
     **One tool call, and that is the safety design.** Splitting write / mint / check / destroy
@@ -351,9 +365,23 @@ def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
     write and the `finally` leaves scratch policies behind; the sweep (FR-023) is what makes
     "always destroyed" checkable rather than merely claimed.
     """
-    run_id = str(arguments.get("run_id", "")).strip()
-    if not run_id:
-        raise ValueError("vault_policy_impact requires a 'run_id' argument to derive its names")
+    # 054: THE SURFACE NAMES THE WORKSPACE, AND NOTHING ELSE CAN.
+    #
+    # This has moved twice, and the second move made the first unnecessary. It was
+    # `arguments["run_id"]` — a value the CALLER supplied, which `b7c2a2f` had to police. Then
+    # it was the allocation, which was unforgeable but cost one permanent Vault identity entity
+    # per Build against a ceiling that logins fail at (054 R9, ADR-0072).
+    #
+    # Now this runs on the long-lived surface and a dispatched run holds no policy-write
+    # authority at all. **So the name no longer has to be attacker-proof.** Nobody but this
+    # process can write in the namespace, and this process creates both sides from the
+    # documents it was handed, measures, and destroys them — it never reads a policy somebody
+    # else wrote. A name supplied by a caller could at worst collide with its own measurement.
+    #
+    # Generated here anyway, because "at worst a collision" is a thing to prevent rather than
+    # tolerate: two concurrent measurements must not share a scratch name.
+    workspace_id = uuid4().hex
+
     proposed_document = str(arguments.get("proposed_document", ""))
     current_document = str(arguments.get("current_document", ""))
     if not proposed_document.strip():
@@ -361,8 +389,8 @@ def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
 
     # DERIVED, never supplied. A `scratch_name` argument would be a caller choosing what to
     # overwrite, and the governance hook refuses a call that carries one.
-    current_name = f"{SCRATCH_PREFIX}{run_id}-current"
-    proposed_name = f"{SCRATCH_PREFIX}{run_id}-proposed"
+    current_name = f"{SCRATCH_PREFIX}{workspace_id}-current"
+    proposed_name = f"{SCRATCH_PREFIX}{workspace_id}-proposed"
 
     paths, truncated = _queried_paths(current_document, proposed_document)
     if not paths:
@@ -434,7 +462,6 @@ def terraform_plan(arguments: Mapping[str, Any]) -> dict[str, Any]:
     working directory refuses rather than inventing ``changes: 0``. Hermetic rows that
     must script a plan inject ``HARNESS_TERRAFORM_BIN`` pointing at a stub executable.
     """
-    import os
     import subprocess
     from pathlib import Path
 
@@ -516,6 +543,73 @@ class TerraformApplyObserver:
             outcome=ObservationOutcome.CANNOT_DETERMINE,
             detail="terraform is fixture-backed here; nothing to observe",
         )
+
+
+#: Where a dispatched run asks the surface to measure. Set on the run's job; absent everywhere
+#: else, which is what makes the client half unreachable from the surface itself.
+POLICY_IMPACT_URL_ENV = "HARNESS_POLICY_IMPACT_URL"
+
+#: The surface identity a run presents. A SECOND token, deliberately: `nomad_vault.jwt` carries
+#: `aud: vault.io`, and reusing it here would make a credential minted for Vault replayable at
+#: the surface.
+SURFACE_IDENTITY_FILE = "nomad_mcp.jwt"
+
+
+def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Ask the surface to measure. **The run performs no Vault write of its own (054).**
+
+    This used to be the measurement. It is now a client, and the reason is the whole of
+    ADR-0072: performing it here meant every dispatched run carried policy-write authority, and
+    bounding that per run cost one permanent Vault identity entity per Build against a ceiling
+    that logins fail at.
+
+    **What did NOT move is interception.** This is still a registered tool reached through
+    `invoke_tool`, so the 042 hooks still run — `b7c2a2f`'s guard included — and the trail still
+    records `TOOL_OUTCOME` where it always did. Only the Vault writes moved.
+
+    **Fail-closed.** No surface, no measurement: a Build proposing a policy stops rather than
+    reporting an unmeasured change as a safe one, which is the trade 042 exists to refuse.
+    """
+    url = os.environ.get(POLICY_IMPACT_URL_ENV, "").strip()
+    if not url:
+        raise ImpactUnavailable(
+            "no policy-impact surface is configured for this run, so a proposed policy cannot "
+            "be measured. The measurement moved off the run in 054; a run that cannot reach "
+            "the surface has no instrument and must not report an unmeasured change."
+        )
+
+    identity = Path(os.environ.get("NOMAD_SECRETS_DIR", "/secrets")) / SURFACE_IDENTITY_FILE
+    try:
+        token = identity.read_text(encoding="utf-8").strip()
+    except OSError as unreadable:
+        raise ImpactUnavailable(f"no surface identity to present: {unreadable}") from unreadable
+
+    body = json.dumps(
+        {
+            "current_document": str(arguments.get("current_document", "")),
+            "proposed_document": str(arguments.get("proposed_document", "")),
+        }
+    ).encode()
+    request = urllib.request.Request(  # noqa: S310
+        url,
+        data=body,
+        method="POST",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+            return dict(json.loads(response.read() or b"{}"))
+    except urllib.error.HTTPError as refused:
+        detail = refused.read().decode("utf-8", "replace")[:200]
+        if refused.code == 400:
+            raise PolicyInvalid(f"the surface refused the documents: {detail}") from refused
+        raise ImpactUnavailable(
+            f"the surface could not measure this policy ({refused.code}): {detail}"
+        ) from refused
+    except OSError as unreachable:
+        raise ImpactUnavailable(
+            f"the policy-impact surface is unreachable: {unreachable}"
+        ) from unreachable
 
 
 #: Handlers a manifest may name. A name absent from this table refuses `unresolved_binding`
