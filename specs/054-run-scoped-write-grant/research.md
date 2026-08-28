@@ -339,3 +339,46 @@ should not hold has the same shape.
 `vault.identity.upsert_entity_txn` is the metric HashiCorp names for this degradation, and
 **telemetry is disabled in this enclave** — `sys/metrics` returns 400. Nothing would have told
 us. For a tier-0 service that is its own defect.
+
+
+---
+
+## R10 — Scoping option C: what moving the measurement actually costs
+
+**Decision**: build it. Recorded here because the estimate was wrong twice and the third one
+should be checkable.
+
+**What was wrong before.** "Small, three files" assumed `transport = "mcp"` would route the
+call to the surface. **It does not: `transport` is purely declarative.** Nothing in `src/`
+reads it at invoke time — it is in the same state `risk_class` was before 013 and `paths` is
+now. A dispatched run has no channel to the MCP surface at all.
+
+**What already exists, and is more than expected.** Both served surfaces already verify a
+**WORKLOAD** subject kind — `served.py` builds `verifier_for(SubjectKind.WORKLOAD, iss=…,
+jwks=…)` from `OIDC_WORKLOAD_ISSUER` / `OIDC_WORKLOAD_JWKS_URI`, and `api/service.py` does the
+same. The API job configures both; **the MCP job configures neither.** So the mechanism for a
+workload to authenticate to a surface is built and unused, not missing.
+
+**The gap that makes it a substrate change.** Measured on a live allocation: the Nomad workload
+identity JWT carries **no `iss` claim** (`aud` is `vault.io`, set by the jobspec's `identity`
+block), and Nomad's `/.well-known/openid-configuration` returns 404 while `/.well-known/jwks.json`
+answers 200. Nomad emits an issuer only when the server is configured with `oidc_issuer`. An
+issuer-keyed verifier cannot accept a token that has no issuer, so configuring Nomad is a
+prerequisite rather than an optimisation.
+
+**The eight steps, each independently checkable:**
+
+1. Configure Nomad `oidc_issuer` so workload tokens carry `iss` and discovery answers.
+2. Add a second `identity` block to the agent-run task with an audience naming the surface —
+   a token minted for Vault must not be replayable at the surface.
+3. Configure the MCP job with `OIDC_WORKLOAD_ISSUER` and `OIDC_WORKLOAD_JWKS_URI`.
+4. Build the run's client for the impact call.
+5. Execute `vault_policy_impact` on the surface, under the surface's identity.
+6. Grant the surface `create`/`update` on the scratch namespace, beside the `list`/`read`/
+   `delete` it already holds for the sweep.
+7. Remove `scratch-policy-check` from the run, and revert `user_claim` to the job (**FR-018**).
+8. Rework the rows to the stricter claim: a run reaches **no** scratch policy.
+
+**Why this is worth it over reaping** (the option it was chosen against): reaping keeps the
+per-run entity and makes availability depend on a cleanup job keeping pace. This removes the
+authority instead of bounding its blast radius, so there is nothing to keep pace with.

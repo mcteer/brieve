@@ -158,7 +158,12 @@ records the rule; these tasks apply it.
 **The two halves are independent and both are required.** Reverting alone loses the isolation;
 moving alone leaves the growth. Ordered so the tree is never in a state that has neither.
 
-- [ ] T046 Move the impact measurement to the long-lived surface: `vault_policy_impact` performs its writes under the surface's identity rather than the run's, in `src/surfaces/`. The surface already holds `list`, `read` and `delete` over the namespace for the sweep — this adds `create` and `update` to the same grant, in `infra/modules/trust-fabric/scratch.tf`
+- [ ] T046 Configure Nomad's `oidc_issuer` in the substrate so workload tokens carry `iss` and discovery answers. **Measured prerequisite, not an optimisation** ([R10](research.md)): the JWT carries no issuer today and the surface's verifier keys on one
+- [ ] T046a Add a second `identity` block to the agent-run task in `infra/jobs/agent-run.nomad.hcl`, with an audience naming the surface. A token minted for Vault must not be replayable at the surface
+- [ ] T046b Configure `OIDC_WORKLOAD_ISSUER` and `OIDC_WORKLOAD_JWKS_URI` on the MCP job. The verifier already exists in `served.py` and the API job already sets both — the MCP job sets neither
+- [ ] T046c Build the run's client for the impact call in `src/surfaces/dispatch/`, presenting the surface-audience identity
+- [ ] T046d Execute `vault_policy_impact` on the surface under the surface's own identity; `toolset` already loads the handler there
+- [ ] T046e Grant the surface `create` and `update` on the scratch namespace in `infra/modules/trust-fabric/scratch.tf`, beside the `list`/`read`/`delete` the sweep already holds
 - [ ] T047 Remove `scratch-policy-check` from the `agent-run` role in `infra/modules/trust-fabric/auth.tf`. **This is FR-012 met in full** — a run then holds no policy-write authority at all, rather than a self-scoped grant it may not need
 - [ ] T048 Revert `user_claim` to `/nomad_job_id` in the same role, so runs share one identity that already exists and nothing accumulates (**FR-018**)
 - [ ] T049 Restore the estate-wide form in `scratch.tf`'s grant — it is the SURFACE's grant now, and one long-lived identity holding it is the shape the sweep already has
