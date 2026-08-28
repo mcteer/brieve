@@ -62,6 +62,19 @@ job "harness-run-probe" {
         change_mode = "restart"
       }
 
+      # The surface identity a real run now carries (054, T046a). Mirrored here because the
+      # probe's whole purpose is to be indistinguishable from a run to anything checking
+      # identity — a probe missing an identity the runs have would let a row pass against a
+      # shape production does not have.
+      identity {
+        name        = "mcp"
+        aud         = ["brieve.mcp"]
+        env         = false
+        file        = true
+        ttl         = "10m"
+        change_mode = "noop"
+      }
+
       config {
         labels = {
           "com.docker.compose.project" = "brieve-local"

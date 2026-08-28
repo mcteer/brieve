@@ -142,6 +142,26 @@ job "agent-run" {
         change_mode = "restart"
       }
 
+      # A SECOND IDENTITY, FOR THE SURFACE, AND THE AUDIENCE IS THE WHOLE POINT (054, T046a).
+      #
+      # 054 moves the policy-impact measurement off the run and onto the long-lived surface,
+      # so a run must be able to authenticate to that surface. It must NOT do so with the
+      # token above: `aud` is what stops a credential minted for one audience being replayed
+      # at another, and a run presenting its Vault token to the surface would make the two
+      # interchangeable — a hole opened by the fix for a different one.
+      #
+      # Shorter than the Vault identity because it is used for one call at one moment, not
+      # held for the length of the run. `change_mode = "noop"`: a re-issue must not restart a
+      # Build mid-flight, and the client reads the file per call rather than caching it.
+      identity {
+        name        = "mcp"
+        aud         = ["brieve.mcp"]
+        env         = false
+        file        = true
+        ttl         = "10m"
+        change_mode = "noop"
+      }
+
       config {
         labels = {
           "com.docker.compose.project" = "brieve-local"
