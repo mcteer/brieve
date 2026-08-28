@@ -177,7 +177,13 @@ def test_the_sweep_grant_is_not_held_by_a_dispatched_run() -> None:
     needs enumeration — which is exactly why a dispatched run must not have it.
     """
     auth = (MODULE / "auth.tf").read_text()
-    agent_role = auth[auth.index('role_name               = "agent-run"') :]
+    # Located by regex rather than by an exact-width slice. `terraform fmt` aligns `=` within
+    # contiguous runs of attributes, so ANY comment added inside the block re-aligns the
+    # others — 054 added one and this row failed on the whitespace while the property it
+    # asserts was untouched. The property is worth keeping; the brittleness was not.
+    anchor = re.search(r'^\s*role_name\s*=\s*"agent-run"', auth, re.MULTILINE)
+    assert anchor is not None, "the agent-run JWT role is gone from auth.tf"
+    agent_role = auth[anchor.start() :]
     agent_role = agent_role[: agent_role.index("\n}")]
 
     assert "scratch_sweep" not in agent_role, (
