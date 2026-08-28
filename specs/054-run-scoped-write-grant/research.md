@@ -382,3 +382,43 @@ prerequisite rather than an optimisation.
 **Why this is worth it over reaping** (the option it was chosen against): reaping keeps the
 per-run entity and makes availability depend on a cleanup job keeping pace. This removes the
 authority instead of bounding its blast radius, so there is nothing to keep pace with.
+
+
+---
+
+## R11 — The run→surface call is not a northbound operation, and a gate said so
+
+**Decision**: T046c/T046d are **blocked on a design choice**, recorded rather than guessed.
+The measurement's *execution* has moved (R10 steps 1-3, 5-6 are done); the *call path* from a
+run to the surface has not.
+
+**What was tried and reverted.** Adding `measure_policy_impact` to `operations()` and
+`McpTransport.call`. Two rows refused it, and the second is the interesting one:
+`test_row_both_transports_expose_the_same_operations`, whose docstring names the exact failure
+committed — *"someone adds 'just this one helper' where it is easiest, and the surfaces diverge
+from the side nobody is watching."*
+
+**Parity is not the real objection, though.** It could be satisfied by adding the operation to
+the API too and amending 008's frozen snapshot. The objection is what that would mean: every
+operation in that catalogue is a **platform** operation — `start_run`, `read_evidence`, `ask`,
+`propose`, `list_agent_definitions`. `measure_policy_impact` is a **product** utility. Putting
+it there makes the northbound API a Vault proxy, and every authenticated person gains a
+capability that exists for the Build pipeline.
+
+**So the northbound catalogue is the wrong door.** What remains is a choice, and each option
+has a real cost:
+
+| Option | Shape | Cost |
+| --- | --- | --- |
+| **Internal endpoint on the surface** | workload-authenticated, outside `operations()` | `served.py` builds a FastMCP server, not a general HTTP app — there is no obvious place to hang one, and it is a second entry point to reason about |
+| **Northbound operation after all** | on both transports, 008's snapshot amended | a product utility in a platform catalogue, reachable by every authenticated person |
+| **The sweeper polls** | the run records a request; the surface measures and writes back | no new entry point and no new auth, but turns a synchronous measurement into an asynchronous one, which changes what a Build waits for |
+
+**Not chosen here.** The estimate for this feature has already been wrong twice, and each of
+these is a different platform, not a different afternoon.
+
+**What is done and standing**: Nomad publishes an issuer; runs carry a second identity for the
+surface with a distinct audience; the surface can verify a workload; the surface holds
+`create`/`update` on the namespace; and the measurement names its own workspace so nothing a
+caller says can steer it. All of that is prerequisite to every option above and none of it is
+wasted.
