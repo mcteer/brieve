@@ -28,6 +28,27 @@
 
 - Q: A restarted run gets a new allocation and therefore a new workspace. Must it still reach the workspace it had before? → A: **No, and returning to it would be actively harmful.** A dependency outage that restarts a job repeatedly would have every attempt contending for one workspace — the original defect, reintroduced and self-inflicted. Each attempt gets its own; the existing sweep clears what a dead one left. FR-016 is rewritten accordingly.
 
+## Amendment — 2026-08-27: the first implementation does not scale
+
+**Branch A shipped the isolation and bought it with a per-run Vault identity.** Measured:
+one dispatched Build costs 73 raft writes and **one permanent identity entity**, and entities
+have no TTL. Vault's documented ceiling is a hard 256 MiB on integrated storage — ~480,000
+entities conservative — reached in about **2.4 months** at 10,000 users × 20 Builds/month.
+Entity writes happen on every login, so the failure mode is that **logins stop and every Build
+fails** ([research R9](research.md)).
+
+This platform is intended to be tier-0. A control whose cost grows monotonically with every
+Build ever run, degrades continuously before it fails, and lengthens restore time is not a
+control that can ship, however correct its refusals are.
+
+**The requirements below are amended rather than the implementation being patched**, because
+the defect is in what was specified: FR-001 asked for a bound and said nothing about what the
+bound may cost to maintain.
+
+- **FR-018 added** — the mechanism's cost must be bounded by things that grow slowly.
+- **FR-012 becomes reachable**, and is now met in full rather than in part.
+- **FR-001 is unchanged.** The property still holds; only the mechanism moves.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### The measurement that produced this feature
@@ -176,9 +197,14 @@ no measurement is attempted; no wider authority is substituted.
   the narrowing derives from, or the spec MUST record why it cannot be.
 - **FR-011**: What a run's authority actually granted MUST remain answerable after the run, so
   an auditor can say what it could have done.
-- **FR-012**: A scoped write grant MUST be manufactured only for a run whose requested tools
-  declare a write path. A run with no such tool MUST receive no write authority at all — not a
-  scoped grant it never uses, and not the estate-wide one.
+- **FR-012**: A dispatched run MUST hold **no policy-write authority at all**. The measurement
+  that needs it is performed by the long-lived surface, which already holds `list`, `read` and
+  `delete` over the same namespace for the sweep.
+
+  *Amended 2026-08-27. The original required the grant to be withheld from runs that declare no
+  write path, which Branch A could not do — `token_policies` on a JWT role is static. Moving
+  the measurement satisfies it for every run instead of some, and removes the requirement's
+  hardest case by removing the grant.*
 - **FR-013**: The decision in FR-012 MUST be made from the run's requested tools rather than
   from what the model later chooses to call, so a run's write authority does not depend on a
   model's behaviour partway through it.
@@ -195,6 +221,13 @@ no measurement is attempted; no wider authority is substituted.
   restarts a job repeatedly would have every attempt contending for one workspace — the defect
   this feature removes, reintroduced and self-inflicted. Anything a dead attempt left behind is
   the existing sweep's job, which is what that sweep is for.*
+- **FR-018**: The cost of the mechanism MUST be bounded by things that grow slowly — agent
+  definitions, tenants, services. It MUST NOT grow with the number of runs, and MUST NOT create
+  a record that outlives the run and cannot be reclaimed.
+
+  *This is the requirement whose absence let Branch A ship a correct bound with an unbounded
+  cost. An identity is who you are; a workspace boundary is what this task may do, and carrying
+  the second in the first is the category error ADR-0056 already drew a line under.*
 - **FR-017**: A run's write scope MUST NOT be derivable, storable or re-presentable by the
   platform. It MUST be evaluated from the caller's own attested identity at the moment of the
   request, so a widened scope is **unrepresentable** rather than merely refused.

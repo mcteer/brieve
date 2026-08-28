@@ -128,6 +128,7 @@ same change.
 | [0069](0069-governance-configuration-is-requested-at-a-console.md) | Governance configuration is requested at a console and decided by the trust fabric | Accepted |
 | [0070](0070-endorsed-content-sync-is-an-egress-class.md) | Endorsed-content sync is an enumerated egress class, and customer content is pinned rather than fetched | Accepted |
 | [0071](0071-prompt-optimization-is-eval-lane-only.md) | Prompt-optimization libraries are eval-lane only | Accepted |
+| [0072](0072-identity-is-per-definition-never-per-invocation.md) | Identity is per definition, never per invocation | Proposed |
 
 ## Reviews
 

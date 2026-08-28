@@ -4,6 +4,25 @@
 
 Gate rows attach as the feature lands (ADR-0047). Every row names the state in which it fails.
 
+## 0. Amendment — 2026-08-27: what these rows will assert instead
+
+The rows below all passed against the live estate, and the mechanism they assert is being
+**withdrawn** — not because the bound failed, but because it cost one permanent Vault identity
+entity per Build against a hard ceiling that logins fail at ([research R9](../research.md),
+proposed [ADR-0072](../../../docs/adr/0072-identity-is-per-definition-never-per-invocation.md)).
+
+**The claim gets stricter, not weaker.** E1-E3 assert a run cannot reach *another run's*
+workspace; after the amendment they assert a run cannot reach **any** scratch policy, because
+it holds no policy-write authority at all. E4 — which required the run to reach its own
+workspace, and was the row that stopped a broken grant looking like a fix — is **withdrawn with
+its reason**: there is no own-workspace left to reach, and the row that replaces it asserts the
+measurement still works through the surface.
+
+**Two rows are added for the cost, which nothing here measured**: no new identity entity per
+Build, and no `create`/`update` on `sys/policies/acl` anywhere in a run's policy set. The
+absence of the first is what let a correct feature ship an unbounded mechanism through two
+analysis passes and ten green rows.
+
 ## 1. The rows that matter most are live
 
 The defect was credible because it was **demonstrated** against the live control plane. The fix
@@ -92,8 +111,8 @@ Dan McTeer (maintainer). E1–E10 fail loudly when the enclave is absent; they d
 
 | Row | Named runner | Status |
 | --- | --- | --- |
-| E1–E3 | — | **Pass, 2026-08-27.** Read 403, write 403, delete 403 under real run authority, against a 200/200/204 baseline recorded before the change |
-| E4 | — | **Pass.** The same authority writes (204) and reads (200) its own workspace, so the refusals above are not an authority that reaches nothing |
+| E1–E3 | — | **Pass, 2026-08-27** (superseded by the amendment above). Read 403, write 403, delete 403 under real run authority, against a 200/200/204 baseline recorded before the change |
+| E4 | — | **Pass** (withdrawn by the amendment — no own workspace remains). The same authority writes (204) and reads (200) its own workspace, so the refusals above are not an authority that reaches nothing |
 | E5 | — | **Pass.** Restoring the estate-wide grant makes the break-in succeed again; restored in a `finally` |
 | E6 | — | **Pass.** A run's five policies unchanged — no read narrowed |
 | E7 | — | **Pass.** The sweeper keeps `list`; the run still lacks it |

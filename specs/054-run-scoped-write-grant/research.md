@@ -260,3 +260,82 @@ path, and it belongs beside R2a's entity sprawl rather than buried.
 **This is a maintainer decision, not an editorial one.** Either FR-012 is amended to what Branch
 A can hold, or it stands and the feature is knowingly short of it. It is left standing and
 unmet, recorded here, rather than rewritten by the implementation that could not satisfy it.
+
+---
+
+## R9 — The implementation does not scale, and the reason is a hard ceiling
+
+**Decision**: **Branch A as built is withdrawn.** `user_claim` reverts to the job, and the
+measurement moves to the long-lived surface. The isolation 054 exists for is kept — and
+improved — without a per-run identity.
+
+**Measured on the running enclave 2026-08-27**, not inferred:
+
+| | |
+| --- | --- |
+| One dispatched Build | **73 raft writes, +1 permanent entity** |
+| A repeat login by an existing identity | 14 raft writes, **no** new entity |
+| This session alone | entities 11 → 69, aliases 6 → 63 |
+| `auth/nomad/` entity clients | ~6 → 62 |
+
+**Documented** ([Vault limits](https://developer.hashicorp.com/vault/docs/internals/limits)):
+entities shard across 256 storage entries, a **hard 256 MiB cap** on integrated storage —
+~480,000 entities conservative, ~1,250,000 best case. This estate is Vault 2.0.3+ent on raft,
+so the figures apply directly. **Entities carry no TTL and no expiry field**; the identity
+record has `creation_time` and `last_update_time` and nothing else.
+
+### Why this is a tier-0 problem and not a bill
+
+**1. Logins are what hit the wall.** Entity writes happen on every login. When the shard space
+fills, logins fail — so every Build fails and the platform is down. The documented recovery
+("reconfigure to a larger maximum storage entry") does not apply: on integrated storage 256 MiB
+*is* the cap. At 10,000 users × 20 Builds/month the conservative ceiling arrives in **2.4
+months**, and because nothing expires, the system arrives and stays.
+
+**2. It degrades long before it breaks.** *"The cost of entity and group updates grows as the
+number of objects in each shard increases."* Every login pays it, so Build-start latency rises
+with the **cumulative count of Builds ever run**. No steady state, no recovery, and it looks
+correct in every test — the worst shape a performance defect can take.
+
+**3. It extends recovery.** Raft snapshots carry the identity store, so a quarter-gigabyte of
+entities lengthens snapshot and restore. For a service that may not go down, restore time *is*
+the availability number.
+
+**4. Write amplification through one leader.** 73 raft writes per Build, serialised through the
+raft leader. Build-start throughput is bounded by raft write throughput.
+
+**Measured versus reasoned, stated plainly**: the writes-per-Build, the entity growth and the
+ceiling arithmetic are measured. **What exactly happens at the wall is inferred** — HashiCorp
+documents the limit and not the failure mode. For tier-0 that belongs in a load test rather
+than in a paragraph.
+
+### The category error, named
+
+Entities express *who you are*. A run's workspace boundary is *what this task may do*. Branch A
+carried a task scope in the identity system, which is the distinction ADR-0056 drew when it
+established Vault as the resource server rather than the authorization server.
+
+**An agent's identity is per definition — or per definition and tenant. Never per invocation.**
+`registry.tf` already builds exactly that with `vault_identity_entity.agent`.
+
+### The replacement, in two independent halves
+
+| Half | Fixes | Keeps |
+| --- | --- | --- |
+| **Revert `user_claim` to `/nomad_job_id`** | the growth, completely — runs share one identity, which already exists, so nothing accumulates | nothing on its own; isolation is lost again |
+| **Move the measurement to the MCP surface** | the isolation, and improves it — runs hold **no** policy-write authority at all, so FR-012 is met in full rather than in part | — |
+
+Either alone is a regression on the other. Together they are better than Branch A **and**
+better than what preceded it.
+
+**The surface is the right home and the precedent is already there.** It is long-lived, one
+alias, one entity, and it already holds `scratch-sweep` with `list`, `read` and `delete` over
+the whole namespace — because the sweeper solves a structurally identical problem: *"something
+a dead run left that only a living process can clear."* A measurement needing authority a run
+should not hold has the same shape.
+
+### Owed regardless of which way this lands
+
+`vault.identity.upsert_entity_txn` is the metric HashiCorp names for this degradation, and
+**telemetry is disabled in this enclave** — `sys/metrics` returns 400. Nothing would have told
+us. For a tier-0 service that is its own defect.

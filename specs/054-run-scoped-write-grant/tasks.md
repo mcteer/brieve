@@ -148,6 +148,28 @@ the attempt succeeds, and it fails if the attempt cannot be made.
 
 ---
 
+## Phase 7: Amendment — withdraw the per-run identity, keep the property
+
+**Added 2026-08-27 after [research R9](research.md).** Branch A's bound is correct and its cost
+is unbounded: one permanent Vault identity entity per Build, against a hard 256 MiB ceiling
+that logins fail at. Proposed [ADR-0072](../../docs/adr/0072-identity-is-per-definition-never-per-invocation.md)
+records the rule; these tasks apply it.
+
+**The two halves are independent and both are required.** Reverting alone loses the isolation;
+moving alone leaves the growth. Ordered so the tree is never in a state that has neither.
+
+- [ ] T046 Move the impact measurement to the long-lived surface: `vault_policy_impact` performs its writes under the surface's identity rather than the run's, in `src/surfaces/`. The surface already holds `list`, `read` and `delete` over the namespace for the sweep — this adds `create` and `update` to the same grant, in `infra/modules/trust-fabric/scratch.tf`
+- [ ] T047 Remove `scratch-policy-check` from the `agent-run` role in `infra/modules/trust-fabric/auth.tf`. **This is FR-012 met in full** — a run then holds no policy-write authority at all, rather than a self-scoped grant it may not need
+- [ ] T048 Revert `user_claim` to `/nomad_job_id` in the same role, so runs share one identity that already exists and nothing accumulates (**FR-018**)
+- [ ] T049 Restore the estate-wide form in `scratch.tf`'s grant — it is the SURFACE's grant now, and one long-lived identity holding it is the shape the sweep already has
+- [ ] T050 Rework rows E1-E4: the claim becomes **a run cannot reach ANY scratch policy**, which is stricter than what they assert today. The probe harness survives unchanged; only the expectation moves
+- [ ] T051 [P] Row: the `agent-run` role's policy set contains no policy granting `create` or `update` on `sys/policies/acl` — asserted against the deployed role, so a future widening fails here
+- [ ] T052 [P] Row (**FR-018**): a dispatched Build creates **no new identity entity**. Measured by counting entities either side of a real dispatch, which is how the defect was found
+- [ ] T053 Delete `infra/jobs/run-probe.nomad.hcl` and its dev-only `agent_run_job_id_patterns` entry **only if** T050 leaves the harness unused. If the rows still borrow run authority, both stay — the probe exists because a minted token cannot carry an identity
+- [ ] T054 Enable telemetry in the enclave and alert on `vault.identity.upsert_entity_txn` — the metric HashiCorp names for this degradation. `sys/metrics` currently answers 400, so nothing would have reported the problem this amendment exists to prevent
+- [ ] T055 Reclaim the entities this session created: 11 → 69 in one afternoon. They do not expire, and the estate should not carry the evidence of a withdrawn design
+- [ ] T056 Load-test the wall rather than trusting the arithmetic. HashiCorp documents the limit and not the failure mode, and "logins stop" is inferred — for tier-0 that belongs in a test
+
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T038 Confirm FR-011 end to end — an auditor can say what a finished run's authority actually granted, from the recorded scope
