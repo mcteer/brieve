@@ -26,12 +26,12 @@ from surfaces.handlers import ImpactUnavailable, PolicyInvalid
 
 RUN = "corr-042"
 
-#: 054: the workspace is named by the ALLOCATION, not by a caller-supplied run id.
+#: 054, second move: the workspace is named by the SURFACE, per call.
 #:
-#: `scratch.tf` grants only `scratch-agent-<this allocation>-*`, evaluated by Vault against the
-#: caller's own attested identity — so a name derived from an argument is unreachable whatever
-#: the argument says. These rows set the environment the allocation would have.
-ALLOC = "b7356fd6-dfbf-7bc7-3ba6-9ac3ba27f87d"
+#: The measurement now runs on the long-lived surface and a dispatched run holds no
+#: policy-write authority at all, so the name no longer has to be attacker-proof — nobody but
+#: that process can write in the namespace. It is generated per call anyway, so two concurrent
+#: measurements cannot collide.
 CURRENT = 'path "secret/data/payments/*" {\n  capabilities = ["read"]\n}\n'
 WIDER = 'path "secret/data/payments/*" {\n  capabilities = ["read", "create", "update"]\n}\n'
 
@@ -73,7 +73,6 @@ class _Vault:
 
 def _impact(monkeypatch: pytest.MonkeyPatch, vault: _Vault, **arguments: Any) -> Mapping[str, Any]:
     monkeypatch.setattr(handlers, "_fabric", lambda: vault)
-    monkeypatch.setenv("NOMAD_ALLOC_ID", ALLOC)
     result: Mapping[str, Any] = handlers.vault_policy_impact({"run_id": RUN, **arguments})
     return result
 
@@ -91,10 +90,11 @@ def test_row_v11_the_scratch_names_are_derived_from_the_allocation(
 
     _impact(monkeypatch, vault, current_document=CURRENT, proposed_document=WIDER)
 
-    assert sorted(vault.written) == [
-        f"scratch-agent-{ALLOC}-current",
-        f"scratch-agent-{ALLOC}-proposed",
-    ]
+    written = sorted(vault.written)
+    assert len(written) == 2
+    stems = {name.removeprefix("scratch-agent-").rsplit("-", 1)[0] for name in written}
+    assert len(stems) == 1, f"the two sides must share one workspace stem: {written}"
+    assert written[0].endswith("-current") and written[1].endswith("-proposed")
     assert all(name.startswith("scratch-agent-") for name in vault.written)
 
 
@@ -209,10 +209,7 @@ def test_the_scratch_policies_are_destroyed_on_the_way_out(
 
     _impact(monkeypatch, vault, current_document=CURRENT, proposed_document=WIDER)
 
-    assert sorted(vault.deleted) == [
-        f"scratch-agent-{ALLOC}-current",
-        f"scratch-agent-{ALLOC}-proposed",
-    ]
+    assert sorted(vault.deleted) == sorted(vault.written)
 
 
 def test_the_scratch_policies_are_destroyed_even_when_the_measurement_fails(
@@ -230,10 +227,13 @@ def test_the_scratch_policies_are_destroyed_even_when_the_measurement_fails(
     with pytest.raises(ImpactUnavailable):
         _impact(monkeypatch, vault, current_document=CURRENT, proposed_document=WIDER)
 
-    assert sorted(vault.deleted) == [
-        f"scratch-agent-{ALLOC}-current",
-        f"scratch-agent-{ALLOC}-proposed",
-    ]
+    # BOTH sides, though the failure came before the second was written. That is the claim:
+    # the `finally` destroys the workspace it named, not merely the parts it reached.
+    deleted = sorted(vault.deleted)
+    assert len(deleted) == 2, f"both sides must be destroyed, got {deleted}"
+    stems = {name.removeprefix("scratch-agent-").rsplit("-", 1)[0] for name in deleted}
+    assert len(stems) == 1
+    assert [n.rsplit("-", 1)[1] for n in deleted] == ["current", "proposed"]
 
 
 def test_the_scratch_token_carries_only_the_policy_under_measurement(
@@ -248,10 +248,7 @@ def test_the_scratch_token_carries_only_the_policy_under_measurement(
 
     _impact(monkeypatch, vault, current_document=CURRENT, proposed_document=WIDER)
 
-    assert [m["policies"] for m in vault.minted] == [
-        [f"scratch-agent-{ALLOC}-current"],
-        [f"scratch-agent-{ALLOC}-proposed"],
-    ]
+    assert [m["policies"] for m in vault.minted] == [[n] for n in sorted(vault.written)]
     assert {m["role"] for m in vault.minted} == {"scratch-check"}
     assert {m["ttl"] for m in vault.minted} == {"60s"}
 
@@ -335,24 +332,23 @@ def test_vaults_deny_marker_is_not_treated_as_a_capability(
 # ------------------------------------------------------------------ 054
 
 
-def test_a_supplied_run_id_does_not_move_the_workspace(
+def test_no_argument_can_move_the_workspace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """054's security property, and the one worth having over the old design.
+    """054's security property, which got simpler when the measurement moved.
 
-    Before, the workspace was named by an argument and `b7c2a2f` had to check that argument
-    against the run's real identity. Now the argument cannot move it: two calls claiming wildly
-    different run ids write the same two policies, because the name comes from the allocation.
+    It was: the workspace is named by the allocation, so an argument cannot move it. It is now
+    named by this process, per call, and a dispatched run cannot write in the namespace at all.
 
-    The guard stays (FR-007), but it is belt-and-braces rather than the only thing between a
-    model and another run's measurement.
+    Two calls claiming wildly different run ids write different workspaces — not the SAME one,
+    which is what an earlier draft asserted. Uniqueness is the property now: a caller cannot
+    steer the name anywhere, including onto somebody else's.
     """
     first = _Vault()
     _impact(monkeypatch, first, current_document=CURRENT, proposed_document=WIDER)
 
     second = _Vault()
     monkeypatch.setattr(handlers, "_fabric", lambda: second)
-    monkeypatch.setenv("NOMAD_ALLOC_ID", ALLOC)
     handlers.vault_policy_impact(
         {
             "run_id": "some-other-runs-correlation-id",
@@ -361,24 +357,10 @@ def test_a_supplied_run_id_does_not_move_the_workspace(
         }
     )
 
-    assert sorted(second.written) == sorted(first.written)
-    assert all(ALLOC in name for name in second.written)
-
-
-def test_a_caller_outside_an_allocation_is_refused(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """FAIL-CLOSED. No allocation means no workspace — never the estate's.
-
-    The measurement namespace is bounded per allocation, so a caller with no allocation
-    identity has nothing it may write. Refusing is the only answer that does not hand it the
-    estate-wide grant 054 removed.
-    """
-    vault = _Vault()
-    monkeypatch.setattr(handlers, "_fabric", lambda: vault)
-    monkeypatch.delenv("NOMAD_ALLOC_ID", raising=False)
-
-    with pytest.raises(ValueError, match="allocation identity"):
-        handlers.vault_policy_impact({"run_id": RUN, "proposed_document": WIDER})
-
-    assert not vault.written, "nothing may be written before the refusal"
+    assert sorted(second.written) != sorted(first.written), (
+        "two measurements shared a workspace name. Concurrent measurements would then "
+        "overwrite each other's scratch policies and report the wrong impact."
+    )
+    assert all("some-other-runs" not in name for name in second.written), (
+        "an argument reached the workspace name. It is generated here for exactly this reason."
+    )

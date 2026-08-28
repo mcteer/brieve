@@ -25,6 +25,7 @@ import os
 import re
 from collections.abc import Mapping
 from typing import Any
+from uuid import uuid4
 
 from core.durability.credentials import NomadWorkloadIdentity, VaultDatabaseCredentials
 from core.observation.types import Observation, ObservationOutcome
@@ -37,8 +38,16 @@ AGENT_SECRET_MOUNT = "secret"
 
 
 def _fabric() -> VaultDatabaseCredentials:
-    """Vault, as this allocation. No credential is accepted from a caller."""
-    return VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role="agent-run")
+    """Vault, as this allocation. No credential is accepted from a caller.
+
+    **The role is the allocation's, and 054 made that matter.** These handlers are loaded in
+    both a dispatched run and the served surface; each logs in as whatever role its own job is
+    admitted to, so the same code carries different authority in the two places. That is the
+    property `measure_policy_impact` relies on: the measurement's writes happen only where the
+    grant exists, and the run no longer has it.
+    """
+    role = os.environ.get("HARNESS_VAULT_ROLE", "").strip() or "agent-run"
+    return VaultDatabaseCredentials(identity=NomadWorkloadIdentity(), role=role)
 
 
 def vault_read(arguments: Mapping[str, Any]) -> dict[str, Any]:
@@ -352,23 +361,23 @@ def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
     write and the `finally` leaves scratch policies behind; the sweep (FR-023) is what makes
     "always destroyed" checkable rather than merely claimed.
     """
-    # 054: THE ALLOCATION NAMES THE WORKSPACE, AND NOTHING ELSE MAY.
+    # 054: THE SURFACE NAMES THE WORKSPACE, AND NOTHING ELSE CAN.
     #
-    # This used to be `arguments["run_id"]` — a value the CALLER supplied. `scratch.tf` now
-    # grants only `scratch-agent-<this allocation>-*`, evaluated by Vault against the caller's
-    # own attested identity, so a name derived from anything else is simply refused. That is
-    # the point: the model cannot reach another run's workspace because it cannot name one,
-    # and could not be authorised for it if it did.
+    # This has moved twice, and the second move made the first unnecessary. It was
+    # `arguments["run_id"]` — a value the CALLER supplied, which `b7c2a2f` had to police. Then
+    # it was the allocation, which was unforgeable but cost one permanent Vault identity entity
+    # per Build against a ceiling that logins fail at (054 R9, ADR-0072).
     #
-    # `b7c2a2f`'s `run_id_forged` guard stays (FR-007) and becomes belt-and-braces rather than
-    # the only thing standing between a model and another run's measurement.
-    workspace_id = os.environ.get("NOMAD_ALLOC_ID", "").strip()
-    if not workspace_id:
-        raise ValueError(
-            "vault_policy_impact has no allocation identity to derive its workspace from. "
-            "The measurement namespace is bounded per allocation (054), so a caller outside "
-            "one has no workspace and must not be given the estate's."
-        )
+    # Now this runs on the long-lived surface and a dispatched run holds no policy-write
+    # authority at all. **So the name no longer has to be attacker-proof.** Nobody but this
+    # process can write in the namespace, and this process creates both sides from the
+    # documents it was handed, measures, and destroys them — it never reads a policy somebody
+    # else wrote. A name supplied by a caller could at worst collide with its own measurement.
+    #
+    # Generated here anyway, because "at worst a collision" is a thing to prevent rather than
+    # tolerate: two concurrent measurements must not share a scratch name.
+    workspace_id = uuid4().hex
+
     proposed_document = str(arguments.get("proposed_document", ""))
     current_document = str(arguments.get("current_document", ""))
     if not proposed_document.strip():
@@ -449,7 +458,6 @@ def terraform_plan(arguments: Mapping[str, Any]) -> dict[str, Any]:
     working directory refuses rather than inventing ``changes: 0``. Hermetic rows that
     must script a plan inject ``HARNESS_TERRAFORM_BIN`` pointing at a stub executable.
     """
-    import os
     import subprocess
     from pathlib import Path
 

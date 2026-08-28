@@ -282,6 +282,12 @@ job "mcp-surface" {
         # keys, and from in here the scheduler is not on loopback: it runs natively on the
         # host while this runs in the Docker VM. Collapsing them into one variable is the
         # mistake 014 paid for with the sweeper's dispatcher.
+        # 054: this allocation logs in to Vault as ITSELF. The handlers are shared with the
+        # dispatched run, and each side must present its own role — that is what makes the
+        # measurement's writes land where the grant is (`scratch-sweep`, held here) rather
+        # than where it no longer exists (`scratch-policy-check`, removed from runs).
+        HARNESS_VAULT_ROLE = "mcp-surface"
+
         OIDC_WORKLOAD_ISSUER   = var.nomad_oidc_issuer
         OIDC_WORKLOAD_JWKS_URI = "${var.nomad_addr}/.well-known/jwks.json"
         OIDC_AUDIENCE     = var.oidc_audience
