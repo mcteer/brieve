@@ -88,6 +88,25 @@ Two things it does not cover:
 - **Match the subject's layout** when it already uses those file names. The guide
   describes a greenfield layout; you are usually editing an existing estate.
 
+## What the subject requires of you
+
+Infrastructure that does not satisfy the application's own configuration contract is
+not a smaller change — it is a change that cannot run. Before authoring, take what
+Research recorded the subject requires at startup and make the configuration supply
+every one of those names.
+
+- The contract is in the code, not in your assumptions. `.env.example`, a config
+  module, a `required` list, a startup check that throws — treat the names Research
+  recorded as exact. `DATABASE_URL` is not `PGPASSWORD`.
+- Every required name must arrive at the workload. Secrets through the platform's
+  secret injection, non-secrets as plain configuration. A name the application needs
+  and the configuration never sets is a deployment that fails at boot.
+- Do not author `.env` files. That rule is about where secrets live, not about
+  whether the contract exists — satisfy it properly instead.
+- Get the subject running, then apply the delivered guides' depth to what you built.
+  An artefact that encrypts everything and cannot start has not earned a better
+  score than a plainer one that runs.
+
 ## Estate shape (not in the style guide)
 
 Formatting, naming, variables, outputs and `for_each` come from the delivered

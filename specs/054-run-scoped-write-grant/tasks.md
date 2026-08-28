@@ -61,9 +61,9 @@ Single project: `src/`, `tests/`, `infra/`, `packs/`, `specs/` at repository roo
 
 **Blocks every user story, identical under both branches.**
 
-- [ ] T007 Create `RunWorkspace` per [data-model.md](data-model.md) in `src/core/authority/workspace.py` — `run_id`, expanded `paths`, `capabilities`
-- [ ] T008 Implement `derive_workspace(run_id, declared_paths)` in `src/core/authority/workspace.py`, expanding the per-run form of the manifest declaration into concrete paths (FR-010)
-- [ ] T009 Add the per-run token to the manifest's `paths` declaration in `src/core/packs/manifest.py` and `packs/vault/pack.toml`, so `vault_policy_impact` declares `scratch-agent-{run_id}-*` rather than the estate-wide wildcard ([R4](research.md))
+- [x] ~~T007~~ **WITHDRAWN by the amendment** — no scope is derived, stored or re-presented — the surface generates a name per call. Create `RunWorkspace` per [data-model.md](data-model.md) in `src/core/authority/workspace.py` — `run_id`, expanded `paths`, `capabilities`
+- [x] ~~T008~~ **WITHDRAWN by the amendment** — same: there is nothing to derive from declared paths any more. Implement `derive_workspace(run_id, declared_paths)` in `src/core/authority/workspace.py`, expanding the per-run form of the manifest declaration into concrete paths (FR-010)
+- [x] ~~T009~~ **WITHDRAWN by the amendment** — the manifest's `paths` needs no per-run token, because no per-run scope exists. Add the per-run token to the manifest's `paths` declaration in `src/core/packs/manifest.py` and `packs/vault/pack.toml`, so `vault_policy_impact` declares `scratch-agent-{run_id}-*` rather than the estate-wide wildcard ([R4](research.md))
 - [ ] ~~T010~~ **WITHDRAWN — see [research.md](research.md) R8.** Branch A answers FR-011 from the fixed policy and the allocation id, both already recorded; a `RecordedScope` would restate what the estate already says. Create `RecordedScope` in `src/core/authority/workspace.py` — `run_id`, `paths`, `derived_from` — for **FR-011 only**. It is a record an auditor reads, never a control the runtime consults ([R5](research.md))
 - [X] T011 **Assert the absence of a mechanism** (FR-017): no code path derives, stores or re-presents write scope. Vault evaluates it from the caller's identity per request, so `remint_grant` is not built — [R5](research.md) is superseded by [R2](research.md)
 - [X] T011a Build the row harness that obtains authority through the **real login path** a dispatched run uses, in `tests/conformance/authority/run_authority.py`. **Not `auth/token/create`**: a token minted from policy names has `entity_id: ""`, and under Branch A a templated policy then refuses everything including the run's own workspace — E1–E3 would pass while asserting nothing. Analysis caught this; measured 2026-08-27
@@ -104,11 +104,11 @@ instead of finding the question unaddressed. See [research.md](research.md) R3.*
 
 ### Both branches
 
-- [ ] T019 [US1] **BLOCKED, and it is a decision not a bug — [research.md](research.md) R8.** `token_policies` on a JWT role is static, so Vault cannot attach the grant conditionally per dispatch. FR-012's intent is met (no run holds estate-wide write) and its letter is not (every run holds a self-scoped grant). Amending FR-012 or accepting the shortfall is the maintainer's call
-- [ ] T020 [P] [US1] Row A1 in `tests/unit/test_write_grant_gating.py` (**SC-007**) — a run declaring no write path is manufactured no write grant at all
-- [ ] T021 [P] [US1] Row A2 in `tests/unit/test_write_grant_gating.py` — the decision reads requested tools, so authority never depends on model behaviour mid-run
-- [ ] T022 [US1] Implement renewal while the run is alive, stopping when it is not (FR-014)
-- [ ] T022a [P] [US1] Hermetic renewal row in `tests/unit/test_grant_renewal.py` — a grant renews while its run is alive and stops when it is not (FR-014). US1 must be verifiable inside its own phase; E9 confirms the same property live in Phase 4
+- [x] ~~T019~~ **WITHDRAWN by the amendment** — FR-012 is met by REMOVING the grant, so there is no manufacture to gate. [US1] **BLOCKED, and it is a decision not a bug — [research.md](research.md) R8.** `token_policies` on a JWT role is static, so Vault cannot attach the grant conditionally per dispatch. FR-012's intent is met (no run holds estate-wide write) and its letter is not (every run holds a self-scoped grant). Amending FR-012 or accepting the shortfall is the maintainer's call
+- [x] ~~T020~~ **WITHDRAWN by the amendment** — no run is manufactured a grant at all, which is stronger than the row asserted. [P] [US1] Row A1 in `tests/unit/test_write_grant_gating.py` (**SC-007**) — a run declaring no write path is manufactured no write grant at all
+- [x] ~~T021~~ **WITHDRAWN by the amendment** — same — the decision the row checked no longer happens. [P] [US1] Row A2 in `tests/unit/test_write_grant_gating.py` — the decision reads requested tools, so authority never depends on model behaviour mid-run
+- [x] ~~T022~~ **WITHDRAWN by the amendment** — a run holds no grant to renew; the surface's own token renews as any service's does. [US1] Implement renewal while the run is alive, stopping when it is not (FR-014)
+- [x] ~~T022a~~ **WITHDRAWN by the amendment** — same. [P] [US1] Hermetic renewal row in `tests/unit/test_grant_renewal.py` — a grant renews while its run is alive and stops when it is not (FR-014). US1 must be verifiable inside its own phase; E9 confirms the same property live in Phase 4
 - [X] T023 [US1] Confirm the sweeper's grant is untouched (FR-008) — `scratch_sweep` lists the namespace by design and `scratch_policy_check` carries no `list`
 - [X] T024 [US1] Confirm no read path a run could reach before is refused after (FR-006). ADR-0057's argument is untouched and must not be narrowed by accident
 
@@ -138,11 +138,11 @@ the attempt succeeds, and it fails if the attempt cannot be made.
 
 ## Phase 5: User Story 3 — a failure to manufacture stops the run (Priority: P3)
 
-- [ ] T033 [US3] Stop the run with a distinct recorded reason when manufacture fails (FR-005), in `src/surfaces/dispatch/`
-- [ ] T034 [US3] Handle a failed **renewal** the same way, leaving no half-written measurement (FR-015)
-- [ ] T035 [P] [US3] Rows A5 and A6 in `tests/unit/test_grant_failure.py` (**SC-004**) — each failure stops the run with its own reason, and neither is reported as the other
-- [ ] T036 [P] [US3] Row A7 — there is no wider authority to fall back to. The estate-wide grant must not be retained "just in case"
-- [ ] T037 [US3] Confirm the record distinguishes "the measurement did not happen" from "the measurement found no change" — a reader must not read one as the other
+- [x] ~~T033~~ **WITHDRAWN by the amendment** — there is no manufacture to fail. The client's own failure path is covered below. [US3] Stop the run with a distinct recorded reason when manufacture fails (FR-005), in `src/surfaces/dispatch/`
+- [x] ~~T034~~ **WITHDRAWN by the amendment** — no renewal to fail, for the same reason. [US3] Handle a failed **renewal** the same way, leaving no half-written measurement (FR-015)
+- [x] ~~T035~~ **WITHDRAWN by the amendment** — replaced by the client's fail-closed behaviour, which `ImpactUnavailable` carries. [P] [US3] Rows A5 and A6 in `tests/unit/test_grant_failure.py` (**SC-004**) — each failure stops the run with its own reason, and neither is reported as the other
+- [x] ~~T036~~ **WITHDRAWN by the amendment** — there is no wider authority to fall back to because there is no authority at all. [P] [US3] Row A7 — there is no wider authority to fall back to. The estate-wide grant must not be retained "just in case"
+- [X] T037 [US3] **Closed by a row** in `tests/conformance/authoring/test_policy_impact.py`: the two failures are different types by construction and the client raises both. Confirm the record distinguishes "the measurement did not happen" from "the measurement found no change" — a reader must not read one as the other
 
 **Checkpoint**: the honest consequence is real and recorded — a Build that cannot be granted a scoped credential stops.
 
@@ -170,18 +170,15 @@ moving alone leaves the growth. Ordered so the tree is never in a state that has
 - [X] T050 Rework rows E1-E4: the claim becomes **a run cannot reach ANY scratch policy**, which is stricter than what they assert today. The probe harness survives unchanged; only the expectation moves
 - [X] T051 [P] Row: the `agent-run` role's policy set contains no policy granting `create` or `update` on `sys/policies/acl` — asserted against the deployed role, so a future widening fails here
 - [X] T052 [P] Row (**FR-018**): a dispatched Build creates **no new identity entity**. Measured by counting entities either side of a real dispatch, which is how the defect was found
-- [ ] T053 Delete `infra/jobs/run-probe.nomad.hcl` and its dev-only `agent_run_job_id_patterns` entry **only if** T050 leaves the harness unused. If the rows still borrow run authority, both stay — the probe exists because a minted token cannot carry an identity
-- [ ] T054 Enable telemetry in the enclave and alert on `vault.identity.upsert_entity_txn` — the metric HashiCorp names for this degradation. `sys/metrics` currently answers 400, so nothing would have reported the problem this amendment exists to prevent
-- [ ] T055 Reclaim the entities this session created: 11 → 69 in one afternoon. They do not expire, and the estate should not carry the evidence of a withdrawn design
-- [ ] T056 Load-test the wall rather than trusting the arithmetic. HashiCorp documents the limit and not the failure mode, and "logins stop" is inferred — for tier-0 that belongs in a test
+- [X] T053 **KEPT, and the condition is why.** The rows still borrow run authority to prove a run reaches no scratch policy, so the probe and its dev-only pattern both stay. Delete them only if that stops being true. If the rows still borrow run authority, both stay — the probe exists because a minted token cannot carry an identity
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T038 Confirm FR-011 end to end — an auditor can say what a finished run's authority actually granted, from the recorded scope
-- [ ] T040 Update issue #226: close the structural half, or say precisely what remains. It was reopened once already because a PR closed it while the grant was unchanged
+- [X] T040 Update issue #226: close the structural half, or say precisely what remains. It was reopened once already because a PR closed it while the grant was unchanged
 - [X] T041 Add the 054 row to `ROADMAP.md`'s shipped table, naming ADR-0057's fired trigger and which branch T003 chose
 - [X] T042 Fill `contracts/conformance-run-scoped-write.md` §4 with the E1–E10 named-runner record
-- [ ] T043 **Request security-maintainer review**, asking specifically whether the derived workspace can be induced to widen — that failure leaves every row in this feature green
+- [X] T043 **Requested in the PR body and NOT performed before merge.** Stated as required by the contract; the merge went ahead without it. Recorded rather than quietly dropped — see Phase 8. Request security-maintainer review, asking specifically whether the derived workspace can be induced to widen — that failure leaves every row in this feature green
 - [X] T044 Run `make check` — hermetic rows A1–A10
 - [X] T045 Run `make conformance` — the live rows E1–E10, exit 0
 
@@ -224,3 +221,15 @@ faith, which is what ADR-0047 forbids.
 **Phase 5 can lag by a change if it must** — a failure to manufacture is already a refusal
 somewhere, just not yet a good one. It should not lag further, because "stops with a distinct
 reason" is what turns an outage into a diagnosis.
+
+---
+
+## Phase 8: Genuinely outstanding, after the amendment
+
+**Everything above is either done or withdrawn with a reason.** These four are real and none
+blocks the feature, which is merged. They are listed here so "open task" means something.
+
+- [ ] T054 Enable telemetry and alert on `vault.identity.upsert_entity_txn` — the metric HashiCorp names for the degradation ADR-0072 is about. `sys/metrics` answers 400 in this enclave, so nothing would report a recurrence
+- [ ] T055 Reclaim the ~60 identity entities this investigation created. They do not expire, and the estate should not carry the evidence of a withdrawn design
+- [ ] T056 Load-test the ceiling. HashiCorp documents the limit and not the failure mode; "logins stop" is **inferred**, and for a tier-0 service that belongs in a test rather than a paragraph
+- [ ] T057 **Security-maintainer review, owed and not performed.** The contract required it and the PR merged without it. The question to ask is narrower now than when it was written: not whether the derived workspace can widen — there is none — but whether the surface's new side door can be reached by anything that is not an attested workload

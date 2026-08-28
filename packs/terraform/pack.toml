@@ -31,9 +31,16 @@ probe = "terraform_probe"
 
 [upstream]
 repository = "https://github.com/hashicorp/agent-skills"
-commit     = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
+commit     = "326846817128fd1d052d25fbfded490ce2c5886e"
 licence    = "MPL-2.0"
-retrieved  = "2026-08-03"
+retrieved  = "2026-08-28"
+# Re-pinned from 8c6573ab. Upstream has since restructured to
+# `plugins/<product>/skills/<name>/` and tagged v1.0.0; the vendored paths below are
+# ours and deliberately unchanged. The style guide's own bytes moved by two frontmatter
+# lines (`metadata: lifecycle-status: active`) and nothing else — SECURITY.md is
+# byte-identical, which is why its digest below did not move. Upstream now carries 20
+# skills; this pack adopts one of them, and widening that is an ADR-0004 adoption
+# review, not a re-pin.
 
 # Transport is MCP because a mature server exists — `hashicorp/terraform-mcp-server`, which
 # upstream's own plugin manifest declares. Principle II: transport is a tool PROPERTY, and
@@ -62,12 +69,12 @@ repeatable     = false
 [[skills]]
 name    = "terraform-style-guide"
 path    = "skills/terraform-style-guide/SKILL.md"
-version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
-digest  = "fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d41762120059c49540c2"
+version = "326846817128fd1d052d25fbfded490ce2c5886e"
+digest  = "3a5c2e06a1daa07600d03f48328d1479284e7a9d59d66b2663693ca972080e22"
 # Reviewed against these exact bytes (051, FR-019). A bump changes `digest`; leaving
 # this behind refuses the load, so nobody can bump the content without re-reading what
 # it now recommends that this platform has no registry tool for.
-unsatisfiable_reviewed_at = "fea8a0eadf68f1ac45cae3b1d6dc4c66b489fb6e40a3d41762120059c49540c2"
+unsatisfiable_reviewed_at = "3a5c2e06a1daa07600d03f48328d1479284e7a9d59d66b2663693ca972080e22"
 # BOUND TO PLAN, WRITE AND JUDGE (051, FR-012).
 #
 # Plan is bound because its output is Write's instruction. The paths and intent Plan names
@@ -101,7 +108,7 @@ recommendation = "No registry tool runs `terraform validate`; this branch's conf
 [[skills]]
 name    = "terraform-style-guide-security"
 path    = "skills/terraform-style-guide/SECURITY.md"
-version = "8c6573abbd21e8094fab8f538eb5f97db63133fd"
+version = "326846817128fd1d052d25fbfded490ce2c5886e"
 digest  = "3dc8ffa10139e9772c5c102fee6377f66f5167bd043a7c43e6e5df682dc75f92"
 # Reviewed against these exact bytes (051, FR-019). A bump changes `digest`; leaving
 # this behind refuses the load, so nobody can bump the content without re-reading what
@@ -122,8 +129,8 @@ phases = ["plan", "write", "judge"]
 [[agents]]
 phase   = "research"
 path    = "agents/research/AGENTS.md"
-version = "0.4.0"
-digest = "772b36b68bb5f1199aa0edf7fcaf550182d11885849e57d233a14af26f356136"
+version = "0.5.0"
+digest = "dab035bec9e7d5b89b24ff32d917e4ff7645cc4bea8989ddd81a7c23599ef76a"
 
 [[agents]]
 phase   = "plan"
@@ -134,14 +141,14 @@ digest = "fe407621c5657982ebcad6a3770b93e585f83acfc065b93d7fb5c9d5bd2dd3b5"
 [[agents]]
 phase   = "write"
 path    = "agents/write/AGENTS.md"
-version = "0.4.0"
-digest = "d1fa0da5a96145f148f322f8e48fc1ebd3c052e445b1d41f0b48fbdb074d496c"
+version = "0.5.0"
+digest = "4538f3cea905e97dac3ea65e46b851c9f136dab5ac233ea81d1b42d1c31add6e"
 
 [[agents]]
 phase   = "judge"
 path    = "agents/judge/AGENTS.md"
-version = "0.4.0"
-digest = "43dec40d4362c046f61de9c81dbd6888faba00c6560be63616cf12e69d3fdfc4"
+version = "0.5.0"
+digest = "a1977ce2dc1b4d9161a336999e7df5e52a6fee9e9c3bca900715ecb6fcf07d4f"
 
 [[agents]]
 phase   = "propose"

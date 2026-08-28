@@ -54,6 +54,16 @@ What the guide does not cover, and this cell checks itself:
   One module composed, not copied.
 - Blast radius stays one component / one state.
 - No dotenv templates in the artefact.
+- **Where Research recorded the subject's required configuration, every name it
+  recorded reaches the workload** — secrets through secret injection, the rest as
+  plain configuration. A name the application needs at startup and the artefact
+  never sets is a deployment that fails on its first request, and it is judged as a
+  defect however well the rest is written. Where Research recorded no such contract,
+  this is not checked and its absence is not held against the artefact.
+- **Encryption depth is not a substitute for a working deployment.** An artefact
+  that applies customer-managed keys throughout while leaving the subject unable to
+  start has not earned a better score than a plainer one that runs. Both, or the
+  gap is named.
 - An application role, if present, has one exact path and an explicit capability
   list — not `"*"`, not `secret/*`, not a trailing glob.
 - Variables and outputs do not contradict resources Research recorded.
