@@ -130,12 +130,28 @@ print(json.dumps(out))
 """
 
 
-def attempt_under_run_authority(foreign_policy: str) -> list[Attempt]:
+def attempt_under_run_authority(foreign_policy: str, *, attempts: int = 2) -> list[Attempt]:
     """Log in as a run inside the probe, try its own workspace and a foreign one.
 
     `foreign_policy` is a policy NAME in the measurement namespace belonging to another run;
     the caller seeds and removes it with administrator authority.
+
+    **Retried once, and only for a failure to ATTACH.** `nomad alloc exec` occasionally fails
+    to attach to a healthy allocation; observed once on 2026-08-27 against a probe that was
+    running before and after. A gate row that fails at random is worse than a missing one — it
+    teaches people to re-run the suite, which is how a real failure gets waved through. What is
+    NOT retried is a verdict: once Vault has answered, the answer stands.
     """
+    last: Exception | None = None
+    for _ in range(max(1, attempts)):
+        try:
+            return _attempt_once(foreign_policy)
+        except ProbeUnavailable as error:
+            last = error
+    raise ProbeUnavailable(f"the probe could not be reached after {attempts} attempts: {last}")
+
+
+def _attempt_once(foreign_policy: str) -> list[Attempt]:
     alloc = probe_allocation()
     out = subprocess.run(  # noqa: S603
         [  # noqa: S607
