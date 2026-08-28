@@ -22,8 +22,15 @@ carries a **per-allocation** claim ([R2](research.md)). If it does, the feature 
 a token handed to an allocation is a key in its environment — which is what makes 016's
 resource-server substrate the expensive-but-correct answer ([R3](research.md)).
 
-**The plan therefore has a decision point in it, deliberately.** Committing to 016's substrate
-before R2 is settled would be justifying parked work, which FR-009 exists to prevent.
+**R2 was settled on 2026-08-27: `nomad_allocation_id` is in the claim set, so Branch A is
+taken and 016's substrate is not built.** The decision point did its job — the cheap path was
+tested rather than assumed, and it works.
+
+Two things came with the answer. Branch A leaves **one permanent Vault identity entity per
+run** and nothing prunes them ([R2a](research.md)) — accepted, with a follow-up owed. And
+**FR-016 reversed**: a restarted run must *not* reach the previous attempt's workspace, because
+an outage restarting a job repeatedly would have every attempt contending for one — this
+feature's own defect, self-inflicted.
 
 ## Technical Context
 
@@ -64,7 +71,7 @@ v1.6.0 (Last Amended 2026-08-05) — checked against that version.*
 | III — Fail-Closed, In-Process Enforcement | **The principle this feature serves** | A failure to manufacture stops the run (FR-005), a failed renewal likewise (FR-015), and no wider authority is ever substituted. The honest consequence is stated: a Build that cannot be granted a scoped credential cannot measure a policy's impact, so it stops |
 | IV — Zero Standing Credentials; Authority Per Task | **The principle this feature repairs** | Principle IV describes authority manufactured per task. For the one write capability a run carries, it currently is not — the grant is per estate. FR-012 also makes most runs carry *no* write authority, which is stricter than today |
 | V — Sealed Core, Versioned Seams | Pass **with obligation** | Touches the trust fabric and the run's authority path. Both are sealed core: this feature has an approved spec, and the implementation PR **must request security-maintainer review**. The recorded per-run scope ([R5](research.md)) is a record shape and is pinned in the contract rather than left to implementation |
-| VI — Lean by Default | Pass **conditionally** | If [R2](research.md) holds, the change is small. If it does not, 016's substrate is a real operated addition — a transit key, a resource-server profile, a mint path — and Principle VI is the reason R2 must be settled first rather than assumed away |
+| VI — Lean by Default | **Pass** | [R2](research.md) held: a changed `user_claim`, a templated policy, no minting, no transit key, no resource-server profile. The one cost is entity growth ([R2a](research.md)), recorded rather than discovered |
 | VII — Anti-Fragmentation | Pass | One mechanism for the one write grant that exists. FR-010 derives from the manifest declaration already in the tree rather than adding a second place to say what a tool touches |
 | VIII — Eval-Gated Promotion; Pinned vs Fresh | N/A | No model, no prompt, no pack instruction changes |
 | IX — Evidence Over Claims | Pass | The defect was demonstrated, not argued, and FR-003/FR-004 require the fix to be demonstrated on the same terms — a real attempt under a real run's authority against the live control plane, with a row that fails if the narrowing is removed |
@@ -72,12 +79,14 @@ v1.6.0 (Last Amended 2026-08-05) — checked against that version.*
 
 **Gate result**: **PASS — proceed to Phase 0.** With one obligation carried below.
 
-### The obligation this plan carries
+### The obligation this plan carried — discharged 2026-08-27
 
-**R2 is a gate, not a research note.** Building 016's substrate before establishing whether a
-per-allocation claim exists would spend the feature's whole budget on the expensive branch and
-call it necessity. Tasks must order R2 first and make the branch explicit, so a reader can see
-which answer was found and what it cost.
+**R2 was a gate, not a research note**, and answering it first is what kept 016's substrate out
+of a feature that turned out not to need it. The claim exists; Branch A is taken; Branch B is
+struck in `tasks.md` rather than deleted, so the rejection stays legible.
+
+**What replaced it as the thing to watch**: entity sprawl. Nothing prunes Vault identity
+entities, and Branch A creates one per run.
 
 ## Project Structure
 
@@ -126,8 +135,8 @@ instruction content and the eval lanes are untouched.
 
 *Run after Phase 1 artifacts.*
 
-**Verdict unchanged: PASS**, with Principle VI still conditional on [R2](research.md) — which
-is the point of putting it first in tasks rather than resolving it here.
+**Verdict: PASS**, and Principle VI is no longer conditional — [R2](research.md) resolved in
+favour of the small change.
 
 One verdict moved. **Principle V's obligation hardened**: Phase 1 gives the recorded per-run
 scope a defined shape, and because an auditor answers FR-011 from it, it is a record rather

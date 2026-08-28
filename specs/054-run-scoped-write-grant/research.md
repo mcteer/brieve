@@ -41,34 +41,69 @@ group membership per run (same ordering problem, and groups are not per-login).
 
 ---
 
-## R2 — The one thing that would make this cheap, and it must be tested first
+## R2 — ANSWERED 2026-08-27: the claim exists, and Branch A is chosen
 
-**Decision**: Before building anything, establish whether Nomad 2.0.4's workload identity JWT
-carries a **per-allocation** claim, and whether `user_claim` can be pointed at it.
+**Decision**: **Branch A.** `nomad_allocation_id` is present in Nomad 2.0.4's workload identity
+JWT, so `user_claim` can name a value that is unique per run. 016's substrate is **not** built.
 
-**Why it matters more than any other question here**: if it can, R1 reverses. The alias becomes
-per-allocation, the entity becomes per-run, and the whole feature is a changed `user_claim`
-plus a templated policy — no minting, no signing, no resource server, no new failure mode on
-the run's startup path. That is the difference between a small change and 016's substrate.
+**Measured**: the identity token was decoded inside a live allocation — the credential never
+left it, and only claim names were read out. The claim set is:
 
-**What is already known**: the enclave runs Nomad 2.0.4. The `identity` block in
-`infra/jobs/agent-run.nomad.hcl` requests audience `vault.io` with a 1h TTL. Present
-`claim_mappings` carry `nomad_namespace`, `nomad_job_id` and `nomad_task` — allocation id is
-**not** mapped today, which is not evidence it is absent from the JWT.
+```
+aud, exp, iat, jti, nbf, nomad_allocation_id, nomad_job_id, nomad_namespace, nomad_task, sub
+```
 
-**What has to be checked, in order**: whether the JWT contains an allocation-scoped claim at
-all; whether `user_claim` may point at it without breaking the `bound_claims` glob that exists
-because of the parent-id behaviour; and what an entity per run costs Vault operationally over
-an estate's lifetime, since nothing prunes them.
+`nomad_job_id` is the parent (`mcp`, `agent-run`) as [R1](#r1) found. `sub` is
+`global:default:<job>:<group>:<task>:vault` — also not per-run. **`nomad_allocation_id` is the
+only per-run value**, and it is there.
 
-**If it fails**, R3 is the fallback and the cost is real.
+**What this makes structurally true, which is better than what the spec asked for.** Scope is no
+longer something the platform derives, stores and re-presents: Vault evaluates the template
+against the caller's **own attested identity** on every request. A widened re-mint is not
+refused, it is *unrepresentable* — there is nothing to re-derive and nothing to drift. FR-017
+stops needing a guard and becomes a property of the mechanism.
+
+**And the policy names change with it.** `vault_policy_impact` currently derives its names from
+a `run_id` **tool argument**. Under Branch A they derive from the allocation the code is running
+in, which the model cannot influence at all — strictly better than validating a claimed
+argument. The `b7c2a2f` guard stays (FR-007) but becomes belt-and-braces rather than the only
+thing standing between a model and another run's workspace.
+
+**Alternatives inside Branch A, and why the cheapest one fails.** Leaving `user_claim` alone and
+merely adding `nomad_allocation_id` to `claim_mappings` would avoid the cost in R2a below. It
+does not work: the alias stays shared, so two concurrent runs overwrite each other's alias
+metadata and the template resolves to whichever logged in last. **Reasoned, not measured** —
+worth confirming with two concurrent logins before relying on the conclusion.
 
 ---
 
-## R3 — The fallback, and the ADR that constrains it
+## R2a — What Branch A costs: permanent entity sprawl
 
-**Decision**: If R2 fails, the grant is manufactured by the platform and reached by the run
-under its **own** attested identity — never handed to it.
+**Decision**: Accepted, and recorded rather than discovered later. It is not a blocker; it is a
+bill that arrives slowly.
+
+**Measured**: pointing `user_claim` at the allocation id gives every run its own alias, and
+therefore its own Vault identity entity. **Nomad garbage-collects its side and Vault does not.**
+The dispatch jobs observed an hour earlier were already gone (`0` retained); Vault's entity
+count sits at 11 and has no TTL, no expiry and no sweep.
+
+So the entity count grows by one per Build, permanently, in every estate. At laptop scale this
+is invisible. At an estate running Builds continuously it is a store that only grows, and
+nothing in this platform currently prunes it.
+
+**What is owed**: not a feature, but a recorded consequence and a follow-up. The sweep that
+already exists for orphaned scratch policies is the natural home for an entity sweep, and it
+already holds the breadth such a sweep needs.
+
+---
+
+## R3 — The fallback, NOT TAKEN (R2 answered yes)
+
+**Status**: recorded for the reader who asks why the obvious cheap alternative was closed.
+Branch B is not built.
+
+**Decision, had R2 failed**: the grant would be manufactured by the platform and reached by the
+run under its **own** attested identity — never handed to it.
 
 **The constraint is recorded, not inferred.** `auth.tf` says why the model-credential grant is
 attached to the role rather than fetched and passed down: *"a key handed to an allocation is a
@@ -81,10 +116,11 @@ Accepted record, not by taste.
 a run cannot mint tokens under real policy names. That shape is reusable; what it does not
 solve is how the run reaches the result without being handed it.
 
-**This is where 016's substrate earns its cost, if anywhere**: Vault as resource server
+**This is where 016's substrate would have earned its cost.** Vault as resource server
 validating a platform-minted JWT is the mechanism that lets a run present something per-run
-under its own identity. ADR-0056 established it and it was demonstrated. It is the expensive
-answer and must not be adopted before R2 is settled.
+under its own identity. ADR-0056 established it and it was demonstrated. **R2 answered yes, so
+it is not needed and 016 stays parked** — which is the outcome FR-009 existed to make possible
+rather than the one it feared.
 
 ---
 
@@ -110,9 +146,17 @@ fails **open** when it breaks.
 
 ---
 
-## R5 — FR-017 is satisfied by not recomputing, not by comparing
+## R5 — SUPERSEDED by R2: FR-017 needs no mechanism at all
 
-**Decision**: Derive a run's workspace **once**, record it, and re-present it on every re-mint.
+**Decision**: Nothing derives, stores or re-presents scope. Vault evaluates the template against
+the caller's own identity per request, so there is no second derivation to disagree with a
+first.
+
+**What survives**: `RecordedScope` is still worth having, for FR-011 alone — an auditor asking
+what a finished run's authority granted. It is a record, not a control.
+
+**Superseded reasoning, kept because the hazard was real**: derive once, record it, re-present
+it on every re-mint.
 
 **Rationale**: FR-017 requires every re-mint — resume, renewal, retry — to be scope-identical,
 and the maintainer's reason for it is exact: a re-derivation can widen. Comparing two
