@@ -364,3 +364,35 @@ def test_no_argument_can_move_the_workspace(
     assert all("some-other-runs" not in name for name in second.written), (
         "an argument reached the workspace name. It is generated here for exactly this reason."
     )
+
+
+def test_a_measurement_that_did_not_happen_is_not_a_measurement_that_found_nothing() -> None:
+    """054 T037 — the distinction a reviewer's decision rests on.
+
+    "The impact check did not run" and "the impact check found no change" lead a reviewer to
+    opposite conclusions, and the second is the dangerous one to report by accident. They are
+    different types by construction, and this asserts the construction rather than trusting it.
+
+    `ImpactUnavailable` is a `RuntimeError` and `PolicyInvalid` a `ValueError`, so neither can
+    be caught by a handler expecting the other, and neither is a dict a caller could mistake
+    for a result. The client half raises the same two, so moving the measurement to the surface
+    did not collapse them into one.
+    """
+    from surfaces.handlers import ImpactUnavailable, PolicyInvalid
+
+    assert issubclass(ImpactUnavailable, RuntimeError)
+    assert issubclass(PolicyInvalid, ValueError)
+    assert not issubclass(ImpactUnavailable, PolicyInvalid)
+    assert not issubclass(PolicyInvalid, ImpactUnavailable)
+
+    # And the client raises them too — a run that cannot reach the surface must not report a
+    # change as unmeasured-but-harmless.
+    import inspect
+
+    from surfaces import handlers
+
+    client = inspect.getsource(handlers.vault_policy_impact)
+    assert "ImpactUnavailable" in client, (
+        "the client half no longer refuses when it cannot measure, so a Build could publish a "
+        "proposal whose impact was never taken"
+    )
