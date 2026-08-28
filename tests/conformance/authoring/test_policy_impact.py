@@ -73,7 +73,7 @@ class _Vault:
 
 def _impact(monkeypatch: pytest.MonkeyPatch, vault: _Vault, **arguments: Any) -> Mapping[str, Any]:
     monkeypatch.setattr(handlers, "_fabric", lambda: vault)
-    result: Mapping[str, Any] = handlers.vault_policy_impact({"run_id": RUN, **arguments})
+    result: Mapping[str, Any] = handlers.measure_policy_impact({"run_id": RUN, **arguments})
     return result
 
 
@@ -349,7 +349,7 @@ def test_no_argument_can_move_the_workspace(
 
     second = _Vault()
     monkeypatch.setattr(handlers, "_fabric", lambda: second)
-    handlers.vault_policy_impact(
+    handlers.measure_policy_impact(
         {
             "run_id": "some-other-runs-correlation-id",
             "current_document": CURRENT,

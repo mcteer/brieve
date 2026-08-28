@@ -21,9 +21,13 @@ without saying so is how a pack comes to read as proven.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import urllib.error
+import urllib.request
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -341,7 +345,7 @@ def _capabilities_under(
     return answered
 
 
-def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
+def measure_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
     """What the proposed policy would ALTER, measured by Vault (042, FR-007/009/019-022).
 
     **One tool call, and that is the safety design.** Splitting write / mint / check / destroy
@@ -539,6 +543,73 @@ class TerraformApplyObserver:
             outcome=ObservationOutcome.CANNOT_DETERMINE,
             detail="terraform is fixture-backed here; nothing to observe",
         )
+
+
+#: Where a dispatched run asks the surface to measure. Set on the run's job; absent everywhere
+#: else, which is what makes the client half unreachable from the surface itself.
+POLICY_IMPACT_URL_ENV = "HARNESS_POLICY_IMPACT_URL"
+
+#: The surface identity a run presents. A SECOND token, deliberately: `nomad_vault.jwt` carries
+#: `aud: vault.io`, and reusing it here would make a credential minted for Vault replayable at
+#: the surface.
+SURFACE_IDENTITY_FILE = "nomad_mcp.jwt"
+
+
+def vault_policy_impact(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Ask the surface to measure. **The run performs no Vault write of its own (054).**
+
+    This used to be the measurement. It is now a client, and the reason is the whole of
+    ADR-0072: performing it here meant every dispatched run carried policy-write authority, and
+    bounding that per run cost one permanent Vault identity entity per Build against a ceiling
+    that logins fail at.
+
+    **What did NOT move is interception.** This is still a registered tool reached through
+    `invoke_tool`, so the 042 hooks still run — `b7c2a2f`'s guard included — and the trail still
+    records `TOOL_OUTCOME` where it always did. Only the Vault writes moved.
+
+    **Fail-closed.** No surface, no measurement: a Build proposing a policy stops rather than
+    reporting an unmeasured change as a safe one, which is the trade 042 exists to refuse.
+    """
+    url = os.environ.get(POLICY_IMPACT_URL_ENV, "").strip()
+    if not url:
+        raise ImpactUnavailable(
+            "no policy-impact surface is configured for this run, so a proposed policy cannot "
+            "be measured. The measurement moved off the run in 054; a run that cannot reach "
+            "the surface has no instrument and must not report an unmeasured change."
+        )
+
+    identity = Path(os.environ.get("NOMAD_SECRETS_DIR", "/secrets")) / SURFACE_IDENTITY_FILE
+    try:
+        token = identity.read_text(encoding="utf-8").strip()
+    except OSError as unreadable:
+        raise ImpactUnavailable(f"no surface identity to present: {unreadable}") from unreadable
+
+    body = json.dumps(
+        {
+            "current_document": str(arguments.get("current_document", "")),
+            "proposed_document": str(arguments.get("proposed_document", "")),
+        }
+    ).encode()
+    request = urllib.request.Request(  # noqa: S310
+        url,
+        data=body,
+        method="POST",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+            return dict(json.loads(response.read() or b"{}"))
+    except urllib.error.HTTPError as refused:
+        detail = refused.read().decode("utf-8", "replace")[:200]
+        if refused.code == 400:
+            raise PolicyInvalid(f"the surface refused the documents: {detail}") from refused
+        raise ImpactUnavailable(
+            f"the surface could not measure this policy ({refused.code}): {detail}"
+        ) from refused
+    except OSError as unreachable:
+        raise ImpactUnavailable(
+            f"the policy-impact surface is unreachable: {unreachable}"
+        ) from unreachable
 
 
 #: Handlers a manifest may name. A name absent from this table refuses `unresolved_binding`

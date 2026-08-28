@@ -222,6 +222,15 @@ job "agent-run" {
       }
 
       env {
+
+        # 054: where this run asks the surface to measure a proposed policy. The run holds no
+
+        # policy-write authority of its own any more; absent this, the impact check refuses
+
+        # rather than reporting an unmeasured change as a safe one.
+
+        HARNESS_POLICY_IMPACT_URL = var.policy_impact_url
+
         VAULT_ADDR   = var.vault_addr
         VAULT_CACERT = var.vault_cacert
 
@@ -269,4 +278,16 @@ job "agent-run" {
       }
     }
   }
+}
+
+variable "policy_impact_url" {
+  type        = string
+  default     = "http://host.docker.internal:8090/internal/policy-impact"
+  description = <<-DESC
+    The surface's side door for policy-impact measurement (054).
+
+    `host.docker.internal` rather than loopback: a dispatched run is a container, and on the
+    dev substrate its loopback is the Docker VM's. This is the same distinction `nomad_addr`
+    draws for the sweeper's dispatcher, which 014 paid for once.
+  DESC
 }
