@@ -39,7 +39,24 @@ resource "vault_policy" "scratch_policy_check" {
     #
     # `delete` is what makes the `finally` block work. `read` is what lets a row assert the
     # policy is gone rather than assuming it.
-    path "sys/policies/acl/scratch-agent-*" {
+    # 054: THE RUN'S OWN WORKSPACE, AND NOTHING ELSE.
+    #
+    # This was `scratch-agent-*` — estate-wide, granted to every dispatched run, while the
+    # names it protects were already per-run. Demonstrated 2026-08-27: a token carrying
+    # exactly what this role grants read (200), overwrote (200) and deleted (204) another
+    # run's measurement policy.
+    #
+    # **Terraform cannot write the narrow form directly**, which is why the wildcard was not
+    # laziness: an allocation id does not exist at apply time. The template is evaluated by
+    # Vault, per request, against the caller's OWN attested identity — so the platform never
+    # derives this scope, never stores it, and cannot widen it. A wider grant is not refused
+    # here; it is unrepresentable.
+    #
+    # The alias name is the allocation id because `auth.tf` sets `user_claim` to it. Change
+    # one without the other and every run is refused its own workspace — which row E4 exists
+    # to catch, since refusing everything satisfies the refusal rows while breaking the
+    # product.
+    path "sys/policies/acl/scratch-agent-{{identity.entity.aliases.${vault_jwt_auth_backend.workload.accessor}.name}}-*" {
       capabilities = ["create", "update", "delete", "read"]
     }
 

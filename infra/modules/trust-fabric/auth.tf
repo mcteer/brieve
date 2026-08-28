@@ -133,13 +133,28 @@ resource "vault_jwt_auth_backend_role" "conformance" {
 # shows — binding only the derived form fails every login with "claim nomad_job_id does not
 # match any associated bound claim values" while the role looks correctly configured.
 resource "vault_jwt_auth_backend_role" "agent_run" {
-  backend                 = vault_jwt_auth_backend.workload.path
-  role_name               = "agent-run"
-  role_type               = "jwt"
-  bound_audiences         = ["vault.io"]
-  not_before_leeway       = local.jwt_clock_leeway
-  clock_skew_leeway       = local.jwt_clock_leeway
-  user_claim              = "/nomad_job_id"
+  backend           = vault_jwt_auth_backend.workload.path
+  role_name         = "agent-run"
+  role_type         = "jwt"
+  bound_audiences   = ["vault.io"]
+  not_before_leeway = local.jwt_clock_leeway
+  clock_skew_leeway = local.jwt_clock_leeway
+
+  # 054: THE ALLOCATION, NOT THE JOB. `user_claim` names the identity alias, and the alias is
+  # what `scratch.tf`'s templated policy resolves against — so this one line is what makes a
+  # run's write grant name its own workspace rather than every run's.
+  #
+  # `nomad_job_id` presents the PARENT here (see the glob below), so every dispatched run
+  # shared ONE alias and ONE entity. Two concurrent runs would have received identical grants
+  # naming each other's workspace. `nomad_allocation_id` is the only per-run value Nomad's
+  # workload identity carries — the claim set is `aud, exp, iat, jti, nbf,
+  # nomad_allocation_id, nomad_job_id, nomad_namespace, nomad_task, sub`, and `sub` is
+  # job-shaped.
+  #
+  # **The cost, recorded rather than discovered** (054 R2a): this creates one Vault identity
+  # entity per run, and Vault never garbage-collects them while Nomad does collect its
+  # allocations. Invisible on a laptop, monotonic in an estate running Builds continuously.
+  user_claim              = "/nomad_allocation_id"
   user_claim_json_pointer = true
 
   bound_claims_type = "glob"
