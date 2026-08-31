@@ -33,7 +33,7 @@ probe = "terraform_probe"
 repository = "https://github.com/hashicorp/agent-skills"
 commit     = "326846817128fd1d052d25fbfded490ce2c5886e"
 licence    = "MPL-2.0"
-retrieved  = "2026-08-28"
+retrieved  = "2026-08-31"
 # Re-pinned from 8c6573ab. Upstream has since restructured to
 # `plugins/<product>/skills/<name>/` and tagged v1.0.0; the vendored paths below are
 # ours and deliberately unchanged. The style guide's own bytes moved by two frontmatter
