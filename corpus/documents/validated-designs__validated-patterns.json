@@ -1,0 +1,16 @@
+{
+  "path": "/validated-designs/validated-patterns",
+  "url": "https://developer.hashicorp.com/validated-designs/validated-patterns",
+  "sections": [
+    {
+      "anchor": "hashicorp-validated-patterns",
+      "title": "HashiCorp Validated Patterns",
+      "text": ""
+    },
+    {
+      "anchor": "field-tested-patterns-and-use-cases-for-hashicorp-products",
+      "title": "Field-tested patterns and use cases for HashiCorp products",
+      "text": "As part of the HVD 2.0 public release, we replaced the Learn menu drop-down link to Validated Patterns with a link to Validated Designs. HashiCorp Validated Patterns will become part of the overall HashiCorp Validated Designs information architecture in a future update; typically placed within the administration guide and user guide for the relevant product. Until that change, all existing validated pattern URLs continue to work as normal. You can access Validated Patterns at https://developer.hashicorp.com/validated-patterns . Edit this page on GitHub"
+    }
+  ]
+}
