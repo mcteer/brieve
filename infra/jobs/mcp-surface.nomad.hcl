@@ -224,6 +224,28 @@ job "mcp-surface" {
         # conversion of one that works.
         ports = ["protocol"]
 
+        # THE COROLLARY OF BRIDGE MODE, AND IT ONLY BITES ON DOCKER LINUX.
+        #
+        # Docker Desktop resolves `host.docker.internal` inside a bridge container. Docker
+        # on Linux does not, and a bridge container receives its OWN generated `/etc/hosts`
+        # — so the host's line for that name, which the host-mode jobs inherit by bind
+        # mount, never reaches this one. `127.0.0.1` is no fallback here: in bridge mode it
+        # is the container itself.
+        #
+        # Without this the surface cannot reach the trust store at `var.vault_addr` and
+        # exits 2 on every restart. It fails as a DNS error that `urllib` surfaces only as
+        # `URLError`, which `core/durability/credentials.py` re-raises without the cause —
+        # and since no connection is ever made, the trust store's own log stays silent.
+        # Budget hours for that pair if this line goes missing again.
+        #
+        # Measured 2026-09-15, Ubuntu 26.04 / WSL2 with native Docker: `getent hosts
+        # host.docker.internal` finds nothing in a plain bridge container, and `172.17.0.1`
+        # with this mapping.
+        #
+        # Unconditional rather than Linux-only: Docker Desktop honours `host-gateway` too,
+        # so one line serves both hosts instead of a platform branch to keep in sync.
+        extra_hosts = ["host.docker.internal:host-gateway"]
+
         # Read-only. The service reads code; it has no business writing to a developer's
         # tree, and on Linux root in a container is root on the host.
         mount {

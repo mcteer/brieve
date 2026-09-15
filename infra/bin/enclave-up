@@ -85,6 +85,13 @@ seal_status_ok() {
 NET_ARGS=()
 [ "${ENCLAVE_VAULT_HOST_NETWORK:-false}" = "true" ] && NET_ARGS=(-var vault_host_network=true)
 
+# The STATE store has the same problem for the same reason, and one flag covers both rather
+# than two for the developer to remember — forgetting the second one fails as an opaque
+# `InterfaceError` from a bridge container, hours from its cause. Its own list because Nomad
+# schedules this one, not Terraform, so the argument goes to `nomad job run`.
+PG_NET_ARGS=()
+[ "${ENCLAVE_VAULT_HOST_NETWORK:-false}" = "true" ] && PG_NET_ARGS=(-var host_network=true)
+
 say "Prerequisites"
 for bin in docker nomad vault terraform python3; do
   command -v "$bin" >/dev/null || die "$bin is not on PATH — see CONTRIBUTING.md"
@@ -191,7 +198,7 @@ cd "$REPO/infra"
 if nomad job status postgres 2>/dev/null | grep -q "^Status *= *running"; then
   ok "already scheduled"
 else
-  nomad job run jobs/postgres.nomad.hcl >/dev/null
+  nomad job run ${PG_NET_ARGS[@]+"${PG_NET_ARGS[@]}"} jobs/postgres.nomad.hcl >/dev/null
   ok "scheduled"
 fi
 for _ in $(seq 1 60); do nc -z 127.0.0.1 5432 2>/dev/null && break; sleep 1; done
